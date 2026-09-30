@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<defs>
+ <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff"/><stop offset=".55" stop-color="#edf8ff"/><stop offset="1" stop-color="#d9dcff"/></linearGradient>
+ <linearGradient id="blue" x1="0" x2="1"><stop stop-color="#188cff"/><stop offset="1" stop-color="#5337ff"/></linearGradient>
+ <linearGradient id="earth" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4ff"/><stop offset="1" stop-color="#1769ff"/></linearGradient>
+ <filter id="shadow"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-opacity=".18"/></filter>
+</defs>
+<rect width="1200" height="630" fill="url(#bg)"/>
+<path d="M0 495 C250 565 430 505 610 545 C825 595 1010 520 1200 455 V630 H0Z" fill="#2d88f8" opacity=".9"/>
+<path d="M0 535 C250 610 455 540 650 580 C850 620 1050 545 1200 500 V630 H0Z" fill="#246ee9" opacity=".5"/>
+<!-- logo -->
+<g transform="translate(66 58)">
+ <path d="M16 15h76a30 30 0 0 1 30 30v45a30 30 0 0 1-30 30H54l-34 23 10-30A30 30 0 0 1 16 87V45a30 30 0 0 1 30-30Z" fill="url(#blue)"/>
+ <circle cx="52" cy="67" r="6" fill="white"/><circle cx="70" cy="67" r="6" fill="white"/><circle cx="88" cy="67" r="6" fill="white"/>
+</g>
+<text x="218" y="138" font-family="Arial,Helvetica,sans-serif" font-size="82" font-weight="800" fill="#101d56">Chat<tspan fill="#1769ff">Net</tspan></text>
+<text x="65" y="225" font-family="Arial,Helvetica,sans-serif" font-size="49" font-weight="800" fill="#111d58">Kết nối <tspan fill="#168cff">không biên giới</tspan></text>
+<text x="66" y="282" font-family="Arial,Helvetica,sans-serif" font-size="25" fill="#495472">Trò chuyện, kết bạn và giao tiếp</text>
+<text x="66" y="316" font-family="Arial,Helvetica,sans-serif" font-size="25" fill="#495472">xuyên ngôn ngữ với dịch tự động bằng AI.</text>
+<!-- feature icons -->
+<g font-family="Arial,Helvetica,sans-serif" text-anchor="middle">
+ <g transform="translate(116 365)"><rect width="58" height="58" rx="15" fill="#dff5ff"/><path d="M13 15h32v22a10 10 0 0 1-10 10H24l-9 7 3-9a10 10 0 0 1-5-8Z" fill="#1796ff"/><circle cx="23" cy="30" r="3" fill="#fff"/><circle cx="30" cy="30" r="3" fill="#fff"/><circle cx="37" cy="30" r="3" fill="#fff"/><text x="29" y="93" font-size="17" fill="#17234e">Trò chuyện</text><text x="29" y="116" font-size="17" fill="#17234e">mọi lúc, mọi nơi</text></g>
+ <g transform="translate(277 365)"><rect width="58" height="58" rx="15" fill="#ece8ff"/><circle cx="22" cy="25" r="8" fill="#7562ff"/><circle cx="38" cy="25" r="8" fill="#7562ff"/><path d="M8 48c2-11 9-16 14-16s12 5 14 16M29 48c2-11 9-16 14-16 5 0 11 5 13 16" fill="#7562ff"/><text x="29" y="93" font-size="17" fill="#17234e">Kết bạn</text><text x="29" y="116" font-size="17" fill="#17234e">khắp thế giới</text></g>
+ <g transform="translate(438 365)"><rect width="58" height="58" rx="15" fill="#def5ff"/><text x="29" y="39" font-size="29" font-weight="700" fill="#177ee8">A文</text><text x="29" y="93" font-size="17" fill="#17234e">Dịch tự động</text><text x="29" y="116" font-size="17" fill="#17234e">bằng AI</text></g>
+</g>
+<!-- globe -->
+<g transform="translate(785 88)">
+ <circle cx="145" cy="170" r="155" fill="url(#earth)" filter="url(#shadow)"/>
+ <path d="M71 68c35-26 82-39 126-27l-12 31-35 9-15 24-48-2-27 22-18-24ZM184 103l53 12 24 42-18 28-56-12-20-37ZM88 194l42 7 24 44-19 50-55-14-18-43Z" fill="#68db86" opacity=".95"/>
+ <ellipse cx="145" cy="170" rx="205" ry="67" fill="none" stroke="#fff" stroke-width="2" opacity=".72" transform="rotate(-17 145 170)"/>
+ <ellipse cx="145" cy="170" rx="190" ry="105" fill="none" stroke="#fff" stroke-width="2" opacity=".5" transform="rotate(24 145 170)"/>
+ <circle cx="-17" cy="192" r="6" fill="#fff"/><circle cx="278" cy="122" r="6" fill="#fff"/>
+</g>
+<!-- avatars -->
+<g filter="url(#shadow)">
+ <g transform="translate(696 44)"><circle cx="58" cy="58" r="55" fill="#fff"/><circle cx="58" cy="58" r="48" fill="#cbe8ff"/><circle cx="58" cy="48" r="17" fill="#f5c5a5"/><path d="M26 98c5-28 18-38 32-38s28 10 33 38Z" fill="#3756d8"/><path d="M39 37c8-20 35-19 40 4-11-7-26-8-40-4Z" fill="#242742"/></g>
+ <g transform="translate(1012 80)"><circle cx="53" cy="53" r="50" fill="#fff"/><circle cx="53" cy="53" r="43" fill="#e7f0ff"/><circle cx="53" cy="43" r="15" fill="#f0bd9b"/><path d="M24 89c5-24 17-33 29-33 13 0 25 9 30 33Z" fill="#173f73"/></g>
+ <g transform="translate(1032 360)"><circle cx="51" cy="51" r="49" fill="#fff"/><circle cx="51" cy="51" r="42" fill="#ffe5d9"/><circle cx="51" cy="41" r="15" fill="#dca67f"/><path d="M23 87c6-24 18-32 29-32 13 0 25 8 29 32Z" fill="#d996a7"/></g>
+</g>
+<!-- speech bubbles -->
+<g font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="18">
+ <g transform="translate(744 27)"><rect width="116" height="42" rx="20" fill="#fff"/><text x="17" y="27" fill="#17234e">🇨🇳 你好!</text></g>
+ <g transform="translate(1041 42)"><rect width="119" height="42" rx="20" fill="#fff"/><text x="16" y="27" fill="#17234e">🇬🇧 Hello!</text></g>
+ <g transform="translate(636 180)"><rect width="116" height="42" rx="20" fill="#fff"/><text x="16" y="27" fill="#17234e">🇪🇸 ¡Hola!</text></g>
+ <g transform="translate(1060 330)"><rect width="125" height="42" rx="20" fill="#fff"/><text x="15" y="27" fill="#17234e">🇸🇦 مرحبا!</text></g>
+</g>
+<!-- phone -->
+<g transform="translate(713 292) rotate(5)" filter="url(#shadow)">
+ <rect width="246" height="385" rx="38" fill="#0c315f"/>
+ <rect x="10" y="10" width="226" height="365" rx="30" fill="#fff"/>
+ <circle cx="32" cy="43" r="12" fill="#1879ff"/><text x="52" y="49" font-family="Arial" font-size="18" font-weight="700" fill="#15224e">ChatNet</text>
+ <line x1="22" x2="224" y1="69" y2="69" stroke="#e6ecf6"/>
+ <rect x="26" y="88" width="132" height="39" rx="14" fill="#f0f3f8"/><text x="38" y="113" font-family="Arial" font-size="13" fill="#45516d">Nice to meet you!</text>
+ <rect x="76" y="142" width="140" height="42" rx="14" fill="#1879ff"/><text x="91" y="168" font-family="Arial" font-size="13" fill="#fff">Rất vui được gặp bạn!</text>
+ <rect x="27" y="205" width="130" height="39" rx="14" fill="#f0f3f8"/><text x="40" y="230" font-family="Arial" font-size="13" fill="#45516d">¡Igualmente!</text>
+ <rect x="102" y="260" width="112" height="39" rx="14" fill="#1879ff"/><text x="119" y="285" font-family="Arial" font-size="13" fill="#fff">同じく!</text>
+ <rect x="26" y="322" width="171" height="34" rx="17" fill="#f4f6fa"/><text x="46" y="344" font-family="Arial" font-size="12" fill="#98a1b5">Nhập tin nhắn...</text><circle cx="214" cy="339" r="15" fill="#1879ff"/>
+</g>
+<text x="68" y="585" font-family="Arial,Helvetica,sans-serif" font-style="italic" font-size="25" fill="#fff">Cùng ChatNet kết nối những điều tuyệt vời!</text>
+</svg>

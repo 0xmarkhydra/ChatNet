@@ -1,0 +1,99 @@
+
+
+@media (max-width: 760px) {
+  /*
+   * iOS Safari auto-zooms focused form controls when their computed
+   * font-size is below 16px. Keep every editable/select control at 16px+
+   * on mobile. This stylesheet is imported last on purpose.
+   */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  .topbar {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .topbar h1,
+  .topbar p {
+    display: none;
+  }
+
+  .brand {
+    font-size: 15px;
+    letter-spacing: .08em;
+  }
+
+  .user-chip {
+    width: auto;
+    max-width: min(72vw, 280px);
+    flex: 0 1 auto;
+  }
+
+  .user-chip > div:nth-child(2) {
+    min-width: 0;
+  }
+
+  .user-chip strong,
+  .user-chip small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .phone-frame > .tabs {
+    order: 2;
+    padding:
+      5px
+      max(8px, env(safe-area-inset-right))
+      max(5px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+    border-top: 1px solid #e8edf4;
+    border-bottom: 0;
+    background: rgba(248,250,255,.97);
+    backdrop-filter: blur(18px);
+  }
+
+  .phone-frame > .chat-view,
+  .phone-frame > .feed-view {
+    order: 1;
+  }
+
+  .phone-frame > .messenger-layout {
+    order: 1;
+  }
+
+  .mobile-conversation-open > .tabs {
+    display: none;
+  }
+}
+
+@media (max-width: 460px) {
+  .user-chip small {
+    display: none;
+  }
+
+  .user-chip {
+    gap: 6px;
+  }
+
+  .user-chip button {
+    padding-inline: 10px;
+  }
+
+  .install-app-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding-inline: 8px !important;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}

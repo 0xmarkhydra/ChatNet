@@ -1,0 +1,52 @@
+.notification-button {
+  width: 40px;
+  min-width: 40px;
+  padding: 0 !important;
+  font-size: 18px;
+}
+
+.notification-button.active {
+  background: #edf4ff;
+  border-color: #bfd5ff;
+}
+
+.notification-test-button {
+  min-height: 40px;
+  padding: 0 12px !important;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notification-test-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.notification-test-icon {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .notification-button {
+    width: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  .notification-test-button {
+    width: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    padding: 0 !important;
+    font-size: 16px;
+  }
+
+  .notification-test-label {
+    display: none;
+  }
+
+  .notification-test-icon {
+    display: inline;
+  }
+}

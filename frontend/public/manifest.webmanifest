@@ -1,0 +1,29 @@
+{
+  "id": "/",
+  "name": "ChatNet",
+  "short_name": "ChatNet",
+  "description": "ChatNet – Kết nối không biên giới. Trò chuyện, kết bạn và giao tiếp xuyên ngôn ngữ với dịch tự động bằng AI.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#1769ff",
+  "categories": ["social", "communication", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
