@@ -75,7 +75,7 @@ func main() {
 func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	rows, err := s.db.Query(r.Context(), `
-		SELECT p.id,u.display_name,p.content,p.likes_count,p.created_at
+		SELECT p.id,u.username,p.content,p.likes_count,p.created_at
 		FROM posts p JOIN users u ON u.id=p.user_id
 		ORDER BY p.id DESC LIMIT 100`)
 	if err != nil {
@@ -100,7 +100,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) comments(r *http.Request, postID int64) []comment {
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id,u.display_name,c.content,c.created_at
+		SELECT c.id,u.username,c.content,c.created_at
 		FROM comments c JOIN users u ON u.id=c.user_id
 		WHERE c.post_id=$1 ORDER BY c.id ASC`, postID)
 	if err != nil {
@@ -188,7 +188,7 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 
 	var p post
-	p.Author = claims.DisplayName
+	p.Author = claims.Username
 	p.Attachments = attachments
 	err = tx.QueryRow(r.Context(), `
 		INSERT INTO posts(user_id,content)
@@ -272,7 +272,7 @@ func (s *server) like(w http.ResponseWriter, r *http.Request) {
 
 	var p post
 	err = tx.QueryRow(r.Context(), `
-		SELECT p.id,u.display_name,p.content,p.likes_count,p.created_at
+		SELECT p.id,u.username,p.content,p.likes_count,p.created_at
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE p.id=$1`, id,
 	).Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt)
@@ -361,7 +361,7 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 
 	var p post
 	err = s.db.QueryRow(r.Context(), `
-		SELECT p.id,u.display_name,p.content,p.likes_count,p.created_at
+		SELECT p.id,u.username,p.content,p.likes_count,p.created_at
 		FROM posts p JOIN users u ON u.id=p.user_id WHERE p.id=$1`, postID,
 	).Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt)
 	if err != nil {

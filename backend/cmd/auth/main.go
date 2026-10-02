@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -25,6 +24,7 @@ import (
 	"chatnet/internal/mailer"
 	"chatnet/internal/ratelimit"
 	"chatnet/internal/redisx"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
@@ -33,7 +33,7 @@ import (
 const (
 	signupTTL         = 10 * time.Minute
 	maxOTPAttempts    = 5
-	maxPasswordLength = 128
+	maxPasswordLength = 72 // bcrypt accepts at most 72 bytes, not 72 Unicode characters.
 )
 
 var (
@@ -62,6 +62,7 @@ type user struct {
 }
 
 type pendingSignup struct {
+	EmailOnly      bool   `json:"emailOnly,omitempty"`
 	Email          string `json:"email"`
 	Username       string `json:"username"`
 	DisplayName    string `json:"displayName"`
@@ -105,6 +106,9 @@ func main() {
 	mux.HandleFunc("POST /api/auth/register/start", s.registerStart)
 	mux.HandleFunc("POST /api/auth/register/verify", s.registerVerify)
 	mux.HandleFunc("POST /api/auth/register/resend", s.registerResend)
+	mux.HandleFunc("POST /api/auth/email/start", s.registerStart)
+	mux.HandleFunc("POST /api/auth/email/verify", s.registerVerify)
+	mux.HandleFunc("POST /api/auth/email/resend", s.registerResend)
 	mux.HandleFunc("POST /api/auth/login", s.login)
 	mux.Handle("GET /api/auth/me", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.me)))
 
@@ -143,6 +147,16 @@ func (s *server) registerStart(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "enter a valid email address")
 		return
 	}
+	emailOnly := r.URL.Path == "/api/auth/email/start" ||
+		(body.Username == "" && body.DisplayName == "" && body.Password == "")
+	if emailOnly {
+		generated, err := newUsername()
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "unable to create username")
+			return
+		}
+		username, displayName = generated, generated
+	}
 	if len(username) < 3 || len(username) > 64 || !validUsername(username) {
 		httpx.Error(w, http.StatusBadRequest, "username must be 3-64 characters using letters, numbers, dot, underscore or hyphen")
 		return
@@ -151,8 +165,8 @@ func (s *server) registerStart(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "displayName is required and must be <= 100 characters")
 		return
 	}
-	if len(body.Password) < 8 || len(body.Password) > maxPasswordLength {
-		httpx.Error(w, http.StatusBadRequest, "password must be 8-128 characters")
+	if !emailOnly && (len(body.Password) < 8 || len(body.Password) > maxPasswordLength) {
+		httpx.Error(w, http.StatusBadRequest, "password must be 8-72 bytes in UTF-8")
 		return
 	}
 
@@ -163,23 +177,31 @@ func (s *server) registerStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var exists bool
-	if err := s.db.QueryRow(r.Context(), `
+	// Email-only requests reveal account existence only after mailbox verification.
+	if !emailOnly {
+		var exists bool
+		if err := s.db.QueryRow(r.Context(), `
 		SELECT EXISTS(SELECT 1 FROM users WHERE email=$1 OR username=$2)`,
-		email, username,
-	).Scan(&exists); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "unable to check account")
-		return
-	}
-	if exists {
-		httpx.Error(w, http.StatusConflict, "email or username already registered")
-		return
+			email, username,
+		).Scan(&exists); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "unable to check account")
+			return
+		}
+		if exists {
+			httpx.Error(w, http.StatusConflict, "email or username already registered")
+			return
+		}
 	}
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "unable to secure password")
-		return
+	// ponytail: OTP-only accounts cannot use password login; add password enrollment when needed.
+	passwordHash := "!"
+	if !emailOnly {
+		hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "unable to secure password")
+			return
+		}
+		passwordHash = string(hash)
 	}
 
 	token, err := randomURL(32)
@@ -194,8 +216,9 @@ func (s *server) registerStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pending := pendingSignup{
-		Email: email, Username: username, DisplayName: displayName,
-		PasswordHash:   string(passwordHash),
+		EmailOnly: emailOnly,
+		Email:     email, Username: username, DisplayName: displayName,
+		PasswordHash:   passwordHash,
 		CodeHash:       s.otpHash(token, code),
 		VerificationAt: time.Now().UnixMilli(),
 	}
@@ -242,58 +265,57 @@ func (s *server) registerVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pending, ttl, ok, err := s.loadPending(r.Context(), token)
+	pending, attemptsLeft, err := s.consumeOTP(r.Context(), token, code)
 	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "verification unavailable")
 		return
 	}
-	if !ok {
+	if attemptsLeft == -1 {
 		httpx.Error(w, http.StatusGone, "verification request expired")
 		return
 	}
 
-	expected := []byte(pending.CodeHash)
-	actual := []byte(s.otpHash(token, code))
-	valid := len(actual) == len(expected) && subtle.ConstantTimeCompare(actual, expected) == 1
-	if !valid {
-		attempts, err := s.redis.Incr(r.Context(), signupAttemptsKey(token)).Result()
-		if err != nil {
-			httpx.Error(w, http.StatusServiceUnavailable, "verification unavailable")
+	if attemptsLeft >= 0 {
+		if attemptsLeft == 0 {
+			httpx.Error(w, http.StatusGone, "too many incorrect codes; request a new code")
 			return
 		}
-		if attempts == 1 && ttl > 0 {
-			_ = s.redis.Expire(r.Context(), signupAttemptsKey(token), ttl).Err()
-		}
-		if attempts >= maxOTPAttempts {
-			_ = s.clearPending(r.Context(), token)
-			httpx.Error(w, http.StatusGone, "too many incorrect codes; start sign up again")
-			return
-		}
-		httpx.Error(w, http.StatusUnauthorized, fmt.Sprintf("verification code is incorrect (%d attempts left)", maxOTPAttempts-attempts))
+		httpx.Error(w, http.StatusUnauthorized, fmt.Sprintf("verification code is incorrect (%d attempts left)", attemptsLeft))
 		return
 	}
 
 	var u user
-	err = s.db.QueryRow(r.Context(), `
+	query := `
 		INSERT INTO users(email,username,password_hash,display_name,email_verified_at)
-		VALUES($1,$2,$3,$4,NOW())
-		RETURNING id,email,username,display_name,created_at`,
+		VALUES($1,$2,$3,$4,NOW())`
+	if pending.EmailOnly {
+		query += ` ON CONFLICT (email) DO UPDATE SET email_verified_at=NOW()`
+	}
+	query += ` RETURNING id,email,username,display_name,created_at`
+	err = s.db.QueryRow(r.Context(), query,
 		pending.Email, pending.Username, pending.PasswordHash, pending.DisplayName,
 	).Scan(&u.ID, &u.Email, &u.Username, &u.DisplayName, &u.CreatedAt)
 	if err != nil {
-		_ = s.clearPending(r.Context(), token)
-		httpx.Error(w, http.StatusConflict, "email or username already registered")
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			httpx.Error(w, http.StatusConflict, "email or username already registered; request a new code")
+		} else {
+			httpx.Error(w, http.StatusInternalServerError, "unable to complete verification; request a new code")
+		}
 		return
 	}
 
-	_ = s.clearPending(r.Context(), token)
 	jwtToken, err := authx.Sign(s.jwtSecret, u.ID, u.Username, u.DisplayName)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create token")
 		return
 	}
 
-	httpx.JSON(w, http.StatusCreated, map[string]any{
+	status := http.StatusCreated
+	if pending.EmailOnly {
+		status = http.StatusOK
+	}
+	httpx.JSON(w, status, map[string]any{
 		"token": jwtToken,
 		"user":  u,
 	})
@@ -334,13 +356,18 @@ func (s *server) registerResend(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "unable to create verification code")
 		return
 	}
+	oldHash := pending.CodeHash
 	pending.CodeHash = s.otpHash(token, code)
 	pending.VerificationAt = time.Now().UnixMilli()
-	if err := s.savePending(r.Context(), token, pending, signupTTL); err != nil {
+	ok, err = s.replacePending(r.Context(), token, oldHash, pending)
+	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "verification unavailable")
 		return
 	}
-	_ = s.redis.Del(r.Context(), signupAttemptsKey(token)).Err()
+	if !ok {
+		httpx.Error(w, http.StatusGone, "verification request expired or changed")
+		return
+	}
 
 	if err := s.sendOTP(r.Context(), pending.Email, token, code); err != nil {
 		log.Printf("resend signup email failed: %v", err)
@@ -434,6 +461,64 @@ func (s *server) savePending(ctx context.Context, token string, pending pendingS
 	return s.redis.Set(ctx, signupPendingKey(token), raw, ttl).Err()
 }
 
+// Comparison, attempt accounting and consumption are atomic, including concurrent resend/verify.
+var consumeOTPScript = redis.NewScript(`
+local raw = redis.call('GET', KEYS[1])
+if not raw then return '-1' end
+local pending = cjson.decode(raw)
+if pending.codeHash ~= ARGV[1] then
+	local attempts = redis.call('INCR', KEYS[2])
+	redis.call('PEXPIRE', KEYS[2], redis.call('PTTL', KEYS[1]))
+	local remaining = tonumber(ARGV[2]) - attempts
+	if remaining <= 0 then
+		redis.call('DEL', KEYS[1], KEYS[2])
+		return '0'
+	end
+	return tostring(remaining)
+end
+redis.call('DEL', KEYS[1], KEYS[2])
+return raw
+`)
+
+func (s *server) consumeOTP(ctx context.Context, token, code string) (pendingSignup, int, error) {
+	result, err := consumeOTPScript.Run(ctx, s.redis,
+		[]string{signupPendingKey(token), signupAttemptsKey(token)},
+		s.otpHash(token, code), maxOTPAttempts).Text()
+	if err != nil {
+		return pendingSignup{}, -1, err
+	}
+	if result == "-1" {
+		return pendingSignup{}, -1, nil
+	}
+	if len(result) == 1 && result[0] >= '0' && result[0] <= '4' {
+		return pendingSignup{}, int(result[0] - '0'), nil
+	}
+	var pending pendingSignup
+	err = json.Unmarshal([]byte(result), &pending)
+	return pending, -2, err
+}
+
+var replacePendingScript = redis.NewScript(`
+local raw = redis.call('GET', KEYS[1])
+if not raw or cjson.decode(raw).codeHash ~= ARGV[1] then return 0 end
+redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[3])
+if redis.call('EXISTS', KEYS[2]) == 1 then
+	redis.call('PEXPIRE', KEYS[2], ARGV[3])
+end
+return 1
+`)
+
+func (s *server) replacePending(ctx context.Context, token, oldHash string, pending pendingSignup) (bool, error) {
+	raw, err := json.Marshal(pending)
+	if err != nil {
+		return false, err
+	}
+	result, err := replacePendingScript.Run(ctx, s.redis,
+		[]string{signupPendingKey(token), signupAttemptsKey(token)},
+		oldHash, raw, signupTTL.Milliseconds()).Int()
+	return result == 1, err
+}
+
 func (s *server) loadPending(ctx context.Context, token string) (pendingSignup, time.Duration, bool, error) {
 	if !tokenRE.MatchString(token) {
 		return pendingSignup{}, 0, false, nil
@@ -472,10 +557,10 @@ func (s *server) sendOTP(ctx context.Context, email, token, code string) error {
 	subject := "Mã xác minh ChatNet của bạn"
 	text := "Mã xác minh ChatNet của bạn là " + code + ". Mã hết hạn sau 10 phút. Nếu bạn không yêu cầu mã này, hãy bỏ qua email."
 	html := `<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:520px;margin:auto;padding:32px;color:#172238">` +
-		`<div style="font-size:13px;font-weight:800;letter-spacing:.12em;color:#1769ff">CHATNET</div>` +
+		`<div style="font-size:13px;font-weight:800;color:#4b7600">CHATNET</div>` +
 		`<h2 style="margin:12px 0">Xác minh email của bạn</h2>` +
-		`<p style="color:#667085">Nhập mã 6 chữ số bên dưới để hoàn tất đăng ký tài khoản ChatNet.</p>` +
-		`<div style="font-size:36px;font-weight:800;letter-spacing:9px;margin:28px 0;color:#1769ff">` + code + `</div>` +
+		`<p style="color:#667085">Nhập mã 6 chữ số bên dưới để vào tài khoản ChatNet.</p>` +
+		`<div style="font-size:36px;font-weight:800;letter-spacing:9px;margin:28px 0;color:#4b7600">` + code + `</div>` +
 		`<p style="color:#8a94a6;font-size:14px">Mã hết hạn sau 10 phút. Nếu bạn không yêu cầu mã này, bạn có thể bỏ qua email.</p></div>`
 
 	idempotency := "chatnet-signup-otp-" + token + "-" + s.otpHash(token, code)[:16]
@@ -495,6 +580,14 @@ func newOTP() (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%06d", value.Int64()), nil
+}
+
+func newUsername() (string, error) {
+	var buf [8]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", err
+	}
+	return "user_" + hex.EncodeToString(buf[:]), nil
 }
 
 func randomURL(size int) (string, error) {

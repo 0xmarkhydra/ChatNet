@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
 import {
   disableOneSignalPush,
   enableOneSignalPush,
@@ -53,6 +53,9 @@ type Message = {
   attachments?: MediaAttachment[]
   createdAt: string
 }
+
+type MessageDraft = { text: string; attachments: MediaAttachment[] }
+const emptyDraft: MessageDraft = { text: '', attachments: [] }
 
 type Conversation = {
   id: number
@@ -126,7 +129,13 @@ const languages = [
 function loadSession(): Session | null {
   try {
     const raw = localStorage.getItem('chatnet-session')
-    return raw ? (JSON.parse(raw) as Session) : null
+    const value = raw ? JSON.parse(raw) : null
+    if (
+      !value || typeof value.token !== 'string' || !value.token ||
+      !Number.isSafeInteger(value.user?.id) || value.user.id <= 0 ||
+      !['email', 'username', 'displayName'].every((key) => typeof value.user[key] === 'string')
+    ) return null
+    return value as Session
   } catch {
     return null
   }
@@ -290,12 +299,11 @@ function UiIcon({ name, size = 24 }: { name: string; size?: number }) {
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession)
+  const sessionRef = useRef(session)
+  sessionRef.current = session
   const [authMode, setAuthMode] = useState<AuthMode>('register')
   const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
   const [authEmail, setAuthEmail] = useState('')
-  const [authUsername, setAuthUsername] = useState('')
-  const [authPassword, setAuthPassword] = useState('')
-  const [authDisplayName, setAuthDisplayName] = useState('')
   const [verificationToken, setVerificationToken] = useState('')
   const [verificationEmail, setVerificationEmail] = useState('')
   const [otpCode, setOtpCode] = useState('')
@@ -313,8 +321,13 @@ export default function App() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
   const activeConversationIdRef = useRef<number | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
-  const [messageText, setMessageText] = useState('')
-  const [messageAttachments, setMessageAttachments] = useState<MediaAttachment[]>([])
+  // ponytail: drafts live in memory per conversation; add persistence only with an explicit retention policy.
+  const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>({})
+  const draft = messageDrafts[activeConversationId ?? 0] ?? emptyDraft
+  const messageText = draft.text
+  const messageAttachments = draft.attachments
+  const [messageSending, setMessageSending] = useState(false)
+  const sendingRef = useRef(false)
   const [newChatMode, setNewChatMode] = useState<NewChatMode>('none')
   const [friendQuery, setFriendQuery] = useState('')
   const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([])
@@ -350,13 +363,35 @@ export default function App() {
   const feedVideoInputRef = useRef<HTMLInputElement>(null)
   const feedAlbumInputRef = useRef<HTMLInputElement>(null)
 
-  const name = session?.user.displayName || ''
+  const name = session?.user.username || ''
   const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId
-    setMessageAttachments([])
+    setMessages([])
   }, [activeConversationId])
+
+  function setMessageText(text: string) {
+    if (!activeConversationId) return
+    setMessageDrafts((current) => ({
+      ...current,
+      [activeConversationId]: { ...(current[activeConversationId] ?? emptyDraft), text },
+    }))
+  }
+
+  function setMessageAttachments(update: SetStateAction<MediaAttachment[]>) {
+    if (!activeConversationId) return
+    setMessageDrafts((current) => {
+      const previous = current[activeConversationId] ?? emptyDraft
+      return {
+        ...current,
+        [activeConversationId]: {
+          ...previous,
+          attachments: typeof update === 'function' ? update(previous.attachments) : update,
+        },
+      }
+    })
+  }
 
   useEffect(() => {
     const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean }
@@ -473,7 +508,9 @@ export default function App() {
         }
       }
 
-      await Promise.all(Array.from({ length: workerCount }, () => worker()))
+      const outcomes = await Promise.allSettled(Array.from({ length: workerCount }, () => worker()))
+      const failed = outcomes.find((outcome) => outcome.status === 'rejected')
+      if (failed?.status === 'rejected') throw failed.reason
       return result
     } finally {
       setMediaUploading(null)
@@ -481,7 +518,9 @@ export default function App() {
   }
 
   async function addChatFiles(files: File[]) {
-    if (!files.length) return
+    if (!files.length || mediaUploading || messageSending || !activeConversationId) return
+    const conversationId = activeConversationId
+    const token = session?.token
     const remaining = Math.max(0, 10 - messageAttachments.length)
     if (remaining === 0) {
       setNotice('Mỗi tin nhắn tối đa 10 file đính kèm.')
@@ -491,7 +530,14 @@ export default function App() {
     if (selected.length < files.length) setNotice('Mỗi tin nhắn tối đa 10 file đính kèm.')
     try {
       const uploaded = await uploadMediaFiles(selected, 'chat')
-      setMessageAttachments((current) => [...current, ...uploaded].slice(0, 10))
+      if (sessionRef.current?.token !== token) return
+      setMessageDrafts((current) => {
+        const previous = current[conversationId] ?? emptyDraft
+        return {
+          ...current,
+          [conversationId]: { ...previous, attachments: [...previous.attachments, ...uploaded].slice(0, 10) },
+        }
+      })
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Không upload được file')
     }
@@ -771,9 +817,10 @@ export default function App() {
 
     const controller = new AbortController()
     const query = friendQuery.trim()
+    setFriendResults([])
+    setFriendSearching(true)
 
     if (!query) {
-      setFriendSearching(true)
       apiFetch('/api/users/suggestions', { signal: controller.signal })
         .then(async (response) => {
           if (!response.ok) return []
@@ -800,10 +847,11 @@ export default function App() {
           { signal: controller.signal },
         )
         if (!response.ok) {
-          setFriendResults([])
+          if (!controller.signal.aborted) setFriendResults([])
           return
         }
-        setFriendResults((await response.json()) as FriendSearchResult[])
+        const items = (await response.json()) as FriendSearchResult[]
+        if (!controller.signal.aborted) setFriendResults(items)
       } catch {
         if (!controller.signal.aborted) setFriendResults([])
       } finally {
@@ -818,16 +866,25 @@ export default function App() {
   }, [friendQuery, newChatMode, session?.token, tab])
 
   async function refreshConversations() {
-    const response = await apiFetch('/api/conversations')
-    if (!response.ok) return
-    const data = (await response.json()) as Conversation[]
-    setConversations(data)
+    try {
+      const response = await apiFetch('/api/conversations')
+      if (!response.ok) return
+      const data = (await response.json()) as Conversation[]
+      if (sessionRef.current?.token === session?.token) setConversations(data)
+    } catch {
+      setStatus('Đang kết nối lại...')
+    }
   }
 
   async function refreshPosts() {
-    const response = await apiFetch('/api/posts')
-    if (!response.ok) return
-    setPosts((await response.json()) as Post[])
+    try {
+      const response = await apiFetch('/api/posts')
+      if (!response.ok) return
+      const data = (await response.json()) as Post[]
+      if (sessionRef.current?.token === session?.token) setPosts(data)
+    } catch {
+      setStatus('Đang kết nối lại...')
+    }
   }
 
   async function submitAuth(event: FormEvent) {
@@ -836,34 +893,11 @@ export default function App() {
     setAuthError('')
 
     try {
-      if (authMode === 'login') {
-        const response = await fetch(`${API}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: authEmail.trim(),
-            password: authPassword,
-          }),
-        })
-        const result = await response.json()
-        if (!response.ok) {
-          setAuthError(result.error || 'Email hoặc mật khẩu không đúng')
-          return
-        }
-        const next = result as Session
-        localStorage.setItem('chatnet-session', JSON.stringify(next))
-        setSession(next)
-        return
-      }
-
-      const response = await fetch(`${API}/api/auth/register/start`, {
+      const response = await fetch(`${API}/api/auth/email/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: authEmail.trim(),
-          username: authUsername.trim(),
-          password: authPassword,
-          displayName: authDisplayName.trim(),
         }),
       })
       const result = await response.json()
@@ -898,7 +932,7 @@ export default function App() {
     setAuthLoading(true)
     setAuthError('')
     try {
-      const response = await fetch(`${API}/api/auth/register/verify`, {
+      const response = await fetch(`${API}/api/auth/email/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -928,7 +962,7 @@ export default function App() {
     setAuthLoading(true)
     setAuthError('')
     try {
-      const response = await fetch(`${API}/api/auth/register/resend`, {
+      const response = await fetch(`${API}/api/auth/email/resend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: verificationToken }),
@@ -993,11 +1027,15 @@ export default function App() {
       .catch(() => undefined)
 
     localStorage.removeItem('chatnet-session')
+    resetRegistration()
+    setAuthMode('login')
     setSession(null)
     setConversations([])
     setActiveConversationId(null)
     setMessages([])
-    setMessageAttachments([])
+    setMessageDrafts({})
+    setPostText('')
+    setCommentDrafts({})
     setPosts([])
     setPostAttachments([])
     setTranslations({})
@@ -1087,7 +1125,7 @@ export default function App() {
       `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}`,
     )
       .then(async (response) => {
-        if (!response.ok) return
+        if (!response.ok) throw new Error('Không tải được tin nhắn')
         const data = (await response.json()) as Message[]
         if (cancelled) return
 
@@ -1102,11 +1140,8 @@ export default function App() {
           }
         }
         setTranslations(restored)
-      })
-      .then(() =>
-        apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' }),
-      )
-      .then(() => {
+        const read = await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
+        if (!read.ok) return
         if (!cancelled) {
           setConversations((current) =>
             current.map((item) =>
@@ -1114,6 +1149,9 @@ export default function App() {
             ),
           )
         }
+      })
+      .catch(() => {
+        if (!cancelled) setNotice('Không tải được tin nhắn. Kiểm tra kết nối rồi mở lại cuộc trò chuyện.')
       })
 
     return () => {
@@ -1163,9 +1201,10 @@ export default function App() {
       Boolean(
         activeConversationId &&
         !mediaUploading &&
+        !messageSending &&
         (messageText.trim() || messageAttachments.length > 0),
       ),
-    [activeConversationId, messageText, messageAttachments.length, mediaUploading],
+    [activeConversationId, messageText, messageAttachments.length, mediaUploading, messageSending],
   )
 
   async function openDirectByUsername(username: string) {
@@ -1173,25 +1212,33 @@ export default function App() {
     const normalized = username.trim().toLowerCase()
     if (!normalized) return
 
-    const response = await apiFetch('/api/conversations/direct', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: normalized }),
-    })
-    const result = await response.json()
-    if (!response.ok) {
-      setChatCreateError(result.error || 'Không thể mở cuộc trò chuyện')
-      return
-    }
+    try {
+      const response = await apiFetch('/api/conversations/direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: normalized }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setNotice(result.error || 'Không thể mở cuộc trò chuyện')
+        return
+      }
 
-    const created = result as Conversation
-    await refreshConversations()
-    setActiveConversationId(created.id)
-    setDirectUsername('')
-    setFriendQuery('')
-    setFriendResults([])
-    setNewChatMode('none')
-    setTranslations({})
+      if (sessionRef.current?.token !== session?.token) return
+      const created = result as Conversation
+      setConversations((current) => [created, ...current.filter((item) => item.id !== created.id)])
+      setActiveConversationId(created.id)
+      setTab('chat')
+      setGlobalSearch('')
+      setDirectUsername('')
+      setFriendQuery('')
+      setFriendResults([])
+      setNewChatMode('none')
+      setTranslations({})
+      void refreshConversations()
+    } catch {
+      setNotice('Không mở được cuộc trò chuyện. Kiểm tra kết nối rồi thử lại.')
+    }
   }
 
   async function createDirect(event: FormEvent) {
@@ -1228,23 +1275,36 @@ export default function App() {
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault()
-    if (!canSend || !activeConversationId) return
+    if (!canSend || !activeConversationId || sendingRef.current) return
 
+    const conversationId = activeConversationId
+    const submittedDraft = draft
     const text = messageText.trim()
     const attachments = messageAttachments
-    setMessageText('')
-    setMessageAttachments([])
-
-    const response = await apiFetch(`/api/conversations/${activeConversationId}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, attachments }),
-    })
-    if (!response.ok) {
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      setMessageText(text)
-      setMessageAttachments(attachments)
-      setNotice(result?.error || 'Gửi tin nhắn thất bại')
+    sendingRef.current = true
+    setMessageSending(true)
+    try {
+      const response = await apiFetch(`/api/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, attachments }),
+      })
+      if (!response.ok) {
+        const result = await response.json().catch(() => null) as { error?: string } | null
+        setNotice(result?.error || 'Gửi tin nhắn thất bại')
+        return
+      }
+      setMessageDrafts((current) => {
+        if (current[conversationId] !== submittedDraft) return current
+        const next = { ...current }
+        delete next[conversationId]
+        return next
+      })
+    } catch {
+      setNotice('Chưa xác nhận được tin đã gửi. Bản nháp được giữ lại; kiểm tra hội thoại trước khi gửi lại.')
+    } finally {
+      sendingRef.current = false
+      setMessageSending(false)
     }
   }
 
@@ -1327,17 +1387,12 @@ export default function App() {
     return (
       <main className="auth-screen">
         <section className="auth-copy">
-          <span className="brand">ChatNet</span>
-          <h1>Nói chuyện không còn rào cản ngôn ngữ.</h1>
-          <p>Chat riêng, chat nhóm, AI dịch tức thì và một news feed để chia sẻ tâm sự.</p>
-          <div className="auth-points">
-            <span>💬 Chat riêng & nhóm</span>
-            <span>🌐 AI Translation</span>
-            <span>🌿 Feed cộng đồng</span>
-          </div>
+          <img src="/icon.svg" width="52" height="52" alt="" />
+          <h1>ChatNet</h1>
+          <p>Kết nối không biên giới</p>
         </section>
 
-        {authMode === 'register' && registerStep === 'otp' ? (
+        {registerStep === 'otp' ? (
           <form className="auth-card otp-card" onSubmit={verifyOTP}>
             <div className="otp-icon">✉️</div>
             <h2>Kiểm tra email của bạn</h2>
@@ -1378,7 +1433,7 @@ export default function App() {
             <button className="auth-submit" disabled={authLoading || otpCode.length !== 6 || otpSecondsLeft <= 0}>
               {authLoading ? 'Đang xác minh...' : 'Xác minh & vào ChatNet'}
             </button>
-            <button type="button" className="auth-secondary" onClick={resetRegistration}>
+            <button type="button" className="auth-secondary" onClick={resetRegistration} disabled={authLoading}>
               Dùng email khác
             </button>
           </form>
@@ -1388,6 +1443,7 @@ export default function App() {
               <button
                 type="button"
                 className={authMode === 'register' ? 'active' : ''}
+                disabled={authLoading}
                 onClick={() => {
                   setAuthMode('register')
                   resetRegistration()
@@ -1398,6 +1454,7 @@ export default function App() {
               <button
                 type="button"
                 className={authMode === 'login' ? 'active' : ''}
+                disabled={authLoading}
                 onClick={() => {
                   setAuthMode('login')
                   resetRegistration()
@@ -1408,37 +1465,9 @@ export default function App() {
             </div>
 
             <h2>{authMode === 'register' ? 'Tạo tài khoản' : 'Chào mừng quay lại'}</h2>
-            {authMode === 'register' && (
-              <>
-                <label>
-                  Tên hiển thị
-                  <input value={authDisplayName} onChange={(event) => setAuthDisplayName(event.target.value)} placeholder="Ví dụ: Mong" maxLength={100} required />
-                </label>
-                <label>
-                  Username
-                  <input value={authUsername} onChange={(event) => setAuthUsername(event.target.value.toLowerCase())} placeholder="mongdev" autoCapitalize="none" maxLength={64} pattern="[a-z0-9._-]{3,64}" required />
-                  <span className="field-hint">Dùng để người khác tìm bạn và bắt đầu chat.</span>
-                </label>
-              </>
-            )}
-
             <label>
               Email
               <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" maxLength={254} required />
-            </label>
-
-            <label>
-              Mật khẩu
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(event) => setAuthPassword(event.target.value)}
-                placeholder={authMode === 'register' ? 'Tối thiểu 8 ký tự' : 'Mật khẩu của bạn'}
-                autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
-                minLength={authMode === 'register' ? 8 : undefined}
-                maxLength={128}
-                required
-              />
             </label>
 
             {authMode === 'register' && (
@@ -1495,6 +1524,7 @@ export default function App() {
   return (
     <main className={`app-shell modern-shell ${tab === 'chat' && activeConversation ? 'conversation-open' : ''}`}>
       <header className="chatnet-appbar">
+        <div className="appbar-brand"><img src="/icon.svg" width="32" height="32" alt="" /><strong>ChatNet</strong></div>
         <label className="appbar-search">
           <UiIcon name="search" size={27} />
           <input
@@ -1503,8 +1533,8 @@ export default function App() {
               if (tab === 'contacts') setFriendQuery(event.target.value)
               else setGlobalSearch(event.target.value)
             }}
-            placeholder="Tìm kiếm"
-            aria-label="Tìm kiếm"
+            placeholder={tab === 'contacts' ? 'Email hoặc @username' : 'Tìm kiếm'}
+            aria-label={tab === 'contacts' ? 'Tìm bạn bằng email hoặc username' : 'Tìm kiếm'}
           />
         </label>
 
@@ -1596,7 +1626,7 @@ export default function App() {
         </div>
       </header>
 
-      {notice && <button className="notice" onClick={() => setNotice('')}>{notice} ×</button>}
+      {notice && <div className="notice" role="status">{notice} <button type="button" aria-label="Đóng thông báo" onClick={() => setNotice('')}>×</button></div>}
 
       <section className={`phone-frame modern-frame ${tab === 'chat' && activeConversation ? 'mobile-conversation-open' : ''}`}>
         {tab === 'chat' && (
@@ -1636,7 +1666,7 @@ export default function App() {
               {newChatMode === 'friends' && (
                 <section className="friend-search-panel compact-friend-panel">
                   <div className="friend-search-title">
-                    <div><strong>Tìm bạn bè</strong><small>Tìm theo tên hoặc @username</small></div>
+                    <div><strong>Tìm bạn bè</strong><small>Email hoặc @username</small></div>
                     <button
                       type="button"
                       className="friend-search-close"
@@ -1649,10 +1679,11 @@ export default function App() {
                     <input
                       value={friendQuery}
                       onChange={(event) => setFriendQuery(event.target.value)}
-                      placeholder="Nhập tên hoặc username..."
+                      placeholder="Email hoặc @username"
+                      aria-label="Tìm bạn bằng email hoặc username"
                       autoCapitalize="none"
                       autoComplete="off"
-                      maxLength={100}
+                      maxLength={254}
                       autoFocus
                     />
                   </div>
@@ -1671,10 +1702,10 @@ export default function App() {
                         key={friend.id}
                         onClick={() => void openDirectByUsername(friend.username)}
                       >
-                        <UserAvatar name={friend.displayName} className="friend-avatar" online={friend.online} />
+                        <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                         <div className="friend-result-copy">
-                          <strong>{friend.displayName}</strong>
-                          <span>@{friend.username}{friend.reason ? ` · ${friend.reason}` : ''}</span>
+                          <strong>@{friend.username}</strong>
+                          <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
                         </div>
                         <div className="friend-result-action"><span>›</span></div>
                       </button>
@@ -1750,7 +1781,7 @@ export default function App() {
                 <>
                   <header className="chat-head">
                     <div className="room-info">
-                      <button className="mobile-back" type="button" onClick={() => setActiveConversationId(null)}>‹</button>
+                      <button className="mobile-back" type="button" aria-label="Quay lại danh sách" onClick={() => setActiveConversationId(null)}>‹</button>
                       <UserAvatar
                         name={activeConversation.name}
                         className="room-avatar"
@@ -1776,7 +1807,7 @@ export default function App() {
                         />
                         <span>Tự dịch AI</span>
                       </label>
-                      <select value={targetLanguage} onChange={(event) => changeTargetLanguage(event.target.value)}>
+                      <select aria-label="Ngôn ngữ dịch" value={targetLanguage} onChange={(event) => changeTargetLanguage(event.target.value)}>
                         {languages.map((language) => <option key={language.value} value={language.value}>→ {language.label}</option>)}
                       </select>
                     </div>
@@ -1818,7 +1849,7 @@ export default function App() {
                         <MediaAttachmentsView
                           items={messageAttachments}
                           pending
-                          onRemove={(index) => setMessageAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                          onRemove={messageSending ? undefined : (index) => setMessageAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
                         />
                       </div>
                     )}
@@ -1826,12 +1857,14 @@ export default function App() {
                       className="ghost-action attach-button"
                       type="button"
                       onClick={() => chatFileInputRef.current?.click()}
-                      disabled={mediaUploading === 'chat'}
+                      disabled={Boolean(mediaUploading) || messageSending}
                       aria-label="Đính kèm file"
                     >
                       <UiIcon name="attach" size={22} />
                     </button>
                     <input
+                      aria-label="Tin nhắn"
+                      disabled={messageSending}
                       placeholder={mediaUploading === 'chat' ? 'Đang tải file lên...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
                       value={messageText}
                       onChange={(event) => setMessageText(event.target.value)}
@@ -1872,10 +1905,10 @@ export default function App() {
                   key={friend.id}
                   onClick={() => void openDirectByUsername(friend.username)}
                 >
-                  <UserAvatar name={friend.displayName} className="friend-avatar" online={friend.online} />
+                  <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                   <div className="friend-result-copy">
-                    <strong>{friend.displayName}</strong>
-                    <span>@{friend.username}{friend.reason ? ` · ${friend.reason}` : ''}</span>
+                    <strong>@{friend.username}</strong>
+                    <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
                   </div>
                   <div className="friend-result-action"><small>Nhắn tin</small><span>›</span></div>
                 </button>
@@ -2062,14 +2095,12 @@ export default function App() {
           <div className="simple-view profile-view">
             <section className="profile-hero">
               <div className="profile-cover-art" aria-hidden="true">
-                <span className="cover-orb cover-orb-one" />
-                <span className="cover-orb cover-orb-two" />
                 <strong>ChatNet</strong>
                 <small>Kết nối không biên giới</small>
               </div>
               <div className="profile-identity">
                 <UserAvatar name={name} className="profile-avatar" online />
-                <div><strong>{name}</strong><span>@{session.user.username}</span></div>
+                <div><strong>@{name}</strong><span>{session.user.email}</span></div>
               </div>
             </section>
 
@@ -2082,6 +2113,8 @@ export default function App() {
                   onClick={() => void togglePush()}
                   disabled={pushBusy}
                   aria-label={pushEnabled ? 'Tắt thông báo' : 'Bật thông báo'}
+                  role="switch"
+                  aria-checked={pushEnabled}
                 ><span /></button>
               </div>
               <div className="settings-row">
@@ -2094,6 +2127,9 @@ export default function App() {
                   type="button"
                   className={`switch-button ${autoTranslate ? 'on' : ''}`}
                   onClick={() => changeAutoTranslate(!autoTranslate)}
+                  aria-label="Tự động dịch"
+                  role="switch"
+                  aria-checked={autoTranslate}
                 ><span /></button>
               </div>
               <label className="settings-row settings-language">

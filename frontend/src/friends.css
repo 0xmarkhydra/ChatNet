@@ -10,8 +10,8 @@
 }
 
 .new-chat-buttons button.active {
-  background: #1769ff;
-  border-color: #1769ff;
+  background: #4c7800;
+  border-color: #4c7800;
   color: #fff;
 }
 
@@ -74,13 +74,13 @@
 }
 
 .friend-search-input-wrap:focus-within {
-  border-color: #92b7ff;
+  border-color: #d5dfc5;
   background: #fff;
   box-shadow: 0 0 0 3px rgba(23, 105, 255, .09);
 }
 
 .friend-search-input-wrap > span {
-  color: #7c8ca5;
+  color: #4c7800;
   font-size: 20px;
   line-height: 1;
 }
@@ -118,7 +118,7 @@
   color: #66758d;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: .02em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -149,7 +149,7 @@
   place-items: center;
   border-radius: 50%;
   background: linear-gradient(145deg, #e9f0ff, #dfe9ff);
-  color: #1769ff;
+  color: #4c7800;
   font-weight: 800;
 }
 
@@ -194,7 +194,7 @@
 }
 
 .friend-result-action span {
-  color: #1769ff;
+  color: #4c7800;
   font-size: 24px;
   line-height: 1;
 }

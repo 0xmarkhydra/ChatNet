@@ -302,7 +302,12 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
-	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
+	q = strings.TrimPrefix(q, "@")
+	if len(q) > 254 {
+		httpx.Error(w, http.StatusBadRequest, "search query must be <= 254 bytes")
+		return
+	}
 	if len(q) < 1 {
 		httpx.JSON(w, http.StatusOK, []any{})
 		return
@@ -311,8 +316,8 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(), `
 		SELECT id,username,display_name
 		FROM users
-		WHERE id<>$1 AND (username ILIKE $2 OR display_name ILIKE $2)
-		ORDER BY display_name ASC LIMIT 12`, claims.UserID, "%"+q+"%")
+		WHERE id<>$1 AND (strpos(lower(username), $2)>0 OR lower(email)=$2)
+		ORDER BY username ASC LIMIT 12`, claims.UserID, q)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot search users")
 		return
@@ -458,7 +463,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			var otherID int64
 			var displayName string
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.display_name
+				SELECT u.id,u.username
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
@@ -492,7 +497,7 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	var otherID int64
 	var otherName string
 	if err := s.db.QueryRow(r.Context(),
-		`SELECT id,display_name FROM users WHERE username=$1`, username,
+		`SELECT id,username FROM users WHERE username=$1`, username,
 	).Scan(&otherID, &otherName); err != nil {
 		httpx.Error(w, http.StatusNotFound, "user not found")
 		return
@@ -639,7 +644,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.display_name,m.text,
+		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
 		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
@@ -724,7 +729,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	m := message{
 		ConversationID: conversationID,
 		SenderID:       claims.UserID,
-		Sender:         claims.DisplayName,
+		Sender:         claims.Username,
 		Attachments:    attachments,
 	}
 	if err := tx.QueryRow(r.Context(), `

@@ -10,7 +10,7 @@
   "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
-  "theme_color": "#1769ff",
+  "theme_color": "#191c17",
   "categories": ["social", "communication", "productivity"],
   "icons": [
     {

@@ -293,22 +293,22 @@ News Feed cũng dùng cùng AI Translation service.
 POST /api/auth/register/start
 POST /api/auth/register/verify
 POST /api/auth/register/resend
+POST /api/auth/email/start
+POST /api/auth/email/verify
+POST /api/auth/email/resend
 POST /api/auth/login
 GET  /api/auth/me
 ~~~
 
-Start signup:
+Đăng ký/đăng nhập bằng email: gọi `POST /api/auth/email/start`.
 
 ~~~json
 {
-  "email": "mong@example.com",
-  "username": "mong",
-  "password": "demo12345",
-  "displayName": "Mong"
+  "email": "mong@example.com"
 }
 ~~~
 
-Sau đó server trả verification token. User nhập OTP email:
+Server trả verification token. Nhập OTP tại `POST /api/auth/email/verify`:
 
 ~~~json
 {
@@ -317,7 +317,16 @@ Sau đó server trả verification token. User nhập OTP email:
 }
 ~~~
 
-User chỉ được tạo trong PostgreSQL sau khi OTP hợp lệ.
+OTP dùng một lần, hết hạn sau 10 phút, tối đa 5 lần sai (gửi lại không reset số lần sai).
+Email mới tạo tài khoản với username ngẫu nhiên dạng `user_<16 ký tự hex>`, tên hiển thị tạm bằng username.
+Email đã tồn tại đăng nhập tài khoản cũ, giữ nguyên username và mật khẩu.
+Không dùng email làm mật khẩu hoặc tên hiển thị công khai.
+API đăng ký cũ và `POST /api/auth/login` bằng mật khẩu vẫn được hỗ trợ.
+Tài khoản mới chỉ dùng OTP, chưa có chức năng đặt mật khẩu.
+
+Tìm người dùng: `/api/users/search?q=...` khớp một phần username (có thể thêm `@`)
+hoặc email đầy đủ, không phân biệt hoa/thường; không tìm theo tên hiển thị.
+Email không được trả về trong kết quả tìm kiếm. Chat, bài viết và bình luận dùng username làm định danh.
 
 Authenticated API:
 

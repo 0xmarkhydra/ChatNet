@@ -27,7 +27,7 @@
 
   .brand {
     font-size: 15px;
-    letter-spacing: .08em;
+    letter-spacing: 0;
   }
 
   .user-chip {
