@@ -1,4 +1,4 @@
-const CACHE = 'chatnet-v28-connect-fixed-height'
+const CACHE = 'chatnet-v29-nearby-force-refresh'
 const CORE = ['/', '/offline.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg']
 
 self.addEventListener('install', (event) => {
@@ -7,14 +7,22 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    Promise.all([
-      self.clients.claim(),
-      caches.keys().then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))),
-      ),
-    ]),
-  )
+  event.waitUntil((async () => {
+    const keys = await caches.keys()
+    await Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))
+    await self.clients.claim()
+
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    await Promise.all(
+      windows.map(async (client) => {
+        try {
+          await client.navigate('/?__chatnet_pwa_refresh=v29')
+        } catch {
+          // A background/suspended iOS window can reject navigation; it will refresh on next launch.
+        }
+      }),
+    )
+  })())
 })
 
 self.addEventListener('fetch', (event) => {
