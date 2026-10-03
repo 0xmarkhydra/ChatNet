@@ -540,6 +540,8 @@ export default function App() {
   const [uiLocaleLoading, setUiLocaleLoading] = useState(false)
   const [localePickerOpen, setLocalePickerOpen] = useState(false)
   const [localeSearch, setLocaleSearch] = useState('')
+  const [translationPickerOpen, setTranslationPickerOpen] = useState(false)
+  const [translationSettingsSearch, setTranslationSettingsSearch] = useState('')
   const [targetLanguage, setTargetLanguage] = useState('en')
   const [autoTranslate, setAutoTranslate] = useState(true)
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] = useState(false)
@@ -583,6 +585,10 @@ export default function App() {
   const visibleLocaleOptions = useMemo(
     () => filterLanguageOptions(languageOptions, localeSearch),
     [languageOptions, localeSearch],
+  )
+  const visibleTranslationSettingsOptions = useMemo(
+    () => filterLanguageOptions(languageOptions, translationSettingsSearch),
+    [languageOptions, translationSettingsSearch],
   )
   const selectedAppLanguage = languageOptions.find((language) => language.value === effectiveAppLocale) || languageOptions[0]
   const t = (key: keyof typeof UI_MESSAGES) => translateUI(uiBundle, key)
@@ -2085,7 +2091,9 @@ export default function App() {
     setTranslations({})
     setTranslationOriginals({})
     setTranslationMenuOpen(false)
+    setTranslationPickerOpen(false)
     setLanguageSearch('')
+    setTranslationSettingsSearch('')
     void saveTranslationPreferences(next, autoTranslate)
   }
 
@@ -4024,17 +4032,90 @@ export default function App() {
                   aria-checked={autoTranslate}
                 ><span /></button>
               </div>
-              <label className="settings-row settings-language">
-                <div><strong>{t('profile.translationLanguage')}</strong><small>{t('profile.translationLanguageHint')}</small></div>
-                <select value={targetLanguage} onChange={(event) => changeTargetLanguage(event.target.value)}>
-                  {languageOptions.map((language) => (
-                    <option key={language.value} value={language.value}>
-                      {language.flag} {language.localizedLanguage} · {language.nativeLanguage}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <button
+                type="button"
+                className="settings-row settings-row-button translation-locale-row"
+                onClick={() => {
+                  setTranslationSettingsSearch('')
+                  setTranslationPickerOpen(true)
+                }}
+              >
+                <div>
+                  <strong>{t('profile.translationLanguage')}</strong>
+                  <small>{t('profile.translationLanguageHint')}</small>
+                </div>
+                <span className="settings-current-locale">
+                  <b aria-hidden="true">{selectedLanguage?.flag || '🌐'}</b>
+                  <span>{selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()}</span>
+                  <i aria-hidden="true">›</i>
+                </span>
+              </button>
             </section>
+
+            {translationPickerOpen && (
+              <div className="locale-picker-overlay" role="dialog" aria-modal="true" aria-label={t('profile.translationLanguage')}>
+                <button
+                  type="button"
+                  className="locale-picker-backdrop"
+                  aria-label={t('common.close')}
+                  onClick={() => setTranslationPickerOpen(false)}
+                />
+                <section className="locale-picker-sheet">
+                  <header>
+                    <div>
+                      <strong>{t('profile.translationLanguage')}</strong>
+                      <small>{t('translation.subtitle')}</small>
+                    </div>
+                    <button type="button" aria-label={t('common.close')} onClick={() => setTranslationPickerOpen(false)}>×</button>
+                  </header>
+
+                  <label className="locale-picker-search">
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                      type="search"
+                      value={translationSettingsSearch}
+                      onChange={(event) => setTranslationSettingsSearch(event.target.value)}
+                      placeholder={t('translation.searchPlaceholder')}
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                    />
+                    {translationSettingsSearch && (
+                      <button
+                        type="button"
+                        aria-label="Xóa tìm kiếm"
+                        onClick={() => setTranslationSettingsSearch('')}
+                      >×</button>
+                    )}
+                  </label>
+
+                  <div className="locale-picker-list">
+                    {visibleTranslationSettingsOptions.map((language) => (
+                      <button
+                        key={language.value}
+                        type="button"
+                        className={`locale-option ${targetLanguage === language.value ? 'active' : ''}`}
+                        onClick={() => changeTargetLanguage(language.value)}
+                      >
+                        <span className="locale-option-flag" aria-hidden="true">{language.flag}</span>
+                        <span className="locale-option-copy">
+                          <strong>{language.localizedLanguage}</strong>
+                          <small>{language.nativeLanguage}</small>
+                          <em>{language.localizedRegion} · {language.nativeRegion}</em>
+                        </span>
+                        <b>{language.code}</b>
+                        {targetLanguage === language.value && <i aria-hidden="true">✓</i>}
+                      </button>
+                    ))}
+                    {visibleTranslationSettingsOptions.length === 0 && (
+                      <div className="locale-picker-empty">{t('translation.noResults')}</div>
+                    )}
+                  </div>
+
+                  <footer>{t('translation.languageHint')}</footer>
+                </section>
+              </div>
+            )}
 
             {localePickerOpen && (
               <div className="locale-picker-overlay" role="dialog" aria-modal="true" aria-label={t('locale.title')}>

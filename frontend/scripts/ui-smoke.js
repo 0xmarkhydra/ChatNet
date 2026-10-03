@@ -519,6 +519,32 @@ async (page) => {
     'App locale picker changes height while searching',
   )
   await localeSheet.locator('header > button').click()
+
+  const translationLocaleButton = page.getByRole('button', { name: /Ngôn ngữ dịch/ })
+  await translationLocaleButton.click()
+  const translationLocaleSheet = page.locator('.locale-picker-sheet')
+  await translationLocaleSheet.waitFor()
+  check(
+    await translationLocaleSheet.evaluate((node) => node.scrollWidth <= node.clientWidth),
+    'Translation locale picker overflows horizontally',
+  )
+  const translationHeightBeforeSearch = await translationLocaleSheet.evaluate((node) => node.getBoundingClientRect().height)
+  await translationLocaleSheet.getByPlaceholder('Tìm ngôn ngữ, quốc gia hoặc mã...', { exact: true }).fill('Nhật')
+  check(
+    await translationLocaleSheet.getByText('日本語', { exact: true }).count() > 0,
+    'Translation locale search cannot find native language name',
+  )
+  const translationHeightAfterSearch = await translationLocaleSheet.evaluate((node) => node.getBoundingClientRect().height)
+  check(
+    Math.abs(translationHeightAfterSearch - translationHeightBeforeSearch) <= 1,
+    'Translation locale picker changes height while searching',
+  )
+  await translationLocaleSheet.getByText('日本語', { exact: true }).click()
+  check(
+    await translationLocaleButton.textContent().then((text) => text?.includes('🇯🇵') || text?.includes('Tiếng Nhật')),
+    'Translation locale row did not update after selection',
+  )
+
   check(await page.locator('.chatnet-appbar').count() === 0, 'Profile must not render the global app bar')
   check(await page.locator('.appbar-search').count() === 0, 'Profile exposes a non-functional search')
   check(await page.locator('.profile-identity strong').textContent() === 'Old Display Name', 'Profile must show display name')
