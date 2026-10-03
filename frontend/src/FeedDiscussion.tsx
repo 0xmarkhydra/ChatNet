@@ -12,12 +12,17 @@ type TranslationProps = { api: string; token: string; target: string }
 export type DiscussionDraft = { replyTo: FeedComment | null; drafts: Record<number, string>; sending?: boolean; error?: string }
 const translationCache = new Map<string, string>()
 
-export function FeedText({ text, api, token, target }: TranslationProps & { text: string }) {
+export function FeedText({ text, api, token, target, maxLines, onExpand }: TranslationProps & {
+  text: string
+  maxLines?: number
+  onExpand?: () => void
+}) {
   const host = useRef<HTMLDivElement>(null)
   const key = JSON.stringify([api, token, target, text])
   const [result, setResult] = useState({ key: '', text: '' })
   const translated = result.key === key ? result.text : ''
   const [original, setOriginal] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [failed, setFailed] = useState(false)
   const [visible, setVisible] = useState(false)
 
@@ -35,6 +40,7 @@ export function FeedText({ text, api, token, target }: TranslationProps & { text
   useEffect(() => {
     setResult({ key, text: '' })
     setOriginal(false)
+    setExpanded(false)
     setFailed(false)
     if (!visible || !text.trim() || !target) return
     const cached = translationCache.get(key)
@@ -72,9 +78,27 @@ export function FeedText({ text, api, token, target }: TranslationProps & { text
     }
   }, [api, token, target, text, visible, key])
 
+  const visibleText = translated && !original ? translated : text
+  const isLong = Boolean(maxLines && (
+    visibleText.length > maxLines * 70 ||
+    visibleText.split('\n').length > maxLines
+  ))
+  const clamped = Boolean(maxLines && !expanded)
+
   return (
     <div ref={host} className="feed-text">
-      <p>{translated && !original ? translated : text}</p>
+      <p className={clamped ? 'feed-text-clamped' : ''} style={clamped ? { WebkitLineClamp: maxLines } : undefined}>
+        {visibleText}
+      </p>
+      {isLong && clamped && (
+        <button
+          type="button"
+          className="feed-text-more"
+          onClick={() => onExpand ? onExpand() : setExpanded(true)}
+        >
+          Xem thêm
+        </button>
+      )}
       {translated && translated !== text && (
         <button type="button" className="feed-text-toggle" onClick={() => setOriginal(!original)}>
           {original ? 'Xem bản dịch' : 'Xem bản gốc'}
@@ -92,7 +116,7 @@ export function FeedDiscussion({ comments, submit, editor, updateEditor, ...tran
   updateEditor: (value: DiscussionDraft) => void
 }) {
   const { replyTo, drafts } = editor
-  const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
+  const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
   const sending = editor.sending ?? false
   const error = editor.error || ''
   const busy = useRef(false)
@@ -123,7 +147,7 @@ export function FeedDiscussion({ comments, submit, editor, updateEditor, ...tran
       await submit(draft.trim(), replyTo?.id)
       updateEditor({ drafts: { ...drafts, [draftKey]: '' }, replyTo: null })
       const root = replyTo && rootByID.get(replyTo.id)
-      if (root) setCollapsed((current) => new Set([...current].filter((id) => id !== root)))
+      if (root) setExpandedThreads((current) => new Set([...current, root]))
     } catch (cause) {
       updateEditor({ ...editor, sending: false,
         error: cause instanceof Error ? cause.message : 'Không gửi được bình luận. Bản nháp được giữ lại.' })
@@ -141,7 +165,7 @@ export function FeedDiscussion({ comments, submit, editor, updateEditor, ...tran
           <div className="feed-comment-bubble">
             <strong>@{comment.author}</strong>
             {parent && <small className="feed-reply-to">Trả lời @{parent.author}</small>}
-            <FeedText {...translation} text={comment.content} />
+            <FeedText {...translation} text={comment.content} maxLines={3} />
           </div>
           <div className="feed-comment-actions">
             <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
@@ -160,16 +184,16 @@ export function FeedDiscussion({ comments, submit, editor, updateEditor, ...tran
             {renderComment(first)}
             {replies.length > 0 && (
               <>
-                <button type="button" className="feed-replies-toggle" aria-expanded={!collapsed.has(root)}
-                  onClick={() => setCollapsed((current) => {
+                <button type="button" className="feed-replies-toggle" aria-expanded={expandedThreads.has(root)}
+                  onClick={() => setExpandedThreads((current) => {
                     const next = new Set(current)
                     if (next.has(root)) next.delete(root)
                     else next.add(root)
                     return next
                   })}>
-                  {collapsed.has(root) ? `Xem ${replies.length} phản hồi` : `Ẩn ${replies.length} phản hồi`}
+                  {expandedThreads.has(root) ? `Ẩn ${replies.length} phản hồi` : `Xem ${replies.length} phản hồi`}
                 </button>
-                {!collapsed.has(root) && (
+                {expandedThreads.has(root) && (
                   <ul className="feed-comment-replies">
                     {replies.map((comment) => <li key={comment.id}>{renderComment(comment)}</li>)}
                   </ul>

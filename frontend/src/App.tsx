@@ -462,6 +462,7 @@ export default function App() {
   const nearbyRequest = useRef(0)
 
   const [posts, setPosts] = useState<Post[]>([])
+  const [activePostId, setActivePostId] = useState<number | null>(null)
   const [stories, setStories] = useState<Story[]>([])
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null)
   const [storyBusy, setStoryBusy] = useState(false)
@@ -494,6 +495,7 @@ export default function App() {
   const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
+  const activePost = activePostId ? posts.find((item) => item.id === activePostId) || null : null
   const activeStoryIndex = stories.findIndex((item) => item.id === activeStoryId)
   const activeStory = activeStoryIndex < 0 ? null : stories[activeStoryIndex]
 
@@ -3094,28 +3096,96 @@ export default function App() {
                       <div><strong>{post.author}</strong><small>{new Date(post.createdAt).toLocaleString('vi-VN')}</small></div>
                       <button type="button" className="post-more" aria-label="Thêm">•••</button>
                     </div>
-                    {post.content && <FeedText api={API} token={session.token} target={translationPreferencesLoaded ? targetLanguage : ''} text={post.content} />}
-                    <MediaAttachmentsView items={post.attachments} />
+                    {post.content && (
+                      <FeedText
+                        api={API}
+                        token={session.token}
+                        target={translationPreferencesLoaded ? targetLanguage : ''}
+                        text={post.content}
+                        maxLines={5}
+                        onExpand={() => setActivePostId(post.id)}
+                      />
+                    )}
+                    <div className="feed-media-preview" onClick={() => setActivePostId(post.id)}>
+                      <MediaAttachmentsView items={post.attachments} />
+                    </div>
                     <div className="post-toolbar">
                       <button type="button" className={post.liked ? 'liked' : ''} onClick={() => like(post)}>
                         <UiIcon name="heart" size={21} /><span>Thích</span>{post.likes > 0 && <b>{post.likes}</b>}
                       </button>
-                      <span className="post-stat"><UiIcon name="comment" size={21} />{post.comments?.length || ''}</span>
+                      <button type="button" className="post-stat post-detail-trigger" onClick={() => setActivePostId(post.id)}>
+                        <UiIcon name="comment" size={21} />
+                        <span>{post.comments?.length ? `${post.comments.length} bình luận` : 'Xem chi tiết'}</span>
+                      </button>
                     </div>
-                    <FeedDiscussion comments={post.comments || []}
-                      editor={commentEditors[post.id] || { replyTo: null, drafts: {} }}
-                      updateEditor={(editor) => {
-                        if (sessionRef.current?.token === session.token) {
-                          setCommentEditors((current) => ({ ...current, [post.id]: editor }))
-                        }
-                      }}
-                      api={API} token={session.token} target={translationPreferencesLoaded ? targetLanguage : ''}
-                      submit={(content, parentId) => addComment(post, content, parentId)} />
                   </div>
                 </article>
               ))}
               {searchedPosts.length === 0 && <div className="feed-empty">Chưa có bài viết phù hợp.</div>}
             </div>
+          </div>
+        )}
+
+        {activePost && (
+          <div
+            className="post-detail-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Chi tiết bài viết của @${activePost.author}`}
+            onMouseDown={(event) => {
+              if (event.currentTarget === event.target) setActivePostId(null)
+            }}
+          >
+            <section className="post-detail-modal">
+              <header className="post-detail-header">
+                <div>
+                  <strong>Chi tiết bài viết</strong>
+                  <small>@{activePost.author}</small>
+                </div>
+                <button type="button" aria-label="Đóng chi tiết bài viết" onClick={() => setActivePostId(null)}>×</button>
+              </header>
+              <div className="post-detail-scroll">
+                <article className="post zalo-post post-detail-post">
+                  <UserAvatar name={activePost.author} className="avatar" />
+                  <div className="post-body">
+                    <div className="post-author">
+                      <div>
+                        <strong>{activePost.author}</strong>
+                        <small>{new Date(activePost.createdAt).toLocaleString('vi-VN')}</small>
+                      </div>
+                    </div>
+                    {activePost.content && (
+                      <FeedText
+                        api={API}
+                        token={session.token}
+                        target={translationPreferencesLoaded ? targetLanguage : ''}
+                        text={activePost.content}
+                      />
+                    )}
+                    <MediaAttachmentsView items={activePost.attachments} />
+                    <div className="post-toolbar">
+                      <button type="button" className={activePost.liked ? 'liked' : ''} onClick={() => like(activePost)}>
+                        <UiIcon name="heart" size={21} /><span>Thích</span>{activePost.likes > 0 && <b>{activePost.likes}</b>}
+                      </button>
+                      <span className="post-stat"><UiIcon name="comment" size={21} />{activePost.comments?.length || 0} bình luận</span>
+                    </div>
+                    <FeedDiscussion
+                      comments={activePost.comments || []}
+                      editor={commentEditors[activePost.id] || { replyTo: null, drafts: {} }}
+                      updateEditor={(editor) => {
+                        if (sessionRef.current?.token === session.token) {
+                          setCommentEditors((current) => ({ ...current, [activePost.id]: editor }))
+                        }
+                      }}
+                      api={API}
+                      token={session.token}
+                      target={translationPreferencesLoaded ? targetLanguage : ''}
+                      submit={(content, parentId) => addComment(activePost, content, parentId)}
+                    />
+                  </div>
+                </article>
+              </div>
+            </section>
           </div>
         )}
 
