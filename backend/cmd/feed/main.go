@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"chatnet/internal/authx"
 	"chatnet/internal/config"
@@ -21,6 +23,7 @@ import (
 
 type comment struct {
 	ID        int64     `json:"id"`
+	ParentID  *int64    `json:"parentId"`
 	Author    string    `json:"author"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -35,6 +38,14 @@ type post struct {
 	Comments    []comment           `json:"comments"`
 	Attachments []mediax.Attachment `json:"attachments,omitempty"`
 	CreatedAt   time.Time           `json:"createdAt"`
+}
+
+type story struct {
+	ID         int64             `json:"id"`
+	Author     string            `json:"author"`
+	Attachment mediax.Attachment `json:"attachment"`
+	CreatedAt  time.Time         `json:"createdAt"`
+	ExpiresAt  time.Time         `json:"expiresAt"`
 }
 
 type server struct {
@@ -66,6 +77,9 @@ func main() {
 	mux.Handle("POST /api/posts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.create)))
 	mux.Handle("POST /api/posts/{id}/like", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.like)))
 	mux.Handle("POST /api/posts/{id}/comments", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.addComment)))
+	mux.Handle("GET /api/stories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listStories)))
+	mux.Handle("POST /api/stories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createStory)))
+	mux.Handle("DELETE /api/stories/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteStory)))
 
 	port := config.Env("PORT", "8083")
 	log.Printf("feed service listening on :%s", port)
@@ -100,7 +114,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) comments(r *http.Request, postID int64) []comment {
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id,u.username,c.content,c.created_at
+		SELECT c.id,c.parent_id,u.username,c.content,c.created_at
 		FROM comments c JOIN users u ON u.id=c.user_id
 		WHERE c.post_id=$1 ORDER BY c.id ASC`, postID)
 	if err != nil {
@@ -111,7 +125,7 @@ func (s *server) comments(r *http.Request, postID int64) []comment {
 	items := []comment{}
 	for rows.Next() {
 		var c comment
-		if rows.Scan(&c.ID, &c.Author, &c.Content, &c.CreatedAt) == nil {
+		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.Content, &c.CreatedAt) == nil {
 			items = append(items, c)
 		}
 	}
@@ -227,6 +241,109 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, p)
 }
 
+func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	// ponytail: rows expire eagerly on reads; add object-store lifecycle cleanup when orphan cleanup ships.
+	_, _ = s.db.Exec(r.Context(), `DELETE FROM stories WHERE expires_at <= NOW()`)
+	rows, err := s.db.Query(r.Context(), `
+		SELECT s.id,u.username,s.storage_ref,s.original_name,s.content_type,s.size_bytes,s.kind,s.created_at,s.expires_at
+		FROM stories s JOIN users u ON u.id=s.user_id
+		WHERE s.expires_at > NOW()
+		ORDER BY (s.user_id=$1) DESC,s.created_at DESC
+		LIMIT 100`, claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load stories")
+		return
+	}
+	defer rows.Close()
+
+	items := []story{}
+	for rows.Next() {
+		var item story
+		if rows.Scan(
+			&item.ID,
+			&item.Author,
+			&item.Attachment.StorageRef,
+			&item.Attachment.Name,
+			&item.Attachment.ContentType,
+			&item.Attachment.SizeBytes,
+			&item.Attachment.Kind,
+			&item.CreatedAt,
+			&item.ExpiresAt,
+		) == nil {
+			mediax.SignAttachment(s.storage, &item.Attachment)
+			items = append(items, item)
+		}
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	var body struct {
+		Attachment mediax.AttachmentInput `json:"attachment"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8*1024))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF {
+		httpx.Error(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	attachments, err := mediax.ValidateAttachments(
+		r.Context(),
+		s.storage,
+		"story",
+		claims.UserID,
+		[]mediax.AttachmentInput{body.Attachment},
+		1,
+	)
+	if err != nil || len(attachments) != 1 {
+		message := "Story requires one image or video"
+		if err != nil {
+			message = err.Error()
+		}
+		httpx.Error(w, http.StatusBadRequest, message)
+		return
+	}
+
+	item := story{Author: claims.Username, Attachment: attachments[0]}
+	err = s.db.QueryRow(r.Context(), `
+		INSERT INTO stories(user_id,storage_ref,original_name,content_type,size_bytes,kind)
+		VALUES($1,$2,$3,$4,$5,$6)
+		RETURNING id,created_at,expires_at`,
+		claims.UserID,
+		item.Attachment.StorageRef,
+		item.Attachment.Name,
+		item.Attachment.ContentType,
+		item.Attachment.SizeBytes,
+		item.Attachment.Kind,
+	).Scan(&item.ID, &item.CreatedAt, &item.ExpiresAt)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot create story")
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, item)
+}
+
+func (s *server) deleteStory(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		httpx.Error(w, http.StatusBadRequest, "invalid story id")
+		return
+	}
+	tag, err := s.db.Exec(r.Context(), `DELETE FROM stories WHERE id=$1 AND user_id=$2`, id, claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot delete story")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httpx.Error(w, http.StatusNotFound, "story not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *server) like(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -294,28 +411,39 @@ func (s *server) like(w http.ResponseWriter, r *http.Request) {
 func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	postID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
+	if err != nil || postID <= 0 {
 		httpx.Error(w, http.StatusBadRequest, "invalid post id")
 		return
 	}
 	var body struct {
-		Content string `json:"content"`
+		Content  string `json:"content"`
+		ParentID *int64 `json:"parentId"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16*1024))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
 	body.Content = strings.TrimSpace(body.Content)
-	if body.Content == "" || len(body.Content) > 1000 {
+	if body.Content == "" || utf8.RuneCountInString(body.Content) > 1000 || (body.ParentID != nil && *body.ParentID <= 0) {
 		httpx.Error(w, http.StatusBadRequest, "content is required and must be <= 1000 characters")
 		return
 	}
 
-	if _, err := s.db.Exec(r.Context(),
-		`INSERT INTO comments(post_id,user_id,content) VALUES($1,$2,$3)`,
-		postID, claims.UserID, body.Content,
-	); err != nil {
-		httpx.Error(w, http.StatusBadRequest, "cannot create comment")
+	tag, err := s.db.Exec(r.Context(), `
+		INSERT INTO comments(post_id,user_id,content,parent_id)
+		SELECT $1,$2,$3,$4::bigint
+		WHERE EXISTS (SELECT 1 FROM posts WHERE id=$1)
+		  AND ($4::bigint IS NULL OR EXISTS (
+		    SELECT 1 FROM comments WHERE id=$4 AND post_id=$1
+		  ))`, postID, claims.UserID, body.Content, body.ParentID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot create comment")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httpx.Error(w, http.StatusNotFound, "post or parent comment not found")
 		return
 	}
 
@@ -369,6 +497,7 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Comments = s.comments(r, p.ID)
+	_ = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id=$1 AND user_id=$2)`, p.ID, claims.UserID).Scan(&p.Liked)
 	p.Attachments = s.postAttachments(r.Context(), p.ID)
 	httpx.JSON(w, http.StatusCreated, p)
 }

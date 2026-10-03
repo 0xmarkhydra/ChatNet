@@ -1,4 +1,5 @@
 import { FormEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
+import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import {
   disableOneSignalPush,
   enableOneSignalPush,
@@ -77,27 +78,26 @@ type RealtimeEvent = {
   conversation?: Conversation
 }
 
-type Comment = {
-  id: number
-  author: string
-  content: string
-  createdAt: string
-}
-
 type Post = {
   id: number
   author: string
   content: string
   likes: number
   liked: boolean
-  comments: Comment[]
+  comments: FeedComment[]
   attachments?: MediaAttachment[]
   createdAt: string
 }
 
+type Story = {
+  id: number
+  author: string
+  attachment: MediaAttachment
+  createdAt: string
+  expiresAt: string
+}
+
 type Tab = 'chat' | 'contacts' | 'discover' | 'feed' | 'profile'
-type ChatSection = 'priority' | 'other'
-type FeedSection = 'following' | 'other'
 type AuthMode = 'login' | 'register'
 type RegisterStep = 'details' | 'otp'
 type NewChatMode = 'none' | 'friends' | 'direct' | 'group'
@@ -271,7 +271,7 @@ function UiIcon({ name, size = 24 }: { name: string; size?: number }) {
     case 'contacts':
       return <svg {...common}><rect x="4" y="3" width="16" height="18" rx="2" /><circle cx="12" cy="9" r="2.5" /><path d="M8 17c.7-2.4 2-3.5 4-3.5s3.3 1.1 4 3.5" /></svg>
     case 'discover':
-      return <svg {...common}><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M17 14v6M14 17h6" /></svg>
+      return <svg {...common}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><path d="m12 12 7-7" /><circle cx="12" cy="12" r="1" /></svg>
     case 'wall':
       return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 9h6M7 13h10M17 9h.01" /></svg>
     case 'profile':
@@ -292,6 +292,8 @@ function UiIcon({ name, size = 24 }: { name: string; size?: number }) {
       return <svg {...common}><path d="M20.8 8.8c0 5-8.8 10-8.8 10s-8.8-5-8.8-10A4.8 4.8 0 0 1 12 6a4.8 4.8 0 0 1 8.8 2.8Z" /></svg>
     case 'comment':
       return <svg {...common}><path d="M4 5h16v11H9l-5 4V5Z" /><path d="M8 9h8M8 12h5" /></svg>
+    case 'trash':
+      return <svg {...common}><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>
     default:
       return <span aria-hidden="true">•</span>
   }
@@ -313,8 +315,6 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false)
 
   const [tab, setTab] = useState<Tab>('chat')
-  const [chatSection, setChatSection] = useState<ChatSection>('priority')
-  const [feedSection, setFeedSection] = useState<FeedSection>('following')
   const [globalSearch, setGlobalSearch] = useState('')
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -336,14 +336,21 @@ export default function App() {
   const [groupName, setGroupName] = useState('')
   const [groupUsers, setGroupUsers] = useState('')
   const [chatCreateError, setChatCreateError] = useState('')
+  const [nearbyUsers, setNearbyUsers] = useState<FriendSearchResult[]>([])
+  const [nearbyBusy, setNearbyBusy] = useState(false)
+  const [nearbyUntil, setNearbyUntil] = useState(0)
+  const [nearbyError, setNearbyError] = useState('')
+  const nearbyRequest = useRef(0)
 
   const [posts, setPosts] = useState<Post[]>([])
+  const [stories, setStories] = useState<Story[]>([])
+  const [activeStoryId, setActiveStoryId] = useState<number | null>(null)
+  const [storyBusy, setStoryBusy] = useState(false)
+  const [commentEditors, setCommentEditors] = useState<Record<number, DiscussionDraft>>({})
   const [postText, setPostText] = useState('')
   const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([])
-  const [mediaUploading, setMediaUploading] = useState<'chat' | 'feed' | null>(null)
-  const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({})
+  const [mediaUploading, setMediaUploading] = useState<'chat' | 'feed' | 'story' | null>(null)
   const [translations, setTranslations] = useState<Record<number, string>>({})
-  const [postTranslations, setPostTranslations] = useState<Record<number, string>>({})
   const [targetLanguage, setTargetLanguage] = useState('en')
   const [autoTranslate, setAutoTranslate] = useState(true)
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] = useState(false)
@@ -362,9 +369,12 @@ export default function App() {
   const feedImageInputRef = useRef<HTMLInputElement>(null)
   const feedVideoInputRef = useRef<HTMLInputElement>(null)
   const feedAlbumInputRef = useRef<HTMLInputElement>(null)
+  const storyFileInputRef = useRef<HTMLInputElement>(null)
 
   const name = session?.user.username || ''
   const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
+  const activeStoryIndex = stories.findIndex((item) => item.id === activeStoryId)
+  const activeStory = activeStoryIndex < 0 ? null : stories[activeStoryIndex]
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId
@@ -453,7 +463,86 @@ export default function App() {
     return response
   }
 
-  async function uploadMediaFiles(files: File[], scope: 'chat' | 'feed') {
+  async function findNearby() {
+    if (!session || nearbyBusy) return
+    const request = ++nearbyRequest.current
+    const token = session.token
+    setNearbyBusy(true)
+    setNearbyError('')
+    try {
+      if (!navigator.geolocation) throw new Error('Trình duyệt không hỗ trợ định vị.')
+      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000, maximumAge: 60000 }),
+      )
+      if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
+      const response = await apiFetch('/api/users/nearby', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+      })
+      if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
+      if (!response.ok) throw new Error(response.status === 429 ? 'Chờ 10 giây trước khi tìm lại.' : 'Không tìm được bạn quanh đây. Thử lại sau.')
+      const result = await response.json() as { users: FriendSearchResult[]; expiresAt: string }
+      if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
+      setNearbyUsers(result.users)
+      setNearbyUntil(Date.parse(result.expiresAt))
+    } catch (error) {
+      if (request !== nearbyRequest.current) return
+      setNearbyError(error instanceof Error ? error.message : 'Không lấy được vị trí. Kiểm tra quyền định vị rồi thử lại.')
+    } finally {
+      if (request === nearbyRequest.current) setNearbyBusy(false)
+    }
+  }
+
+  async function stopNearby() {
+    if (!session || nearbyBusy) return
+    const request = ++nearbyRequest.current
+    setNearbyBusy(true)
+    setNearbyError('')
+    try {
+      const response = await apiFetch('/api/users/nearby', { method: 'DELETE' })
+      if (request !== nearbyRequest.current) return
+      if (!response.ok) throw new Error('Chưa tắt được Quanh đây. Thử lại sau.')
+      setNearbyUntil(0)
+      setNearbyUsers([])
+    } catch (error) {
+      if (request !== nearbyRequest.current) return
+      setNearbyError(error instanceof Error ? error.message : 'Mất kết nối. Chưa xác nhận đã tắt Quanh đây.')
+    } finally {
+      if (request === nearbyRequest.current) setNearbyBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!nearbyUntil) return
+    const timer = window.setTimeout(() => {
+      setNearbyUntil(0)
+      setNearbyUsers([])
+    }, Math.max(0, nearbyUntil - Date.now()))
+    return () => window.clearTimeout(timer)
+  }, [nearbyUntil])
+
+  useEffect(() => {
+    if (!activeStory) {
+      if (activeStoryId !== null) setActiveStoryId(null)
+      return
+    }
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActiveStoryId(null)
+      if (event.key === 'ArrowLeft') previousStory()
+      if (event.key === 'ArrowRight') nextStory()
+    }
+    window.addEventListener('keydown', handleKey)
+    const timer = activeStory.attachment.kind === 'image'
+      ? window.setTimeout(nextStory, 7000)
+      : undefined
+    return () => {
+      window.removeEventListener('keydown', handleKey)
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [activeStory?.id, activeStoryId, stories.length])
+
+  async function uploadMediaFiles(files: File[], scope: 'chat' | 'feed' | 'story') {
     if (!files.length) return [] as MediaAttachment[]
 
     setMediaUploading(scope)
@@ -557,6 +646,54 @@ export default function App() {
       setPostAttachments((current) => [...current, ...uploaded].slice(0, 12))
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Không upload được media')
+    }
+  }
+
+  async function createStory(file?: File) {
+    if (!file || storyBusy || mediaUploading) return
+    const token = session?.token
+    setStoryBusy(true)
+    try {
+      const [attachment] = await uploadMediaFiles([file], 'story')
+      if (sessionRef.current?.token !== token) return
+      const response = await apiFetch('/api/stories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attachment }),
+      })
+      const result = await response.json().catch(() => null) as (Story & { error?: string }) | null
+      if (!response.ok || !result) throw new Error(result?.error || 'Không đăng được Story')
+      setStories((current) => [result, ...current])
+      setActiveStoryId(result.id)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Không đăng được Story')
+    } finally {
+      setStoryBusy(false)
+    }
+  }
+
+  function nextStory() {
+    const next = stories[activeStoryIndex + 1]
+    setActiveStoryId(next?.id ?? null)
+  }
+
+  function previousStory() {
+    const previous = stories[activeStoryIndex - 1]
+    if (previous) setActiveStoryId(previous.id)
+  }
+
+  async function deleteStory(story: Story) {
+    if (story.author !== name || storyBusy || !window.confirm('Xóa Story này?')) return
+    setStoryBusy(true)
+    try {
+      const response = await apiFetch(`/api/stories/${story.id}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Không xóa được Story')
+      setStories((current) => current.filter((item) => item.id !== story.id))
+      setActiveStoryId(null)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Không xóa được Story')
+    } finally {
+      setStoryBusy(false)
     }
   }
 
@@ -887,6 +1024,19 @@ export default function App() {
     }
   }
 
+  async function refreshStories() {
+    try {
+      const response = await apiFetch('/api/stories')
+      if (!response.ok) return
+      const data = (await response.json()) as Story[]
+      if (sessionRef.current?.token === session?.token) {
+        setStories(data.filter((item) => Date.parse(item.expiresAt) > Date.now()))
+      }
+    } catch {
+      setStatus('Đang kết nối lại...')
+    }
+  }
+
   async function submitAuth(event: FormEvent) {
     event.preventDefault()
     setAuthLoading(true)
@@ -1012,6 +1162,16 @@ export default function App() {
 
   function logout() {
     const currentToken = session?.token
+    ++nearbyRequest.current
+    setNearbyUsers([])
+    setNearbyUntil(0)
+    setNearbyBusy(false)
+    setNearbyError('')
+    if (currentToken) {
+      void fetch(`${API}/api/users/nearby`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${currentToken}` }, keepalive: true,
+      }).catch(() => undefined)
+    }
     void getOneSignalPushState()
       .then(async (state) => {
         if (!currentToken || !state.subscriptionId) return
@@ -1035,11 +1195,12 @@ export default function App() {
     setMessages([])
     setMessageDrafts({})
     setPostText('')
-    setCommentDrafts({})
     setPosts([])
+    setStories([])
+    setActiveStoryId(null)
+    setCommentEditors({})
     setPostAttachments([])
     setTranslations({})
-    setPostTranslations({})
   }
 
   useEffect(() => {
@@ -1047,6 +1208,7 @@ export default function App() {
 
     void refreshConversations()
     void refreshPosts()
+    void refreshStories()
 
     const events = new EventSource(
       `${API}/api/events?token=${encodeURIComponent(session.token)}`,
@@ -1109,7 +1271,11 @@ export default function App() {
   useEffect(() => {
     if (!session?.token || tab !== 'feed') return
     void refreshPosts()
-    const timer = window.setInterval(() => void refreshPosts(), 12000)
+    void refreshStories()
+    const timer = window.setInterval(() => {
+      void refreshPosts()
+      void refreshStories()
+    }, 12000)
     return () => window.clearInterval(timer)
   }, [tab, session?.token])
 
@@ -1192,7 +1358,6 @@ export default function App() {
   function changeTargetLanguage(next: string) {
     setTargetLanguage(next)
     setTranslations({})
-    setPostTranslations({})
     void saveTranslationPreferences(next, autoTranslate)
   }
 
@@ -1362,25 +1527,22 @@ export default function App() {
     setPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
   }
 
-  async function addComment(post: Post) {
-    const content = commentDrafts[post.id]?.trim()
-    if (!content) return
-    const response = await apiFetch(`/api/posts/${post.id}/comments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    })
-    if (!response.ok) return
+  async function addComment(post: Post, content: string, parentId?: number) {
+    const token = session?.token
+    let response: Response
+    try {
+      response = await apiFetch(`/api/posts/${post.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, parentId }),
+      })
+    } catch {
+      throw new Error('Chưa xác nhận được bình luận đã gửi. Bản nháp được giữ lại; kiểm tra bài viết trước khi gửi lại.')
+    }
+    if (!response.ok) throw new Error('Không gửi được bình luận. Bản nháp được giữ lại.')
     const updated = (await response.json()) as Post
+    if (sessionRef.current?.token !== token) return
     setPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
-    setCommentDrafts((current) => ({ ...current, [post.id]: '' }))
-  }
-
-  async function translatePost(post: Post) {
-    if (!post.content.trim()) return
-    const result = await requestTranslation(post.content)
-    if (!result) return
-    setPostTranslations((current) => ({ ...current, [post.id]: result.translatedText }))
   }
 
   if (!session) {
@@ -1499,10 +1661,10 @@ export default function App() {
       conversation.lastMessage.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
     )
   })
-  const visibleConversations = searchedConversations.filter((conversation) => {
-    const priority = conversation.unreadCount > 0 || conversation.type === 'direct'
-    return chatSection === 'priority' ? priority : !priority
-  })
+  const visibleConversations = searchedConversations
+  const visibleNearbyUsers = nearbyUsers.filter((user) =>
+    user.username.toLocaleLowerCase('vi-VN').includes(normalizedSearch.replace(/^@/, '')),
+  )
   const searchedPosts = posts.filter((post) => {
     if (!normalizedSearch || tab !== 'feed') return true
     return (
@@ -1510,9 +1672,6 @@ export default function App() {
       post.content.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
     )
   })
-  const visiblePosts = feedSection === 'following' ? searchedPosts : [...searchedPosts].reverse()
-  const storyConversations = conversations.slice(0, 4)
-
   const switchTab = (nextTab: Tab) => {
     setTab(nextTab)
     setQuickCreateOpen(false)
@@ -1533,7 +1692,7 @@ export default function App() {
               if (tab === 'contacts') setFriendQuery(event.target.value)
               else setGlobalSearch(event.target.value)
             }}
-            placeholder={tab === 'contacts' ? 'Email hoặc @username' : 'Tìm kiếm'}
+            placeholder={tab === 'contacts' ? 'Email hoặc @username' : tab === 'discover' ? 'Lọc theo @username' : 'Tìm kiếm'}
             aria-label={tab === 'contacts' ? 'Tìm bạn bằng email hoặc username' : 'Tìm kiếm'}
           />
         </label>
@@ -1604,10 +1763,11 @@ export default function App() {
             <button
               className="appbar-icon-button"
               type="button"
-              aria-label="Quét QR"
-              onClick={() => setNotice('QR ChatNet đang được chuẩn bị để kết nối nhanh giữa hai người dùng.')}
+              aria-label="Tìm lại quanh đây"
+              onClick={() => void findNearby()}
+              disabled={nearbyBusy || !nearbyUntil}
             >
-              <UiIcon name="qr" size={28} />
+              <UiIcon name="discover" size={28} />
             </button>
           )}
 
@@ -1632,23 +1792,6 @@ export default function App() {
         {tab === 'chat' && (
           <div className={`messenger-layout modern-messenger ${activeConversation ? 'has-active' : ''}`}>
             <aside className="conversation-sidebar">
-              <div className="zalo-section-tabs">
-                <button
-                  type="button"
-                  className={chatSection === 'priority' ? 'active' : ''}
-                  onClick={() => setChatSection('priority')}
-                >
-                  Ưu tiên
-                </button>
-                <button
-                  type="button"
-                  className={chatSection === 'other' ? 'active' : ''}
-                  onClick={() => setChatSection('other')}
-                >
-                  Khác
-                </button>
-              </div>
-
               {quickCreateOpen && (
                 <div className="quick-create-menu">
                   <button type="button" onClick={() => { setNewChatMode('friends'); setQuickCreateOpen(false) }}>
@@ -1736,7 +1879,7 @@ export default function App() {
               <div className="conversation-list zalo-conversation-list">
                 {visibleConversations.length === 0 && (
                   <div className="conversation-list-empty">
-                    {normalizedSearch ? 'Không tìm thấy cuộc trò chuyện phù hợp.' : chatSection === 'priority' ? 'Chưa có tin nhắn ưu tiên.' : 'Chưa có cuộc trò chuyện khác.'}
+                    {normalizedSearch ? 'Không tìm thấy cuộc trò chuyện phù hợp.' : 'Chưa có cuộc trò chuyện.'}
                   </div>
                 )}
 
@@ -1919,58 +2062,76 @@ export default function App() {
 
         {tab === 'discover' && (
           <div className="simple-view discover-view">
-            <div className="simple-view-title"><strong>Khám phá</strong><small>Tính năng nổi bật của ChatNet</small></div>
-            <div className="discover-grid">
-              <button type="button" onClick={() => { setTab('chat'); setNewChatMode('friends') }}>
-                <span>🌐</span><strong>Kết nối toàn cầu</strong><small>Tìm bạn và nhắn tin xuyên ngôn ngữ</small>
-              </button>
-              <button type="button" onClick={() => { setTab('chat'); setActiveConversationId(conversations[0]?.id || null) }}>
-                <span>✨</span><strong>Dịch AI tự động</strong><small>Ngôn ngữ đã chọn được ghi nhớ cho lần sau</small>
-              </button>
-              <button type="button" onClick={() => { setTab('chat'); setNewChatMode('group') }}>
-                <span>👥</span><strong>Nhóm ChatNet</strong><small>Tạo nhóm và trò chuyện realtime</small>
-              </button>
-              <button type="button" onClick={() => void installApp()}>
-                <span>📲</span><strong>Cài PWA</strong><small>Dùng ChatNet như một ứng dụng trên điện thoại</small>
-              </button>
+            <div className="simple-view-title"><strong>Tìm bạn quanh đây</strong><small>Trong phạm vi 5 km</small></div>
+            <div className="nearby-controls">
+              <div className="nearby-radar"><UiIcon name="discover" size={80} /></div>
+              <p>{nearbyUntil ? 'Đang hiển thị với người dùng quanh đây.' : 'Bật Quanh đây để tìm người cùng bật trong phạm vi 5 km.'}</p>
+              <p className="nearby-privacy">Vị trí chỉ dùng khi bạn bật. Tự ẩn sau 15 phút. Không hiển thị tọa độ hoặc khoảng cách chính xác. Nếu mất kết nối, bạn có thể vẫn hiển thị đến hết thời hạn.</p>
+              <div className="nearby-actions">
+                <button type="button" onClick={() => void findNearby()} disabled={nearbyBusy}>
+                  <UiIcon name="discover" size={20} />{nearbyBusy ? 'Đang xử lý...' : nearbyUntil ? 'Tìm lại' : 'Bật Quanh đây'}
+                </button>
+                <button type="button" className="secondary" onClick={() => void stopNearby()} disabled={nearbyBusy}>Tắt Quanh đây</button>
+              </div>
+              {nearbyError && <p role="alert" className="inline-error">{nearbyError}</p>}
+              {nearbyUntil > 0 && <p role="status">{visibleNearbyUsers.length ? `${visibleNearbyUsers.length} người quanh đây` : 'Chưa tìm thấy người phù hợp quanh đây.'}</p>}
             </div>
+            <section className="friend-results" aria-label="Người dùng quanh đây">
+              {visibleNearbyUsers.map((friend) => (
+                <button key={friend.id} type="button" className="friend-result contact-result" aria-label={`Nhắn tin với @${friend.username}`} onClick={() => void openDirectByUsername(friend.username)}>
+                  <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+                  <div className="friend-result-copy"><strong>@{friend.username}</strong><span>Trong phạm vi 5 km</span></div>
+                  <div className="friend-result-action"><small>Nhắn tin</small><span>›</span></div>
+                </button>
+              ))}
+            </section>
           </div>
         )}
 
         {tab === 'feed' && (
           <div className="feed-view zalo-feed-view">
-            <div className="zalo-section-tabs feed-tabs">
-              <button type="button" className={feedSection === 'following' ? 'active' : ''} onClick={() => setFeedSection('following')}>Quan tâm</button>
-              <button type="button" className={feedSection === 'other' ? 'active' : ''} onClick={() => setFeedSection('other')}>Khác</button>
-            </div>
-
+            <input
+              ref={storyFileInputRef}
+              className="hidden-media-input"
+              type="file"
+              accept="image/*,video/*"
+              aria-label="Chọn ảnh hoặc video cho Story"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                void createStory(file)
+              }}
+            />
             <div className="stories-row">
               <button
                 type="button"
-                className="story-card create-story"
-                onClick={() => {
-                  postComposerRef.current?.focus()
-                  postComposerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                }}
+                className="story-card"
+                disabled={storyBusy || mediaUploading === 'story'}
+                onClick={() => storyFileInputRef.current?.click()}
+                aria-label="Tạo Story mới"
               >
-                <div className="story-visual self-story">{name.slice(0, 1).toUpperCase()}<span className="story-camera">●</span></div>
-                <span>Tạo mới</span>
+                <div className="story-visual self-story">
+                  <span className="story-camera"><UiIcon name="plus" size={22} /></span>
+                </div>
+                <span>{storyBusy || mediaUploading === 'story' ? 'Đang tải...' : 'Tạo mới'}</span>
               </button>
-              {storyConversations.map((conversation, index) => (
+              {stories.map((story) => (
                 <button
                   type="button"
                   className="story-card"
-                  key={conversation.id}
-                  onClick={() => {
-                    setTab('chat')
-                    setActiveConversationId(conversation.id)
-                  }}
+                  key={story.id}
+                  onClick={() => setActiveStoryId(story.id)}
+                  aria-label={`Xem Story của @${story.author}`}
                 >
-                  <div className={`story-visual story-tone-${index % 4}`}>
-                    {conversation.name.slice(0, 1).toUpperCase()}
-                    <span className="story-avatar-mini">{conversation.name.slice(0, 1).toUpperCase()}</span>
+                  <div className="story-visual">
+                    {story.attachment.kind === 'video' ? (
+                      <video src={story.attachment.url} muted playsInline preload="metadata" />
+                    ) : (
+                      <img src={story.attachment.url} alt="" loading="lazy" />
+                    )}
+                    <span className="story-avatar-mini">{story.author.slice(0, 1).toUpperCase()}</span>
                   </div>
-                  <span>{conversation.name}</span>
+                  <span>{story.author === name ? 'Story của bạn' : story.author}</span>
                 </button>
               ))}
             </div>
@@ -2043,7 +2204,7 @@ export default function App() {
             </form>
 
             <div className="feed zalo-feed">
-              {visiblePosts.map((post) => (
+              {searchedPosts.map((post) => (
                 <article className="post zalo-post" key={post.id}>
                   <UserAvatar name={post.author} className="avatar" />
                   <div className="post-body">
@@ -2051,43 +2212,72 @@ export default function App() {
                       <div><strong>{post.author}</strong><small>{new Date(post.createdAt).toLocaleString('vi-VN')}</small></div>
                       <button type="button" className="post-more" aria-label="Thêm">•••</button>
                     </div>
-                    {post.content && <p>{post.content}</p>}
+                    {post.content && <FeedText api={API} token={session.token} target={translationPreferencesLoaded ? targetLanguage : ''} text={post.content} />}
                     <MediaAttachmentsView items={post.attachments} />
-                    {postTranslations[post.id] && <div className="post-translation">✨ {postTranslations[post.id]}</div>}
                     <div className="post-toolbar">
                       <button type="button" className={post.liked ? 'liked' : ''} onClick={() => like(post)}>
                         <UiIcon name="heart" size={21} /><span>Thích</span>{post.likes > 0 && <b>{post.likes}</b>}
                       </button>
                       <span className="post-stat"><UiIcon name="comment" size={21} />{post.comments?.length || ''}</span>
-                      {Boolean(post.content.trim()) && <button type="button" onClick={() => translatePost(post)}>✨ <span>Dịch AI</span></button>}
                     </div>
-                    {!!post.comments?.length && (
-                      <div className="comments">
-                        {post.comments.map((comment) => (
-                          <div key={comment.id} className="comment"><strong>{comment.author}</strong><span>{comment.content}</span></div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="comment-box">
-                      <input
-                        value={commentDrafts[post.id] || ''}
-                        onChange={(event) => setCommentDrafts((current) => ({ ...current, [post.id]: event.target.value }))}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            void addComment(post)
-                          }
-                        }}
-                        placeholder="Viết bình luận..."
-                        maxLength={1000}
-                      />
-                      <button type="button" onClick={() => addComment(post)}>Gửi</button>
-                    </div>
+                    <FeedDiscussion comments={post.comments || []}
+                      editor={commentEditors[post.id] || { replyTo: null, drafts: {} }}
+                      updateEditor={(editor) => {
+                        if (sessionRef.current?.token === session.token) {
+                          setCommentEditors((current) => ({ ...current, [post.id]: editor }))
+                        }
+                      }}
+                      api={API} token={session.token} target={translationPreferencesLoaded ? targetLanguage : ''}
+                      submit={(content, parentId) => addComment(post, content, parentId)} />
                   </div>
                 </article>
               ))}
-              {visiblePosts.length === 0 && <div className="feed-empty">Chưa có bài viết phù hợp.</div>}
+              {searchedPosts.length === 0 && <div className="feed-empty">Chưa có bài viết phù hợp.</div>}
             </div>
+          </div>
+        )}
+
+        {activeStory && (
+          <div
+            className="story-viewer-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Story của @${activeStory.author}`}
+            onMouseDown={(event) => {
+              if (event.currentTarget === event.target) setActiveStoryId(null)
+            }}
+          >
+            <section className="story-viewer">
+              <div className="story-progress" aria-hidden="true">
+                <span key={activeStory.id} className={activeStory.attachment.kind === 'image' ? 'running' : ''} />
+              </div>
+              <header>
+                <UserAvatar name={activeStory.author} className="story-viewer-avatar" />
+                <div className="story-viewer-owner">
+                  <strong>@{activeStory.author}</strong>
+                  <time dateTime={activeStory.createdAt}>
+                    {new Date(activeStory.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric' })}
+                  </time>
+                </div>
+                {activeStory.author === name && (
+                  <button type="button" className="story-delete" aria-label="Xóa Story" title="Xóa Story" disabled={storyBusy} onClick={() => void deleteStory(activeStory)}>
+                    <UiIcon name="trash" size={20} />
+                  </button>
+                )}
+                <button type="button" className="story-close" aria-label="Đóng Story" title="Đóng" onClick={() => setActiveStoryId(null)}>×</button>
+              </header>
+              <div className="story-viewer-media">
+                {activeStory.attachment.kind === 'video' ? (
+                  <video src={activeStory.attachment.url} autoPlay controls playsInline onEnded={nextStory} />
+                ) : (
+                  <img src={activeStory.attachment.url} alt={activeStory.attachment.name} />
+                )}
+              </div>
+              <button type="button" className="story-nav story-previous" aria-label="Story trước" title="Story trước"
+                disabled={activeStoryIndex === 0} onClick={previousStory}>‹</button>
+              <button type="button" className="story-nav story-next" aria-label="Story tiếp theo" title="Story tiếp theo"
+                onClick={nextStory}>›</button>
+            </section>
           </div>
         )}
 
@@ -2122,7 +2312,7 @@ export default function App() {
                 <button type="button" className="settings-action" onClick={() => void sendTestPush()} disabled={pushBusy || !pushEnabled}>Test</button>
               </div>
               <div className="settings-row">
-                <div><strong>Tự động dịch</strong><small>Mặc định bật và nhớ lựa chọn</small></div>
+                <div><strong>Tự động dịch tin nhắn</strong></div>
                 <button
                   type="button"
                   className={`switch-button ${autoTranslate ? 'on' : ''}`}
@@ -2159,7 +2349,7 @@ export default function App() {
         </button>
         <button type="button" className={tab === 'discover' ? 'active' : ''} onClick={() => switchTab('discover')}>
           <span className="nav-icon"><UiIcon name="discover" size={25} /></span>
-          <span>Khám phá</span>
+          <span>Quanh đây</span>
         </button>
         <button type="button" className={tab === 'feed' ? 'active' : ''} onClick={() => switchTab('feed')}>
           <span className="nav-icon"><UiIcon name="wall" size={25} /></span>

@@ -32,6 +32,7 @@ declare global {
 
 let sdkPromise: Promise<OneSignalAPI> | null = null
 let initializedAppId = ''
+let initialization: { appId: string; promise: Promise<void> } | null = null
 let listenersBound = false
 let stateHandler: ((state: PushState) => void | Promise<void>) | null = null
 
@@ -101,6 +102,41 @@ async function emitState(OneSignal: OneSignalAPI) {
   await stateHandler(state)
 }
 
+async function initializeSDK(OneSignal: OneSignalAPI, appId: string) {
+  if (initializedAppId) {
+    if (initializedAppId !== appId) {
+      throw new Error('OneSignal đã được khởi tạo với App ID khác.')
+    }
+    return
+  }
+
+  if (initialization) {
+    if (initialization.appId !== appId) {
+      throw new Error('OneSignal đang được khởi tạo với App ID khác.')
+    }
+    await initialization.promise
+    return
+  }
+
+  const promise = OneSignal.init({
+    appId,
+    serviceWorkerPath: '/push/onesignal/OneSignalSDKWorker.js',
+    serviceWorkerParam: { scope: '/push/onesignal/' },
+    allowLocalhostAsSecureOrigin:
+      location.hostname === 'localhost' || location.hostname === '127.0.0.1',
+  }).then(() => {
+    initializedAppId = appId
+  })
+  initialization = { appId, promise }
+
+  try {
+    await promise
+  } catch (error) {
+    if (initialization?.promise === promise) initialization = null
+    throw error
+  }
+}
+
 export async function setupOneSignal(
   appId: string,
   onStateChange?: (state: PushState) => void | Promise<void>,
@@ -114,16 +150,7 @@ export async function setupOneSignal(
   }
 
   const OneSignal = await getSDK()
-  if (initializedAppId !== appId) {
-    await OneSignal.init({
-      appId,
-      serviceWorkerPath: '/push/onesignal/OneSignalSDKWorker.js',
-      serviceWorkerParam: { scope: '/push/onesignal/' },
-      allowLocalhostAsSecureOrigin:
-        location.hostname === 'localhost' || location.hostname === '127.0.0.1',
-    })
-    initializedAppId = appId
-  }
+  await initializeSDK(OneSignal, appId)
 
   stateHandler = onStateChange || null
 

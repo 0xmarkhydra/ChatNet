@@ -1,6 +1,6 @@
 # ChatNet
 
-ChatNet là MVP mạng giao tiếp đa ngôn ngữ cho hackathon: **chat riêng + chat nhóm + AI Translation + News Feed**.
+ChatNet là MVP mạng giao tiếp đa ngôn ngữ cho hackathon: **chat riêng + chat nhóm + AI Translation + News Feed + Story 24 giờ**.
 
 Mục tiêu của bản thi là chứng minh một flow end-to-end đủ giống sản phẩm thật nhưng vẫn có kiến trúc để tiếp tục scale sau cuộc thi.
 
@@ -637,7 +637,6 @@ make test
 
 Để giữ scope đủ hoàn thiện trong thời gian hackathon, bản hiện tại chưa ưu tiên:
 - Voice/video call.
-- Story media 24 giờ.
 - Recall/edit message.
 - Message reaction.
 - Push notification.

@@ -83,7 +83,7 @@ func (c *Client) PresignPut(scope string, userID int64, originalName string, ttl
 		return PresignedUpload{}, errors.New("S3 storage is not configured")
 	}
 	scope = strings.TrimSpace(scope)
-	if scope != "chat" && scope != "feed" {
+	if scope != "chat" && scope != "feed" && scope != "story" {
 		return PresignedUpload{}, errors.New("invalid media scope")
 	}
 	if userID <= 0 {

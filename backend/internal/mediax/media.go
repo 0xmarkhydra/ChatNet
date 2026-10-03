@@ -165,7 +165,7 @@ func PreviewLabel(kind string) string {
 
 func classify(scope, fileName, contentType string) (string, int64, error) {
 	scope = strings.TrimSpace(strings.ToLower(scope))
-	if scope != "chat" && scope != "feed" {
+	if scope != "chat" && scope != "feed" && scope != "story" {
 		return "", 0, errors.New("nhóm upload không hợp lệ")
 	}
 
@@ -194,8 +194,8 @@ func classify(scope, fileName, contentType string) (string, int64, error) {
 		}
 		return "file", MaxFileBytes, nil
 	}
-	if scope == "feed" {
-		return "", 0, errors.New("tường nhà chỉ hỗ trợ ảnh và video")
+	if scope == "feed" || scope == "story" {
+		return "", 0, errors.New("tường nhà và Story chỉ hỗ trợ ảnh và video")
 	}
 	return "", 0, errors.New("loại file không được phép")
 }

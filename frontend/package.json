@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "check:onesignal": "node --experimental-strip-types scripts/onesignal-init-check.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

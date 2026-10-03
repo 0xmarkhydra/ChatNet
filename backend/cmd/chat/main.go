@@ -83,6 +83,7 @@ func main() {
 		push:      onesignalx.New(config.Env("ONESIGNAL_APP_ID", ""), config.Env("ONESIGNAL_REST_API_KEY", "")),
 		storage:   objectstore.NewFromEnv(),
 	}
+	go s.expireNearby(ctx)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
@@ -94,6 +95,8 @@ func main() {
 	mux.Handle("POST /api/media/presign", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.presignMedia)))
 	mux.Handle("GET /api/users/search", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.searchUsers)))
 	mux.Handle("GET /api/users/suggestions", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.suggestUsers)))
+	mux.Handle("POST /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.findNearby)))
+	mux.Handle("DELETE /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.stopNearby)))
 	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
 	mux.Handle("PUT /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateTranslationPreferences)))
 	mux.Handle("GET /api/conversations", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversations)))

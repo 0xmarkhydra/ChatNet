@@ -83,6 +83,21 @@ CREATE TABLE IF NOT EXISTS post_attachments (
 CREATE INDEX IF NOT EXISTS idx_post_attachments_post
 ON post_attachments(post_id, position, id);
 
+CREATE TABLE IF NOT EXISTS stories (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    storage_ref TEXT NOT NULL,
+    original_name VARCHAR(180) NOT NULL,
+    content_type VARCHAR(160) NOT NULL,
+    size_bytes BIGINT NOT NULL CHECK (size_bytes > 0),
+    kind VARCHAR(16) NOT NULL CHECK (kind IN ('image', 'video')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours')
+);
+
+CREATE INDEX IF NOT EXISTS idx_stories_active
+ON stories(expires_at, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS post_likes (
     post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -99,6 +114,18 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id, created_at);
+
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id BIGINT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_post_comment ON comments(post_id, id);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='comments'::regclass AND conname='comments_parent_post_fk') THEN
+        ALTER TABLE comments ADD CONSTRAINT comments_parent_post_fk
+            FOREIGN KEY (post_id, parent_id) REFERENCES comments(post_id, id) ON DELETE CASCADE;
+        ALTER TABLE comments ADD CONSTRAINT comments_parent_order CHECK (parent_id < id);
+    END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id) WHERE parent_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS user_preferences (
     user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

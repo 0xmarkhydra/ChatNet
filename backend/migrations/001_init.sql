@@ -53,6 +53,21 @@ CREATE TABLE IF NOT EXISTS posts (
 
 CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
 
+CREATE TABLE IF NOT EXISTS stories (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    storage_ref TEXT NOT NULL,
+    original_name VARCHAR(180) NOT NULL,
+    content_type VARCHAR(160) NOT NULL,
+    size_bytes BIGINT NOT NULL CHECK (size_bytes > 0),
+    kind VARCHAR(16) NOT NULL CHECK (kind IN ('image', 'video')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours')
+);
+
+CREATE INDEX IF NOT EXISTS idx_stories_active
+ON stories(expires_at, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS post_likes (
     post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
