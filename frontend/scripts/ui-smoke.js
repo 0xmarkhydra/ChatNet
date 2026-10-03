@@ -102,6 +102,20 @@ async (page) => {
         updatedAt: new Date().toISOString(),
       })
     }
+    if (path === '/api/profile' && request.method() === 'PUT') {
+      const body = request.postDataJSON()
+      session.user.username = body.username
+      session.user.displayName = body.displayName
+      session.token = 'ui-smoke-profile-updated'
+      return json({
+        username: session.user.username,
+        displayName: session.user.displayName,
+        avatarSet: false,
+        coverSet: false,
+        updatedAt: new Date().toISOString(),
+        token: session.token,
+      })
+    }
     if (path === '/api/profile/media' && request.method() === 'PUT') {
       const body = request.postDataJSON()
       return json({
@@ -466,7 +480,24 @@ async (page) => {
   await page.getByRole('button', { name: /Cá nhân/ }).click()
   await page.getByRole('switch', { name: 'Tự động dịch', exact: true }).waitFor()
   check(await page.locator('.appbar-search').count() === 0, 'Profile exposes a non-functional search')
-  check(await page.locator('.profile-identity strong').textContent() === '@user_1234567890abcdef', 'Profile must identify user by username')
+  check(await page.locator('.profile-identity strong').textContent() === 'Old Display Name', 'Profile must show display name')
+  check(await page.locator('.profile-identity-copy > span').textContent() === '@user_1234567890abcdef', 'Profile must show username')
+  await page.locator('.profile-cover-art').evaluate((node) => node.classList.add('has-cover'))
+  check(await page.locator('.profile-cover-placeholder').evaluate((node) => getComputedStyle(node).display === 'none'), 'Cover placeholder overlays a real cover')
+  await page.locator('.profile-cover-art').evaluate((node) => node.classList.remove('has-cover'))
+  const displayNameInput = page.getByPlaceholder('Tên của bạn', { exact: true })
+  const usernameInput = page.getByPlaceholder('username', { exact: true })
+  await displayNameInput.fill('Mong Le')
+  await usernameInput.fill('MongLV36')
+  check(await usernameInput.inputValue() === 'monglv36', 'Username input must normalize uppercase')
+  await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click()
+  await page.getByText('Đã cập nhật tên và username.', { exact: true }).waitFor()
+  check(await page.locator('.profile-identity strong').textContent() === 'Mong Le', 'Display name did not update immediately')
+  check(await page.locator('.profile-identity-copy > span').textContent() === '@monglv36', 'Username did not update immediately')
+  check(await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('chatnet-session') || '{}')
+    return stored.token === 'ui-smoke-profile-updated' && stored.user?.username === 'monglv36' && stored.user?.displayName === 'Mong Le'
+  }), 'Profile update did not persist refreshed session')
   check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Profile overflows horizontally')
   check(await page.locator('.profile-avatar .avatar-initials').evaluate((node) =>
     getComputedStyle(node).fontSize === '24px' && getComputedStyle(node).color === 'rgb(255, 255, 255)',

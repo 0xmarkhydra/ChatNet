@@ -2254,6 +2254,10 @@
   z-index: 2;
 }
 
+.profile-cover-art.has-cover .profile-cover-placeholder {
+  display: none;
+}
+
 .profile-cover-art strong,
 .profile-cover-art small {
   display: block;
@@ -2349,6 +2353,131 @@
   margin-top: 4px;
   color: #8b9189;
   font-size: 11px;
+}
+
+.profile-email {
+  display: block;
+  margin-top: 3px;
+  color: #8b9189;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.profile-edit-card {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+  padding: 18px;
+  background: #fff;
+}
+
+.profile-edit-heading strong,
+.profile-edit-heading small,
+.profile-edit-field > span,
+.profile-edit-field > small {
+  display: block;
+}
+
+.profile-edit-heading strong {
+  color: #20242a;
+  font-size: 17px;
+}
+
+.profile-edit-heading small {
+  margin-top: 3px;
+  color: #7d8792;
+  font-size: 12px;
+}
+
+.profile-edit-field {
+  display: grid;
+  gap: 7px;
+  color: #3b4148;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profile-edit-field input {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  border: 1px solid #dfe3e7;
+  border-radius: 12px;
+  padding: 0 12px;
+  background: #f8f9fa;
+  color: #20242a;
+  outline: none;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.profile-edit-field input:focus {
+  border-color: #9dbd65;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(118, 185, 0, .12);
+}
+
+.profile-edit-field > small {
+  color: #8b9189;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.profile-username-input {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #dfe3e7;
+  border-radius: 12px;
+  background: #f8f9fa;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.profile-username-input:focus-within {
+  border-color: #9dbd65;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(118, 185, 0, .12);
+}
+
+.profile-username-input b {
+  flex: 0 0 auto;
+  padding-left: 12px;
+  color: #7d8792;
+  font-size: 16px;
+}
+
+.profile-username-input input {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.profile-username-input input:focus {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.profile-save-button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 16px;
+  background: var(--chatnet-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.profile-save-button:disabled {
+  background: #dfe4d7;
+  color: #98a08e;
+  cursor: default;
 }
 
 .profile-identity > div:last-child {

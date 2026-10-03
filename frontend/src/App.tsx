@@ -32,6 +32,10 @@ type ProfileMediaState = {
   updatedAt: string
 }
 
+type ProfileUpdateResponse = ProfileMediaState & {
+  token: string
+}
+
 type MediaAttachment = {
   id?: number
   storageRef: string
@@ -518,6 +522,9 @@ export default function App() {
   const [mediaUploading, setMediaUploading] = useState<'chat' | 'feed' | 'story' | 'profile' | null>(null)
   const [profileMedia, setProfileMedia] = useState<ProfileMediaState | null>(null)
   const [profileBusy, setProfileBusy] = useState<'avatar' | 'cover' | null>(null)
+  const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState('')
+  const [profileUsernameDraft, setProfileUsernameDraft] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [targetLanguage, setTargetLanguage] = useState('en')
   const [autoTranslate, setAutoTranslate] = useState(true)
@@ -721,6 +728,62 @@ export default function App() {
     const profile = await response.json() as ProfileMediaState
     avatarRefreshVersions.set(profile.username, profile.updatedAt)
     setProfileMedia(profile)
+    setProfileDisplayNameDraft(profile.displayName)
+    setProfileUsernameDraft(profile.username)
+  }
+
+  async function saveProfileIdentity(event: FormEvent) {
+    event.preventDefault()
+    if (!session || profileSaving) return
+
+    const displayName = profileDisplayNameDraft.trim()
+    const username = profileUsernameDraft.trim().toLowerCase()
+    if (!displayName || !username) {
+      setNotice('Tên hiển thị và username không được để trống.', 'error')
+      return
+    }
+
+    setProfileSaving(true)
+    try {
+      const response = await apiFetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName, username }),
+      })
+      const result = await response.json().catch(() => null) as (ProfileUpdateResponse & { error?: string }) | null
+      if (!response.ok || !result?.token) {
+        throw new Error(result?.error || 'Không cập nhật được thông tin cá nhân.')
+      }
+
+      const previousUsername = session.user.username
+      avatarRefreshVersions.delete(previousUsername)
+      avatarRefreshVersions.set(result.username, result.updatedAt)
+      setProfileMedia({
+        username: result.username,
+        displayName: result.displayName,
+        avatarSet: result.avatarSet,
+        coverSet: result.coverSet,
+        updatedAt: result.updatedAt,
+      })
+      setProfileDisplayNameDraft(result.displayName)
+      setProfileUsernameDraft(result.username)
+
+      const nextSession: Session = {
+        token: result.token,
+        user: {
+          ...session.user,
+          username: result.username,
+          displayName: result.displayName,
+        },
+      }
+      localStorage.setItem('chatnet-session', JSON.stringify(nextSession))
+      setSession(nextSession)
+      setNotice('Đã cập nhật tên và username.', 'success')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông tin cá nhân.', 'error')
+    } finally {
+      setProfileSaving(false)
+    }
   }
 
   async function updateProfileImage(kind: 'avatar' | 'cover', file?: File) {
@@ -3536,7 +3599,10 @@ export default function App() {
                     src={profileAssetUrl(name, 'cover', profileMedia.updatedAt)}
                     alt="Ảnh bìa"
                     draggable={false}
-                    onError={(event) => { event.currentTarget.hidden = true }}
+                    onError={(event) => {
+                      event.currentTarget.hidden = true
+                      event.currentTarget.parentElement?.classList.remove('has-cover')
+                    }}
                   />
                 )}
                 <button
@@ -3564,15 +3630,71 @@ export default function App() {
                     <UiIcon name="photo" size={17} />
                   </button>
                 </div>
-                <div>
-                  <strong>@{name}</strong>
-                  <span>{session.user.email}</span>
+                <div className="profile-identity-copy">
+                  <strong>{profileMedia?.displayName || session.user.displayName || name}</strong>
+                  <span>@{name}</span>
+                  <small className="profile-email">{session.user.email}</small>
                   <small className="profile-media-hint">
                     {profileBusy === 'avatar' ? 'Đang cập nhật ảnh đại diện...' : 'Bấm biểu tượng máy ảnh để đổi avatar'}
                   </small>
                 </div>
               </div>
             </section>
+
+            <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
+              <div className="profile-edit-heading">
+                <div>
+                  <strong>Thông tin cá nhân</strong>
+                  <small>Đổi tên hiển thị và username của bạn</small>
+                </div>
+              </div>
+              <label className="profile-edit-field">
+                <span>Tên hiển thị</span>
+                <input
+                  type="text"
+                  value={profileDisplayNameDraft}
+                  onChange={(event) => setProfileDisplayNameDraft(event.target.value)}
+                  maxLength={100}
+                  autoComplete="name"
+                  placeholder="Tên của bạn"
+                  disabled={profileSaving}
+                />
+              </label>
+              <label className="profile-edit-field">
+                <span>Username</span>
+                <div className="profile-username-input">
+                  <b aria-hidden="true">@</b>
+                  <input
+                    type="text"
+                    value={profileUsernameDraft}
+                    onChange={(event) => setProfileUsernameDraft(event.target.value.toLowerCase())}
+                    minLength={3}
+                    maxLength={32}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoComplete="username"
+                    placeholder="username"
+                    disabled={profileSaving}
+                  />
+                </div>
+                <small>3–32 ký tự: chữ thường, số, dấu chấm, _ hoặc -</small>
+              </label>
+              <button
+                type="submit"
+                className="profile-save-button"
+                disabled={
+                  profileSaving ||
+                  !profileMedia ||
+                  (
+                    profileDisplayNameDraft.trim() === profileMedia.displayName &&
+                    profileUsernameDraft.trim().toLowerCase() === profileMedia.username
+                  )
+                }
+              >
+                {profileSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+              </button>
+            </form>
 
             <section className="settings-card">
               <div className="settings-row">
