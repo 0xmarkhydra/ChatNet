@@ -86,8 +86,8 @@ h1 {
 .post-box textarea:focus,
 .comment-box input:focus,
 .chat-head select:focus {
-  border-color: #d5dfc5;
-  box-shadow: 0 0 0 3px rgba(23, 105, 255, .09);
+  border-color: #dbe2ec;
+  box-shadow: none;
 }
 
 .phone-frame {
@@ -592,8 +592,8 @@ button:disabled {
 }
 
 .auth-card input:focus {
-  border-color: #d5dfc5;
-  box-shadow: 0 0 0 3px rgba(23, 105, 255, .09);
+  border-color: #dbe2ec;
+  box-shadow: none;
 }
 
 .auth-tabs {
@@ -955,8 +955,8 @@ button:disabled {
 }
 
 .new-chat-panel input:focus {
-  border-color: #d5dfc5;
-  box-shadow: 0 0 0 3px rgba(23, 105, 255, .08);
+  border-color: #dce4ef;
+  box-shadow: none;
 }
 
 .new-chat-panel button {

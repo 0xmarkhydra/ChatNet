@@ -579,7 +579,7 @@
   font: inherit;
   font-size: 14px;
 }
-.feed-comment-compose textarea:focus { outline: 2px solid #76b900; outline-offset: 1px; }
+.feed-comment-compose textarea:focus { outline: none; box-shadow: none; }
 .feed-comment-compose button {
   min-width: 44px;
   min-height: 44px;
@@ -2046,9 +2046,9 @@
 }
 
 .media-composer > input:not(.hidden-media-input):focus {
-  border-color: var(--chatnet-accent-ink);
+  border-color: #e2e6eb;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(118, 185, 0, .12);
+  box-shadow: none;
 }
 
 .attach-button {
@@ -2578,7 +2578,7 @@ body { background: #e9ecef; }
 .auth-tabs button { min-height: 44px; font-weight: 600; }
 .auth-tabs button.active { box-shadow: 0 1px 3px #0000000a, 0 3px 8px #0000000a; }
 .auth-card input { min-height: 48px; background: rgba(255, 255, 255, .8); font-size: 16px; }
-.auth-card input:focus { border-color: var(--chatnet-accent-ink); box-shadow: 0 0 0 3px #76b9001f; }
+.auth-card input:focus { border-color: #dbe2ec; box-shadow: none; }
 .email-verify-note { border: 0; background: var(--chatnet-accent-soft); }
 .auth-secondary, .otp-meta button, .translate-btn, .post-more { min-height: 44px; }
 .post-more { min-width: 44px; }
@@ -2672,12 +2672,22 @@ body { background: #e9ecef; }
 .room-info > div:last-child { min-width: 0; }
 button:disabled { cursor: not-allowed; }
 input[type="checkbox"] { accent-color: var(--chatnet-accent-ink); }
-button:focus-visible, a:focus-visible, input:focus-visible,
-textarea:focus-visible, select:focus-visible {
+button:focus-visible,
+a:focus-visible {
   outline: 2px solid var(--chatnet-accent-ink);
   outline-offset: 3px;
 }
-.chatnet-appbar :focus-visible { outline-color: var(--chatnet-accent); }
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+.chatnet-appbar button:focus-visible,
+.chatnet-appbar a:focus-visible {
+  outline-color: var(--chatnet-accent);
+}
 @media (max-width: 760px) {
   html, body, #root, .modern-shell { background: #f0f2f5; }
   .auth-screen { padding: 24px 16px; gap: 20px; align-content: start; }
