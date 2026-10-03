@@ -202,7 +202,7 @@ async (page) => {
   await page.getByText('Chưa xác nhận được tin đã gửi.', { exact: false }).waitFor()
   check(await input.inputValue() === 'Bản nháp không được mất', 'Network failure lost draft')
   await page.setViewportSize({ width: 320, height: 568 })
-  const notice = await page.getByRole('status').boundingBox()
+  const notice = await page.locator('.notice.toast').boundingBox()
   const back = await page.getByRole('button', { name: 'Quay lại danh sách' }).boundingBox()
   const composer = await input.boundingBox()
   check(notice && back && notice.y + notice.height <= back.y, 'Notice covers mobile navigation')

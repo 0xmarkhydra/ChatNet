@@ -148,7 +148,33 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
+type ToastKind = 'success' | 'error' | 'warning' | 'info'
+type ToastNotice = { id: number; message: string; kind: ToastKind }
+
 const minimumNearbyScanMs = 2800
+
+function inferToastKind(message: string): ToastKind {
+  const normalized = message.trim().toLocaleLowerCase('vi-VN')
+  if (
+    normalized.startsWith('đã ') ||
+    normalized.startsWith('bạn đã ') ||
+    normalized.startsWith('chatnet đã ')
+  ) return 'success'
+  if (
+    normalized.includes('không ') ||
+    normalized.includes('thất bại') ||
+    normalized.includes('bị chặn') ||
+    normalized.startsWith('chưa xác nhận') ||
+    normalized.startsWith('mất kết nối')
+  ) return 'error'
+  if (
+    normalized.startsWith('mỗi ') ||
+    normalized.startsWith('hãy ') ||
+    normalized.startsWith('trên iphone') ||
+    normalized.includes('chưa hỗ trợ')
+  ) return 'warning'
+  return 'info'
+}
 
 const languages = [
   { value: 'en', label: 'English' },
@@ -433,7 +459,6 @@ export default function App() {
   const [nearbyScanning, setNearbyScanning] = useState(false)
   const [nearbyUntil, setNearbyUntil] = useState(0)
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5)
-  const [nearbyError, setNearbyError] = useState('')
   const nearbyRequest = useRef(0)
 
   const [posts, setPosts] = useState<Post[]>([])
@@ -449,7 +474,7 @@ export default function App() {
   const [autoTranslate, setAutoTranslate] = useState(true)
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] = useState(false)
   const [status, setStatus] = useState('Đang kết nối...')
-  const [notice, setNotice] = useState('')
+  const [notice, setNoticeState] = useState<ToastNotice | null>(null)
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   const [isStandalone, setIsStandalone] = useState(false)
   const [pushConfigured, setPushConfigured] = useState(false)
@@ -471,6 +496,31 @@ export default function App() {
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
   const activeStoryIndex = stories.findIndex((item) => item.id === activeStoryId)
   const activeStory = activeStoryIndex < 0 ? null : stories[activeStoryIndex]
+
+  function setNotice(message: string, kind?: ToastKind) {
+    const clean = message.trim()
+    if (!clean) {
+      setNoticeState(null)
+      return
+    }
+    setNoticeState({
+      id: Date.now(),
+      message: clean,
+      kind: kind || inferToastKind(clean),
+    })
+  }
+
+  useEffect(() => {
+    if (!notice) return
+    const timeout =
+      notice.kind === 'error' ? 8000 :
+      notice.kind === 'warning' ? 6000 :
+      4500
+    const timer = window.setTimeout(() => {
+      setNoticeState((current) => current?.id === notice.id ? null : current)
+    }, timeout)
+    return () => window.clearTimeout(timer)
+  }, [notice])
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId
@@ -570,7 +620,6 @@ export default function App() {
     const scanStartedAt = Date.now()
     setNearbyBusy(true)
     setNearbyScanning(true)
-    setNearbyError('')
     try {
       if (!navigator.geolocation) throw new Error('Trình duyệt không hỗ trợ định vị.')
       const position = await new Promise<GeolocationPosition>((resolve, reject) =>
@@ -603,9 +652,15 @@ export default function App() {
       if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
       setNearbyUsers(result.users)
       setNearbyUntil(Date.parse(result.expiresAt))
+      setNotice(
+        result.users.length
+          ? `Quét thành công: tìm thấy ${result.users.length} người trong bán kính ${nearbyRadiusKm} km.`
+          : `Quét thành công nhưng chưa tìm thấy người dùng trong bán kính ${nearbyRadiusKm} km.`,
+        result.users.length ? 'success' : 'info',
+      )
     } catch (error) {
       if (request !== nearbyRequest.current) return
-      setNearbyError(geolocationErrorMessage(error))
+      setNotice(geolocationErrorMessage(error), 'error')
     } finally {
       if (request === nearbyRequest.current) {
         setNearbyBusy(false)
@@ -618,16 +673,19 @@ export default function App() {
     if (!session || nearbyBusy) return
     const request = ++nearbyRequest.current
     setNearbyBusy(true)
-    setNearbyError('')
     try {
       const response = await apiFetch('/api/users/nearby', { method: 'DELETE' })
       if (request !== nearbyRequest.current) return
       if (!response.ok) throw new Error('Chưa tắt được Quanh đây. Thử lại sau.')
       setNearbyUntil(0)
       setNearbyUsers([])
+      setNotice('Đã tắt Quanh đây và xóa cache vị trí gần nhất.', 'success')
     } catch (error) {
       if (request !== nearbyRequest.current) return
-      setNearbyError(error instanceof Error ? error.message : 'Mất kết nối. Chưa xác nhận đã tắt Quanh đây.')
+      setNotice(
+        error instanceof Error ? error.message : 'Mất kết nối. Chưa xác nhận đã tắt Quanh đây.',
+        'error',
+      )
     } finally {
       if (request === nearbyRequest.current) setNearbyBusy(false)
     }
@@ -1375,7 +1433,6 @@ export default function App() {
     setNearbyUntil(0)
     setNearbyBusy(false)
     setNearbyScanning(false)
-    setNearbyError('')
     if (currentToken) {
       void fetch(`${API}/api/users/nearby`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${currentToken}` }, keepalive: true,
@@ -2254,7 +2311,24 @@ export default function App() {
         </div>
       </header>
 
-      {notice && <div className="notice" role="status">{notice} <button type="button" aria-label="Đóng thông báo" onClick={() => setNotice('')}>×</button></div>}
+      {notice && (
+        <div
+          className={`notice toast toast-${notice.kind}`}
+          role={notice.kind === 'error' ? 'alert' : 'status'}
+          aria-live={notice.kind === 'error' ? 'assertive' : 'polite'}
+        >
+          <span className="toast-icon" aria-hidden="true">
+            {notice.kind === 'success' ? '✓' : notice.kind === 'error' ? '!' : notice.kind === 'warning' ? '!' : 'i'}
+          </span>
+          <div className="toast-copy">
+            <strong>
+              {notice.kind === 'success' ? 'Thành công' : notice.kind === 'error' ? 'Có lỗi' : notice.kind === 'warning' ? 'Lưu ý' : 'Thông báo'}
+            </strong>
+            <span>{notice.message}</span>
+          </div>
+          <button type="button" aria-label="Đóng thông báo" onClick={() => setNoticeState(null)}>×</button>
+        </div>
+      )}
 
       <section className={`phone-frame modern-frame ${tab === 'chat' && activeConversation ? 'mobile-conversation-open' : ''}`}>
         {tab === 'chat' && (
@@ -2836,7 +2910,6 @@ export default function App() {
                 </button>
                 <button type="button" className="secondary" onClick={() => void stopNearby()} disabled={nearbyBusy}>Tắt Quanh đây</button>
               </div>
-              {nearbyError && <p role="alert" className="inline-error">{nearbyError}</p>}
               {(nearbyUntil > 0 || nearbyUsers.length > 0) && (
                 <p role="status">
                   {visibleNearbyUsers.length
