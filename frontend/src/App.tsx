@@ -305,7 +305,18 @@ function MediaAttachmentsView({
         <div className={`media-item media-${item.kind}`} key={`${item.storageRef}:${index}`}>
           {item.kind === 'image' && item.url ? (
             <a href={item.url} target="_blank" rel="noreferrer">
-              <img src={item.url} alt={item.name} loading="lazy" />
+              <img
+                src={item.url}
+                alt={item.name}
+                loading="lazy"
+                onLoad={(event) => {
+                  const image = event.currentTarget
+                  image.classList.toggle(
+                    'media-extra-tall',
+                    image.naturalWidth > 0 && image.naturalHeight / image.naturalWidth >= 1.8,
+                  )
+                }}
+              />
             </a>
           ) : item.kind === 'video' && item.url ? (
             <video src={item.url} controls playsInline preload="metadata" />

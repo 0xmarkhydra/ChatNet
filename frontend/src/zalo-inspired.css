@@ -382,8 +382,7 @@
 }
 
 .feed-media-preview {
-  max-height: 420px;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 14px;
   cursor: pointer;
 }
@@ -460,10 +459,6 @@
 }
 
 @media (max-width: 760px) {
-  .feed-media-preview {
-    max-height: 300px;
-  }
-
   .post-detail-backdrop {
     align-items: end;
     padding: 0;
@@ -2157,11 +2152,43 @@
   border-radius: 7px;
 }
 
-.zalo-post .media-count-1 .media-item img,
-.zalo-post .media-count-1 .media-item video {
+.feed-media-preview .media-count-1 .media-item img {
   width: 100%;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.feed-media-preview .media-count-1 .media-item img.media-extra-tall {
+  height: min(68vh, 620px);
+  max-height: 620px;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.feed-media-preview .media-count-1 .media-item video {
+  width: 100%;
+  height: auto;
   max-height: 520px;
-  min-height: 220px;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.post-detail-modal .media-count-1 .media-item img {
+  width: 100%;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.post-detail-modal .media-count-1 .media-item video {
+  width: 100%;
+  height: auto;
+  max-height: 72vh;
+  min-height: 0;
+  object-fit: contain;
 }
 
 .zalo-post {
