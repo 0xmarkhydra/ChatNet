@@ -3235,7 +3235,7 @@ export default function App() {
         </button>
         <button type="button" className={tab === 'feed' ? 'active' : ''} onClick={() => switchTab('feed')}>
           <span className="nav-icon"><UiIcon name="wall" size={25} /></span>
-          <span>Tường nhà</span>
+          <span>Bảng tin</span>
         </button>
         <button type="button" className={tab === 'profile' ? 'active' : ''} onClick={() => switchTab('profile')}>
           <span className="nav-icon"><UiIcon name="profile" size={25} />{!pushEnabled && <b>!</b>}</span>
