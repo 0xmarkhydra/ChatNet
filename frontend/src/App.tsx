@@ -186,6 +186,34 @@ function formatBytes(value: number) {
   return `${(value / 1024 / 1024).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`
 }
 
+function geolocationErrorMessage(error: unknown) {
+  if (!window.isSecureContext) {
+    return 'Không thể dùng định vị vì trang không chạy trong ngữ cảnh HTTPS an toàn. Mở lại ChatNet bằng https://chat.codelocal.cloud.'
+  }
+
+  const geoError = error as { code?: unknown; message?: unknown } | null
+  const code = typeof geoError?.code === 'number' ? geoError.code : 0
+  const browserMessage =
+    typeof geoError?.message === 'string' && geoError.message.trim()
+      ? geoError.message.trim().slice(0, 180)
+      : ''
+
+  const detail = browserMessage ? ` Chi tiết trình duyệt: ${browserMessage}` : ''
+
+  if (code === 1) {
+    return `Quyền vị trí bị từ chối (PERMISSION_DENIED · mã GPS 1). macOS có thể đã bật Location Services nhưng trình duyệt vẫn có thể chặn riêng chat.codelocal.cloud. Hãy mở quyền của trang → Location → Allow, rồi tải lại trang.${detail}`
+  }
+  if (code === 2) {
+    return `Không xác định được vị trí hiện tại (POSITION_UNAVAILABLE · mã GPS 2). Hãy bật Wi‑Fi, kiểm tra Location Services và thử đứng ở nơi máy có thể xác định vị trí tốt hơn rồi quét lại.${detail}`
+  }
+  if (code === 3) {
+    return `Lấy vị trí quá thời gian cho phép (TIMEOUT · mã GPS 3). Kết nối hoặc dịch vụ định vị đang phản hồi chậm. Hãy bật Wi‑Fi, chờ vài giây rồi Quét quanh đây lại.${detail}`
+  }
+
+  if (error instanceof Error && error.message) return error.message
+  return `Không lấy được vị trí do lỗi không xác định.${detail || ' Hãy kiểm tra quyền Location của trình duyệt và thử lại.'}`
+}
+
 function attachmentLabel(items?: MediaAttachment[]) {
   const first = items?.[0]
   if (!first) return ''
@@ -577,7 +605,7 @@ export default function App() {
       setNearbyUntil(Date.parse(result.expiresAt))
     } catch (error) {
       if (request !== nearbyRequest.current) return
-      setNearbyError(error instanceof Error ? error.message : 'Không lấy được vị trí. Kiểm tra quyền định vị rồi thử lại.')
+      setNearbyError(geolocationErrorMessage(error))
     } finally {
       if (request === nearbyRequest.current) {
         setNearbyBusy(false)

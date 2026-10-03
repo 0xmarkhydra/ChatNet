@@ -301,7 +301,7 @@ async (page) => {
     } })
   })
   await page.getByRole('button', { name: 'Quét quanh đây', exact: true }).click()
-  await page.getByRole('alert').waitFor()
+  await page.getByText(/PERMISSION_DENIED · mã GPS 1/).waitFor()
   check(nearbyRequests.length === 0, 'Denied location reached API')
   await page.evaluate(() => Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
     getCurrentPosition: (ok) => { window.__resolveNearbyLocation = () => ok({ coords: { latitude: 10.77, longitude: 106.69 } }) },
