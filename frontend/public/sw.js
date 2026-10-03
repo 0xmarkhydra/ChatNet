@@ -1,4 +1,4 @@
-const CACHE = 'chatnet-v25-auto-refresh'
+const CACHE = 'chatnet-v26-connect-ios'
 const CORE = ['/', '/offline.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg']
 
 self.addEventListener('install', (event) => {

@@ -489,3 +489,325 @@
   .connect-quick-actions { gap: 6px; }
   .connect-quick-actions button { padding-inline: 8px; }
 }
+
+/* iOS-style Connect sheet */
+.connect-modal-scrim {
+  background: rgba(15, 23, 42, .3);
+  backdrop-filter: blur(16px) saturate(115%);
+  -webkit-backdrop-filter: blur(16px) saturate(115%);
+}
+
+.friend-search-panel.connect-modal {
+  width: min(460px, calc(100vw - 28px));
+  max-height: min(680px, calc(100dvh - 64px));
+  padding: 12px 14px 16px;
+  border: 1px solid rgba(255, 255, 255, .7);
+  border-radius: 30px;
+  background: rgba(250, 250, 252, .985);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .2);
+}
+
+.connect-ios-header {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 8px;
+}
+
+.connect-ios-header > div {
+  min-width: 0;
+}
+
+.connect-ios-header strong,
+.connect-ios-header small {
+  display: block;
+}
+
+.connect-ios-header strong {
+  color: #111827;
+  font-size: 21px;
+  font-weight: 760;
+  letter-spacing: -.025em;
+  line-height: 1.12;
+}
+
+.connect-ios-header small {
+  margin-top: 3px;
+  color: #8e8e93;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.connect-modal .friend-search-close {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: #e9e9ee;
+  color: #6e6e73;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.connect-search-input {
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 0 11px;
+  gap: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: #ededf2;
+  box-shadow: none;
+}
+
+.connect-search-input:focus-within {
+  border: 0;
+  background: #e9e9ef;
+  box-shadow: inset 0 0 0 1px rgba(76, 120, 0, .16);
+}
+
+.connect-search-input > span {
+  color: #8e8e93;
+}
+
+.connect-search-input input {
+  height: 44px;
+  color: #1c1c1e;
+  font-size: 16px !important;
+  font-weight: 500;
+}
+
+.connect-search-input input::placeholder {
+  color: #8e8e93;
+  opacity: 1;
+}
+
+.connect-search-input > button {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #c7c7cc;
+  color: #fff;
+  font-size: 16px;
+}
+
+.connect-identity-card {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  min-height: 58px;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 7px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 rgba(60, 60, 67, .1);
+}
+
+.connect-identity-avatar {
+  width: 42px;
+  height: 42px;
+}
+
+.connect-identity-copy {
+  min-width: 0;
+}
+
+.connect-identity-card strong {
+  color: #1c1c1e;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.connect-identity-card span {
+  margin-top: 1px;
+  color: #8e8e93;
+  font-size: 12px;
+}
+
+.connect-identity-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.connect-identity-card .connect-identity-actions > button {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #ededf2;
+  color: #4c7800;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.connect-results {
+  flex: 1;
+  max-height: min(42dvh, 340px);
+  margin-top: 8px;
+  padding: 0;
+  gap: 0;
+  overflow: auto;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(60, 60, 67, .08);
+}
+
+.connect-results:empty {
+  display: none;
+}
+
+.connect-results .friend-suggestion-label {
+  padding: 11px 12px 6px;
+  color: #8e8e93;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  text-transform: none;
+}
+
+.connect-result {
+  min-height: 64px;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 0;
+  background: #fff !important;
+  box-shadow: inset 0 -1px 0 rgba(60, 60, 67, .08);
+}
+
+.connect-result:last-child {
+  box-shadow: none;
+}
+
+.connect-result:hover,
+.connect-result:active {
+  background: #f7f7f9 !important;
+}
+
+.connect-result .friend-avatar {
+  width: 44px;
+  height: 44px;
+}
+
+.connect-result .friend-result-copy strong {
+  color: #1c1c1e;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.connect-result .friend-result-copy span {
+  margin-top: 2px;
+  color: #8e8e93;
+  font-size: 12px;
+}
+
+.connect-result .friend-result-action {
+  min-width: 68px;
+  min-height: 32px;
+  padding: 0 11px;
+  justify-content: center;
+  border-radius: 999px;
+  background: #edf4e4;
+  color: #4c7800;
+}
+
+.connect-result .friend-result-action small {
+  display: block !important;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.connect-result .friend-result-action > span {
+  display: none;
+}
+
+.connect-result .friend-result-action.relationship-accepted {
+  background: #f0f0f3;
+  color: #636366;
+}
+
+.connect-result .friend-result-action.relationship-outgoing {
+  background: #f0f0f3;
+  color: #8e8e93;
+}
+
+.connect-result .friend-result-action.relationship-incoming {
+  background: #4c7800;
+  color: #fff;
+}
+
+.connect-results .friend-search-state {
+  padding: 28px 18px;
+  background: #fff;
+}
+
+.connect-results .friend-search-state strong {
+  color: #3a3a3c;
+  font-size: 14px;
+}
+
+.connect-results .friend-search-state span {
+  color: #8e8e93;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .connect-modal-layer {
+    place-items: end stretch;
+    padding: 0;
+  }
+
+  .friend-search-panel.connect-modal {
+    width: 100%;
+    max-height: 78dvh;
+    padding: 9px 14px calc(12px + env(safe-area-inset-bottom));
+    border-width: 1px 0 0;
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 -14px 50px rgba(15, 23, 42, .16);
+  }
+
+  .connect-modal-handle {
+    width: 36px;
+    height: 5px;
+    margin: 0 auto 7px;
+    background: #d1d1d6;
+  }
+
+  .connect-ios-header {
+    min-height: 48px;
+    padding-bottom: 7px;
+  }
+
+  .connect-ios-header strong {
+    font-size: 20px;
+  }
+
+  .connect-ios-header small {
+    font-size: 11px;
+  }
+
+  .connect-results {
+    max-height: none;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .connect-result {
+    min-height: 62px;
+    padding-inline: 10px;
+  }
+
+  .connect-result .friend-result-action {
+    min-width: 64px;
+    min-height: 32px;
+  }
+}

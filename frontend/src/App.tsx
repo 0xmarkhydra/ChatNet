@@ -2766,11 +2766,10 @@ export default function App() {
                     aria-labelledby="connect-modal-title"
                   >
                     <div className="connect-modal-handle" aria-hidden="true" />
-                    <div className="friend-search-title connect-modal-title">
+                    <div className="connect-ios-header">
                       <div>
-                        <span className="connect-eyebrow">CHATNET CONNECT</span>
-                        <strong id="connect-modal-title">Tìm & kết nối</strong>
-                        <small>Tìm bằng tên, @username hoặc email. Số điện thoại đã được chuẩn bị cho bản sau.</small>
+                        <strong id="connect-modal-title">Kết nối</strong>
+                        <small>Tìm bạn bè trên ChatNet</small>
                       </div>
                       <button
                         type="button"
@@ -2780,26 +2779,8 @@ export default function App() {
                       >×</button>
                     </div>
 
-                    <div className="connect-identity-card">
-                      <UserAvatar name={session.user.username} className="connect-identity-avatar" online />
-                      <div>
-                        <strong>{session.user.displayName || session.user.username}</strong>
-                        <span>@{session.user.username}</span>
-                      </div>
-                      <button type="button" onClick={() => void shareMyProfile()} aria-label="Chia sẻ hồ sơ của tôi">↗</button>
-                    </div>
-
-                    <div className="connect-quick-actions" aria-label="Chia sẻ kết nối">
-                      <button type="button" onClick={() => void shareMyProfile()}>
-                        <span>↗</span><b>Chia sẻ hồ sơ</b><small>Native share</small>
-                      </button>
-                      <button type="button" onClick={() => void copyInviteLink()}>
-                        <span>🔗</span><b>Sao chép link</b><small>Gửi cho bạn bè</small>
-                      </button>
-                    </div>
-
                     <label className="friend-search-input-wrap connect-search-input">
-                      <UiIcon name="search" size={20} />
+                      <UiIcon name="search" size={19} />
                       <input
                         value={friendQuery}
                         onChange={(event) => setFriendQuery(event.target.value)}
@@ -2809,12 +2790,23 @@ export default function App() {
                         autoComplete="off"
                         spellCheck={false}
                         maxLength={254}
-                        autoFocus
                       />
                       {friendQuery && (
                         <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setFriendQuery('')}>×</button>
                       )}
                     </label>
+
+                    <div className="connect-identity-card">
+                      <UserAvatar name={session.user.username} className="connect-identity-avatar" online />
+                      <div className="connect-identity-copy">
+                        <strong>{session.user.displayName || session.user.username}</strong>
+                        <span>@{session.user.username}</span>
+                      </div>
+                      <div className="connect-identity-actions" aria-label="Chia sẻ hồ sơ">
+                        <button type="button" onClick={() => void shareMyProfile()} aria-label="Chia sẻ hồ sơ của tôi" title="Chia sẻ">↗</button>
+                        <button type="button" onClick={() => void copyInviteLink()} aria-label="Sao chép link hồ sơ" title="Sao chép link">⧉</button>
+                      </div>
+                    </div>
 
                     <div className="friend-search-results connect-results">
                       {friendSearching && (
