@@ -98,7 +98,7 @@ async (page) => {
       if (nearbyFailure) return json({ error: 'nearby unavailable' }, 503)
       if (request.method() === 'DELETE') return json({ ok: true })
       return json({
-        users: nearbyEmpty ? [] : [{ id: 2, username: 'minhanh', online: true }],
+        users: nearbyEmpty ? [] : [{ id: 2, username: 'minhanh', online: true, distanceKm: 1.3 }],
         expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       })
     }
@@ -281,6 +281,9 @@ async (page) => {
   await page.screenshot({ path: 'output/playwright/contacts-mobile.png' })
   await page.getByRole('button', { name: 'Quanh đây', exact: true }).click()
   check(await page.locator('.bottom-navigation button.active svg circle').count() === 3, 'Nearby icon is not radar')
+  check(await page.locator('.nearby-radar-ring').count() === 2, 'Nearby radar rings are missing')
+  check(await page.locator('.nearby-radar-blip').count() === 3, 'Nearby radar targets are missing')
+  check(await page.locator('.nearby-radar-sweep').count() === 1, 'Nearby radar sweep is missing')
   check(nearbyRequests.length === 0, 'Location published without consent')
   await page.evaluate(() => {
     window.__realGeolocation = navigator.geolocation
@@ -292,14 +295,26 @@ async (page) => {
   await page.getByRole('alert').waitFor()
   check(nearbyRequests.length === 0, 'Denied location reached API')
   await page.evaluate(() => Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
-    getCurrentPosition: (ok) => ok({ coords: { latitude: 10.77, longitude: 106.69 } }),
+    getCurrentPosition: (ok) => { window.__resolveNearbyLocation = () => ok({ coords: { latitude: 10.77, longitude: 106.69 } }) },
   } }))
   nearbyFailure = true
   await page.getByRole('button', { name: 'Bật Quanh đây', exact: true }).click()
+  await page.getByText('Radar đang quét...', { exact: true }).waitFor()
+  await page.getByRole('dialog', { name: 'Đang tìm quanh đây', exact: true }).waitFor()
+  check(await page.locator('.nearby-radar.is-scanning').count() === 1, 'Radar is not scanning while nearby request is busy')
+  await page.screenshot({ path: 'output/playwright/nearby-scanning-mobile.png', fullPage: true })
+  await page.evaluate(() => window.__resolveNearbyLocation())
   await page.getByText('Không tìm được bạn quanh đây. Thử lại sau.', { exact: true }).waitFor()
   nearbyFailure = false
+  await page.evaluate(() => Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
+    getCurrentPosition: (ok) => ok({ coords: { latitude: 10.77, longitude: 106.69 } }),
+  } }))
+  const scanStartedAt = Date.now()
   await page.getByRole('button', { name: 'Bật Quanh đây', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Đang tìm quanh đây', exact: true }).waitFor()
   await page.getByRole('button', { name: 'Nhắn tin với @minhanh', exact: true }).waitFor()
+  check(Date.now() - scanStartedAt >= 2600, 'Successful nearby scan closes too quickly')
+  await page.getByText('Khoảng 1,3 km', { exact: true }).waitFor()
   check(nearbyRequests.some((request) => request.body === '{"latitude":10.77,"longitude":106.69}'), 'Wrong geolocation payload')
   await page.screenshot({ path: 'output/playwright/nearby-mobile.png', fullPage: true })
   for (const width of [320, 1440]) {
@@ -310,6 +325,7 @@ async (page) => {
   await page.setViewportSize({ width: 390, height: 844 })
   nearbyFailure = true
   await page.getByRole('button', { name: 'Tắt Quanh đây', exact: true }).click()
+  check(await page.locator('.nearby-radar.is-scanning').count() === 0, 'Radar scans while disabling nearby')
   await page.getByText('Chưa tắt được Quanh đây. Thử lại sau.', { exact: true }).waitFor()
   check(await page.getByRole('button', { name: 'Nhắn tin với @minhanh', exact: true }).isVisible(), 'Failed disable falsely cleared state')
   nearbyFailure = false

@@ -18,6 +18,11 @@ server {
         proxy_send_timeout 3600s;
     }
 
+    location = /sw.js {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        try_files $uri =404;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }

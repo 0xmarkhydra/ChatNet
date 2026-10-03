@@ -59,6 +59,16 @@ func TestNearbyValidation(t *testing.T) {
 	}
 }
 
+func TestParseNearbyMatches(t *testing.T) {
+	ids, distances := parseNearbyMatches(
+		[]string{"42", "0.0000", "7", "1.26", "bad-id", "2.0", "8", "bad-distance", "9"},
+		42,
+	)
+	if !reflect.DeepEqual(ids, []int64{7}) || distances[7] != 1.3 {
+		t.Fatalf("unexpected nearby matches: ids=%v distances=%v", ids, distances)
+	}
+}
+
 func TestNearbyRedisIntegration(t *testing.T) {
 	addr := os.Getenv("CHATNET_TEST_REDIS_ADDR")
 	if addr == "" {
@@ -81,13 +91,13 @@ func TestNearbyRedisIntegration(t *testing.T) {
 	find("1", 106.69, 10.77)
 	find("2", 106.70, 10.77)
 	find("3", 105.83, 21.02)
-	if got := find("1", 106.69, 10.77); !reflect.DeepEqual(got, []string{"1", "2"}) {
+	if got := find("1", 106.69, 10.77); len(got) != 4 || got[0] != "1" || got[2] != "2" {
 		t.Fatalf("radius mismatch: %v", got)
 	}
 	if err := rdb.ZAdd(ctx, keys[1], redis.Z{Score: 1, Member: "2"}).Err(); err != nil {
 		t.Fatal(err)
 	}
-	if got := find("1", 106.69, 10.77); !reflect.DeepEqual(got, []string{"1"}) {
+	if got := find("1", 106.69, 10.77); len(got) != 2 || got[0] != "1" {
 		t.Fatalf("expired user visible: %v", got)
 	}
 	if _, err := rdb.ZScore(ctx, keys[0], "2").Result(); err != redis.Nil {
@@ -97,12 +107,12 @@ func TestNearbyRedisIntegration(t *testing.T) {
 	if err := nearbyScript.Run(ctx, rdb, keys, "remove", "2").Err(); err != nil {
 		t.Fatal(err)
 	}
-	if got := find("1", 106.69, 10.77); !reflect.DeepEqual(got, []string{"1"}) {
+	if got := find("1", 106.69, 10.77); len(got) != 2 || got[0] != "1" {
 		t.Fatalf("disabled user visible: %v", got)
 	}
 	find("2", 106.70, 10.77)
 	find("2", 105.83, 21.02)
-	if got := find("1", 106.69, 10.77); !reflect.DeepEqual(got, []string{"1"}) {
+	if got := find("1", 106.69, 10.77); len(got) != 2 || got[0] != "1" {
 		t.Fatalf("old location retained: %v", got)
 	}
 	for _, key := range keys {

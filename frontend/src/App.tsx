@@ -107,6 +107,7 @@ type FriendSearchResult = {
   username: string
   displayName: string
   online: boolean
+  distanceKm?: number
   mutualGroups?: number
   reason?: string
 }
@@ -115,6 +116,8 @@ type InstallPromptEvent = Event & {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
+
+const minimumNearbyScanMs = 2800
 
 const languages = [
   { value: 'en', label: 'English' },
@@ -299,6 +302,27 @@ function UiIcon({ name, size = 24 }: { name: string; size?: number }) {
   }
 }
 
+function formatEstimatedDistance(distanceKm?: number) {
+  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) return 'Trong phạm vi 5 km'
+  return `Khoảng ${distanceKm.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`
+}
+
+function NearbyRadar({ scanning = false, large = false }: { scanning?: boolean; large?: boolean }) {
+  return (
+    <div className={`nearby-radar ${scanning ? 'is-scanning' : ''} ${large ? 'is-large' : ''}`} aria-hidden="true">
+      <span className="nearby-radar-ring ring-one" />
+      <span className="nearby-radar-ring ring-two" />
+      <span className="nearby-radar-axis axis-x" />
+      <span className="nearby-radar-axis axis-y" />
+      <span className="nearby-radar-sweep" />
+      <span className="nearby-radar-blip blip-one" />
+      <span className="nearby-radar-blip blip-two" />
+      <span className="nearby-radar-blip blip-three" />
+      <span className="nearby-radar-center" />
+    </div>
+  )
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession)
   const sessionRef = useRef(session)
@@ -338,6 +362,7 @@ export default function App() {
   const [chatCreateError, setChatCreateError] = useState('')
   const [nearbyUsers, setNearbyUsers] = useState<FriendSearchResult[]>([])
   const [nearbyBusy, setNearbyBusy] = useState(false)
+  const [nearbyScanning, setNearbyScanning] = useState(false)
   const [nearbyUntil, setNearbyUntil] = useState(0)
   const [nearbyError, setNearbyError] = useState('')
   const nearbyRequest = useRef(0)
@@ -467,7 +492,9 @@ export default function App() {
     if (!session || nearbyBusy) return
     const request = ++nearbyRequest.current
     const token = session.token
+    const scanStartedAt = Date.now()
     setNearbyBusy(true)
+    setNearbyScanning(true)
     setNearbyError('')
     try {
       if (!navigator.geolocation) throw new Error('Trình duyệt không hỗ trợ định vị.')
@@ -483,6 +510,8 @@ export default function App() {
       if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
       if (!response.ok) throw new Error(response.status === 429 ? 'Chờ 10 giây trước khi tìm lại.' : 'Không tìm được bạn quanh đây. Thử lại sau.')
       const result = await response.json() as { users: FriendSearchResult[]; expiresAt: string }
+      const remainingScanMs = minimumNearbyScanMs - (Date.now() - scanStartedAt)
+      if (remainingScanMs > 0) await new Promise((resolve) => window.setTimeout(resolve, remainingScanMs))
       if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
       setNearbyUsers(result.users)
       setNearbyUntil(Date.parse(result.expiresAt))
@@ -490,7 +519,10 @@ export default function App() {
       if (request !== nearbyRequest.current) return
       setNearbyError(error instanceof Error ? error.message : 'Không lấy được vị trí. Kiểm tra quyền định vị rồi thử lại.')
     } finally {
-      if (request === nearbyRequest.current) setNearbyBusy(false)
+      if (request === nearbyRequest.current) {
+        setNearbyBusy(false)
+        setNearbyScanning(false)
+      }
     }
   }
 
@@ -1166,6 +1198,7 @@ export default function App() {
     setNearbyUsers([])
     setNearbyUntil(0)
     setNearbyBusy(false)
+    setNearbyScanning(false)
     setNearbyError('')
     if (currentToken) {
       void fetch(`${API}/api/users/nearby`, {
@@ -2076,12 +2109,12 @@ export default function App() {
           <div className="simple-view discover-view">
             <div className="simple-view-title"><strong>Tìm bạn quanh đây</strong><small>Trong phạm vi 5 km</small></div>
             <div className="nearby-controls">
-              <div className="nearby-radar"><UiIcon name="discover" size={80} /></div>
-              <p>{nearbyUntil ? 'Đang hiển thị với người dùng quanh đây.' : 'Bật Quanh đây để tìm người cùng bật trong phạm vi 5 km.'}</p>
-              <p className="nearby-privacy">Vị trí chỉ dùng khi bạn bật. Tự ẩn sau 15 phút. Không hiển thị tọa độ hoặc khoảng cách chính xác. Nếu mất kết nối, bạn có thể vẫn hiển thị đến hết thời hạn.</p>
+              <NearbyRadar />
+              <p aria-live="polite">{nearbyScanning ? 'Radar đang quét...' : nearbyUntil ? 'Đang hiển thị với người dùng quanh đây.' : 'Bật Quanh đây để tìm người cùng bật trong phạm vi 5 km.'}</p>
+              <p className="nearby-privacy">Vị trí chỉ dùng khi bạn bật. Tự ẩn sau 15 phút. Chỉ hiển thị khoảng cách ước lượng, không hiển thị tọa độ. Nếu mất kết nối, bạn có thể vẫn hiển thị đến hết thời hạn.</p>
               <div className="nearby-actions">
                 <button type="button" onClick={() => void findNearby()} disabled={nearbyBusy}>
-                  <UiIcon name="discover" size={20} />{nearbyBusy ? 'Đang xử lý...' : nearbyUntil ? 'Tìm lại' : 'Bật Quanh đây'}
+                  <UiIcon name="discover" size={20} />{nearbyScanning ? 'Đang quét...' : nearbyUntil ? 'Tìm lại' : 'Bật Quanh đây'}
                 </button>
                 <button type="button" className="secondary" onClick={() => void stopNearby()} disabled={nearbyBusy}>Tắt Quanh đây</button>
               </div>
@@ -2092,11 +2125,25 @@ export default function App() {
               {visibleNearbyUsers.map((friend) => (
                 <button key={friend.id} type="button" className="friend-result contact-result" aria-label={`Nhắn tin với @${friend.username}`} onClick={() => void openDirectByUsername(friend.username)}>
                   <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                  <div className="friend-result-copy"><strong>@{friend.username}</strong><span>Trong phạm vi 5 km</span></div>
+                  <div className="friend-result-copy"><strong>@{friend.username}</strong><span>{formatEstimatedDistance(friend.distanceKm)}</span></div>
                   <div className="friend-result-action"><small>Nhắn tin</small><span>›</span></div>
                 </button>
               ))}
             </section>
+            {nearbyScanning && (
+              <div className="nearby-scan-backdrop" role="dialog" aria-modal="true" aria-labelledby="nearby-scan-title">
+                <div className="nearby-scan-modal">
+                  <div className="nearby-scan-heading">
+                    <strong id="nearby-scan-title">Đang tìm quanh đây</strong>
+                    <span>Phạm vi 5 km</span>
+                  </div>
+                  <NearbyRadar scanning large />
+                  <p>Radar đang quét khu vực...</p>
+                  <div className="nearby-scan-progress" aria-hidden="true"><span /></div>
+                  <small>Đang ước lượng khoảng cách tới người dùng gần bạn</small>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

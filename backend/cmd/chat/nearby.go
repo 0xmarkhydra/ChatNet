@@ -34,8 +34,14 @@ elseif ARGV[1] == 'find' then
   redis.call('ZADD', KEYS[2], now + 900, ARGV[2])
   redis.call('EXPIRE', KEYS[1], 900)
   redis.call('EXPIRE', KEYS[2], 900)
-  return redis.call('GEOSEARCH', KEYS[1], 'FROMMEMBER', ARGV[2],
-    'BYRADIUS', 5, 'km', 'ASC', 'COUNT', 51)
+  local nearby = redis.call('GEOSEARCH', KEYS[1], 'FROMMEMBER', ARGV[2],
+    'BYRADIUS', 5, 'km', 'ASC', 'COUNT', 51, 'WITHDIST')
+  local result = {}
+  for _, match in ipairs(nearby) do
+    table.insert(result, match[1])
+    table.insert(result, match[2])
+  end
+  return result
 end
 return {}
 `)
@@ -43,6 +49,20 @@ return {}
 func validCoordinates(lat, lon float64) bool {
 	return !math.IsNaN(lat) && !math.IsNaN(lon) &&
 		lat >= -85.05112878 && lat <= 85.05112878 && lon >= -180 && lon <= 180
+}
+
+func parseNearbyMatches(found []string, currentUserID int64) ([]int64, map[int64]float64) {
+	ids := make([]int64, 0, len(found)/2)
+	distances := make(map[int64]float64, len(found)/2)
+	for index := 0; index+1 < len(found); index += 2 {
+		userID, idErr := strconv.ParseInt(found[index], 10, 64)
+		distanceKm, distanceErr := strconv.ParseFloat(found[index+1], 64)
+		if idErr == nil && distanceErr == nil && userID != currentUserID {
+			ids = append(ids, userID)
+			distances[userID] = math.Round(distanceKm*10) / 10
+		}
+	}
+	return ids, distances
 }
 
 func (s *server) expireNearby(ctx context.Context) {
@@ -94,27 +114,33 @@ func (s *server) findNearby(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
 		return
 	}
-	ids := make([]int64, 0, len(found))
-	for _, member := range found {
-		value, err := strconv.ParseInt(member, 10, 64)
-		if err == nil && value != claims.UserID {
-			ids = append(ids, value)
-		}
-	}
+	ids, distances := parseNearbyMatches(found, claims.UserID)
 	users := make([]map[string]any, 0, len(ids))
 	if len(ids) > 0 {
-		rows, err := s.db.Query(ctx, "SELECT id,username FROM users WHERE id=ANY($1) ORDER BY username", ids)
+		rows, err := s.db.Query(ctx, "SELECT id,username FROM users WHERE id=ANY($1)", ids)
 		if err != nil {
 			httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
 			return
 		}
 		defer rows.Close()
+		usernames := make(map[int64]string, len(ids))
 		for rows.Next() {
 			var userID int64
 			var username string
 			if err := rows.Scan(&userID, &username); err != nil {
 				httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
 				return
+			}
+			usernames[userID] = username
+		}
+		if rows.Err() != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
+			return
+		}
+		for _, userID := range ids {
+			username, exists := usernames[userID]
+			if !exists {
+				continue
 			}
 			// Recheck consent after DB lookup so disabled/expired entries stay hidden.
 			expiry, err := s.redis.ZScore(ctx, nearbyKeys[1], strconv.FormatInt(userID, 10)).Result()
@@ -129,11 +155,10 @@ func (s *server) findNearby(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			online, _ := s.redis.Exists(ctx, presenceKey(userID)).Result()
-			users = append(users, map[string]any{"id": userID, "username": username, "online": online > 0})
-		}
-		if rows.Err() != nil {
-			httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
-			return
+			users = append(users, map[string]any{
+				"id": userID, "username": username, "online": online > 0,
+				"distanceKm": distances[userID],
+			})
 		}
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"users": users, "expiresAt": expiresAt})

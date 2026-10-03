@@ -433,10 +433,204 @@
 .feed-comment-error, .feed-translation-error { color: #9f2929; font-size: 12px; }
 
 .nearby-radar {
-  color: #568000;
+  position: relative;
+  width: 156px;
+  aspect-ratio: 1;
+  margin-inline: auto;
+  overflow: hidden;
+  border: 2px solid #6a980f;
+  border-radius: 50%;
+  background: #edf5e7;
+  box-shadow: inset 0 0 28px rgba(74, 118, 0, 0.12), 0 8px 22px rgba(35, 58, 0, 0.08);
+}
+
+.nearby-radar.is-large {
+  width: 196px;
+  background: #eaf5e1;
+  box-shadow: inset 0 0 38px rgba(74, 118, 0, 0.16), 0 12px 30px rgba(25, 44, 0, 0.18);
+}
+
+.nearby-radar-ring,
+.nearby-radar-axis,
+.nearby-radar-sweep,
+.nearby-radar-blip,
+.nearby-radar-center {
+  position: absolute;
+}
+
+.nearby-radar-ring {
+  z-index: 1;
+  border: 1px solid rgba(80, 126, 0, 0.32);
+  border-radius: 50%;
+}
+
+.nearby-radar-ring.ring-one { inset: 27px; }
+.nearby-radar-ring.ring-two { inset: 52px; }
+.nearby-radar.is-large .nearby-radar-ring.ring-one { inset: 34px; }
+.nearby-radar.is-large .nearby-radar-ring.ring-two { inset: 65px; }
+
+.nearby-radar-axis {
+  z-index: 1;
+  background: rgba(80, 126, 0, 0.22);
+}
+
+.nearby-radar-axis.axis-x {
+  top: 50%;
+  right: 10px;
+  left: 10px;
+  height: 1px;
+}
+
+.nearby-radar-axis.axis-y {
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  width: 1px;
+}
+
+.nearby-radar-sweep {
+  z-index: 2;
+  inset: 5px;
+  border-radius: 50%;
+  background: conic-gradient(from 270deg, transparent 0deg 300deg, rgba(107, 165, 0, 0.05) 315deg, rgba(107, 165, 0, 0.4) 358deg, transparent 360deg);
+  opacity: 0.6;
+  transform: rotate(-30deg);
+}
+
+.nearby-radar-sweep::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46%;
+  height: 2px;
+  background: #568800;
+  content: "";
+  transform: translateY(-50%);
+  transform-origin: left center;
+}
+
+.nearby-radar.is-scanning .nearby-radar-sweep {
+  opacity: 1;
+  animation: nearby-radar-scan 2.8s linear infinite;
+}
+
+.nearby-radar-blip {
+  z-index: 3;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #f8fff2;
+  border-radius: 50%;
+  background: #4f8500;
+  box-shadow: 0 0 0 3px rgba(79, 133, 0, 0.18);
+}
+
+.nearby-radar-blip.blip-one { top: 28%; left: 67%; }
+.nearby-radar-blip.blip-two { top: 63%; left: 27%; }
+.nearby-radar-blip.blip-three { top: 70%; left: 72%; }
+
+.nearby-radar.is-scanning .nearby-radar-blip {
+  animation: nearby-radar-blip 2.8s ease-in-out infinite;
+}
+
+.nearby-radar.is-scanning .blip-two { animation-delay: 0.65s; }
+.nearby-radar.is-scanning .blip-three { animation-delay: 1.3s; }
+
+.nearby-radar-center {
+  z-index: 4;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #f8fff2;
+  border-radius: 50%;
+  background: #456f00;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes nearby-radar-scan {
+  to { transform: rotate(330deg); }
+}
+
+@keyframes nearby-radar-blip {
+  0%, 100% { opacity: 0.45; transform: scale(0.9); }
+  45% { opacity: 1; transform: scale(1.3); }
+}
+
+.nearby-scan-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
   display: grid;
   place-items: center;
-  height: 112px;
+  padding: 16px;
+  background: rgba(20, 28, 16, 0.48);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.nearby-scan-modal {
+  width: min(330px, calc(100vw - 32px));
+  padding: 20px 20px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 20px;
+  background: #f9fbf7;
+  color: #1d2718;
+  text-align: center;
+  box-shadow: 0 24px 70px rgba(10, 20, 5, 0.3);
+}
+
+.nearby-scan-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.nearby-scan-heading strong {
+  font-size: 18px;
+}
+
+.nearby-scan-heading span {
+  flex-shrink: 0;
+  color: #66705f;
+  font-size: 12px;
+}
+
+.nearby-scan-modal > p {
+  margin: 18px 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.nearby-scan-modal > small {
+  display: block;
+  margin-top: 12px;
+  color: #687262;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.nearby-scan-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dce6d4;
+}
+
+.nearby-scan-progress span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: #69a800;
+  animation: nearby-scan-progress 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes nearby-scan-progress {
+  from { transform: translateX(-15%); }
+  to { transform: translateX(155%); }
 }
 
 .nearby-privacy {
