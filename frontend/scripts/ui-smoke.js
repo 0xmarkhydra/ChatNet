@@ -93,6 +93,28 @@ async (page) => {
     }
     if (path === '/api/auth/email/resend') return json({ verificationToken: 'test-verification-token', emailMasked: 't***@example.com', expiresInSeconds: 600 })
     if (path === '/api/events') return route.fulfill({ contentType: 'text/event-stream', body: ': connected\n\n' })
+    if (path === '/api/profile' && request.method() === 'GET') {
+      return json({
+        username: session.user.username,
+        displayName: session.user.displayName,
+        avatarSet: false,
+        coverSet: false,
+        updatedAt: new Date().toISOString(),
+      })
+    }
+    if (path === '/api/profile/media' && request.method() === 'PUT') {
+      const body = request.postDataJSON()
+      return json({
+        username: session.user.username,
+        displayName: session.user.displayName,
+        avatarSet: body.kind === 'avatar',
+        coverSet: body.kind === 'cover',
+        updatedAt: new Date().toISOString(),
+      })
+    }
+    if (/^\/api\/users\/[^/]+\/(avatar|cover)$/.test(path)) {
+      return route.fulfill({ status: 404, body: '' })
+    }
     if (path === '/api/users/nearby') {
       nearbyRequests.push({ method: request.method(), body: request.postData() })
       if (nearbyFailure) return json({ error: 'nearby unavailable' }, 503)

@@ -1797,11 +1797,24 @@
 
 .smart-avatar .avatar-initials {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   margin: 0;
   color: inherit;
   font-size: inherit;
   letter-spacing: 0;
+}
+
+.smart-avatar .avatar-photo {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
 }
 
 .avatar-shine {
@@ -2226,10 +2239,23 @@
   color: #fff;
 }
 
-.profile-cover-art strong,
-.profile-cover-art small {
+.profile-cover-art > img {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.profile-cover-placeholder {
   position: relative;
   z-index: 2;
+}
+
+.profile-cover-art strong,
+.profile-cover-art small {
   display: block;
 }
 
@@ -2263,6 +2289,66 @@
   border-radius: 50%;
   font-size: 24px;
   box-shadow: 0 7px 20px rgba(35, 69, 105, .2);
+}
+
+.profile-avatar-editor {
+  position: relative;
+  flex: 0 0 82px;
+}
+
+.profile-avatar-edit,
+.profile-cover-edit {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.profile-avatar-edit {
+  position: absolute;
+  z-index: 6;
+  right: -2px;
+  bottom: 1px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #eef2e7;
+  color: var(--chatnet-accent-ink);
+  box-shadow: 0 3px 10px rgba(20, 28, 35, .16);
+}
+
+.profile-cover-edit {
+  position: absolute;
+  z-index: 4;
+  right: 12px;
+  bottom: 10px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .9);
+  color: #252b31;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .16);
+  font-size: 12px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+
+.profile-avatar-edit:disabled,
+.profile-cover-edit:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.profile-media-hint {
+  display: block;
+  margin-top: 4px;
+  color: #8b9189;
+  font-size: 11px;
 }
 
 .profile-identity > div:last-child {

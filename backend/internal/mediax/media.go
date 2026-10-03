@@ -165,7 +165,7 @@ func PreviewLabel(kind string) string {
 
 func classify(scope, fileName, contentType string) (string, int64, error) {
 	scope = strings.TrimSpace(strings.ToLower(scope))
-	if scope != "chat" && scope != "feed" && scope != "story" {
+	if scope != "chat" && scope != "feed" && scope != "story" && scope != "profile" {
 		return "", 0, errors.New("nhóm upload không hợp lệ")
 	}
 
@@ -180,9 +180,12 @@ func classify(scope, fileName, contentType string) (string, int64, error) {
 	}
 
 	if imageExt[ext] && (strings.HasPrefix(mime, "image/") || mime == "" || mime == "application/octet-stream") {
+		if scope == "profile" {
+			return "image", 12 * 1024 * 1024, nil
+		}
 		return "image", MaxImageBytes, nil
 	}
-	if videoExt[ext] && (strings.HasPrefix(mime, "video/") || mime == "" || mime == "application/octet-stream") {
+	if scope != "profile" && videoExt[ext] && (strings.HasPrefix(mime, "video/") || mime == "" || mime == "application/octet-stream") {
 		return "video", MaxVideoBytes, nil
 	}
 	if scope == "chat" && audioExt[ext] && (strings.HasPrefix(mime, "audio/") || mime == "" || mime == "application/octet-stream") {
@@ -194,8 +197,11 @@ func classify(scope, fileName, contentType string) (string, int64, error) {
 		}
 		return "file", MaxFileBytes, nil
 	}
+	if scope == "profile" {
+		return "", 0, errors.New("ảnh đại diện và ảnh bìa chỉ hỗ trợ file ảnh")
+	}
 	if scope == "feed" || scope == "story" {
-		return "", 0, errors.New("tường nhà và Story chỉ hỗ trợ ảnh và video")
+		return "", 0, errors.New("bảng tin và Story chỉ hỗ trợ ảnh và video")
 	}
 	return "", 0, errors.New("loại file không được phép")
 }

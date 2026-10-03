@@ -4,9 +4,16 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(64) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     display_name VARCHAR(100) NOT NULL,
+    avatar_ref TEXT,
+    cover_ref TEXT,
+    profile_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     email_verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_ref TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_ref TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);

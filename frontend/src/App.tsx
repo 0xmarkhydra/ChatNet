@@ -24,6 +24,14 @@ type Session = {
   user: User
 }
 
+type ProfileMediaState = {
+  username: string
+  displayName: string
+  avatarSet: boolean
+  coverSet: boolean
+  updatedAt: string
+}
+
 type MediaAttachment = {
   id?: number
   storageRef: string
@@ -264,6 +272,13 @@ function avatarTone(name: string) {
   return hash % 8
 }
 
+const avatarRefreshVersions = new Map<string, string>()
+
+function profileAssetUrl(name: string, kind: 'avatar' | 'cover', version?: string) {
+  const base = `${API}/api/users/${encodeURIComponent(name)}/${kind}`
+  return version ? `${base}?v=${encodeURIComponent(version)}` : base
+}
+
 function UserAvatar({
   name,
   className = 'avatar',
@@ -275,6 +290,14 @@ function UserAvatar({
   online?: boolean
   group?: boolean
 }) {
+  const version = avatarRefreshVersions.get(name)
+  const imageUrl = group ? '' : profileAssetUrl(name, 'avatar', version)
+  const [imageFailed, setImageFailed] = useState(false)
+
+  useEffect(() => {
+    setImageFailed(false)
+  }, [imageUrl])
+
   return (
     <div
       className={`${className} smart-avatar avatar-tone-${avatarTone(name)} ${group ? 'group' : ''}`}
@@ -282,6 +305,15 @@ function UserAvatar({
       title={name}
     >
       <span className="avatar-initials">{group ? '👥' : avatarInitials(name)}</span>
+      {!group && !imageFailed && (
+        <img
+          className="avatar-photo"
+          src={imageUrl}
+          alt=""
+          draggable={false}
+          onError={() => setImageFailed(true)}
+        />
+      )}
       <span className="avatar-shine" aria-hidden="true" />
       {online && <span className="presence-dot" />}
     </div>
@@ -483,7 +515,9 @@ export default function App() {
   const [commentEditors, setCommentEditors] = useState<Record<number, DiscussionDraft>>({})
   const [postText, setPostText] = useState('')
   const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([])
-  const [mediaUploading, setMediaUploading] = useState<'chat' | 'feed' | 'story' | null>(null)
+  const [mediaUploading, setMediaUploading] = useState<'chat' | 'feed' | 'story' | 'profile' | null>(null)
+  const [profileMedia, setProfileMedia] = useState<ProfileMediaState | null>(null)
+  const [profileBusy, setProfileBusy] = useState<'avatar' | 'cover' | null>(null)
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [targetLanguage, setTargetLanguage] = useState('en')
   const [autoTranslate, setAutoTranslate] = useState(true)
@@ -504,6 +538,8 @@ export default function App() {
   const feedVideoInputRef = useRef<HTMLInputElement>(null)
   const feedAlbumInputRef = useRef<HTMLInputElement>(null)
   const storyFileInputRef = useRef<HTMLInputElement>(null)
+  const avatarFileInputRef = useRef<HTMLInputElement>(null)
+  const coverFileInputRef = useRef<HTMLInputElement>(null)
 
   const name = session?.user.username || ''
   const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
@@ -677,6 +713,63 @@ export default function App() {
     return response
   }
 
+  async function loadProfileMedia() {
+    if (!session?.token) return
+    const token = session.token
+    const response = await apiFetch('/api/profile')
+    if (!response.ok || sessionRef.current?.token !== token) return
+    const profile = await response.json() as ProfileMediaState
+    avatarRefreshVersions.set(profile.username, profile.updatedAt)
+    setProfileMedia(profile)
+  }
+
+  async function updateProfileImage(kind: 'avatar' | 'cover', file?: File) {
+    if (!session || profileBusy) return
+    if (!file || !file.type.toLowerCase().startsWith('image/')) {
+      setNotice('Chỉ hỗ trợ file ảnh cho ảnh đại diện và ảnh bìa.', 'error')
+      return
+    }
+    setProfileBusy(kind)
+    try {
+      const [attachment] = await uploadMediaFiles([file], 'profile')
+      if (!attachment) throw new Error('Không upload được ảnh.')
+
+      const response = await apiFetch('/api/profile/media', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind,
+          attachment: {
+            storageRef: attachment.storageRef,
+            name: attachment.name,
+            sizeBytes: attachment.sizeBytes,
+            contentType: attachment.contentType,
+            kind: attachment.kind,
+          },
+        }),
+      })
+      const result = await response.json().catch(() => null) as (ProfileMediaState & { error?: string }) | null
+      if (!response.ok || !result) {
+        throw new Error(result?.error || 'Không cập nhật được ảnh hồ sơ.')
+      }
+      avatarRefreshVersions.set(result.username, result.updatedAt)
+      setProfileMedia(result)
+      setNotice(kind === 'avatar' ? 'Đã cập nhật ảnh đại diện.' : 'Đã cập nhật ảnh bìa.', 'success')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Không cập nhật được ảnh hồ sơ.', 'error')
+    } finally {
+      setProfileBusy(null)
+    }
+  }
+
+  useEffect(() => {
+    if (!session?.token) {
+      setProfileMedia(null)
+      return
+    }
+    void loadProfileMedia()
+  }, [session?.token])
+
   async function findNearby() {
     if (!session || nearbyBusy) return
     const request = ++nearbyRequest.current
@@ -785,7 +878,7 @@ export default function App() {
     }
   }, [activeStory?.id, activeStoryId, stories.length])
 
-  async function uploadMediaFiles(files: File[], scope: 'chat' | 'feed' | 'story') {
+  async function uploadMediaFiles(files: File[], scope: 'chat' | 'feed' | 'story' | 'profile') {
     if (!files.length) return [] as MediaAttachment[]
 
     setMediaUploading(scope)
@@ -3407,14 +3500,77 @@ export default function App() {
 
         {tab === 'profile' && (
           <div className="simple-view profile-view">
+            <input
+              ref={avatarFileInputRef}
+              className="hidden-media-input"
+              type="file"
+              accept="image/*"
+              aria-label="Chọn ảnh đại diện"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                void updateProfileImage('avatar', file)
+              }}
+            />
+            <input
+              ref={coverFileInputRef}
+              className="hidden-media-input"
+              type="file"
+              accept="image/*"
+              aria-label="Chọn ảnh bìa"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                void updateProfileImage('cover', file)
+              }}
+            />
+
             <section className="profile-hero">
-              <div className="profile-cover-art" aria-hidden="true">
-                <strong>ChatNet</strong>
-                <small>Kết nối không biên giới</small>
+              <div className={`profile-cover-art ${profileMedia?.coverSet ? 'has-cover' : ''}`}>
+                <div className="profile-cover-placeholder">
+                  <strong>ChatNet</strong>
+                  <small>Kết nối không biên giới</small>
+                </div>
+                {profileMedia?.coverSet && (
+                  <img
+                    src={profileAssetUrl(name, 'cover', profileMedia.updatedAt)}
+                    alt="Ảnh bìa"
+                    draggable={false}
+                    onError={(event) => { event.currentTarget.hidden = true }}
+                  />
+                )}
+                <button
+                  type="button"
+                  className="profile-cover-edit"
+                  disabled={profileBusy !== null || mediaUploading === 'profile'}
+                  onClick={() => coverFileInputRef.current?.click()}
+                >
+                  <UiIcon name="photo" size={17} />
+                  {profileBusy === 'cover' ? 'Đang tải...' : profileMedia?.coverSet ? 'Đổi ảnh bìa' : 'Thêm ảnh bìa'}
+                </button>
               </div>
+
               <div className="profile-identity">
-                <UserAvatar name={name} className="profile-avatar" online />
-                <div><strong>@{name}</strong><span>{session.user.email}</span></div>
+                <div className="profile-avatar-editor">
+                  <UserAvatar name={name} className="profile-avatar" online />
+                  <button
+                    type="button"
+                    className="profile-avatar-edit"
+                    aria-label="Đổi ảnh đại diện"
+                    title="Đổi ảnh đại diện"
+                    disabled={profileBusy !== null || mediaUploading === 'profile'}
+                    onClick={() => avatarFileInputRef.current?.click()}
+                  >
+                    <UiIcon name="photo" size={17} />
+                  </button>
+                </div>
+                <div>
+                  <strong>@{name}</strong>
+                  <span>{session.user.email}</span>
+                  <small className="profile-media-hint">
+                    {profileBusy === 'avatar' ? 'Đang cập nhật ảnh đại diện...' : 'Bấm biểu tượng máy ảnh để đổi avatar'}
+                  </small>
+                </div>
               </div>
             </section>
 
