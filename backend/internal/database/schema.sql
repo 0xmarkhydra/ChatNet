@@ -32,16 +32,65 @@ CREATE TABLE IF NOT EXISTS conversation_members (
 CREATE INDEX IF NOT EXISTS idx_conversation_members_user
 ON conversation_members(user_id, conversation_id);
 
+CREATE TABLE IF NOT EXISTS friend_connections (
+    user_low BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_high BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    requested_by BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_low, user_high),
+    CHECK (user_low < user_high),
+    CHECK (requested_by = user_low OR requested_by = user_high)
+);
+
+CREATE INDEX IF NOT EXISTS idx_friend_connections_low
+ON friend_connections(user_low, status, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_friend_connections_high
+ON friend_connections(user_high, status, updated_at DESC);
+
 CREATE TABLE IF NOT EXISTS messages (
     id BIGSERIAL PRIMARY KEY,
     conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     text TEXT NOT NULL,
+    reply_to_message_id BIGINT,
+    edited_at TIMESTAMPTZ,
+    deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_message_id BIGINT;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid='messages'::regclass
+          AND conname='messages_reply_to_message_fk'
+    ) THEN
+        ALTER TABLE messages
+            ADD CONSTRAINT messages_reply_to_message_fk
+            FOREIGN KEY (reply_to_message_id) REFERENCES messages(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_messages_conversation
 ON messages(conversation_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS message_reactions (
+    message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    emoji VARCHAR(16) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (message_id, user_id, emoji)
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_reactions_message
+ON message_reactions(message_id, emoji);
 
 CREATE TABLE IF NOT EXISTS message_attachments (
     id BIGSERIAL PRIMARY KEY,

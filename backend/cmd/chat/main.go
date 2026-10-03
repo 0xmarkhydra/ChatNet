@@ -28,10 +28,23 @@ type message struct {
 	SenderID            int64               `json:"senderId"`
 	Sender              string              `json:"sender"`
 	Text                string              `json:"text"`
+	ReplyToMessageID    *int64              `json:"replyToMessageId,omitempty"`
+	ReplyToSender       string              `json:"replyToSender,omitempty"`
+	ReplyToText         string              `json:"replyToText,omitempty"`
+	EditedAt            *time.Time          `json:"editedAt,omitempty"`
+	Deleted             bool                `json:"deleted,omitempty"`
+	Reactions           []messageReaction   `json:"reactions,omitempty"`
+	ReadByUserIDs       []int64             `json:"readByUserIds,omitempty"`
 	TranslatedText      string              `json:"translatedText,omitempty"`
 	TranslationLanguage string              `json:"translationLanguage,omitempty"`
 	Attachments         []mediax.Attachment `json:"attachments,omitempty"`
 	CreatedAt           time.Time           `json:"createdAt"`
+}
+
+type messageReaction struct {
+	Emoji string `json:"emoji"`
+	Count int    `json:"count"`
+	Mine  bool   `json:"mine"`
 }
 
 type conversation struct {
@@ -48,10 +61,12 @@ type conversation struct {
 }
 
 type realtimeEvent struct {
-	Type           string        `json:"type"`
-	ConversationID int64         `json:"conversationId"`
-	Message        *message      `json:"message,omitempty"`
-	Conversation   *conversation `json:"conversation,omitempty"`
+	Type              string        `json:"type"`
+	ConversationID    int64         `json:"conversationId"`
+	Message           *message      `json:"message,omitempty"`
+	Conversation      *conversation `json:"conversation,omitempty"`
+	ReaderID          int64         `json:"readerId,omitempty"`
+	LastReadMessageID int64         `json:"lastReadMessageId,omitempty"`
 }
 
 type server struct {
@@ -97,6 +112,11 @@ func main() {
 	mux.Handle("GET /api/users/suggestions", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.suggestUsers)))
 	mux.Handle("POST /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.findNearby)))
 	mux.Handle("DELETE /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.stopNearby)))
+	mux.Handle("GET /api/friends", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriends)))
+	mux.Handle("GET /api/friends/requests", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriendRequests)))
+	mux.Handle("POST /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.sendFriendRequest)))
+	mux.Handle("POST /api/friends/{id}/accept", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.acceptFriendRequest)))
+	mux.Handle("DELETE /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeFriendConnection)))
 	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
 	mux.Handle("PUT /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateTranslationPreferences)))
 	mux.Handle("GET /api/conversations", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversations)))
@@ -104,7 +124,15 @@ func main() {
 	mux.Handle("POST /api/conversations/groups", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createGroup)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listMessages)))
 	mux.Handle("POST /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createMessage)))
+	mux.Handle("PATCH /api/messages/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.editMessage)))
+	mux.Handle("DELETE /api/messages/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteMessage)))
+	mux.Handle("POST /api/messages/{id}/reactions", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.toggleMessageReaction)))
 	mux.Handle("POST /api/conversations/{id}/read", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.markRead)))
+	mux.Handle("PATCH /api/conversations/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateGroup)))
+	mux.Handle("GET /api/conversations/{id}/members", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listGroupMembers)))
+	mux.Handle("POST /api/conversations/{id}/members", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.addGroupMembers)))
+	mux.Handle("PATCH /api/conversations/{id}/members/{userId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateGroupMemberRole)))
+	mux.Handle("DELETE /api/conversations/{id}/members/{userId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeGroupMember)))
 	mux.Handle("GET /api/events", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.events)))
 
 	port := config.Env("PORT", "8082")
@@ -648,9 +676,21 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := s.db.Query(r.Context(), `
 		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
+		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
+		       m.edited_at,(m.deleted_at IS NOT NULL),
+		       ARRAY(
+		           SELECT cmr.user_id
+		           FROM conversation_members cmr
+		           WHERE cmr.conversation_id=m.conversation_id
+		             AND cmr.user_id<>m.user_id
+		             AND cmr.last_read_message_id>=m.id
+		           ORDER BY cmr.user_id
+		       ),
 		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
+		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
 		WHERE m.conversation_id=$1
@@ -666,8 +706,14 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		var m message
 		if rows.Scan(
 			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
+			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
+			&m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
 			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
 		) == nil {
+			if m.Deleted {
+				m.Text = ""
+				m.TranslatedText = ""
+			}
 			items = append(items, m)
 		}
 	}
@@ -676,6 +722,10 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.attachMessageMedia(r.Context(), items); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load message attachments")
+		return
+	}
+	if err := s.attachMessageReactions(r.Context(), claims.UserID, items); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load message reactions")
 		return
 	}
 	httpx.JSON(w, http.StatusOK, items)
@@ -692,8 +742,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Text        string                   `json:"text"`
-		Attachments []mediax.AttachmentInput `json:"attachments"`
+		Text             string                   `json:"text"`
+		ReplyToMessageID *int64                   `json:"replyToMessageId"`
+		Attachments      []mediax.AttachmentInput `json:"attachments"`
 	}
 	if json.NewDecoder(r.Body).Decode(&body) != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
@@ -721,6 +772,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "message text or attachment is required")
 		return
 	}
+	if body.ReplyToMessageID != nil {
+		var replyConversationID int64
+		if err := s.db.QueryRow(r.Context(), `
+			SELECT conversation_id FROM messages WHERE id=$1
+		`, *body.ReplyToMessageID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
+			httpx.Error(w, http.StatusBadRequest, "invalid reply message")
+			return
+		}
+	}
 
 	tx, err := s.db.Begin(r.Context())
 	if err != nil {
@@ -730,15 +790,17 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 
 	m := message{
-		ConversationID: conversationID,
-		SenderID:       claims.UserID,
-		Sender:         claims.Username,
-		Attachments:    attachments,
+		ConversationID:   conversationID,
+		SenderID:         claims.UserID,
+		Sender:           claims.Username,
+		ReplyToMessageID: body.ReplyToMessageID,
+		Attachments:      attachments,
+		Reactions:        []messageReaction{},
 	}
 	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO messages(conversation_id,user_id,text)
-		VALUES($1,$2,$3) RETURNING id,text,created_at`,
-		conversationID, claims.UserID, body.Text,
+		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id)
+		VALUES($1,$2,$3,$4) RETURNING id,text,created_at`,
+		conversationID, claims.UserID, body.Text, body.ReplyToMessageID,
 	).Scan(&m.ID, &m.Text, &m.CreatedAt); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create message")
 		return
@@ -766,6 +828,14 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot save message")
 		return
 	}
+	if m.ReplyToMessageID != nil {
+		_ = s.db.QueryRow(r.Context(), `
+			SELECT u.username, CASE WHEN rm.deleted_at IS NULL THEN rm.text ELSE '' END
+			FROM messages rm
+			JOIN users u ON u.id=rm.user_id
+			WHERE rm.id=$1
+		`, *m.ReplyToMessageID).Scan(&m.ReplyToSender, &m.ReplyToText)
+	}
 
 	memberIDs := s.memberIDs(r.Context(), conversationID)
 	s.publishConversationEvent(r.Context(), memberIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
@@ -788,6 +858,189 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	})
 
 	httpx.JSON(w, http.StatusCreated, m)
+}
+
+func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (message, error) {
+	var m message
+	err := s.db.QueryRow(ctx, `
+		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
+		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
+		       m.edited_at,(m.deleted_at IS NOT NULL),
+		       ARRAY(
+		           SELECT cmr.user_id
+		           FROM conversation_members cmr
+		           WHERE cmr.conversation_id=m.conversation_id
+		             AND cmr.user_id<>m.user_id
+		             AND cmr.last_read_message_id>=m.id
+		           ORDER BY cmr.user_id
+		       ),
+		       m.created_at
+		FROM messages m
+		JOIN users u ON u.id=m.user_id
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
+		LEFT JOIN users ru ON ru.id=rm.user_id
+		WHERE m.id=$1`, messageID).Scan(
+		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
+		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
+		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
+	)
+	if err != nil {
+		return message{}, err
+	}
+	if m.Deleted {
+		m.Text = ""
+	}
+	items := []message{m}
+	if err := s.attachMessageMedia(ctx, items); err != nil {
+		return message{}, err
+	}
+	if err := s.attachMessageReactions(ctx, viewerID, items); err != nil {
+		return message{}, err
+	}
+	return items[0], nil
+}
+
+func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	messageID, ok := parseID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+
+	var body struct {
+		Text string `json:"text"`
+	}
+	if json.NewDecoder(r.Body).Decode(&body) != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	body.Text = strings.TrimSpace(body.Text)
+	if body.Text == "" || len(body.Text) > 4000 {
+		httpx.Error(w, http.StatusBadRequest, "text must be between 1 and 4000 characters")
+		return
+	}
+
+	var conversationID int64
+	if err := s.db.QueryRow(r.Context(), `
+		UPDATE messages
+		SET text=$1,edited_at=NOW()
+		WHERE id=$2 AND user_id=$3 AND deleted_at IS NULL
+		RETURNING conversation_id`, body.Text, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		httpx.Error(w, http.StatusNotFound, "message not found or cannot be edited")
+		return
+	}
+	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_translations WHERE message_id=$1`, messageID)
+
+	m, err := s.loadMessage(r.Context(), messageID, claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load edited message")
+		return
+	}
+	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
+		Type: "message.updated", ConversationID: conversationID, Message: &m,
+	})
+	httpx.JSON(w, http.StatusOK, m)
+}
+
+func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	messageID, ok := parseID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+
+	var conversationID int64
+	if err := s.db.QueryRow(r.Context(), `
+		UPDATE messages
+		SET text='',deleted_at=NOW(),edited_at=NULL
+		WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
+		RETURNING conversation_id`, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		httpx.Error(w, http.StatusNotFound, "message not found or cannot be recalled")
+		return
+	}
+	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_attachments WHERE message_id=$1`, messageID)
+	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_translations WHERE message_id=$1`, messageID)
+
+	m, err := s.loadMessage(r.Context(), messageID, claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load recalled message")
+		return
+	}
+	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
+		Type: "message.updated", ConversationID: conversationID, Message: &m,
+	})
+	httpx.JSON(w, http.StatusOK, m)
+}
+
+func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	messageID, ok := parseID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+
+	var body struct {
+		Emoji string `json:"emoji"`
+	}
+	if json.NewDecoder(r.Body).Decode(&body) != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	allowed := map[string]bool{
+		"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "🙏": true,
+	}
+	if !allowed[body.Emoji] {
+		httpx.Error(w, http.StatusBadRequest, "unsupported reaction")
+		return
+	}
+
+	var conversationID int64
+	if err := s.db.QueryRow(r.Context(), `
+		SELECT conversation_id FROM messages WHERE id=$1 AND deleted_at IS NULL
+	`, messageID).Scan(&conversationID); err != nil {
+		httpx.Error(w, http.StatusNotFound, "message not found")
+		return
+	}
+	if !s.isMember(r.Context(), conversationID, claims.UserID) {
+		httpx.Error(w, http.StatusForbidden, "not a conversation member")
+		return
+	}
+
+	var exists bool
+	_ = s.db.QueryRow(r.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM message_reactions
+			WHERE message_id=$1 AND user_id=$2 AND emoji=$3
+		)`, messageID, claims.UserID, body.Emoji).Scan(&exists)
+
+	if exists {
+		if _, err := s.db.Exec(r.Context(), `
+			DELETE FROM message_reactions
+			WHERE message_id=$1 AND user_id=$2 AND emoji=$3
+		`, messageID, claims.UserID, body.Emoji); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot remove reaction")
+			return
+		}
+	} else {
+		if _, err := s.db.Exec(r.Context(), `
+			INSERT INTO message_reactions(message_id,user_id,emoji)
+			VALUES($1,$2,$3)
+			ON CONFLICT DO NOTHING
+		`, messageID, claims.UserID, body.Emoji); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot save reaction")
+			return
+		}
+	}
+
+	m, err := s.loadMessage(r.Context(), messageID, claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load reaction")
+		return
+	}
+	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
+		Type: "message.updated", ConversationID: conversationID, Message: &m,
+	})
+	httpx.JSON(w, http.StatusOK, m)
 }
 
 func (s *server) attachMessageMedia(ctx context.Context, items []message) error {
@@ -834,6 +1087,43 @@ func (s *server) attachMessageMedia(ctx context.Context, items []message) error 
 	return rows.Err()
 }
 
+func (s *server) attachMessageReactions(ctx context.Context, viewerID int64, items []message) error {
+	if len(items) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(items))
+	indexByID := make(map[int64]int, len(items))
+	for i := range items {
+		ids = append(ids, items[i].ID)
+		indexByID[items[i].ID] = i
+		items[i].Reactions = []messageReaction{}
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT message_id,emoji,COUNT(*)::int,BOOL_OR(user_id=$2)
+		FROM message_reactions
+		WHERE message_id = ANY($1::bigint[])
+		GROUP BY message_id,emoji
+		ORDER BY message_id,MIN(created_at)
+	`, ids, viewerID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var messageID int64
+		var reaction messageReaction
+		if err := rows.Scan(&messageID, &reaction.Emoji, &reaction.Count, &reaction.Mine); err != nil {
+			return err
+		}
+		if idx, ok := indexByID[messageID]; ok {
+			items[idx].Reactions = append(items[idx].Reactions, reaction)
+		}
+	}
+	return rows.Err()
+}
+
 func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -841,16 +1131,44 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var maxID int64
-	_ = s.db.QueryRow(r.Context(), `SELECT COALESCE(MAX(id),0) FROM messages WHERE conversation_id=$1`, conversationID).Scan(&maxID)
-	tag, err := s.db.Exec(r.Context(), `
-		UPDATE conversation_members SET last_read_message_id=$1
-		WHERE conversation_id=$2 AND user_id=$3`, maxID, conversationID, claims.UserID)
-	if err != nil || tag.RowsAffected() == 0 {
+	var previousReadID int64
+	if err := s.db.QueryRow(r.Context(), `
+		SELECT last_read_message_id
+		FROM conversation_members
+		WHERE conversation_id=$1 AND user_id=$2
+	`, conversationID, claims.UserID).Scan(&previousReadID); err != nil {
 		httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"conversationId": conversationID, "lastReadMessageId": maxID})
+
+	var maxID int64
+	_ = s.db.QueryRow(r.Context(), `
+		SELECT COALESCE(MAX(id),0)
+		FROM messages
+		WHERE conversation_id=$1
+	`, conversationID).Scan(&maxID)
+
+	if maxID > previousReadID {
+		if _, err := s.db.Exec(r.Context(), `
+			UPDATE conversation_members
+			SET last_read_message_id=$1
+			WHERE conversation_id=$2 AND user_id=$3
+		`, maxID, conversationID, claims.UserID); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot update read state")
+			return
+		}
+		s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
+			Type:              "conversation.read",
+			ConversationID:    conversationID,
+			ReaderID:          claims.UserID,
+			LastReadMessageID: maxID,
+		})
+	}
+
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"conversationId":    conversationID,
+		"lastReadMessageId": maxID,
+	})
 }
 
 func (s *server) events(w http.ResponseWriter, r *http.Request) {

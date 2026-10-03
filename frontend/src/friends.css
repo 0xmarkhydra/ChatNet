@@ -141,6 +141,32 @@
   background: #f3f7ff;
 }
 
+.friend-request-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+}
+
+.friend-request-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.friend-request-actions button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: #4c7800;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.friend-request-actions button.secondary {
+  background: #eef2f6;
+  color: #647084;
+}
+
 .friend-avatar {
   position: relative;
   width: 42px;

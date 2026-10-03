@@ -26,9 +26,21 @@ Mục tiêu của bản thi là chứng minh một flow end-to-end đủ giống
 - Realtime message qua Redis Pub/Sub + SSE.
 - Presence online tối thiểu.
 - Unread count theo từng conversation.
-- Mark-as-read khi mở conversation.
+- Mark-as-read khi mở conversation và hiển thị trạng thái **Đã xem**.
+- Reply tin nhắn.
+- Reaction nhanh.
+- Sửa tin nhắn của chính mình.
+- Thu hồi tin nhắn của chính mình.
 - Dịch từng message bằng AI.
-- Auto Translate message nhận được.
+- Auto Translate message nhận được; bản dịch được lưu theo message + ngôn ngữ.
+
+### Danh bạ / kết bạn
+- Gợi ý tối đa 10 người bạn có thể biết.
+- Tìm người dùng theo username.
+- Gửi/hủy lời mời kết bạn.
+- Nhận, chấp nhận hoặc từ chối lời mời.
+- Danh sách bạn bè thật từ PostgreSQL.
+- OneSignal push khi có lời mời hoặc lời mời được chấp nhận.
 
 ### Chat nhóm
 - Tạo group bằng tên nhóm.
@@ -36,6 +48,10 @@ Mục tiêu của bản thi là chứng minh một flow end-to-end đủ giống
 - Mỗi group có conversation và message history riêng.
 - Realtime cho mọi thành viên.
 - Unread count theo từng user.
+- Read receipt hiển thị số người đã xem.
+- Owner/admin có thể đổi tên và thêm thành viên.
+- Owner có thể đặt/gỡ admin và chuyển quyền chủ nhóm.
+- Owner/admin có thể xóa thành viên theo quyền; thành viên có thể rời nhóm.
 - AI Translation hoạt động giống chat riêng.
 
 ### News Feed / Tâm sự
@@ -322,7 +338,7 @@ Email mới tạo tài khoản với username ngẫu nhiên dạng `user_<16 ký
 Email đã tồn tại đăng nhập tài khoản cũ, giữ nguyên username và mật khẩu.
 Không dùng email làm mật khẩu hoặc tên hiển thị công khai.
 API đăng ký cũ và `POST /api/auth/login` bằng mật khẩu vẫn được hỗ trợ.
-Tài khoản mới chỉ dùng OTP, chưa có chức năng đặt mật khẩu.
+Đăng ký xác minh email bằng OTP; sau khi xác minh, đăng nhập bằng email/password đã hash bằng bcrypt.
 
 Tìm người dùng: `/api/users/search?q=...` khớp một phần username (có thể thêm `@`)
 hoặc email đầy đủ, không phân biệt hoa/thường; không tìm theo tên hiển thị.
@@ -635,32 +651,28 @@ make test
 
 ## Những gì cố tình chưa làm trong MVP
 
-Để giữ scope đủ hoàn thiện trong thời gian hackathon, bản hiện tại chưa ưu tiên:
+Các phần vẫn để ngoài scope bản hiện tại vì cần thay đổi kiến trúc, hạ tầng hoặc chính sách sản phẩm lớn hơn:
 - Voice/video call.
-- Recall/edit message.
-- Message reaction.
-- Push notification.
-- Friend request graph.
-- Group admin/member management nâng cao.
 - End-to-end encryption.
-
-Các boundary hiện tại cho phép bổ sung các phần này mà không cần viết lại frontend gateway/auth core.
+- Notification Center trong app + badge tổng hợp đầy đủ.
+- Media thumbnail/transcode và cleanup orphan theo job nền.
+- Hệ thống block/report/moderation hoàn chỉnh.
 
 ---
 
 ## Roadmap sau cuộc thi
 
-1. SSE → WebSocket.
-2. Thumbnail/transcode + cleanup media orphan.
-3. Notification Center + badge hoàn chỉnh.
-4. Delivered/read receipt chi tiết.
-5. Reply/reaction/recall.
-6. Friend/follow graph.
-7. Group role/admin/invite.
+1. SSE → WebSocket khi cần nhiều realtime event/typing/presence hơn.
+2. Thumbnail/transcode + cleanup media orphan bằng worker/job queue.
+3. Notification Center trong app + badge/unread tổng hợp.
+4. Delivered receipt chi tiết bên cạnh read receipt hiện tại.
+5. Search / pin / forward message.
+6. Block user, privacy controls và report abuse.
+7. Invite link / join approval cho group lớn.
 8. AI context-aware translation theo conversation.
-9. OpenTelemetry + metrics.
-10. Rate limit + abuse/moderation.
-11. Tách database theo service khi traffic cần.
+9. OpenTelemetry + metrics + tracing.
+10. Rate limit + abuse/moderation sâu hơn cho chat/feed/media.
+11. Tách database theo service khi traffic thực sự cần.
 
 ---
 

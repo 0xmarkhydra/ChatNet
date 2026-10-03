@@ -43,12 +43,25 @@ type PresignedUpload = {
   downloadUrl: string
 }
 
+type MessageReaction = {
+  emoji: string
+  count: number
+  mine: boolean
+}
+
 type Message = {
   id: number
   conversationId: number
   senderId: number
   sender: string
   text: string
+  replyToMessageId?: number
+  replyToSender?: string
+  replyToText?: string
+  editedAt?: string
+  deleted?: boolean
+  reactions?: MessageReaction[]
+  readByUserIds?: number[]
   translatedText?: string
   translationLanguage?: string
   attachments?: MediaAttachment[]
@@ -72,10 +85,12 @@ type Conversation = {
 }
 
 type RealtimeEvent = {
-  type: 'message' | 'conversation.created'
+  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.read'
   conversationId: number
   message?: Message
   conversation?: Conversation
+  readerId?: number
+  lastReadMessageId?: number
 }
 
 type Post = {
@@ -110,6 +125,20 @@ type FriendSearchResult = {
   distanceKm?: number
   mutualGroups?: number
   reason?: string
+}
+
+type FriendConnection = FriendSearchResult & {
+  status: 'accepted' | 'pending'
+  direction?: 'incoming' | 'outgoing'
+  updatedAt: string
+}
+
+type GroupMember = {
+  id: number
+  username: string
+  displayName: string
+  role: 'owner' | 'admin' | 'member'
+  online: boolean
 }
 
 type InstallPromptEvent = Event & {
@@ -345,6 +374,12 @@ export default function App() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
   const activeConversationIdRef = useRef<number | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
+  const [groupNameDraft, setGroupNameDraft] = useState('')
+  const [groupInviteDraft, setGroupInviteDraft] = useState('')
+  const [groupBusy, setGroupBusy] = useState(false)
   // ponytail: drafts live in memory per conversation; add persistence only with an explicit retention policy.
   const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>({})
   const draft = messageDrafts[activeConversationId ?? 0] ?? emptyDraft
@@ -356,6 +391,9 @@ export default function App() {
   const [friendQuery, setFriendQuery] = useState('')
   const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([])
   const [friendSearching, setFriendSearching] = useState(false)
+  const [friends, setFriends] = useState<FriendConnection[]>([])
+  const [friendRequests, setFriendRequests] = useState<FriendConnection[]>([])
+  const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null)
   const [directUsername, setDirectUsername] = useState('')
   const [groupName, setGroupName] = useState('')
   const [groupUsers, setGroupUsers] = useState('')
@@ -398,12 +436,18 @@ export default function App() {
 
   const name = session?.user.username || ''
   const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
+  const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
+  const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
   const activeStoryIndex = stories.findIndex((item) => item.id === activeStoryId)
   const activeStory = activeStoryIndex < 0 ? null : stories[activeStoryIndex]
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId
     setMessages([])
+    setReplyingTo(null)
+    setGroupSettingsOpen(false)
+    setGroupMembers([])
+    setGroupInviteDraft('')
   }, [activeConversationId])
 
   function setMessageText(text: string) {
@@ -821,6 +865,8 @@ export default function App() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('tab') === 'feed') {
       setTab('feed')
+    } else if (params.get('tab') === 'contacts') {
+      setTab('contacts')
     }
     const conversationID = Number(params.get('conversation'))
     if (Number.isInteger(conversationID) && conversationID > 0) {
@@ -975,6 +1021,91 @@ export default function App() {
       setPushBusy(false)
     }
   }
+
+  async function refreshFriendConnections() {
+    if (!session?.token) return
+    try {
+      const [friendsResponse, requestsResponse] = await Promise.all([
+        apiFetch('/api/friends'),
+        apiFetch('/api/friends/requests'),
+      ])
+      if (friendsResponse.ok) {
+        setFriends((await friendsResponse.json()) as FriendConnection[])
+      }
+      if (requestsResponse.ok) {
+        setFriendRequests((await requestsResponse.json()) as FriendConnection[])
+      }
+    } catch {
+      // Friend discovery remains usable even when relationship sync is temporarily unavailable.
+    }
+  }
+
+  function friendRelationship(userId: number) {
+    if (friends.some((item) => item.id === userId)) return 'accepted' as const
+    const request = friendRequests.find((item) => item.id === userId)
+    if (request?.direction === 'incoming') return 'incoming' as const
+    if (request?.direction === 'outgoing') return 'outgoing' as const
+    return 'none' as const
+  }
+
+  async function actOnFriend(friend: FriendSearchResult | FriendConnection) {
+    const relationship = friendRelationship(friend.id)
+    if (relationship === 'accepted') {
+      await openDirectByUsername(friend.username)
+      return
+    }
+
+    setFriendActionBusy(friend.id)
+    try {
+      const method = relationship === 'outgoing' ? 'DELETE' : 'POST'
+      const path = relationship === 'incoming'
+        ? `/api/friends/${friend.id}/accept`
+        : `/api/friends/${friend.id}`
+      const response = await apiFetch(path, { method })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (!response.ok) {
+        setNotice(result?.error || 'Không cập nhật được lời mời kết bạn')
+        return
+      }
+      if (relationship === 'incoming') {
+        setNotice(`Đã kết bạn với @${friend.username}`)
+      } else if (relationship === 'outgoing') {
+        setNotice(`Đã hủy lời mời tới @${friend.username}`)
+      } else {
+        setNotice(`Đã gửi lời mời kết bạn tới @${friend.username}`)
+      }
+      await refreshFriendConnections()
+    } catch {
+      setNotice('Không cập nhật được lời mời kết bạn. Kiểm tra kết nối rồi thử lại.')
+    } finally {
+      setFriendActionBusy(null)
+    }
+  }
+
+  async function declineFriendRequest(friend: FriendConnection) {
+    setFriendActionBusy(friend.id)
+    try {
+      const response = await apiFetch(`/api/friends/${friend.id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        setNotice('Không từ chối được lời mời kết bạn')
+        return
+      }
+      await refreshFriendConnections()
+    } finally {
+      setFriendActionBusy(null)
+    }
+  }
+
+  useEffect(() => {
+    if (!session?.token) {
+      setFriends([])
+      setFriendRequests([])
+      return
+    }
+    if (tab === 'contacts' || newChatMode === 'friends') {
+      void refreshFriendConnections()
+    }
+  }, [session?.token, tab, newChatMode])
 
   useEffect(() => {
     const friendSurfaceOpen = newChatMode === 'friends' || tab === 'contacts'
@@ -1227,6 +1358,8 @@ export default function App() {
     setActiveConversationId(null)
     setMessages([])
     setMessageDrafts({})
+    setFriends([])
+    setFriendRequests([])
     setPostText('')
     setPosts([])
     setStories([])
@@ -1251,7 +1384,60 @@ export default function App() {
     events.addEventListener('update', (event) => {
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
 
-      if (update.type === 'conversation.created') {
+      if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
+        void refreshConversations()
+        if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
+          void refreshGroupMembers(update.conversationId)
+        }
+        return
+      }
+
+      if (
+        update.type === 'conversation.read' &&
+        update.readerId &&
+        update.lastReadMessageId &&
+        update.readerId !== session.user.id
+      ) {
+        if (activeConversationIdRef.current === update.conversationId) {
+          setMessages((current) =>
+            current.map((message) => {
+              if (
+                message.senderId !== session.user.id ||
+                message.id > (update.lastReadMessageId || 0)
+              ) return message
+              const readers = message.readByUserIds || []
+              if (readers.includes(update.readerId as number)) return message
+              return { ...message, readByUserIds: [...readers, update.readerId as number] }
+            }),
+          )
+        }
+        return
+      }
+
+      if (update.type === 'message.updated' && update.message) {
+        const changed = update.message
+        if (activeConversationIdRef.current === update.conversationId) {
+          setMessages((current) =>
+            current.map((item) => {
+              if (item.id !== changed.id) return item
+              const mineByEmoji = new Map(
+                (item.reactions || []).map((reaction) => [reaction.emoji, reaction.mine]),
+              )
+              return {
+                ...changed,
+                reactions: (changed.reactions || []).map((reaction) => ({
+                  ...reaction,
+                  mine: mineByEmoji.get(reaction.emoji) ?? false,
+                })),
+              }
+            }),
+          )
+          setTranslations((current) => {
+            const next = { ...current }
+            delete next[changed.id]
+            return next
+          })
+        }
         void refreshConversations()
         return
       }
@@ -1299,7 +1485,7 @@ export default function App() {
       events.close()
       window.clearInterval(refreshTimer)
     }
-  }, [session?.token])
+  }, [session?.token, groupSettingsOpen])
 
   useEffect(() => {
     if (!session?.token || tab !== 'feed') return
@@ -1485,7 +1671,11 @@ export default function App() {
       const response = await apiFetch(`/api/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, attachments }),
+        body: JSON.stringify({
+          text,
+          attachments,
+          ...(replyingTo ? { replyToMessageId: replyingTo.id } : {}),
+        }),
       })
       if (!response.ok) {
         const result = await response.json().catch(() => null) as { error?: string } | null
@@ -1498,12 +1688,197 @@ export default function App() {
         delete next[conversationId]
         return next
       })
+      setReplyingTo(null)
     } catch {
       setNotice('Chưa xác nhận được tin đã gửi. Bản nháp được giữ lại; kiểm tra hội thoại trước khi gửi lại.')
     } finally {
       sendingRef.current = false
       setMessageSending(false)
     }
+  }
+
+  async function refreshGroupMembers(conversationId = activeConversationId || undefined) {
+    if (!conversationId) return
+    try {
+      const response = await apiFetch(`/api/conversations/${conversationId}/members`)
+      if (!response.ok) return
+      const items = (await response.json()) as GroupMember[]
+      if (activeConversationIdRef.current === conversationId) {
+        setGroupMembers(items)
+      }
+    } catch {
+      setNotice('Không tải được danh sách thành viên nhóm.')
+    }
+  }
+
+  async function renameActiveGroup() {
+    if (!activeConversationId || !groupNameDraft.trim()) return
+    setGroupBusy(true)
+    try {
+      const response = await apiFetch(`/api/conversations/${activeConversationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: groupNameDraft.trim() }),
+      })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (!response.ok) {
+        setNotice(result?.error || 'Không đổi được tên nhóm')
+        return
+      }
+      setNotice('Đã cập nhật tên nhóm.')
+      await refreshConversations()
+    } finally {
+      setGroupBusy(false)
+    }
+  }
+
+  async function inviteGroupMembers() {
+    if (!activeConversationId) return
+    const usernames = groupInviteDraft
+      .split(/[\s,;]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+    if (usernames.length === 0) return
+
+    setGroupBusy(true)
+    try {
+      const response = await apiFetch(`/api/conversations/${activeConversationId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernames }),
+      })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (!response.ok) {
+        setNotice(result?.error || 'Không thêm được thành viên')
+        return
+      }
+      setGroupInviteDraft('')
+      setNotice('Đã thêm thành viên vào nhóm.')
+      await Promise.all([refreshGroupMembers(activeConversationId), refreshConversations()])
+    } finally {
+      setGroupBusy(false)
+    }
+  }
+
+  async function changeGroupMemberRole(member: GroupMember, role: GroupMember['role']) {
+    if (!activeConversationId) return
+    const message = role === 'owner'
+      ? `Chuyển quyền chủ nhóm cho @${member.username}?`
+      : role === 'admin'
+        ? `Đặt @${member.username} làm quản trị viên?`
+        : `Gỡ quyền quản trị của @${member.username}?`
+    if (!window.confirm(message)) return
+
+    setGroupBusy(true)
+    try {
+      const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (!response.ok) {
+        setNotice(result?.error || 'Không cập nhật được quyền thành viên')
+        return
+      }
+      setNotice(role === 'owner' ? 'Đã chuyển quyền chủ nhóm.' : 'Đã cập nhật quyền thành viên.')
+      await refreshGroupMembers(activeConversationId)
+    } finally {
+      setGroupBusy(false)
+    }
+  }
+
+  async function removeGroupMember(member: GroupMember) {
+    if (!activeConversationId) return
+    const self = member.id === session?.user.id
+    if (!window.confirm(self ? 'Rời khỏi nhóm này?' : `Xóa @${member.username} khỏi nhóm?`)) return
+
+    setGroupBusy(true)
+    try {
+      const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
+        method: 'DELETE',
+      })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (!response.ok) {
+        setNotice(result?.error || (self ? 'Không rời được nhóm' : 'Không xóa được thành viên'))
+        return
+      }
+      if (self) {
+        setGroupSettingsOpen(false)
+        setActiveConversationId(null)
+        setNotice('Bạn đã rời nhóm.')
+        await refreshConversations()
+        return
+      }
+      setNotice(`Đã xóa @${member.username} khỏi nhóm.`)
+      await Promise.all([refreshGroupMembers(activeConversationId), refreshConversations()])
+    } finally {
+      setGroupBusy(false)
+    }
+  }
+
+  async function editOwnMessage(message: Message) {
+    if (message.deleted || message.senderId !== session?.user.id) return
+    const next = window.prompt('Sửa tin nhắn', message.text)
+    if (next === null || next.trim() === message.text.trim()) return
+    if (!next.trim()) {
+      setNotice('Tin nhắn sau khi sửa không được để trống.')
+      return
+    }
+
+    const response = await apiFetch(`/api/messages/${message.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: next.trim() }),
+    })
+    const result = await response.json().catch(() => null) as Message | { error?: string } | null
+    if (!response.ok) {
+      setNotice((result as { error?: string } | null)?.error || 'Không sửa được tin nhắn')
+      return
+    }
+    const updated = result as Message
+    setMessages((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+    setTranslations((current) => {
+      const nextTranslations = { ...current }
+      delete nextTranslations[message.id]
+      return nextTranslations
+    })
+  }
+
+  async function recallOwnMessage(message: Message) {
+    if (message.deleted || message.senderId !== session?.user.id) return
+    if (!window.confirm('Thu hồi tin nhắn này?')) return
+
+    const response = await apiFetch(`/api/messages/${message.id}`, { method: 'DELETE' })
+    const result = await response.json().catch(() => null) as Message | { error?: string } | null
+    if (!response.ok) {
+      setNotice((result as { error?: string } | null)?.error || 'Không thu hồi được tin nhắn')
+      return
+    }
+    const updated = result as Message
+    setMessages((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+    setTranslations((current) => {
+      const next = { ...current }
+      delete next[message.id]
+      return next
+    })
+    if (replyingTo?.id === message.id) setReplyingTo(null)
+  }
+
+  async function toggleReaction(message: Message, emoji: string) {
+    if (message.deleted) return
+    const response = await apiFetch(`/api/messages/${message.id}/reactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emoji }),
+    })
+    const result = await response.json().catch(() => null) as Message | { error?: string } | null
+    if (!response.ok) {
+      setNotice((result as { error?: string } | null)?.error || 'Không thả cảm xúc được')
+      return
+    }
+    const updated = result as Message
+    setMessages((current) => current.map((item) => (item.id === updated.id ? updated : item)))
   }
 
   async function requestTranslation(text: string, messageId?: number) {
@@ -1883,21 +2258,33 @@ export default function App() {
                     {!friendSearching && friendQuery.trim() && friendResults.length === 0 && (
                       <div className="friend-search-state">Không tìm thấy người dùng phù hợp.</div>
                     )}
-                    {friendResults.map((friend) => (
-                      <button
-                        type="button"
-                        className="friend-result"
-                        key={friend.id}
-                        onClick={() => void openDirectByUsername(friend.username)}
-                      >
-                        <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                        <div className="friend-result-copy">
-                          <strong>@{friend.username}</strong>
-                          <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
-                        </div>
-                        <div className="friend-result-action"><span>›</span></div>
-                      </button>
-                    ))}
+                    {friendResults.map((friend) => {
+                      const relationship = friendRelationship(friend.id)
+                      const actionLabel =
+                        relationship === 'accepted'
+                          ? 'Nhắn tin'
+                          : relationship === 'incoming'
+                            ? 'Chấp nhận'
+                            : relationship === 'outgoing'
+                              ? 'Hủy lời mời'
+                              : 'Kết bạn'
+                      return (
+                        <button
+                          type="button"
+                          className="friend-result"
+                          key={friend.id}
+                          onClick={() => void actOnFriend(friend)}
+                          disabled={friendActionBusy === friend.id}
+                        >
+                          <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+                          <div className="friend-result-copy">
+                            <strong>@{friend.username}</strong>
+                            <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
+                          </div>
+                          <div className="friend-result-action"><small>{actionLabel}</small><span>›</span></div>
+                        </button>
+                      )
+                    })}
                   </div>
                 </section>
               )}
@@ -1987,6 +2374,22 @@ export default function App() {
                     </div>
 
                     <div className="translate-controls">
+                      {activeConversation.type === 'group' && (
+                        <button
+                          type="button"
+                          className={groupSettingsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
+                          onClick={() => {
+                            const next = !groupSettingsOpen
+                            setGroupSettingsOpen(next)
+                            if (next) {
+                              setGroupNameDraft(activeConversation.name)
+                              void refreshGroupMembers(activeConversation.id)
+                            }
+                          }}
+                        >
+                          👥 Nhóm
+                        </button>
+                      )}
                       <label className="auto-translate">
                         <input
                           type="checkbox"
@@ -2001,6 +2404,118 @@ export default function App() {
                     </div>
                   </header>
 
+                  {groupSettingsOpen && activeConversation.type === 'group' && (
+                    <section className="group-settings-panel" aria-label="Quản lý nhóm">
+                      <div className="group-settings-heading">
+                        <div>
+                          <strong>Quản lý nhóm</strong>
+                          <small>
+                            {activeGroupMember
+                              ? activeGroupMember.role === 'owner'
+                                ? 'Bạn là chủ nhóm'
+                                : activeGroupMember.role === 'admin'
+                                  ? 'Bạn là quản trị viên'
+                                  : 'Bạn là thành viên'
+                              : 'Đang tải quyền...'}
+                          </small>
+                        </div>
+                        <button type="button" onClick={() => setGroupSettingsOpen(false)} aria-label="Đóng quản lý nhóm">×</button>
+                      </div>
+
+                      {canManageActiveGroup && (
+                        <div className="group-admin-tools">
+                          <div className="group-tool-row">
+                            <input
+                              value={groupNameDraft}
+                              onChange={(event) => setGroupNameDraft(event.target.value)}
+                              placeholder="Tên nhóm"
+                              maxLength={120}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void renameActiveGroup()}
+                              disabled={groupBusy || !groupNameDraft.trim() || groupNameDraft.trim() === activeConversation.name}
+                            >
+                              Đổi tên
+                            </button>
+                          </div>
+                          <div className="group-tool-row">
+                            <input
+                              value={groupInviteDraft}
+                              onChange={(event) => setGroupInviteDraft(event.target.value)}
+                              placeholder="Username cần thêm, cách nhau bằng dấu phẩy"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void inviteGroupMembers()}
+                              disabled={groupBusy || !groupInviteDraft.trim()}
+                            >
+                              Thêm
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="group-member-list">
+                        {groupMembers.map((member) => (
+                          <div className="group-member-row" key={member.id}>
+                            <UserAvatar name={member.username} className="group-member-avatar" online={member.online} />
+                            <div className="group-member-copy">
+                              <strong>@{member.username}{member.id === session.user.id ? ' · Bạn' : ''}</strong>
+                              <span>
+                                {member.role === 'owner' ? 'Chủ nhóm' : member.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
+                                {member.online ? ' · online' : ''}
+                              </span>
+                            </div>
+                            <div className="group-member-actions">
+                              {activeGroupMember?.role === 'owner' && member.id !== session.user.id && member.role !== 'owner' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => void changeGroupMemberRole(member, member.role === 'admin' ? 'member' : 'admin')}
+                                    disabled={groupBusy}
+                                  >
+                                    {member.role === 'admin' ? 'Gỡ admin' : 'Đặt admin'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void changeGroupMemberRole(member, 'owner')}
+                                    disabled={groupBusy}
+                                  >
+                                    Chuyển chủ
+                                  </button>
+                                </>
+                              )}
+                              {canManageActiveGroup &&
+                                member.id !== session.user.id &&
+                                member.role !== 'owner' &&
+                                !(activeGroupMember?.role === 'admin' && member.role === 'admin') && (
+                                  <button
+                                    type="button"
+                                    className="danger"
+                                    onClick={() => void removeGroupMember(member)}
+                                    disabled={groupBusy}
+                                  >
+                                    Xóa
+                                  </button>
+                                )}
+                              {member.id === session.user.id && member.role !== 'owner' && (
+                                <button
+                                  type="button"
+                                  className="danger"
+                                  onClick={() => void removeGroupMember(member)}
+                                  disabled={groupBusy}
+                                >
+                                  Rời nhóm
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
                   <div className="messages">
                     <div className="day-divider"><span>Cuộc trò chuyện</span></div>
                     {messages.map((message) => {
@@ -2008,11 +2523,60 @@ export default function App() {
                       return (
                         <article key={message.id} className={mine ? 'message mine' : 'message'}>
                           {!mine && <div className="message-meta">{message.sender}</div>}
-                          {message.text && <div className="bubble">{message.text}</div>}
-                          <MediaAttachmentsView items={message.attachments} />
-                          <div className="message-stamp">{formatTime(message.createdAt)}</div>
-                          {translations[message.id] && <div className="translation"><span>✨</span>{translations[message.id]}</div>}
-                          {!mine && Boolean(message.text.trim()) && <button className="translate-btn" type="button" onClick={() => translateMessage(message)}>✨ Dịch bằng AI</button>}
+                          {message.replyToMessageId && (
+                            <div className="message-reply-quote">
+                              <strong>@{message.replyToSender || 'user'}</strong>
+                              <span>{message.replyToText || 'Tin nhắn đã thu hồi'}</span>
+                            </div>
+                          )}
+                          {message.deleted ? (
+                            <div className="bubble recalled-message">Tin nhắn đã được thu hồi</div>
+                          ) : (
+                            <>
+                              {message.text && <div className="bubble">{message.text}</div>}
+                              <MediaAttachmentsView items={message.attachments} />
+                            </>
+                          )}
+                          <div className="message-stamp">
+                            {formatTime(message.createdAt)}
+                            {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
+                            {mine && (message.readByUserIds?.length || 0) > 0
+                              ? activeConversation.type === 'group'
+                                ? ` · ${message.readByUserIds?.length} đã xem`
+                                : ' · Đã xem'
+                              : ''}
+                          </div>
+                          {!message.deleted && translations[message.id] && <div className="translation"><span>✨</span>{translations[message.id]}</div>}
+                          {!message.deleted && (
+                            <>
+                              <div className="message-reactions">
+                                {(message.reactions || []).map((reaction) => (
+                                  <button
+                                    key={reaction.emoji}
+                                    type="button"
+                                    className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
+                                    onClick={() => void toggleReaction(message, reaction.emoji)}
+                                    aria-label={`Thả cảm xúc ${reaction.emoji}`}
+                                  >
+                                    {reaction.emoji} {reaction.count}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="message-actions">
+                                <button type="button" onClick={() => setReplyingTo(message)}>Trả lời</button>
+                                {['👍', '❤️', '😂'].map((emoji) => (
+                                  <button key={emoji} type="button" onClick={() => void toggleReaction(message, emoji)}>{emoji}</button>
+                                ))}
+                                {mine && Boolean(message.text.trim()) && (
+                                  <button type="button" onClick={() => void editOwnMessage(message)}>Sửa</button>
+                                )}
+                                {mine && (
+                                  <button type="button" onClick={() => void recallOwnMessage(message)}>Thu hồi</button>
+                                )}
+                              </div>
+                            </>
+                          )}
+                          {!message.deleted && !mine && Boolean(message.text.trim()) && <button className="translate-btn" type="button" onClick={() => translateMessage(message)}>✨ Dịch bằng AI</button>}
                         </article>
                       )
                     })}
@@ -2032,6 +2596,15 @@ export default function App() {
                         void addChatFiles(files)
                       }}
                     />
+                    {replyingTo && (
+                      <div className="composer-reply-preview">
+                        <div>
+                          <strong>Đang trả lời @{replyingTo.sender}</strong>
+                          <span>{replyingTo.deleted ? 'Tin nhắn đã thu hồi' : (replyingTo.text || attachmentLabel(replyingTo.attachments))}</span>
+                        </div>
+                        <button type="button" onClick={() => setReplyingTo(null)} aria-label="Hủy trả lời">×</button>
+                      </div>
+                    )}
                     {messageAttachments.length > 0 && (
                       <div className="composer-pending">
                         <MediaAttachmentsView
@@ -2080,13 +2653,33 @@ export default function App() {
               </button>
             </div>
 
+            {friendRequests.some((item) => item.direction === 'incoming') && (
+              <section className="contacts-suggestions">
+                <div className="contacts-heading">
+                  Lời mời kết bạn ({friendRequests.filter((item) => item.direction === 'incoming').length})
+                </div>
+                {friendRequests.filter((item) => item.direction === 'incoming').map((friend) => (
+                  <div className="friend-result contact-result friend-request-row" key={friend.id}>
+                    <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+                    <div className="friend-result-copy">
+                      <strong>@{friend.username}</strong>
+                      <span>Muốn kết bạn với bạn</span>
+                    </div>
+                    <div className="friend-request-actions">
+                      <button type="button" onClick={() => void actOnFriend(friend)} disabled={friendActionBusy === friend.id}>Chấp nhận</button>
+                      <button type="button" className="secondary" onClick={() => void declineFriendRequest(friend)} disabled={friendActionBusy === friend.id}>Từ chối</button>
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )}
+
             <section className="contacts-suggestions">
-              <div className="contacts-heading">Người bạn có thể biết</div>
-              {friendSearching && <div className="friend-search-state">Đang tải gợi ý...</div>}
-              {!friendSearching && friendResults.length === 0 && (
-                <div className="friend-search-state">Chưa có gợi ý phù hợp.</div>
+              <div className="contacts-heading">Bạn bè ({friends.length})</div>
+              {friends.length === 0 && (
+                <div className="friend-search-state">Chưa có bạn bè. Hãy gửi một lời mời kết bạn.</div>
               )}
-              {friendResults.map((friend) => (
+              {friends.map((friend) => (
                 <button
                   type="button"
                   className="friend-result contact-result"
@@ -2096,9 +2689,55 @@ export default function App() {
                   <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                   <div className="friend-result-copy">
                     <strong>@{friend.username}</strong>
-                    <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
+                    <span>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
                   </div>
                   <div className="friend-result-action"><small>Nhắn tin</small><span>›</span></div>
+                </button>
+              ))}
+            </section>
+
+            {friendRequests.some((item) => item.direction === 'outgoing') && (
+              <section className="contacts-suggestions">
+                <div className="contacts-heading">Lời mời đã gửi</div>
+                {friendRequests.filter((item) => item.direction === 'outgoing').map((friend) => (
+                  <button
+                    type="button"
+                    className="friend-result contact-result"
+                    key={friend.id}
+                    onClick={() => void actOnFriend(friend)}
+                    disabled={friendActionBusy === friend.id}
+                  >
+                    <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+                    <div className="friend-result-copy">
+                      <strong>@{friend.username}</strong>
+                      <span>Đang chờ phản hồi</span>
+                    </div>
+                    <div className="friend-result-action"><small>Hủy lời mời</small><span>×</span></div>
+                  </button>
+                ))}
+              </section>
+            )}
+
+            <section className="contacts-suggestions">
+              <div className="contacts-heading">Người bạn có thể biết</div>
+              {friendSearching && <div className="friend-search-state">Đang tải gợi ý...</div>}
+              {!friendSearching && friendResults.filter((friend) => friendRelationship(friend.id) === 'none').length === 0 && (
+                <div className="friend-search-state">Chưa có gợi ý mới phù hợp.</div>
+              )}
+              {friendResults.filter((friend) => friendRelationship(friend.id) === 'none').map((friend) => (
+                <button
+                  type="button"
+                  className="friend-result contact-result"
+                  key={friend.id}
+                  onClick={() => void actOnFriend(friend)}
+                  disabled={friendActionBusy === friend.id}
+                >
+                  <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+                  <div className="friend-result-copy">
+                    <strong>@{friend.username}</strong>
+                    <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
+                  </div>
+                  <div className="friend-result-action"><small>Kết bạn</small><span>＋</span></div>
                 </button>
               ))}
             </section>
