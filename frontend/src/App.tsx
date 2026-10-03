@@ -527,6 +527,7 @@ export default function App() {
   const [profileSaving, setProfileSaving] = useState(false)
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
+  const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
   const [targetLanguage, setTargetLanguage] = useState('en')
   const [autoTranslate, setAutoTranslate] = useState(true)
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] = useState(false)
@@ -1901,6 +1902,7 @@ export default function App() {
     setTargetLanguage(next)
     setTranslations({})
     setTranslationOriginals({})
+    setTranslationMenuOpen(false)
     void saveTranslationPreferences(next, autoTranslate)
   }
 
@@ -2655,6 +2657,7 @@ export default function App() {
                       setActiveConversationId(conversation.id)
                       setTranslations({})
                       setTranslationOriginals({})
+                      setTranslationMenuOpen(false)
                     }}
                   >
                     <UserAvatar
@@ -2723,22 +2726,64 @@ export default function App() {
                           👥 Nhóm
                         </button>
                       )}
-                      <label
-                        className={autoTranslate ? 'auto-translate active' : 'auto-translate'}
-                        aria-label={autoTranslate ? 'Tắt tự động dịch' : 'Bật tự động dịch'}
-                        title={autoTranslate ? 'Tắt tự động dịch' : 'Bật tự động dịch'}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={autoTranslate}
-                          onChange={(event) => changeAutoTranslate(event.target.checked)}
-                        />
-                        <span className="auto-translate-indicator" aria-hidden="true">{autoTranslate ? '✓' : ''}</span>
-                        <b>AI</b>
-                      </label>
-                      <select aria-label="Ngôn ngữ dịch" value={targetLanguage} onChange={(event) => changeTargetLanguage(event.target.value)}>
-                        {languages.map((language) => <option key={language.value} value={language.value}>{language.label}</option>)}
-                      </select>
+                      <div className="translation-hub">
+                        <button
+                          type="button"
+                          className={autoTranslate ? 'translation-hub-trigger active' : 'translation-hub-trigger'}
+                          aria-expanded={translationMenuOpen}
+                          aria-label="Cài đặt dịch AI"
+                          onClick={() => setTranslationMenuOpen((current) => !current)}
+                        >
+                          <span className="translation-hub-spark" aria-hidden="true">✦</span>
+                          <b>AI</b>
+                          <span className="translation-hub-dot" aria-hidden="true">·</span>
+                          <strong>{targetLanguage.split('-')[0].toUpperCase()}</strong>
+                          <span className="translation-hub-chevron" aria-hidden="true">{translationMenuOpen ? '⌃' : '⌄'}</span>
+                        </button>
+
+                        {translationMenuOpen && (
+                          <>
+                            <button
+                              type="button"
+                              className="translation-hub-scrim"
+                              aria-label="Đóng cài đặt dịch"
+                              onClick={() => setTranslationMenuOpen(false)}
+                            />
+                            <div className="translation-hub-popover" role="dialog" aria-label="Cài đặt dịch AI">
+                              <div className="translation-hub-heading">
+                                <div>
+                                  <strong>Dịch AI</strong>
+                                  <small>Dịch tự động tin nhắn nhận được</small>
+                                </div>
+                                <button
+                                  type="button"
+                                  className={autoTranslate ? 'translation-hub-switch active' : 'translation-hub-switch'}
+                                  role="switch"
+                                  aria-checked={autoTranslate}
+                                  onClick={() => changeAutoTranslate(!autoTranslate)}
+                                >
+                                  <span />
+                                </button>
+                              </div>
+
+                              <div className="translation-language-grid" aria-label="Chọn ngôn ngữ dịch">
+                                {languages.map((language) => (
+                                  <button
+                                    key={language.value}
+                                    type="button"
+                                    className={targetLanguage === language.value ? 'active' : ''}
+                                    onClick={() => changeTargetLanguage(language.value)}
+                                  >
+                                    <b>{language.value.split('-')[0].toUpperCase()}</b>
+                                    <span>{language.label}</span>
+                                    {targetLanguage === language.value && <i aria-hidden="true">✓</i>}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </header>
 
@@ -2888,30 +2933,32 @@ export default function App() {
                           ) : (
                             <>
                               {message.text && (
-                                <div className={translatedText ? 'bubble translated-bubble' : 'bubble'}>
-                                  {translatedText || message.text}
+                                <div className={translatedText ? 'bubble translated-bubble translation-flip-bubble' : 'bubble'}>
+                                  <span
+                                    key={translatedText ? `${message.id}-${originalVisible ? 'original' : 'translated'}` : `${message.id}-plain`}
+                                    className="translation-flip-content"
+                                  >
+                                    {translatedText
+                                      ? originalVisible ? message.text : translatedText
+                                      : message.text}
+                                  </span>
                                 </div>
                               )}
                               {translatedText && message.text && (
                                 <button
                                   type="button"
-                                  className="translation-meta"
-                                  aria-expanded={originalVisible}
+                                  className={originalVisible ? 'translation-flip-pill original' : 'translation-flip-pill translated'}
+                                  aria-label={originalVisible ? `Hiện bản dịch ${translatedLanguage}` : 'Hiện bản gốc'}
                                   onClick={() => setTranslationOriginals((current) => ({
                                     ...current,
                                     [message.id]: !current[message.id],
                                   }))}
                                 >
-                                  <span>{translatedLanguage}</span>
-                                  <small>Đã dịch</small>
-                                  <b aria-hidden="true">{originalVisible ? '⌃' : '⌄'}</b>
+                                  <span className="translation-flip-icon" aria-hidden="true">{originalVisible ? '↔' : '✦'}</span>
+                                  <b>{originalVisible ? 'GỐC' : targetLanguage.split('-')[0].toUpperCase()}</b>
+                                  <small>{originalVisible ? 'Nguyên văn' : 'AI'}</small>
+                                  <span className="translation-flip-swap" aria-hidden="true">↔</span>
                                 </button>
-                              )}
-                              {translatedText && message.text && originalVisible && (
-                                <div className="translation-original">
-                                  <strong>Bản gốc</strong>
-                                  <span>{message.text}</span>
-                                </div>
                               )}
                               <MediaAttachmentsView items={message.attachments} />
                             </>

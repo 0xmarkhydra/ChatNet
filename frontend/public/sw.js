@@ -1,4 +1,4 @@
-const CACHE = 'chatnet-v19'
+const CACHE = 'chatnet-v20'
 const CORE = ['/', '/offline.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg']
 
 self.addEventListener('install', (event) => {
