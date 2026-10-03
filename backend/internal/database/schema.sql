@@ -4,6 +4,11 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(64) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     display_name VARCHAR(100) NOT NULL,
+    phone_e164 VARCHAR(32),
+    searchable_by_username BOOLEAN NOT NULL DEFAULT TRUE,
+    searchable_by_name BOOLEAN NOT NULL DEFAULT TRUE,
+    searchable_by_email BOOLEAN NOT NULL DEFAULT TRUE,
+    searchable_by_phone BOOLEAN NOT NULL DEFAULT FALSE,
     avatar_ref TEXT,
     cover_ref TEXT,
     profile_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -14,9 +19,18 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_ref TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_ref TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_e164 VARCHAR(32);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_username BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_name BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_email BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_phone BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_e164
+ON users(phone_e164) WHERE phone_e164 IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_username_lower ON users(lower(username));
+CREATE INDEX IF NOT EXISTS idx_users_display_name_lower ON users(lower(display_name));
 
 CREATE TABLE IF NOT EXISTS conversations (
     id BIGSERIAL PRIMARY KEY,

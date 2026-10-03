@@ -355,8 +355,23 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(), `
 		SELECT id,username,display_name
 		FROM users
-		WHERE id<>$1 AND (strpos(lower(username), $2)>0 OR lower(email)=$2)
-		ORDER BY username ASC LIMIT 12`, claims.UserID, q)
+		WHERE id<>$1
+		  AND (
+			(searchable_by_username AND strpos(lower(username), $2)>0)
+			OR (searchable_by_email AND lower(email)=$2)
+			OR (searchable_by_name AND strpos(lower(display_name), $2)>0)
+		  )
+		ORDER BY
+		  CASE
+			WHEN searchable_by_username AND lower(username)=$2 THEN 0
+			WHEN searchable_by_email AND lower(email)=$2 THEN 1
+			WHEN searchable_by_username AND strpos(lower(username), $2)=1 THEN 2
+			WHEN searchable_by_username AND strpos(lower(username), $2)>0 THEN 3
+			WHEN searchable_by_name AND strpos(lower(display_name), $2)=1 THEN 4
+			ELSE 5
+		  END,
+		  username ASC
+		LIMIT 20`, claims.UserID, q)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot search users")
 		return

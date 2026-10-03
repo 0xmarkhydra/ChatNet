@@ -1,5 +1,8 @@
-import { FormEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
+import type { NearbyUser } from './NearbyExplorer'
+
+const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
 import {
   defaultBundle,
   loadAppLocalePreference,
@@ -597,6 +600,53 @@ export default function App() {
     })
   }
 
+  function connectUrl(username = session?.user.username || '') {
+    const url = new URL(window.location.href)
+    url.hash = ''
+    url.search = ''
+    if (username) url.searchParams.set('connect', username)
+    return url.toString()
+  }
+
+  function openConnectSurface(query = '') {
+    setTab('chat')
+    setActiveConversationId(null)
+    setQuickCreateOpen(false)
+    setNewChatMode('friends')
+    if (query) setFriendQuery(query.replace(/^@/, '').trim())
+  }
+
+  async function shareMyProfile() {
+    if (!session?.user.username) return
+    const url = connectUrl(session.user.username)
+    const shareData = {
+      title: `Kết nối với @${session.user.username} trên ChatNet`,
+      text: `Kết nối với ${session.user.displayName || '@' + session.user.username} trên ChatNet`,
+      url,
+    }
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share(shareData)
+        return
+      }
+      await navigator.clipboard.writeText(url)
+      setNotice('Đã sao chép link hồ sơ ChatNet.', 'success')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      setNotice('Không thể chia sẻ hồ sơ trên thiết bị này.', 'error')
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!session?.user.username) return
+    try {
+      await navigator.clipboard.writeText(connectUrl(session.user.username))
+      setNotice('Đã sao chép link kết nối ChatNet.', 'success')
+    } catch {
+      setNotice('Không sao chép được link trên trình duyệt này.', 'error')
+    }
+  }
+
   function cancelMessageLongPress() {
     if (messageLongPressTimer.current !== null) {
       window.clearTimeout(messageLongPressTimer.current)
@@ -651,6 +701,22 @@ export default function App() {
     }, timeout)
     return () => window.clearTimeout(timer)
   }, [notice])
+
+  useEffect(() => {
+    if (!session?.token) return
+    const params = new URLSearchParams(window.location.search)
+    const requestedUser = (params.get('connect') || params.get('invite') || '').replace(/^@/, '').trim()
+    if (!requestedUser) return
+
+    if (requestedUser.toLocaleLowerCase('vi-VN') !== session.user.username.toLocaleLowerCase('vi-VN')) {
+      openConnectSurface(requestedUser)
+    }
+
+    params.delete('connect')
+    params.delete('invite')
+    const nextSearch = params.toString()
+    window.history.replaceState({}, '', `${window.location.pathname}${nextSearch ? '?' + nextSearch : ''}${window.location.hash}`)
+  }, [session?.token])
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId
@@ -2539,7 +2605,8 @@ export default function App() {
       {tab !== 'profile' && (
       <header className="chatnet-appbar">
         <div className="appbar-brand"><img src="/icon.svg" width="32" height="32" alt="" /><strong>ChatNet</strong></div>
-        <label className="appbar-search">
+        {tab !== 'discover' && (
+          <label className="appbar-search">
             <UiIcon name="search" size={27} />
             <input
               value={tab === 'contacts' ? friendQuery : globalSearch}
@@ -2548,19 +2615,18 @@ export default function App() {
                 else setGlobalSearch(event.target.value)
               }}
               placeholder={
-                tab === 'contacts' ? 'Email hoặc @username'
-                  : tab === 'discover' ? 'Lọc người quanh đây theo @username'
-                    : tab === 'feed' ? 'Tìm tác giả hoặc nội dung bài viết'
-                      : 'Tìm cuộc trò chuyện'
+                tab === 'contacts' ? 'Tên, @username hoặc email'
+                  : tab === 'feed' ? 'Tìm tác giả hoặc nội dung bài viết'
+                    : 'Tìm cuộc trò chuyện'
               }
               aria-label={
-                tab === 'contacts' ? 'Tìm bạn bằng email hoặc username'
-                  : tab === 'discover' ? 'Lọc người quanh đây theo username'
-                    : tab === 'feed' ? 'Tìm bài viết'
-                      : 'Tìm cuộc trò chuyện'
+                tab === 'contacts' ? 'Tìm bạn bằng tên, username hoặc email'
+                  : tab === 'feed' ? 'Tìm bài viết'
+                    : 'Tìm cuộc trò chuyện'
               }
             />
           </label>
+        )}
 
         <div className="appbar-actions">
           {tab === 'chat' && (
@@ -2569,7 +2635,7 @@ export default function App() {
                 className="appbar-icon-button"
                 type="button"
                 aria-label="Quét QR"
-                onClick={() => setNotice('QR sẽ được dùng để chia sẻ hồ sơ/kết nối nhanh trong bản tiếp theo.')}
+                onClick={() => openConnectSurface()}
               >
                 <UiIcon name="qr" size={28} />
               </button>
@@ -2665,8 +2731,8 @@ export default function App() {
             <aside className="conversation-sidebar">
               {quickCreateOpen && (
                 <div className="quick-create-menu">
-                  <button type="button" onClick={() => { setNewChatMode('friends'); setQuickCreateOpen(false) }}>
-                    <span>⌕</span><div><strong>Tìm bạn bè</strong><small>Gợi ý người bạn có thể biết</small></div>
+                  <button type="button" onClick={() => openConnectSurface()}>
+                    <span>⌕</span><div><strong>Tìm & kết nối</strong><small>Tên, username, email hoặc link mời</small></div>
                   </button>
                   <button type="button" onClick={() => { setNewChatMode('direct'); setQuickCreateOpen(false) }}>
                     <span>＋</span><div><strong>Chat riêng</strong><small>Bắt đầu cuộc trò chuyện 1-1</small></div>
@@ -2678,66 +2744,120 @@ export default function App() {
               )}
 
               {newChatMode === 'friends' && (
-                <section className="friend-search-panel compact-friend-panel">
-                  <div className="friend-search-title">
-                    <div><strong>Tìm bạn bè</strong><small>Email hoặc @username</small></div>
-                    <button
-                      type="button"
-                      className="friend-search-close"
-                      onClick={() => { setNewChatMode('none'); setFriendQuery(''); setFriendResults([]) }}
-                      aria-label="Đóng tìm bạn bè"
-                    >×</button>
-                  </div>
-                  <div className="friend-search-input-wrap">
-                    <UiIcon name="search" size={19} />
-                    <input
-                      value={friendQuery}
-                      onChange={(event) => setFriendQuery(event.target.value)}
-                      placeholder="Email hoặc @username"
-                      aria-label="Tìm bạn bằng email hoặc username"
-                      autoCapitalize="none"
-                      autoComplete="off"
-                      maxLength={254}
-                      autoFocus
-                    />
-                  </div>
-                  <div className="friend-search-results">
-                    {friendSearching && <div className="friend-search-state">Đang tìm...</div>}
-                    {!friendSearching && !friendQuery.trim() && friendResults.length > 0 && (
-                      <div className="friend-suggestion-label">Người bạn có thể biết</div>
-                    )}
-                    {!friendSearching && friendQuery.trim() && friendResults.length === 0 && (
-                      <div className="friend-search-state">Không tìm thấy người dùng phù hợp.</div>
-                    )}
-                    {friendResults.map((friend) => {
-                      const relationship = friendRelationship(friend.id)
-                      const actionLabel =
-                        relationship === 'accepted'
-                          ? 'Nhắn tin'
-                          : relationship === 'incoming'
-                            ? 'Chấp nhận'
-                            : relationship === 'outgoing'
-                              ? 'Hủy lời mời'
-                              : 'Kết bạn'
-                      return (
-                        <button
-                          type="button"
-                          className="friend-result"
-                          key={friend.id}
-                          onClick={() => void actOnFriend(friend)}
-                          disabled={friendActionBusy === friend.id}
-                        >
-                          <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                          <div className="friend-result-copy">
-                            <strong>@{friend.username}</strong>
-                            <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
-                          </div>
-                          <div className="friend-result-action"><small>{actionLabel}</small><span>›</span></div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </section>
+                <div className="connect-modal-layer">
+                  <button
+                    type="button"
+                    className="connect-modal-scrim"
+                    aria-label="Đóng tìm và kết nối"
+                    onClick={() => { setNewChatMode('none'); setFriendQuery(''); setFriendResults([]) }}
+                  />
+                  <section
+                    className="friend-search-panel connect-modal"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="connect-modal-title"
+                  >
+                    <div className="connect-modal-handle" aria-hidden="true" />
+                    <div className="friend-search-title connect-modal-title">
+                      <div>
+                        <span className="connect-eyebrow">CHATNET CONNECT</span>
+                        <strong id="connect-modal-title">Tìm & kết nối</strong>
+                        <small>Tìm bằng tên, @username hoặc email. Số điện thoại đã được chuẩn bị cho bản sau.</small>
+                      </div>
+                      <button
+                        type="button"
+                        className="friend-search-close"
+                        onClick={() => { setNewChatMode('none'); setFriendQuery(''); setFriendResults([]) }}
+                        aria-label="Đóng tìm và kết nối"
+                      >×</button>
+                    </div>
+
+                    <div className="connect-identity-card">
+                      <UserAvatar name={session.user.username} className="connect-identity-avatar" online />
+                      <div>
+                        <strong>{session.user.displayName || session.user.username}</strong>
+                        <span>@{session.user.username}</span>
+                      </div>
+                      <button type="button" onClick={() => void shareMyProfile()} aria-label="Chia sẻ hồ sơ của tôi">↗</button>
+                    </div>
+
+                    <div className="connect-quick-actions" aria-label="Chia sẻ kết nối">
+                      <button type="button" onClick={() => void shareMyProfile()}>
+                        <span>↗</span><b>Chia sẻ hồ sơ</b><small>Native share</small>
+                      </button>
+                      <button type="button" onClick={() => void copyInviteLink()}>
+                        <span>🔗</span><b>Sao chép link</b><small>Gửi cho bạn bè</small>
+                      </button>
+                    </div>
+
+                    <label className="friend-search-input-wrap connect-search-input">
+                      <UiIcon name="search" size={20} />
+                      <input
+                        value={friendQuery}
+                        onChange={(event) => setFriendQuery(event.target.value)}
+                        placeholder="Tên, @username hoặc email"
+                        aria-label="Tìm bạn bằng tên, username hoặc email"
+                        autoCapitalize="none"
+                        autoComplete="off"
+                        spellCheck={false}
+                        maxLength={254}
+                        autoFocus
+                      />
+                      {friendQuery && (
+                        <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setFriendQuery('')}>×</button>
+                      )}
+                    </label>
+
+                    <div className="friend-search-results connect-results">
+                      {friendSearching && (
+                        <div className="connect-loading" aria-label="Đang tìm">
+                          <span /><span /><span />
+                        </div>
+                      )}
+                      {!friendSearching && !friendQuery.trim() && friendResults.length > 0 && (
+                        <div className="friend-suggestion-label">Người bạn có thể biết</div>
+                      )}
+                      {!friendSearching && friendQuery.trim() && friendResults.length === 0 && (
+                        <div className="friend-search-state">
+                          <strong>Không tìm thấy người phù hợp</strong>
+                          <span>Thử tên khác, @username hoặc email chính xác.</span>
+                        </div>
+                      )}
+                      {friendResults.map((friend) => {
+                        const relationship = friendRelationship(friend.id)
+                        const actionLabel =
+                          relationship === 'accepted'
+                            ? 'Nhắn tin'
+                            : relationship === 'incoming'
+                              ? 'Chấp nhận'
+                              : relationship === 'outgoing'
+                                ? 'Đã gửi'
+                                : 'Kết bạn'
+                        return (
+                          <button
+                            type="button"
+                            className="friend-result connect-result"
+                            key={friend.id}
+                            onClick={() => void actOnFriend(friend)}
+                            disabled={friendActionBusy === friend.id}
+                          >
+                            <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+                            <div className="friend-result-copy">
+                              <strong>{friend.displayName || friend.username}</strong>
+                              <span>
+                                @{friend.username}
+                                {friend.reason ? ` · ${friend.reason}` : friend.online ? ' · Đang hoạt động' : ''}
+                              </span>
+                            </div>
+                            <div className={`friend-result-action relationship-${relationship}`}>
+                              <small>{actionLabel}</small><span>{relationship === 'none' ? '＋' : '›'}</span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </section>
+                </div>
               )}
 
               {newChatMode === 'direct' && (
@@ -3312,107 +3432,41 @@ export default function App() {
         )}
 
         {tab === 'discover' && (
-          <div className="simple-view discover-view">
-            <div className="simple-view-title">
-              <strong>Quét bạn quanh đây</strong>
-              <small>Gần → xa · tối đa {nearbyRadiusKm} km</small>
-            </div>
-            <div className="nearby-controls">
-              <NearbyRadar />
-              <p aria-live="polite">
-                {nearbyScanning
-                  ? 'Radar đang quét...'
-                  : nearbyUntil
-                    ? 'Vị trí vừa được cập nhật. Kết quả đang xếp từ gần đến xa.'
-                    : nearbyUsers.length
-                      ? 'Đang hiển thị kết quả cache từ lần quét gần nhất.'
-                      : 'Bấm Quét quanh đây để cập nhật vị trí và tìm người dùng gần bạn.'}
-              </p>
-
-              <div className="nearby-radius" aria-label="Bán kính quét">
-                {[1, 5, 10, 25, 50].map((radius) => (
-                  <button
-                    key={radius}
-                    type="button"
-                    className={nearbyRadiusKm === radius ? 'active' : ''}
-                    onClick={() => setNearbyRadiusKm(radius)}
-                    disabled={nearbyBusy}
-                    aria-pressed={nearbyRadiusKm === radius}
-                  >
-                    {radius} km
-                  </button>
-                ))}
-              </div>
-
-              <p className="nearby-privacy">
-                Không hiển thị tọa độ chính xác. Trạng thái “vừa hoạt động” hết sau 15 phút,
-                nhưng vị trí gần nhất được cache tối đa 7 ngày để hỗ trợ nhiều lần quét.
-                Bấm Tắt Quanh đây sẽ xóa cache vị trí ngay.
-              </p>
-              <div className="nearby-actions">
-                <button type="button" onClick={() => void findNearby()} disabled={nearbyBusy}>
-                  <UiIcon name="discover" size={20} />{nearbyScanning ? 'Đang quét...' : nearbyUsers.length ? 'Quét lại' : 'Quét quanh đây'}
-                </button>
-                <button type="button" className="secondary" onClick={() => void stopNearby()} disabled={nearbyBusy}>Tắt Quanh đây</button>
-              </div>
-              {(nearbyUntil > 0 || nearbyUsers.length > 0) && (
-                <p role="status">
-                  {visibleNearbyUsers.length
-                    ? `${visibleNearbyUsers.length} người trong bán kính ${nearbyRadiusKm} km · đã xếp gần → xa`
-                    : 'Chưa tìm thấy người phù hợp quanh đây.'}
-                </p>
-              )}
-            </div>
-
-            <section className="friend-results" aria-label="Người dùng quanh đây">
-              {visibleNearbyUsers.map((friend) => {
-                const relationship = friendRelationship(friend.id)
-                const actionLabel =
-                  relationship === 'accepted'
-                    ? 'Nhắn tin'
-                    : relationship === 'incoming'
-                      ? 'Chấp nhận'
-                      : relationship === 'outgoing'
-                        ? 'Hủy lời mời'
-                        : 'Kết bạn'
-                return (
-                  <div key={friend.id} className="friend-result contact-result nearby-result">
-                    <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                    <div className="friend-result-copy">
-                      <strong>@{friend.username}</strong>
-                      <span>
-                        {formatEstimatedDistance(friend.distanceKm)} · {friend.nearbyActive ? 'vừa hoạt động' : 'vị trí gần nhất'}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="nearby-result-action"
-                      onClick={() => void actOnFriend(friend)}
-                      disabled={friendActionBusy === friend.id}
-                      aria-label={`${actionLabel} @${friend.username}`}
-                    >
-                      {actionLabel}
-                    </button>
-                  </div>
-                )
-              })}
-            </section>
-
-            {nearbyScanning && (
-              <div className="nearby-scan-backdrop" role="dialog" aria-modal="true" aria-labelledby="nearby-scan-title">
-                <div className="nearby-scan-modal">
-                  <div className="nearby-scan-heading">
-                    <strong id="nearby-scan-title">Đang quét quanh đây</strong>
-                    <span>Phạm vi {nearbyRadiusKm} km</span>
-                  </div>
-                  <NearbyRadar scanning large />
-                  <p>Đang cập nhật vị trí và tìm người gần nhất...</p>
-                  <div className="nearby-scan-progress" aria-hidden="true"><span /></div>
-                  <small>Kết quả sẽ được xếp tự động từ gần đến xa</small>
-                </div>
+          <Suspense
+            fallback={(
+              <div className="nearby-module-loading" role="status">
+                <span>⌖</span>
+                <strong>Đang mở Quanh đây</strong>
+                <small>Chuẩn bị bản đồ và lớp khám phá địa phương...</small>
               </div>
             )}
-          </div>
+          >
+            <NearbyExplorer
+              query={globalSearch}
+              onQueryChange={setGlobalSearch}
+              users={visibleNearbyUsers as NearbyUser[]}
+              peopleBusy={nearbyBusy}
+              peopleScanning={nearbyScanning}
+              peopleActive={nearbyUntil > 0}
+              peopleRadiusKm={nearbyRadiusKm}
+              onPeopleRadiusChange={setNearbyRadiusKm}
+              onScanPeople={findNearby}
+              onStopPeople={stopNearby}
+              friendActionBusy={friendActionBusy}
+              onFriendAction={actOnFriend}
+              getFriendActionLabel={(friend) => {
+                const relationship = friendRelationship(friend.id)
+                return relationship === 'accepted'
+                  ? 'Nhắn tin'
+                  : relationship === 'incoming'
+                    ? 'Chấp nhận'
+                    : relationship === 'outgoing'
+                      ? 'Hủy lời mời'
+                      : 'Kết bạn'
+              }}
+              onNotice={setNotice}
+            />
+          </Suspense>
         )}
 
         {tab === 'feed' && (

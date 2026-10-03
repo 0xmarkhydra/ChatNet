@@ -7,6 +7,7 @@ import './mobile-nav.css'
 import './notifications.css'
 import './friends.css'
 import './zalo-inspired.css'
+import './nearby-explorer.css'
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   navigator.serviceWorker
