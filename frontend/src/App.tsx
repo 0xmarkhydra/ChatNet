@@ -442,6 +442,9 @@ export default function App() {
   const activeConversationIdRef = useRef<number | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [messageActionId, setMessageActionId] = useState<number | null>(null)
+  const messageLongPressTimer = useRef<number | null>(null)
+  const messageLongPressStart = useRef<{ x: number; y: number; messageId: number } | null>(null)
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [groupNameDraft, setGroupNameDraft] = useState('')
@@ -507,6 +510,9 @@ export default function App() {
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
   const activePost = activePostId ? posts.find((item) => item.id === activePostId) || null : null
+  const activeMessageAction = messageActionId
+    ? messages.find((item) => item.id === messageActionId) || null
+    : null
   const activeStoryIndex = stories.findIndex((item) => item.id === activeStoryId)
   const activeStory = activeStoryIndex < 0 ? null : stories[activeStoryIndex]
 
@@ -523,6 +529,49 @@ export default function App() {
     })
   }
 
+  function cancelMessageLongPress() {
+    if (messageLongPressTimer.current !== null) {
+      window.clearTimeout(messageLongPressTimer.current)
+      messageLongPressTimer.current = null
+    }
+    messageLongPressStart.current = null
+  }
+
+  function openMessageActions(message: Message) {
+    if (message.deleted) return
+    cancelMessageLongPress()
+    setMessageActionId(message.id)
+    navigator.vibrate?.(24)
+  }
+
+  function beginMessageLongPress(message: Message, x: number, y: number, button: number, target: EventTarget | null) {
+    if (message.deleted || button !== 0) return
+    if (target instanceof Element && target.closest('button,a,input,textarea,select,video,audio')) return
+    cancelMessageLongPress()
+    messageLongPressStart.current = { x, y, messageId: message.id }
+    messageLongPressTimer.current = window.setTimeout(() => {
+      if (messageLongPressStart.current?.messageId === message.id) openMessageActions(message)
+    }, 500)
+  }
+
+  function moveMessageLongPress(x: number, y: number) {
+    const start = messageLongPressStart.current
+    if (!start) return
+    if (Math.hypot(x - start.x, y - start.y) > 12) cancelMessageLongPress()
+  }
+
+  async function copyMessage(message: Message) {
+    const content = message.text.trim()
+    setMessageActionId(null)
+    if (!content) return
+    try {
+      await navigator.clipboard.writeText(content)
+      setNotice('Đã sao chép tin nhắn.', 'success')
+    } catch {
+      setNotice('Không sao chép được tin nhắn trên trình duyệt này.', 'error')
+    }
+  }
+
   useEffect(() => {
     if (!notice) return
     const timeout =
@@ -537,6 +586,8 @@ export default function App() {
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId
+    cancelMessageLongPress()
+    setMessageActionId(null)
     setMessages([])
     setReplyingTo(null)
     setGroupSettingsOpen(false)
@@ -2656,7 +2707,20 @@ export default function App() {
                     {messages.map((message) => {
                       const mine = message.senderId === session.user.id
                       return (
-                        <article key={message.id} className={mine ? 'message mine' : 'message'}>
+                        <article
+                          key={message.id}
+                          className={mine ? 'message mine message-press-target' : 'message message-press-target'}
+                          onPointerDown={(event) => beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)}
+                          onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
+                          onPointerUp={cancelMessageLongPress}
+                          onPointerCancel={cancelMessageLongPress}
+                          onPointerLeave={cancelMessageLongPress}
+                          onContextMenu={(event) => {
+                            if (message.deleted) return
+                            event.preventDefault()
+                            openMessageActions(message)
+                          }}
+                        >
                           {!mine && <div className="message-meta">{message.sender}</div>}
                           {message.replyToMessageId && (
                             <div className="message-reply-quote">
@@ -2696,18 +2760,6 @@ export default function App() {
                                     {reaction.emoji} {reaction.count}
                                   </button>
                                 ))}
-                              </div>
-                              <div className="message-actions">
-                                <button type="button" onClick={() => setReplyingTo(message)}>Trả lời</button>
-                                {['👍', '❤️', '😂'].map((emoji) => (
-                                  <button key={emoji} type="button" onClick={() => void toggleReaction(message, emoji)}>{emoji}</button>
-                                ))}
-                                {mine && Boolean(message.text.trim()) && (
-                                  <button type="button" onClick={() => void editOwnMessage(message)}>Sửa</button>
-                                )}
-                                {mine && (
-                                  <button type="button" onClick={() => void recallOwnMessage(message)}>Thu hồi</button>
-                                )}
                               </div>
                             </>
                           )}
@@ -3136,6 +3188,115 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {activeMessageAction && (() => {
+          const mine = activeMessageAction.senderId === session.user.id
+          const preview = activeMessageAction.text.trim() || attachmentLabel(activeMessageAction.attachments)
+          return (
+            <div
+              className="message-context-backdrop"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Tùy chọn tin nhắn"
+              onMouseDown={(event) => {
+                if (event.currentTarget === event.target) setMessageActionId(null)
+              }}
+            >
+              <section className="message-context-sheet">
+                <div className={mine ? 'message-context-preview mine' : 'message-context-preview'}>
+                  <small>{mine ? 'Bạn' : `@${activeMessageAction.sender}`}</small>
+                  <div className="message-context-preview-bubble">{preview || 'Tin nhắn'}</div>
+                  <time>{formatTime(activeMessageAction.createdAt)}</time>
+                </div>
+
+                <div className="message-context-reactions" aria-label="Thả cảm xúc">
+                  {['❤️', '👍', '😂', '😮', '😢', '🙏'].map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className={(activeMessageAction.reactions || []).some((reaction) => reaction.emoji === emoji && reaction.mine) ? 'active' : ''}
+                      aria-label={`Thả cảm xúc ${emoji}`}
+                      onClick={() => {
+                        setMessageActionId(null)
+                        void toggleReaction(activeMessageAction, emoji)
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="message-context-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReplyingTo(activeMessageAction)
+                      setMessageActionId(null)
+                    }}
+                  >
+                    <span aria-hidden="true">↩</span>
+                    <b>Trả lời</b>
+                  </button>
+
+                  {Boolean(activeMessageAction.text.trim()) && (
+                    <button type="button" onClick={() => void copyMessage(activeMessageAction)}>
+                      <span aria-hidden="true">▣</span>
+                      <b>Sao chép</b>
+                    </button>
+                  )}
+
+                  {!mine && Boolean(activeMessageAction.text.trim()) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMessageActionId(null)
+                        void translateMessage(activeMessageAction)
+                      }}
+                    >
+                      <span aria-hidden="true">文</span>
+                      <b>Dịch</b>
+                    </button>
+                  )}
+
+                  {mine && Boolean(activeMessageAction.text.trim()) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMessageActionId(null)
+                        void editOwnMessage(activeMessageAction)
+                      }}
+                    >
+                      <span aria-hidden="true">✎</span>
+                      <b>Sửa</b>
+                    </button>
+                  )}
+
+                  {mine && (
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => {
+                        setMessageActionId(null)
+                        void recallOwnMessage(activeMessageAction)
+                      }}
+                    >
+                      <span aria-hidden="true">⌫</span>
+                      <b>Thu hồi</b>
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className="message-context-cancel"
+                  onClick={() => setMessageActionId(null)}
+                >
+                  Đóng
+                </button>
+              </section>
+            </div>
+          )
+        })()}
 
         {activePost && (
           <div
