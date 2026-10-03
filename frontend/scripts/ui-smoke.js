@@ -413,6 +413,7 @@ async (page) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: /Cá nhân/ }).click()
   await page.getByRole('switch', { name: 'Tự động dịch', exact: true }).waitFor()
+  check(await page.locator('.appbar-search').count() === 0, 'Profile exposes a non-functional search')
   check(await page.locator('.profile-identity strong').textContent() === '@user_1234567890abcdef', 'Profile must identify user by username')
   check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Profile overflows horizontally')
   check(await page.locator('.profile-avatar .avatar-initials').evaluate((node) =>

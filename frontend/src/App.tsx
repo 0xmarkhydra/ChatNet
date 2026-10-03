@@ -1684,20 +1684,32 @@ export default function App() {
     <main className={`app-shell modern-shell ${tab === 'chat' && activeConversation ? 'conversation-open' : ''}`}>
       <header className="chatnet-appbar">
         <div className="appbar-brand"><img src="/icon.svg" width="32" height="32" alt="" /><strong>ChatNet</strong></div>
-        <label className="appbar-search">
-          <UiIcon name="search" size={27} />
-          <input
-            value={tab === 'contacts' ? friendQuery : globalSearch}
-            onChange={(event) => {
-              if (tab === 'contacts') setFriendQuery(event.target.value)
-              else setGlobalSearch(event.target.value)
-            }}
-            placeholder={tab === 'contacts' ? 'Email hoặc @username' : tab === 'discover' ? 'Lọc theo @username' : 'Tìm kiếm'}
-            aria-label={tab === 'contacts' ? 'Tìm bạn bằng email hoặc username' : 'Tìm kiếm'}
-          />
-        </label>
+        {tab !== 'profile' && (
+          <label className="appbar-search">
+            <UiIcon name="search" size={27} />
+            <input
+              value={tab === 'contacts' ? friendQuery : globalSearch}
+              onChange={(event) => {
+                if (tab === 'contacts') setFriendQuery(event.target.value)
+                else setGlobalSearch(event.target.value)
+              }}
+              placeholder={
+                tab === 'contacts' ? 'Email hoặc @username'
+                  : tab === 'discover' ? 'Lọc người quanh đây theo @username'
+                    : tab === 'feed' ? 'Tìm tác giả hoặc nội dung bài viết'
+                      : 'Tìm cuộc trò chuyện'
+              }
+              aria-label={
+                tab === 'contacts' ? 'Tìm bạn bằng email hoặc username'
+                  : tab === 'discover' ? 'Lọc người quanh đây theo username'
+                    : tab === 'feed' ? 'Tìm bài viết'
+                      : 'Tìm cuộc trò chuyện'
+              }
+            />
+          </label>
+        )}
 
-        <div className="appbar-actions">
+        <div className="appbar-actions" style={tab === 'profile' ? { marginLeft: 'auto' } : undefined}>
           {tab === 'chat' && (
             <>
               <button
