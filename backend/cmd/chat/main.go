@@ -115,7 +115,7 @@ func main() {
 func (s *server) pushConfig(w http.ResponseWriter, r *http.Request) {
 	appID := s.push.AppID()
 	httpx.JSON(w, http.StatusOK, map[string]any{
-		"configured": appID != "",
+		"configured": s.push.Configured(),
 		"appId":      appID,
 	})
 }

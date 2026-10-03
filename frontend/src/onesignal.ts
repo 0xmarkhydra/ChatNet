@@ -55,23 +55,49 @@ function snapshot(OneSignal: OneSignalAPI): PushState {
   }
 }
 
-function loadSDK() {
-  if (document.querySelector('script[data-chatnet-onesignal]')) return
+function loadSDK(onError: () => void) {
+  const existing = document.querySelector<HTMLScriptElement>('script[data-chatnet-onesignal]')
+  if (existing) {
+    existing.addEventListener('error', onError, { once: true })
+    return existing
+  }
   const script = document.createElement('script')
   script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'
   script.defer = true
   script.dataset.chatnetOnesignal = '1'
+  script.addEventListener('error', onError, { once: true })
   document.head.appendChild(script)
+  return script
 }
 
 function getSDK(): Promise<OneSignalAPI> {
   if (sdkPromise) return sdkPromise
-  sdkPromise = new Promise((resolve) => {
+  const promise = new Promise<OneSignalAPI>((resolve, reject) => {
+    let settled = false
+    let script: HTMLScriptElement
+    const finish = (callback: () => void) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      callback()
+    }
+    const fail = () => finish(() => {
+      script?.remove()
+      reject(new Error('Không tải được OneSignal SDK.'))
+    })
+    const timeout = window.setTimeout(fail, 15000)
+
     window.OneSignalDeferred = window.OneSignalDeferred || []
-    window.OneSignalDeferred.push(async (OneSignal) => resolve(OneSignal))
-    loadSDK()
+    window.OneSignalDeferred.push(async (OneSignal) => {
+      finish(() => resolve(OneSignal))
+    })
+    script = loadSDK(fail)
+  }).catch((error) => {
+    sdkPromise = null
+    throw error
   })
-  return sdkPromise
+  sdkPromise = promise
+  return promise
 }
 
 async function waitForSubscription(
@@ -83,8 +109,9 @@ async function waitForSubscription(
 
   while (
     Date.now() < expiresAt &&
-    state.optedIn &&
-    !state.subscriptionId
+    state.supported &&
+    state.permission === 'granted' &&
+    (!state.optedIn || !state.subscriptionId)
   ) {
     await new Promise((resolve) => window.setTimeout(resolve, 200))
     state = snapshot(OneSignal)
@@ -186,7 +213,7 @@ export async function enableOneSignalPush(): Promise<PushState> {
   }
 
   let state = snapshot(OneSignal)
-  if (state.optedIn && !state.subscriptionId) {
+  if (state.supported && state.permission === 'granted' && (!state.optedIn || !state.subscriptionId)) {
     state = await waitForSubscription(OneSignal)
   }
 

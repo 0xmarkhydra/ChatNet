@@ -14,9 +14,40 @@ import (
 
 	"chatnet/internal/authx"
 	"chatnet/internal/database"
+	"chatnet/internal/onesignalx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
+
+func TestPushConfigRequiresAppIDAndAPIKey(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		appID      string
+		apiKey     string
+		configured bool
+	}{
+		{name: "complete", appID: "app-id", apiKey: "api-key", configured: true},
+		{name: "missing API key", appID: "app-id", configured: false},
+		{name: "missing app ID", apiKey: "api-key", configured: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &server{push: onesignalx.New(tc.appID, tc.apiKey)}
+			w := httptest.NewRecorder()
+			s.pushConfig(w, httptest.NewRequest(http.MethodGet, "/api/push/config", nil))
+
+			var result struct {
+				Configured bool   `json:"configured"`
+				AppID      string `json:"appId"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+				t.Fatal(err)
+			}
+			if result.Configured != tc.configured || result.AppID != tc.appID {
+				t.Fatalf("got %+v, want configured=%v appId=%q", result, tc.configured, tc.appID)
+			}
+		})
+	}
+}
 
 func TestUserSearchIntegration(t *testing.T) {
 	dbURL, redisAddr := os.Getenv("CHATNET_TEST_DATABASE_URL"), os.Getenv("CHATNET_TEST_REDIS_ADDR")

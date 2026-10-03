@@ -13,12 +13,19 @@ const OneSignal = {
   Notifications: {
     permission: false,
     isPushSupported: () => true,
-    requestPermission: async () => {},
+    requestPermission: async () => {
+      Notification.permission = 'granted'
+      setTimeout(() => {
+        OneSignal.User.PushSubscription.optedIn = true
+        OneSignal.User.PushSubscription.id = 'subscription-id'
+      }, 20)
+    },
     addEventListener: () => {},
   },
   User: {
     PushSubscription: {
       optedIn: false,
+      optIn: async () => {},
       addEventListener: () => {},
     },
   },
@@ -27,12 +34,20 @@ const OneSignal = {
 globalThis.Notification = { permission: 'default' }
 globalThis.location = { hostname: 'localhost' }
 globalThis.window = {
+  Notification,
   setTimeout,
+  clearTimeout,
   OneSignalDeferred: [],
 }
 globalThis.document = {
   querySelector: () => null,
-  createElement: () => ({ dataset: {} }),
+  createElement: () => ({
+    dataset: {},
+    addEventListener(name, handler) {
+      if (name === 'error') this.onerror = handler
+    },
+    remove() {},
+  }),
   head: {
     appendChild: () => {
       queueMicrotask(() => {
@@ -42,7 +57,7 @@ globalThis.document = {
   },
 }
 
-const { setupOneSignal } = await import('../src/onesignal.ts')
+const { enableOneSignalPush, setupOneSignal } = await import('../src/onesignal.ts')
 const first = setupOneSignal('test-app')
 const second = setupOneSignal('test-app')
 
@@ -52,4 +67,8 @@ finishInit()
 await Promise.all([first, second])
 assert.equal(initCalls, 1, 'completed setup must stay initialized')
 
-console.log('PASS: concurrent OneSignal setup initializes SDK once')
+const enabled = await enableOneSignalPush()
+assert.equal(enabled.optedIn, true, 'enable must wait for OneSignal opt-in state')
+assert.equal(enabled.subscriptionId, 'subscription-id', 'enable must wait for subscription ID')
+
+console.log('PASS: OneSignal initialization and delayed subscription')
