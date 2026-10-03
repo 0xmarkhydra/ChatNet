@@ -149,19 +149,14 @@ async function initializeSDK(OneSignal: OneSignalAPI, appId: string) {
     appId,
     serviceWorkerPath: '/push/onesignal/OneSignalSDKWorker.js',
     serviceWorkerParam: { scope: '/push/onesignal/' },
+    serviceWorkerOverrideForTypical: true,
     allowLocalhostAsSecureOrigin:
       location.hostname === 'localhost' || location.hostname === '127.0.0.1',
   }).then(() => {
     initializedAppId = appId
   })
   initialization = { appId, promise }
-
-  try {
-    await promise
-  } catch (error) {
-    if (initialization?.promise === promise) initialization = null
-    throw error
-  }
+  await promise
 }
 
 export async function setupOneSignal(
