@@ -282,7 +282,12 @@ async (page) => {
     if (viewport.width <= 390) {
       const room = await page.locator('.room-info').boundingBox()
       const controls = await page.locator('.translate-controls').boundingBox()
-      check(room && controls && room.y + room.height <= controls.y, 'Translation controls squeeze chat title')
+      check(
+        room && controls &&
+        Math.abs((room.y + room.height / 2) - (controls.y + controls.height / 2)) <= 8,
+        'Translation controls are not aligned with chat title',
+      )
+      check(room && controls && room.x + room.width <= controls.x + 1, 'Translation controls overlap chat title')
     }
   }
   await page.setViewportSize({ width: 390, height: 844 })

@@ -526,6 +526,7 @@ export default function App() {
   const [profileUsernameDraft, setProfileUsernameDraft] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
   const [translations, setTranslations] = useState<Record<number, string>>({})
+  const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [targetLanguage, setTargetLanguage] = useState('en')
   const [autoTranslate, setAutoTranslate] = useState(true)
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] = useState(false)
@@ -1899,6 +1900,7 @@ export default function App() {
   function changeTargetLanguage(next: string) {
     setTargetLanguage(next)
     setTranslations({})
+    setTranslationOriginals({})
     void saveTranslationPreferences(next, autoTranslate)
   }
 
@@ -2652,6 +2654,7 @@ export default function App() {
                     onClick={() => {
                       setActiveConversationId(conversation.id)
                       setTranslations({})
+                      setTranslationOriginals({})
                     }}
                   >
                     <UserAvatar
@@ -2720,16 +2723,21 @@ export default function App() {
                           👥 Nhóm
                         </button>
                       )}
-                      <label className="auto-translate">
+                      <label
+                        className={autoTranslate ? 'auto-translate active' : 'auto-translate'}
+                        aria-label={autoTranslate ? 'Tắt tự động dịch' : 'Bật tự động dịch'}
+                        title={autoTranslate ? 'Tắt tự động dịch' : 'Bật tự động dịch'}
+                      >
                         <input
                           type="checkbox"
                           checked={autoTranslate}
                           onChange={(event) => changeAutoTranslate(event.target.checked)}
                         />
-                        <span>Tự dịch AI</span>
+                        <span className="auto-translate-indicator" aria-hidden="true">{autoTranslate ? '✓' : ''}</span>
+                        <b>AI</b>
                       </label>
                       <select aria-label="Ngôn ngữ dịch" value={targetLanguage} onChange={(event) => changeTargetLanguage(event.target.value)}>
-                        {languages.map((language) => <option key={language.value} value={language.value}>→ {language.label}</option>)}
+                        {languages.map((language) => <option key={language.value} value={language.value}>{language.label}</option>)}
                       </select>
                     </div>
                   </header>
@@ -2850,6 +2858,9 @@ export default function App() {
                     <div className="day-divider"><span>Cuộc trò chuyện</span></div>
                     {messages.map((message) => {
                       const mine = message.senderId === session.user.id
+                      const translatedText = !message.deleted ? translations[message.id] : ''
+                      const originalVisible = Boolean(translationOriginals[message.id])
+                      const translatedLanguage = languages.find((language) => language.value === targetLanguage)?.label || targetLanguage
                       return (
                         <article
                           key={message.id}
@@ -2876,7 +2887,32 @@ export default function App() {
                             <div className="bubble recalled-message">Tin nhắn đã được thu hồi</div>
                           ) : (
                             <>
-                              {message.text && <div className="bubble">{message.text}</div>}
+                              {message.text && (
+                                <div className={translatedText ? 'bubble translated-bubble' : 'bubble'}>
+                                  {translatedText || message.text}
+                                </div>
+                              )}
+                              {translatedText && message.text && (
+                                <button
+                                  type="button"
+                                  className="translation-meta"
+                                  aria-expanded={originalVisible}
+                                  onClick={() => setTranslationOriginals((current) => ({
+                                    ...current,
+                                    [message.id]: !current[message.id],
+                                  }))}
+                                >
+                                  <span>{translatedLanguage}</span>
+                                  <small>Đã dịch</small>
+                                  <b aria-hidden="true">{originalVisible ? '⌃' : '⌄'}</b>
+                                </button>
+                              )}
+                              {translatedText && message.text && originalVisible && (
+                                <div className="translation-original">
+                                  <strong>Bản gốc</strong>
+                                  <span>{message.text}</span>
+                                </div>
+                              )}
                               <MediaAttachmentsView items={message.attachments} />
                             </>
                           )}
@@ -2889,7 +2925,6 @@ export default function App() {
                                 : ' · Đã xem'
                               : ''}
                           </div>
-                          {!message.deleted && translations[message.id] && <div className="translation"><span>✨</span>{translations[message.id]}</div>}
                           {!message.deleted && (
                             <>
                               <div className="message-reactions">
@@ -2907,7 +2942,6 @@ export default function App() {
                               </div>
                             </>
                           )}
-                          {!message.deleted && !mine && Boolean(message.text.trim()) && <button className="translate-btn" type="button" onClick={() => translateMessage(message)}>✨ Dịch bằng AI</button>}
                         </article>
                       )
                     })}
