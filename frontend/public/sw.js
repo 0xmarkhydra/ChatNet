@@ -1,4 +1,4 @@
-const CACHE = 'chatnet-v26-connect-ios'
+const CACHE = 'chatnet-v27-nearby-v2'
 const CORE = ['/', '/offline.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg']
 
 self.addEventListener('install', (event) => {
