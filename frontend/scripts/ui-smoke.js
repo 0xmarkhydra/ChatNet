@@ -479,9 +479,16 @@ async (page) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: /Cá nhân/ }).click()
   await page.getByRole('switch', { name: 'Tự động dịch', exact: true }).waitFor()
+  check(await page.locator('.chatnet-appbar').count() === 0, 'Profile must not render the global app bar')
   check(await page.locator('.appbar-search').count() === 0, 'Profile exposes a non-functional search')
   check(await page.locator('.profile-identity strong').textContent() === 'Old Display Name', 'Profile must show display name')
   check(await page.locator('.profile-identity-copy > span').textContent() === '@user_1234567890abcdef', 'Profile must show username')
+  const coverBox = await page.locator('.profile-cover-art').boundingBox()
+  const identityCopyBox = await page.locator('.profile-identity-copy').boundingBox()
+  check(
+    coverBox && identityCopyBox && identityCopyBox.y >= coverBox.y + coverBox.height,
+    'Profile name/username overlaps the cover image',
+  )
   await page.locator('.profile-cover-art').evaluate((node) => node.classList.add('has-cover'))
   check(await page.locator('.profile-cover-placeholder').evaluate((node) => getComputedStyle(node).display === 'none'), 'Cover placeholder overlays a real cover')
   await page.locator('.profile-cover-art').evaluate((node) => node.classList.remove('has-cover'))

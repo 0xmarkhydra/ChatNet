@@ -2415,10 +2415,10 @@ export default function App() {
 
   return (
     <main className={`app-shell modern-shell ${tab === 'chat' && activeConversation ? 'conversation-open' : ''}`}>
+      {tab !== 'profile' && (
       <header className="chatnet-appbar">
         <div className="appbar-brand"><img src="/icon.svg" width="32" height="32" alt="" /><strong>ChatNet</strong></div>
-        {tab !== 'profile' && (
-          <label className="appbar-search">
+        <label className="appbar-search">
             <UiIcon name="search" size={27} />
             <input
               value={tab === 'contacts' ? friendQuery : globalSearch}
@@ -2440,9 +2440,8 @@ export default function App() {
               }
             />
           </label>
-        )}
 
-        <div className="appbar-actions" style={tab === 'profile' ? { marginLeft: 'auto' } : undefined}>
+        <div className="appbar-actions">
           {tab === 'chat' && (
             <>
               <button
@@ -2516,20 +2515,9 @@ export default function App() {
             </button>
           )}
 
-          {tab === 'profile' && (
-            <button
-              className="appbar-icon-button notification-appbar"
-              type="button"
-              aria-label={pushEnabled ? 'Tắt thông báo' : 'Bật thông báo'}
-              onClick={() => void togglePush()}
-              disabled={pushBusy}
-            >
-              <UiIcon name="bell" size={27} />
-              {!pushEnabled && <span className="appbar-badge">!</span>}
-            </button>
-          )}
         </div>
       </header>
+      )}
 
       {notice && (
         <div
