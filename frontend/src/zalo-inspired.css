@@ -2538,11 +2538,9 @@ textarea:focus-visible, select:focus-visible {
   margin-top: 5px;
 }
 .message-actions {
-  opacity: 0;
+  opacity: 1;
   transition: opacity .16s ease;
 }
-.message:hover .message-actions,
-.message:focus-within .message-actions { opacity: 1; }
 .message-actions button,
 .reaction-chip {
   min-height: 28px;
