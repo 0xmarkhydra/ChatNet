@@ -14,6 +14,7 @@ import (
 	"chatnet/internal/config"
 	"chatnet/internal/database"
 	"chatnet/internal/httpx"
+	"chatnet/internal/languagecatalog"
 	"chatnet/internal/mediax"
 	"chatnet/internal/objectstore"
 	"chatnet/internal/onesignalx"
@@ -436,12 +437,7 @@ func (s *server) updateTranslationPreferences(w http.ResponseWriter, r *http.Req
 }
 
 func validTranslationTarget(value string) bool {
-	switch value {
-	case "en", "vi", "ja", "ko", "zh", "th", "fr", "de", "es":
-		return true
-	default:
-		return false
-	}
+	return languagecatalog.Valid(value)
 }
 
 func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {

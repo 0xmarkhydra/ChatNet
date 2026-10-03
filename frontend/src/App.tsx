@@ -1,5 +1,6 @@
 import { FormEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
+import { buildLanguageOptions, filterLanguageOptions } from './languages'
 import {
   disableOneSignalPush,
   enableOneSignalPush,
@@ -187,16 +188,6 @@ function inferToastKind(message: string): ToastKind {
   ) return 'warning'
   return 'info'
 }
-
-const languages = [
-  { value: 'en', label: 'English' },
-  { value: 'vi', label: 'Tiếng Việt' },
-  { value: 'ja', label: '日本語' },
-  { value: 'ko', label: '한국어' },
-  { value: 'zh', label: '中文' },
-  { value: 'th', label: 'ไทย' },
-  { value: 'fr', label: 'Français' },
-]
 
 function loadSession(): Session | null {
   try {
@@ -528,6 +519,7 @@ export default function App() {
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
+  const [languageSearch, setLanguageSearch] = useState('')
   const [targetLanguage, setTargetLanguage] = useState('en')
   const [autoTranslate, setAutoTranslate] = useState(true)
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] = useState(false)
@@ -560,6 +552,13 @@ export default function App() {
     : null
   const activeStoryIndex = stories.findIndex((item) => item.id === activeStoryId)
   const activeStory = activeStoryIndex < 0 ? null : stories[activeStoryIndex]
+  const interfaceLocale = document.documentElement.lang || navigator.language || 'vi'
+  const languageOptions = useMemo(() => buildLanguageOptions(interfaceLocale), [interfaceLocale])
+  const selectedLanguage = languageOptions.find((language) => language.value === targetLanguage) || languageOptions[0]
+  const visibleLanguageOptions = useMemo(
+    () => filterLanguageOptions(languageOptions, languageSearch),
+    [languageOptions, languageSearch],
+  )
 
   function setNotice(message: string, kind?: ToastKind) {
     const clean = message.trim()
@@ -1903,6 +1902,7 @@ export default function App() {
     setTranslations({})
     setTranslationOriginals({})
     setTranslationMenuOpen(false)
+    setLanguageSearch('')
     void saveTranslationPreferences(next, autoTranslate)
   }
 
@@ -2732,12 +2732,19 @@ export default function App() {
                           className={autoTranslate ? 'translation-hub-trigger active' : 'translation-hub-trigger'}
                           aria-expanded={translationMenuOpen}
                           aria-label="Cài đặt dịch AI"
-                          onClick={() => setTranslationMenuOpen((current) => !current)}
+                          onClick={() => {
+                            setTranslationMenuOpen((current) => {
+                              const next = !current
+                              if (next) setLanguageSearch('')
+                              return next
+                            })
+                          }}
                         >
+                          <span className="translation-hub-flag" aria-hidden="true">{selectedLanguage?.flag || '🌐'}</span>
                           <span className="translation-hub-spark" aria-hidden="true">✦</span>
                           <b>AI</b>
                           <span className="translation-hub-dot" aria-hidden="true">·</span>
-                          <strong>{targetLanguage.split('-')[0].toUpperCase()}</strong>
+                          <strong>{selectedLanguage?.code || targetLanguage.toUpperCase()}</strong>
                           <span className="translation-hub-chevron" aria-hidden="true">{translationMenuOpen ? '⌃' : '⌄'}</span>
                         </button>
 
@@ -2766,19 +2773,50 @@ export default function App() {
                                 </button>
                               </div>
 
-                              <div className="translation-language-grid" aria-label="Chọn ngôn ngữ dịch">
-                                {languages.map((language) => (
+                              <label className="translation-language-search">
+                                <span aria-hidden="true">⌕</span>
+                                <input
+                                  type="search"
+                                  value={languageSearch}
+                                  onChange={(event) => setLanguageSearch(event.target.value)}
+                                  placeholder="Tìm ngôn ngữ, quốc gia hoặc mã..."
+                                  autoComplete="off"
+                                  autoCapitalize="none"
+                                  spellCheck={false}
+                                />
+                                {languageSearch && (
+                                  <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setLanguageSearch('')}>×</button>
+                                )}
+                              </label>
+
+                              <div className="translation-language-count">
+                                <span>{visibleLanguageOptions.length} ngôn ngữ</span>
+                                <small>Tên theo ngôn ngữ giao diện + tên bản địa</small>
+                              </div>
+
+                              <div className="translation-language-list" aria-label="Chọn ngôn ngữ dịch">
+                                {visibleLanguageOptions.map((language) => (
                                   <button
                                     key={language.value}
                                     type="button"
                                     className={targetLanguage === language.value ? 'active' : ''}
                                     onClick={() => changeTargetLanguage(language.value)}
                                   >
-                                    <b>{language.value.split('-')[0].toUpperCase()}</b>
-                                    <span>{language.label}</span>
+                                    <span className="translation-language-flag" aria-hidden="true">{language.flag}</span>
+                                    <span className="translation-language-copy">
+                                      <strong>{language.localizedLanguage}</strong>
+                                      <small>{language.nativeLanguage}</small>
+                                      <em>{language.localizedRegion} · {language.nativeRegion}</em>
+                                    </span>
+                                    <b>{language.code}</b>
                                     {targetLanguage === language.value && <i aria-hidden="true">✓</i>}
                                   </button>
                                 ))}
+                                {visibleLanguageOptions.length === 0 && (
+                                  <div className="translation-language-empty">
+                                    Không tìm thấy ngôn ngữ phù hợp.
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </>
@@ -2905,7 +2943,7 @@ export default function App() {
                       const mine = message.senderId === session.user.id
                       const translatedText = !message.deleted ? translations[message.id] : ''
                       const originalVisible = Boolean(translationOriginals[message.id])
-                      const translatedLanguage = languages.find((language) => language.value === targetLanguage)?.label || targetLanguage
+                      const translatedLanguage = selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()
                       return (
                         <article
                           key={message.id}
@@ -3796,7 +3834,11 @@ export default function App() {
               <label className="settings-row settings-language">
                 <div><strong>Ngôn ngữ dịch</strong><small>Giữ nguyên sau khi F5/mở lại app</small></div>
                 <select value={targetLanguage} onChange={(event) => changeTargetLanguage(event.target.value)}>
-                  {languages.map((language) => <option key={language.value} value={language.value}>{language.label}</option>)}
+                  {languageOptions.map((language) => (
+                    <option key={language.value} value={language.value}>
+                      {language.flag} {language.localizedLanguage} · {language.nativeLanguage}
+                    </option>
+                  ))}
                 </select>
               </label>
             </section>

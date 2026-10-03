@@ -17,6 +17,7 @@ import (
 	"chatnet/internal/config"
 	"chatnet/internal/database"
 	"chatnet/internal/httpx"
+	"chatnet/internal/languagecatalog"
 	"chatnet/internal/redisx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -187,9 +188,13 @@ func (s *server) translate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	target := strings.ToLower(strings.TrimSpace(body.Target))
+	target := languagecatalog.Normalize(body.Target)
 	if target == "" {
 		httpx.Error(w, http.StatusBadRequest, "target is required")
+		return
+	}
+	if !languagecatalog.Valid(target) {
+		httpx.Error(w, http.StatusBadRequest, "unsupported target language")
 		return
 	}
 
@@ -476,26 +481,5 @@ func firstEnvDefault(fallback string, keys ...string) string {
 }
 
 func languageName(code string) string {
-	switch strings.ToLower(code) {
-	case "vi":
-		return "Vietnamese"
-	case "en":
-		return "English"
-	case "ja":
-		return "Japanese"
-	case "ko":
-		return "Korean"
-	case "zh":
-		return "Simplified Chinese"
-	case "th":
-		return "Thai"
-	case "fr":
-		return "French"
-	case "de":
-		return "German"
-	case "es":
-		return "Spanish"
-	default:
-		return code
-	}
+	return languagecatalog.PromptName(code)
 }

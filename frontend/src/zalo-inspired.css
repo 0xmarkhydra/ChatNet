@@ -3637,6 +3637,11 @@ select:focus-visible {
   color: #2d4315;
 }
 
+.translation-hub-flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
 .translation-hub-spark {
   color: #79b91a;
   font-size: 14px;
@@ -3680,7 +3685,10 @@ select:focus-visible {
   z-index: 199;
   top: calc(100% + 9px);
   right: 0;
-  width: min(292px, calc(100vw - 20px));
+  width: min(356px, calc(100vw - 20px));
+  max-height: min(72vh, 620px);
+  display: flex;
+  flex-direction: column;
   padding: 13px;
   border: 1px solid rgba(255, 255, 255, .11);
   border-radius: 19px;
@@ -3756,24 +3764,106 @@ select:focus-visible {
   transform: translateX(18px);
 }
 
-.translation-language-grid {
+.translation-language-search {
+  min-height: 42px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: 7px;
+  margin-bottom: 8px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .065);
+  color: #aeb8b2;
 }
 
-.translation-language-grid button {
+.translation-language-search > span {
+  font-size: 20px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.translation-language-search input {
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #fff;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  box-shadow: none;
+}
+
+.translation-language-search input::placeholder {
+  color: #87928c;
+}
+
+.translation-language-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.translation-language-search button {
+  width: 27px;
+  height: 27px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .08);
+  color: #c7cfca;
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.translation-language-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 3px 8px;
+  color: #aeb8b2;
+}
+
+.translation-language-count span {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.translation-language-count small {
+  min-width: 0;
+  overflow: hidden;
+  color: #7f8b84;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.translation-language-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+  padding-right: 2px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, .18) transparent;
+}
+
+.translation-language-list > button {
   position: relative;
   min-width: 0;
-  min-height: 48px;
+  min-height: 68px;
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 7px;
-  border: 1px solid rgba(255, 255, 255, .08);
-  border-radius: 13px;
-  padding: 7px 9px;
-  background: rgba(255, 255, 255, .055);
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 14px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, .045);
   color: #f3f6f3;
   text-align: left;
   font: inherit;
@@ -3781,37 +3871,83 @@ select:focus-visible {
   transition: background .14s ease, border-color .14s ease, transform .14s ease;
 }
 
-.translation-language-grid button:hover,
-.translation-language-grid button:focus-visible {
+.translation-language-list > button:hover,
+.translation-language-list > button:focus-visible {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, .09);
+  background: rgba(255, 255, 255, .085);
 }
 
-.translation-language-grid button.active {
-  border-color: rgba(118, 185, 0, .44);
-  background: rgba(118, 185, 0, .13);
+.translation-language-list > button.active {
+  border-color: rgba(118, 185, 0, .42);
+  background: rgba(118, 185, 0, .12);
 }
 
-.translation-language-grid button > b {
-  color: #a9d66a;
-  font-size: 10px;
-  letter-spacing: .04em;
+.translation-language-flag {
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
 }
 
-.translation-language-grid button > span {
+.translation-language-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.translation-language-copy strong,
+.translation-language-copy small,
+.translation-language-copy em {
+  min-width: 0;
   overflow: hidden;
-  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.translation-language-grid button > i {
+.translation-language-copy strong {
+  color: #f7f9f7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.translation-language-copy small {
+  color: #c0c8c3;
+  font-size: 11px;
+}
+
+.translation-language-copy em {
+  color: #7f8c84;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.translation-language-list > button > b {
+  align-self: start;
+  margin-top: 3px;
+  color: #a7ca75;
+  font-size: 9px;
+  letter-spacing: .05em;
+}
+
+.translation-language-list > button > i {
   position: absolute;
-  top: 6px;
-  right: 7px;
-  color: #9bd04e;
+  right: 9px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(118, 185, 0, .18);
+  color: #a8d56a;
   font-size: 10px;
   font-style: normal;
+}
+
+.translation-language-empty {
+  padding: 28px 14px;
+  color: #9ca7a1;
+  text-align: center;
+  font-size: 12px;
 }
 
 .translation-flip-bubble {
@@ -3928,7 +4064,8 @@ select:focus-visible {
   .chat-head .translation-hub-popover {
     top: calc(100% + 7px);
     right: -1px;
-    width: min(278px, calc(100vw - 16px));
+    width: min(344px, calc(100vw - 12px));
+    max-height: min(74dvh, 590px);
   }
 
   .translation-flip-pill {
