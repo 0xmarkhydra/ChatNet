@@ -123,6 +123,8 @@ type FriendSearchResult = {
   displayName: string
   online: boolean
   distanceKm?: number
+  nearbyActive?: boolean
+  locationUpdatedAt?: string
   mutualGroups?: number
   reason?: string
 }
@@ -402,6 +404,7 @@ export default function App() {
   const [nearbyBusy, setNearbyBusy] = useState(false)
   const [nearbyScanning, setNearbyScanning] = useState(false)
   const [nearbyUntil, setNearbyUntil] = useState(0)
+  const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5)
   const [nearbyError, setNearbyError] = useState('')
   const nearbyRequest = useRef(0)
 
@@ -543,17 +546,30 @@ export default function App() {
     try {
       if (!navigator.geolocation) throw new Error('Trình duyệt không hỗ trợ định vị.')
       const position = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000, maximumAge: 60000 }),
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 30000,
+        }),
       )
       if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
       const response = await apiFetch('/api/users/nearby', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+        body: JSON.stringify({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          radiusKm: nearbyRadiusKm,
+        }),
       })
       if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
       if (!response.ok) throw new Error(response.status === 429 ? 'Chờ 10 giây trước khi tìm lại.' : 'Không tìm được bạn quanh đây. Thử lại sau.')
-      const result = await response.json() as { users: FriendSearchResult[]; expiresAt: string }
+      const result = await response.json() as {
+        users: FriendSearchResult[]
+        expiresAt: string
+        cacheExpiresAt?: string
+        radiusKm?: number
+      }
       const remainingScanMs = minimumNearbyScanMs - (Date.now() - scanStartedAt)
       if (remainingScanMs > 0) await new Promise((resolve) => window.setTimeout(resolve, remainingScanMs))
       if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
@@ -592,8 +608,9 @@ export default function App() {
   useEffect(() => {
     if (!nearbyUntil) return
     const timer = window.setTimeout(() => {
+      // Keep the last scan results visible from the longer server-side cache.
+      // Only the short "active nearby" lease expires here.
       setNearbyUntil(0)
-      setNearbyUsers([])
     }, Math.max(0, nearbyUntil - Date.now()))
     return () => window.clearTimeout(timer)
   }, [nearbyUntil])
@@ -2070,9 +2087,12 @@ export default function App() {
     )
   })
   const visibleConversations = searchedConversations
-  const visibleNearbyUsers = nearbyUsers.filter((user) =>
-    user.username.toLocaleLowerCase('vi-VN').includes(normalizedSearch.replace(/^@/, '')),
-  )
+  const visibleNearbyUsers = nearbyUsers
+    .filter((user) =>
+      user.username.toLocaleLowerCase('vi-VN').includes(normalizedSearch.replace(/^@/, '')),
+    )
+    .slice()
+    .sort((left, right) => (left.distanceKm ?? Number.POSITIVE_INFINITY) - (right.distanceKm ?? Number.POSITIVE_INFINITY))
   const searchedPosts = posts.filter((post) => {
     if (!normalizedSearch || tab !== 'feed') return true
     return (
@@ -2746,40 +2766,103 @@ export default function App() {
 
         {tab === 'discover' && (
           <div className="simple-view discover-view">
-            <div className="simple-view-title"><strong>Tìm bạn quanh đây</strong><small>Trong phạm vi 5 km</small></div>
+            <div className="simple-view-title">
+              <strong>Quét bạn quanh đây</strong>
+              <small>Gần → xa · tối đa {nearbyRadiusKm} km</small>
+            </div>
             <div className="nearby-controls">
               <NearbyRadar />
-              <p aria-live="polite">{nearbyScanning ? 'Radar đang quét...' : nearbyUntil ? 'Đang hiển thị với người dùng quanh đây.' : 'Bật Quanh đây để tìm người cùng bật trong phạm vi 5 km.'}</p>
-              <p className="nearby-privacy">Vị trí chỉ dùng khi bạn bật. Tự ẩn sau 15 phút. Chỉ hiển thị khoảng cách ước lượng, không hiển thị tọa độ. Nếu mất kết nối, bạn có thể vẫn hiển thị đến hết thời hạn.</p>
+              <p aria-live="polite">
+                {nearbyScanning
+                  ? 'Radar đang quét...'
+                  : nearbyUntil
+                    ? 'Vị trí vừa được cập nhật. Kết quả đang xếp từ gần đến xa.'
+                    : nearbyUsers.length
+                      ? 'Đang hiển thị kết quả cache từ lần quét gần nhất.'
+                      : 'Bấm Quét quanh đây để cập nhật vị trí và tìm người dùng gần bạn.'}
+              </p>
+
+              <div className="nearby-radius" aria-label="Bán kính quét">
+                {[1, 5, 10, 25, 50].map((radius) => (
+                  <button
+                    key={radius}
+                    type="button"
+                    className={nearbyRadiusKm === radius ? 'active' : ''}
+                    onClick={() => setNearbyRadiusKm(radius)}
+                    disabled={nearbyBusy}
+                    aria-pressed={nearbyRadiusKm === radius}
+                  >
+                    {radius} km
+                  </button>
+                ))}
+              </div>
+
+              <p className="nearby-privacy">
+                Không hiển thị tọa độ chính xác. Trạng thái “vừa hoạt động” hết sau 15 phút,
+                nhưng vị trí gần nhất được cache tối đa 7 ngày để hỗ trợ nhiều lần quét.
+                Bấm Tắt Quanh đây sẽ xóa cache vị trí ngay.
+              </p>
               <div className="nearby-actions">
                 <button type="button" onClick={() => void findNearby()} disabled={nearbyBusy}>
-                  <UiIcon name="discover" size={20} />{nearbyScanning ? 'Đang quét...' : nearbyUntil ? 'Tìm lại' : 'Bật Quanh đây'}
+                  <UiIcon name="discover" size={20} />{nearbyScanning ? 'Đang quét...' : nearbyUsers.length ? 'Quét lại' : 'Quét quanh đây'}
                 </button>
                 <button type="button" className="secondary" onClick={() => void stopNearby()} disabled={nearbyBusy}>Tắt Quanh đây</button>
               </div>
               {nearbyError && <p role="alert" className="inline-error">{nearbyError}</p>}
-              {nearbyUntil > 0 && <p role="status">{visibleNearbyUsers.length ? `${visibleNearbyUsers.length} người quanh đây` : 'Chưa tìm thấy người phù hợp quanh đây.'}</p>}
+              {(nearbyUntil > 0 || nearbyUsers.length > 0) && (
+                <p role="status">
+                  {visibleNearbyUsers.length
+                    ? `${visibleNearbyUsers.length} người trong bán kính ${nearbyRadiusKm} km · đã xếp gần → xa`
+                    : 'Chưa tìm thấy người phù hợp quanh đây.'}
+                </p>
+              )}
             </div>
+
             <section className="friend-results" aria-label="Người dùng quanh đây">
-              {visibleNearbyUsers.map((friend) => (
-                <button key={friend.id} type="button" className="friend-result contact-result" aria-label={`Nhắn tin với @${friend.username}`} onClick={() => void openDirectByUsername(friend.username)}>
-                  <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                  <div className="friend-result-copy"><strong>@{friend.username}</strong><span>{formatEstimatedDistance(friend.distanceKm)}</span></div>
-                  <div className="friend-result-action"><small>Nhắn tin</small><span>›</span></div>
-                </button>
-              ))}
+              {visibleNearbyUsers.map((friend) => {
+                const relationship = friendRelationship(friend.id)
+                const actionLabel =
+                  relationship === 'accepted'
+                    ? 'Nhắn tin'
+                    : relationship === 'incoming'
+                      ? 'Chấp nhận'
+                      : relationship === 'outgoing'
+                        ? 'Hủy lời mời'
+                        : 'Kết bạn'
+                return (
+                  <div key={friend.id} className="friend-result contact-result nearby-result">
+                    <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+                    <div className="friend-result-copy">
+                      <strong>@{friend.username}</strong>
+                      <span>
+                        {formatEstimatedDistance(friend.distanceKm)} · {friend.nearbyActive ? 'vừa hoạt động' : 'vị trí gần nhất'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="nearby-result-action"
+                      onClick={() => void actOnFriend(friend)}
+                      disabled={friendActionBusy === friend.id}
+                      aria-label={`${actionLabel} @${friend.username}`}
+                    >
+                      {actionLabel}
+                    </button>
+                  </div>
+                )
+              })}
             </section>
+
             {nearbyScanning && (
               <div className="nearby-scan-backdrop" role="dialog" aria-modal="true" aria-labelledby="nearby-scan-title">
                 <div className="nearby-scan-modal">
                   <div className="nearby-scan-heading">
-                    <strong id="nearby-scan-title">Đang tìm quanh đây</strong>
-                    <span>Phạm vi 5 km</span>
+                    <strong id="nearby-scan-title">Đang quét quanh đây</strong>
+                    <span>Phạm vi {nearbyRadiusKm} km</span>
                   </div>
                   <NearbyRadar scanning large />
-                  <p>Radar đang quét khu vực...</p>
+                  <p>Đang cập nhật vị trí và tìm người gần nhất...</p>
                   <div className="nearby-scan-progress" aria-hidden="true"><span /></div>
-                  <small>Đang ước lượng khoảng cách tới người dùng gần bạn</small>
+                  <small>Kết quả sẽ được xếp tự động từ gần đến xa</small>
                 </div>
               </div>
             )}

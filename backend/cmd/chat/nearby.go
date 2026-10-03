@@ -14,28 +14,44 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const nearbyTTL = 15 * time.Minute
+const (
+	nearbyActiveTTL = 15 * time.Minute
+	nearbyCacheTTL  = 7 * 24 * time.Hour
+)
 
-var nearbyKeys = []string{"chatnet:nearby:geo", "chatnet:nearby:expiry"}
+var nearbyKeys = []string{"chatnet:nearby:geo", "chatnet:nearby:active-expiry", "chatnet:nearby:cache-expiry"}
 
-// Keep removal, renewal and radius lookup atomic across chat replicas.
+// Keep removal, renewal, cache pruning and radius lookup atomic across chat replicas.
+// Active visibility expires after 15 minutes, while the last opted-in location is cached
+// for longer so repeated scans still work. Manual disable removes both immediately.
 var nearbyScript = redis.NewScript(`
 local now = tonumber(redis.call('TIME')[1])
-local expired = redis.call('ZRANGEBYSCORE', KEYS[2], '-inf', now)
-for _, id in ipairs(expired) do
-  redis.call('ZREM', KEYS[1], id)
+
+local expiredActive = redis.call('ZRANGEBYSCORE', KEYS[2], '-inf', now)
+for _, id in ipairs(expiredActive) do
   redis.call('ZREM', KEYS[2], id)
 end
+
+local expiredCache = redis.call('ZRANGEBYSCORE', KEYS[3], '-inf', now)
+for _, id in ipairs(expiredCache) do
+  redis.call('ZREM', KEYS[1], id)
+  redis.call('ZREM', KEYS[2], id)
+  redis.call('ZREM', KEYS[3], id)
+end
+
 if ARGV[1] == 'remove' then
   redis.call('ZREM', KEYS[1], ARGV[2])
   redis.call('ZREM', KEYS[2], ARGV[2])
+  redis.call('ZREM', KEYS[3], ARGV[2])
 elseif ARGV[1] == 'find' then
   redis.call('GEOADD', KEYS[1], ARGV[3], ARGV[4], ARGV[2])
   redis.call('ZADD', KEYS[2], now + 900, ARGV[2])
-  redis.call('EXPIRE', KEYS[1], 900)
-  redis.call('EXPIRE', KEYS[2], 900)
+  redis.call('ZADD', KEYS[3], now + 604800, ARGV[2])
+  redis.call('EXPIRE', KEYS[1], 604800)
+  redis.call('EXPIRE', KEYS[2], 604800)
+  redis.call('EXPIRE', KEYS[3], 604800)
   local nearby = redis.call('GEOSEARCH', KEYS[1], 'FROMMEMBER', ARGV[2],
-    'BYRADIUS', 5, 'km', 'ASC', 'COUNT', 51, 'WITHDIST')
+    'BYRADIUS', ARGV[5], 'km', 'ASC', 'COUNT', 101, 'WITHDIST')
   local result = {}
   for _, match in ipairs(nearby) do
     table.insert(result, match[1])
@@ -49,6 +65,11 @@ return {}
 func validCoordinates(lat, lon float64) bool {
 	return !math.IsNaN(lat) && !math.IsNaN(lon) &&
 		lat >= -85.05112878 && lat <= 85.05112878 && lon >= -180 && lon <= 180
+}
+
+func validNearbyRadius(radiusKm float64) bool {
+	return !math.IsNaN(radiusKm) && !math.IsInf(radiusKm, 0) &&
+		radiusKm >= 1 && radiusKm <= 50
 }
 
 func parseNearbyMatches(found []string, currentUserID int64) ([]int64, map[int64]float64) {
@@ -86,12 +107,21 @@ func (s *server) findNearby(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Latitude  *float64 `json:"latitude"`
 		Longitude *float64 `json:"longitude"`
+		RadiusKm  *float64 `json:"radiusKm,omitempty"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&body) != nil || body.Latitude == nil || body.Longitude == nil ||
 		!validCoordinates(*body.Latitude, *body.Longitude) || decoder.Decode(new(any)) != io.EOF {
 		httpx.Error(w, http.StatusBadRequest, "invalid coordinates")
+		return
+	}
+	radiusKm := 5.0
+	if body.RadiusKm != nil {
+		radiusKm = *body.RadiusKm
+	}
+	if !validNearbyRadius(radiusKm) {
+		httpx.Error(w, http.StatusBadRequest, "invalid nearby radius")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -107,9 +137,12 @@ func (s *server) findNearby(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusTooManyRequests, "try again in 10 seconds")
 		return
 	}
-	// ponytail: one fixed radius, short opt-in lease; no location history.
-	expiresAt := time.Now().Add(nearbyTTL)
-	found, err := nearbyScript.Run(ctx, s.redis, nearbyKeys, "find", id, *body.Longitude, *body.Latitude).StringSlice()
+	now := time.Now()
+	activeUntil := now.Add(nearbyActiveTTL)
+	cacheUntil := now.Add(nearbyCacheTTL)
+	found, err := nearbyScript.Run(
+		ctx, s.redis, nearbyKeys, "find", id, *body.Longitude, *body.Latitude, radiusKm,
+	).StringSlice()
 	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
 		return
@@ -117,33 +150,37 @@ func (s *server) findNearby(w http.ResponseWriter, r *http.Request) {
 	ids, distances := parseNearbyMatches(found, claims.UserID)
 	users := make([]map[string]any, 0, len(ids))
 	if len(ids) > 0 {
-		rows, err := s.db.Query(ctx, "SELECT id,username FROM users WHERE id=ANY($1)", ids)
+		rows, err := s.db.Query(ctx, "SELECT id,username,display_name FROM users WHERE id=ANY($1)", ids)
 		if err != nil {
 			httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
 			return
 		}
 		defer rows.Close()
-		usernames := make(map[int64]string, len(ids))
+		type nearbyProfile struct {
+			username    string
+			displayName string
+		}
+		profiles := make(map[int64]nearbyProfile, len(ids))
 		for rows.Next() {
 			var userID int64
-			var username string
-			if err := rows.Scan(&userID, &username); err != nil {
+			var profile nearbyProfile
+			if err := rows.Scan(&userID, &profile.username, &profile.displayName); err != nil {
 				httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
 				return
 			}
-			usernames[userID] = username
+			profiles[userID] = profile
 		}
 		if rows.Err() != nil {
 			httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
 			return
 		}
 		for _, userID := range ids {
-			username, exists := usernames[userID]
+			profile, exists := profiles[userID]
 			if !exists {
 				continue
 			}
-			// Recheck consent after DB lookup so disabled/expired entries stay hidden.
-			expiry, err := s.redis.ZScore(ctx, nearbyKeys[1], strconv.FormatInt(userID, 10)).Result()
+			userIDString := strconv.FormatInt(userID, 10)
+			cacheExpiry, err := s.redis.ZScore(ctx, nearbyKeys[2], userIDString).Result()
 			if err == redis.Nil {
 				continue
 			}
@@ -151,17 +188,27 @@ func (s *server) findNearby(w http.ResponseWriter, r *http.Request) {
 				httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
 				return
 			}
-			if expiry <= float64(time.Now().Unix()) {
-				continue
+			activeExpiry, err := s.redis.ZScore(ctx, nearbyKeys[1], userIDString).Result()
+			nearbyActive := err == nil && activeExpiry > float64(now.Unix())
+			if err != nil && err != redis.Nil {
+				httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
+				return
 			}
+			locationUpdatedAt := time.Unix(
+				int64(cacheExpiry)-int64(nearbyCacheTTL/time.Second),
+				0,
+			).UTC()
 			online, _ := s.redis.Exists(ctx, presenceKey(userID)).Result()
 			users = append(users, map[string]any{
-				"id": userID, "username": username, "online": online > 0,
-				"distanceKm": distances[userID],
+				"id": userID, "username": profile.username, "displayName": profile.displayName,
+				"online": online > 0, "nearbyActive": nearbyActive,
+				"distanceKm": distances[userID], "locationUpdatedAt": locationUpdatedAt,
 			})
 		}
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"users": users, "expiresAt": expiresAt})
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"users": users, "expiresAt": activeUntil, "cacheExpiresAt": cacheUntil, "radiusKm": radiusKm,
+	})
 }
 
 func (s *server) stopNearby(w http.ResponseWriter, r *http.Request) {

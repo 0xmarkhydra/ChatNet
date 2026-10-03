@@ -308,6 +308,56 @@
   text-align: center;
 }
 
+.nearby-radius {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+
+.nearby-radius button {
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid #d5dfc9;
+  border-radius: 999px;
+  background: #f7faf4;
+  color: #4f5f45;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nearby-radius button.active {
+  border-color: #6fa900;
+  background: #e8f3d8;
+  color: #304a0f;
+}
+
+.nearby-result {
+  cursor: default;
+}
+
+.nearby-result-action {
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 0;
+  border-radius: 11px;
+  background: #76b900;
+  color: #172700;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.nearby-result-action:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
 .feed-text p {
   margin: 6px 0;
   white-space: pre-wrap;

@@ -98,10 +98,19 @@ async (page) => {
       if (nearbyFailure) return json({ error: 'nearby unavailable' }, 503)
       if (request.method() === 'DELETE') return json({ ok: true })
       return json({
-        users: nearbyEmpty ? [] : [{ id: 2, username: 'minhanh', online: true, distanceKm: 1.3 }],
+        users: nearbyEmpty ? [] : [
+          { id: 2, username: 'minhanh', displayName: 'Minh Anh', online: true, nearbyActive: true, distanceKm: 1.3, locationUpdatedAt: new Date().toISOString() },
+          { id: 3, username: 'hoangnam', displayName: 'Hoàng Nam', online: false, nearbyActive: false, distanceKm: 0.4, locationUpdatedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() },
+        ],
         expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        cacheExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        radiusKm: request.postDataJSON()?.radiusKm || 5,
       })
     }
+    if (path === '/api/friends' && request.method() === 'GET') {
+      return json([{ id: 2, username: 'minhanh', displayName: 'Minh Anh', online: true, status: 'accepted', updatedAt: new Date().toISOString() }])
+    }
+    if (path === '/api/friends/requests' && request.method() === 'GET') return json([])
     if (path === '/api/preferences/translation') return json({ autoTranslate: false, targetLanguage: 'en' })
     if (path === '/api/translate') {
       const body = request.postDataJSON()
@@ -291,16 +300,16 @@ async (page) => {
       getCurrentPosition: (_ok, fail) => fail({ code: 1, message: 'denied' }),
     } })
   })
-  await page.getByRole('button', { name: 'Bật Quanh đây', exact: true }).click()
+  await page.getByRole('button', { name: 'Quét quanh đây', exact: true }).click()
   await page.getByRole('alert').waitFor()
   check(nearbyRequests.length === 0, 'Denied location reached API')
   await page.evaluate(() => Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
     getCurrentPosition: (ok) => { window.__resolveNearbyLocation = () => ok({ coords: { latitude: 10.77, longitude: 106.69 } }) },
   } }))
   nearbyFailure = true
-  await page.getByRole('button', { name: 'Bật Quanh đây', exact: true }).click()
+  await page.getByRole('button', { name: 'Quét quanh đây', exact: true }).click()
   await page.getByText('Radar đang quét...', { exact: true }).waitFor()
-  await page.getByRole('dialog', { name: 'Đang tìm quanh đây', exact: true }).waitFor()
+  await page.getByRole('dialog', { name: 'Đang quét quanh đây', exact: true }).waitFor()
   check(await page.locator('.nearby-radar.is-scanning').count() === 1, 'Radar is not scanning while nearby request is busy')
   await page.screenshot({ path: 'output/playwright/nearby-scanning-mobile.png', fullPage: true })
   await page.evaluate(() => window.__resolveNearbyLocation())
@@ -310,12 +319,17 @@ async (page) => {
     getCurrentPosition: (ok) => ok({ coords: { latitude: 10.77, longitude: 106.69 } }),
   } }))
   const scanStartedAt = Date.now()
-  await page.getByRole('button', { name: 'Bật Quanh đây', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Đang tìm quanh đây', exact: true }).waitFor()
-  await page.getByRole('button', { name: 'Nhắn tin với @minhanh', exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Quét quanh đây', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Đang quét quanh đây', exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Nhắn tin @minhanh', exact: true }).waitFor()
   check(Date.now() - scanStartedAt >= 2600, 'Successful nearby scan closes too quickly')
-  await page.getByText('Khoảng 1,3 km', { exact: true }).waitFor()
-  check(nearbyRequests.some((request) => request.body === '{"latitude":10.77,"longitude":106.69}'), 'Wrong geolocation payload')
+  await page.getByText(/Khoảng 1,3 km/).waitFor()
+  check(
+    nearbyRequests.some((request) => request.body === '{"latitude":10.77,"longitude":106.69,"radiusKm":5}'),
+    'Wrong geolocation/radius payload',
+  )
+  const firstNearbyName = await page.locator('.nearby-result .friend-result-copy strong').first().textContent()
+  check(firstNearbyName === '@hoangnam', 'Nearby results are not sorted nearest first')
   await page.screenshot({ path: 'output/playwright/nearby-mobile.png', fullPage: true })
   for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: 900 })
@@ -327,17 +341,17 @@ async (page) => {
   await page.getByRole('button', { name: 'Tắt Quanh đây', exact: true }).click()
   check(await page.locator('.nearby-radar.is-scanning').count() === 0, 'Radar scans while disabling nearby')
   await page.getByText('Chưa tắt được Quanh đây. Thử lại sau.', { exact: true }).waitFor()
-  check(await page.getByRole('button', { name: 'Nhắn tin với @minhanh', exact: true }).isVisible(), 'Failed disable falsely cleared state')
+  check(await page.getByRole('button', { name: 'Nhắn tin @minhanh', exact: true }).isVisible(), 'Failed disable falsely cleared state')
   nearbyFailure = false
   await page.getByRole('button', { name: 'Tắt Quanh đây', exact: true }).click()
-  await page.getByRole('button', { name: 'Bật Quanh đây', exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Quét quanh đây', exact: true }).waitFor()
   check(await page.locator('.discover-view .friend-result').count() === 0, 'Disabled nearby retained results')
   nearbyEmpty = true
-  await page.getByRole('button', { name: 'Bật Quanh đây', exact: true }).click()
+  await page.getByRole('button', { name: 'Quét quanh đây', exact: true }).click()
   await page.getByText('Chưa tìm thấy người phù hợp quanh đây.', { exact: true }).waitFor()
   nearbyEmpty = false
-  await page.getByRole('button', { name: 'Tìm lại', exact: true }).click()
-  await page.getByRole('button', { name: 'Nhắn tin với @minhanh', exact: true }).click()
+  await page.getByRole('button', { name: 'Quét quanh đây', exact: true }).click()
+  await page.getByRole('button', { name: 'Nhắn tin @minhanh', exact: true }).click()
   await input.waitFor()
   check(await input.isVisible(), 'Nearby user did not open chat')
   await page.getByRole('button', { name: 'Quay lại danh sách' }).click()

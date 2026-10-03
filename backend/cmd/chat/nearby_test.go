@@ -39,6 +39,7 @@ func TestNearbyValidation(t *testing.T) {
 	for _, body := range []string{
 		`{}`, `{"latitude":null,"longitude":0}`, `{"latitude":0}`,
 		`{"latitude":91,"longitude":0}`, `{"latitude":0,"longitude":181}`,
+		`{"latitude":0,"longitude":0,"radiusKm":0}`, `{"latitude":0,"longitude":0,"radiusKm":51}`,
 		`{"latitude":0,"longitude":0,"userId":3}`, `{"latitude":0,"longitude":0} {}`,
 		`{"latitude":"0","longitude":0}`, strings.Repeat(" ", 1025),
 	} {
@@ -78,50 +79,64 @@ func TestNearbyRedisIntegration(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{Addr: addr})
 	defer rdb.Close()
 	prefix := "chatnet:test:nearby:" + t.Name() + ":" + time.Now().Format("150405.000000000")
-	keys := []string{prefix + ":geo", prefix + ":expiry"}
+	keys := []string{prefix + ":geo", prefix + ":active-expiry", prefix + ":cache-expiry"}
 	defer rdb.Del(ctx, keys...)
-	find := func(id string, lon, lat float64) []string {
+	find := func(id string, lon, lat, radiusKm float64) []string {
 		t.Helper()
-		result, err := nearbyScript.Run(ctx, rdb, keys, "find", id, lon, lat).StringSlice()
+		result, err := nearbyScript.Run(ctx, rdb, keys, "find", id, lon, lat, radiusKm).StringSlice()
 		if err != nil {
 			t.Fatal(err)
 		}
 		return result
 	}
-	find("1", 106.69, 10.77)
-	find("2", 106.70, 10.77)
-	find("3", 105.83, 21.02)
-	if got := find("1", 106.69, 10.77); len(got) != 4 || got[0] != "1" || got[2] != "2" {
+	find("1", 106.69, 10.77, 5)
+	find("2", 106.70, 10.77, 5)
+	find("3", 105.83, 21.02, 5)
+	if got := find("1", 106.69, 10.77, 5); len(got) != 4 || got[0] != "1" || got[2] != "2" {
 		t.Fatalf("radius mismatch: %v", got)
 	}
+
+	// Active status may expire, but the opted-in cached location remains discoverable.
 	if err := rdb.ZAdd(ctx, keys[1], redis.Z{Score: 1, Member: "2"}).Err(); err != nil {
 		t.Fatal(err)
 	}
-	if got := find("1", 106.69, 10.77); len(got) != 2 || got[0] != "1" {
-		t.Fatalf("expired user visible: %v", got)
+	if got := find("1", 106.69, 10.77, 5); len(got) != 4 || got[2] != "2" {
+		t.Fatalf("cached location disappeared with active expiry: %v", got)
+	}
+	if _, err := rdb.ZScore(ctx, keys[0], "2").Result(); err != nil {
+		t.Fatalf("cached coordinate removed too early: %v", err)
+	}
+
+	// Cache expiry removes the stale location entirely.
+	if err := rdb.ZAdd(ctx, keys[2], redis.Z{Score: 1, Member: "2"}).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if got := find("1", 106.69, 10.77, 5); len(got) != 2 || got[0] != "1" {
+		t.Fatalf("expired cache still visible: %v", got)
 	}
 	if _, err := rdb.ZScore(ctx, keys[0], "2").Result(); err != redis.Nil {
-		t.Fatalf("expired coordinate retained: %v", err)
+		t.Fatalf("expired cached coordinate retained: %v", err)
 	}
-	find("2", 106.70, 10.77)
+
+	find("2", 106.70, 10.77, 5)
 	if err := nearbyScript.Run(ctx, rdb, keys, "remove", "2").Err(); err != nil {
 		t.Fatal(err)
 	}
-	if got := find("1", 106.69, 10.77); len(got) != 2 || got[0] != "1" {
+	if got := find("1", 106.69, 10.77, 5); len(got) != 2 || got[0] != "1" {
 		t.Fatalf("disabled user visible: %v", got)
 	}
-	find("2", 106.70, 10.77)
-	find("2", 105.83, 21.02)
-	if got := find("1", 106.69, 10.77); len(got) != 2 || got[0] != "1" {
+	find("2", 106.70, 10.77, 5)
+	find("2", 105.83, 21.02, 5)
+	if got := find("1", 106.69, 10.77, 5); len(got) != 2 || got[0] != "1" {
 		t.Fatalf("old location retained: %v", got)
 	}
 	for _, key := range keys {
-		if ttl := rdb.TTL(ctx, key).Val(); ttl <= 0 || ttl > nearbyTTL {
-			t.Fatalf("missing bounded TTL: %v", ttl)
+		if ttl := rdb.TTL(ctx, key).Val(); ttl <= 0 || ttl > nearbyCacheTTL {
+			t.Fatalf("missing bounded cache TTL: %v", ttl)
 		}
 	}
 	originalKeys := nearbyKeys
-	nearbyKeys = []string{prefix + ":api:geo", prefix + ":api:expiry"}
+	nearbyKeys = []string{prefix + ":api:geo", prefix + ":api:active-expiry", prefix + ":api:cache-expiry"}
 	defer func() { nearbyKeys = originalKeys }()
 	defer rdb.Del(ctx, nearbyKeys...)
 	userID := time.Now().UnixNano()
@@ -141,11 +156,14 @@ func TestNearbyRedisIntegration(t *testing.T) {
 	}
 	w := request(s.findNearby, "POST", `{"latitude":10.77,"longitude":106.69}`)
 	var result struct {
-		Users     []map[string]any `json:"users"`
-		ExpiresAt time.Time        `json:"expiresAt"`
+		Users          []map[string]any `json:"users"`
+		ExpiresAt      time.Time        `json:"expiresAt"`
+		CacheExpiresAt time.Time        `json:"cacheExpiresAt"`
+		RadiusKm       float64          `json:"radiusKm"`
 	}
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &result) != nil || len(result.Users) != 0 ||
-		!result.ExpiresAt.After(time.Now()) || w.Header().Get("Cache-Control") != "no-store" {
+		!result.ExpiresAt.After(time.Now()) || !result.CacheExpiresAt.After(result.ExpiresAt) ||
+		result.RadiusKm != 5 || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("invalid self-only response: %d %s", w.Code, w.Body.String())
 	}
 	w = request(s.findNearby, "POST", `{"latitude":10.77,"longitude":106.69}`)
@@ -153,7 +171,10 @@ func TestNearbyRedisIntegration(t *testing.T) {
 		t.Fatalf("rate limit failed: %d", w.Code)
 	}
 	w = request(s.stopNearby, "DELETE", "")
-	if w.Code != 200 || rdb.ZCard(ctx, nearbyKeys[0]).Val() != 0 || rdb.ZCard(ctx, nearbyKeys[1]).Val() != 0 {
+	if w.Code != 200 ||
+		rdb.ZCard(ctx, nearbyKeys[0]).Val() != 0 ||
+		rdb.ZCard(ctx, nearbyKeys[1]).Val() != 0 ||
+		rdb.ZCard(ctx, nearbyKeys[2]).Val() != 0 {
 		t.Fatalf("disable failed: %d %s", w.Code, w.Body.String())
 	}
 }
