@@ -67,6 +67,7 @@ func main() {
 	mux.Handle("/api/conversations", chatProxy)
 	mux.Handle("/api/conversations/", chatProxy)
 	mux.Handle("/api/translate", translateProxy)
+	mux.Handle("/api/i18n/", translateProxy)
 	mux.Handle("/api/posts", feedProxy)
 	mux.Handle("/api/posts/", feedProxy)
 	mux.Handle("/api/stories", feedProxy)

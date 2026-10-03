@@ -187,8 +187,12 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     translation_target VARCHAR(16) NOT NULL DEFAULT 'en',
     auto_translate BOOLEAN NOT NULL DEFAULT TRUE,
+    app_locale VARCHAR(16) NOT NULL DEFAULT 'auto',
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE user_preferences
+ADD COLUMN IF NOT EXISTS app_locale VARCHAR(16) NOT NULL DEFAULT 'auto';
 
 CREATE TABLE IF NOT EXISTS message_translations (
     message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,

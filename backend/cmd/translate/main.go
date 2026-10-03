@@ -129,6 +129,7 @@ func main() {
 	})
 	mux.HandleFunc("GET /health/provider", s.providerHealth)
 	mux.Handle("POST /api/translate", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.translate)))
+	mux.Handle("POST /api/i18n/bundle", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.translateUIBundle)))
 
 	port := config.Env("PORT", "8084")
 	log.Printf("translate service listening on :%s provider=%s model=%s style=%s", port, s.provider, s.model, s.apiStyle)
@@ -292,17 +293,22 @@ func (s *server) saveMessageTranslation(ctx context.Context, messageID int64, ta
 }
 
 func (s *server) callAI(r *http.Request, text, target string) (string, string, error) {
-	instructions := translationInstructions(languageName(target))
+	return s.callAIWithInstructions(r, translationInstructions(languageName(target)), text, 700)
+}
 
+func (s *server) callAIWithInstructions(r *http.Request, instructions, text string, maxTokens int) (string, string, error) {
+	if maxTokens < 1 {
+		maxTokens = 700
+	}
 	switch s.apiStyle {
 	case "responses":
-		value, err := s.callResponses(r.Context(), instructions, text)
+		value, err := s.callResponsesWithLimit(r.Context(), instructions, text, maxTokens)
 		return value, "responses", err
 	case "chat_completions":
-		value, err := s.callChatCompletions(r.Context(), instructions, text)
+		value, err := s.callChatCompletionsWithLimit(r.Context(), instructions, text, maxTokens)
 		return value, "chat_completions", err
 	default:
-		value, err := s.callResponses(r.Context(), instructions, text)
+		value, err := s.callResponsesWithLimit(r.Context(), instructions, text, maxTokens)
 		if err == nil {
 			return value, "responses", nil
 		}
@@ -310,7 +316,7 @@ func (s *server) callAI(r *http.Request, text, target string) (string, string, e
 		var callErr *aiCallError
 		if errors.As(err, &callErr) && shouldFallbackToChatCompletions(callErr.Status) {
 			log.Printf("provider %s does not appear to support /responses (status=%d), falling back to /chat/completions", s.provider, callErr.Status)
-			value, fallbackErr := s.callChatCompletions(r.Context(), instructions, text)
+			value, fallbackErr := s.callChatCompletionsWithLimit(r.Context(), instructions, text, maxTokens)
 			return value, "chat_completions", fallbackErr
 		}
 		return "", "responses", err
@@ -318,11 +324,15 @@ func (s *server) callAI(r *http.Request, text, target string) (string, string, e
 }
 
 func (s *server) callResponses(ctx context.Context, instructions, text string) (string, error) {
+	return s.callResponsesWithLimit(ctx, instructions, text, 700)
+}
+
+func (s *server) callResponsesWithLimit(ctx context.Context, instructions, text string, maxTokens int) (string, error) {
 	payload := map[string]any{
 		"model":             s.model,
 		"instructions":      instructions,
 		"input":             text,
-		"max_output_tokens": 700,
+		"max_output_tokens": maxTokens,
 	}
 	raw, status, err := s.postJSON(ctx, "/responses", payload)
 	if err != nil {
@@ -355,14 +365,18 @@ func (s *server) callResponses(ctx context.Context, instructions, text string) (
 }
 
 func (s *server) callChatCompletions(ctx context.Context, instructions, text string) (string, error) {
+	return s.callChatCompletionsWithLimit(ctx, instructions, text, 700)
+}
+
+func (s *server) callChatCompletionsWithLimit(ctx context.Context, instructions, text string, maxTokens int) (string, error) {
 	payload := map[string]any{
 		"model": s.model,
 		"messages": []map[string]string{
 			{"role": "system", "content": instructions},
 			{"role": "user", "content": text},
 		},
-		"temperature": 0.2,
-		"max_tokens":  700,
+		"temperature": 0.1,
+		"max_tokens":  maxTokens,
 	}
 	raw, status, err := s.postJSON(ctx, "/chat/completions", payload)
 	if err != nil {
