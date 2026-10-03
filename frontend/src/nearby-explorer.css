@@ -31,7 +31,7 @@
 }
 .nearby-map-canvas { position: absolute; inset: 0; }
 .nearby-map-canvas .maplibregl-map { font-family: inherit; }
-.nearby-map-canvas .maplibregl-canvas { filter: saturate(.82) contrast(.96) brightness(1.03); }
+.nearby-map-canvas .maplibregl-canvas { filter: none; }
 .nearby-map-canvas::after {
   position: absolute; z-index: 1; inset: 0; pointer-events: none; content: "";
   background: linear-gradient(180deg, rgba(239,245,235,.32), transparent 24%, transparent 72%, rgba(228,235,224,.18));
@@ -346,4 +346,293 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .nearby-map-location::after,.nearby-place-skeleton > span,.nearby-place-skeleton b,.nearby-place-skeleton i { animation: none !important; }
+}
+
+/* Nearby mobile v2 — map-first, compact, legible */
+.nearby-sheet-list-toggle {
+  min-height: 32px;
+  border: 1px solid rgba(45, 60, 42, .10);
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: #eef3e9;
+  color: #42523d;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .app-shell:has(.nearby-explorer) > .chatnet-appbar {
+    display: none;
+  }
+
+  .nearby-explorer,
+  .nearby-map-stage {
+    min-height: calc(100dvh - 78px);
+    height: calc(100dvh - 78px);
+    background: #dfe7da;
+  }
+
+  .nearby-map-canvas::after {
+    background: linear-gradient(
+      180deg,
+      rgba(255,255,255,.08) 0%,
+      transparent 16%,
+      transparent 78%,
+      rgba(27,38,23,.04) 100%
+    );
+  }
+
+  .nearby-floating-top {
+    top: max(10px, env(safe-area-inset-top));
+    left: 10px;
+    width: calc(100% - 20px);
+    gap: 8px;
+  }
+
+  .nearby-title-row {
+    min-height: 34px;
+    padding: 0 2px;
+  }
+
+  .nearby-title-row strong {
+    font-size: 20px;
+    font-weight: 860;
+    letter-spacing: -.035em;
+  }
+
+  .nearby-live-chip {
+    min-height: 32px;
+    border: 1px solid rgba(255,255,255,.76);
+    padding: 6px 10px;
+    background: rgba(255,255,255,.91);
+    color: #42513e;
+    box-shadow: 0 5px 18px rgba(32,45,28,.09);
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  .nearby-smart-search {
+    min-height: 46px;
+    border-radius: 15px;
+    padding: 0 12px;
+    background: rgba(255,255,255,.96);
+    box-shadow: 0 9px 28px rgba(26,39,23,.12);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .nearby-smart-search > span {
+    font-size: 24px;
+  }
+
+  .nearby-smart-search input {
+    height: 44px;
+    font-size: 16px;
+    font-weight: 560;
+  }
+
+  .nearby-category-strip {
+    gap: 6px;
+    margin-right: -10px;
+    padding: 0 10px 3px 0;
+  }
+
+  .nearby-category-strip button {
+    min-height: 32px;
+    gap: 5px;
+    border: 1px solid rgba(255,255,255,.85);
+    padding: 5px 9px;
+    background: rgba(255,255,255,.91);
+    color: #53604f;
+    box-shadow: 0 5px 16px rgba(37,49,33,.08);
+    font-size: 10px;
+    font-weight: 720;
+  }
+
+  .nearby-category-strip button > span {
+    font-size: 13px;
+  }
+
+  .nearby-category-strip button.active {
+    background: #263223;
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(29,42,25,.16);
+  }
+
+  .nearby-location-prompt {
+    top: 50%;
+    width: calc(100% - 32px);
+    min-height: 64px;
+    border-radius: 18px;
+    padding: 9px 11px;
+    transform: translate(-50%, -50%);
+  }
+
+  .nearby-location-prompt-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+    font-size: 20px;
+  }
+
+  .nearby-location-prompt strong {
+    font-size: 13px;
+  }
+
+  .nearby-location-prompt small {
+    font-size: 9px;
+  }
+
+  .nearby-map-actions {
+    right: 10px;
+    bottom: 218px;
+    gap: 7px;
+  }
+
+  .nearby-map-actions button {
+    width: auto;
+    min-width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    background: rgba(255,255,255,.95);
+    box-shadow: 0 8px 22px rgba(30,43,27,.13);
+  }
+
+  .nearby-map-actions button:nth-child(2) {
+    display: none;
+  }
+
+  .nearby-bottom-sheet {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    min-height: 0;
+    max-height: 224px;
+    overflow-y: auto;
+    border: 1px solid rgba(255,255,255,.86);
+    border-radius: 22px;
+    padding: 7px 12px max(12px, env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.96);
+    box-shadow: 0 18px 54px rgba(27,39,24,.16);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .nearby-sheet-handle {
+    width: 34px;
+    height: 4px;
+    margin-bottom: 8px;
+  }
+
+  .nearby-sheet-heading {
+    align-items: center;
+  }
+
+  .nearby-sheet-heading > div {
+    gap: 2px;
+  }
+
+  .nearby-sheet-heading strong {
+    font-size: 15px;
+    letter-spacing: -.02em;
+  }
+
+  .nearby-sheet-heading small {
+    color: #778171;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0;
+  }
+
+  .nearby-sheet-list-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nearby-radius-row {
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .nearby-radius-row button {
+    min-height: 29px;
+    padding: 4px 9px;
+    font-size: 9px;
+  }
+
+  .nearby-preview-list {
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .nearby-preview-list > :nth-child(n+3) {
+    display: none;
+  }
+
+  .nearby-place-preview {
+    min-height: 46px;
+    border-radius: 13px;
+    padding: 5px 7px;
+    background: #f5f7f2;
+  }
+
+  .nearby-place-icon {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    font-size: 16px;
+  }
+
+  .nearby-place-preview-copy strong {
+    font-size: 12px;
+  }
+
+  .nearby-place-preview-copy small {
+    font-size: 9px;
+  }
+
+  .nearby-place-preview > b {
+    font-size: 17px;
+  }
+
+  .nearby-inline-error {
+    margin-top: 7px;
+    font-size: 9px;
+  }
+
+  .nearby-place-detail {
+    grid-template-columns: auto minmax(0,1fr);
+  }
+
+  .nearby-place-copy strong {
+    font-size: 14px;
+  }
+
+  .nearby-place-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 2px;
+  }
+
+  .nearby-place-actions button {
+    min-height: 34px;
+    display: flex;
+    justify-content: center;
+    font-size: 13px;
+  }
+
+  .nearby-privacy-radar {
+    top: 51%;
+    width: 170px;
+    height: 170px;
+  }
+
+  .maplibregl-ctrl-bottom-right {
+    bottom: 202px;
+  }
 }

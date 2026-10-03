@@ -36,7 +36,7 @@ type Props = {
 
 const fallbackCenter: [number, number] = [105.8342, 21.0278]
 const categories: Array<{ id: DiscoveryCategory; icon: string; label: string }> = [
-  { id: 'all', icon: '✨', label: 'Gợi ý' },
+  { id: 'all', icon: '⌖', label: 'Tất cả' },
   { id: 'people', icon: '👥', label: 'Người' },
   { id: 'food', icon: '🍜', label: 'Ăn uống' },
   { id: 'cafe', icon: '☕', label: 'Cafe' },
@@ -62,15 +62,6 @@ function distanceLabel(distanceKm?: number) {
   if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) return 'Quanh bạn'
   if (distanceKm < 1) return `${Math.max(10, Math.round(distanceKm * 1000 / 10) * 10)} m`
   return `${distanceKm.toLocaleString('vi-VN', { maximumFractionDigits: distanceKm >= 10 ? 0 : 1 })} km`
-}
-
-function smartContext() {
-  const hour = new Date().getHours()
-  if (hour >= 5 && hour < 10) return 'Buổi sáng · cafe, ăn sáng và dịch vụ gần bạn'
-  if (hour >= 10 && hour < 14) return 'Buổi trưa · ưu tiên địa điểm ăn uống gần bạn'
-  if (hour >= 14 && hour < 18) return 'Buổi chiều · cafe, mua sắm và dịch vụ'
-  if (hour >= 18 && hour < 23) return 'Buổi tối · ăn uống, cafe và lưu trú'
-  return 'Khám phá những gì đang ở gần bạn'
 }
 
 function osmStyle(): maplibregl.StyleSpecification {
@@ -306,9 +297,9 @@ export default function NearbyExplorer({
         ? `${users.length} người được tìm thấy trong ${peopleRadiusKm} km`
         : 'Quét để tìm người dùng ChatNet quanh bạn'
       : placesBusy
-        ? 'Đang đọc dữ liệu địa điểm quanh khu vực này...'
-        : `${visiblePlaces.length} địa điểm trong bán kính ${placeRadiusKm} km`
-    : 'Bật vị trí để ChatNet hiểu khu vực quanh bạn'
+        ? 'Đang tìm địa điểm gần bạn…'
+        : `${visiblePlaces.length} địa điểm · trong ${placeRadiusKm < 1 ? '500 m' : `${placeRadiusKm} km`}`
+    : 'Bật vị trí để xem những gì ở gần bạn'
 
   return (
     <section className="nearby-explorer" aria-label="Khám phá quanh đây">
@@ -317,8 +308,16 @@ export default function NearbyExplorer({
 
         <div className="nearby-floating-top">
           <div className="nearby-title-row">
-            <div><small>CHATNET NEARBY</small><strong>Quanh đây</strong></div>
-            <div className="nearby-live-chip"><span />{location ? 'Đã định vị' : 'Riêng tư'}</div>
+            <strong>Quanh đây</strong>
+            <button
+              type="button"
+              className="nearby-live-chip"
+              onClick={() => void locate()}
+              disabled={locationBusy}
+            >
+              <span />
+              {locationBusy ? 'Đang định vị…' : location ? 'Vị trí của bạn' : 'Bật vị trí'}
+            </button>
           </div>
 
           <label className="nearby-smart-search">
@@ -326,13 +325,11 @@ export default function NearbyExplorer({
             <input
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Tìm quán ăn, cafe, dịch vụ..."
+              placeholder="Tìm địa điểm quanh đây"
               inputMode="search"
             />
             {query && <button type="button" onClick={() => onQueryChange('')} aria-label="Xóa tìm kiếm">×</button>}
           </label>
-
-          <div className="nearby-smart-context"><span>✦</span><p>{smartContext()}</p></div>
 
           <div className="nearby-category-strip" role="tablist" aria-label="Loại địa điểm">
             {categories.map((item) => (
@@ -389,8 +386,11 @@ export default function NearbyExplorer({
             {category === 'people' ? (
               <>
                 <div className="nearby-sheet-heading">
-                  <div><small>NGƯỜI QUANH ĐÂY</small><strong>{summaryText}</strong></div>
-                  <span className="nearby-privacy-badge">Ẩn tọa độ chính xác</span>
+                  <div>
+                    <strong>Người quanh đây</strong>
+                    <small>{summaryText}</small>
+                  </div>
+                  <span className="nearby-privacy-badge">Không lộ vị trí chính xác</span>
                 </div>
                 <div className="nearby-radius-row" aria-label="Bán kính tìm người">
                   {[1, 5, 10, 25, 50].map((radius) => (
@@ -446,8 +446,13 @@ export default function NearbyExplorer({
             ) : (
               <>
                 <div className="nearby-sheet-heading">
-                  <div><small>KHÁM PHÁ KHU VỰC</small><strong>{summaryText}</strong></div>
-                  {location && <span className="nearby-area-pill">OSM · Free</span>}
+                  <div>
+                    <strong>Gần bạn</strong>
+                    <small>{summaryText}</small>
+                  </div>
+                  <button type="button" className="nearby-sheet-list-toggle" onClick={() => setViewMode('list')}>
+                    Danh sách
+                  </button>
                 </div>
                 <div className="nearby-radius-row" aria-label="Bán kính địa điểm">
                   {[0.5, 1, 3, 5].map((radius) => (
