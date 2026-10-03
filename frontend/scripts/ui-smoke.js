@@ -508,8 +508,16 @@ async (page) => {
   const localeSheet = page.locator('.locale-picker-sheet')
   await localeSheet.waitFor()
   check(await localeSheet.evaluate((node) => node.scrollWidth <= node.clientWidth), 'App locale picker overflows horizontally')
+  const localeAuto = localeSheet.locator('.locale-auto-option')
+  check(await localeAuto.evaluate((node) => node.scrollWidth <= node.clientWidth), 'Auto locale option overflows horizontally')
+  const localeHeightBeforeSearch = await localeSheet.evaluate((node) => node.getBoundingClientRect().height)
   await localeSheet.getByPlaceholder('Tìm ngôn ngữ, quốc gia hoặc mã...', { exact: true }).fill('Nhật')
   check(await localeSheet.getByText('日本語', { exact: true }).count() > 0, 'App locale search cannot find native language name')
+  const localeHeightAfterSearch = await localeSheet.evaluate((node) => node.getBoundingClientRect().height)
+  check(
+    Math.abs(localeHeightAfterSearch - localeHeightBeforeSearch) <= 1,
+    'App locale picker changes height while searching',
+  )
   await localeSheet.locator('header > button').click()
   check(await page.locator('.chatnet-appbar').count() === 0, 'Profile must not render the global app bar')
   check(await page.locator('.appbar-search').count() === 0, 'Profile exposes a non-functional search')
