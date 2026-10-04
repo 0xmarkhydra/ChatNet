@@ -38,18 +38,18 @@ type Props = {
 const fallbackCenter: [number, number] = [105.8342, 21.0278]
 const categories: Array<{ id: DiscoveryCategory; icon: string; label: string }> = [
   { id: 'all', icon: '⌖', label: 'Tất cả' },
-  { id: 'people', icon: '👥', label: 'Người' },
-  { id: 'food', icon: '🍜', label: 'Ăn uống' },
-  { id: 'cafe', icon: '☕', label: 'Cafe' },
-  { id: 'services', icon: '✂️', label: 'Dịch vụ' },
-  { id: 'stay', icon: '🏨', label: 'Lưu trú' },
-  { id: 'health', icon: '🏥', label: 'Y tế' },
-  { id: 'education', icon: '🏫', label: 'Giáo dục' },
-  { id: 'shopping', icon: '🛍️', label: 'Mua sắm' },
+  { id: 'people', icon: '◉', label: 'Người' },
+  { id: 'food', icon: '◌', label: 'Ăn uống' },
+  { id: 'cafe', icon: '◒', label: 'Cafe' },
+  { id: 'services', icon: '✣', label: 'Dịch vụ' },
+  { id: 'stay', icon: '⌂', label: 'Lưu trú' },
+  { id: 'health', icon: '✚', label: 'Y tế' },
+  { id: 'education', icon: '▱', label: 'Giáo dục' },
+  { id: 'shopping', icon: '□', label: 'Mua sắm' },
 ]
 const categoryIcon: Record<NearbyPlaceCategory, string> = {
-  all: '📍', food: '🍜', cafe: '☕', services: '✂️',
-  stay: '🏨', health: '🏥', education: '🏫', shopping: '🛍️',
+  all: '⌖', food: '◌', cafe: '◒', services: '✣',
+  stay: '⌂', health: '✚', education: '▱', shopping: '□',
 }
 
 function initials(value: string) {
@@ -76,7 +76,20 @@ function osmStyle(): maplibregl.StyleSpecification {
         attribution: '© OpenStreetMap contributors',
       },
     },
-    layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+    layers: [
+      { id: 'base', type: 'background', paint: { 'background-color': '#edf0ea' } },
+      {
+        id: 'osm',
+        type: 'raster',
+        source: 'osm',
+        paint: {
+          'raster-saturation': -0.55,
+          'raster-contrast': -0.08,
+          'raster-brightness-min': 0.84,
+          'raster-brightness-max': 1,
+        },
+      },
+    ],
   }
 }
 
@@ -132,6 +145,8 @@ export default function NearbyExplorer({
       attributionControl: false,
     })
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+    map.once('load', () => map.resize())
+    requestAnimationFrame(() => map.resize())
     mapRef.current = map
     return () => {
       placeMarkersRef.current.forEach((marker) => marker.remove())
@@ -340,7 +355,7 @@ export default function NearbyExplorer({
             <input
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Tìm địa điểm quanh đây"
+              placeholder="Tìm quán, cafe, dịch vụ..."
               inputMode="search"
             />
             {query && <button type="button" onClick={() => onQueryChange('')} aria-label="Xóa tìm kiếm">×</button>}
@@ -383,6 +398,18 @@ export default function NearbyExplorer({
           </div>
         )}
 
+        {category !== 'people' && location && placesBusy && !selectedPlace && (
+          <div className="nearby-map-loading" role="status" aria-live="polite">
+            <div className="nearby-mini-radar" aria-hidden="true">
+              <span className="pulse pulse-a" />
+              <span className="pulse pulse-b" />
+              <b>⌖</b>
+            </div>
+            <strong>Đang khám phá quanh bạn</strong>
+            <span>{placeRadiusKm < 1 ? 'Trong bán kính 500 m' : `Trong bán kính ${placeRadiusKm} km`}</span>
+          </div>
+        )}
+
         <div className="nearby-map-actions">
           <button type="button" onClick={() => void locate()} disabled={locationBusy} aria-label="Về vị trí của tôi">◎</button>
           <button
@@ -396,7 +423,7 @@ export default function NearbyExplorer({
         </div>
 
         {viewMode === 'map' && (
-          <div className="nearby-bottom-sheet">
+          <div className={`nearby-bottom-sheet${category === 'people' ? ' is-people' : ''}${placesBusy ? ' is-loading' : ''}${visiblePlaces.length ? ' has-results' : ''}${selectedPlace ? ' has-selection' : ''}`}>
             <div className="nearby-sheet-handle" />
             {category === 'people' ? (
               <div className="nearby-people-launcher">
