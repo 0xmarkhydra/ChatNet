@@ -112,6 +112,7 @@ export default function NearbyExplorer({
   const [places, setPlaces] = useState<NearbyPlace[]>([])
   const [placesBusy, setPlacesBusy] = useState(false)
   const [placesError, setPlacesError] = useState('')
+  const [placesReloadKey, setPlacesReloadKey] = useState(0)
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
   const [sheetExpanded, setSheetExpanded] = useState(false)
   const [peopleResultsOpen, setPeopleResultsOpen] = useState(false)
@@ -252,7 +253,7 @@ export default function NearbyExplorer({
         if (!controller.signal.aborted) setPlacesBusy(false)
       })
     return () => controller.abort()
-  }, [category, location, placeRadiusKm])
+  }, [category, location, placeRadiusKm, placesReloadKey])
 
   async function locate() {
     if (locationBusy) return location
@@ -426,31 +427,23 @@ export default function NearbyExplorer({
           </button>
         )}
 
-        {category === 'people' && location && (
-          <div className="nearby-privacy-radar" aria-hidden="true">
-            <span className="ring ring-a" /><span className="ring ring-b" /><span className="ring ring-c" />
-            <div>
-              <strong>{peopleScanning ? '•••' : visibleUsers.length}</strong>
-              <small>{peopleScanning ? 'Đang quét' : 'người gần bạn'}</small>
-            </div>
+        {!loadingNearby && (
+          <div className="nearby-map-actions">
+            <button type="button" onClick={() => void locate()} disabled={locationBusy} aria-label="Về vị trí của tôi">◎</button>
+            <button type="button" className="nearby-map-zoom" onClick={() => mapRef.current?.zoomIn({ duration: 220 })} aria-label="Phóng to bản đồ">+</button>
+            <button type="button" className="nearby-map-zoom" onClick={() => mapRef.current?.zoomOut({ duration: 220 })} aria-label="Thu nhỏ bản đồ">−</button>
+            <button
+              type="button"
+              className={`nearby-map-list-toggle${viewMode === 'list' ? ' active' : ''}`}
+              onClick={() => setViewMode((current) => current === 'map' ? 'list' : 'map')}
+              aria-label="Chuyển bản đồ và danh sách"
+            >
+              {viewMode === 'map' ? '☰' : '⌖'}
+            </button>
           </div>
         )}
 
-        <div className="nearby-map-actions">
-          <button type="button" onClick={() => void locate()} disabled={locationBusy} aria-label="Về vị trí của tôi">◎</button>
-          <button type="button" className="nearby-map-zoom" onClick={() => mapRef.current?.zoomIn({ duration: 220 })} aria-label="Phóng to bản đồ">+</button>
-          <button type="button" className="nearby-map-zoom" onClick={() => mapRef.current?.zoomOut({ duration: 220 })} aria-label="Thu nhỏ bản đồ">−</button>
-          <button
-            type="button"
-            className={`nearby-map-list-toggle${viewMode === 'list' ? ' active' : ''}`}
-            onClick={() => setViewMode((current) => current === 'map' ? 'list' : 'map')}
-            aria-label="Chuyển bản đồ và danh sách"
-          >
-            {viewMode === 'map' ? '☰' : '⌖'}
-          </button>
-        </div>
-
-        {viewMode === 'map' && (
+        {viewMode === 'map' && !loadingNearby && (
           <div className={`nearby-bottom-sheet${category === 'people' ? ' is-people' : ''}${placesBusy ? ' is-loading' : ''}${visiblePlaces.length ? ' has-results' : ''}${selectedPlace ? ' has-selection' : ''}${sheetExpanded ? ' is-expanded' : ' is-collapsed'}`}>
             {category !== 'people' ? (
               <button
@@ -521,15 +514,23 @@ export default function NearbyExplorer({
                     <strong>Gần bạn</strong>
                     <small>{summaryText}</small>
                   </div>
-                  <button
-                    type="button"
-                    className="nearby-sheet-list-toggle"
-                    onClick={() => setSheetExpanded((value) => !value)}
-                    aria-expanded={sheetExpanded}
-                  >
-                    {sheetExpanded ? 'Thu gọn' : 'Mở rộng'}
-                    <span aria-hidden="true">{sheetExpanded ? '⌄' : '⌃'}</span>
-                  </button>
+                  <div className="nearby-sheet-actions">
+                    <button
+                      type="button"
+                      className="nearby-sheet-retry"
+                      onClick={() => setPlacesReloadKey((value) => value + 1)}
+                      aria-label="Quét lại địa điểm"
+                    >↻</button>
+                    <button
+                      type="button"
+                      className="nearby-sheet-list-toggle"
+                      onClick={() => setSheetExpanded((value) => !value)}
+                      aria-expanded={sheetExpanded}
+                    >
+                      {sheetExpanded ? 'Thu gọn' : 'Mở rộng'}
+                      <span aria-hidden="true">{sheetExpanded ? '⌄' : '⌃'}</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="nearby-radius-row" aria-label="Bán kính địa điểm">
                   {[0.5, 1, 3, 5].map((radius) => (
@@ -541,7 +542,18 @@ export default function NearbyExplorer({
                     >{radius < 1 ? '500 m' : `${radius} km`}</button>
                   ))}
                 </div>
-                {placesError && <div className="nearby-inline-error">{placesError}</div>}
+                {placesError && (
+                  <div className="nearby-error-state">
+                    <div className="nearby-inline-error">{placesError}</div>
+                    <button type="button" className="nearby-retry-button" onClick={() => setPlacesReloadKey((value) => value + 1)}>↻ Quét lại</button>
+                  </div>
+                )}
+                {!placesError && !visiblePlaces.length && !placesBusy && (
+                  <div className="nearby-empty-retry">
+                    <span>Chưa tìm thấy địa điểm trong phạm vi này.</span>
+                    <button type="button" className="nearby-retry-button" onClick={() => setPlacesReloadKey((value) => value + 1)}>↻ Quét lại</button>
+                  </div>
+                )}
                 <div className="nearby-preview-list">
                   {visiblePlaces.slice(0, sheetExpanded ? 12 : 2).map((place) => (
                     <button
