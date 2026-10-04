@@ -11,6 +11,7 @@ import './nearby-explorer.css'
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   let refreshingForNewWorker = false
+  let refreshingForNewBuild = false
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshingForNewWorker) return
@@ -28,9 +29,9 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     ?.getAttribute('src')
 
   const refreshForNewBuild = async () => {
-    if (!currentEntry || document.visibilityState === 'hidden') return
+    if (!currentEntry || refreshingForNewBuild || document.visibilityState === 'hidden') return
     try {
-      const response = await fetch(`/?__chatnet_build_check=${Date.now()}`, {
+      const response = await fetch(`/index.html?__chatnet_build_check=${Date.now()}`, {
         cache: 'no-store',
         headers: { 'cache-control': 'no-cache' },
       })
@@ -39,10 +40,10 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       const nextEntry = html.match(/<script[^>]+src="(\/assets\/index-[^"]+\.js)"/)?.[1]
       if (!nextEntry || nextEntry === currentEntry) return
 
-      const reloadKey = 'chatnet-last-auto-reload-build'
-      if (sessionStorage.getItem(reloadKey) === nextEntry) return
-      sessionStorage.setItem(reloadKey, nextEntry)
-      window.location.reload()
+      refreshingForNewBuild = true
+      void navigator.serviceWorker.getRegistration().then((registration) => registration?.update())
+      const buildId = nextEntry.split('/').pop() || 'latest'
+      window.location.replace(`/?__chatnet_build=${encodeURIComponent(buildId)}&t=${Date.now()}`)
     } catch {
       // Offline/resume should keep the current working app instead of interrupting the user.
     }

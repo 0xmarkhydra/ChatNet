@@ -1,5 +1,5 @@
-const CACHE = 'chatnet-v30-nearby-stable-refresh'
-const CORE = ['/', '/offline.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg']
+const CACHE = 'chatnet-v31-runtime'
+const CORE = ['/offline.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(CORE)))
@@ -11,17 +11,6 @@ self.addEventListener('activate', (event) => {
     const keys = await caches.keys()
     await Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))
     await self.clients.claim()
-
-    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    await Promise.all(
-      windows.map(async (client) => {
-        try {
-          await client.navigate('/?__chatnet_pwa_refresh=v30')
-        } catch {
-          // A background/suspended iOS window can reject navigation; it will refresh on next launch.
-        }
-      }),
-    )
   })())
 })
 
