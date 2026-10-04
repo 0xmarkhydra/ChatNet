@@ -37,8 +37,8 @@ type Props = {
 
 const fallbackCenter: [number, number] = [105.8342, 21.0278]
 const categories: Array<{ id: DiscoveryCategory; icon: string; label: string }> = [
-  { id: 'all', icon: '⌖', label: 'Tất cả' },
   { id: 'people', icon: '◉', label: 'Người' },
+  { id: 'all', icon: '⌖', label: 'Tiện ích' },
   { id: 'food', icon: '◌', label: 'Ăn uống' },
   { id: 'cafe', icon: '◒', label: 'Cafe' },
   { id: 'services', icon: '✣', label: 'Dịch vụ' },
@@ -104,7 +104,7 @@ export default function NearbyExplorer({
   const locationMarkerRef = useRef<maplibregl.Marker | null>(null)
   const placesAbortRef = useRef<AbortController | null>(null)
 
-  const [category, setCategory] = useState<DiscoveryCategory>('all')
+  const [category, setCategory] = useState<DiscoveryCategory>('people')
   const [viewMode, setViewMode] = useState<ViewMode>('map')
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
   const [locationBusy, setLocationBusy] = useState(false)
@@ -294,6 +294,8 @@ export default function NearbyExplorer({
   }
 
   function chooseCategory(nextCategory: DiscoveryCategory) {
+    const switchingPeopleMode = (category === 'people') !== (nextCategory === 'people')
+    if (switchingPeopleMode) onQueryChange('')
     setCategory(nextCategory)
     setSelectedPlaceId(null)
     setSheetExpanded(false)
@@ -349,7 +351,7 @@ export default function NearbyExplorer({
     : category === 'people'
       ? 'Đang tìm người quanh bạn'
       : category === 'all'
-        ? 'Đang khám phá quanh bạn'
+        ? 'Đang tìm tiện ích quanh bạn'
         : `Đang tìm ${activeCategoryLabel.toLocaleLowerCase('vi-VN')} quanh bạn`
   const loadingRange = locationBusy
     ? 'Đang kết nối GPS…'
@@ -384,13 +386,13 @@ export default function NearbyExplorer({
             <input
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Tìm quán, cafe, dịch vụ..."
+              placeholder={category === 'people' ? 'Tìm người theo tên hoặc @username' : 'Tìm quán, cafe, dịch vụ...'}
               inputMode="search"
             />
             {query && <button type="button" onClick={() => onQueryChange('')} aria-label="Xóa tìm kiếm">×</button>}
           </label>
 
-          <div className="nearby-category-strip" role="tablist" aria-label="Loại địa điểm">
+          <div className="nearby-category-strip" role="tablist" aria-label="Khám phá quanh đây">
             {categories.map((item) => (
               <button
                 key={item.id}
@@ -410,7 +412,7 @@ export default function NearbyExplorer({
           <button className="nearby-location-prompt" type="button" onClick={() => void locate()} disabled={locationBusy}>
             <span className="nearby-location-prompt-icon">◎</span>
             <span>
-              <strong>{locationBusy ? 'Đang xác định vị trí...' : 'Khám phá quanh tôi'}</strong>
+              <strong>{locationBusy ? 'Đang xác định vị trí...' : category === 'people' ? 'Bật vị trí để tìm bạn bè' : 'Khám phá tiện ích quanh tôi'}</strong>
               <small>Dùng GPS trên thiết bị · không cần API key</small>
             </span>
             <b>→</b>
@@ -476,7 +478,7 @@ export default function NearbyExplorer({
                 </div>
                 <div className="nearby-primary-actions">
                   <button type="button" className="primary" onClick={() => void handlePeopleScan()} disabled={peopleBusy}>
-                    <span>⌖</span>{peopleBusy ? 'Đang chuẩn bị...' : 'Tìm người quanh đây'}
+                    <span>⌖</span>{peopleBusy ? 'Đang chuẩn bị...' : 'Quét người quanh đây'}
                   </button>
                   {(peopleActive || users.length > 0) && (
                     <button type="button" className="ghost" onClick={() => void handleStopPeople()} disabled={peopleBusy}>Tắt</button>
