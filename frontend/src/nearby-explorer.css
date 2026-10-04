@@ -500,8 +500,14 @@
     box-shadow: 0 8px 22px rgba(30,43,27,.13);
   }
 
-  .nearby-map-actions button:nth-child(2) {
+  .nearby-map-actions .nearby-map-list-toggle {
     display: none;
+  }
+
+  .nearby-map-actions .nearby-map-zoom {
+    font-size: 23px;
+    font-weight: 560;
+    line-height: 1;
   }
 
   .nearby-bottom-sheet {

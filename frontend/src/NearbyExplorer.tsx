@@ -144,8 +144,15 @@ export default function NearbyExplorer({
       center: fallbackCenter,
       zoom: 13,
       attributionControl: false,
+      dragPan: true,
+      scrollZoom: true,
+      doubleClickZoom: true,
+      touchZoomRotate: true,
+      keyboard: true,
     })
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+    map.touchZoomRotate.enable()
+    map.touchZoomRotate.disableRotation()
     map.once('load', () => map.resize())
     requestAnimationFrame(() => map.resize())
     mapRef.current = map
@@ -431,9 +438,11 @@ export default function NearbyExplorer({
 
         <div className="nearby-map-actions">
           <button type="button" onClick={() => void locate()} disabled={locationBusy} aria-label="Về vị trí của tôi">◎</button>
+          <button type="button" className="nearby-map-zoom" onClick={() => mapRef.current?.zoomIn({ duration: 220 })} aria-label="Phóng to bản đồ">+</button>
+          <button type="button" className="nearby-map-zoom" onClick={() => mapRef.current?.zoomOut({ duration: 220 })} aria-label="Thu nhỏ bản đồ">−</button>
           <button
             type="button"
-            className={viewMode === 'list' ? 'active' : ''}
+            className={`nearby-map-list-toggle${viewMode === 'list' ? ' active' : ''}`}
             onClick={() => setViewMode((current) => current === 'map' ? 'list' : 'map')}
             aria-label="Chuyển bản đồ và danh sách"
           >
