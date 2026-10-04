@@ -1,4 +1,4 @@
-const CACHE = 'chatnet-v29-nearby-force-refresh'
+const CACHE = 'chatnet-v30-nearby-stable-refresh'
 const CORE = ['/', '/offline.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg']
 
 self.addEventListener('install', (event) => {
@@ -16,7 +16,7 @@ self.addEventListener('activate', (event) => {
     await Promise.all(
       windows.map(async (client) => {
         try {
-          await client.navigate('/?__chatnet_pwa_refresh=v29')
+          await client.navigate('/?__chatnet_pwa_refresh=v30')
         } catch {
           // A background/suspended iOS window can reject navigation; it will refresh on next launch.
         }

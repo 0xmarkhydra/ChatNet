@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { loadNearbyPlaces, type NearbyPlace, type NearbyPlaceCategory } from './nearbyPlaces'
-import './nearby-people-overlay.css'
 
 export type NearbyUser = {
   id: number
@@ -37,9 +35,6 @@ type Props = {
 }
 
 const fallbackCenter: [number, number] = [105.8342, 21.0278]
-const categoryStorageKey = 'chatnet-nearby-category'
-const placeRadiusStorageKey = 'chatnet-nearby-place-radius'
-
 const categories: Array<{ id: DiscoveryCategory; icon: string; label: string }> = [
   { id: 'all', icon: '⌖', label: 'Tất cả' },
   { id: 'people', icon: '👥', label: 'Người' },
@@ -51,28 +46,9 @@ const categories: Array<{ id: DiscoveryCategory; icon: string; label: string }> 
   { id: 'education', icon: '🏫', label: 'Giáo dục' },
   { id: 'shopping', icon: '🛍️', label: 'Mua sắm' },
 ]
-
 const categoryIcon: Record<NearbyPlaceCategory, string> = {
-  all: '📍',
-  food: '🍜',
-  cafe: '☕',
-  services: '✂️',
-  stay: '🏨',
-  health: '🏥',
-  education: '🏫',
-  shopping: '🛍️',
-}
-
-function savedCategory(): DiscoveryCategory {
-  if (typeof window === 'undefined') return 'all'
-  const value = window.localStorage.getItem(categoryStorageKey) as DiscoveryCategory | null
-  return categories.some((item) => item.id === value) ? value as DiscoveryCategory : 'all'
-}
-
-function savedPlaceRadius() {
-  if (typeof window === 'undefined') return 1
-  const value = Number(window.localStorage.getItem(placeRadiusStorageKey))
-  return [0.5, 1, 3, 5].includes(value) ? value : 1
+  all: '📍', food: '🍜', cafe: '☕', services: '✂️',
+  stay: '🏨', health: '🏥', education: '🏫', shopping: '🛍️',
 }
 
 function initials(value: string) {
@@ -83,9 +59,9 @@ function initials(value: string) {
 }
 
 function distanceLabel(distanceKm?: number) {
-  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) return 'Gần bạn'
-  if (distanceKm < 1) return `~${Math.max(10, Math.round(distanceKm * 1000 / 10) * 10)} m`
-  return `~${distanceKm.toLocaleString('vi-VN', { maximumFractionDigits: distanceKm >= 10 ? 0 : 1 })} km`
+  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) return 'Quanh bạn'
+  if (distanceKm < 1) return `${Math.max(10, Math.round(distanceKm * 1000 / 10) * 10)} m`
+  return `${distanceKm.toLocaleString('vi-VN', { maximumFractionDigits: distanceKm >= 10 ? 0 : 1 })} km`
 }
 
 function osmStyle(): maplibregl.StyleSpecification {
@@ -104,20 +80,9 @@ function osmStyle(): maplibregl.StyleSpecification {
 }
 
 export default function NearbyExplorer({
-  query,
-  onQueryChange,
-  users,
-  peopleBusy,
-  peopleScanning,
-  peopleActive,
-  peopleRadiusKm,
-  onPeopleRadiusChange,
-  onScanPeople,
-  onStopPeople,
-  friendActionBusy,
-  onFriendAction,
-  getFriendActionLabel,
-  onNotice,
+  query, onQueryChange, users, peopleBusy, peopleScanning, peopleActive,
+  peopleRadiusKm, onPeopleRadiusChange, onScanPeople, onStopPeople,
+  friendActionBusy, onFriendAction, getFriendActionLabel, onNotice,
 }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -125,23 +90,18 @@ export default function NearbyExplorer({
   const locationMarkerRef = useRef<maplibregl.Marker | null>(null)
   const placesAbortRef = useRef<AbortController | null>(null)
 
-  const [category, setCategory] = useState<DiscoveryCategory>(savedCategory)
+  const [category, setCategory] = useState<DiscoveryCategory>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('map')
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
   const [locationBusy, setLocationBusy] = useState(false)
-  const [placeRadiusKm, setPlaceRadiusKmState] = useState(savedPlaceRadius)
+  const [placeRadiusKm, setPlaceRadiusKm] = useState(1)
   const [places, setPlaces] = useState<NearbyPlace[]>([])
   const [placesBusy, setPlacesBusy] = useState(false)
   const [placesError, setPlacesError] = useState('')
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
-  const [peopleScanOverlayOpen, setPeopleScanOverlayOpen] = useState(false)
-  const [peopleResultsOpen, setPeopleResultsOpen] = useState(false)
 
   const selectedPlace = places.find((place) => place.id === selectedPlaceId) || null
-  const selectedUser = users.find((user) => user.id === selectedUserId) || null
   const normalizedQuery = query.trim().toLocaleLowerCase('vi-VN')
-
   const visiblePlaces = useMemo(() => !normalizedQuery
     ? places
     : places.filter((place) =>
@@ -151,11 +111,9 @@ export default function NearbyExplorer({
 
   const visibleUsers = useMemo(() => {
     const normalized = normalizedQuery.replace(/^@/, '')
-    const filtered = !normalized
-      ? users
-      : users.filter((user) =>
-          user.username.toLocaleLowerCase('vi-VN').includes(normalized) ||
-          user.displayName.toLocaleLowerCase('vi-VN').includes(normalized))
+    const filtered = !normalized ? users : users.filter((user) =>
+      user.username.toLocaleLowerCase('vi-VN').includes(normalized) ||
+      user.displayName.toLocaleLowerCase('vi-VN').includes(normalized))
     return filtered.slice().sort(
       (left, right) => (left.distanceKm ?? Number.POSITIVE_INFINITY) - (right.distanceKm ?? Number.POSITIVE_INFINITY),
     )
@@ -196,7 +154,7 @@ export default function NearbyExplorer({
     map.easeTo({
       center: [location.longitude, location.latitude],
       zoom: Math.max(map.getZoom(), 14),
-      duration: 650,
+      duration: 700,
     })
   }, [location])
 
@@ -206,7 +164,6 @@ export default function NearbyExplorer({
     placeMarkersRef.current.forEach((marker) => marker.remove())
     placeMarkersRef.current = []
     if (category === 'people') return
-
     visiblePlaces.slice(0, 42).forEach((place) => {
       const element = document.createElement('button')
       element.type = 'button'
@@ -219,7 +176,7 @@ export default function NearbyExplorer({
       element.addEventListener('click', (event) => {
         event.stopPropagation()
         setSelectedPlaceId(place.id)
-        map.easeTo({ center: [place.longitude, place.latitude], duration: 380 })
+        map.easeTo({ center: [place.longitude, place.latitude], duration: 420 })
       })
       placeMarkersRef.current.push(
         new maplibregl.Marker({ element, anchor: 'bottom' })
@@ -227,7 +184,6 @@ export default function NearbyExplorer({
           .addTo(map),
       )
     })
-
     return () => {
       placeMarkersRef.current.forEach((marker) => marker.remove())
       placeMarkersRef.current = []
@@ -241,7 +197,6 @@ export default function NearbyExplorer({
     placesAbortRef.current = controller
     setPlacesBusy(true)
     setPlacesError('')
-
     void loadNearbyPlaces({
       latitude: location.latitude,
       longitude: location.longitude,
@@ -252,7 +207,8 @@ export default function NearbyExplorer({
       .then((items) => {
         if (controller.signal.aborted) return
         setPlaces(items)
-        setSelectedPlaceId((current) => current && items.some((item) => item.id === current) ? current : null)
+        setSelectedPlaceId((current) =>
+          current && items.some((item) => item.id === current) ? current : null)
       })
       .catch((error) => {
         if (controller.signal.aborted) return
@@ -262,15 +218,8 @@ export default function NearbyExplorer({
       .finally(() => {
         if (!controller.signal.aborted) setPlacesBusy(false)
       })
-
     return () => controller.abort()
   }, [category, location, placeRadiusKm])
-
-  useEffect(() => {
-    if (selectedUserId !== null && !users.some((user) => user.id === selectedUserId)) {
-      setSelectedUserId(null)
-    }
-  }, [selectedUserId, users])
 
   async function locate() {
     if (locationBusy) return location
@@ -278,7 +227,6 @@ export default function NearbyExplorer({
       onNotice('Thiết bị này không hỗ trợ định vị.', 'error')
       return null
     }
-
     setLocationBusy(true)
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) =>
@@ -287,17 +235,14 @@ export default function NearbyExplorer({
           timeout: 15000,
           maximumAge: 60000,
         }))
-      const next = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      }
+      const next = { latitude: position.coords.latitude, longitude: position.coords.longitude }
       setLocation(next)
       return next
     } catch (error) {
       const code = (error as GeolocationPositionError | undefined)?.code
       onNotice(
         code === 1
-          ? 'ChatNet cần quyền vị trí để khám phá quanh bạn. Hãy cho phép Location rồi thử lại.'
+          ? 'ChatNet cần quyền vị trí để khám phá địa điểm quanh bạn. Hãy cho phép Location rồi thử lại.'
           : 'Chưa lấy được vị trí hiện tại. Hãy kiểm tra GPS/Wi‑Fi và thử lại.',
         'error',
       )
@@ -308,44 +253,16 @@ export default function NearbyExplorer({
   }
 
   async function handlePeopleScan() {
-    setSelectedUserId(null)
-    setPeopleResultsOpen(false)
-    setPeopleScanOverlayOpen(true)
-
-    const currentLocation = location || await locate()
-    if (!currentLocation) {
-      setPeopleScanOverlayOpen(false)
-      return
-    }
-
-    try {
-      await Promise.resolve(onScanPeople())
-      setPeopleResultsOpen(true)
-    } finally {
-      setPeopleScanOverlayOpen(false)
-    }
+    await locate()
+    await onScanPeople()
   }
 
   function chooseCategory(nextCategory: DiscoveryCategory) {
     setCategory(nextCategory)
-    window.localStorage.setItem(categoryStorageKey, nextCategory)
     setSelectedPlaceId(null)
-    setSelectedUserId(null)
-    setPeopleResultsOpen(false)
-    setViewMode('map')
-
-    if (nextCategory === 'people') {
-      return
+    if (nextCategory !== 'people' && location) {
+      mapRef.current?.easeTo({ center: [location.longitude, location.latitude], duration: 350 })
     }
-
-    if (location) {
-      mapRef.current?.easeTo({ center: [location.longitude, location.latitude], duration: 320 })
-    }
-  }
-
-  function setPlaceRadius(radius: number) {
-    setPlaceRadiusKmState(radius)
-    window.localStorage.setItem(placeRadiusStorageKey, String(radius))
   }
 
   function openDirections(place: NearbyPlace) {
@@ -370,76 +287,51 @@ export default function NearbyExplorer({
       await navigator.clipboard.writeText(`${text} — ${url}`)
       onNotice('Đã sao chép địa điểm để chia sẻ.', 'success')
     } catch {
-      // Native share cancellation is not an error.
+      // Ignore native share cancellation.
     }
   }
 
-  function openPerson(user: NearbyUser) {
-    setSelectedUserId(user.id)
-  }
-
-  function handlePersonKeyDown(event: React.KeyboardEvent<HTMLElement>, user: NearbyUser) {
-    if (event.key !== 'Enter' && event.key !== ' ') return
-    event.preventDefault()
-    openPerson(user)
-  }
-
-  const searchPlaceholder = category === 'people'
-    ? 'Tìm người quanh đây'
-    : category === 'all'
-      ? 'Tìm người, quán ăn, cafe…'
-      : 'Tìm địa điểm quanh đây'
-
-  const placeSummary = placesBusy
-    ? 'Đang tìm địa điểm gần bạn…'
-    : `${visiblePlaces.length} địa điểm · trong ${placeRadiusKm < 1 ? '500 m' : `${placeRadiusKm} km`}`
-
-  const peopleSummary = peopleScanning
-    ? 'Đang tìm người gần bạn…'
-    : visibleUsers.length
-      ? `${visibleUsers.length} người · trong ${peopleRadiusKm} km`
-      : peopleActive
-        ? `Chưa có người phù hợp trong ${peopleRadiusKm} km`
-        : `Sẵn sàng tìm trong ${peopleRadiusKm} km`
-
-  const showLocationPrompt = !location && category !== 'people' && !peopleActive
+  const summaryText = location
+    ? category === 'people'
+      ? users.length
+        ? `${users.length} người được tìm thấy trong ${peopleRadiusKm} km`
+        : 'Quét để tìm người dùng ChatNet quanh bạn'
+      : placesBusy
+        ? 'Đang tìm địa điểm gần bạn…'
+        : `${visiblePlaces.length} địa điểm · trong ${placeRadiusKm < 1 ? '500 m' : `${placeRadiusKm} km`}`
+    : 'Bật vị trí để xem những gì ở gần bạn'
 
   return (
-    <section className={`nearby-explorer category-${category}`} aria-label="Khám phá quanh đây">
+    <section className="nearby-explorer" aria-label="Khám phá quanh đây">
       <div className="nearby-map-stage">
         <div ref={mapContainerRef} className="nearby-map-canvas" />
-        <div className="nearby-map-soft-wash" aria-hidden="true" />
 
         <div className="nearby-floating-top">
           <div className="nearby-title-row">
-            <strong>{category === 'people' ? 'Người quanh đây' : 'Quanh đây'}</strong>
+            <strong>Quanh đây</strong>
             <button
               type="button"
-              className={`nearby-location-chip${location ? ' active' : ''}`}
+              className="nearby-live-chip"
               onClick={() => void locate()}
               disabled={locationBusy}
             >
-              <span className="nearby-location-chip-dot" />
+              <span />
               {locationBusy ? 'Đang định vị…' : location ? 'Vị trí của bạn' : 'Bật vị trí'}
             </button>
           </div>
 
-          {category !== 'people' && (
-            <label className="nearby-smart-search">
-              <span className="nearby-search-icon" aria-hidden="true">⌕</span>
-              <input
-                value={query}
-                onChange={(event) => onQueryChange(event.target.value)}
-                placeholder={searchPlaceholder}
-                inputMode="search"
-              />
-              {query && (
-                <button type="button" onClick={() => onQueryChange('')} aria-label="Xóa tìm kiếm">×</button>
-              )}
-            </label>
-          )}
+          <label className="nearby-smart-search">
+            <span aria-hidden="true">⌕</span>
+            <input
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Tìm địa điểm quanh đây"
+              inputMode="search"
+            />
+            {query && <button type="button" onClick={() => onQueryChange('')} aria-label="Xóa tìm kiếm">×</button>}
+          </label>
 
-          <div className="nearby-category-strip" role="tablist" aria-label="Loại khám phá">
+          <div className="nearby-category-strip" role="tablist" aria-label="Loại địa điểm">
             {categories.map((item) => (
               <button
                 key={item.id}
@@ -455,392 +347,221 @@ export default function NearbyExplorer({
           </div>
         </div>
 
-        {showLocationPrompt && (
-          <div className="nearby-location-empty">
-            <span className="nearby-location-empty-icon">⌖</span>
+        {!location && (
+          <button className="nearby-location-prompt" type="button" onClick={() => void locate()} disabled={locationBusy}>
+            <span className="nearby-location-prompt-icon">◎</span>
+            <span>
+              <strong>{locationBusy ? 'Đang xác định vị trí...' : 'Khám phá quanh tôi'}</strong>
+              <small>Dùng GPS trên thiết bị · không cần API key</small>
+            </span>
+            <b>→</b>
+          </button>
+        )}
+
+        {category === 'people' && location && (
+          <div className="nearby-privacy-radar" aria-hidden="true">
+            <span className="ring ring-a" /><span className="ring ring-b" /><span className="ring ring-c" />
             <div>
-              <strong>Bật vị trí để bắt đầu</strong>
-              <small>Tìm người và địa điểm gần bạn mà không cần nhập địa chỉ.</small>
+              <strong>{peopleScanning ? '•••' : visibleUsers.length}</strong>
+              <small>{peopleScanning ? 'Đang quét' : 'người gần bạn'}</small>
             </div>
-            <button type="button" onClick={() => void locate()} disabled={locationBusy}>
-              {locationBusy ? 'Đang bật…' : 'Cho phép vị trí'}
-            </button>
           </div>
         )}
 
-        {viewMode === 'map' && category === 'people' && (
-          <section className="nearby-people-home" aria-label="Tìm người ChatNet quanh đây">
-            <div className="nearby-people-home-radar" aria-hidden="true">
-              <span className="ring ring-one" />
-              <span className="ring ring-two" />
-              <span className="ring ring-three" />
-              <div className="nearby-people-home-center">
-                <span>👥</span>
-              </div>
-              <i className="dot dot-one" />
-              <i className="dot dot-two" />
-              <i className="dot dot-three" />
-            </div>
+        <div className="nearby-map-actions">
+          <button type="button" onClick={() => void locate()} disabled={locationBusy} aria-label="Về vị trí của tôi">◎</button>
+          <button
+            type="button"
+            className={viewMode === 'list' ? 'active' : ''}
+            onClick={() => setViewMode((current) => current === 'map' ? 'list' : 'map')}
+            aria-label="Chuyển bản đồ và danh sách"
+          >
+            {viewMode === 'map' ? '☰' : '⌖'}
+          </button>
+        </div>
 
-            <div className="nearby-people-home-copy">
-              <strong>Tìm người quanh bạn</strong>
-              <p>Khám phá người dùng ChatNet ở gần mà không chia sẻ vị trí chính xác.</p>
-            </div>
-
-            <div className="nearby-people-home-scope">
-              <span>Phạm vi</span>
-              <div role="group" aria-label="Phạm vi tìm người">
-                {[1, 5, 10, 25, 50].map((radius) => (
-                  <button
-                    key={radius}
-                    type="button"
-                    className={peopleRadiusKm === radius ? 'active' : ''}
-                    onClick={() => onPeopleRadiusChange(radius)}
-                    disabled={peopleBusy}
-                  >
-                    {radius} km
+        {viewMode === 'map' && (
+          <div className="nearby-bottom-sheet">
+            <div className="nearby-sheet-handle" />
+            {category === 'people' ? (
+              <>
+                <div className="nearby-sheet-heading">
+                  <div>
+                    <strong>Người quanh đây</strong>
+                    <small>{summaryText}</small>
+                  </div>
+                  <span className="nearby-privacy-badge">Không lộ vị trí chính xác</span>
+                </div>
+                <div className="nearby-radius-row" aria-label="Bán kính tìm người">
+                  {[1, 5, 10, 25, 50].map((radius) => (
+                    <button
+                      key={radius}
+                      type="button"
+                      className={peopleRadiusKm === radius ? 'active' : ''}
+                      onClick={() => onPeopleRadiusChange(radius)}
+                      disabled={peopleBusy}
+                    >{radius} km</button>
+                  ))}
+                </div>
+                <div className="nearby-primary-actions">
+                  <button type="button" className="primary" onClick={() => void handlePeopleScan()} disabled={peopleBusy}>
+                    <span>⌖</span>{peopleScanning ? 'Đang quét...' : users.length ? 'Quét lại' : 'Quét người quanh đây'}
                   </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="nearby-people-home-actions">
-              <button type="button" className="primary" onClick={() => void handlePeopleScan()} disabled={peopleBusy}>
-                <span>⌖</span>
-                {peopleBusy ? 'Đang tìm…' : 'Tìm người quanh đây'}
-              </button>
-              {visibleUsers.length > 0 && (
-                <button type="button" className="history" onClick={() => setPeopleResultsOpen(true)}>
-                  <span>👥</span>
-                  <span>
-                    <strong>{visibleUsers.length} người gần đây</strong>
-                    <small>Chạm để mở lại kết quả</small>
-                  </span>
-                  <b>›</b>
-                </button>
-              )}
-            </div>
-
-            <small className="nearby-people-home-privacy">⌾ Chỉ hiển thị khoảng cách gần đúng</small>
-          </section>
-        )}
-
-        {category !== 'people' && (
-          <div className="nearby-map-actions">
-            <button type="button" onClick={() => void locate()} disabled={locationBusy} aria-label="Về vị trí của tôi">⌖</button>
-            <button type="button" onClick={() => setViewMode('list')} aria-label="Mở danh sách">☰</button>
-          </div>
-        )}
-
-        {viewMode === 'map' && category !== 'people' && (
-          <section className="nearby-place-sheet">
-            <div className="nearby-sheet-grabber static"><span /></div>
-            {selectedPlace ? (
+                  {(peopleActive || users.length > 0) && (
+                    <button type="button" className="ghost" onClick={() => void onStopPeople()} disabled={peopleBusy}>Tắt</button>
+                  )}
+                </div>
+                {!!visibleUsers.length && (
+                  <div className="nearby-preview-list">
+                    {visibleUsers.slice(0, 3).map((user) => (
+                      <article className="nearby-person-card" key={user.id}>
+                        <div className="nearby-person-avatar">{initials(user.displayName || user.username)}</div>
+                        <div>
+                          <strong>{user.displayName || `@${user.username}`}</strong>
+                          <span>@{user.username} · {distanceLabel(user.distanceKm)}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void onFriendAction(user)}
+                          disabled={friendActionBusy === user.id}
+                        >{getFriendActionLabel(user)}</button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : selectedPlace ? (
               <article className="nearby-place-detail">
-                <div className="nearby-place-icon large">{categoryIcon[selectedPlace.category]}</div>
+                <div className="nearby-place-icon">{categoryIcon[selectedPlace.category]}</div>
                 <div className="nearby-place-copy">
                   <small>{selectedPlace.kind} · {distanceLabel(selectedPlace.distanceKm)}</small>
                   <strong>{selectedPlace.name}</strong>
                   <span>{selectedPlace.address || selectedPlace.openingHours || 'Dữ liệu cộng đồng OpenStreetMap'}</span>
                 </div>
-                <button type="button" className="nearby-place-close" onClick={() => setSelectedPlaceId(null)} aria-label="Đóng">×</button>
                 <div className="nearby-place-actions">
-                  <button type="button" className="primary" onClick={() => openDirections(selectedPlace)}>↗ Chỉ đường</button>
-                  <button type="button" onClick={() => void sharePlace(selectedPlace)}>⌁ Chia sẻ</button>
+                  <button type="button" onClick={() => openDirections(selectedPlace)}>↗ <span>Chỉ đường</span></button>
+                  <button type="button" onClick={() => void sharePlace(selectedPlace)}>⌁ <span>Chia sẻ</span></button>
                 </div>
               </article>
             ) : (
               <>
-                <div className="nearby-place-sheet-head">
+                <div className="nearby-sheet-heading">
                   <div>
-                    <strong>{category === 'all' ? 'Khám phá gần bạn' : categories.find((item) => item.id === category)?.label}</strong>
-                    <small>{location ? placeSummary : 'Bật vị trí để xem địa điểm gần bạn'}</small>
+                    <strong>Gần bạn</strong>
+                    <small>{summaryText}</small>
                   </div>
-                  {location && (
-                    <button type="button" className="nearby-list-button" onClick={() => setViewMode('list')}>Danh sách</button>
-                  )}
-                </div>
-
-                {category === 'all' && (peopleActive || users.length > 0) && (
-                  <button type="button" className="nearby-smart-people-card" onClick={() => chooseCategory('people')}>
-                    <span className="nearby-smart-people-icon">👥</span>
-                    <span>
-                      <strong>{users.length ? `${users.length} người ChatNet gần bạn` : 'Người ChatNet quanh đây'}</strong>
-                      <small>{users.length ? 'Chạm để xem ngay' : 'Mở chế độ tìm người'}</small>
-                    </span>
-                    <b>›</b>
+                  <button type="button" className="nearby-sheet-list-toggle" onClick={() => setViewMode('list')}>
+                    Danh sách
                   </button>
-                )}
-
-                <div className="nearby-place-radius-row">
+                </div>
+                <div className="nearby-radius-row" aria-label="Bán kính địa điểm">
                   {[0.5, 1, 3, 5].map((radius) => (
                     <button
                       key={radius}
                       type="button"
                       className={placeRadiusKm === radius ? 'active' : ''}
-                      onClick={() => setPlaceRadius(radius)}
+                      onClick={() => setPlaceRadiusKm(radius)}
+                    >{radius < 1 ? '500 m' : `${radius} km`}</button>
+                  ))}
+                </div>
+                {placesError && <div className="nearby-inline-error">{placesError}</div>}
+                <div className="nearby-preview-list">
+                  {visiblePlaces.slice(0, 3).map((place) => (
+                    <button
+                      className="nearby-place-preview"
+                      type="button"
+                      key={place.id}
+                      onClick={() => {
+                        setSelectedPlaceId(place.id)
+                        mapRef.current?.easeTo({ center: [place.longitude, place.latitude], duration: 420 })
+                      }}
                     >
-                      {radius < 1 ? '500 m' : `${radius} km`}
+                      <span className="nearby-place-icon">{categoryIcon[place.category]}</span>
+                      <span className="nearby-place-preview-copy">
+                        <strong>{place.name}</strong>
+                        <small>{place.kind} · {distanceLabel(place.distanceKm)}</small>
+                      </span>
+                      <b>›</b>
                     </button>
                   ))}
                 </div>
-
-                {placesError && <div className="nearby-inline-error">{placesError}</div>}
-
-                {location && placesBusy && (
-                  <div className="nearby-place-mini-loading">
-                    <span /><span /><span />
-                  </div>
-                )}
-
-                {location && !placesBusy && (
-                  <div className="nearby-place-preview-list">
-                    {visiblePlaces.slice(0, category === 'all' ? 2 : 3).map((place) => (
-                      <button
-                        className="nearby-place-preview"
-                        type="button"
-                        key={place.id}
-                        onClick={() => {
-                          setSelectedPlaceId(place.id)
-                          mapRef.current?.easeTo({ center: [place.longitude, place.latitude], duration: 360 })
-                        }}
-                      >
-                        <span className="nearby-place-icon">{categoryIcon[place.category]}</span>
-                        <span className="nearby-place-preview-copy">
-                          <strong>{place.name}</strong>
-                          <small>{place.kind} · {distanceLabel(place.distanceKm)}</small>
-                        </span>
-                        <b>›</b>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </>
             )}
-          </section>
+          </div>
         )}
       </div>
 
-      {viewMode === 'list' && category !== 'people' && (
+      {viewMode === 'list' && (
         <div className="nearby-list-view">
           <div className="nearby-list-head">
             <div>
-              <small>QUANH ĐÂY</small>
-              <strong>{category === 'all' ? 'Địa điểm gần bạn' : categories.find((item) => item.id === category)?.label}</strong>
-              <span>{location ? placeSummary : 'Chưa có vị trí'}</span>
+              <small>{category === 'people' ? 'CHATNET SOCIAL' : 'LOCAL DISCOVERY'}</small>
+              <strong>{summaryText}</strong>
             </div>
             <button type="button" onClick={() => setViewMode('map')}>⌖ Bản đồ</button>
           </div>
 
-          <div className="nearby-list-stack">
-            {!location && (
-              <div className="nearby-empty-state">
-                <span>⌖</span>
-                <strong>Bật vị trí để bắt đầu</strong>
-                <small>ChatNet dùng vị trí thiết bị để tìm POI quanh bạn.</small>
-                <button type="button" onClick={() => void locate()} disabled={locationBusy}>Bật vị trí</button>
-              </div>
-            )}
-
-            {location && !placesBusy && !visiblePlaces.length && (
-              <div className="nearby-empty-state">
-                <span>⌕</span>
-                <strong>Chưa tìm thấy địa điểm phù hợp</strong>
-                <small>Thử tăng bán kính hoặc đổi nhóm địa điểm.</small>
-              </div>
-            )}
-
-            {placesBusy && Array.from({ length: 5 }).map((_, index) => (
-              <div className="nearby-place-skeleton" key={index}><span /><div><b /><i /></div></div>
-            ))}
-
-            {!placesBusy && visiblePlaces.map((place) => (
-              <article className="nearby-place-list-card" key={place.id}>
-                <button
-                  type="button"
-                  className="nearby-place-icon"
-                  onClick={() => {
-                    setSelectedPlaceId(place.id)
-                    setViewMode('map')
-                  }}
-                  aria-label={`Xem ${place.name} trên bản đồ`}
-                >
-                  {categoryIcon[place.category]}
-                </button>
-                <div>
-                  <strong>{place.name}</strong>
-                  <span>{place.kind} · {distanceLabel(place.distanceKm)}</span>
-                  <small>{place.address || place.openingHours || 'OpenStreetMap'}</small>
+          {category === 'people' ? (
+            <div className="nearby-list-stack">
+              {!visibleUsers.length && (
+                <div className="nearby-empty-state">
+                  <span>👥</span><strong>Chưa có người dùng trong kết quả</strong>
+                  <small>Quét vị trí để tìm người ChatNet gần bạn mà không lộ tọa độ chính xác.</small>
+                  <button type="button" onClick={() => void handlePeopleScan()} disabled={peopleBusy}>Quét ngay</button>
                 </div>
-                <button type="button" className="nearby-card-route" onClick={() => openDirections(place)}>↗</button>
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {typeof document !== 'undefined' && (peopleScanOverlayOpen || peopleScanning) && createPortal(
-        <div className="nearby-flow-layer nearby-flow-layer-scan" role="dialog" aria-modal="true" aria-label="Đang tìm người quanh đây">
-          <section className="nearby-radar-dialog">
-            <div className="nearby-radar-visual" aria-hidden="true">
-              <span className="nearby-radar-ring ring-one" />
-              <span className="nearby-radar-ring ring-two" />
-              <span className="nearby-radar-ring ring-three" />
-              <span className="nearby-radar-sweep" />
-              <div className="nearby-radar-center">⌖</div>
-              <i className="nearby-radar-dot dot-one" />
-              <i className="nearby-radar-dot dot-two" />
-              <i className="nearby-radar-dot dot-three" />
-            </div>
-            <div className="nearby-radar-copy">
-              <small>CHATNET NEARBY</small>
-              <strong>Đang tìm người quanh bạn</strong>
-              <span>Trong {peopleRadiusKm} km · chỉ dùng khoảng cách gần đúng</span>
-            </div>
-            <div className="nearby-radar-status"><b /><b /><b /></div>
-          </section>
-        </div>,
-        document.body,
-      )}
-
-      {typeof document !== 'undefined' && peopleResultsOpen && !peopleScanOverlayOpen && !peopleScanning && createPortal(
-        <div className="nearby-flow-layer nearby-flow-layer-results" role="presentation" onClick={() => setPeopleResultsOpen(false)}>
-          <section
-            className="nearby-results-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Kết quả người quanh đây"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="nearby-results-header">
-              <div>
-                <small>NGƯỜI QUANH ĐÂY</small>
-                <strong>{visibleUsers.length ? `${visibleUsers.length} người được tìm thấy` : 'Chưa tìm thấy người phù hợp'}</strong>
-                <span>Trong {peopleRadiusKm} km · sắp xếp từ gần đến xa</span>
-              </div>
-              <button type="button" onClick={() => setPeopleResultsOpen(false)} aria-label="Đóng kết quả">×</button>
-            </header>
-
-            <div className="nearby-results-radius" aria-label="Phạm vi tìm người">
-              {[1, 5, 10, 25, 50].map((radius) => (
-                <button
-                  key={radius}
-                  type="button"
-                  className={peopleRadiusKm === radius ? 'active' : ''}
-                  onClick={() => onPeopleRadiusChange(radius)}
-                  disabled={peopleBusy}
-                >
-                  {radius} km
-                </button>
-              ))}
-            </div>
-
-            <div className="nearby-results-list" aria-live="polite">
-              {visibleUsers.length > 0 ? visibleUsers.map((user) => (
-                <article
-                  key={user.id}
-                  className="nearby-result-person"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openPerson(user)}
-                  onKeyDown={(event) => handlePersonKeyDown(event, user)}
-                >
-                  <div className="nearby-result-avatar">
-                    {initials(user.displayName || user.username)}
-                    {user.nearbyActive && <i />}
-                  </div>
-                  <div className="nearby-result-copy">
+              )}
+              {visibleUsers.map((user) => (
+                <article className="nearby-person-card full" key={user.id}>
+                  <div className="nearby-person-avatar">{initials(user.displayName || user.username)}</div>
+                  <div>
                     <strong>{user.displayName || `@${user.username}`}</strong>
-                    <span>@{user.username}</span>
-                    <small>{distanceLabel(user.distanceKm)} · {user.nearbyActive ? 'vừa hoạt động' : 'vị trí gần nhất'}</small>
+                    <span>@{user.username} · {distanceLabel(user.distanceKm)} · {user.nearbyActive ? 'vừa hoạt động' : 'vị trí gần nhất'}</span>
                   </div>
                   <button
                     type="button"
-                    className="nearby-result-action"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      void onFriendAction(user)
-                    }}
+                    onClick={() => void onFriendAction(user)}
                     disabled={friendActionBusy === user.id}
-                  >
-                    {friendActionBusy === user.id ? '…' : getFriendActionLabel(user)}
-                  </button>
+                  >{getFriendActionLabel(user)}</button>
                 </article>
-              )) : (
-                <div className="nearby-results-empty">
-                  <span>👥</span>
-                  <strong>Chưa thấy ai trong phạm vi này</strong>
-                  <small>Thử tăng bán kính rồi quét lại. ChatNet không hiển thị tọa độ chính xác của người khác.</small>
+              ))}
+            </div>
+          ) : (
+            <div className="nearby-list-stack">
+              {!location && (
+                <div className="nearby-empty-state">
+                  <span>📍</span><strong>Bật vị trí để bắt đầu</strong>
+                  <small>ChatNet chỉ dùng GPS trên thiết bị để tìm POI quanh bạn.</small>
+                  <button type="button" onClick={() => void locate()} disabled={locationBusy}>Dùng vị trí của tôi</button>
                 </div>
               )}
-            </div>
-
-            <footer className="nearby-results-footer">
-              <button type="button" className="primary" onClick={() => void handlePeopleScan()} disabled={peopleBusy}>
-                ↻ Quét lại
-              </button>
-              {(peopleActive || users.length > 0) && (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => {
-                    setPeopleResultsOpen(false)
-                    void onStopPeople()
-                  }}
-                  disabled={peopleBusy}
-                >
-                  Tắt Quanh đây
-                </button>
+              {location && !placesBusy && !visiblePlaces.length && (
+                <div className="nearby-empty-state">
+                  <span>⌕</span><strong>Chưa tìm thấy địa điểm phù hợp</strong>
+                  <small>Thử tăng bán kính hoặc đổi nhóm địa điểm.</small>
+                </div>
               )}
-            </footer>
-            <div className="nearby-results-safe-note">⌾ Vị trí chính xác luôn được ẩn</div>
-          </section>
-        </div>,
-        document.body,
-      )}
-
-      {selectedUser && typeof document !== 'undefined' && createPortal(
-        <div className="nearby-profile-backdrop nearby-profile-backdrop-portal" role="presentation" onClick={() => setSelectedUserId(null)}>
-          <section
-            className="nearby-profile-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Hồ sơ nhanh của ${selectedUser.displayName || selectedUser.username}`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="nearby-sheet-grabber static"><span /></div>
-            <button type="button" className="nearby-profile-close" onClick={() => setSelectedUserId(null)} aria-label="Đóng">×</button>
-
-            <div className="nearby-profile-avatar">
-              {initials(selectedUser.displayName || selectedUser.username)}
-              {selectedUser.nearbyActive && <i />}
+              {placesBusy && Array.from({ length: 5 }).map((_, index) => (
+                <div className="nearby-place-skeleton" key={index}><span /><div><b /><i /></div></div>
+              ))}
+              {!placesBusy && visiblePlaces.map((place) => (
+                <article className="nearby-place-list-card" key={place.id}>
+                  <button
+                    type="button"
+                    className="nearby-place-icon"
+                    onClick={() => { setSelectedPlaceId(place.id); setViewMode('map') }}
+                    aria-label={`Xem ${place.name} trên bản đồ`}
+                  >{categoryIcon[place.category]}</button>
+                  <div>
+                    <strong>{place.name}</strong>
+                    <span>{place.kind} · {distanceLabel(place.distanceKm)}</span>
+                    <small>{place.address || place.openingHours || 'OpenStreetMap'}</small>
+                  </div>
+                  <button type="button" className="nearby-card-route" onClick={() => openDirections(place)}>↗</button>
+                </article>
+              ))}
             </div>
-            <div className="nearby-profile-identity">
-              <strong>{selectedUser.displayName || `@${selectedUser.username}`}</strong>
-              <span>@{selectedUser.username}</span>
-            </div>
-
-            <div className="nearby-profile-meta">
-              <span>{selectedUser.nearbyActive ? '● Vừa hoạt động' : '○ Vị trí gần nhất'}</span>
-              <span>⌖ {distanceLabel(selectedUser.distanceKm)}</span>
-            </div>
-
-            <button
-              type="button"
-              className="nearby-profile-primary"
-              onClick={() => void onFriendAction(selectedUser)}
-              disabled={friendActionBusy === selectedUser.id}
-            >
-              {friendActionBusy === selectedUser.id ? 'Đang xử lý…' : getFriendActionLabel(selectedUser)}
-            </button>
-
-            <div className="nearby-profile-privacy">
-              <span>⌾</span>
-              <p>ChatNet chỉ hiển thị khoảng cách gần đúng. Tọa độ chính xác của người dùng không được chia sẻ.</p>
-            </div>
-          </section>
-        </div>,
-        document.body,
+          )}
+        </div>
       )}
     </section>
   )
