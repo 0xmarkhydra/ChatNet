@@ -113,6 +113,7 @@ export default function NearbyExplorer({
   const [placesBusy, setPlacesBusy] = useState(false)
   const [placesError, setPlacesError] = useState('')
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
+  const [sheetExpanded, setSheetExpanded] = useState(false)
   const [peopleResultsOpen, setPeopleResultsOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null)
 
@@ -194,6 +195,7 @@ export default function NearbyExplorer({
       element.addEventListener('click', (event) => {
         event.stopPropagation()
         setSelectedPlaceId(place.id)
+        setSheetExpanded(true)
         map.easeTo({ center: [place.longitude, place.latitude], duration: 420 })
       })
       placeMarkersRef.current.push(
@@ -288,6 +290,7 @@ export default function NearbyExplorer({
   function chooseCategory(nextCategory: DiscoveryCategory) {
     setCategory(nextCategory)
     setSelectedPlaceId(null)
+    setSheetExpanded(false)
     setPeopleResultsOpen(false)
     setSelectedUser(null)
     if (nextCategory !== 'people' && location) {
@@ -423,8 +426,20 @@ export default function NearbyExplorer({
         </div>
 
         {viewMode === 'map' && (
-          <div className={`nearby-bottom-sheet${category === 'people' ? ' is-people' : ''}${placesBusy ? ' is-loading' : ''}${visiblePlaces.length ? ' has-results' : ''}${selectedPlace ? ' has-selection' : ''}`}>
-            <div className="nearby-sheet-handle" />
+          <div className={`nearby-bottom-sheet${category === 'people' ? ' is-people' : ''}${placesBusy ? ' is-loading' : ''}${visiblePlaces.length ? ' has-results' : ''}${selectedPlace ? ' has-selection' : ''}${sheetExpanded ? ' is-expanded' : ' is-collapsed'}`}>
+            {category !== 'people' ? (
+              <button
+                type="button"
+                className="nearby-sheet-handle-button"
+                onClick={() => setSheetExpanded((value) => !value)}
+                aria-label={sheetExpanded ? 'Thu gọn kết quả' : 'Mở rộng kết quả'}
+                aria-expanded={sheetExpanded}
+              >
+                <span className="nearby-sheet-handle" />
+              </button>
+            ) : (
+              <div className="nearby-sheet-handle" />
+            )}
             {category === 'people' ? (
               <div className="nearby-people-launcher">
                 <div className="nearby-sheet-heading">
@@ -481,8 +496,14 @@ export default function NearbyExplorer({
                     <strong>Gần bạn</strong>
                     <small>{summaryText}</small>
                   </div>
-                  <button type="button" className="nearby-sheet-list-toggle" onClick={() => setViewMode('list')}>
-                    Danh sách
+                  <button
+                    type="button"
+                    className="nearby-sheet-list-toggle"
+                    onClick={() => setSheetExpanded((value) => !value)}
+                    aria-expanded={sheetExpanded}
+                  >
+                    {sheetExpanded ? 'Thu gọn' : 'Mở rộng'}
+                    <span aria-hidden="true">{sheetExpanded ? '⌄' : '⌃'}</span>
                   </button>
                 </div>
                 <div className="nearby-radius-row" aria-label="Bán kính địa điểm">
@@ -497,13 +518,14 @@ export default function NearbyExplorer({
                 </div>
                 {placesError && <div className="nearby-inline-error">{placesError}</div>}
                 <div className="nearby-preview-list">
-                  {visiblePlaces.slice(0, 3).map((place) => (
+                  {visiblePlaces.slice(0, sheetExpanded ? 12 : 2).map((place) => (
                     <button
                       className="nearby-place-preview"
                       type="button"
                       key={place.id}
                       onClick={() => {
                         setSelectedPlaceId(place.id)
+                        setSheetExpanded(true)
                         mapRef.current?.easeTo({ center: [place.longitude, place.latitude], duration: 420 })
                       }}
                     >
