@@ -184,7 +184,13 @@ export async function loadNearbyPlaces({
         .slice(0, 80)
     } catch (error) {
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-      lastError = error
+      const message = error instanceof Error ? error.message : String(error || '')
+      const isAbortLike =
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        /abort|aborted/i.test(message)
+      lastError = isAbortLike
+        ? new Error('Dữ liệu địa điểm phản hồi chậm. Hãy thử lại sau ít giây.')
+        : error
     } finally {
       window.clearTimeout(timer)
       signal?.removeEventListener('abort', abort)

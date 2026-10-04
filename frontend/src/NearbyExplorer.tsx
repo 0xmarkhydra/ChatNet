@@ -233,8 +233,12 @@ export default function NearbyExplorer({
       })
       .catch((error) => {
         if (controller.signal.aborted) return
+        const rawMessage = error instanceof Error ? error.message : 'Chưa tải được địa điểm quanh đây.'
+        const friendlyMessage = /abort|aborted/i.test(rawMessage)
+          ? 'Dữ liệu địa điểm phản hồi chậm. Hãy thử lại sau ít giây.'
+          : rawMessage
         setPlaces([])
-        setPlacesError(error instanceof Error ? error.message : 'Chưa tải được địa điểm quanh đây.')
+        setPlacesError(friendlyMessage)
         setSheetExpanded(true)
       })
       .finally(() => {
@@ -333,7 +337,9 @@ export default function NearbyExplorer({
         : 'Quét để tìm người dùng ChatNet quanh bạn'
       : placesBusy
         ? 'Đang tìm địa điểm gần bạn…'
-        : `${visiblePlaces.length} địa điểm · trong ${placeRadiusKm < 1 ? '500 m' : `${placeRadiusKm} km`}`
+        : placesError
+          ? 'Chưa tải được dữ liệu địa điểm'
+          : `${visiblePlaces.length} địa điểm · trong ${placeRadiusKm < 1 ? '500 m' : `${placeRadiusKm} km`}`
     : 'Bật vị trí để xem những gì ở gần bạn'
 
   const loadingNearby = locationBusy || (category === 'people' ? peopleScanning : placesBusy)
