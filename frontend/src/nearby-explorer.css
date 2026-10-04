@@ -1287,6 +1287,136 @@
   }
 }
 
+/* Nearby map + people results: real map first, user list as primary content */
+.nearby-map-stage::before,
+.nearby-map-canvas::after {
+  pointer-events: none;
+}
+.nearby-map-canvas,
+.nearby-map-canvas .maplibregl-map,
+.nearby-map-canvas .maplibregl-canvas-container,
+.nearby-map-canvas canvas {
+  touch-action: none !important;
+}
+.nearby-people-inline-section {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.nearby-people-inline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px;
+}
+.nearby-people-inline-head > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.nearby-people-inline-head strong { font-size: 13px; font-weight: 820; }
+.nearby-people-inline-head small { color: #858d82; font-size: 9px; }
+.nearby-people-inline-head > button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #eef3e9;
+  color: #4f6e2a;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 780;
+  cursor: pointer;
+}
+.nearby-people-inline-results {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #f7f9f6;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.nearby-person-inline {
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #fff;
+  box-shadow: inset 0 -1px 0 rgba(48,60,44,.07);
+  cursor: pointer;
+}
+.nearby-person-inline:last-child { box-shadow: none; }
+.nearby-person-inline > div:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.nearby-person-inline strong,
+.nearby-person-inline span,
+.nearby-person-inline small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nearby-person-inline strong { font-size: 12px; font-weight: 800; }
+.nearby-person-inline span { color: #767f72; font-size: 9px; }
+.nearby-person-inline small { color: #5d7751; font-size: 9px; }
+.nearby-person-inline > button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #edf4e4;
+  color: #4c7800;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  /* Never draw a fake road/grid behind the real MapLibre canvas. */
+  .nearby-map-stage::before { display: none; }
+  .nearby-map-stage,
+  .nearby-map-canvas { background: #edf1eb; }
+  .nearby-map-canvas .maplibregl-canvas { opacity: 1; }
+
+  .nearby-bottom-sheet.is-people {
+    max-height: 226px;
+    overflow: hidden;
+  }
+
+  .nearby-bottom-sheet.is-people.has-people-results {
+    height: min(58dvh, 560px);
+    max-height: min(58dvh, 560px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .nearby-bottom-sheet.is-people.has-people-results .nearby-people-launcher {
+    min-height: 0;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .nearby-bottom-sheet.is-people.has-people-results .nearby-people-inline-section {
+    min-height: 130px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nearby-mini-radar .pulse { animation: none !important; }
 }

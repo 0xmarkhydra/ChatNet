@@ -444,7 +444,7 @@ export default function NearbyExplorer({
         )}
 
         {viewMode === 'map' && !loadingNearby && (
-          <div className={`nearby-bottom-sheet${category === 'people' ? ' is-people' : ''}${placesBusy ? ' is-loading' : ''}${visiblePlaces.length ? ' has-results' : ''}${selectedPlace ? ' has-selection' : ''}${sheetExpanded ? ' is-expanded' : ' is-collapsed'}`}>
+          <div className={`nearby-bottom-sheet${category === 'people' ? ' is-people' : ''}${category === 'people' && visibleUsers.length ? ' has-people-results' : ''}${placesBusy ? ' is-loading' : ''}${visiblePlaces.length ? ' has-results' : ''}${selectedPlace ? ' has-selection' : ''}${sheetExpanded ? ' is-expanded' : ' is-collapsed'}`}>
             {category !== 'people' ? (
               <button
                 type="button"
@@ -487,11 +487,35 @@ export default function NearbyExplorer({
                   )}
                 </div>
                 {!!visibleUsers.length && !peopleScanning && (
-                  <button type="button" className="nearby-last-results" onClick={() => setPeopleResultsOpen(true)}>
-                    <span>👥</span>
-                    <span><strong>{visibleUsers.length} người gần đây</strong><small>Chạm để xem lại kết quả</small></span>
-                    <b>›</b>
-                  </button>
+                  <section className="nearby-people-inline-section" aria-label="Người gần đây">
+                    <div className="nearby-people-inline-head">
+                      <div>
+                        <strong>{visibleUsers.length} người gần đây</strong>
+                        <small>Gần → xa · chạm một người để xem nhanh</small>
+                      </div>
+                      <button type="button" onClick={() => setPeopleResultsOpen(true)}>Mở toàn bộ</button>
+                    </div>
+                    <div className="nearby-people-inline-results">
+                      {visibleUsers.map((user) => (
+                        <article key={user.id} className="nearby-person-inline" onClick={() => setSelectedUser(user)}>
+                          <div className="nearby-person-avatar">{initials(user.displayName || user.username)}</div>
+                          <div>
+                            <strong>{user.displayName || `@${user.username}`}</strong>
+                            <span>@{user.username} · {distanceLabel(user.distanceKm)}</span>
+                            <small>{user.nearbyActive ? '● Vừa hoạt động' : 'Vị trí gần nhất'}</small>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void onFriendAction(user)
+                            }}
+                            disabled={friendActionBusy === user.id}
+                          >{getFriendActionLabel(user)}</button>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
                 )}
               </div>
             ) : selectedPlace ? (
