@@ -581,13 +581,13 @@ export default function NearbyExplorer({
 
             <div className="nearby-results-toolbar">
               <button type="button" onClick={() => void handlePeopleScan()} disabled={peopleBusy}>↻ Quét lại</button>
-              <span>🔒 Không hiển thị tọa độ chính xác</span>
+              <span>Vị trí chính xác luôn được ẩn</span>
             </div>
 
             <div className="nearby-results-list">
               {!visibleUsers.length && (
                 <div className="nearby-results-empty">
-                  <span>👥</span>
+                  <span aria-hidden="true">○</span>
                   <strong>Chưa có người trong phạm vi này</strong>
                   <small>Thử tăng bán kính rồi quét lại.</small>
                 </div>
