@@ -717,6 +717,281 @@
   }
 }
 
+/* People mode v4: no map/dashboard feeling. Keep the map only for places. */
+.nearby-explorer.category-people .nearby-map-canvas,
+.nearby-explorer.category-people .nearby-map-soft-wash {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nearby-explorer.category-people .nearby-map-stage {
+  background:
+    radial-gradient(circle at 50% 35%, rgba(118, 185, 0, .15), transparent 30%),
+    linear-gradient(180deg, #f7faf4 0%, #eef3e9 100%);
+}
+
+.nearby-explorer.category-people .nearby-category-strip {
+  padding-bottom: 0;
+}
+
+.nearby-people-home {
+  position: absolute;
+  z-index: 6;
+  top: 142px;
+  right: 18px;
+  bottom: 18px;
+  left: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: auto;
+  padding: 18px 16px 20px;
+  border: 1px solid rgba(255,255,255,.78);
+  border-radius: 28px;
+  background: rgba(255,255,255,.72);
+  box-shadow: 0 24px 70px rgba(37,52,32,.10);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.nearby-people-home-radar {
+  position: relative;
+  width: min(48vw, 220px);
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  margin: 8px 0 10px;
+}
+
+.nearby-people-home-radar .ring {
+  position: absolute;
+  border: 1px solid rgba(93,145,17,.16);
+  border-radius: 50%;
+  background: rgba(118,185,0,.025);
+}
+
+.nearby-people-home-radar .ring-one { inset: 0; }
+.nearby-people-home-radar .ring-two { inset: 18%; }
+.nearby-people-home-radar .ring-three { inset: 36%; }
+
+.nearby-people-home-center {
+  position: absolute;
+  inset: 36%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #22301f;
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(27,42,23,.20), 0 0 0 12px rgba(118,185,0,.08);
+  font-size: 28px;
+}
+
+.nearby-people-home-radar .dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #78b916;
+  box-shadow: 0 4px 12px rgba(68,107,10,.22);
+}
+
+.nearby-people-home-radar .dot-one { top: 20%; left: 25%; }
+.nearby-people-home-radar .dot-two { right: 18%; top: 39%; }
+.nearby-people-home-radar .dot-three { left: 34%; bottom: 14%; }
+
+.nearby-people-home-copy {
+  max-width: 360px;
+  text-align: center;
+}
+
+.nearby-people-home-copy strong {
+  display: block;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -.04em;
+  color: #1b2618;
+}
+
+.nearby-people-home-copy p {
+  margin: 7px auto 0;
+  color: #788273;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.nearby-people-home-scope {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 18px;
+}
+
+.nearby-people-home-scope > span {
+  display: block;
+  margin-bottom: 8px;
+  color: #7b8576;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.nearby-people-home-scope > div {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.nearby-people-home-scope button {
+  min-height: 36px;
+  border: 1px solid rgba(44,61,39,.08);
+  border-radius: 12px;
+  background: #eef3e9;
+  color: #687563;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.nearby-people-home-scope button.active {
+  background: #243220;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(30,45,26,.14);
+}
+
+.nearby-people-home-actions {
+  width: 100%;
+  max-width: 420px;
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.nearby-people-home-actions > button {
+  width: 100%;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.nearby-people-home-actions .primary {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #87c91b, #69a800);
+  color: #152300;
+  box-shadow: 0 14px 30px rgba(91,143,10,.20);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.nearby-people-home-actions .history {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(49,66,45,.08);
+  border-radius: 16px;
+  padding: 8px 11px;
+  background: #f5f7f2;
+  color: #283425;
+  text-align: left;
+}
+
+.nearby-people-home-actions .history > span:first-child {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #e7eddf;
+}
+
+.nearby-people-home-actions .history > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.nearby-people-home-actions .history strong { font-size: 11px; }
+.nearby-people-home-actions .history small { color: #8a9285; font-size: 9px; }
+.nearby-people-home-actions .history b { color: #899283; font-size: 18px; }
+
+.nearby-people-home-privacy {
+  margin-top: 12px;
+  color: #8a9386;
+  font-size: 9px;
+}
+
+@media (max-width: 760px) {
+  .nearby-explorer.category-people .nearby-floating-top {
+    gap: 8px;
+  }
+
+  .nearby-explorer.category-people .nearby-title-row strong {
+    font-size: 21px;
+  }
+
+  .nearby-people-home {
+    top: 104px;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    justify-content: center;
+    padding: 14px 13px max(16px, env(safe-area-inset-bottom));
+    border-radius: 24px;
+  }
+
+  .nearby-people-home-radar {
+    width: min(51vw, 196px);
+    margin-top: 0;
+  }
+
+  .nearby-people-home-copy strong {
+    font-size: 20px;
+  }
+
+  .nearby-people-home-copy p {
+    max-width: 290px;
+    font-size: 10px;
+  }
+
+  .nearby-people-home-scope {
+    margin-top: 16px;
+  }
+
+  .nearby-people-home-scope button {
+    min-height: 34px;
+    padding: 0;
+    font-size: 9px;
+  }
+
+  .nearby-people-home-actions .primary {
+    min-height: 48px;
+  }
+}
+
+@media (max-height: 700px) and (max-width: 760px) {
+  .nearby-people-home {
+    justify-content: flex-start;
+  }
+
+  .nearby-people-home-radar {
+    width: 155px;
+  }
+
+  .nearby-people-home-copy strong {
+    font-size: 18px;
+  }
+
+  .nearby-people-home-scope {
+    margin-top: 10px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nearby-radar-sweep,
   .nearby-radar-dot,
