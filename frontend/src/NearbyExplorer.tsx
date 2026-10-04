@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import * as maplibregl from 'maplibre-gl'
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { loadNearbyPlaces, type NearbyPlace, type NearbyPlaceCategory } from './nearbyPlaces'
 
@@ -16,6 +17,7 @@ export type NearbyUser = {
 
 type DiscoveryCategory = 'people' | NearbyPlaceCategory
 type ViewMode = 'map' | 'list'
+type SheetSnap = 'compact' | 'medium' | 'expanded'
 type NoticeKind = 'success' | 'error' | 'warning' | 'info'
 
 type Props = {
@@ -65,33 +67,8 @@ function distanceLabel(distanceKm?: number) {
   return `${distanceKm.toLocaleString('vi-VN', { maximumFractionDigits: distanceKm >= 10 ? 0 : 1 })} km`
 }
 
-function osmStyle(): maplibregl.StyleSpecification {
-  return {
-    version: 8,
-    sources: {
-      osm: {
-        type: 'raster',
-        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-        tileSize: 256,
-        attribution: '© OpenStreetMap contributors',
-      },
-    },
-    layers: [
-      { id: 'base', type: 'background', paint: { 'background-color': '#edf0ea' } },
-      {
-        id: 'osm',
-        type: 'raster',
-        source: 'osm',
-        paint: {
-          'raster-saturation': -0.12,
-          'raster-contrast': 0.04,
-          'raster-brightness-min': 0,
-          'raster-brightness-max': 1,
-        },
-      },
-    ],
-  }
-}
+const mapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty'
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 export default function NearbyExplorer({
   query, onQueryChange, users, peopleBusy, peopleScanning, peopleActive,
@@ -103,9 +80,12 @@ export default function NearbyExplorer({
   const placeMarkersRef = useRef<maplibregl.Marker[]>([])
   const locationMarkerRef = useRef<maplibregl.Marker | null>(null)
   const placesAbortRef = useRef<AbortController | null>(null)
+  const peopleSheetDragRef = useRef<{ startY: number; startSnap: SheetSnap; pointerId: number } | null>(null)
+  const placeSheetDragRef = useRef<{ startY: number; startSnap: SheetSnap; pointerId: number } | null>(null)
 
   const [category, setCategory] = useState<DiscoveryCategory>('people')
   const [viewMode, setViewMode] = useState<ViewMode>('map')
+  const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
   const [locationBusy, setLocationBusy] = useState(false)
   const [placeRadiusKm, setPlaceRadiusKm] = useState(1)
@@ -114,7 +94,8 @@ export default function NearbyExplorer({
   const [placesError, setPlacesError] = useState('')
   const [placesReloadKey, setPlacesReloadKey] = useState(0)
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
-  const [sheetExpanded, setSheetExpanded] = useState(false)
+  const [placeSheetSnap, setPlaceSheetSnap] = useState<SheetSnap>('medium')
+  const [peopleSheetSnap, setPeopleSheetSnap] = useState<SheetSnap>('medium')
   const [peopleResultsOpen, setPeopleResultsOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<NearbyUser | null>(null)
 
@@ -138,10 +119,14 @@ export default function NearbyExplorer({
   }, [normalizedQuery, users])
 
   useEffect(() => {
+    requestAnimationFrame(() => mapRef.current?.resize())
+  }, [category, peopleSheetSnap, placeSheetSnap, viewMode])
+
+  useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: osmStyle(),
+      style: mapStyleUrl,
       center: fallbackCenter,
       zoom: 13,
       attributionControl: false,
@@ -157,7 +142,13 @@ export default function NearbyExplorer({
     map.doubleClickZoom.enable()
     map.touchZoomRotate.enable()
     map.touchZoomRotate.disableRotation()
-    map.once('load', () => map.resize())
+    map.once('load', () => {
+      setMapStatus('ready')
+      map.resize()
+    })
+    map.on('error', () => {
+      if (!map.isStyleLoaded()) setMapStatus('error')
+    })
     requestAnimationFrame(() => map.resize())
     mapRef.current = map
     return () => {
@@ -206,7 +197,7 @@ export default function NearbyExplorer({
       element.addEventListener('click', (event) => {
         event.stopPropagation()
         setSelectedPlaceId(place.id)
-        setSheetExpanded(true)
+        setPlaceSheetSnap('expanded')
         map.easeTo({ center: [place.longitude, place.latitude], duration: 420 })
       })
       placeMarkersRef.current.push(
@@ -240,7 +231,7 @@ export default function NearbyExplorer({
         setPlaces(items)
         setSelectedPlaceId((current) =>
           current && items.some((item) => item.id === current) ? current : null)
-        setSheetExpanded(true)
+        setPlaceSheetSnap('expanded')
       })
       .catch((error) => {
         if (controller.signal.aborted) return
@@ -250,7 +241,7 @@ export default function NearbyExplorer({
           : rawMessage
         setPlaces([])
         setPlacesError(friendlyMessage)
-        setSheetExpanded(true)
+        setPlaceSheetSnap('expanded')
       })
       .finally(() => {
         if (!controller.signal.aborted) setPlacesBusy(false)
@@ -289,18 +280,90 @@ export default function NearbyExplorer({
     }
   }
 
+  function retryMap() {
+    const map = mapRef.current
+    if (!map) return
+    setMapStatus('loading')
+    try {
+      map.setStyle(mapStyleUrl)
+      map.once('style.load', () => {
+        setMapStatus('ready')
+        map.resize()
+      })
+    } catch {
+      setMapStatus('error')
+    }
+  }
+
+  function adjacentSnap(current: SheetSnap, direction: 'up' | 'down') {
+    const snaps: SheetSnap[] = ['compact', 'medium', 'expanded']
+    const currentIndex = snaps.indexOf(current)
+    const nextIndex = direction === 'up'
+      ? Math.min(snaps.length - 1, currentIndex + 1)
+      : Math.max(0, currentIndex - 1)
+    return snaps[nextIndex]
+  }
+
+  function movePeopleSheet(direction: 'up' | 'down') {
+    setPeopleSheetSnap((current) => adjacentSnap(current, direction))
+  }
+
+  function handlePlaceSheetPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+    placeSheetDragRef.current = {
+      startY: event.clientY,
+      startSnap: placeSheetSnap,
+      pointerId: event.pointerId,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function handlePlaceSheetPointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = placeSheetDragRef.current
+    placeSheetDragRef.current = null
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const deltaY = event.clientY - drag.startY
+    if (Math.abs(deltaY) < 16) {
+      setPlaceSheetSnap((current) => current === 'compact' ? 'medium' : current === 'medium' ? 'expanded' : 'medium')
+      return
+    }
+    setPlaceSheetSnap(adjacentSnap(drag.startSnap, deltaY < 0 ? 'up' : 'down'))
+  }
+
+  function handlePeopleSheetPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+    peopleSheetDragRef.current = {
+      startY: event.clientY,
+      startSnap: peopleSheetSnap,
+      pointerId: event.pointerId,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function handlePeopleSheetPointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = peopleSheetDragRef.current
+    peopleSheetDragRef.current = null
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const deltaY = event.clientY - drag.startY
+    if (Math.abs(deltaY) < 16) {
+      setPeopleSheetSnap((current) => current === 'compact' ? 'medium' : current === 'medium' ? 'expanded' : 'medium')
+      return
+    }
+    movePeopleSheet(deltaY < 0 ? 'up' : 'down')
+  }
+
   async function handlePeopleScan() {
     const currentLocation = await locate()
     if (!currentLocation) return
     setPeopleResultsOpen(false)
     setSelectedUser(null)
+    setPeopleSheetSnap('medium')
     await onScanPeople()
-    setPeopleResultsOpen(true)
+    setPeopleSheetSnap('expanded')
   }
 
   async function handleStopPeople() {
     setPeopleResultsOpen(false)
     setSelectedUser(null)
+    setPeopleSheetSnap('medium')
     await onStopPeople()
   }
 
@@ -309,9 +372,10 @@ export default function NearbyExplorer({
     if (switchingPeopleMode) onQueryChange('')
     setCategory(nextCategory)
     setSelectedPlaceId(null)
-    setSheetExpanded(false)
+    setPlaceSheetSnap('medium')
     setPeopleResultsOpen(false)
     setSelectedUser(null)
+    if (nextCategory === 'people') setPeopleSheetSnap(users.length ? 'expanded' : 'medium')
     if (nextCategory !== 'people' && location) {
       mapRef.current?.easeTo({ center: [location.longitude, location.latitude], duration: 350 })
     }
@@ -374,9 +438,18 @@ export default function NearbyExplorer({
     : 'Kết quả sẽ tự mở rộng ngay khi tải xong'
 
   return (
-    <section className="nearby-explorer" aria-label="Khám phá quanh đây">
+    <section className={`nearby-explorer${category === 'people' ? ` people-snap-${peopleSheetSnap}` : ''}`} aria-label="Khám phá quanh đây">
       <div className="nearby-map-stage">
         <div ref={mapContainerRef} className="nearby-map-canvas" />
+
+        {mapStatus !== 'ready' && (
+          <div className={`nearby-map-status is-${mapStatus}`} role="status">
+            <span aria-hidden="true">{mapStatus === 'error' ? '!' : '⌖'}</span>
+            <strong>{mapStatus === 'error' ? 'Không tải được bản đồ' : 'Đang tải bản đồ…'}</strong>
+            <small>{mapStatus === 'error' ? 'Danh sách vẫn dùng được. Bạn có thể thử tải lại map.' : 'Đang kết nối dữ liệu bản đồ mở.'}</small>
+            {mapStatus === 'error' && <button type="button" onClick={retryMap}>↻ Thử lại bản đồ</button>}
+          </div>
+        )}
 
         <div className="nearby-floating-top">
           <div className="nearby-title-row">
@@ -447,78 +520,106 @@ export default function NearbyExplorer({
         )}
 
         {viewMode === 'map' && !loadingNearby && (
-          <div className={`nearby-bottom-sheet${category === 'people' ? ' is-people' : ''}${category === 'people' && visibleUsers.length ? ' has-people-results' : ''}${placesBusy ? ' is-loading' : ''}${visiblePlaces.length ? ' has-results' : ''}${selectedPlace ? ' has-selection' : ''}${sheetExpanded ? ' is-expanded' : ' is-collapsed'}`}>
+          <div className={`nearby-bottom-sheet${category === 'people' ? ` is-people snap-${peopleSheetSnap}` : ` is-places snap-${placeSheetSnap}`}${category === 'people' && visibleUsers.length ? ' has-people-results' : ''}${placesBusy ? ' is-loading' : ''}${visiblePlaces.length ? ' has-results' : ''}${selectedPlace ? ' has-selection' : ''}${placeSheetSnap === 'expanded' ? ' is-expanded' : ' is-collapsed'}`}>
             {category !== 'people' ? (
               <button
                 type="button"
                 className="nearby-sheet-handle-button"
-                onClick={() => setSheetExpanded((value) => !value)}
-                aria-label={sheetExpanded ? 'Thu gọn kết quả' : 'Mở rộng kết quả'}
-                aria-expanded={sheetExpanded}
+                onPointerDown={handlePlaceSheetPointerDown}
+                onPointerUp={handlePlaceSheetPointerUp}
+                aria-label={`Bottom sheet địa điểm đang ở mức ${placeSheetSnap}`}
+                aria-expanded={placeSheetSnap === 'expanded'}
               >
                 <span className="nearby-sheet-handle" />
               </button>
             ) : (
-              <div className="nearby-sheet-handle" />
+              <button
+                type="button"
+                className="nearby-people-sheet-handle"
+                onPointerDown={handlePeopleSheetPointerDown}
+                onPointerUp={handlePeopleSheetPointerUp}
+                aria-label={`Bottom sheet đang ở mức ${peopleSheetSnap}`}
+              >
+                <span className="nearby-sheet-handle" />
+              </button>
             )}
             {category === 'people' ? (
               <div className="nearby-people-launcher">
-                <div className="nearby-sheet-heading">
+                <div className="nearby-sheet-heading nearby-people-sheet-heading">
                   <div>
-                    <strong>Tìm người quanh đây</strong>
-                    <small>Chọn phạm vi rồi bắt đầu quét</small>
+                    <strong>{visibleUsers.length ? `${visibleUsers.length} người quanh đây` : 'Tìm người quanh đây'}</strong>
+                    <small>{visibleUsers.length ? `Trong ${peopleRadiusKm} km · gần → xa` : `Trong ${peopleRadiusKm} km · chọn phạm vi rồi quét`}</small>
                   </div>
-                  <span className="nearby-privacy-badge">Ẩn vị trí chính xác</span>
+                  <div className="nearby-people-heading-actions">
+                    {!!visibleUsers.length && (
+                      <button type="button" className="nearby-people-retry" onClick={() => void handlePeopleScan()} disabled={peopleBusy} aria-label="Quét lại">↻</button>
+                    )}
+                    {(peopleActive || users.length > 0) && (
+                      <button type="button" className="nearby-people-stop" onClick={() => void handleStopPeople()} disabled={peopleBusy}>Tắt</button>
+                    )}
+                  </div>
                 </div>
-                <div className="nearby-radius-row" aria-label="Bán kính tìm người">
-                  {[1, 5, 10, 25, 50].map((radius) => (
-                    <button
-                      key={radius}
-                      type="button"
-                      className={peopleRadiusKm === radius ? 'active' : ''}
-                      onClick={() => onPeopleRadiusChange(radius)}
-                      disabled={peopleBusy}
-                    >{radius} km</button>
-                  ))}
-                </div>
-                <div className="nearby-primary-actions">
-                  <button type="button" className="primary" onClick={() => void handlePeopleScan()} disabled={peopleBusy}>
-                    <span>⌖</span>{peopleBusy ? 'Đang chuẩn bị...' : 'Quét người quanh đây'}
-                  </button>
-                  {(peopleActive || users.length > 0) && (
-                    <button type="button" className="ghost" onClick={() => void handleStopPeople()} disabled={peopleBusy}>Tắt</button>
-                  )}
-                </div>
-                {!!visibleUsers.length && !peopleScanning && (
-                  <section className="nearby-people-inline-section" aria-label="Người gần đây">
-                    <div className="nearby-people-inline-head">
-                      <div>
-                        <strong>{visibleUsers.length} người gần đây</strong>
-                        <small>Gần → xa · chạm một người để xem nhanh</small>
-                      </div>
-                      <button type="button" onClick={() => setPeopleResultsOpen(true)}>Mở toàn bộ</button>
-                    </div>
-                    <div className="nearby-people-inline-results">
-                      {visibleUsers.map((user) => (
-                        <article key={user.id} className="nearby-person-inline" onClick={() => setSelectedUser(user)}>
-                          <div className="nearby-person-avatar">{initials(user.displayName || user.username)}</div>
-                          <div>
-                            <strong>{user.displayName || `@${user.username}`}</strong>
-                            <span>@{user.username} · {distanceLabel(user.distanceKm)}</span>
-                            <small>{user.nearbyActive ? '● Vừa hoạt động' : 'Vị trí gần nhất'}</small>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              void onFriendAction(user)
-                            }}
-                            disabled={friendActionBusy === user.id}
-                          >{getFriendActionLabel(user)}</button>
-                        </article>
+
+                {peopleSheetSnap !== 'compact' && (
+                  <>
+                    <div className="nearby-radius-row" aria-label="Bán kính tìm người">
+                      {[1, 5, 10, 25, 50].map((radius) => (
+                        <button
+                          key={radius}
+                          type="button"
+                          className={peopleRadiusKm === radius ? 'active' : ''}
+                          onClick={() => onPeopleRadiusChange(radius)}
+                          disabled={peopleBusy}
+                        >{radius} km</button>
                       ))}
                     </div>
-                  </section>
+
+                    {!visibleUsers.length && (
+                      <div className="nearby-primary-actions">
+                        <button type="button" className="primary" onClick={() => void handlePeopleScan()} disabled={peopleBusy}>
+                          <span>⌖</span>{peopleBusy ? 'Đang chuẩn bị...' : 'Quét người quanh đây'}
+                        </button>
+                      </div>
+                    )}
+
+                    {!visibleUsers.length && peopleActive && !peopleScanning && (
+                      <div className="nearby-people-empty">
+                        <strong>Chưa tìm thấy ai trong {peopleRadiusKm} km</strong>
+                        <small>Thử tăng bán kính hoặc quét lại.</small>
+                        <button type="button" onClick={() => void handlePeopleScan()} disabled={peopleBusy}>↻ Quét lại</button>
+                      </div>
+                    )}
+
+                    {!!visibleUsers.length && !peopleScanning && (
+                      <section className="nearby-people-inline-section" aria-label="Người gần đây">
+                        <div className="nearby-people-inline-results">
+                          {visibleUsers.slice(0, peopleSheetSnap === 'medium' ? 3 : visibleUsers.length).map((user) => (
+                            <article key={user.id} className="nearby-person-inline" onClick={() => setSelectedUser(user)}>
+                              <div className="nearby-person-avatar">{initials(user.displayName || user.username)}</div>
+                              <div>
+                                <strong>{user.displayName || `@${user.username}`}</strong>
+                                <span>@{user.username} · {distanceLabel(user.distanceKm)}</span>
+                                <small>{user.nearbyActive ? '● Vừa hoạt động' : 'Vị trí gần nhất'}</small>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  void onFriendAction(user)
+                                }}
+                                disabled={friendActionBusy === user.id}
+                              >{getFriendActionLabel(user)}</button>
+                            </article>
+                          ))}
+                        </div>
+                        {peopleSheetSnap === 'medium' && visibleUsers.length > 3 && (
+                          <button type="button" className="nearby-people-expand-list" onClick={() => setPeopleSheetSnap('expanded')}>
+                            Xem thêm {visibleUsers.length - 3} người
+                          </button>
+                        )}
+                      </section>
+                    )}
+                  </>
                 )}
               </div>
             ) : selectedPlace ? (
@@ -551,11 +652,11 @@ export default function NearbyExplorer({
                     <button
                       type="button"
                       className="nearby-sheet-list-toggle"
-                      onClick={() => setSheetExpanded((value) => !value)}
-                      aria-expanded={sheetExpanded}
+                      onClick={() => setPlaceSheetSnap((current) => current === 'expanded' ? 'medium' : 'expanded')}
+                      aria-expanded={placeSheetSnap === 'expanded'}
                     >
-                      {sheetExpanded ? 'Thu gọn' : 'Mở rộng'}
-                      <span aria-hidden="true">{sheetExpanded ? '⌄' : '⌃'}</span>
+                      {placeSheetSnap === 'expanded' ? 'Thu gọn' : 'Mở rộng'}
+                      <span aria-hidden="true">{placeSheetSnap === 'expanded' ? '⌄' : '⌃'}</span>
                     </button>
                   </div>
                 </div>
@@ -582,14 +683,14 @@ export default function NearbyExplorer({
                   </div>
                 )}
                 <div className="nearby-preview-list">
-                  {visiblePlaces.slice(0, sheetExpanded ? 12 : 2).map((place) => (
+                  {visiblePlaces.slice(0, placeSheetSnap === 'expanded' ? 12 : placeSheetSnap === 'medium' ? 3 : 0).map((place) => (
                     <button
                       className="nearby-place-preview"
                       type="button"
                       key={place.id}
                       onClick={() => {
                         setSelectedPlaceId(place.id)
-                        setSheetExpanded(true)
+                        setPlaceSheetSnap('expanded')
                         mapRef.current?.easeTo({ center: [place.longitude, place.latitude], duration: 420 })
                       }}
                     >

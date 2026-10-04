@@ -37,6 +37,51 @@
   background: linear-gradient(180deg, rgba(239,245,235,.32), transparent 24%, transparent 72%, rgba(228,235,224,.18));
 }
 
+.nearby-map-status {
+  position: absolute;
+  z-index: 4;
+  top: 45%;
+  left: 50%;
+  width: min(280px, calc(100% - 40px));
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,.78);
+  border-radius: 20px;
+  background: rgba(250,252,248,.96);
+  color: #263322;
+  box-shadow: 0 18px 44px rgba(29,42,25,.14);
+  text-align: center;
+  transform: translate(-50%,-50%);
+}
+.nearby-map-status.is-loading { pointer-events: none; }
+.nearby-map-status > span {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf4e4;
+  color: #5b850f;
+  font-size: 18px;
+  font-weight: 800;
+}
+.nearby-map-status strong { font-size: 12px; font-weight: 820; }
+.nearby-map-status small { max-width: 230px; color: #7c8678; font-size: 10px; line-height: 1.4; }
+.nearby-map-status button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #eaf2df;
+  color: #4b7608;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .nearby-floating-top {
   position: absolute; z-index: 8; top: 18px; left: 20px;
   width: min(560px, calc(100% - 40px)); display: grid; gap: 10px; pointer-events: none;
@@ -1420,6 +1465,150 @@
   }
 }
 
+/* Smart three-snap people sheet: map is context, people list is primary content. */
+.nearby-people-sheet-handle {
+  width: 100%;
+  height: 22px;
+  display: grid;
+  place-items: start center;
+  border: 0;
+  padding: 3px 0 0;
+  background: transparent;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.nearby-people-sheet-handle .nearby-sheet-handle { margin: 0; }
+.nearby-people-sheet-heading { align-items: center; }
+.nearby-people-heading-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.nearby-people-retry,
+.nearby-people-stop,
+.nearby-people-expand-list {
+  border: 0;
+  border-radius: 999px;
+  background: #edf3e8;
+  color: #4c6b2d;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 780;
+  cursor: pointer;
+}
+.nearby-people-retry { width: 34px; height: 34px; padding: 0; font-size: 17px; }
+.nearby-people-stop { min-height: 34px; padding: 6px 10px; color: #6f776c; background: #f0f2ef; }
+.nearby-people-retry:disabled,
+.nearby-people-stop:disabled { opacity: .55; cursor: wait; }
+.nearby-people-empty {
+  min-height: 118px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  border-radius: 16px;
+  background: #f6f8f4;
+  text-align: center;
+}
+.nearby-people-empty strong { font-size: 12px; }
+.nearby-people-empty small { color: #858d82; font-size: 10px; }
+.nearby-people-empty button { min-height: 34px; border: 0; border-radius: 999px; padding: 6px 12px; background: #eaf2df; color: #4b7608; font: inherit; font-size: 10px; font-weight: 800; }
+.nearby-people-expand-list { width: 100%; min-height: 36px; margin-top: 7px; }
+
+@media (max-width: 760px) {
+  .nearby-bottom-sheet.is-people {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: none;
+    transition: height .28s cubic-bezier(.22,.8,.22,1), border-radius .2s ease, box-shadow .2s ease;
+    will-change: height;
+  }
+  .nearby-bottom-sheet.is-people.snap-compact {
+    height: 116px;
+    min-height: 116px;
+  }
+  .nearby-bottom-sheet.is-people.snap-medium {
+    height: min(44dvh, 390px);
+    min-height: 260px;
+  }
+  .nearby-bottom-sheet.is-people.snap-expanded {
+    height: min(70dvh, 650px);
+    min-height: 420px;
+    border-radius: 28px 28px 18px 18px;
+    box-shadow: 0 22px 62px rgba(25,36,22,.19), inset 0 1px 0 rgba(255,255,255,.95);
+  }
+  .nearby-bottom-sheet.is-people .nearby-people-launcher {
+    min-height: 0;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+  .nearby-bottom-sheet.is-people.snap-compact .nearby-people-launcher {
+    justify-content: flex-start;
+  }
+  .nearby-bottom-sheet.is-people .nearby-people-inline-section {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .nearby-bottom-sheet.is-people .nearby-people-inline-results {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nearby-bottom-sheet.is-people.snap-medium .nearby-people-inline-results {
+    max-height: 205px;
+  }
+  .nearby-bottom-sheet.is-people.snap-expanded .nearby-people-inline-results {
+    max-height: none;
+  }
+  .nearby-explorer.people-snap-compact .nearby-map-actions,
+  .nearby-explorer.people-snap-medium .nearby-map-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .nearby-explorer.people-snap-expanded .nearby-map-actions {
+    opacity: .28;
+  }
+
+  .nearby-bottom-sheet.is-places {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    max-height: none;
+    transition: height .28s cubic-bezier(.22,.8,.22,1), border-radius .2s ease, box-shadow .2s ease;
+    will-change: height;
+  }
+  .nearby-bottom-sheet.is-places .nearby-sheet-handle-button { touch-action: none; }
+  .nearby-bottom-sheet.is-places.snap-compact {
+    height: 118px;
+    min-height: 118px;
+    overflow: hidden;
+  }
+  .nearby-bottom-sheet.is-places.snap-medium {
+    height: min(44dvh, 390px);
+    min-height: 240px;
+    overflow-y: auto;
+  }
+  .nearby-bottom-sheet.is-places.snap-expanded {
+    height: min(70dvh, 650px);
+    min-height: 400px;
+    overflow-y: auto;
+    border-radius: 28px 28px 18px 18px;
+    box-shadow: 0 22px 62px rgba(25,36,22,.19), inset 0 1px 0 rgba(255,255,255,.95);
+  }
+  .nearby-bottom-sheet.is-places.snap-compact .nearby-radius-row,
+  .nearby-bottom-sheet.is-places.snap-compact .nearby-error-state,
+  .nearby-bottom-sheet.is-places.snap-compact .nearby-empty-retry,
+  .nearby-bottom-sheet.is-places.snap-compact .nearby-preview-list {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nearby-mini-radar .pulse { animation: none !important; }
+  .nearby-bottom-sheet.is-people { transition: none !important; }
 }
