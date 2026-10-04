@@ -147,7 +147,17 @@ async (page) => {
       return json([{ id: 2, username: 'minhanh', displayName: 'Minh Anh', online: true, status: 'accepted', updatedAt: new Date().toISOString() }])
     }
     if (path === '/api/friends/requests' && request.method() === 'GET') return json([])
+    if (path === '/api/preferences' && request.method() === 'GET') {
+      return json({ autoTranslate: false, targetLanguage: 'en', appLocale: 'auto' })
+    }
+    if (path === '/api/preferences' && request.method() === 'PUT') {
+      return json(request.postDataJSON())
+    }
     if (path === '/api/preferences/translation') return json({ autoTranslate: false, targetLanguage: 'en' })
+    if (path === '/api/i18n/bundle') {
+      const body = request.postDataJSON()
+      return json({ locale: body.locale, version: body.version, messages: body.messages, cache: 'hit' })
+    }
     if (path === '/api/translate') {
       const body = request.postDataJSON()
       translations.push(body)
@@ -483,7 +493,24 @@ async (page) => {
   check(translations.filter((item) => item.text === feedPost.content).length === 1, 'Post translation cache missed')
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: /Cá nhân/ }).click()
-  await page.getByRole('switch', { name: 'Tự động dịch', exact: true }).waitFor()
+  await page.getByRole('switch', { name: 'Tự động dịch tin nhắn', exact: true }).waitFor()
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Profile document overflows at ${width}px`)
+    check(await page.locator('.profile-view').evaluate((node) => node.scrollWidth <= node.clientWidth), `Profile view overflows at ${width}px`)
+    for (const row of await page.locator('.settings-row').all()) {
+      check(await row.evaluate((node) => node.scrollWidth <= node.clientWidth), `Profile settings row overflows at ${width}px`)
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 })
+  const appLocaleButton = page.getByRole('button', { name: /Ngôn ngữ ứng dụng/ })
+  await appLocaleButton.click()
+  const localeSheet = page.locator('.locale-picker-sheet')
+  await localeSheet.waitFor()
+  check(await localeSheet.evaluate((node) => node.scrollWidth <= node.clientWidth), 'App locale picker overflows horizontally')
+  await localeSheet.getByPlaceholder('Tìm ngôn ngữ, quốc gia hoặc mã...', { exact: true }).fill('Nhật')
+  check(await localeSheet.getByText('日本語', { exact: true }).count() > 0, 'App locale search cannot find native language name')
+  await localeSheet.locator('header > button').click()
   check(await page.locator('.chatnet-appbar').count() === 0, 'Profile must not render the global app bar')
   check(await page.locator('.appbar-search').count() === 0, 'Profile exposes a non-functional search')
   check(await page.locator('.profile-identity strong').textContent() === 'Old Display Name', 'Profile must show display name')

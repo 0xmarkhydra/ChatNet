@@ -1,6 +1,21 @@
-import { FormEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
-import { buildLanguageOptions, filterLanguageOptions } from './languages'
+import type { NearbyUser } from './NearbyExplorer'
+
+const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
+import {
+  defaultBundle,
+  loadAppLocalePreference,
+  loadCachedBundle,
+  resolveEffectiveLocale,
+  saveAppLocalePreference,
+  saveCachedBundle,
+  translateUI,
+  UI_BUNDLE_VERSION,
+  UI_MESSAGES,
+  type UIBundle,
+} from './i18n'
+import { buildLanguageOptions, filterLanguageOptions, isSupportedLanguageCode } from './languages'
 import {
   disableOneSignalPush,
   enableOneSignalPush,
@@ -520,6 +535,11 @@ export default function App() {
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
   const [languageSearch, setLanguageSearch] = useState('')
+  const [appLocale, setAppLocale] = useState(loadAppLocalePreference)
+  const [uiBundle, setUiBundle] = useState<UIBundle>(defaultBundle)
+  const [uiLocaleLoading, setUiLocaleLoading] = useState(false)
+  const [localePickerOpen, setLocalePickerOpen] = useState(false)
+  const [localeSearch, setLocaleSearch] = useState('')
   const [targetLanguage, setTargetLanguage] = useState('en')
   const [autoTranslate, setAutoTranslate] = useState(true)
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] = useState(false)
@@ -552,13 +572,20 @@ export default function App() {
     : null
   const activeStoryIndex = stories.findIndex((item) => item.id === activeStoryId)
   const activeStory = activeStoryIndex < 0 ? null : stories[activeStoryIndex]
-  const interfaceLocale = document.documentElement.lang || navigator.language || 'vi'
+  const effectiveAppLocale = resolveEffectiveLocale(appLocale, isSupportedLanguageCode)
+  const interfaceLocale = effectiveAppLocale || 'vi'
   const languageOptions = useMemo(() => buildLanguageOptions(interfaceLocale), [interfaceLocale])
   const selectedLanguage = languageOptions.find((language) => language.value === targetLanguage) || languageOptions[0]
   const visibleLanguageOptions = useMemo(
     () => filterLanguageOptions(languageOptions, languageSearch),
     [languageOptions, languageSearch],
   )
+  const visibleLocaleOptions = useMemo(
+    () => filterLanguageOptions(languageOptions, localeSearch),
+    [languageOptions, localeSearch],
+  )
+  const selectedAppLanguage = languageOptions.find((language) => language.value === effectiveAppLocale) || languageOptions[0]
+  const t = (key: keyof typeof UI_MESSAGES) => translateUI(uiBundle, key)
 
   function setNotice(message: string, kind?: ToastKind) {
     const clean = message.trim()
@@ -1112,47 +1139,64 @@ export default function App() {
       setTranslationPreferencesLoaded(false)
       setAutoTranslate(true)
       setTargetLanguage('en')
+      setAppLocale(loadAppLocalePreference())
       return
     }
 
     let cancelled = false
-    const preferenceKey = `chatnet-translation-preferences:${session.user.id}`
+    const preferenceKey = `chatnet-preferences:${session.user.id}`
     try {
       const cached = JSON.parse(localStorage.getItem(preferenceKey) || 'null') as
-        | { targetLanguage?: string; autoTranslate?: boolean }
+        | { targetLanguage?: string; autoTranslate?: boolean; appLocale?: string }
         | null
-      if (cached?.targetLanguage) setTargetLanguage(cached.targetLanguage)
+      if (cached?.targetLanguage && isSupportedLanguageCode(cached.targetLanguage)) {
+        setTargetLanguage(cached.targetLanguage)
+      }
       if (typeof cached?.autoTranslate === 'boolean') setAutoTranslate(cached.autoTranslate)
+      if (cached?.appLocale === 'auto' || (cached?.appLocale && isSupportedLanguageCode(cached.appLocale))) {
+        setAppLocale(cached.appLocale)
+        saveAppLocalePreference(cached.appLocale)
+      }
     } catch {
       // Ignore malformed local fallback; server preferences remain authoritative.
     }
 
-    apiFetch('/api/preferences/translation')
+    apiFetch('/api/preferences')
       .then(async (response) => {
         if (!response.ok) return null
-        return response.json() as Promise<{ targetLanguage: string; autoTranslate: boolean }>
+        return response.json() as Promise<{
+          targetLanguage: string
+          autoTranslate: boolean
+          appLocale: string
+        }>
       })
       .then((preferences) => {
         if (cancelled) return
         if (preferences) {
-          const nextTarget = preferences.targetLanguage || 'en'
+          const nextTarget = isSupportedLanguageCode(preferences.targetLanguage)
+            ? preferences.targetLanguage
+            : 'en'
           const nextAuto = preferences.autoTranslate !== false
+          const nextLocale = preferences.appLocale === 'auto' || isSupportedLanguageCode(preferences.appLocale)
+            ? preferences.appLocale
+            : 'auto'
+
           setTargetLanguage(nextTarget)
           setAutoTranslate(nextAuto)
+          setAppLocale(nextLocale)
+          saveAppLocalePreference(nextLocale)
           localStorage.setItem(
-            `chatnet-translation-preferences:${session.user.id}`,
-            JSON.stringify({ targetLanguage: nextTarget, autoTranslate: nextAuto }),
+            preferenceKey,
+            JSON.stringify({
+              targetLanguage: nextTarget,
+              autoTranslate: nextAuto,
+              appLocale: nextLocale,
+            }),
           )
-        } else {
-          setTargetLanguage('en')
-          setAutoTranslate(true)
         }
       })
       .catch(() => {
-        if (!cancelled) {
-          setTargetLanguage('en')
-          setAutoTranslate(true)
-        }
+        // Keep local/device preferences when the network is unavailable.
       })
       .finally(() => {
         if (!cancelled) setTranslationPreferencesLoaded(true)
@@ -1163,25 +1207,101 @@ export default function App() {
     }
   }, [session?.token])
 
-  async function saveTranslationPreferences(nextTarget: string, nextAuto: boolean) {
+  async function savePreferences(
+    nextTarget: string,
+    nextAuto: boolean,
+    nextAppLocale: string,
+  ) {
     if (!session?.token) return
+    const preferenceKey = `chatnet-preferences:${session.user.id}`
     localStorage.setItem(
-      `chatnet-translation-preferences:${session.user.id}`,
-      JSON.stringify({ targetLanguage: nextTarget, autoTranslate: nextAuto }),
+      preferenceKey,
+      JSON.stringify({
+        targetLanguage: nextTarget,
+        autoTranslate: nextAuto,
+        appLocale: nextAppLocale,
+      }),
     )
     try {
-      await apiFetch('/api/preferences/translation', {
+      await apiFetch('/api/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           targetLanguage: nextTarget,
           autoTranslate: nextAuto,
+          appLocale: nextAppLocale,
         }),
       })
     } catch {
       // Keep the UI responsive; the next successful save/read will reconcile server state.
     }
   }
+
+  async function saveTranslationPreferences(nextTarget: string, nextAuto: boolean) {
+    await savePreferences(nextTarget, nextAuto, appLocale)
+  }
+
+  async function changeAppLocale(nextLocale: string) {
+    const normalized = nextLocale === 'auto' ? 'auto' : nextLocale.toLowerCase().split('-')[0]
+    if (normalized !== 'auto' && !isSupportedLanguageCode(normalized)) return
+    setAppLocale(normalized)
+    saveAppLocalePreference(normalized)
+    setLocalePickerOpen(false)
+    setLocaleSearch('')
+    if (session?.token) {
+      await savePreferences(targetLanguage, autoTranslate, normalized)
+    }
+  }
+
+  useEffect(() => {
+    document.documentElement.lang = effectiveAppLocale
+
+    const cached = loadCachedBundle(effectiveAppLocale)
+    if (cached) {
+      setUiBundle(cached)
+    } else {
+      setUiBundle(defaultBundle())
+    }
+
+    if (effectiveAppLocale === 'vi' || !session?.token) {
+      setUiLocaleLoading(false)
+      return
+    }
+
+    const token = session.token
+    let cancelled = false
+    setUiLocaleLoading(true)
+
+    apiFetch('/api/i18n/bundle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locale: effectiveAppLocale,
+        version: UI_BUNDLE_VERSION,
+        messages: UI_MESSAGES,
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('cannot load UI locale')
+        return response.json() as Promise<{ locale: string; messages: UIBundle }>
+      })
+      .then((result) => {
+        if (cancelled || sessionRef.current?.token !== token || result.locale !== effectiveAppLocale) return
+        const bundle = { ...defaultBundle(), ...result.messages }
+        setUiBundle(bundle)
+        saveCachedBundle(effectiveAppLocale, bundle)
+      })
+      .catch(() => {
+        // Cached bundle or Vietnamese source remains available as a safe fallback.
+      })
+      .finally(() => {
+        if (!cancelled) setUiLocaleLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [effectiveAppLocale, session?.token])
 
   useEffect(() => {
     if (!session?.token) return
@@ -2422,7 +2542,8 @@ export default function App() {
       {tab !== 'profile' && (
       <header className="chatnet-appbar">
         <div className="appbar-brand"><img src="/icon.svg" width="32" height="32" alt="" /><strong>ChatNet</strong></div>
-        <label className="appbar-search">
+        {tab !== 'discover' && (
+          <label className="appbar-search">
             <UiIcon name="search" size={27} />
             <input
               value={tab === 'contacts' ? friendQuery : globalSearch}
@@ -2432,18 +2553,17 @@ export default function App() {
               }}
               placeholder={
                 tab === 'contacts' ? 'Email hoặc @username'
-                  : tab === 'discover' ? 'Lọc người quanh đây theo @username'
-                    : tab === 'feed' ? 'Tìm tác giả hoặc nội dung bài viết'
-                      : 'Tìm cuộc trò chuyện'
+                  : tab === 'feed' ? 'Tìm tác giả hoặc nội dung bài viết'
+                    : 'Tìm cuộc trò chuyện'
               }
               aria-label={
                 tab === 'contacts' ? 'Tìm bạn bằng email hoặc username'
-                  : tab === 'discover' ? 'Lọc người quanh đây theo username'
-                    : tab === 'feed' ? 'Tìm bài viết'
-                      : 'Tìm cuộc trò chuyện'
+                  : tab === 'feed' ? 'Tìm bài viết'
+                    : 'Tìm cuộc trò chuyện'
               }
             />
           </label>
+        )}
 
         <div className="appbar-actions">
           {tab === 'chat' && (
@@ -2759,8 +2879,8 @@ export default function App() {
                             <div className="translation-hub-popover" role="dialog" aria-label="Cài đặt dịch AI">
                               <div className="translation-hub-heading">
                                 <div>
-                                  <strong>Dịch AI</strong>
-                                  <small>Dịch tự động tin nhắn nhận được</small>
+                                  <strong>{t('translation.title')}</strong>
+                                  <small>{t('translation.subtitle')}</small>
                                 </div>
                                 <button
                                   type="button"
@@ -2779,7 +2899,7 @@ export default function App() {
                                   type="search"
                                   value={languageSearch}
                                   onChange={(event) => setLanguageSearch(event.target.value)}
-                                  placeholder="Tìm ngôn ngữ, quốc gia hoặc mã..."
+                                  placeholder={t('translation.searchPlaceholder')}
                                   autoComplete="off"
                                   autoCapitalize="none"
                                   spellCheck={false}
@@ -2790,8 +2910,8 @@ export default function App() {
                               </label>
 
                               <div className="translation-language-count">
-                                <span>{visibleLanguageOptions.length} ngôn ngữ</span>
-                                <small>Tên theo ngôn ngữ giao diện + tên bản địa</small>
+                                <span>{visibleLanguageOptions.length} {t('translation.languageCount')}</span>
+                                <small>{t('translation.languageHint')}</small>
                               </div>
 
                               <div className="translation-language-list" aria-label="Chọn ngôn ngữ dịch">
@@ -2814,7 +2934,7 @@ export default function App() {
                                 ))}
                                 {visibleLanguageOptions.length === 0 && (
                                   <div className="translation-language-empty">
-                                    Không tìm thấy ngôn ngữ phù hợp.
+                                    {t('translation.noResults')}
                                   </div>
                                 )}
                               </div>
@@ -2993,8 +3113,8 @@ export default function App() {
                                   }))}
                                 >
                                   <span className="translation-flip-icon" aria-hidden="true">{originalVisible ? '↔' : '✦'}</span>
-                                  <b>{originalVisible ? 'GỐC' : targetLanguage.split('-')[0].toUpperCase()}</b>
-                                  <small>{originalVisible ? 'Nguyên văn' : 'AI'}</small>
+                                  <b>{originalVisible ? t('translation.original') : targetLanguage.split('-')[0].toUpperCase()}</b>
+                                  <small>{originalVisible ? t('translation.originalText') : 'AI'}</small>
                                   <span className="translation-flip-swap" aria-hidden="true">↔</span>
                                 </button>
                               )}
@@ -3195,107 +3315,41 @@ export default function App() {
         )}
 
         {tab === 'discover' && (
-          <div className="simple-view discover-view">
-            <div className="simple-view-title">
-              <strong>Quét bạn quanh đây</strong>
-              <small>Gần → xa · tối đa {nearbyRadiusKm} km</small>
-            </div>
-            <div className="nearby-controls">
-              <NearbyRadar />
-              <p aria-live="polite">
-                {nearbyScanning
-                  ? 'Radar đang quét...'
-                  : nearbyUntil
-                    ? 'Vị trí vừa được cập nhật. Kết quả đang xếp từ gần đến xa.'
-                    : nearbyUsers.length
-                      ? 'Đang hiển thị kết quả cache từ lần quét gần nhất.'
-                      : 'Bấm Quét quanh đây để cập nhật vị trí và tìm người dùng gần bạn.'}
-              </p>
-
-              <div className="nearby-radius" aria-label="Bán kính quét">
-                {[1, 5, 10, 25, 50].map((radius) => (
-                  <button
-                    key={radius}
-                    type="button"
-                    className={nearbyRadiusKm === radius ? 'active' : ''}
-                    onClick={() => setNearbyRadiusKm(radius)}
-                    disabled={nearbyBusy}
-                    aria-pressed={nearbyRadiusKm === radius}
-                  >
-                    {radius} km
-                  </button>
-                ))}
-              </div>
-
-              <p className="nearby-privacy">
-                Không hiển thị tọa độ chính xác. Trạng thái “vừa hoạt động” hết sau 15 phút,
-                nhưng vị trí gần nhất được cache tối đa 7 ngày để hỗ trợ nhiều lần quét.
-                Bấm Tắt Quanh đây sẽ xóa cache vị trí ngay.
-              </p>
-              <div className="nearby-actions">
-                <button type="button" onClick={() => void findNearby()} disabled={nearbyBusy}>
-                  <UiIcon name="discover" size={20} />{nearbyScanning ? 'Đang quét...' : nearbyUsers.length ? 'Quét lại' : 'Quét quanh đây'}
-                </button>
-                <button type="button" className="secondary" onClick={() => void stopNearby()} disabled={nearbyBusy}>Tắt Quanh đây</button>
-              </div>
-              {(nearbyUntil > 0 || nearbyUsers.length > 0) && (
-                <p role="status">
-                  {visibleNearbyUsers.length
-                    ? `${visibleNearbyUsers.length} người trong bán kính ${nearbyRadiusKm} km · đã xếp gần → xa`
-                    : 'Chưa tìm thấy người phù hợp quanh đây.'}
-                </p>
-              )}
-            </div>
-
-            <section className="friend-results" aria-label="Người dùng quanh đây">
-              {visibleNearbyUsers.map((friend) => {
-                const relationship = friendRelationship(friend.id)
-                const actionLabel =
-                  relationship === 'accepted'
-                    ? 'Nhắn tin'
-                    : relationship === 'incoming'
-                      ? 'Chấp nhận'
-                      : relationship === 'outgoing'
-                        ? 'Hủy lời mời'
-                        : 'Kết bạn'
-                return (
-                  <div key={friend.id} className="friend-result contact-result nearby-result">
-                    <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                    <div className="friend-result-copy">
-                      <strong>@{friend.username}</strong>
-                      <span>
-                        {formatEstimatedDistance(friend.distanceKm)} · {friend.nearbyActive ? 'vừa hoạt động' : 'vị trí gần nhất'}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="nearby-result-action"
-                      onClick={() => void actOnFriend(friend)}
-                      disabled={friendActionBusy === friend.id}
-                      aria-label={`${actionLabel} @${friend.username}`}
-                    >
-                      {actionLabel}
-                    </button>
-                  </div>
-                )
-              })}
-            </section>
-
-            {nearbyScanning && (
-              <div className="nearby-scan-backdrop" role="dialog" aria-modal="true" aria-labelledby="nearby-scan-title">
-                <div className="nearby-scan-modal">
-                  <div className="nearby-scan-heading">
-                    <strong id="nearby-scan-title">Đang quét quanh đây</strong>
-                    <span>Phạm vi {nearbyRadiusKm} km</span>
-                  </div>
-                  <NearbyRadar scanning large />
-                  <p>Đang cập nhật vị trí và tìm người gần nhất...</p>
-                  <div className="nearby-scan-progress" aria-hidden="true"><span /></div>
-                  <small>Kết quả sẽ được xếp tự động từ gần đến xa</small>
-                </div>
+          <Suspense
+            fallback={(
+              <div className="nearby-module-loading" role="status">
+                <span>⌖</span>
+                <strong>Đang mở Quanh đây</strong>
+                <small>Chuẩn bị bản đồ và lớp khám phá địa phương...</small>
               </div>
             )}
-          </div>
+          >
+            <NearbyExplorer
+              query={globalSearch}
+              onQueryChange={setGlobalSearch}
+              users={visibleNearbyUsers as NearbyUser[]}
+              peopleBusy={nearbyBusy}
+              peopleScanning={nearbyScanning}
+              peopleActive={nearbyUntil > 0}
+              peopleRadiusKm={nearbyRadiusKm}
+              onPeopleRadiusChange={setNearbyRadiusKm}
+              onScanPeople={findNearby}
+              onStopPeople={stopNearby}
+              friendActionBusy={friendActionBusy}
+              onFriendAction={actOnFriend}
+              getFriendActionLabel={(friend) => {
+                const relationship = friendRelationship(friend.id)
+                return relationship === 'accepted'
+                  ? 'Nhắn tin'
+                  : relationship === 'incoming'
+                    ? 'Chấp nhận'
+                    : relationship === 'outgoing'
+                      ? 'Hủy lời mời'
+                      : 'Kết bạn'
+              }}
+              onNotice={setNotice}
+            />
+          </Suspense>
         )}
 
         {tab === 'feed' && (
@@ -3699,7 +3753,7 @@ export default function App() {
               <div className={`profile-cover-art ${profileMedia?.coverSet ? 'has-cover' : ''}`}>
                 <div className="profile-cover-placeholder">
                   <strong>ChatNet</strong>
-                  <small>Kết nối không biên giới</small>
+                  <small>{t('profile.tagline')}</small>
                 </div>
                 {profileMedia?.coverSet && (
                   <img
@@ -3719,7 +3773,11 @@ export default function App() {
                   onClick={() => coverFileInputRef.current?.click()}
                 >
                   <UiIcon name="photo" size={17} />
-                  {profileBusy === 'cover' ? 'Đang tải...' : profileMedia?.coverSet ? 'Đổi ảnh bìa' : 'Thêm ảnh bìa'}
+                  {profileBusy === 'cover'
+                    ? t('common.loading')
+                    : profileMedia?.coverSet
+                      ? t('profile.changeCover')
+                      : t('profile.addCover')}
                 </button>
               </div>
 
@@ -3742,7 +3800,7 @@ export default function App() {
                   <span>@{name}</span>
                   <small className="profile-email">{session.user.email}</small>
                   <small className="profile-media-hint">
-                    {profileBusy === 'avatar' ? 'Đang cập nhật ảnh đại diện...' : 'Bấm biểu tượng máy ảnh để đổi avatar'}
+                    {profileBusy === 'avatar' ? t('profile.avatarUpdating') : t('profile.avatarHint')}
                   </small>
                 </div>
               </div>
@@ -3751,24 +3809,24 @@ export default function App() {
             <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
               <div className="profile-edit-heading">
                 <div>
-                  <strong>Thông tin cá nhân</strong>
-                  <small>Đổi tên hiển thị và username của bạn</small>
+                  <strong>{t('profile.personalInfo')}</strong>
+                  <small>{t('profile.personalInfoHint')}</small>
                 </div>
               </div>
               <label className="profile-edit-field">
-                <span>Tên hiển thị</span>
+                <span>{t('profile.displayName')}</span>
                 <input
                   type="text"
                   value={profileDisplayNameDraft}
                   onChange={(event) => setProfileDisplayNameDraft(event.target.value)}
                   maxLength={100}
                   autoComplete="name"
-                  placeholder="Tên của bạn"
+                  placeholder={t('profile.displayNamePlaceholder')}
                   disabled={profileSaving}
                 />
               </label>
               <label className="profile-edit-field">
-                <span>Username</span>
+                <span>{t('profile.username')}</span>
                 <div className="profile-username-input">
                   <b aria-hidden="true">@</b>
                   <input
@@ -3785,7 +3843,7 @@ export default function App() {
                     disabled={profileSaving}
                   />
                 </div>
-                <small>3–32 ký tự: chữ thường, số, dấu chấm, _ hoặc -</small>
+                <small>{t('profile.usernameHint')}</small>
               </label>
               <button
                 type="submit"
@@ -3799,13 +3857,35 @@ export default function App() {
                   )
                 }
               >
-                {profileSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                {profileSaving ? t('common.saving') : t('common.save')}
               </button>
             </form>
 
             <section className="settings-card">
+              <button
+                type="button"
+                className="settings-row settings-row-button app-locale-row"
+                onClick={() => {
+                  setLocaleSearch('')
+                  setLocalePickerOpen(true)
+                }}
+              >
+                <div>
+                  <strong>{t('profile.appLanguage')}</strong>
+                  <small>{t('profile.appLanguageHint')}</small>
+                </div>
+                <span className="settings-current-locale">
+                  <b aria-hidden="true">{selectedAppLanguage?.flag || '🌐'}</b>
+                  <span>
+                    {appLocale === 'auto' ? t('common.auto') : selectedAppLanguage?.localizedLanguage}
+                    {uiLocaleLoading ? ' · …' : ''}
+                  </span>
+                  <i aria-hidden="true">›</i>
+                </span>
+              </button>
+
               <div className="settings-row">
-                <div><strong>Thông báo</strong><small>Cho phép bật/tắt bất cứ lúc nào</small></div>
+                <div><strong>{t('profile.notifications')}</strong><small>{t('profile.notificationsHint')}</small></div>
                 <button
                   type="button"
                   className={`switch-button ${pushEnabled ? 'on' : ''}`}
@@ -3817,22 +3897,22 @@ export default function App() {
                 ><span /></button>
               </div>
               <div className="settings-row">
-                <div><strong>Test thông báo</strong><small>Bắn một push thử tới thiết bị này</small></div>
-                <button type="button" className="settings-action" onClick={() => void sendTestPush()} disabled={pushBusy || !pushEnabled}>Test</button>
+                <div><strong>{t('profile.testNotification')}</strong><small>{t('profile.testNotificationHint')}</small></div>
+                <button type="button" className="settings-action" onClick={() => void sendTestPush()} disabled={pushBusy || !pushEnabled}>{t('common.test')}</button>
               </div>
               <div className="settings-row">
-                <div><strong>Tự động dịch tin nhắn</strong></div>
+                <div><strong>{t('profile.autoTranslate')}</strong></div>
                 <button
                   type="button"
                   className={`switch-button ${autoTranslate ? 'on' : ''}`}
                   onClick={() => changeAutoTranslate(!autoTranslate)}
-                  aria-label="Tự động dịch"
+                  aria-label={t('profile.autoTranslate')}
                   role="switch"
                   aria-checked={autoTranslate}
                 ><span /></button>
               </div>
               <label className="settings-row settings-language">
-                <div><strong>Ngôn ngữ dịch</strong><small>Giữ nguyên sau khi F5/mở lại app</small></div>
+                <div><strong>{t('profile.translationLanguage')}</strong><small>{t('profile.translationLanguageHint')}</small></div>
                 <select value={targetLanguage} onChange={(event) => changeTargetLanguage(event.target.value)}>
                   {languageOptions.map((language) => (
                     <option key={language.value} value={language.value}>
@@ -3843,9 +3923,86 @@ export default function App() {
               </label>
             </section>
 
+            {localePickerOpen && (
+              <div className="locale-picker-overlay" role="dialog" aria-modal="true" aria-label={t('locale.title')}>
+                <button
+                  type="button"
+                  className="locale-picker-backdrop"
+                  aria-label={t('common.close')}
+                  onClick={() => setLocalePickerOpen(false)}
+                />
+                <section className="locale-picker-sheet">
+                  <header>
+                    <div>
+                      <strong>{t('locale.title')}</strong>
+                      <small>{t('locale.subtitle')}</small>
+                    </div>
+                    <button type="button" aria-label={t('common.close')} onClick={() => setLocalePickerOpen(false)}>×</button>
+                  </header>
+
+                  <label className="locale-picker-search">
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                      type="search"
+                      value={localeSearch}
+                      onChange={(event) => setLocaleSearch(event.target.value)}
+                      placeholder={t('locale.searchPlaceholder')}
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                    />
+                    {localeSearch && (
+                      <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setLocaleSearch('')}>×</button>
+                    )}
+                  </label>
+
+                  {!localeSearch && (
+                    <button
+                      type="button"
+                      className={`locale-option locale-auto-option ${appLocale === 'auto' ? 'active' : ''}`}
+                      onClick={() => void changeAppLocale('auto')}
+                    >
+                      <span className="locale-option-flag" aria-hidden="true">⚙️</span>
+                      <span className="locale-option-copy">
+                        <strong>{t('locale.device')}</strong>
+                        <small>{t('locale.deviceHint')}</small>
+                        <em>{selectedAppLanguage?.flag} {selectedAppLanguage?.localizedLanguage}</em>
+                      </span>
+                      {appLocale === 'auto' && <i aria-hidden="true">✓</i>}
+                    </button>
+                  )}
+
+                  <div className="locale-picker-list">
+                    {visibleLocaleOptions.map((language) => (
+                      <button
+                        key={language.value}
+                        type="button"
+                        className={`locale-option ${appLocale === language.value ? 'active' : ''}`}
+                        onClick={() => void changeAppLocale(language.value)}
+                      >
+                        <span className="locale-option-flag" aria-hidden="true">{language.flag}</span>
+                        <span className="locale-option-copy">
+                          <strong>{language.localizedLanguage}</strong>
+                          <small>{language.nativeLanguage}</small>
+                          <em>{language.localizedRegion} · {language.nativeRegion}</em>
+                        </span>
+                        <b>{language.code}</b>
+                        {appLocale === language.value && <i aria-hidden="true">✓</i>}
+                      </button>
+                    ))}
+                    {visibleLocaleOptions.length === 0 && (
+                      <div className="locale-picker-empty">{t('locale.noResults')}</div>
+                    )}
+                  </div>
+
+                  <footer>{t('locale.dynamicHint')}</footer>
+                </section>
+              </div>
+            )}
+
             <section className="profile-actions">
-              {!isStandalone && <button type="button" onClick={() => void installApp()}>Cài ChatNet vào điện thoại</button>}
-              <button type="button" className="danger-action" onClick={logout}>Đăng xuất</button>
+              {!isStandalone && <button type="button" onClick={() => void installApp()}>{t('profile.install')}</button>}
+              <button type="button" className="danger-action" onClick={logout}>{t('profile.logout')}</button>
             </section>
           </div>
         )}
@@ -3854,23 +4011,23 @@ export default function App() {
       <nav className="bottom-navigation" aria-label="Điều hướng chính">
         <button type="button" className={tab === 'chat' ? 'active' : ''} onClick={() => switchTab('chat')}>
           <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b>{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
-          <span>Tin nhắn</span>
+          <span>{t('nav.chat')}</span>
         </button>
         <button type="button" className={tab === 'contacts' ? 'active' : ''} onClick={() => switchTab('contacts')}>
           <span className="nav-icon"><UiIcon name="contacts" size={25} /></span>
-          <span>Danh bạ</span>
+          <span>{t('nav.contacts')}</span>
         </button>
         <button type="button" className={tab === 'discover' ? 'active' : ''} onClick={() => switchTab('discover')}>
           <span className="nav-icon"><UiIcon name="discover" size={25} /></span>
-          <span>Quanh đây</span>
+          <span>{t('nav.discover')}</span>
         </button>
         <button type="button" className={tab === 'feed' ? 'active' : ''} onClick={() => switchTab('feed')}>
           <span className="nav-icon"><UiIcon name="wall" size={25} /></span>
-          <span>Bảng tin</span>
+          <span>{t('nav.feed')}</span>
         </button>
         <button type="button" className={tab === 'profile' ? 'active' : ''} onClick={() => switchTab('profile')}>
           <span className="nav-icon"><UiIcon name="profile" size={25} />{!pushEnabled && <b>!</b>}</span>
-          <span>Cá nhân</span>
+          <span>{t('nav.profile')}</span>
         </button>
       </nav>
     </main>

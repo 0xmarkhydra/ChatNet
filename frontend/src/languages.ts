@@ -38,6 +38,12 @@ xh yi yo
 za zh zu
 `.trim().split(/\s+/)
 
+const ISO_639_1_SET = new Set(ISO_639_1_CODES)
+
+export function isSupportedLanguageCode(value: string) {
+  return ISO_639_1_SET.has(value.trim().toLowerCase().split('-')[0])
+}
+
 function safeDisplayName(locale: string, type: 'language' | 'region', value: string) {
   try {
     const names = new Intl.DisplayNames([locale], { type })

@@ -1449,12 +1449,18 @@
 
 .settings-card,
 .profile-actions {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: grid;
   margin-top: 10px;
   background: #fff;
 }
 
 .settings-row {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 66px;
   display: flex;
   align-items: center;
@@ -1462,6 +1468,16 @@
   gap: 14px;
   padding: 10px 16px;
   border-bottom: 1px solid #edf0f2;
+}
+
+.settings-row > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.settings-row > div:first-child strong,
+.settings-row > div:first-child small {
+  overflow-wrap: anywhere;
 }
 
 .settings-row strong,
@@ -1519,11 +1535,306 @@
 }
 
 .settings-language select {
+  width: min(145px, 42vw);
   max-width: 145px;
+  min-width: 0;
+  flex: 0 1 145px;
+  overflow: hidden;
   border: 1px solid #dde2e7;
   border-radius: 9px;
   padding: 7px 9px;
   background: #fff;
+  text-overflow: ellipsis;
+}
+
+.settings-row-button {
+  border: 0;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-row-button:hover {
+  background: #fafbf9;
+}
+
+.settings-current-locale {
+  min-width: 0;
+  max-width: 48%;
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: #66717b;
+}
+
+.settings-current-locale > b {
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.settings-current-locale > span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-current-locale > i {
+  flex: 0 0 auto;
+  color: #9aa2aa;
+  font-size: 20px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.locale-picker-overlay {
+  position: fixed;
+  z-index: 520;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.locale-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(15, 20, 18, .44);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.locale-picker-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(480px, calc(100vw - 24px));
+  max-width: 100%;
+  max-height: min(82dvh, 680px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 22px;
+  background: #18201d;
+  color: #f5f7f5;
+  box-shadow: 0 26px 80px rgba(10, 15, 13, .34);
+}
+
+.locale-picker-sheet > header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px;
+}
+
+.locale-picker-sheet > header > div {
+  min-width: 0;
+}
+
+.locale-picker-sheet > header strong,
+.locale-picker-sheet > header small {
+  display: block;
+}
+
+.locale-picker-sheet > header strong {
+  font-size: 16px;
+}
+
+.locale-picker-sheet > header small {
+  margin-top: 3px;
+  color: #aeb8b2;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.locale-picker-sheet > header > button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255,255,255,.08);
+  color: #eef2ef;
+  font: inherit;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.locale-picker-search {
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  margin: 0 14px 10px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 13px;
+  background: rgba(255,255,255,.065);
+}
+
+.locale-picker-search > span {
+  color: #aeb8b2;
+  font-size: 20px;
+}
+
+.locale-picker-search input {
+  min-width: 0;
+  width: 100%;
+  height: 42px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #fff;
+  outline: none;
+  box-shadow: none;
+  font-size: 16px;
+}
+
+.locale-picker-search input::placeholder {
+  color: #7f8a84;
+}
+
+.locale-picker-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.locale-picker-search button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255,255,255,.08);
+  color: #d0d6d2;
+  font-size: 17px;
+}
+
+.locale-auto-option {
+  margin: 0 14px 8px;
+}
+
+.locale-picker-list {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  gap: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 14px 12px;
+  overscroll-behavior: contain;
+}
+
+.locale-option {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 14px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,.045);
+  color: #f3f6f3;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.locale-option.active {
+  border-color: rgba(118,185,0,.44);
+  background: rgba(118,185,0,.13);
+}
+
+.locale-option-flag {
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+}
+
+.locale-option-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.locale-option-copy strong,
+.locale-option-copy small,
+.locale-option-copy em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locale-option-copy strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.locale-option-copy small {
+  color: #c0c8c3;
+  font-size: 11px;
+}
+
+.locale-option-copy em {
+  color: #7f8c84;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.locale-option > b {
+  align-self: start;
+  margin-top: 3px;
+  color: #a7ca75;
+  font-size: 9px;
+  letter-spacing: .05em;
+}
+
+.locale-option > i {
+  position: absolute;
+  right: 9px;
+  bottom: 8px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(118,185,0,.18);
+  color: #a8d56a;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.locale-picker-empty {
+  padding: 28px 14px;
+  color: #9ca7a1;
+  text-align: center;
+  font-size: 12px;
+}
+
+.locale-picker-sheet > footer {
+  padding: 10px 16px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255,255,255,.07);
+  color: #7f8c84;
+  font-size: 10px;
+  text-align: center;
 }
 
 .profile-actions button {
@@ -2220,10 +2531,26 @@
   background: #eef3f7;
 }
 
+.profile-view {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.profile-view > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .profile-hero {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: block;
-  overflow: visible;
+  overflow-x: clip;
+  overflow-y: visible;
   padding: 0;
   background: #fff;
 }
@@ -2584,6 +2911,88 @@
 
   .profile-identity-copy {
     padding-top: 50px;
+  }
+
+  .profile-view,
+  .profile-hero,
+  .profile-edit-card,
+  .settings-card,
+  .profile-actions,
+  .settings-row {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .profile-view {
+    overflow-x: clip;
+  }
+
+  .profile-cover-edit {
+    right: 10px;
+    max-width: calc(100% - 20px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .profile-edit-card {
+    padding-inline: 14px;
+  }
+
+  .settings-row {
+    gap: 10px;
+    padding-inline: 14px;
+  }
+
+  .settings-row > div:first-child {
+    min-width: 0;
+    max-width: 62%;
+  }
+
+  .settings-language {
+    align-items: center;
+  }
+
+  .settings-language select {
+    width: min(132px, 38vw);
+    max-width: 38vw;
+    min-width: 0;
+    flex: 0 1 132px;
+  }
+
+  .settings-current-locale {
+    max-width: 42%;
+  }
+
+  .locale-picker-overlay {
+    place-items: end center;
+    padding: 0;
+  }
+
+  .locale-picker-sheet {
+    width: 100%;
+    max-width: 100%;
+    max-height: min(86dvh, 680px);
+    border-radius: 22px 22px 0 0;
+    border-bottom: 0;
+  }
+
+  .locale-picker-list {
+    padding-inline: 12px;
+  }
+
+  .locale-auto-option {
+    margin-inline: 12px;
+  }
+
+  .bottom-navigation > button > span:last-child {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding-inline: 2px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .chatnet-appbar {
