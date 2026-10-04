@@ -229,11 +229,13 @@ export default function NearbyExplorer({
         setPlaces(items)
         setSelectedPlaceId((current) =>
           current && items.some((item) => item.id === current) ? current : null)
+        setSheetExpanded(true)
       })
       .catch((error) => {
         if (controller.signal.aborted) return
         setPlaces([])
         setPlacesError(error instanceof Error ? error.message : 'Chưa tải được địa điểm quanh đây.')
+        setSheetExpanded(true)
       })
       .finally(() => {
         if (!controller.signal.aborted) setPlacesBusy(false)
@@ -334,6 +336,24 @@ export default function NearbyExplorer({
         : `${visiblePlaces.length} địa điểm · trong ${placeRadiusKm < 1 ? '500 m' : `${placeRadiusKm} km`}`
     : 'Bật vị trí để xem những gì ở gần bạn'
 
+  const loadingNearby = locationBusy || (category === 'people' ? peopleScanning : placesBusy)
+  const activeCategoryLabel = categories.find((item) => item.id === category)?.label || 'địa điểm'
+  const loadingTitle = locationBusy
+    ? 'Đang xác định vị trí của bạn'
+    : category === 'people'
+      ? 'Đang tìm người quanh bạn'
+      : category === 'all'
+        ? 'Đang khám phá quanh bạn'
+        : `Đang tìm ${activeCategoryLabel.toLocaleLowerCase('vi-VN')} quanh bạn`
+  const loadingRange = locationBusy
+    ? 'Đang kết nối GPS…'
+    : category === 'people'
+      ? `Trong phạm vi ${peopleRadiusKm} km`
+      : `Trong phạm vi ${placeRadiusKm < 1 ? '500 m' : `${placeRadiusKm} km`}`
+  const loadingHint = category === 'people'
+    ? 'Vị trí chính xác của mọi người luôn được ẩn'
+    : 'Kết quả sẽ tự mở rộng ngay khi tải xong'
+
   return (
     <section className="nearby-explorer" aria-label="Khám phá quanh đây">
       <div className="nearby-map-stage">
@@ -398,18 +418,6 @@ export default function NearbyExplorer({
               <strong>{peopleScanning ? '•••' : visibleUsers.length}</strong>
               <small>{peopleScanning ? 'Đang quét' : 'người gần bạn'}</small>
             </div>
-          </div>
-        )}
-
-        {category !== 'people' && location && placesBusy && !selectedPlace && (
-          <div className="nearby-map-loading" role="status" aria-live="polite">
-            <div className="nearby-mini-radar" aria-hidden="true">
-              <span className="pulse pulse-a" />
-              <span className="pulse pulse-b" />
-              <b>⌖</b>
-            </div>
-            <strong>Đang khám phá quanh bạn</strong>
-            <span>{placeRadiusKm < 1 ? 'Trong bán kính 500 m' : `Trong bán kính ${placeRadiusKm} km`}</span>
           </div>
         )}
 
@@ -544,8 +552,8 @@ export default function NearbyExplorer({
         )}
       </div>
 
-      {category === 'people' && peopleScanning && createPortal(
-        <div className="nearby-radar-overlay" role="dialog" aria-modal="true" aria-label="Đang tìm người quanh đây">
+      {loadingNearby && createPortal(
+        <div className="nearby-radar-overlay" role="dialog" aria-modal="true" aria-label={loadingTitle}>
           <div className="nearby-radar-modal">
             <div className="nearby-radar-visual" aria-hidden="true">
               <span className="nearby-radar-ring ring-1" />
@@ -557,9 +565,9 @@ export default function NearbyExplorer({
               <span className="nearby-radar-dot dot-3" />
               <span className="nearby-radar-center" />
             </div>
-            <strong>Đang tìm người quanh bạn</strong>
-            <span>Trong phạm vi {peopleRadiusKm} km</span>
-            <small>Vị trí chính xác của mọi người luôn được ẩn</small>
+            <strong>{loadingTitle}</strong>
+            <span>{loadingRange}</span>
+            <small>{loadingHint}</small>
           </div>
         </div>,
         document.body,
