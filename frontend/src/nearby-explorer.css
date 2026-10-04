@@ -1292,6 +1292,9 @@
 .nearby-map-canvas::after {
   pointer-events: none;
 }
+.nearby-map-canvas::after {
+  display: none;
+}
 .nearby-map-canvas,
 .nearby-map-canvas .maplibregl-map,
 .nearby-map-canvas .maplibregl-canvas-container,

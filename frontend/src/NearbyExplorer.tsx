@@ -83,9 +83,9 @@ function osmStyle(): maplibregl.StyleSpecification {
         type: 'raster',
         source: 'osm',
         paint: {
-          'raster-saturation': -0.55,
-          'raster-contrast': -0.08,
-          'raster-brightness-min': 0.84,
+          'raster-saturation': -0.12,
+          'raster-contrast': 0.04,
+          'raster-brightness-min': 0,
           'raster-brightness-max': 1,
         },
       },
@@ -152,6 +152,9 @@ export default function NearbyExplorer({
       keyboard: true,
     })
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+    map.dragPan.enable()
+    map.scrollZoom.enable()
+    map.doubleClickZoom.enable()
     map.touchZoomRotate.enable()
     map.touchZoomRotate.disableRotation()
     map.once('load', () => map.resize())
