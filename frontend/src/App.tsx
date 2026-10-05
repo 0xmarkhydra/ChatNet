@@ -2,7 +2,7 @@ import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useMemo, use
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
-import { Check, RefreshCw, UserCheck, UserPlus, X } from 'lucide-react'
+import { Bell, Check, RefreshCw, UserCheck, UserPlus, X } from 'lucide-react'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
 const ProfileQr = lazy(() => import('./ProfileQr'))
@@ -23,6 +23,7 @@ import {
   disableOneSignalPush,
   enableOneSignalPush,
   getOneSignalPushState,
+  isPushDisabled,
   setupOneSignal,
   type PushState,
 } from './onesignal'
@@ -561,6 +562,8 @@ export default function App() {
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   const [pushInitFailed, setPushInitFailed] = useState(false)
+  const [pushPrompt, setPushPrompt] = useState(false)
+  const [pushPromptDismissed, setPushPromptDismissed] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const postComposerRef = useRef<HTMLTextAreaElement>(null)
   const chatFileInputRef = useRef<HTMLInputElement>(null)
@@ -1211,11 +1214,12 @@ export default function App() {
   async function syncPushState(state: PushState) {
     if (!session?.token || !state.subscriptionId) return
 
-    await apiFetch('/api/push/subscription', {
+    const response = await apiFetch('/api/push/subscription', {
       method: state.optedIn ? 'POST' : 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subscriptionId: state.subscriptionId }),
     })
+    if (!response.ok) throw new Error('Không lưu được đăng ký thông báo.')
   }
 
   useEffect(() => {
@@ -1407,6 +1411,8 @@ export default function App() {
   }, [session?.token])
 
   useEffect(() => {
+    setPushPrompt(false)
+    setPushPromptDismissed(false)
     if (!session?.token) {
       setPushConfigured(false)
       setPushAppId('')
@@ -1438,11 +1444,13 @@ export default function App() {
           const state = await setupOneSignal(config.appId, async (nextState) => {
             if (cancelled) return
             setPushEnabled(nextState.optedIn)
+            setPushPrompt(nextState.supported && nextState.permission === 'default' && !isPushDisabled())
             await syncPushState(nextState)
           })
 
           if (!cancelled) {
             setPushEnabled(state.optedIn)
+            setPushPrompt(state.supported && state.permission === 'default' && !isPushDisabled())
             await syncPushState(state)
           }
         } catch (error) {
@@ -1523,6 +1531,7 @@ export default function App() {
         : await enableOneSignalPush()
 
       setPushEnabled(state.optedIn)
+      setPushPrompt(state.supported && state.permission === 'default' && !isPushDisabled())
       await syncPushState(state)
 
       if (state.permission === 'denied') {
@@ -1533,13 +1542,10 @@ export default function App() {
         setNotice('Thiết bị hoặc trình duyệt này chưa hỗ trợ Web Push.')
       } else if (!pushEnabled && !state.optedIn) {
         setNotice(
-          'Chưa đăng ký được Push Notification. Hãy Allow thông báo rồi bấm 🔕 thêm một lần.',
+          'Chưa bật được thông báo. Vui lòng thử lại và chọn Cho phép.',
         )
       } else if (state.optedIn) {
-        setNotice('Đã bật thông báo ChatNet. Đang gửi thông báo test...')
-        window.setTimeout(() => {
-          void sendTestPush(false, true)
-        }, 500)
+        setNotice('Đã bật thông báo ChatNet.')
       } else {
         setNotice('Đã tắt thông báo ChatNet')
       }
@@ -2666,10 +2672,9 @@ export default function App() {
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
-      {tab !== 'profile' && (
+      {tab !== 'profile' && tab !== 'discover' && (
       <header className="chatnet-appbar">
         <div className="appbar-brand"><img src="/icon.svg" width="32" height="32" alt="" /><strong>ChatNet</strong></div>
-        {tab !== 'discover' && (
           <label className="appbar-search">
             <UiIcon name="search" size={27} />
             <input
@@ -2690,8 +2695,6 @@ export default function App() {
               }
             />
           </label>
-        )}
-
         <div className="appbar-actions">
           {tab === 'chat' && (
             <>
@@ -2757,6 +2760,21 @@ export default function App() {
 
         </div>
       </header>
+      )}
+
+      {pushPrompt && !pushPromptDismissed && !pushEnabled && (
+        <section className="push-onboarding" aria-label="Thông báo tin nhắn" aria-live="polite">
+          <Bell size={22} aria-hidden="true" />
+          <strong>Nhận thông báo tin nhắn mới?</strong>
+          <div className="push-onboarding-actions">
+            <button type="button" onClick={() => setPushPromptDismissed(true)} disabled={pushBusy}>
+              Để sau
+            </button>
+            <button className="push-onboarding-enable" type="button" onClick={() => void togglePush()} disabled={pushBusy}>
+              {pushBusy ? 'Đang bật...' : 'Bật thông báo'}
+            </button>
+          </div>
+        </section>
       )}
 
       {notice && (
@@ -3590,6 +3608,7 @@ export default function App() {
                 <UserAvatar name={name} className="avatar self-avatar" />
                 <textarea
                   ref={postComposerRef}
+                  aria-label="Nội dung bài viết"
                   placeholder="Hôm nay bạn thế nào?"
                   value={postText}
                   onChange={(event) => setPostText(event.target.value)}

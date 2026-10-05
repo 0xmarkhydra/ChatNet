@@ -1249,10 +1249,11 @@
 .zalo-post-composer {
   position: relative;
   gap: 0;
-  margin: 0 0 9px;
+  margin: 0;
   border: 0;
   border-radius: 0;
-  padding: 12px 12px 9px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e4e6e8;
   box-shadow: none;
 }
 
@@ -1268,6 +1269,7 @@
 }
 
 .zalo-post-composer textarea {
+  min-width: 0;
   min-height: 42px;
   max-height: 120px;
   resize: none;
@@ -1312,10 +1314,9 @@
 .composer-shortcuts button:nth-child(4) svg { color: #4c7800; }
 
 .feed-submit {
-  position: absolute;
-  top: 15px;
-  right: 13px;
-  min-height: 32px;
+  justify-self: end;
+  margin-top: 8px;
+  min-height: 44px;
   border: 0;
   border-radius: 9px;
   padding: 0 11px;
@@ -1329,6 +1330,8 @@
 }
 
 .zalo-post {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
   gap: 10px;
   border: 0;
   border-radius: 0;
@@ -1336,7 +1339,17 @@
   box-shadow: none;
 }
 
+.zalo-post .post-body { display: contents; }
+.zalo-post .post-body > * { grid-column: 1 / -1; min-width: 0; }
+.zalo-post .post-body > .post-author { grid-column: 2; grid-row: 1; }
+.zalo-post .post-author > div { min-width: 0; overflow-wrap: anywhere; }
+.zalo-post .post-more { flex-shrink: 0; }
+.zalo-post .feed-media-preview:empty { display: none; }
+
 .zalo-post > .avatar {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1;
   width: 42px;
   height: 42px;
   flex-basis: 42px;
@@ -2646,8 +2659,8 @@
   z-index: 6;
   right: -2px;
   bottom: 1px;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 2px solid #fff;
@@ -2662,12 +2675,12 @@
   z-index: 4;
   right: 12px;
   bottom: 10px;
-  min-height: 34px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 7px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, .9);
   color: #252b31;
   box-shadow: 0 3px 12px rgba(0, 0, 0, .16);
@@ -2703,7 +2716,7 @@
 .profile-edit-card {
   display: grid;
   gap: 14px;
-  margin-top: 10px;
+  margin-top: 0;
   padding: 18px;
   background: #fff;
 }
@@ -2751,7 +2764,7 @@
 }
 
 .profile-edit-field input:focus {
-  border-color: #d6dce2;
+  border-color: #4c7800;
   background: #fff;
   box-shadow: none;
 }
@@ -2773,7 +2786,7 @@
 }
 
 .profile-username-input:focus-within {
-  border-color: #d6dce2;
+  border-color: #4c7800;
   background: #fff;
   box-shadow: none;
 }
@@ -3118,12 +3131,12 @@
   }
 
   .story-card {
-    width: 98px;
-    flex-basis: 98px;
+    width: 88px;
+    flex-basis: 88px;
   }
 
   .story-visual {
-    height: 138px;
+    height: 116px;
   }
 
   .zalo-post > .avatar {
@@ -3309,8 +3322,38 @@ body { background: #e9ecef; }
 .bubble { border-radius: 20px 20px 20px 6px; box-shadow: 0 1px 3px #191e2305, 0 4px 12px #191e2305; }
 .translation { border-radius: 14px; box-shadow: none; }
 .modern-frame, .profile-avatar, .smart-avatar { box-shadow: none; }
-.zalo-feed { padding: 0 10px 12px; }
-.zalo-post { border-radius: 18px; box-shadow: 0 1px 3px #191e2305, 0 4px 12px #191e2305; }
+.zalo-feed { padding: 12px 0; }
+.zalo-post { border-radius: 8px; box-shadow: none; border: 1px solid #e4e6e8; }
+.zalo-feed-view { padding: 0 max(16px, calc((100% - 720px) / 2)); }
+.zalo-post .media-item img, .zalo-post .media-item video { max-height: 520px; object-fit: contain; border-radius: 8px; }
+.zalo-post-composer textarea:focus-visible { outline: 2px solid var(--chatnet-accent-ink); outline-offset: 2px; }
+.profile-view { background: #fff; }
+.profile-view .settings-card, .profile-view .profile-actions { margin-top: 0; border-top: 1px solid #e4e6e8; }
+.profile-view .profile-edit-card { border-top: 1px solid #e4e6e8; }
+.profile-view .profile-actions { padding: 12px 18px; }
+@media (min-width: 900px) {
+  .simple-view.profile-view {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    align-content: start;
+    align-items: start;
+    max-width: 1060px;
+    margin-inline: auto;
+    padding: 0 0 16px;
+  }
+  .profile-hero, .profile-actions { grid-column: 1 / -1; }
+  .profile-cover-art { height: 200px; }
+  .profile-identity { padding-inline: 24px; }
+  .profile-edit-card { padding: 24px; }
+  .profile-view .settings-card { border-left: 1px solid #e4e6e8; }
+  .profile-view .settings-row { padding: 14px 24px; min-height: 72px; }
+  .profile-view .profile-actions { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 24px; }
+}
+@media (max-width: 760px) {
+  .zalo-feed { padding: 8px 0; }
+  .zalo-post { border-radius: 0; border-inline: 0; padding-inline: 14px; }
+  .profile-view .profile-hero { padding-top: env(safe-area-inset-top); }
+}
 .profile-cover-art {
   background: #272b30;
   border-top: 0;

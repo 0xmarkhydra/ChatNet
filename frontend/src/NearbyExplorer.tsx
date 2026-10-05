@@ -107,7 +107,7 @@ export default function NearbyExplorer({
   onPeopleRadiusChange, onScanPeople, onStopPeople, friendActionBusy, onFriendAction, getFriendActionLabel,
 }: Props) {
   const [mode, setMode] = useState<'people' | 'places'>('people')
-  const [view, setView] = useState<'list' | 'map'>('list')
+  const [view, setView] = useState<'list' | 'map'>('map')
   const [category, setCategory] = useState<NearbyPlaceCategory>('all')
   const [radius, setRadius] = useState(1)
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
@@ -162,7 +162,7 @@ export default function NearbyExplorer({
 
   return <section className="nearby-explorer" aria-label="Khám phá quanh đây">
     <header className="nearby-heading">
-      <div><h1>Quanh đây</h1><p>{mode === 'people' ? peopleActive ? 'Bạn đang hiển thị với người ở gần' : 'Bạn đang ẩn với người ở gần' : 'Địa điểm gần vị trí của bạn'}</p></div>
+      <h1>Quanh đây</h1>
       {mode === 'people' && <label className="nearby-visibility">
         <span>Hiển thị</span><input type="checkbox" role="switch" aria-label="Hiển thị quanh đây" checked={peopleActive} disabled={busy} onChange={() => void (peopleActive ? onStopPeople() : scan())} />
       </label>}
@@ -173,7 +173,7 @@ export default function NearbyExplorer({
     </div>
     <div className="nearby-toolbar">
       <label className="nearby-search"><Search size={18} /><input aria-label={mode === 'people' ? 'Tìm người quanh đây' : 'Tìm địa điểm'} placeholder={mode === 'people' ? 'Tên hoặc @username' : 'Tên địa điểm hoặc địa chỉ'} value={query} onChange={(event) => onQueryChange(event.target.value)} /></label>
-      <label className="nearby-radius-field">Bán kính<select aria-label="Bán kính tìm kiếm" value={mode === 'people' ? peopleRadiusKm : radius} disabled={busy} onChange={(event) => mode === 'people' ? onPeopleRadiusChange(Number(event.target.value)) : setRadius(Number(event.target.value))}>
+      <label className="nearby-radius-field"><select aria-label="Bán kính tìm kiếm" title="Bán kính tìm kiếm" value={mode === 'people' ? peopleRadiusKm : radius} disabled={busy} onChange={(event) => mode === 'people' ? onPeopleRadiusChange(Number(event.target.value)) : setRadius(Number(event.target.value))}>
         {(mode === 'people' ? [1, 5, 10, 25, 50] : [0.5, 1, 3, 5]).map((value) => <option key={value} value={value}>{value < 1 ? '500 m' : `${value} km`}</option>)}
       </select></label>
       <button className="nearby-refresh" disabled={busy} title="Tìm lại" aria-label="Tìm lại" onClick={() => void (mode === 'people' ? scan() : location ? setReload((value) => value + 1) : locate())}><RefreshCw size={19} className={busy ? 'spinning' : ''} /></button>
@@ -184,14 +184,13 @@ export default function NearbyExplorer({
     {locationError && mode === 'places' && <p className="nearby-error" role="alert">{locationError}</p>}
     {error && mode === 'places' && <div className="nearby-error" role="alert">{error}<button onClick={() => setReload((value) => value + 1)}>Thử lại</button></div>}
     <div className="nearby-results-heading">
-      <strong>{busy ? 'Đang tìm...' : `${count} ${mode === 'people' ? 'người' : 'địa điểm'}`}</strong>
+      <strong role="status">{busy ? locating ? 'Đang lấy vị trí...' : 'Đang cập nhật...' : `${count} ${mode === 'people' ? 'người' : 'địa điểm'}`}</strong>
       {mode === 'people' ? <span>{users.length ? `Trong ${resultRadiusKm} km · gần nhất trước` : ''}</span> : <div className="nearby-view">
         <button title="Danh sách" aria-label="Danh sách" aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={18} /></button>
         <button title="Bản đồ" aria-label="Bản đồ" aria-pressed={view === 'map'} onClick={() => setView('map')}><MapIcon size={18} /></button>
       </div>}
     </div>
     {mode === 'people' && users.length > 0 && resultRadiusKm !== peopleRadiusKm && <p className="nearby-privacy">Bán kính đã đổi. Kết quả vẫn thuộc lần tìm trước.</p>}
-    {busy && <p className="nearby-loading" role="status">{locating ? 'Đang lấy vị trí...' : 'Đang cập nhật kết quả...'}</p>}
     {mode === 'people' ? <div className="nearby-people-list">
       {!count && !busy && <div className="nearby-empty">
         <Users size={36} /><h2>{normalized ? 'Không khớp tìm kiếm' : peopleActive ? 'Chưa có ai ở gần' : 'Tìm người ở gần bạn'}</h2>
@@ -205,14 +204,17 @@ export default function NearbyExplorer({
       </article>)}
     </div> : <>
       {!location && !busy && <div className="nearby-empty"><MapPin size={36} /><h2>Tìm địa điểm gần bạn</h2><button className="nearby-primary" onClick={() => void locate()}>Dùng vị trí hiện tại</button></div>}
-      {location && view === 'map' && <NearbyMap location={location} places={visiblePlaces} selected={selected} onSelect={setSelected} />}
+      {location && <div className={`nearby-place-content${view === 'map' ? ' map-view' : ''}`}>
+      {view === 'map' && <NearbyMap location={location} places={visiblePlaces} selected={selected} onSelect={setSelected} />}
+      <div className="nearby-place-list" aria-label="Kết quả địa điểm">
       {location && !busy && !error && !count && <div className="nearby-empty"><Search size={30} /><h2>Chưa tìm thấy địa điểm</h2><p>Thử từ khóa khác hoặc tăng bán kính.</p></div>}
-      <div className="nearby-place-list">{visiblePlaces.map((place, index) => <article key={place.id} className={`nearby-place-row${place.id === selected ? ' selected' : ''}`}>
+      {visiblePlaces.map((place, index) => <article key={place.id} className={`nearby-place-row${place.id === selected ? ' selected' : ''}`}>
         <button className="nearby-place-number" aria-label={`Xem ${place.name} trên bản đồ`} onClick={() => { setSelected(place.id); setView('map') }}>{index + 1}</button>
         <div><strong>{place.name}</strong><span>{categories.find((item) => item.id === place.category)?.label} · {distance(place.distanceKm)}</span>{place.address && <small>{place.address}</small>}{place.openingHours && <small>{place.openingHours}</small>}</div>
         <button className="nearby-route" title={`Chỉ đường đến ${place.name}`} aria-label={`Chỉ đường đến ${place.name}`} onClick={() => directions(place)}><Navigation size={19} /></button>
       </article>)}</div>
-      {location && <p className="nearby-source">Dữ liệu © OpenStreetMap</p>}
+      </div>}
+      {location && view === 'list' && <p className="nearby-source">Dữ liệu © OpenStreetMap</p>}
     </>}
   </section>
 }

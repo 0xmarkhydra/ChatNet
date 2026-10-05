@@ -35,6 +35,24 @@ let initializedAppId = ''
 let initialization: { appId: string; promise: Promise<void> } | null = null
 let listenersBound = false
 let stateHandler: ((state: PushState) => void | Promise<void>) | null = null
+let pushDisabled = false
+
+export function isPushDisabled(): boolean {
+  try {
+    return window.localStorage.getItem('chatnet-push-disabled') === 'true' || pushDisabled
+  } catch {
+    return pushDisabled
+  }
+}
+
+function rememberPushDisabled(disabled: boolean) {
+  pushDisabled = disabled
+  try {
+    window.localStorage.setItem('chatnet-push-disabled', String(disabled))
+  } catch {
+    // ponytail: blocked storage keeps preference for this page; SDK preserves opt-out across visits.
+  }
+}
 
 function nativePermission(): NotificationPermission | 'unsupported' {
   if (!('Notification' in window)) return 'unsupported'
@@ -178,15 +196,23 @@ export async function setupOneSignal(
 
   if (!listenersBound) {
     OneSignal.Notifications.addEventListener?.('permissionChange', () => {
-      void emitState(OneSignal)
+      void emitState(OneSignal).catch(console.warn)
     })
     OneSignal.User.PushSubscription.addEventListener?.('change', () => {
-      void emitState(OneSignal)
+      void emitState(OneSignal).catch(console.warn)
     })
     listenersBound = true
   }
 
   let state = snapshot(OneSignal)
+  // Existing opted-out subscriptions stay off, including preferences saved before this release.
+  if (
+    state.supported && state.permission === 'granted' &&
+    !state.optedIn && !state.subscriptionId && !isPushDisabled()
+  ) {
+    await OneSignal.User.PushSubscription.optIn?.()
+    state = await waitForSubscription(OneSignal)
+  }
   if (state.optedIn && !state.subscriptionId) {
     state = await waitForSubscription(OneSignal)
   }
@@ -199,12 +225,15 @@ export async function enableOneSignalPush(): Promise<PushState> {
     return snapshot(OneSignal)
   }
 
-  if (OneSignal.User.PushSubscription.optedIn !== true) {
-    await OneSignal.User.PushSubscription.optIn?.()
+  if (nativePermission() === 'default') {
+    await OneSignal.Notifications.requestPermission()
   }
 
-  if (nativePermission() !== 'granted') {
-    await OneSignal.Notifications.requestPermission()
+  if (nativePermission() === 'granted') {
+    if (OneSignal.User.PushSubscription.optedIn !== true) {
+      await OneSignal.User.PushSubscription.optIn?.()
+    }
+    rememberPushDisabled(false)
   }
 
   let state = snapshot(OneSignal)
@@ -225,6 +254,7 @@ export async function disableOneSignalPush(): Promise<PushState> {
   }
 
   const after = snapshot(OneSignal)
+  if (!after.optedIn) rememberPushDisabled(true)
   await emitState(OneSignal)
   return {
     ...after,
