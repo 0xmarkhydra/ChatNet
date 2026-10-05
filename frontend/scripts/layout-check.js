@@ -43,7 +43,9 @@ async (page) => {
       }) })
     })
     await context.addInitScript(() => localStorage.setItem('chatnet-session', JSON.stringify({
-      token: 'layout-test', user: { id: 1, email: 'test@example.com', username: 'tester', displayName: 'Nguyễn Minh Anh' },
+      token: `header.${btoa(JSON.stringify({ exp: Date.now() / 1000 + 86400 }))}.signature`,
+      refreshToken: 'r'.repeat(43),
+      user: { id: 1, email: 'test@example.com', username: 'tester', displayName: 'Nguyễn Minh Anh' },
     })))
     const p = await context.newPage()
     p.on('pageerror', (error) => errors.push(error.message))

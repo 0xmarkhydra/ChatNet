@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "check:onesignal": "node --experimental-strip-types scripts/onesignal-init-check.mjs",
     "check:pwa": "node --experimental-strip-types scripts/pwa-update-check.mjs",
+    "check:session": "node --experimental-strip-types scripts/session-check.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

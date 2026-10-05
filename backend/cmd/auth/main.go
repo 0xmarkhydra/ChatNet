@@ -110,6 +110,8 @@ func main() {
 	mux.HandleFunc("POST /api/auth/email/verify", s.registerVerify)
 	mux.HandleFunc("POST /api/auth/email/resend", s.registerResend)
 	mux.HandleFunc("POST /api/auth/login", s.login)
+	mux.HandleFunc("POST /api/auth/refresh", s.refresh)
+	mux.HandleFunc("POST /api/auth/logout", s.logout)
 	mux.Handle("GET /api/auth/me", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.me)))
 
 	port := config.Env("PORT", "8081")
@@ -305,20 +307,11 @@ func (s *server) registerVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jwtToken, err := authx.Sign(s.jwtSecret, u.ID, u.Username, u.DisplayName)
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot create token")
-		return
-	}
-
 	status := http.StatusCreated
 	if pending.EmailOnly {
 		status = http.StatusOK
 	}
-	httpx.JSON(w, status, map[string]any{
-		"token": jwtToken,
-		"user":  u,
-	})
+	s.startSession(w, r, u, status)
 }
 
 func (s *server) registerResend(w http.ResponseWriter, r *http.Request) {
@@ -415,12 +408,7 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := authx.Sign(s.jwtSecret, u.ID, u.Username, u.DisplayName)
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot create token")
-		return
-	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"token": token, "user": u})
+	s.startSession(w, r, u, http.StatusOK)
 }
 
 func (s *server) me(w http.ResponseWriter, r *http.Request) {

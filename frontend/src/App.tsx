@@ -3,6 +3,7 @@ import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
 import { Bell, Check, RefreshCw, UserCheck, UserPlus, X } from 'lucide-react'
+import { createSessionClient, loadSession, parseSession, type Session } from './session'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
 const ProfileQr = lazy(() => import('./ProfileQr'))
@@ -37,11 +38,6 @@ type User = {
   email: string
   username: string
   displayName: string
-}
-
-type Session = {
-  token: string
-  user: User
 }
 
 type ProfileMediaState = {
@@ -205,21 +201,6 @@ function inferToastKind(message: string): ToastKind {
     normalized.includes('chưa hỗ trợ')
   ) return 'warning'
   return 'info'
-}
-
-function loadSession(): Session | null {
-  try {
-    const raw = localStorage.getItem('chatnet-session')
-    const value = raw ? JSON.parse(raw) : null
-    if (
-      !value || typeof value.token !== 'string' || !value.token ||
-      !Number.isSafeInteger(value.user?.id) || value.user.id <= 0 ||
-      !['email', 'username', 'displayName'].every((key) => typeof value.user[key] === 'string')
-    ) return null
-    return value as Session
-  } catch {
-    return null
-  }
 }
 
 function formatTime(value?: string) {
@@ -467,7 +448,11 @@ function NearbyRadar({ scanning = false, large = false }: { scanning?: boolean; 
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession)
   const sessionRef = useRef(session)
-  sessionRef.current = session
+  const [sessionClient] = useState(() => createSessionClient(API, {
+    get: () => sessionRef.current,
+    save: saveSession,
+    expire: () => logout(false),
+  }))
   const [authMode, setAuthMode] = useState<AuthMode>('register')
   const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
   const [authEmail, setAuthEmail] = useState('')
@@ -511,7 +496,7 @@ export default function App() {
   const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null)
   const friendActionRef = useRef(false)
   const friendSyncRequest = useRef(0)
-  const [friendSyncToken, setFriendSyncToken] = useState('')
+  const [friendSyncSessionId, setFriendSyncSessionId] = useState('')
   const [friendSyncError, setFriendSyncError] = useState('')
   const [friendSyncBusy, setFriendSyncBusy] = useState(false)
   const [directUsername, setDirectUsername] = useState('')
@@ -817,27 +802,23 @@ export default function App() {
     )
   }
 
-  function authHeaders(extra?: HeadersInit) {
-    const headers = new Headers(extra)
-    if (session?.token) headers.set('Authorization', `Bearer ${session.token}`)
-    return headers
+  function saveSession(next: Session) {
+    localStorage.setItem('chatnet-session', JSON.stringify(next))
+    sessionRef.current = next
+    setSession(next)
   }
 
-  async function apiFetch(path: string, init: RequestInit = {}) {
-    const response = await fetch(`${API}${path}`, {
-      ...init,
-      headers: authHeaders(init.headers),
-    })
-    if (response.status === 401) logout()
-    return response
+  function apiFetch(path: string, init: RequestInit = {}) {
+    return sessionClient.request(path, init, session?.sessionId)
   }
 
   async function loadProfileMedia() {
     if (!session?.token) return
-    const token = session.token
+    const sessionId = session.sessionId
     const response = await apiFetch('/api/profile')
-    if (!response.ok || sessionRef.current?.token !== token) return
+    if (!response.ok) return
     const profile = await response.json() as ProfileMediaState
+    if (sessionRef.current?.sessionId !== sessionId) return
     avatarRefreshVersions.set(profile.username, profile.updatedAt)
     setProfileMedia(profile)
     setProfileDisplayNameDraft(profile.displayName)
@@ -863,6 +844,7 @@ export default function App() {
         body: JSON.stringify({ displayName, username }),
       })
       const result = await response.json().catch(() => null) as (ProfileUpdateResponse & { error?: string }) | null
+      if (sessionRef.current?.sessionId !== session.sessionId) return
       if (!response.ok || !result?.token) {
         throw new Error(result?.error || 'Không cập nhật được thông tin cá nhân.')
       }
@@ -881,6 +863,7 @@ export default function App() {
       setProfileUsernameDraft(result.username)
 
       const nextSession: Session = {
+        ...sessionRef.current,
         token: result.token,
         user: {
           ...session.user,
@@ -888,8 +871,7 @@ export default function App() {
           displayName: result.displayName,
         },
       }
-      localStorage.setItem('chatnet-session', JSON.stringify(nextSession))
-      setSession(nextSession)
+      saveSession(nextSession)
       setNotice('Đã cập nhật tên và username.', 'success')
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông tin cá nhân.', 'error')
@@ -942,13 +924,13 @@ export default function App() {
       setProfileMedia(null)
       return
     }
-    void loadProfileMedia()
-  }, [session?.token])
+    void loadProfileMedia().catch(() => setStatus('Đang kết nối lại...'))
+  }, [session?.sessionId])
 
   async function findNearby() {
     if (!session || nearbyBusy) return
     const request = ++nearbyRequest.current
-    const token = session.token
+    const sessionId = session.sessionId
     setNearbyBusy(true)
     setNearbyScanning(true)
     try {
@@ -960,7 +942,7 @@ export default function App() {
           maximumAge: 30000,
         }),
       )
-      if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
+      if (request !== nearbyRequest.current || sessionRef.current?.sessionId !== sessionId) return
       const { latitude, longitude } = position.coords
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
         || Math.abs(latitude) > 85.05112878 || Math.abs(longitude) > 180) {
@@ -975,7 +957,7 @@ export default function App() {
           radiusKm: nearbyRadiusKm,
         }),
       })
-      if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
+      if (request !== nearbyRequest.current || sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) throw new Error(response.status === 429 ? 'Chờ 10 giây trước khi tìm lại.' : 'Không tìm được bạn quanh đây. Thử lại sau.')
       const result = await response.json() as {
         users: FriendSearchResult[]
@@ -983,7 +965,7 @@ export default function App() {
         cacheExpiresAt?: string
         radiusKm?: number
       }
-      if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
+      if (request !== nearbyRequest.current || sessionRef.current?.sessionId !== sessionId) return
       setNearbyUsers(result.users)
       setNearbyResultRadiusKm(nearbyRadiusKm)
       setNearbyUntil(Date.parse(result.expiresAt))
@@ -1123,7 +1105,7 @@ export default function App() {
   async function addChatFiles(files: File[]) {
     if (!files.length || mediaUploading || messageSending || !activeConversationId) return
     const conversationId = activeConversationId
-    const token = session?.token
+    const sessionId = session?.sessionId
     const remaining = Math.max(0, 10 - messageAttachments.length)
     if (remaining === 0) {
       setNotice('Mỗi tin nhắn tối đa 10 file đính kèm.')
@@ -1133,7 +1115,7 @@ export default function App() {
     if (selected.length < files.length) setNotice('Mỗi tin nhắn tối đa 10 file đính kèm.')
     try {
       const uploaded = await uploadMediaFiles(selected, 'chat')
-      if (sessionRef.current?.token !== token) return
+      if (sessionRef.current?.sessionId !== sessionId) return
       setMessageDrafts((current) => {
         const previous = current[conversationId] ?? emptyDraft
         return {
@@ -1165,11 +1147,11 @@ export default function App() {
 
   async function createStory(file?: File) {
     if (!file || storyBusy || mediaUploading) return
-    const token = session?.token
+    const sessionId = session?.sessionId
     setStoryBusy(true)
     try {
       const [attachment] = await uploadMediaFiles([file], 'story')
-      if (sessionRef.current?.token !== token) return
+      if (sessionRef.current?.sessionId !== sessionId) return
       const response = await apiFetch('/api/stories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1293,7 +1275,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [session?.token])
+  }, [session?.sessionId])
 
   async function savePreferences(
     nextTarget: string,
@@ -1356,7 +1338,7 @@ export default function App() {
       return
     }
 
-    const token = session.token
+    const sessionId = session.sessionId
     let cancelled = false
     setUiLocaleLoading(true)
 
@@ -1374,7 +1356,7 @@ export default function App() {
         return response.json() as Promise<{ locale: string; messages: UIBundle }>
       })
       .then((result) => {
-        if (cancelled || sessionRef.current?.token !== token || result.locale !== effectiveAppLocale) return
+        if (cancelled || sessionRef.current?.sessionId !== sessionId || result.locale !== effectiveAppLocale) return
         const bundle = { ...defaultBundle(), ...result.messages }
         setUiBundle(bundle)
         saveCachedBundle(effectiveAppLocale, bundle)
@@ -1469,7 +1451,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [session?.token])
+  }, [session?.sessionId])
 
   async function sendTestPush(silent = false, force = false) {
     if (!pushConfigured || (!pushEnabled && !force) || (pushBusy && !force)) return false
@@ -1557,8 +1539,8 @@ export default function App() {
   }
 
   async function refreshFriendConnections() {
-    const token = session?.token
-    if (!token) return
+    const sessionId = session?.sessionId
+    if (!sessionId) return
     const request = ++friendSyncRequest.current
     setFriendSyncBusy(true)
     try {
@@ -1571,17 +1553,17 @@ export default function App() {
         friendsResponse.json() as Promise<FriendConnection[]>,
         requestsResponse.json() as Promise<FriendConnection[]>,
       ])
-      if (sessionRef.current?.token !== token || request !== friendSyncRequest.current) return
+      if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
       setFriends(nextFriends)
       setFriendRequests(nextRequests)
-      setFriendSyncToken(token)
+      setFriendSyncSessionId(sessionId)
       setFriendSyncError('')
     } catch {
-      if (sessionRef.current?.token === token && request === friendSyncRequest.current) {
+      if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) {
         setFriendSyncError('Chưa tải được trạng thái kết bạn.')
       }
     } finally {
-      if (sessionRef.current?.token === token && request === friendSyncRequest.current) setFriendSyncBusy(false)
+      if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) setFriendSyncBusy(false)
     }
   }
 
@@ -1594,8 +1576,8 @@ export default function App() {
   }
 
   async function actOnFriend(friend: FriendSearchResult | FriendConnection, decline = false) {
-    const token = session?.token
-    if (!token || friendActionRef.current || friend.id === session.user.id) return
+    const sessionId = session?.sessionId
+    if (!sessionId || friendActionRef.current || friend.id === session.user.id) return
     const relationship = friendRelationship(friend.id)
     if (decline && relationship !== 'incoming') return
     if (relationship === 'accepted') {
@@ -1616,7 +1598,7 @@ export default function App() {
         : `/api/friends/${friend.id}`
       const response = await apiFetch(path, { method })
       const result = await response.json().catch(() => null) as (FriendConnection & { error?: string }) | null
-      if (sessionRef.current?.token !== token) return
+      if (sessionRef.current?.sessionId !== sessionId) return
       ++friendSyncRequest.current
       if (!response.ok) {
         setNotice(result?.error || 'Không cập nhật được lời mời kết bạn')
@@ -1641,7 +1623,7 @@ export default function App() {
       }
       await refreshFriendConnections()
     } catch {
-      if (sessionRef.current?.token === token) {
+      if (sessionRef.current?.sessionId === sessionId) {
         setNotice('Không cập nhật được lời mời kết bạn. Kiểm tra kết nối rồi thử lại.')
         await refreshFriendConnections()
       }
@@ -1659,7 +1641,7 @@ export default function App() {
     if (!session?.token) {
       setFriends([])
       setFriendRequests([])
-      setFriendSyncToken('')
+      setFriendSyncSessionId('')
       setFriendSyncError('')
       ++friendSyncRequest.current
       return
@@ -1732,7 +1714,7 @@ export default function App() {
       const response = await apiFetch('/api/conversations')
       if (!response.ok) return
       const data = (await response.json()) as Conversation[]
-      if (sessionRef.current?.token === session?.token) setConversations(data)
+      if (sessionRef.current?.sessionId === session?.sessionId) setConversations(data)
     } catch {
       setStatus('Đang kết nối lại...')
     }
@@ -1743,7 +1725,7 @@ export default function App() {
       const response = await apiFetch('/api/posts')
       if (!response.ok) return
       const data = (await response.json()) as Post[]
-      if (sessionRef.current?.token === session?.token) setPosts(data)
+      if (sessionRef.current?.sessionId === session?.sessionId) setPosts(data)
     } catch {
       setStatus('Đang kết nối lại...')
     }
@@ -1754,7 +1736,7 @@ export default function App() {
       const response = await apiFetch('/api/stories')
       if (!response.ok) return
       const data = (await response.json()) as Story[]
-      if (sessionRef.current?.token === session?.token) {
+      if (sessionRef.current?.sessionId === session?.sessionId) {
         setStories(data.filter((item) => Date.parse(item.expiresAt) > Date.now()))
       }
     } catch {
@@ -1821,9 +1803,9 @@ export default function App() {
         return
       }
 
-      const next = result as Session
-      localStorage.setItem('chatnet-session', JSON.stringify(next))
-      setSession(next)
+      const next = parseSession(result)
+      if (!next) throw new Error('invalid session response')
+      saveSession({ ...next, sessionId: crypto.randomUUID() })
     } catch {
       setAuthError('Không kết nối được server')
     } finally {
@@ -1885,8 +1867,19 @@ export default function App() {
     return () => window.clearInterval(timer)
   }, [registerStep, otpExpiresAt])
 
-  function logout() {
-    const currentToken = session?.token
+  function logout(revoke = true, clearStorage = true) {
+    const current = sessionRef.current
+    const currentToken = current?.token
+    if (revoke && current?.refreshToken) {
+      void fetch(`${API}/api/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: current.refreshToken }),
+        keepalive: true,
+      }).then((response) => {
+        if (!response.ok) throw new Error('revocation failed')
+      }).catch(() => setNotice('Đã đăng xuất trên máy này. Không kết nối được server để thu hồi phiên.', 'warning'))
+    }
     ++nearbyRequest.current
     setNearbyUsers([])
     setNearbyUntil(0)
@@ -1911,7 +1904,8 @@ export default function App() {
       })
       .catch(() => undefined)
 
-    localStorage.removeItem('chatnet-session')
+    if (clearStorage) localStorage.removeItem('chatnet-session')
+    sessionRef.current = null
     resetRegistration()
     setAuthMode('login')
     setSession(null)
@@ -1929,6 +1923,37 @@ export default function App() {
     setPostAttachments([])
     setTranslations({})
   }
+
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== 'chatnet-session' && event.key !== null) return
+      const next = loadSession()
+      if (sessionRef.current?.sessionId !== next?.sessionId) logout(false, false)
+      sessionRef.current = next
+      setSession(next)
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
+
+  useEffect(() => {
+    if (!session) return
+    const refresh = () => {
+      if (document.visibilityState === 'hidden') return
+      void sessionClient.refresh().catch(() => setStatus('Đang kết nối lại...'))
+    }
+    refresh()
+    const timer = window.setInterval(refresh, 60_000)
+    window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [session?.sessionId, sessionClient])
 
   useEffect(() => {
     if (!session?.token) return
@@ -2044,6 +2069,7 @@ export default function App() {
               : [...current, incoming],
           )
           void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
+            .catch(() => setStatus('Đang kết nối lại...'))
         }
       }
     })
@@ -2184,7 +2210,7 @@ export default function App() {
         return
       }
 
-      if (sessionRef.current?.token !== session?.token) return
+      if (sessionRef.current?.sessionId !== session?.sessionId) return
       const created = result as Conversation
       setConversations((current) => [created, ...current.filter((item) => item.id !== created.id)])
       setActiveConversationId(created.id)
@@ -2208,7 +2234,7 @@ export default function App() {
 
   async function createGroup(name: string, usernames: string[]) {
     setChatCreateError('')
-    const token = session?.token
+    const sessionId = session?.sessionId
     try {
       const response = await apiFetch('/api/conversations/groups', {
         method: 'POST',
@@ -2216,7 +2242,7 @@ export default function App() {
         body: JSON.stringify({ name, usernames }),
       })
       const result = await response.json()
-      if (sessionRef.current?.token !== token) return
+      if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) {
         setChatCreateError(result.error || 'Không thể tạo nhóm')
         return
@@ -2229,7 +2255,7 @@ export default function App() {
       setNewChatMode('none')
       void refreshConversations()
     } catch {
-      if (sessionRef.current?.token === token) setChatCreateError('Không thể tạo nhóm. Kiểm tra kết nối rồi thử lại.')
+      if (sessionRef.current?.sessionId === sessionId) setChatCreateError('Không thể tạo nhóm. Kiểm tra kết nối rồi thử lại.')
     }
   }
 
@@ -2512,7 +2538,7 @@ export default function App() {
   }
 
   async function addComment(post: Post, content: string, parentId?: number) {
-    const token = session?.token
+    const sessionId = session?.sessionId
     let response: Response
     try {
       response = await apiFetch(`/api/posts/${post.id}/comments`, {
@@ -2525,7 +2551,7 @@ export default function App() {
     }
     if (!response.ok) throw new Error('Không gửi được bình luận. Bản nháp được giữ lại.')
     const updated = (await response.json()) as Post
-    if (sessionRef.current?.token !== token) return
+    if (sessionRef.current?.sessionId !== sessionId) return
     setPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
   }
 
@@ -3121,7 +3147,7 @@ export default function App() {
                     <div className={`chat-friend-bar relationship-${chatFriendRelationship}`} aria-label="Kết bạn trong cuộc trò chuyện">
                       <span role="status">
                         {chatFriendRelationship === 'accepted' ? <UserCheck size={18} aria-hidden="true" /> : <UserPlus size={18} aria-hidden="true" />}
-                        {friendSyncError || (friendSyncToken !== session?.token ? 'Đang tải trạng thái kết bạn...' :
+                        {friendSyncError || (friendSyncSessionId !== session?.sessionId ? 'Đang tải trạng thái kết bạn...' :
                           chatFriendRelationship === 'accepted' ? 'Hai bạn đã là bạn bè' :
                           chatFriendRelationship === 'incoming' ? 'Bạn nhận được lời mời kết bạn' :
                           chatFriendRelationship === 'outgoing' ? 'Đã gửi lời mời kết bạn' : 'Hai bạn chưa kết bạn')}
@@ -3130,7 +3156,7 @@ export default function App() {
                         <button type="button" disabled={friendSyncBusy} onClick={() => void refreshFriendConnections()}>
                           <RefreshCw size={16} aria-hidden="true" /> Thử lại
                         </button>
-                      ) : friendSyncToken === session?.token && chatFriendRelationship !== 'accepted' && (
+                      ) : friendSyncSessionId === session?.sessionId && chatFriendRelationship !== 'accepted' && (
                         <div className="chat-friend-actions">
                           <button
                             type="button"
@@ -3866,7 +3892,7 @@ export default function App() {
                       comments={activePost.comments || []}
                       editor={commentEditors[activePost.id] || { replyTo: null, drafts: {} }}
                       updateEditor={(editor) => {
-                        if (sessionRef.current?.token === session.token) {
+                        if (sessionRef.current?.sessionId === session.sessionId) {
                           setCommentEditors((current) => ({ ...current, [activePost.id]: editor }))
                         }
                       }}
@@ -4275,7 +4301,7 @@ export default function App() {
 
             <section className="profile-actions">
               {!isStandalone && <button type="button" onClick={() => void installApp()}>{t('profile.install')}</button>}
-              <button type="button" className="danger-action" onClick={logout}>{t('profile.logout')}</button>
+              <button type="button" className="danger-action" onClick={() => logout()}>{t('profile.logout')}</button>
             </section>
           </div>
         )}

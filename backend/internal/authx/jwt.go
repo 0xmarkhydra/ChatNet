@@ -43,12 +43,12 @@ func Parse(secret, raw string) (*Claims, error) {
 			return nil, errors.New("unexpected signing method")
 		}
 		return []byte(secret), nil
-	})
+	}, jwt.WithExpirationRequired())
 	if err != nil || !token.Valid {
 		return nil, errors.New("invalid token")
 	}
 	claims, ok := token.Claims.(*Claims)
-	if !ok {
+	if !ok || claims.UserID <= 0 {
 		return nil, errors.New("invalid claims")
 	}
 	return claims, nil
