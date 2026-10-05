@@ -1,8 +1,10 @@
 import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import type { NearbyUser } from './NearbyExplorer'
+import GroupCreator from './GroupCreator'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
+const ProfileQr = lazy(() => import('./ProfileQr'))
 import {
   defaultBundle,
   loadAppLocalePreference,
@@ -179,7 +181,6 @@ type InstallPromptEvent = Event & {
 type ToastKind = 'success' | 'error' | 'warning' | 'info'
 type ToastNotice = { id: number; message: string; kind: ToastKind }
 
-const minimumNearbyScanMs = 2800
 
 function inferToastKind(message: string): ToastKind {
   const normalized = message.trim().toLocaleLowerCase('vi-VN')
@@ -507,13 +508,13 @@ export default function App() {
   const [friendRequests, setFriendRequests] = useState<FriendConnection[]>([])
   const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null)
   const [directUsername, setDirectUsername] = useState('')
-  const [groupName, setGroupName] = useState('')
-  const [groupUsers, setGroupUsers] = useState('')
+  const [qrOpen, setQrOpen] = useState<'mine' | 'scan' | null>(null)
   const [chatCreateError, setChatCreateError] = useState('')
   const [nearbyUsers, setNearbyUsers] = useState<FriendSearchResult[]>([])
   const [nearbyBusy, setNearbyBusy] = useState(false)
   const [nearbyScanning, setNearbyScanning] = useState(false)
   const [nearbyUntil, setNearbyUntil] = useState(0)
+  const [nearbyResultRadiusKm, setNearbyResultRadiusKm] = useState(5)
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5)
   const nearbyRequest = useRef(0)
 
@@ -934,7 +935,6 @@ export default function App() {
     if (!session || nearbyBusy) return
     const request = ++nearbyRequest.current
     const token = session.token
-    const scanStartedAt = Date.now()
     setNearbyBusy(true)
     setNearbyScanning(true)
     try {
@@ -964,10 +964,9 @@ export default function App() {
         cacheExpiresAt?: string
         radiusKm?: number
       }
-      const remainingScanMs = minimumNearbyScanMs - (Date.now() - scanStartedAt)
-      if (remainingScanMs > 0) await new Promise((resolve) => window.setTimeout(resolve, remainingScanMs))
       if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
       setNearbyUsers(result.users)
+      setNearbyResultRadiusKm(nearbyRadiusKm)
       setNearbyUntil(Date.parse(result.expiresAt))
       setNotice(
         result.users.length
@@ -1615,13 +1614,13 @@ export default function App() {
       setFriendRequests([])
       return
     }
-    if (tab === 'contacts' || newChatMode === 'friends') {
+    if (tab === 'contacts' || newChatMode === 'friends' || newChatMode === 'group') {
       void refreshFriendConnections()
     }
   }, [session?.token, tab, newChatMode])
 
   useEffect(() => {
-    const friendSurfaceOpen = newChatMode === 'friends' || tab === 'contacts'
+    const friendSurfaceOpen = newChatMode === 'friends' || newChatMode === 'group' || tab === 'contacts'
     if (!session?.token || !friendSurfaceOpen) {
       setFriendResults([])
       setFriendSearching(false)
@@ -2147,31 +2146,31 @@ export default function App() {
     await openDirectByUsername(directUsername)
   }
 
-  async function createGroup(event: FormEvent) {
-    event.preventDefault()
+  async function createGroup(name: string, usernames: string[]) {
     setChatCreateError('')
-    const usernames = groupUsers
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-
-    const response = await apiFetch('/api/conversations/groups', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: groupName.trim(), usernames }),
-    })
-    const result = await response.json()
-    if (!response.ok) {
-      setChatCreateError(result.error || 'Không thể tạo nhóm')
-      return
+    const token = session?.token
+    try {
+      const response = await apiFetch('/api/conversations/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, usernames }),
+      })
+      const result = await response.json()
+      if (sessionRef.current?.token !== token) return
+      if (!response.ok) {
+        setChatCreateError(result.error || 'Không thể tạo nhóm')
+        return
+      }
+      const created = result as Conversation
+      setConversations((current) => [created, ...current.filter((item) => item.id !== created.id)])
+      setActiveConversationId(created.id)
+      setTab('chat')
+      setFriendQuery('')
+      setNewChatMode('none')
+      void refreshConversations()
+    } catch {
+      if (sessionRef.current?.token === token) setChatCreateError('Không thể tạo nhóm. Kiểm tra kết nối rồi thử lại.')
     }
-
-    const created = result as Conversation
-    await refreshConversations()
-    setActiveConversationId(created.id)
-    setGroupName('')
-    setGroupUsers('')
-    setNewChatMode('none')
   }
 
   async function sendMessage(event: FormEvent) {
@@ -2587,12 +2586,6 @@ export default function App() {
     )
   })
   const visibleConversations = searchedConversations
-  const visibleNearbyUsers = nearbyUsers
-    .filter((user) =>
-      user.username.toLocaleLowerCase('vi-VN').includes(normalizedSearch.replace(/^@/, '')),
-    )
-    .slice()
-    .sort((left, right) => (left.distanceKm ?? Number.POSITIVE_INFINITY) - (right.distanceKm ?? Number.POSITIVE_INFINITY))
   const searchedPosts = posts.filter((post) => {
     if (!normalizedSearch || tab !== 'feed') return true
     return (
@@ -2610,6 +2603,15 @@ export default function App() {
 
   return (
     <main className={`app-shell modern-shell ${tab === 'chat' && activeConversation ? 'conversation-open' : ''}`}>
+      {qrOpen && <Suspense fallback={<div role="status">Đang mở QR...</div>}>
+        <ProfileQr username={session.user.username} displayName={session.user.displayName || session.user.username}
+          url={connectUrl()} initialMode={qrOpen} onClose={() => setQrOpen(null)}
+          onConnect={(username) => { setQrOpen(null); openConnectSurface(username) }} />
+      </Suspense>}
+      {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
+        friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
+        searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
+        error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
       {tab !== 'profile' && (
       <header className="chatnet-appbar">
         <div className="appbar-brand"><img src="/icon.svg" width="32" height="32" alt="" /><strong>ChatNet</strong></div>
@@ -2643,7 +2645,7 @@ export default function App() {
                 className="appbar-icon-button"
                 type="button"
                 aria-label="Quét QR"
-                onClick={() => openConnectSurface()}
+                onClick={() => setQrOpen('scan')}
               >
                 <UiIcon name="qr" size={28} />
               </button>
@@ -2698,17 +2700,6 @@ export default function App() {
             </button>
           )}
 
-          {tab === 'discover' && (
-            <button
-              className="appbar-icon-button"
-              type="button"
-              aria-label="Tìm lại quanh đây"
-              onClick={() => void findNearby()}
-              disabled={nearbyBusy || !nearbyUntil}
-            >
-              <UiIcon name="discover" size={28} />
-            </button>
-          )}
 
         </div>
       </header>
@@ -2745,7 +2736,7 @@ export default function App() {
                   <button type="button" onClick={() => { setNewChatMode('direct'); setQuickCreateOpen(false) }}>
                     <span>＋</span><div><strong>Chat riêng</strong><small>Bắt đầu cuộc trò chuyện 1-1</small></div>
                   </button>
-                  <button type="button" onClick={() => { setNewChatMode('group'); setQuickCreateOpen(false) }}>
+                  <button type="button" onClick={() => { setFriendQuery(''); setChatCreateError(''); setNewChatMode('group'); setQuickCreateOpen(false) }}>
                     <span>👥</span><div><strong>Tạo nhóm</strong><small>Nhắn tin với nhiều người</small></div>
                   </button>
                 </div>
@@ -2803,6 +2794,7 @@ export default function App() {
                         <span>@{session.user.username}</span>
                       </div>
                       <div className="connect-identity-actions" aria-label="Chia sẻ hồ sơ">
+                        <button type="button" onClick={() => setQrOpen('mine')} aria-label="QR của tôi" title="QR của tôi"><UiIcon name="qr" size={20} /></button>
                         <button type="button" onClick={() => void shareMyProfile()} aria-label="Chia sẻ hồ sơ của tôi" title="Chia sẻ">↗</button>
                         <button type="button" onClick={() => void copyInviteLink()} aria-label="Sao chép link hồ sơ" title="Sao chép link">⧉</button>
                       </div>
@@ -2868,16 +2860,7 @@ export default function App() {
                 </form>
               )}
 
-              {newChatMode === 'group' && (
-                <form className="new-chat-panel" onSubmit={createGroup}>
-                  <div className="panel-line"><strong>Tạo nhóm</strong><button type="button" onClick={() => setNewChatMode('none')}>×</button></div>
-                  <input value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="Tên nhóm" maxLength={120} autoFocus />
-                  <input value={groupUsers} onChange={(event) => setGroupUsers(event.target.value)} placeholder="Username: linh, ken, ..." />
-                  <button>Tạo nhóm</button>
-                </form>
-              )}
-
-              {chatCreateError && <div className="inline-error">{chatCreateError}</div>}
+              {chatCreateError && newChatMode !== 'group' && <div className="inline-error">{chatCreateError}</div>}
 
               <div className="conversation-list zalo-conversation-list">
                 {visibleConversations.length === 0 && (
@@ -3335,7 +3318,7 @@ export default function App() {
               <button type="button" onClick={() => { setTab('chat'); setNewChatMode('friends') }}>
                 <span className="shortcut-icon">＋</span><div><strong>Lời mời kết bạn</strong><small>Tìm và kết nối người mới</small></div><b>›</b>
               </button>
-              <button type="button" onClick={() => { setTab('chat'); setNewChatMode('group') }}>
+              <button type="button" onClick={() => { setFriendQuery(''); setChatCreateError(''); setTab('chat'); setNewChatMode('group') }}>
                 <span className="shortcut-icon">👥</span><div><strong>Nhóm và cộng đồng</strong><small>Tạo cuộc trò chuyện nhóm</small></div><b>›</b>
               </button>
             </div>
@@ -3434,21 +3417,18 @@ export default function App() {
         {tab === 'discover' && (
           <Suspense
             fallback={(
-              <div className="nearby-module-loading" role="status">
-                <span>⌖</span>
-                <strong>Đang mở Quanh đây</strong>
-                <small>Chuẩn bị bản đồ và lớp khám phá địa phương...</small>
-              </div>
+              <p role="status">Đang mở Quanh đây...</p>
             )}
           >
             <NearbyExplorer
               query={globalSearch}
               onQueryChange={setGlobalSearch}
-              users={visibleNearbyUsers as NearbyUser[]}
+              users={nearbyUsers as NearbyUser[]}
               peopleBusy={nearbyBusy}
               peopleScanning={nearbyScanning}
               peopleActive={nearbyUntil > 0}
               peopleRadiusKm={nearbyRadiusKm}
+              resultRadiusKm={nearbyResultRadiusKm}
               onPeopleRadiusChange={setNearbyRadiusKm}
               onScanPeople={findNearby}
               onStopPeople={stopNearby}
@@ -3464,7 +3444,6 @@ export default function App() {
                       ? 'Hủy lời mời'
                       : 'Kết bạn'
               }}
-              onNotice={setNotice}
             />
           </Suspense>
         )}
