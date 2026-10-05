@@ -4,6 +4,7 @@ import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
 import { Bell, Check, RefreshCw, UserCheck, UserPlus, X } from 'lucide-react'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
+import { mergeById, toggleCount } from './optimistic'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
 const ProfileQr = lazy(() => import('./ProfileQr'))
@@ -79,6 +80,7 @@ type MessageReaction = {
 
 type Message = {
   id: number
+  clientId?: string
   conversationId: number
   senderId: number
   sender: string
@@ -487,6 +489,21 @@ export default function App() {
   const messageAttachments = draft.attachments
   const [messageSending, setMessageSending] = useState(false)
   const sendingRef = useRef(false)
+  const [outgoingMessage, setOutgoingMessage] = useState<Message | null>(null)
+  const [pendingPost, setPendingPost] = useState<Post | null>(null)
+  const [pendingComments, setPendingComments] = useState<Record<number, FeedComment>>({})
+  const [likePreviews, setLikePreviews] = useState<Record<number, boolean>>({})
+  const [reactionPreviews, setReactionPreviews] = useState<Record<number, MessageReaction[]>>({})
+  const messageChanges = useRef(new Set<number>())
+  const actionLocks = useRef(new Set<string>())
+  const feedRevision = useRef(0)
+  const feedLoads = useRef(0)
+  const [pendingActions, setPendingActions] = useState(0)
+  const pendingRequests = useRef(new Set<symbol>())
+  const mutationRequests = useRef(new Map<string, Promise<Response>>())
+  const messageReceipts = useRef(new Map<string, Message | null>())
+  const preferenceQueue = useRef(Promise.resolve())
+  const preferenceRevision = useRef(0)
   const [newChatMode, setNewChatMode] = useState<NewChatMode>('none')
   const [friendQuery, setFriendQuery] = useState('')
   const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([])
@@ -568,7 +585,14 @@ export default function App() {
   const chatFriendRelationship = chatFriend ? friendRelationship(chatFriend.id) : 'none'
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
-  const activePost = activePostId ? posts.find((item) => item.id === activePostId) || null : null
+  const visiblePosts = posts.map((post) => likePreviews[post.id] === undefined ? post : {
+    ...post, liked: likePreviews[post.id],
+    likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
+  })
+  const visibleMessages = messages.map((message) => reactionPreviews[message.id] ? {
+    ...message, reactions: message.deleted ? [] : reactionPreviews[message.id],
+  } : message)
+  const activePost = activePostId ? visiblePosts.find((item) => item.id === activePostId) || null : null
   const activeMessageAction = messageActionId
     ? messages.find((item) => item.id === messageActionId) || null
     : null
@@ -808,8 +832,43 @@ export default function App() {
     setSession(next)
   }
 
-  function apiFetch(path: string, init: RequestInit = {}) {
-    return sessionClient.request(path, init, session?.sessionId)
+  async function apiFetch(path: string, init: RequestInit = {}) {
+    const sessionId = session?.sessionId
+    const write = !!init.method && !['GET', 'HEAD'].includes(init.method)
+    const key = JSON.stringify([sessionId, path, init.method, init.body])
+    const existing = write && mutationRequests.current.get(key)
+    if (existing) return (await existing).clone()
+    const operation = performRequest()
+    if (write) mutationRequests.current.set(key, operation)
+    try { return (await operation).clone() }
+    finally { if (mutationRequests.current.get(key) === operation) mutationRequests.current.delete(key) }
+
+    async function performRequest() {
+      const mutation = write && !/\/(read|translate|presign|subscription|bundle)$/.test(path)
+      const request = Symbol(path)
+      if (mutation) {
+        pendingRequests.current.add(request)
+        setPendingActions(pendingRequests.current.size)
+      }
+      try {
+        const response = await sessionClient.request(path, {
+          ...init, signal: init.signal || AbortSignal.timeout(30_000),
+        }, sessionId)
+        // Consume the body before releasing pending state or accepting a stale session.
+        await response.clone().text()
+        if (sessionRef.current?.sessionId !== sessionId) throw new Error('Phiên đăng nhập đã thay đổi.')
+        return response
+      } catch (error) {
+        if (!write) throw error
+        const message = error instanceof Error && error.message === 'Phiên đăng nhập đã thay đổi.'
+          ? error.message
+          : 'Chưa xác nhận được kết quả. Kiểm tra dữ liệu trước khi thử lại.'
+        return Response.json({ error: message }, { status: 503 })
+      } finally {
+        pendingRequests.current.delete(request)
+        if (sessionRef.current?.sessionId === sessionId) setPendingActions(pendingRequests.current.size)
+      }
+    }
   }
 
   async function loadProfileMedia() {
@@ -874,9 +933,9 @@ export default function App() {
       saveSession(nextSession)
       setNotice('Đã cập nhật tên và username.', 'success')
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông tin cá nhân.', 'error')
+      if (sessionRef.current?.sessionId === session.sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông tin cá nhân.', 'error')
     } finally {
-      setProfileSaving(false)
+      if (sessionRef.current?.sessionId === session.sessionId) setProfileSaving(false)
     }
   }
 
@@ -889,6 +948,7 @@ export default function App() {
     setProfileBusy(kind)
     try {
       const [attachment] = await uploadMediaFiles([file], 'profile')
+      if (sessionRef.current?.sessionId !== session.sessionId) return
       if (!attachment) throw new Error('Không upload được ảnh.')
 
       const response = await apiFetch('/api/profile/media', {
@@ -906,6 +966,7 @@ export default function App() {
         }),
       })
       const result = await response.json().catch(() => null) as (ProfileMediaState & { error?: string }) | null
+      if (sessionRef.current?.sessionId !== session.sessionId) return
       if (!response.ok || !result) {
         throw new Error(result?.error || 'Không cập nhật được ảnh hồ sơ.')
       }
@@ -913,9 +974,9 @@ export default function App() {
       setProfileMedia(result)
       setNotice(kind === 'avatar' ? 'Đã cập nhật ảnh đại diện.' : 'Đã cập nhật ảnh bìa.', 'success')
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được ảnh hồ sơ.', 'error')
+      if (sessionRef.current?.sessionId === session.sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được ảnh hồ sơ.', 'error')
     } finally {
-      setProfileBusy(null)
+      if (sessionRef.current?.sessionId === session.sessionId) setProfileBusy(null)
     }
   }
 
@@ -1040,7 +1101,7 @@ export default function App() {
 
   async function uploadMediaFiles(files: File[], scope: 'chat' | 'feed' | 'story' | 'profile') {
     if (!files.length) return [] as MediaAttachment[]
-
+    const sessionId = session?.sessionId
     setMediaUploading(scope)
     try {
       const result = new Array<MediaAttachment>(files.length)
@@ -1077,6 +1138,7 @@ export default function App() {
             body: file,
             headers: { 'Content-Type': contentType },
             credentials: 'omit',
+            signal: AbortSignal.timeout(120_000),
           })
           if (!put.ok) {
             throw new Error(`S3 từ chối upload ${file.name} (HTTP ${put.status}). Kiểm tra CORS/quyền bucket.`)
@@ -1098,7 +1160,7 @@ export default function App() {
       if (failed?.status === 'rejected') throw failed.reason
       return result
     } finally {
-      setMediaUploading(null)
+      if (sessionRef.current?.sessionId === sessionId) setMediaUploading(null)
     }
   }
 
@@ -1124,12 +1186,13 @@ export default function App() {
         }
       })
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không upload được file')
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không upload được file')
     }
   }
 
   async function addFeedFiles(files: File[]) {
-    if (!files.length) return
+    if (!files.length || pendingPost || mediaUploading) return
+    const sessionId = session?.sessionId
     const remaining = Math.max(0, 12 - postAttachments.length)
     if (remaining === 0) {
       setNotice('Mỗi bài viết tối đa 12 ảnh/video.')
@@ -1139,9 +1202,10 @@ export default function App() {
     if (selected.length < files.length) setNotice('Mỗi bài viết tối đa 12 ảnh/video.')
     try {
       const uploaded = await uploadMediaFiles(selected, 'feed')
+      if (sessionRef.current?.sessionId !== sessionId) return
       setPostAttachments((current) => [...current, ...uploaded].slice(0, 12))
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không upload được media')
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không upload được media')
     }
   }
 
@@ -1158,13 +1222,14 @@ export default function App() {
         body: JSON.stringify({ attachment }),
       })
       const result = await response.json().catch(() => null) as (Story & { error?: string }) | null
-      if (!response.ok || !result) throw new Error(result?.error || 'Không đăng được Story')
-      setStories((current) => [result, ...current])
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || !result?.id || !result.attachment) throw new Error(result?.error || 'Không đăng được Story')
+      setStories((current) => [result, ...current.filter((item) => item.id !== result.id)])
       setActiveStoryId(result.id)
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không đăng được Story')
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không đăng được Story')
     } finally {
-      setStoryBusy(false)
+      if (sessionRef.current?.sessionId === sessionId) setStoryBusy(false)
     }
   }
 
@@ -1180,16 +1245,18 @@ export default function App() {
 
   async function deleteStory(story: Story) {
     if (story.author !== name || storyBusy || !window.confirm('Xóa Story này?')) return
+    const sessionId = session?.sessionId
     setStoryBusy(true)
     try {
       const response = await apiFetch(`/api/stories/${story.id}`, { method: 'DELETE' })
+      if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) throw new Error('Không xóa được Story')
       setStories((current) => current.filter((item) => item.id !== story.id))
-      setActiveStoryId(null)
+      setActiveStoryId((current) => current === story.id ? null : current)
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không xóa được Story')
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không xóa được Story')
     } finally {
-      setStoryBusy(false)
+      if (sessionRef.current?.sessionId === sessionId) setStoryBusy(false)
     }
   }
 
@@ -1214,6 +1281,7 @@ export default function App() {
     }
 
     let cancelled = false
+    const revision = preferenceRevision.current
     const preferenceKey = `chatnet-preferences:${session.user.id}`
     try {
       const cached = JSON.parse(localStorage.getItem(preferenceKey) || 'null') as
@@ -1241,7 +1309,7 @@ export default function App() {
         }>
       })
       .then((preferences) => {
-        if (cancelled) return
+        if (cancelled || revision !== preferenceRevision.current) return
         if (preferences) {
           const nextTarget = isSupportedLanguageCode(preferences.targetLanguage)
             ? preferences.targetLanguage
@@ -1283,6 +1351,8 @@ export default function App() {
     nextAppLocale: string,
   ) {
     if (!session?.token) return
+    const sessionId = session.sessionId
+    const revision = ++preferenceRevision.current
     const preferenceKey = `chatnet-preferences:${session.user.id}`
     localStorage.setItem(
       preferenceKey,
@@ -1292,8 +1362,9 @@ export default function App() {
         appLocale: nextAppLocale,
       }),
     )
-    try {
-      await apiFetch('/api/preferences', {
+    const save = async () => {
+      if (sessionRef.current?.sessionId !== sessionId || revision !== preferenceRevision.current) return
+      const response = await apiFetch('/api/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1302,9 +1373,12 @@ export default function App() {
           appLocale: nextAppLocale,
         }),
       })
-    } catch {
-      // Keep the UI responsive; the next successful save/read will reconcile server state.
+      if (!response.ok && sessionRef.current?.sessionId === sessionId && revision === preferenceRevision.current) {
+        setNotice('Cài đặt đã áp dụng trên máy này nhưng chưa đồng bộ được. Chọn lại cài đặt để thử lại.', 'warning')
+      }
     }
+    preferenceQueue.current = preferenceQueue.current.catch(() => undefined).then(save)
+    await preferenceQueue.current
   }
 
   async function saveTranslationPreferences(nextTarget: string, nextAuto: boolean) {
@@ -1628,8 +1702,10 @@ export default function App() {
         await refreshFriendConnections()
       }
     } finally {
-      friendActionRef.current = false
-      setFriendActionBusy(null)
+      if (sessionRef.current?.sessionId === sessionId) {
+        friendActionRef.current = false
+        setFriendActionBusy(null)
+      }
     }
   }
 
@@ -1721,11 +1797,15 @@ export default function App() {
   }
 
   async function refreshPosts() {
+    const revision = feedRevision.current
+    const request = ++feedLoads.current
     try {
       const response = await apiFetch('/api/posts')
       if (!response.ok) return
       const data = (await response.json()) as Post[]
-      if (sessionRef.current?.sessionId === session?.sessionId) setPosts(data)
+      if (sessionRef.current?.sessionId === session?.sessionId
+        && revision === feedRevision.current && request === feedLoads.current
+        && ![...actionLocks.current].some((key) => key.startsWith('feed:'))) setPosts(data)
     } catch {
       setStatus('Đang kết nối lại...')
     }
@@ -1912,6 +1992,27 @@ export default function App() {
     setConversations([])
     setActiveConversationId(null)
     setMessages([])
+    setOutgoingMessage(null)
+    setPendingPost(null)
+    setPendingComments({})
+    setLikePreviews({})
+    setReactionPreviews({})
+    actionLocks.current.clear()
+    pendingRequests.current.clear()
+    mutationRequests.current.clear()
+    messageReceipts.current.clear()
+    ++preferenceRevision.current
+    setPendingActions(0)
+    sendingRef.current = false
+    setMessageSending(false)
+    setGroupBusy(false)
+    setProfileBusy(null)
+    setProfileSaving(false)
+    setStoryBusy(false)
+    setMediaUploading(null)
+    friendActionRef.current = false
+    setFriendActionBusy(null)
+    ++feedRevision.current
     setMessageDrafts({})
     setFriends([])
     setFriendRequests([])
@@ -1971,6 +2072,7 @@ export default function App() {
     }
     events.onerror = () => setStatus('Đang kết nối lại...')
     events.addEventListener('update', (event) => {
+      if (sessionRef.current?.sessionId !== session.sessionId) return
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
       if (update.type === 'friend.updated') {
         void refreshFriendConnections()
@@ -2000,6 +2102,7 @@ export default function App() {
               ) return message
               const readers = message.readByUserIds || []
               if (readers.includes(update.readerId as number)) return message
+              messageChanges.current.add(message.id)
               return { ...message, readByUserIds: [...readers, update.readerId as number] }
             }),
           )
@@ -2009,22 +2112,22 @@ export default function App() {
 
       if (update.type === 'message.updated' && update.message) {
         const changed = update.message
+        messageChanges.current.add(changed.id)
         if (activeConversationIdRef.current === update.conversationId) {
-          setMessages((current) =>
-            current.map((item) => {
-              if (item.id !== changed.id) return item
-              const mineByEmoji = new Map(
-                (item.reactions || []).map((reaction) => [reaction.emoji, reaction.mine]),
-              )
-              return {
-                ...changed,
-                reactions: (changed.reactions || []).map((reaction) => ({
-                  ...reaction,
-                  mine: mineByEmoji.get(reaction.emoji) ?? false,
-                })),
-              }
-            }),
-          )
+          setMessages((current) => {
+            const item = current.find((message) => message.id === changed.id)
+            const mineByEmoji = new Map(
+              (item?.reactions || []).map((reaction) => [reaction.emoji, reaction.mine]),
+            )
+            return mergeById(current, {
+              ...changed,
+              readByUserIds: [...new Set([...(item?.readByUserIds || []), ...(changed.readByUserIds || [])])],
+              reactions: (changed.reactions || []).map((reaction) => ({
+                ...reaction,
+                mine: mineByEmoji.get(reaction.emoji) ?? false,
+              })),
+            }).sort((a, b) => a.id - b.id)
+          })
           setTranslations((current) => {
             const next = { ...current }
             delete next[changed.id]
@@ -2037,6 +2140,11 @@ export default function App() {
 
       if (update.type === 'message' && update.message) {
         const incoming = update.message
+        messageChanges.current.add(incoming.id)
+        if (incoming.senderId === session.user.id && incoming.clientId) {
+          if (messageReceipts.current.has(incoming.clientId)) messageReceipts.current.set(incoming.clientId, incoming)
+          setOutgoingMessage((current) => current?.clientId === incoming.clientId ? null : current)
+        }
         const currentId = activeConversationIdRef.current
 
         setConversations((current) => {
@@ -2102,6 +2210,8 @@ export default function App() {
     }
 
     let cancelled = false
+    const changes = new Set<number>()
+    messageChanges.current = changes
     setTranslations({})
     apiFetch(
       `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}`,
@@ -2111,11 +2221,16 @@ export default function App() {
         const data = (await response.json()) as Message[]
         if (cancelled) return
 
-        setMessages(data)
+        setMessages((current) => {
+          const live = current.filter((item) => item.conversationId === activeConversationId && changes.has(item.id))
+          const liveIds = new Set(live.map((item) => item.id))
+          return [...data.filter((item) => !liveIds.has(item.id)), ...live].sort((a, b) => a.id - b.id)
+        })
         const restored: Record<number, string> = {}
         for (const message of data) {
           if (
             message.translatedText &&
+            !changes.has(message.id) &&
             message.translationLanguage === targetLanguage
           ) {
             restored[message.id] = message.translatedText
@@ -2148,7 +2263,7 @@ export default function App() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, outgoingMessage])
 
   useEffect(() => {
     if (
@@ -2196,8 +2311,9 @@ export default function App() {
   async function openDirectByUsername(username: string) {
     setChatCreateError('')
     const normalized = username.trim().toLowerCase()
-    if (!normalized) return
-
+    if (!normalized || actionLocks.current.has('chat:create')) return
+    const sessionId = session?.sessionId
+    actionLocks.current.add('chat:create')
     try {
       const response = await apiFetch('/api/conversations/direct', {
         method: 'POST',
@@ -2205,8 +2321,9 @@ export default function App() {
         body: JSON.stringify({ username: normalized }),
       })
       const result = await response.json()
-      if (!response.ok) {
-        setNotice(result.error || 'Không thể mở cuộc trò chuyện')
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || !Number.isSafeInteger(result?.id) || result.id <= 0) {
+        setNotice(result?.error || 'Không thể mở cuộc trò chuyện')
         return
       }
 
@@ -2223,7 +2340,9 @@ export default function App() {
       setTranslations({})
       void refreshConversations()
     } catch {
-      setNotice('Không mở được cuộc trò chuyện. Kiểm tra kết nối rồi thử lại.')
+      if (sessionRef.current?.sessionId === sessionId) setNotice('Không mở được cuộc trò chuyện. Kiểm tra kết nối rồi thử lại.')
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) actionLocks.current.delete('chat:create')
     }
   }
 
@@ -2233,6 +2352,8 @@ export default function App() {
   }
 
   async function createGroup(name: string, usernames: string[]) {
+    if (actionLocks.current.has('chat:create')) return
+    actionLocks.current.add('chat:create')
     setChatCreateError('')
     const sessionId = session?.sessionId
     try {
@@ -2243,8 +2364,8 @@ export default function App() {
       })
       const result = await response.json()
       if (sessionRef.current?.sessionId !== sessionId) return
-      if (!response.ok) {
-        setChatCreateError(result.error || 'Không thể tạo nhóm')
+      if (!response.ok || !Number.isSafeInteger(result?.id) || result.id <= 0) {
+        setChatCreateError(result?.error || 'Không thể tạo nhóm')
         return
       }
       const created = result as Conversation
@@ -2256,6 +2377,8 @@ export default function App() {
       void refreshConversations()
     } catch {
       if (sessionRef.current?.sessionId === sessionId) setChatCreateError('Không thể tạo nhóm. Kiểm tra kết nối rồi thử lại.')
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) actionLocks.current.delete('chat:create')
     }
   }
 
@@ -2267,8 +2390,19 @@ export default function App() {
     const submittedDraft = draft
     const text = messageText.trim()
     const attachments = messageAttachments
+    const sessionId = session?.sessionId
+    if (!session) return
+    const clientId = crypto.randomUUID()
+    const reply = replyingTo
+    // A matching realtime receipt can confirm delivery even if the HTTP response is lost.
+    messageReceipts.current.set(clientId, null)
     sendingRef.current = true
     setMessageSending(true)
+    setOutgoingMessage({
+      id: -1, clientId, conversationId, senderId: session.user.id, sender: session.user.username,
+      text, attachments, createdAt: new Date().toISOString(),
+      replyToMessageId: reply?.id, replyToSender: reply?.sender, replyToText: reply?.text,
+    })
     try {
       const response = await apiFetch(`/api/conversations/${conversationId}/messages`, {
         method: 'POST',
@@ -2276,26 +2410,44 @@ export default function App() {
         body: JSON.stringify({
           text,
           attachments,
-          ...(replyingTo ? { replyToMessageId: replyingTo.id } : {}),
+          clientId,
+          ...(reply ? { replyToMessageId: reply.id } : {}),
         }),
       })
-      if (!response.ok) {
+      if (sessionRef.current?.sessionId !== sessionId) return
+      const receipt = messageReceipts.current.get(clientId)
+      if (!response.ok && !receipt?.id) {
         const result = await response.json().catch(() => null) as { error?: string } | null
         setNotice(result?.error || 'Gửi tin nhắn thất bại')
         return
       }
+      const sent = receipt?.id ? receipt : await response.json() as Message
+      if (!Number.isSafeInteger(sent.id) || sent.id <= 0 || sent.conversationId !== conversationId) {
+        throw new Error('Invalid message response')
+      }
+      if (activeConversationIdRef.current === conversationId) {
+        messageChanges.current.add(sent.id)
+        setMessages((current) => mergeById(current, sent).sort((a, b) => a.id - b.id))
+      }
+      void refreshConversations()
       setMessageDrafts((current) => {
         if (current[conversationId] !== submittedDraft) return current
         const next = { ...current }
         delete next[conversationId]
         return next
       })
-      setReplyingTo(null)
+      if (activeConversationIdRef.current === conversationId) setReplyingTo((current) => current === reply ? null : current)
     } catch {
-      setNotice('Chưa xác nhận được tin đã gửi. Bản nháp được giữ lại; kiểm tra hội thoại trước khi gửi lại.')
+      if (sessionRef.current?.sessionId === sessionId) {
+        setNotice('Chưa xác nhận được tin đã gửi. Bản nháp được giữ lại; kiểm tra hội thoại trước khi gửi lại.')
+      }
     } finally {
-      sendingRef.current = false
-      setMessageSending(false)
+      messageReceipts.current.delete(clientId)
+      if (sessionRef.current?.sessionId === sessionId) {
+        setOutgoingMessage(null)
+        sendingRef.current = false
+        setMessageSending(false)
+      }
     }
   }
 
@@ -2314,7 +2466,9 @@ export default function App() {
   }
 
   async function renameActiveGroup() {
-    if (!activeConversationId || !groupNameDraft.trim()) return
+    if (!activeConversationId || !groupNameDraft.trim() || actionLocks.current.has('group:write')) return
+    const sessionId = session?.sessionId
+    actionLocks.current.add('group:write')
     setGroupBusy(true)
     try {
       const response = await apiFetch(`/api/conversations/${activeConversationId}`, {
@@ -2323,6 +2477,7 @@ export default function App() {
         body: JSON.stringify({ name: groupNameDraft.trim() }),
       })
       const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) {
         setNotice(result?.error || 'Không đổi được tên nhóm')
         return
@@ -2330,18 +2485,22 @@ export default function App() {
       setNotice('Đã cập nhật tên nhóm.')
       await refreshConversations()
     } finally {
-      setGroupBusy(false)
+      if (sessionRef.current?.sessionId === sessionId) {
+        actionLocks.current.delete('group:write')
+        setGroupBusy(false)
+      }
     }
   }
 
   async function inviteGroupMembers() {
-    if (!activeConversationId) return
+    if (!activeConversationId || actionLocks.current.has('group:write')) return
+    const sessionId = session?.sessionId
     const usernames = groupInviteDraft
       .split(/[\s,;]+/)
       .map((item) => item.trim())
       .filter(Boolean)
     if (usernames.length === 0) return
-
+    actionLocks.current.add('group:write')
     setGroupBusy(true)
     try {
       const response = await apiFetch(`/api/conversations/${activeConversationId}/members`, {
@@ -2350,27 +2509,34 @@ export default function App() {
         body: JSON.stringify({ usernames }),
       })
       const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) {
         setNotice(result?.error || 'Không thêm được thành viên')
         return
       }
-      setGroupInviteDraft('')
+      if (activeConversationIdRef.current === activeConversationId) {
+        setGroupInviteDraft((current) => current === groupInviteDraft ? '' : current)
+      }
       setNotice('Đã thêm thành viên vào nhóm.')
       await Promise.all([refreshGroupMembers(activeConversationId), refreshConversations()])
     } finally {
-      setGroupBusy(false)
+      if (sessionRef.current?.sessionId === sessionId) {
+        actionLocks.current.delete('group:write')
+        setGroupBusy(false)
+      }
     }
   }
 
   async function changeGroupMemberRole(member: GroupMember, role: GroupMember['role']) {
-    if (!activeConversationId) return
+    if (!activeConversationId || actionLocks.current.has('group:write')) return
+    const sessionId = session?.sessionId
     const message = role === 'owner'
       ? `Chuyển quyền chủ nhóm cho @${member.username}?`
       : role === 'admin'
         ? `Đặt @${member.username} làm quản trị viên?`
         : `Gỡ quyền quản trị của @${member.username}?`
     if (!window.confirm(message)) return
-
+    actionLocks.current.add('group:write')
     setGroupBusy(true)
     try {
       const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
@@ -2379,6 +2545,7 @@ export default function App() {
         body: JSON.stringify({ role }),
       })
       const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) {
         setNotice(result?.error || 'Không cập nhật được quyền thành viên')
         return
@@ -2386,28 +2553,35 @@ export default function App() {
       setNotice(role === 'owner' ? 'Đã chuyển quyền chủ nhóm.' : 'Đã cập nhật quyền thành viên.')
       await refreshGroupMembers(activeConversationId)
     } finally {
-      setGroupBusy(false)
+      if (sessionRef.current?.sessionId === sessionId) {
+        actionLocks.current.delete('group:write')
+        setGroupBusy(false)
+      }
     }
   }
 
   async function removeGroupMember(member: GroupMember) {
-    if (!activeConversationId) return
+    if (!activeConversationId || actionLocks.current.has('group:write')) return
+    const sessionId = session?.sessionId
     const self = member.id === session?.user.id
     if (!window.confirm(self ? 'Rời khỏi nhóm này?' : `Xóa @${member.username} khỏi nhóm?`)) return
-
+    actionLocks.current.add('group:write')
     setGroupBusy(true)
     try {
       const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
         method: 'DELETE',
       })
       const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) {
         setNotice(result?.error || (self ? 'Không rời được nhóm' : 'Không xóa được thành viên'))
         return
       }
       if (self) {
-        setGroupSettingsOpen(false)
-        setActiveConversationId(null)
+        if (activeConversationIdRef.current === activeConversationId) {
+          setGroupSettingsOpen(false)
+          setActiveConversationId(null)
+        }
         setNotice('Bạn đã rời nhóm.')
         await refreshConversations()
         return
@@ -2415,12 +2589,16 @@ export default function App() {
       setNotice(`Đã xóa @${member.username} khỏi nhóm.`)
       await Promise.all([refreshGroupMembers(activeConversationId), refreshConversations()])
     } finally {
-      setGroupBusy(false)
+      if (sessionRef.current?.sessionId === sessionId) {
+        actionLocks.current.delete('group:write')
+        setGroupBusy(false)
+      }
     }
   }
 
   async function editOwnMessage(message: Message) {
-    if (message.deleted || message.senderId !== session?.user.id) return
+    const key = `message:${message.id}`
+    if (message.deleted || message.senderId !== session?.user.id || actionLocks.current.has(key)) return
     const next = window.prompt('Sửa tin nhắn', message.text)
     if (next === null || next.trim() === message.text.trim()) return
     if (!next.trim()) {
@@ -2428,59 +2606,92 @@ export default function App() {
       return
     }
 
-    const response = await apiFetch(`/api/messages/${message.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: next.trim() }),
-    })
-    const result = await response.json().catch(() => null) as Message | { error?: string } | null
-    if (!response.ok) {
-      setNotice((result as { error?: string } | null)?.error || 'Không sửa được tin nhắn')
-      return
+    const sessionId = session?.sessionId
+    actionLocks.current.add(key)
+    try {
+      const response = await apiFetch(`/api/messages/${message.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: next.trim() }),
+      })
+      const result = await response.json().catch(() => null) as Message | { error?: string } | null
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || !result || !('id' in result) || result.id !== message.id || typeof result.text !== 'string') {
+        setNotice((result as { error?: string } | null)?.error || 'Không sửa được tin nhắn')
+        return
+      }
+      const updated = result as Message
+      if (activeConversationIdRef.current !== message.conversationId) return
+      messageChanges.current.add(updated.id)
+      setMessages((current) => current.map((item) => item.id === updated.id ? {
+        ...item, text: updated.text, editedAt: updated.editedAt,
+      } : item))
+      setTranslations((current) => {
+        const nextTranslations = { ...current }
+        delete nextTranslations[message.id]
+        return nextTranslations
+      })
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) actionLocks.current.delete(key)
     }
-    const updated = result as Message
-    setMessages((current) => current.map((item) => (item.id === updated.id ? updated : item)))
-    setTranslations((current) => {
-      const nextTranslations = { ...current }
-      delete nextTranslations[message.id]
-      return nextTranslations
-    })
   }
 
   async function recallOwnMessage(message: Message) {
-    if (message.deleted || message.senderId !== session?.user.id) return
+    const key = `message:${message.id}`
+    if (message.deleted || message.senderId !== session?.user.id || actionLocks.current.has(key)) return
     if (!window.confirm('Thu hồi tin nhắn này?')) return
-
-    const response = await apiFetch(`/api/messages/${message.id}`, { method: 'DELETE' })
-    const result = await response.json().catch(() => null) as Message | { error?: string } | null
-    if (!response.ok) {
-      setNotice((result as { error?: string } | null)?.error || 'Không thu hồi được tin nhắn')
-      return
+    const sessionId = session?.sessionId
+    actionLocks.current.add(key)
+    try {
+      const response = await apiFetch(`/api/messages/${message.id}`, { method: 'DELETE' })
+      const result = await response.json().catch(() => null) as Message | { error?: string } | null
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || !result || !('id' in result) || result.id !== message.id || !result.deleted) {
+        setNotice((result as { error?: string } | null)?.error || 'Không thu hồi được tin nhắn')
+        return
+      }
+      const updated = result as Message
+      if (activeConversationIdRef.current !== message.conversationId) return
+      messageChanges.current.add(updated.id)
+      setMessages((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+      setTranslations((current) => {
+        const next = { ...current }
+        delete next[message.id]
+        return next
+      })
+      setReplyingTo((current) => current?.id === message.id ? null : current)
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) actionLocks.current.delete(key)
     }
-    const updated = result as Message
-    setMessages((current) => current.map((item) => (item.id === updated.id ? updated : item)))
-    setTranslations((current) => {
-      const next = { ...current }
-      delete next[message.id]
-      return next
-    })
-    if (replyingTo?.id === message.id) setReplyingTo(null)
   }
 
   async function toggleReaction(message: Message, emoji: string) {
-    if (message.deleted) return
-    const response = await apiFetch(`/api/messages/${message.id}/reactions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emoji }),
-    })
-    const result = await response.json().catch(() => null) as Message | { error?: string } | null
-    if (!response.ok) {
-      setNotice((result as { error?: string } | null)?.error || 'Không thả cảm xúc được')
-      return
+    const key = `message:${message.id}`
+    if (message.deleted || actionLocks.current.has(key)) return
+    const sessionId = session?.sessionId
+    actionLocks.current.add(key)
+    setReactionPreviews((current) => ({ ...current, [message.id]: toggleCount(message.reactions || [], emoji) }))
+    try {
+      const response = await apiFetch(`/api/messages/${message.id}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji }),
+      })
+      const result = await response.json() as Message & { error?: string }
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || result.id !== message.id) throw new Error(result.error || 'Không thả cảm xúc được')
+      if (activeConversationIdRef.current === message.conversationId) {
+        messageChanges.current.add(result.id)
+        setMessages((current) => current.map((item) => item.id === result.id ? { ...item, reactions: result.reactions } : item))
+      }
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không thả cảm xúc được', 'error')
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) {
+        actionLocks.current.delete(key)
+        setReactionPreviews((current) => { const next = { ...current }; delete next[message.id]; return next })
+      }
     }
-    const updated = result as Message
-    setMessages((current) => current.map((item) => (item.id === updated.id ? updated : item)))
   }
 
   async function requestTranslation(text: string, messageId?: number) {
@@ -2493,9 +2704,10 @@ export default function App() {
         ...(messageId ? { messageId } : {}),
       }),
     })
-    const result = await response.json()
-    if (!response.ok) {
-      setNotice(result.error || 'AI dịch thất bại')
+    const result = await response.json().catch(() => null)
+    if (sessionRef.current?.sessionId !== session?.sessionId) return null
+    if (!response.ok || typeof result?.translatedText !== 'string') {
+      setNotice(result?.error || 'AI dịch thất bại')
       return null
     }
     return result as { translatedText: string }
@@ -2510,49 +2722,91 @@ export default function App() {
 
   async function createPost(event: FormEvent) {
     event.preventDefault()
-    if (mediaUploading || (!postText.trim() && postAttachments.length === 0)) return
+    if (!session || actionLocks.current.has('feed:create') || mediaUploading || (!postText.trim() && postAttachments.length === 0)) return
 
     const content = postText.trim()
     const attachments = postAttachments
-    const response = await apiFetch('/api/posts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, attachments }),
-    })
-    if (!response.ok) {
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      setNotice(result?.error || 'Không đăng được bài viết')
-      return
+    const sessionId = session.sessionId
+    actionLocks.current.add('feed:create')
+    ++feedRevision.current
+    setPendingPost({ id: -1, author: name, content, attachments, likes: 0, liked: false, comments: [], createdAt: new Date().toISOString() })
+    try {
+      const response = await apiFetch('/api/posts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, attachments }),
+      })
+      const post = await response.json() as Post & { error?: string }
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || !Number.isSafeInteger(post.id) || post.id <= 0) throw new Error(post.error || 'Không đăng được bài viết')
+      setPosts((current) => [post, ...current.filter((item) => item.id !== post.id)])
+      setPostText('')
+      setPostAttachments([])
+      setNotice('Đã đăng bài viết.', 'success')
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không đăng được bài viết. Bản nháp được giữ lại.', 'error')
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) {
+        ++feedRevision.current
+        actionLocks.current.delete('feed:create')
+        setPendingPost(null)
+      }
     }
-    const post = (await response.json()) as Post
-    setPosts((current) => [post, ...current])
-    setPostText('')
-    setPostAttachments([])
   }
 
   async function like(post: Post) {
-    const response = await apiFetch(`/api/posts/${post.id}/like`, { method: 'POST' })
-    if (!response.ok) return
-    const updated = (await response.json()) as Post
-    setPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+    const key = `feed:like:${post.id}`
+    if (actionLocks.current.has(key)) return
+    const sessionId = session?.sessionId
+    actionLocks.current.add(key)
+    ++feedRevision.current
+    setLikePreviews((current) => ({ ...current, [post.id]: !post.liked }))
+    try {
+      const response = await apiFetch(`/api/posts/${post.id}/like`, { method: 'POST' })
+      const updated = await response.json() as Post & { error?: string }
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || updated.id !== post.id || typeof updated.liked !== 'boolean' || !Number.isFinite(updated.likes)) {
+        throw new Error(updated.error || 'Không cập nhật được lượt thích.')
+      }
+      setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được lượt thích.', 'error')
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) {
+        ++feedRevision.current
+        actionLocks.current.delete(key)
+        setLikePreviews((current) => { const next = { ...current }; delete next[post.id]; return next })
+        void refreshPosts()
+      }
+    }
   }
 
   async function addComment(post: Post, content: string, parentId?: number) {
     const sessionId = session?.sessionId
-    let response: Response
+    const key = `feed:comment:${post.id}`
+    if (actionLocks.current.has(key)) throw new Error('Bình luận đang được gửi.')
+    actionLocks.current.add(key)
+    ++feedRevision.current
+    setPendingComments((current) => ({ ...current, [post.id]: {
+      id: -1, parentId, author: name, content, createdAt: new Date().toISOString(),
+    } }))
     try {
-      response = await apiFetch(`/api/posts/${post.id}/comments`, {
+      const response = await apiFetch(`/api/posts/${post.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, parentId }),
       })
-    } catch {
-      throw new Error('Chưa xác nhận được bình luận đã gửi. Bản nháp được giữ lại; kiểm tra bài viết trước khi gửi lại.')
+      if (!response.ok) throw new Error('Chưa xác nhận được bình luận. Bản nháp được giữ lại; kiểm tra bài viết trước khi gửi lại.')
+      const updated = await response.json() as Post
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (updated.id !== post.id || !Array.isArray(updated.comments)) throw new Error('Phản hồi không hợp lệ. Bản nháp được giữ lại.')
+      setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) {
+        ++feedRevision.current
+        actionLocks.current.delete(key)
+        setPendingComments((current) => { const next = { ...current }; delete next[post.id]; return next })
+      }
     }
-    if (!response.ok) throw new Error('Không gửi được bình luận. Bản nháp được giữ lại.')
-    const updated = (await response.json()) as Post
-    if (sessionRef.current?.sessionId !== sessionId) return
-    setPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
   }
 
   if (!session) {
@@ -2672,7 +2926,7 @@ export default function App() {
     )
   })
   const visibleConversations = searchedConversations
-  const searchedPosts = posts.filter((post) => {
+  const searchedPosts = visiblePosts.filter((post) => {
     if (!normalizedSearch || tab !== 'feed') return true
     return (
       post.author.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
@@ -2819,6 +3073,12 @@ export default function App() {
             <span>{notice.message}</span>
           </div>
           <button type="button" aria-label="Đóng thông báo" onClick={() => setNoticeState(null)}>×</button>
+        </div>
+      )}
+      {pendingActions > 0 && (
+        <div className="request-progress" role="status" aria-live="polite">
+          <RefreshCw size={16} aria-hidden="true" />
+          <span>Đang xử lý{pendingActions > 1 ? ` (${pendingActions})` : ''}...</span>
         </div>
       )}
 
@@ -3292,7 +3552,7 @@ export default function App() {
 
                   <div className="messages">
                     <div className="day-divider"><span>Cuộc trò chuyện</span></div>
-                    {messages.map((message) => {
+                    {visibleMessages.map((message) => {
                       const mine = message.senderId === session.user.id
                       const translatedText = !message.deleted ? translations[message.id] : ''
                       const originalVisible = Boolean(translationOriginals[message.id])
@@ -3370,6 +3630,8 @@ export default function App() {
                                   <button
                                     key={reaction.emoji}
                                     type="button"
+                                    disabled={reactionPreviews[message.id] !== undefined}
+                                    aria-pressed={reaction.mine}
                                     className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
                                     onClick={() => void toggleReaction(message, reaction.emoji)}
                                     aria-label={`Thả cảm xúc ${reaction.emoji}`}
@@ -3383,6 +3645,18 @@ export default function App() {
                         </article>
                       )
                     })}
+                    {outgoingMessage?.conversationId === activeConversationId && (
+                      <article className="message mine outgoing-preview" aria-busy="true">
+                        {outgoingMessage.replyToMessageId && (
+                          <div className="message-reply-quote">
+                            <strong>@{outgoingMessage.replyToSender}</strong><span>{outgoingMessage.replyToText}</span>
+                          </div>
+                        )}
+                        {outgoingMessage.text && <div className="bubble">{outgoingMessage.text}</div>}
+                        <MediaAttachmentsView items={outgoingMessage.attachments} />
+                        <div className="message-stamp" role="status">Đang gửi...</div>
+                      </article>
+                    )}
                     <div ref={bottomRef} />
                   </div>
 
@@ -3435,7 +3709,7 @@ export default function App() {
                       maxLength={4000}
                     />
                     <button className="send-button polished-send" disabled={!canSend} aria-label="Gửi tin nhắn">
-                      {mediaUploading === 'chat' ? <span className="send-loading">•••</span> : <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>}
+                      {messageSending || mediaUploading === 'chat' ? <RefreshCw size={19} aria-label="Đang gửi" /> : <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>}
                     </button>
                   </form>
                 </>
@@ -3634,6 +3908,7 @@ export default function App() {
                 <UserAvatar name={name} className="avatar self-avatar" />
                 <textarea
                   ref={postComposerRef}
+                  disabled={!!pendingPost}
                   aria-label="Nội dung bài viết"
                   placeholder="Hôm nay bạn thế nào?"
                   value={postText}
@@ -3681,23 +3956,33 @@ export default function App() {
                   <MediaAttachmentsView
                     items={postAttachments}
                     pending
-                    onRemove={(index) => setPostAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    onRemove={pendingPost ? undefined : (index) => setPostAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
                   />
                 </div>
               )}
               <div className="composer-shortcuts">
-                <button type="button" disabled={mediaUploading === 'feed'} onClick={() => feedImageInputRef.current?.click()}><UiIcon name="photo" size={20} />Ảnh</button>
-                <button type="button" disabled={mediaUploading === 'feed'} onClick={() => feedVideoInputRef.current?.click()}><UiIcon name="video" size={20} />Video</button>
-                <button type="button" disabled={mediaUploading === 'feed'} onClick={() => feedAlbumInputRef.current?.click()}><UiIcon name="album" size={20} />Album</button>
+                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedImageInputRef.current?.click()}><UiIcon name="photo" size={20} />Ảnh</button>
+                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedVideoInputRef.current?.click()}><UiIcon name="video" size={20} />Video</button>
+                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedAlbumInputRef.current?.click()}><UiIcon name="album" size={20} />Album</button>
                 <button type="button" onClick={() => postComposerRef.current?.focus()}><UiIcon name="text" size={20} />Nền chữ</button>
               </div>
               {mediaUploading === 'feed' && <div className="media-uploading-note">Đang tải media thẳng lên kho lưu trữ…</div>}
               {(postText.trim() || postAttachments.length > 0) && (
-                <button className="feed-submit" disabled={mediaUploading === 'feed'}>Đăng</button>
+                <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
               )}
             </form>
 
             <div className="feed zalo-feed">
+              {pendingPost && (
+                <article className="post zalo-post outgoing-preview" aria-busy="true">
+                  <UserAvatar name={pendingPost.author} className="avatar" />
+                  <div className="post-body">
+                    <div className="post-author"><strong>{pendingPost.author}</strong><small role="status">Đang đăng...</small></div>
+                    <p className="pending-content">{pendingPost.content}</p>
+                    <MediaAttachmentsView items={pendingPost.attachments} />
+                  </div>
+                </article>
+              )}
               {searchedPosts.map((post) => (
                 <article className="post zalo-post" key={post.id}>
                   <UserAvatar name={post.author} className="avatar" />
@@ -3720,7 +4005,8 @@ export default function App() {
                       <MediaAttachmentsView items={post.attachments} />
                     </div>
                     <div className="post-toolbar">
-                      <button type="button" className={post.liked ? 'liked' : ''} onClick={() => like(post)}>
+                      <button type="button" className={post.liked ? 'liked' : ''} disabled={likePreviews[post.id] !== undefined}
+                        aria-pressed={post.liked} aria-busy={likePreviews[post.id] !== undefined} onClick={() => void like(post)}>
                         <UiIcon name="heart" size={21} /><span>Thích</span>{post.likes > 0 && <b>{post.likes}</b>}
                       </button>
                       <button type="button" className="post-stat post-detail-trigger" onClick={() => setActivePostId(post.id)}>
@@ -3883,12 +4169,15 @@ export default function App() {
                     )}
                     <MediaAttachmentsView items={activePost.attachments} />
                     <div className="post-toolbar">
-                      <button type="button" className={activePost.liked ? 'liked' : ''} onClick={() => like(activePost)}>
+                      <button type="button" className={activePost.liked ? 'liked' : ''} disabled={likePreviews[activePost.id] !== undefined}
+                        aria-pressed={activePost.liked} aria-busy={likePreviews[activePost.id] !== undefined} onClick={() => void like(activePost)}>
                         <UiIcon name="heart" size={21} /><span>Thích</span>{activePost.likes > 0 && <b>{activePost.likes}</b>}
                       </button>
                       <span className="post-stat"><UiIcon name="comment" size={21} />{activePost.comments?.length || 0} bình luận</span>
                     </div>
                     <FeedDiscussion
+                      key={activePost.id}
+                      pending={pendingComments[activePost.id]}
                       comments={activePost.comments || []}
                       editor={commentEditors[activePost.id] || { replyTo: null, drafts: {} }}
                       updateEditor={(editor) => {

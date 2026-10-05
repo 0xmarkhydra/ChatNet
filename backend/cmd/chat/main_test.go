@@ -147,3 +147,24 @@ func TestDirectKeyIsOrderIndependent(t *testing.T) {
 		t.Fatal("directKey must be order independent")
 	}
 }
+
+func TestMessageClientID(t *testing.T) {
+	for _, id := range []string{"", "d74bc71f-02df-4bb3-9cec-71543a1b0d9f", strings.Repeat("x", 64)} {
+		if !validClientID(id) {
+			t.Fatalf("rejected valid client id %q", id)
+		}
+	}
+	for _, id := range []string{strings.Repeat("x", 65), "a b", "a\n", "é", "<script>"} {
+		if validClientID(id) {
+			t.Fatalf("accepted invalid client id %q", id)
+		}
+	}
+	body, err := json.Marshal(message{ID: 1, ClientID: "draft-123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded message
+	if err := json.Unmarshal(body, &decoded); err != nil || decoded.ClientID != "draft-123" {
+		t.Fatalf("lost correlation id: %s, %v", body, err)
+	}
+}

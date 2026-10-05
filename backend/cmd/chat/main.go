@@ -25,6 +25,7 @@ import (
 
 type message struct {
 	ID                  int64               `json:"id"`
+	ClientID            string              `json:"clientId,omitempty"`
 	ConversationID      int64               `json:"conversationId"`
 	SenderID            int64               `json:"senderId"`
 	Sender              string              `json:"sender"`
@@ -749,6 +750,12 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, items)
 }
 
+func validClientID(id string) bool {
+	return len(id) <= 64 && strings.IndexFunc(id, func(c rune) bool {
+		return !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-')
+	}) < 0
+}
+
 func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -761,6 +768,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		Text             string                   `json:"text"`
+		ClientID         string                   `json:"clientId"`
 		ReplyToMessageID *int64                   `json:"replyToMessageId"`
 		Attachments      []mediax.AttachmentInput `json:"attachments"`
 	}
@@ -769,6 +777,11 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Text = strings.TrimSpace(body.Text)
+	// ponytail: correlation only, not durable idempotency; do not auto-retry message creation.
+	if !validClientID(body.ClientID) {
+		httpx.Error(w, http.StatusBadRequest, "invalid client id")
+		return
+	}
 	if len(body.Text) > 4000 {
 		httpx.Error(w, http.StatusBadRequest, "text must be <= 4000 characters")
 		return
@@ -808,6 +821,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 
 	m := message{
+		ClientID:         body.ClientID,
 		ConversationID:   conversationID,
 		SenderID:         claims.UserID,
 		Sender:           claims.Username,

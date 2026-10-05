@@ -109,8 +109,9 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
   )
 }
 
-export function FeedDiscussion({ comments, submit, editor, updateEditor, ...translation }: TranslationProps & {
+export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, ...translation }: TranslationProps & {
   comments: FeedComment[]
+  pending?: FeedComment
   submit: (content: string, parentId?: number) => Promise<void>
   editor: DiscussionDraft
   updateEditor: (value: DiscussionDraft) => void
@@ -203,6 +204,19 @@ export function FeedDiscussion({ comments, submit, editor, updateEditor, ...tran
           </li>
         ))}
       </ul>
+      {pending && (
+        <div className="feed-comment-row outgoing-preview" aria-busy="true">
+          <span className="feed-comment-avatar" aria-hidden="true">{pending.author.slice(0, 2).toUpperCase()}</span>
+          <div className="feed-comment-body">
+            <div className="feed-comment-bubble">
+              <strong>@{pending.author}</strong>
+              {pending.parentId && <small className="feed-reply-to">Trả lời @{byID.get(pending.parentId)?.author}</small>}
+              <p className="pending-content">{pending.content}</p>
+            </div>
+            <small role="status">Đang gửi bình luận...</small>
+          </div>
+        </div>
+      )}
       <form className="feed-comment-form" onSubmit={(event) => { event.preventDefault(); void send() }}>
         {replyTo && (
           <div className="feed-reply-target">

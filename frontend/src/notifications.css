@@ -102,3 +102,22 @@
     display: inline;
   }
 }
+.request-progress {
+  display: flex;
+  flex-shrink: 0;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-bottom: 1px solid #cbd5dc;
+  background: #fff;
+  color: #243a32;
+  font-size: 13px;
+}
+
+.request-progress svg { flex-shrink: 0; animation: request-spin 1s linear infinite; }
+.outgoing-preview { opacity: .75; }
+.pending-content { white-space: pre-wrap; overflow-wrap: anywhere; }
+@keyframes request-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .request-progress svg { animation: none; } }
