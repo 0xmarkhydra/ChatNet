@@ -1,4 +1,4 @@
-const CACHE = 'chatnet-v31-runtime'
+const CACHE = 'chatnet-v32-runtime'
 const CORE = ['/offline.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg']
 
 self.addEventListener('install', (event) => {
@@ -11,6 +11,13 @@ self.addEventListener('activate', (event) => {
     const keys = await caches.keys()
     await Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))
     await self.clients.claim()
+
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    await Promise.all(clients.map(async (client) => {
+      const url = new URL(client.url)
+      if (!url.searchParams.has('pwa')) return
+      await client.navigate(`/?__chatnet_refresh=v32&t=${Date.now()}`)
+    }))
   })())
 })
 

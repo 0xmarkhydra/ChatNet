@@ -9,6 +9,10 @@ import './friends.css'
 import './zalo-inspired.css'
 import './nearby-explorer.css'
 
+if (window.location.search.includes('pwa=')) {
+  window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)
+}
+
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   let refreshingForNewWorker = false
   let refreshingForNewBuild = false

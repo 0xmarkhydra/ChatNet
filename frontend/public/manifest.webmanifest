@@ -4,7 +4,7 @@
   "short_name": "ChatNet",
   "description": "ChatNet – Kết nối không biên giới. Trò chuyện, kết bạn và giao tiếp xuyên ngôn ngữ với dịch tự động bằng AI.",
   "lang": "vi",
-  "start_url": "/?pwa=v30",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
