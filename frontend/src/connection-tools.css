@@ -42,3 +42,20 @@
 .group-selection { display: flex; flex-wrap: wrap; gap: 8px; }
 .group-selection button { border: 1px solid #c8d5cd; background: #f0f6f2; border-radius: 6px; padding: 6px 10px; overflow-wrap: anywhere; }
 .group-count { color: #52675b; font-size: 14px; margin: 0; }
+.chat-friend-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px 16px; padding: 8px 16px; flex: 0 0 auto; border-bottom: 1px solid #dce4df;
+  background: #fff; color: #54635b; font-size: 13px; letter-spacing: 0;
+}
+.chat-friend-bar > span { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.chat-friend-bar svg { flex-shrink: 0; }
+.chat-friend-bar.relationship-accepted { color: #176c50; }
+.chat-friend-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.chat-friend-bar button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; border: 1px solid #c8d5cd; border-radius: 6px; padding: 8px 12px;
+  background: white; color: #354d40; font: inherit; font-weight: 600; cursor: pointer;
+}
+.chat-friend-bar button.primary { background: #08764b; border-color: #08764b; color: white; }
+.chat-friend-bar button:disabled { opacity: .5; cursor: wait; }
+.chat-friend-bar button:focus-visible { outline: 2px solid #08764b; outline-offset: 2px; }

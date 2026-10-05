@@ -2,6 +2,7 @@ import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useMemo, use
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
+import { Check, RefreshCw, UserCheck, UserPlus, X } from 'lucide-react'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
 const ProfileQr = lazy(() => import('./ProfileQr'))
@@ -115,7 +116,7 @@ type Conversation = {
 }
 
 type RealtimeEvent = {
-  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.read'
+  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.read' | 'friend.updated'
   conversationId: number
   message?: Message
   conversation?: Conversation
@@ -507,6 +508,11 @@ export default function App() {
   const [friends, setFriends] = useState<FriendConnection[]>([])
   const [friendRequests, setFriendRequests] = useState<FriendConnection[]>([])
   const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null)
+  const friendActionRef = useRef(false)
+  const friendSyncRequest = useRef(0)
+  const [friendSyncToken, setFriendSyncToken] = useState('')
+  const [friendSyncError, setFriendSyncError] = useState('')
+  const [friendSyncBusy, setFriendSyncBusy] = useState(false)
   const [directUsername, setDirectUsername] = useState('')
   const [qrOpen, setQrOpen] = useState<'mine' | 'scan' | null>(null)
   const [chatCreateError, setChatCreateError] = useState('')
@@ -567,6 +573,11 @@ export default function App() {
 
   const name = session?.user.username || ''
   const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
+  const chatFriend = activeConversation?.type === 'direct' && activeConversation.otherUserId
+    && activeConversation.otherUserId !== session?.user.id
+    ? { id: activeConversation.otherUserId, username: '', displayName: activeConversation.name, online: activeConversation.online }
+    : null
+  const chatFriendRelationship = chatFriend ? friendRelationship(chatFriend.id) : 'none'
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
   const activePost = activePostId ? posts.find((item) => item.id === activePostId) || null : null
@@ -947,12 +958,17 @@ export default function App() {
         }),
       )
       if (request !== nearbyRequest.current || sessionRef.current?.token !== token) return
+      const { latitude, longitude } = position.coords
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
+        || Math.abs(latitude) > 85.05112878 || Math.abs(longitude) > 180) {
+        throw new Error('Tọa độ trình duyệt không hợp lệ. Kiểm tra Latitude (vĩ độ) và Longitude (kinh độ) trong cài đặt vị trí giả lập nếu đang dùng.')
+      }
       const response = await apiFetch('/api/users/nearby', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          latitude,
+          longitude,
           radiusKm: nearbyRadiusKm,
         }),
       })
@@ -1535,20 +1551,31 @@ export default function App() {
   }
 
   async function refreshFriendConnections() {
-    if (!session?.token) return
+    const token = session?.token
+    if (!token) return
+    const request = ++friendSyncRequest.current
+    setFriendSyncBusy(true)
     try {
       const [friendsResponse, requestsResponse] = await Promise.all([
         apiFetch('/api/friends'),
         apiFetch('/api/friends/requests'),
       ])
-      if (friendsResponse.ok) {
-        setFriends((await friendsResponse.json()) as FriendConnection[])
-      }
-      if (requestsResponse.ok) {
-        setFriendRequests((await requestsResponse.json()) as FriendConnection[])
-      }
+      if (!friendsResponse.ok || !requestsResponse.ok) throw new Error('Friend sync failed')
+      const [nextFriends, nextRequests] = await Promise.all([
+        friendsResponse.json() as Promise<FriendConnection[]>,
+        requestsResponse.json() as Promise<FriendConnection[]>,
+      ])
+      if (sessionRef.current?.token !== token || request !== friendSyncRequest.current) return
+      setFriends(nextFriends)
+      setFriendRequests(nextRequests)
+      setFriendSyncToken(token)
+      setFriendSyncError('')
     } catch {
-      // Friend discovery remains usable even when relationship sync is temporarily unavailable.
+      if (sessionRef.current?.token === token && request === friendSyncRequest.current) {
+        setFriendSyncError('Chưa tải được trạng thái kết bạn.')
+      }
+    } finally {
+      if (sessionRef.current?.token === token && request === friendSyncRequest.current) setFriendSyncBusy(false)
     }
   }
 
@@ -1560,64 +1587,81 @@ export default function App() {
     return 'none' as const
   }
 
-  async function actOnFriend(friend: FriendSearchResult | FriendConnection) {
+  async function actOnFriend(friend: FriendSearchResult | FriendConnection, decline = false) {
+    const token = session?.token
+    if (!token || friendActionRef.current || friend.id === session.user.id) return
     const relationship = friendRelationship(friend.id)
+    if (decline && relationship !== 'incoming') return
     if (relationship === 'accepted') {
-      await openDirectByUsername(friend.username)
+      if (friend.username) await openDirectByUsername(friend.username)
       return
     }
 
+    friendActionRef.current = true
+    ++friendSyncRequest.current
     setFriendActionBusy(friend.id)
     try {
-      const method = relationship === 'outgoing' ? 'DELETE' : 'POST'
-      const path = relationship === 'incoming'
+      const removing = decline || relationship === 'outgoing'
+      const method = removing ? 'DELETE' : 'POST'
+      const path = removing
+        ? `/api/friends/${friend.id}?direction=${relationship}`
+        : relationship === 'incoming'
         ? `/api/friends/${friend.id}/accept`
         : `/api/friends/${friend.id}`
       const response = await apiFetch(path, { method })
-      const result = await response.json().catch(() => null) as { error?: string } | null
+      const result = await response.json().catch(() => null) as (FriendConnection & { error?: string }) | null
+      if (sessionRef.current?.token !== token) return
+      ++friendSyncRequest.current
       if (!response.ok) {
         setNotice(result?.error || 'Không cập nhật được lời mời kết bạn')
+        await refreshFriendConnections()
         return
       }
-      if (relationship === 'incoming') {
-        setNotice(`Đã kết bạn với @${friend.username}`)
-      } else if (relationship === 'outgoing') {
-        setNotice(`Đã hủy lời mời tới @${friend.username}`)
+      const label = friend.displayName || `@${friend.username}`
+      if (removing) {
+        setFriendRequests((current) => current.filter((item) => item.id !== friend.id))
+        setNotice(decline ? 'Đã từ chối lời mời kết bạn' : 'Đã hủy lời mời kết bạn')
+      } else if (result?.id === friend.id && result.status === 'accepted') {
+        setFriends((current) => [...current.filter((item) => item.id !== friend.id), result])
+        setFriendRequests((current) => current.filter((item) => item.id !== friend.id))
+        setNotice(`Đã kết bạn với ${label}`)
+      } else if (result?.id === friend.id && result.status === 'pending') {
+        setFriendRequests((current) => [...current.filter((item) => item.id !== friend.id), result])
+        setNotice(result.direction === 'incoming'
+          ? `${label} cũng đã gửi lời mời. Bạn có thể chấp nhận ngay.`
+          : `Đã gửi lời mời kết bạn tới ${label}`)
       } else {
-        setNotice(`Đã gửi lời mời kết bạn tới @${friend.username}`)
+        setNotice('Đang kiểm tra trạng thái kết bạn')
       }
       await refreshFriendConnections()
     } catch {
-      setNotice('Không cập nhật được lời mời kết bạn. Kiểm tra kết nối rồi thử lại.')
+      if (sessionRef.current?.token === token) {
+        setNotice('Không cập nhật được lời mời kết bạn. Kiểm tra kết nối rồi thử lại.')
+        await refreshFriendConnections()
+      }
     } finally {
+      friendActionRef.current = false
       setFriendActionBusy(null)
     }
   }
 
   async function declineFriendRequest(friend: FriendConnection) {
-    setFriendActionBusy(friend.id)
-    try {
-      const response = await apiFetch(`/api/friends/${friend.id}`, { method: 'DELETE' })
-      if (!response.ok) {
-        setNotice('Không từ chối được lời mời kết bạn')
-        return
-      }
-      await refreshFriendConnections()
-    } finally {
-      setFriendActionBusy(null)
-    }
+    await actOnFriend(friend, true)
   }
 
   useEffect(() => {
     if (!session?.token) {
       setFriends([])
       setFriendRequests([])
+      setFriendSyncToken('')
+      setFriendSyncError('')
+      ++friendSyncRequest.current
       return
     }
-    if (tab === 'contacts' || newChatMode === 'friends' || newChatMode === 'group') {
+    if (tab === 'contacts' || newChatMode === 'friends' || newChatMode === 'group' || chatFriend) {
       void refreshFriendConnections()
     }
-  }, [session?.token, tab, newChatMode])
+  }, [session?.token, tab, newChatMode, chatFriend?.id])
 
   useEffect(() => {
     const friendSurfaceOpen = newChatMode === 'friends' || newChatMode === 'group' || tab === 'contacts'
@@ -1890,10 +1934,17 @@ export default function App() {
     const events = new EventSource(
       `${API}/api/events?token=${encodeURIComponent(session.token)}`,
     )
-    events.onopen = () => setStatus('Đang online')
+    events.onopen = () => {
+      setStatus('Đang online')
+      void refreshFriendConnections()
+    }
     events.onerror = () => setStatus('Đang kết nối lại...')
     events.addEventListener('update', (event) => {
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
+      if (update.type === 'friend.updated') {
+        void refreshFriendConnections()
+        return
+      }
 
       if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
         void refreshConversations()
@@ -1991,7 +2042,10 @@ export default function App() {
       }
     })
 
-    const refreshTimer = window.setInterval(() => void refreshConversations(), 20000)
+    const refreshTimer = window.setInterval(() => {
+      void refreshConversations()
+      void refreshFriendConnections()
+    }, 20000)
     return () => {
       events.close()
       window.clearInterval(refreshTimer)
@@ -3044,6 +3098,41 @@ export default function App() {
                       </div>
                     </div>
                   </header>
+
+                  {chatFriend && (
+                    <div className={`chat-friend-bar relationship-${chatFriendRelationship}`} aria-label="Kết bạn trong cuộc trò chuyện">
+                      <span role="status">
+                        {chatFriendRelationship === 'accepted' ? <UserCheck size={18} aria-hidden="true" /> : <UserPlus size={18} aria-hidden="true" />}
+                        {friendSyncError || (friendSyncToken !== session?.token ? 'Đang tải trạng thái kết bạn...' :
+                          chatFriendRelationship === 'accepted' ? 'Hai bạn đã là bạn bè' :
+                          chatFriendRelationship === 'incoming' ? 'Bạn nhận được lời mời kết bạn' :
+                          chatFriendRelationship === 'outgoing' ? 'Đã gửi lời mời kết bạn' : 'Hai bạn chưa kết bạn')}
+                      </span>
+                      {friendSyncError ? (
+                        <button type="button" disabled={friendSyncBusy} onClick={() => void refreshFriendConnections()}>
+                          <RefreshCw size={16} aria-hidden="true" /> Thử lại
+                        </button>
+                      ) : friendSyncToken === session?.token && chatFriendRelationship !== 'accepted' && (
+                        <div className="chat-friend-actions">
+                          <button
+                            type="button"
+                            className={chatFriendRelationship === 'outgoing' ? '' : 'primary'}
+                            disabled={friendActionBusy !== null}
+                            onClick={() => void actOnFriend(chatFriend)}
+                          >
+                            {chatFriendRelationship === 'incoming' ? <Check size={16} aria-hidden="true" /> :
+                              chatFriendRelationship === 'outgoing' ? <X size={16} aria-hidden="true" /> : <UserPlus size={16} aria-hidden="true" />}
+                            {chatFriendRelationship === 'incoming' ? 'Chấp nhận' : chatFriendRelationship === 'outgoing' ? 'Hủy lời mời' : 'Gửi lời mời kết bạn'}
+                          </button>
+                          {chatFriendRelationship === 'incoming' && (
+                            <button type="button" disabled={friendActionBusy !== null} onClick={() => void actOnFriend(chatFriend, true)}>
+                              <X size={16} aria-hidden="true" /> Từ chối
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {groupSettingsOpen && activeConversation.type === 'group' && (
                     <section className="group-settings-panel" aria-label="Quản lý nhóm">

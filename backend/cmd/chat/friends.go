@@ -164,6 +164,7 @@ func (s *server) sendFriendRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if tag.RowsAffected() > 0 {
+		s.publishConversationEvent(r.Context(), []int64{claims.UserID, otherID}, realtimeEvent{Type: "friend.updated"})
 		s.sendPushAsync([]int64{otherID}, onesignalx.Notification{
 			Title: "ChatNet",
 			Body:  fmt.Sprintf("@%s đã gửi lời mời kết bạn.", claims.Username),
@@ -203,6 +204,7 @@ func (s *server) acceptFriendRequest(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load friend")
 		return
 	}
+	s.publishConversationEvent(r.Context(), []int64{claims.UserID, otherID}, realtimeEvent{Type: "friend.updated"})
 	s.sendPushAsync([]int64{otherID}, onesignalx.Notification{
 		Title: "ChatNet",
 		Body:  fmt.Sprintf("@%s đã chấp nhận lời mời kết bạn.", claims.Username),
@@ -224,12 +226,27 @@ func (s *server) removeFriendConnection(w http.ResponseWriter, r *http.Request) 
 	}
 
 	low, high := orderedUserPair(claims.UserID, otherID)
-	if _, err := s.db.Exec(r.Context(), `
+	direction := r.URL.Query().Get("direction")
+	if direction != "" && direction != "incoming" && direction != "outgoing" {
+		httpx.Error(w, http.StatusBadRequest, "invalid request direction")
+		return
+	}
+	tag, err := s.db.Exec(r.Context(), `
 		DELETE FROM friend_connections
 		WHERE user_low=$1 AND user_high=$2
-	`, low, high); err != nil {
+		  AND ($3='' OR (status='pending' AND (
+		    ($3='outgoing' AND requested_by=$4) OR
+		    ($3='incoming' AND requested_by<>$4)
+		  )))
+	`, low, high, direction, claims.UserID)
+	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot remove friend connection")
 		return
 	}
+	if direction != "" && tag.RowsAffected() == 0 {
+		httpx.Error(w, http.StatusConflict, "Lời mời đã thay đổi. Vui lòng kiểm tra lại.")
+		return
+	}
+	s.publishConversationEvent(r.Context(), []int64{claims.UserID, otherID}, realtimeEvent{Type: "friend.updated"})
 	httpx.JSON(w, http.StatusOK, map[string]any{"ok": true, "userId": otherID})
 }
