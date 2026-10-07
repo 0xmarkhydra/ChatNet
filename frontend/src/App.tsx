@@ -2,7 +2,7 @@ import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useMemo, use
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
-import { Bell, Check, RefreshCw, UserCheck, UserPlus, X } from 'lucide-react'
+import { Bell, Check, Images, RefreshCw, UserCheck, UserPlus, X } from 'lucide-react'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
@@ -3291,7 +3291,8 @@ export default function App() {
                         aria-label="Xem ảnh, tệp và liên kết đã chia sẻ"
                         title="Nội dung đã chia sẻ"
                       >
-                        ▦ Nội dung
+                        <Images size={19} strokeWidth={2.1} aria-hidden="true" />
+                        <span className="shared-content-label">Nội dung</span>
                       </button>
                       {activeConversation.type === 'group' && (
                         <button
