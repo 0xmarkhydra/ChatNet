@@ -238,3 +238,40 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
 ON push_subscriptions(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS call_sessions (
+    id VARCHAR(40) PRIMARY KEY,
+    conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    created_by BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    media_type VARCHAR(16) NOT NULL CHECK (media_type IN ('audio', 'video')),
+    status VARCHAR(16) NOT NULL CHECK (status IN ('ringing', 'active', 'ended', 'cancelled')),
+    livekit_room VARCHAR(40) UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    ended_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_call_sessions_active_conversation
+ON call_sessions(conversation_id)
+WHERE status IN ('ringing', 'active');
+
+CREATE INDEX IF NOT EXISTS idx_call_sessions_conversation_created
+ON call_sessions(conversation_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS call_participants (
+    call_id VARCHAR(40) NOT NULL REFERENCES call_sessions(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(16) NOT NULL CHECK (role IN ('host', 'cohost', 'participant')),
+    invited_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    joined_at TIMESTAMPTZ,
+    left_at TIMESTAMPTZ,
+    declined_at TIMESTAMPTZ,
+    PRIMARY KEY (call_id, user_id)
+);
+
+ALTER TABLE call_participants ADD COLUMN IF NOT EXISTS invited_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE call_participants ADD COLUMN IF NOT EXISTS declined_at TIMESTAMPTZ;
+ALTER TABLE call_participants ALTER COLUMN joined_at DROP NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_call_participants_user_invited
+ON call_participants(user_id, invited_at DESC);

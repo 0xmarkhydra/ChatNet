@@ -3,7 +3,7 @@ WORKDIR /src
 COPY backend/go.mod backend/go.sum* ./
 RUN go mod download
 COPY backend/ ./
-RUN CGO_ENABLED=0 GOOS=linux go build -o /out/auth ./cmd/auth &&     CGO_ENABLED=0 GOOS=linux go build -o /out/chat ./cmd/chat &&     CGO_ENABLED=0 GOOS=linux go build -o /out/feed ./cmd/feed &&     CGO_ENABLED=0 GOOS=linux go build -o /out/translate ./cmd/translate &&     CGO_ENABLED=0 GOOS=linux go build -o /out/gateway ./cmd/gateway
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/auth ./cmd/auth &&     CGO_ENABLED=0 GOOS=linux go build -o /out/chat ./cmd/chat &&     CGO_ENABLED=0 GOOS=linux go build -o /out/feed ./cmd/feed &&     CGO_ENABLED=0 GOOS=linux go build -o /out/translate ./cmd/translate &&     CGO_ENABLED=0 GOOS=linux go build -o /out/call ./cmd/call &&     CGO_ENABLED=0 GOOS=linux go build -o /out/gateway ./cmd/gateway
 
 FROM alpine:3.20
 RUN adduser -D -H app
@@ -12,6 +12,7 @@ COPY --from=build /out/auth /app/auth
 COPY --from=build /out/chat /app/chat
 COPY --from=build /out/feed /app/feed
 COPY --from=build /out/translate /app/translate
+COPY --from=build /out/call /app/call
 COPY --from=build /out/gateway /app/gateway
 COPY backend-run.sh /app/backend-run.sh
 RUN chmod +x /app/backend-run.sh

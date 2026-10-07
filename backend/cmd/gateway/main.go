@@ -19,11 +19,13 @@ func main() {
 	chatURL := config.Env("CHAT_URL", "http://localhost:8082")
 	feedURL := config.Env("FEED_URL", "http://localhost:8083")
 	translateURL := config.Env("TRANSLATE_URL", "http://localhost:8084")
+	callURL := config.Env("CALL_URL", "http://localhost:8085")
 
 	authProxy := mustProxy(authURL)
 	chatProxy := mustProxy(chatURL)
 	feedProxy := mustProxy(feedURL)
 	translateProxy := mustProxy(translateURL)
+	callProxy := mustProxy(callURL)
 
 	healthClient := &http.Client{Timeout: 1200 * time.Millisecond}
 	mux := http.NewServeMux()
@@ -33,6 +35,7 @@ func main() {
 			"chat":      healthy(healthClient, chatURL+"/health"),
 			"feed":      healthy(healthClient, feedURL+"/health"),
 			"translate": healthy(healthClient, translateURL+"/health"),
+			"call":      healthy(healthClient, callURL+"/health"),
 		}
 		status := "ok"
 		code := http.StatusOK
@@ -66,6 +69,8 @@ func main() {
 	mux.Handle("/api/preferences/", chatProxy)
 	mux.Handle("/api/conversations", chatProxy)
 	mux.Handle("/api/conversations/", chatProxy)
+	mux.Handle("/api/calls", callProxy)
+	mux.Handle("/api/calls/", callProxy)
 	mux.Handle("/api/translate", translateProxy)
 	mux.Handle("/api/i18n/", translateProxy)
 	mux.Handle("/api/posts", feedProxy)

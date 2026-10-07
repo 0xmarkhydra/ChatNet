@@ -4,6 +4,7 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { loadNearbyPlaces, type NearbyPlace, type NearbyPlaceCategory } from './nearbyPlaces'
+import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
 
 export type NearbyUser = {
   id: number
@@ -142,12 +143,10 @@ export default function NearbyExplorer({
     if (locating) return
     setLocating(true); setLocationError('')
     try {
-      if (!navigator.geolocation) throw new Error('Thiết bị không hỗ trợ định vị.')
-      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }))
+      const position = await getCurrentPositionSmart()
       setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude })
-    } catch {
-      setLocationError('Chưa lấy được vị trí. Kiểm tra quyền vị trí và GPS rồi thử lại.')
+    } catch (error) {
+      setLocationError(await geolocationErrorMessage(error))
     } finally { setLocating(false) }
   }
 

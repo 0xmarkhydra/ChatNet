@@ -172,7 +172,7 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Content = strings.TrimSpace(body.Content)
-	if len(body.Content) > 5000 {
+	if utf8.RuneCountInString(body.Content) > 5000 {
 		httpx.Error(w, http.StatusBadRequest, "content must be <= 5000 characters")
 		return
 	}

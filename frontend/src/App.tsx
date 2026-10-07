@@ -5,6 +5,9 @@ import GroupCreator from './GroupCreator'
 import { Bell, Check, RefreshCw, UserCheck, UserPlus, X } from 'lucide-react'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
 import { mergeById, toggleCount } from './optimistic'
+import CallManager, { CallHeaderActions } from './CallManager'
+import SharedContent from './SharedContent'
+import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
 const ProfileQr = lazy(() => import('./ProfileQr'))
@@ -214,34 +217,6 @@ function formatBytes(value: number) {
   if (!Number.isFinite(value) || value <= 0) return ''
   if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`
   return `${(value / 1024 / 1024).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`
-}
-
-function geolocationErrorMessage(error: unknown) {
-  if (!window.isSecureContext) {
-    return 'Không thể dùng định vị vì trang không chạy trong ngữ cảnh HTTPS an toàn. Mở lại ChatNet bằng https://chat.codelocal.cloud.'
-  }
-
-  const geoError = error as { code?: unknown; message?: unknown } | null
-  const code = typeof geoError?.code === 'number' ? geoError.code : 0
-  const browserMessage =
-    typeof geoError?.message === 'string' && geoError.message.trim()
-      ? geoError.message.trim().slice(0, 180)
-      : ''
-
-  const detail = browserMessage ? ` Chi tiết trình duyệt: ${browserMessage}` : ''
-
-  if (code === 1) {
-    return `Quyền vị trí bị từ chối (PERMISSION_DENIED · mã GPS 1). macOS có thể đã bật Location Services nhưng trình duyệt vẫn có thể chặn riêng chat.codelocal.cloud. Hãy mở quyền của trang → Location → Allow, rồi tải lại trang.${detail}`
-  }
-  if (code === 2) {
-    return `Không xác định được vị trí hiện tại (POSITION_UNAVAILABLE · mã GPS 2). Hãy bật Wi‑Fi, kiểm tra Location Services và thử đứng ở nơi máy có thể xác định vị trí tốt hơn rồi quét lại.${detail}`
-  }
-  if (code === 3) {
-    return `Lấy vị trí quá thời gian cho phép (TIMEOUT · mã GPS 3). Kết nối hoặc dịch vụ định vị đang phản hồi chậm. Hãy bật Wi‑Fi, chờ vài giây rồi Quét quanh đây lại.${detail}`
-  }
-
-  if (error instanceof Error && error.message) return error.message
-  return `Không lấy được vị trí do lỗi không xác định.${detail || ' Hãy kiểm tra quyền Location của trình duyệt và thử lại.'}`
 }
 
 function attachmentLabel(items?: MediaAttachment[]) {
@@ -481,6 +456,9 @@ export default function App() {
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [groupNameDraft, setGroupNameDraft] = useState('')
   const [groupInviteDraft, setGroupInviteDraft] = useState('')
+  const [groupInviteSearch, setGroupInviteSearch] = useState('')
+  const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
+  const [sharedContentOpen, setSharedContentOpen] = useState(false)
   const [groupBusy, setGroupBusy] = useState(false)
   // ponytail: drafts live in memory per conversation; add persistence only with an explicit retention policy.
   const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>({})
@@ -568,6 +546,7 @@ export default function App() {
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const postComposerRef = useRef<HTMLTextAreaElement>(null)
+  const messageInputRef = useRef<HTMLInputElement>(null)
   const chatFileInputRef = useRef<HTMLInputElement>(null)
   const feedImageInputRef = useRef<HTMLInputElement>(null)
   const feedVideoInputRef = useRef<HTMLInputElement>(null)
@@ -585,6 +564,14 @@ export default function App() {
   const chatFriendRelationship = chatFriend ? friendRelationship(chatFriend.id) : 'none'
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
+  const groupInviteCandidates = useMemo(() => {
+    const memberIds = new Set(groupMembers.map((member) => member.id))
+    const normalized = groupInviteSearch.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
+    return friends
+      .filter((friend) => friend.status === 'accepted' && !memberIds.has(friend.id))
+      .filter((friend) => !normalized || `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(normalized))
+      .sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username, 'vi'))
+  }, [friends, groupMembers, groupInviteSearch])
   const visiblePosts = posts.map((post) => likePreviews[post.id] === undefined ? post : {
     ...post, liked: likePreviews[post.id],
     likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
@@ -755,8 +742,11 @@ export default function App() {
     setMessages([])
     setReplyingTo(null)
     setGroupSettingsOpen(false)
+    setSharedContentOpen(false)
     setGroupMembers([])
     setGroupInviteDraft('')
+    setGroupInviteSearch('')
+    setGroupInviteSelection([])
   }, [activeConversationId])
 
   function setMessageText(text: string) {
@@ -995,14 +985,7 @@ export default function App() {
     setNearbyBusy(true)
     setNearbyScanning(true)
     try {
-      if (!navigator.geolocation) throw new Error('Trình duyệt không hỗ trợ định vị.')
-      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 30000,
-        }),
-      )
+      const position = await getCurrentPositionSmart()
       if (request !== nearbyRequest.current || sessionRef.current?.sessionId !== sessionId) return
       const { latitude, longitude } = position.coords
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
@@ -1038,7 +1021,7 @@ export default function App() {
       )
     } catch (error) {
       if (request !== nearbyRequest.current) return
-      setNotice(geolocationErrorMessage(error), 'error')
+      setNotice(await geolocationErrorMessage(error), 'error')
     } finally {
       if (request === nearbyRequest.current) {
         setNearbyBusy(false)
@@ -2447,6 +2430,9 @@ export default function App() {
         setOutgoingMessage(null)
         sendingRef.current = false
         setMessageSending(false)
+        if (activeConversationIdRef.current === conversationId) {
+          window.requestAnimationFrame(() => messageInputRef.current?.focus({ preventScroll: true }))
+        }
       }
     }
   }
@@ -2495,11 +2481,18 @@ export default function App() {
   async function inviteGroupMembers() {
     if (!activeConversationId || actionLocks.current.has('group:write')) return
     const sessionId = session?.sessionId
-    const usernames = groupInviteDraft
-      .split(/[\s,;]+/)
-      .map((item) => item.trim())
-      .filter(Boolean)
+    const selectedUsernames = friends
+      .filter((friend) => friend.status === 'accepted' && groupInviteSelection.includes(friend.id))
+      .map((friend) => friend.username)
+    const usernames = Array.from(new Set([
+      ...selectedUsernames,
+      ...groupInviteDraft.split(/[\s,;]+/),
+    ].map((item) => item.trim().replace(/^@/, '').toLowerCase()).filter(Boolean)))
     if (usernames.length === 0) return
+    if (usernames.length > 50) {
+      setNotice('Mỗi lần có thể mời tối đa 50 người. Hãy chia thành nhiều lượt.', 'warning')
+      return
+    }
     actionLocks.current.add('group:write')
     setGroupBusy(true)
     try {
@@ -2516,6 +2509,8 @@ export default function App() {
       }
       if (activeConversationIdRef.current === activeConversationId) {
         setGroupInviteDraft((current) => current === groupInviteDraft ? '' : current)
+        setGroupInviteSelection([])
+        setGroupInviteSearch('')
       }
       setNotice('Đã thêm thành viên vào nhóm.')
       await Promise.all([refreshGroupMembers(activeConversationId), refreshConversations()])
@@ -3288,6 +3283,16 @@ export default function App() {
                     </div>
 
                     <div className="translate-controls">
+                      <CallHeaderActions conversationId={activeConversation.id} />
+                      <button
+                        type="button"
+                        className="group-settings-toggle shared-content-trigger"
+                        onClick={() => setSharedContentOpen(true)}
+                        aria-label="Xem ảnh, tệp và liên kết đã chia sẻ"
+                        title="Nội dung đã chia sẻ"
+                      >
+                        ▦ Nội dung
+                      </button>
                       {activeConversation.type === 'group' && (
                         <button
                           type="button"
@@ -3297,7 +3302,12 @@ export default function App() {
                             setGroupSettingsOpen(next)
                             if (next) {
                               setGroupNameDraft(activeConversation.name)
-                              void refreshGroupMembers(activeConversation.id)
+                              setGroupInviteSearch('')
+                              setGroupInviteSelection([])
+                              void Promise.all([
+                                refreshGroupMembers(activeConversation.id),
+                                refreshFriendConnections(),
+                              ])
                             }
                           }}
                         >
@@ -3473,18 +3483,69 @@ export default function App() {
                               Đổi tên
                             </button>
                           </div>
+
+                          <div className="group-invite-friends">
+                            <div className="group-invite-title">
+                              <strong>Mời bạn bè</strong>
+                              <span>{groupInviteSelection.length ? `${groupInviteSelection.length} đã chọn` : 'Chọn trực tiếp từ danh bạ'}</span>
+                            </div>
+                            <input
+                              className="group-invite-search"
+                              type="search"
+                              value={groupInviteSearch}
+                              onChange={(event) => setGroupInviteSearch(event.target.value)}
+                              placeholder="Tìm bạn theo tên hoặc @username"
+                              autoComplete="off"
+                            />
+                            <div className="group-invite-list">
+                              {groupInviteCandidates.length === 0 && (
+                                <div className="group-invite-empty">
+                                  {friends.some((friend) => friend.status === 'accepted')
+                                    ? 'Không còn bạn phù hợp để thêm vào nhóm.'
+                                    : 'Chưa có bạn bè trong danh bạ để mời.'}
+                                </div>
+                              )}
+                              {groupInviteCandidates.map((friend) => {
+                                const selected = groupInviteSelection.includes(friend.id)
+                                return (
+                                  <button
+                                    key={friend.id}
+                                    type="button"
+                                    className={selected ? 'group-invite-friend selected' : 'group-invite-friend'}
+                                    aria-pressed={selected}
+                                    onClick={() => setGroupInviteSelection((current) =>
+                                      current.includes(friend.id)
+                                        ? current.filter((id) => id !== friend.id)
+                                        : [...current, friend.id])}
+                                  >
+                                    <UserAvatar
+                                      name={friend.displayName || friend.username}
+                                      className="group-member-avatar"
+                                      online={friend.online}
+                                    />
+                                    <span>
+                                      <strong>{friend.displayName || friend.username}</strong>
+                                      <small>@{friend.username}</small>
+                                    </span>
+                                    <span className="group-invite-check" aria-hidden="true">✓</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+
                           <div className="group-tool-row">
                             <input
                               value={groupInviteDraft}
                               onChange={(event) => setGroupInviteDraft(event.target.value)}
-                              placeholder="Username cần thêm, cách nhau bằng dấu phẩy"
+                              placeholder="Hoặc nhập @username"
                             />
                             <button
                               type="button"
                               onClick={() => void inviteGroupMembers()}
-                              disabled={groupBusy || !groupInviteDraft.trim()}
+                              disabled={groupBusy || (!groupInviteDraft.trim() && groupInviteSelection.length === 0)}
                             >
-                              Thêm
+                              {groupInviteSelection.length > 0 ? `Thêm ${groupInviteSelection.length}` : 'Thêm'}
                             </button>
                           </div>
                         </div>
@@ -3548,6 +3609,14 @@ export default function App() {
                         ))}
                       </div>
                     </section>
+                  )}
+
+                  {sharedContentOpen && (
+                    <SharedContent
+                      conversationId={activeConversation.id}
+                      request={apiFetch}
+                      onClose={() => setSharedContentOpen(false)}
+                    />
                   )}
 
                   <div className="messages">
@@ -3701,8 +3770,8 @@ export default function App() {
                       <UiIcon name="attach" size={22} />
                     </button>
                     <input
+                      ref={messageInputRef}
                       aria-label="Tin nhắn"
-                      disabled={messageSending}
                       placeholder={mediaUploading === 'chat' ? 'Đang tải file lên...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
                       value={messageText}
                       onChange={(event) => setMessageText(event.target.value)}
@@ -4595,6 +4664,14 @@ export default function App() {
           </div>
         )}
       </section>
+
+      <CallManager
+        request={apiFetch}
+        apiBase={API}
+        token={session.token}
+        userId={session.user.id}
+        conversations={conversations.map(({ id, name, type }) => ({ id, name, type }))}
+      />
 
       <nav className="bottom-navigation" aria-label="Điều hướng chính">
         <button type="button" className={tab === 'chat' ? 'active' : ''} onClick={() => switchTab('chat')}>
