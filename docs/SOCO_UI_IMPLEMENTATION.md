@@ -45,3 +45,19 @@ SOCO visual identity follows the customer brand board for review: blue `#2563EB`
 3. Check accessibility (contrast, touch targets, screen readers) and safe areas in genuine mobile browsers.
 4. Consider splitting the large JS bundle in a subsequent performance pass.
 5. **Merge does not imply release validation or Railway deployment.** Retest once combined with uncommitted Live Project work, particularly call translation.
+
+## SOCO UI 1.1 — Semantic layout & component refinement (2026-10-14)
+
+- Added reusable `SocoSectionHeading`, `SocoEmptyState` and `SocoTextAction` presentation components in `frontend/src/SocoUI.tsx`.
+- Added `frontend/src/soco-layout-v2.css` after all existing styles to unify section hierarchy, typography, brand accents, empty states, grouped cards, mobile safe areas and desktop reading widths.
+- Chat now has a recognizable heading, conversation count, connection entry point and a guided empty state.
+- Contacts uses a common page heading, friend count and a guided add-friend empty state.
+- Feed distinctly groups stories, composer and latest posts; includes action on empty feed.
+- Profile uses the shared page heading and clear personal info/settings groups.
+- No backend, authentication, storage, privacy or business logic changes.
+
+### Validation of 1.1
+- `npm run build`: passed (existing large chunks warning remains).
+- `npm run check:pwa`, `check:session`, `check:optimistic`, `check:onesignal`: passed.
+- Local browser: unauthenticated signup screen rendered, 0 console errors.
+- **Still required**: browser/device validation of authenticated page flows and screenshots at narrow viewport sizes. Do not claim pixel-perfect 18 mockups yet.

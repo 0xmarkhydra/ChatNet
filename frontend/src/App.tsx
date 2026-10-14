@@ -7,6 +7,7 @@ import { createSessionClient, loadSession, parseSession, type Session } from './
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
 import SharedContent from './SharedContent'
+import { SocoSectionHeading, SocoEmptyState, SocoTextAction } from './SocoUI'
 import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
@@ -3215,10 +3216,22 @@ export default function App() {
 
               {chatCreateError && newChatMode !== 'group' && <div className="inline-error">{chatCreateError}</div>}
 
+              <SocoSectionHeading
+                eyebrow="TIN NHẮN"
+                title="Trò chuyện"
+                description={`${conversations.length} cuộc trò chuyện · Kết nối không biên giới`}
+                className="soco-chat-list-heading"
+                action={<SocoTextAction onClick={() => openConnectSurface()} label="Tìm và kết nối bạn bè">Kết nối</SocoTextAction>}
+              />
               <div className="conversation-list zalo-conversation-list">
                 {visibleConversations.length === 0 && (
                   <div className="conversation-list-empty">
-                    {normalizedSearch ? 'Không tìm thấy cuộc trò chuyện phù hợp.' : 'Chưa có cuộc trò chuyện.'}
+                    <SocoEmptyState
+                      kind={normalizedSearch ? 'search' : 'chat'}
+                      title={normalizedSearch ? 'Không tìm thấy cuộc trò chuyện' : 'Chưa có cuộc trò chuyện'}
+                      description={normalizedSearch ? 'Thử tìm bằng tên hoặc nội dung khác.' : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
+                      action={!normalizedSearch && <SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
+                    />
                   </div>
                 )}
 
@@ -3257,9 +3270,10 @@ export default function App() {
             <section className="conversation-panel">
               {!activeConversation ? (
                 <div className="conversation-empty">
-                  <div className="empty-icon"><UiIcon name="chat" size={36} /></div>
-                  <h2>Chọn một cuộc trò chuyện</h2>
-                  <p>Chat riêng, chat nhóm và tự động dịch AI ngay trong cùng một luồng.</p>
+                  <SocoEmptyState kind="chat" title="Kết nối không biên giới"
+                    description="Chọn một cuộc trò chuyện để bắt đầu nhắn tin và dịch AI tự động."
+                    action={<SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn mới</SocoTextAction>}
+                  />
                 </div>
               ) : (
                 <>
@@ -3790,7 +3804,10 @@ export default function App() {
 
         {tab === 'contacts' && (
           <div className="simple-view contacts-view">
-            <div className="simple-view-title"><strong>Danh bạ</strong><small>{status}</small></div>
+            <SocoSectionHeading eyebrow="KẾT NỐI" title="Danh bạ"
+              description={`${friends.length} bạn bè · ${status}`}
+              action={<SocoTextAction onClick={() => { setTab('chat'); setNewChatMode('friends') }}>Thêm bạn</SocoTextAction>}
+            />
             <div className="contact-shortcuts">
               <button type="button" onClick={() => { setTab('chat'); setNewChatMode('friends') }}>
                 <span className="shortcut-icon">＋</span><div><strong>Lời mời kết bạn</strong><small>Tìm và kết nối người mới</small></div><b>›</b>
@@ -3824,7 +3841,10 @@ export default function App() {
             <section className="contacts-suggestions">
               <div className="contacts-heading">Bạn bè ({friends.length})</div>
               {friends.length === 0 && (
-                <div className="friend-search-state">Chưa có bạn bè. Hãy gửi một lời mời kết bạn.</div>
+                <SocoEmptyState kind="friends" title="Chưa có bạn bè"
+                  description="Gửi lời mời để bắt đầu những cuộc trò chuyện mới."
+                  action={<SocoTextAction onClick={() => { setTab('chat'); setNewChatMode('friends') }}>Tìm bạn bè</SocoTextAction>}
+                />
               )}
               {friends.map((friend) => (
                 <button
@@ -3927,6 +3947,9 @@ export default function App() {
 
         {tab === 'feed' && (
           <div className="feed-view zalo-feed-view">
+            <SocoSectionHeading eyebrow="CỘNG ĐỒNG" title="Bảng tin"
+              description="Chia sẻ khoảnh khắc và câu chuyện của bạn."
+            />
             <input
               ref={storyFileInputRef}
               className="hidden-media-input"
@@ -3939,6 +3962,7 @@ export default function App() {
                 void createStory(file)
               }}
             />
+            <div className="soco-feed-section-label"><strong>Khoảnh khắc</strong><small>Story trong 24 giờ</small></div>
             <div className="stories-row">
               <button
                 type="button"
@@ -4042,6 +4066,7 @@ export default function App() {
               )}
             </form>
 
+            <div className="soco-feed-section-label soco-feed-posts-label"><strong>Bài viết mới</strong><small>${searchedPosts.length} bài viết</small></div>
             <div className="feed zalo-feed">
               {pendingPost && (
                 <article className="post zalo-post outgoing-preview" aria-busy="true">
@@ -4087,7 +4112,14 @@ export default function App() {
                   </div>
                 </article>
               ))}
-              {searchedPosts.length === 0 && <div className="feed-empty">Chưa có bài viết phù hợp.</div>}
+              {searchedPosts.length === 0 && (
+                <div className="feed-empty">
+                  <SocoEmptyState title={normalizedSearch ? 'Không tìm thấy bài viết' : 'Chưa có bài viết'}
+                    description={normalizedSearch ? 'Thử một từ khóa khác nhé.' : 'Hãy chia sẻ khoảnh khắc đầu tiên của bạn.'}
+                    action={!normalizedSearch && <SocoTextAction onClick={() => postComposerRef.current?.focus()}>Tạo bài viết</SocoTextAction>}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -4313,6 +4345,9 @@ export default function App() {
 
         {tab === 'profile' && (
           <div className="simple-view profile-view">
+            <SocoSectionHeading eyebrow="KHÔNG GIAN CỦA BẠN" title="Cá nhân"
+              description="Hồ sơ, ngôn ngữ và quyền riêng tư."
+            />
             <input
               ref={avatarFileInputRef}
               className="hidden-media-input"
@@ -4391,6 +4426,7 @@ export default function App() {
               </div>
             </section>
 
+            <div className="soco-profile-section-label">THÔNG TIN CÁ NHÂN</div>
             <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
               <div className="profile-edit-heading">
                 <div>
@@ -4446,6 +4482,7 @@ export default function App() {
               </button>
             </form>
 
+            <div className="soco-profile-section-label">TÙY CHỌN & CÀI ĐẶT</div>
             <section className="settings-card">
               <button
                 type="button"

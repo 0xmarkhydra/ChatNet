@@ -12,6 +12,7 @@ import './nearby-explorer.css'
 import './conversation-content.css'
 import './soco-theme.css'
 import './soco-screens.css'
+import './soco-layout-v2.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)

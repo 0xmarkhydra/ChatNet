@@ -1,0 +1,330 @@
+/*
+ * SOCO 1.1: reusable screen layout and iOS-inspired interaction polish.
+ * Unlike the legacy skin, this sheet styles the new semantic screen components.
+ * Keep all behavior, routes and API requests in existing React feature modules.
+ */
+:root {
+  --soco-hairline: #e8edf8;
+  --soco-quiet: #7282a1;
+  --soco-card: #ffffff;
+  --soco-card-shadow: 0 4px 22px rgba(38, 61, 120, .045);
+}
+
+.soco-section-heading {
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 21px 20px 16px;
+  color: var(--soco-text);
+}
+.soco-section-heading-copy { min-width: 0; }
+.soco-eyebrow, .soco-profile-section-label {
+  display: block;
+  color: #5973c1;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .105em;
+  line-height: 1.6;
+}
+.soco-section-heading h2 {
+  margin: 3px 0 0;
+  color: #162341;
+  font-size: clamp(23px, 2vw, 27px);
+  font-weight: 800;
+  letter-spacing: -.9px;
+  line-height: 1.13;
+}
+.soco-section-heading p {
+  margin: 7px 0 0;
+  color: var(--soco-quiet);
+  font-size: 12px;
+  font-weight: 450;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.soco-section-heading-action { flex: 0 0 auto; padding-bottom: 2px; }
+.soco-text-action {
+  min-height: 37px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid rgba(62,112,241,.13);
+  border-radius: 12px;
+  padding: 0 11px;
+  background: #edf3ff;
+  color: #2a58c9;
+  cursor: pointer;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -.1px;
+}
+.soco-text-action:hover { background: #e2ebff; border-color: rgba(62,112,241,.23); }
+.soco-text-action:active { transform: scale(.98); }
+.soco-text-action:focus-visible { outline: 3px solid rgba(37,99,235,.34); outline-offset: 2px; }
+
+.soco-empty-state {
+  width: 100%;
+  min-width: 0;
+  max-width: 440px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  margin: 0 auto;
+  padding: 32px 22px;
+  color: #172741;
+  text-align: center;
+}
+.soco-empty-state-icon {
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 7px;
+  border: 1px solid #e1e9ff;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #eff6ff, #f0eaff);
+  color: #5167cf;
+  box-shadow: 0 10px 24px rgba(66,87,168,.075);
+}
+.soco-empty-state > strong { max-width: 290px; color: #1a2946; font-size: 17px; font-weight: 800; letter-spacing: -.4px; }
+.soco-empty-state > p { max-width: 285px; margin: 0; color: #71819a; line-height: 1.5; font-size: 13px; }
+.soco-empty-action { padding-top: 8px; }
+.conversation-list-empty .soco-empty-state { padding: 34px 12px; }
+.conversation-empty:has(.soco-empty-state) { padding: 18px; }
+.conversation-empty .soco-empty-state { background: transparent; }
+.contacts-view .soco-empty-state { min-height: 144px; padding: 26px 14px; }
+.contacts-view .soco-empty-state-icon { width: 55px; height: 55px; border-radius: 18px; }
+.contacts-view .soco-empty-state strong { font-size: 15px; }
+.contacts-view .soco-empty-state p { font-size: 12px; }
+.feed-empty .soco-empty-state { min-height: 220px; }
+.feed-empty { margin: 12px 0 26px; border: 1px solid var(--soco-hairline); border-radius: 20px; background: white; }
+
+/* Main conversation list: native list grouped under an unambiguous title. */
+.modern-shell .soco-chat-list-heading {
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 23px 17px 15px;
+  background: #fff;
+  border-bottom: 1px solid var(--soco-hairline);
+}
+.modern-shell .soco-chat-list-heading h2 { font-size: 24px; }
+.modern-shell .soco-chat-list-heading p { font-size: 11px; margin-top: 6px; }
+.modern-shell .zalo-conversation-list { min-height: 0; }
+.modern-shell .conversation-copy { min-width: 0; }
+.modern-shell .conversation-copy > div { min-width: 0; }
+.modern-shell .conversation-copy strong,
+.modern-shell .conversation-copy > div span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modern-shell .conversation-copy time { white-space: nowrap; }
+.modern-shell .conversation-item { isolation: isolate; }
+
+/* Contacts: separate collections on a soft canvas, never overflow on narrow phones. */
+.modern-shell .contacts-view { background: #f6f8fd; }
+.modern-shell .contacts-view > .soco-section-heading { padding-bottom: 14px; }
+.modern-shell .contact-shortcuts { border: 1px solid var(--soco-hairline); }
+.modern-shell .contacts-suggestions { box-shadow: var(--soco-card-shadow); }
+.modern-shell .contacts-heading { padding: 15px 17px 11px; color: #1a2948; font-weight: 780; font-size: 14px; }
+.modern-shell .friend-result-copy,
+.modern-shell .friend-result-copy strong,
+.modern-shell .friend-result-copy span { min-width: 0; }
+.modern-shell .contact-result > .friend-result-copy { overflow: hidden; }
+.modern-shell .friend-result-action { flex-shrink: 0; }
+.modern-shell .contact-shortcuts > button > div { min-width: 0; }
+.modern-shell .contact-shortcuts > button > div strong,
+.modern-shell .contact-shortcuts > button > div small { overflow-wrap: anywhere; }
+
+/* Feed: distinct stages like mockup — stories, composer and content. */
+.modern-shell .zalo-feed-view {
+  background:
+    radial-gradient(circle at 98% 0%, rgba(134,104,246,.05), transparent 40%),
+    #f6f8fd;
+}
+.modern-shell .zalo-feed-view > .soco-section-heading { padding: 22px 19px 15px; }
+.modern-shell .soco-feed-section-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  margin: 4px 2px 13px;
+  color: #1b2944;
+}
+.modern-shell .soco-feed-section-label strong { font-size: 16px; font-weight: 800; letter-spacing: -.35px; }
+.modern-shell .soco-feed-section-label small { color: #8590aa; font-size: 11px; }
+.modern-shell .soco-feed-posts-label { margin-top: 26px; margin-bottom: 12px; }
+.modern-shell .stories-row { scrollbar-width: none; overscroll-behavior-x: contain; }
+.modern-shell .stories-row::-webkit-scrollbar { display: none; }
+.modern-shell .zalo-post-composer {
+  min-width: 0;
+  border: 1px solid var(--soco-hairline);
+  border-radius: 21px;
+  box-shadow: var(--soco-card-shadow);
+}
+.modern-shell .zalo-post-composer textarea { min-width: 0; font-size: 16px; background: transparent; }
+.modern-shell .zalo-post { border: 1px solid var(--soco-hairline); box-shadow: var(--soco-card-shadow); }
+.modern-shell .post-body { min-width: 0; }
+.modern-shell .post-author { min-width: 0; }
+.modern-shell .post-content { overflow-wrap: anywhere; }
+
+/* Profile: full-width glass cover, identity and consistent grouped settings. */
+.modern-shell .profile-view { background: #f6f8fd; }
+.modern-shell .profile-view > .soco-section-heading { padding: 23px 18px 6px; }
+.modern-shell .soco-profile-section-label {
+  margin: 23px 20px 9px;
+  color: #7b8baa;
+  font-size: 10px;
+}
+.modern-shell .profile-hero {
+  min-width: 0;
+  border: 1px solid var(--soco-hairline);
+  box-shadow: var(--soco-card-shadow);
+}
+.modern-shell .profile-identity, .modern-shell .profile-identity-copy { min-width: 0; }
+.modern-shell .profile-identity-copy strong,
+.modern-shell .profile-identity-copy span,
+.modern-shell .profile-email {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modern-shell .profile-edit-card,
+.modern-shell .settings-card {
+  min-width: 0;
+  border: 1px solid var(--soco-hairline);
+  border-radius: 20px;
+  box-shadow: var(--soco-card-shadow);
+  background: var(--soco-card);
+}
+.modern-shell .profile-edit-field { min-width: 0; }
+.modern-shell .profile-edit-field input { max-width: 100%; min-width: 0; }
+.modern-shell .settings-row { min-width: 0; }
+.modern-shell .settings-row > div { min-width: 0; }
+.modern-shell .settings-row > div strong,
+.modern-shell .settings-row > div small { overflow-wrap: anywhere; }
+.modern-shell .settings-current-locale {
+  max-width: 43%;
+  min-width: 0;
+}
+.modern-shell .settings-current-locale span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.modern-shell .settings-row button { flex-shrink: 0; }
+.modern-shell .profile-actions { gap: 9px; }
+
+/* Overlay dialogs may be portaled outside .modern-shell: style by owning class. */
+.connection-dialog {
+  border: 1px solid #e6eafa;
+  border-radius: 24px;
+  background: white;
+  color: #1c2c4b;
+  box-shadow: 0 25px 76px rgba(19,37,83,.22);
+}
+.connection-dialog header button { border-radius: 12px; color: #3259c9; background: #eef3ff; }
+.connection-dialog h2 { color: #192847; font-size: 21px; letter-spacing: -.4px; }
+.connection-segments { border-radius: 14px; background: #edf2ff; }
+.connection-segments button { border-radius: 11px; }
+.connection-segments button[aria-pressed="true"] { color: #2559d3; }
+.connection-primary, .connection-actions button {
+  border: none;
+  border-radius: 13px;
+  background: var(--soco-gradient);
+}
+.connection-dialog .qr-image { padding: 10px; border-radius: 17px; background: white; }
+.connection-dialog .qr-camera { border-radius: 16px; background: #edf4ff; }
+.connection-dialog .group-create-form input:not([type="checkbox"]) {
+  border-radius: 13px;
+  border-color: #dae5fb;
+  background: #f8faff;
+}
+.connection-dialog .group-member input { accent-color: #2563eb; }
+
+/* Consistent modal typography and fixed height, including opened keyboard. */
+.modern-shell .locale-picker-sheet,
+.modern-shell .translation-hub-popover {
+  background: #fff;
+  border: 1px solid #e2e8f6;
+  box-shadow: 0 -10px 48px rgba(29,52,104,.14);
+}
+.modern-shell .locale-picker-sheet { min-width: 0; }
+.modern-shell .locale-picker-search input,
+.modern-shell .translation-language-search input,
+.modern-shell .connect-search-input input { min-width: 0; font-size: 16px; }
+.modern-shell .locale-option-copy { min-width: 0; }
+.modern-shell .locale-option-copy strong,
+.modern-shell .locale-option-copy small,
+.modern-shell .locale-option-copy em { overflow-wrap: anywhere; }
+.modern-shell .translation-language-copy { min-width: 0; }
+
+/* Tablet/desktop: main sections have comfortably contained reading widths. */
+@media (min-width: 761px) {
+  .modern-shell .soco-chat-list-heading { padding: 22px 20px; }
+  .modern-shell .contacts-view > .soco-section-heading,
+  .modern-shell .contacts-view > .contacts-suggestions,
+  .modern-shell .contacts-view > .contact-shortcuts { max-width: 980px; margin-left: auto; margin-right: auto; }
+  .modern-shell .profile-view > .soco-section-heading,
+  .modern-shell .profile-view > .profile-hero,
+  .modern-shell .profile-view > .profile-edit-card,
+  .modern-shell .profile-view > .settings-card,
+  .modern-shell .profile-view > .soco-profile-section-label { max-width: 860px; margin-left: auto; margin-right: auto; }
+  .modern-shell .zalo-feed-view > .soco-section-heading,
+  .modern-shell .zalo-feed-view > .soco-feed-section-label,
+  .modern-shell .zalo-feed-view > .stories-row,
+  .modern-shell .zalo-feed-view > .zalo-post-composer,
+  .modern-shell .zalo-feed-view > .zalo-feed { max-width: 800px; margin-left: auto; margin-right: auto; }
+}
+
+/* iPhone-size views: safe-area, tappable buttons and stable scroll sections. */
+@media (max-width: 760px) {
+  html, body, #root { max-width: 100%; }
+  .modern-shell { overscroll-behavior-y: none; }
+  .modern-shell .modern-frame { min-height: 0; }
+  .modern-shell .modern-frame > .messenger-layout { min-width: 0; min-height: 0; }
+  .modern-shell .conversation-sidebar,
+  .modern-shell .conversation-panel { min-height: 0; }
+  .modern-shell .soco-chat-list-heading { padding: 17px 16px 14px; }
+  .modern-shell .soco-chat-list-heading h2 { font-size: 23px; }
+  .modern-shell .soco-chat-list-heading p { max-width: 210px; font-size: 11px; }
+  .modern-shell .soco-section-heading { padding: 19px 15px 13px; gap: 8px; }
+  .modern-shell .soco-section-heading h2 { font-size: 24px; }
+  .modern-shell .soco-section-heading p { font-size: 11px; }
+  .modern-shell .soco-section-heading-action { max-width: 45%; }
+  .modern-shell .soco-text-action { min-height: 39px; padding: 0 10px; }
+  .modern-shell .contacts-view { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .modern-shell .contacts-view .contact-result { min-width: 0; }
+  .modern-shell .friend-request-row { min-width: 0; }
+  .modern-shell .friend-request-actions { flex-wrap: wrap; }
+  .modern-shell .zalo-feed-view { padding: 0 12px max(24px, env(safe-area-inset-bottom)) !important; }
+  .modern-shell .zalo-feed-view > .soco-section-heading { padding: 20px 5px 18px; }
+  .modern-shell .soco-feed-section-label { margin: 6px 3px 12px; }
+  .modern-shell .soco-feed-posts-label { margin-top: 23px; }
+  .modern-shell .zalo-post-composer { margin: 0 0 15px; }
+  .modern-shell .profile-view > .soco-section-heading { padding: 19px 17px 7px; }
+  .modern-shell .soco-profile-section-label { margin: 20px 17px 9px; }
+  .modern-shell .profile-hero { margin-top: 10px; }
+  .modern-shell .settings-row > div { flex: 1 1 auto; }
+  .modern-shell .settings-current-locale { flex: 0 1 auto; max-width: 45%; }
+  .modern-shell .locale-picker-sheet { max-width: 100%; }
+  .connection-dialog { width: calc(100vw - 22px); max-width: 500px; max-height: calc(100dvh - 26px); }
+}
+
+/* At 320px, prioritize usable tap areas and prevent horizontal viewport movement. */
+@media (max-width: 370px) {
+  .modern-shell .soco-chat-list-heading .soco-section-heading-copy p { max-width: 170px; }
+  .modern-shell .soco-text-action { padding-inline: 8px; font-size: 11px; }
+  .modern-shell .soco-section-heading h2 { font-size: 22px; }
+  .modern-shell .settings-current-locale { max-width: 38%; }
+  .modern-shell .friend-request-actions button { min-height: 34px; }
+}
+
+/* Nonessential transitions disappear for people preferring reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .soco-text-action { transition: none; transform: none !important; }
+}
