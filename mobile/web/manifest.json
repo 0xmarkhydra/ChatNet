@@ -1,0 +1,34 @@
+{
+    "name": "SOCO",
+    "short_name": "SOCO",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#F4F7FF",
+    "theme_color": "#2F65F5",
+    "description": "SOCO - Understand. Connect. Together.",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

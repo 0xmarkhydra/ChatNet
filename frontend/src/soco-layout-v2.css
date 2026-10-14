@@ -402,3 +402,38 @@
   }
   .modern-shell .feed-view.zalo-feed-view { height: 100%; overflow-y: auto; }
 }
+/* Icon-only primary navigation shared by mobile, tablet and desktop. */
+.modern-shell .bottom-navigation {
+  min-height: calc(58px + env(safe-area-inset-bottom));
+  padding:
+    4px
+    max(8px, env(safe-area-inset-right))
+    max(4px, env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left));
+}
+
+.modern-shell .bottom-navigation > button {
+  width: min(72px, 100%);
+  min-height: 48px;
+  justify-self: center;
+  padding: 4px;
+  gap: 0;
+}
+
+.modern-shell .bottom-navigation .nav-icon {
+  width: 48px;
+  min-width: 48px;
+  height: 40px;
+  min-height: 40px;
+}
+
+@media (min-width: 761px) {
+  .modern-shell .bottom-navigation {
+    min-height: 64px;
+    padding-block: 6px;
+  }
+
+  .modern-shell .bottom-navigation > button {
+    min-height: 52px;
+  }
+}
