@@ -2808,9 +2808,9 @@ export default function App() {
     return (
       <main className="auth-screen">
         <section className="auth-copy">
-          <img src="/icon.svg" width="52" height="52" alt="" />
-          <h1>ChatNet</h1>
-          <p>Kết nối không biên giới</p>
+          <img src="/soco-mark.svg" width="52" height="52" alt="SOCO" />
+          <h1>SOCO</h1>
+          <p>Understand. Connect. Together.</p>
         </section>
 
         {registerStep === 'otp' ? (
@@ -2818,7 +2818,7 @@ export default function App() {
             <div className="otp-icon">✉️</div>
             <h2>Kiểm tra email của bạn</h2>
             <p className="auth-hint">
-              ChatNet đã gửi mã xác minh 6 số tới <strong>{verificationEmail || 'email của bạn'}</strong>.
+              SOCO đã gửi mã xác minh 6 số tới <strong>{verificationEmail || 'email của bạn'}</strong>.
               Mã có hiệu lực trong 10 phút.
             </p>
 
@@ -2852,7 +2852,7 @@ export default function App() {
 
             {authError && <div className="auth-error">{authError}</div>}
             <button className="auth-submit" disabled={authLoading || otpCode.length !== 6 || otpSecondsLeft <= 0}>
-              {authLoading ? 'Đang xác minh...' : 'Xác minh & vào ChatNet'}
+              {authLoading ? 'Đang xác minh...' : 'Xác minh & vào SOCO'}
             </button>
             <button type="button" className="auth-secondary" onClick={resetRegistration} disabled={authLoading}>
               Dùng email khác
@@ -2949,7 +2949,7 @@ export default function App() {
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
       {tab !== 'profile' && tab !== 'discover' && (
       <header className="chatnet-appbar">
-        <div className="appbar-brand"><img src="/icon.svg" width="32" height="32" alt="" /><strong>ChatNet</strong></div>
+        <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SOCO</strong></div>
           <label className="appbar-search">
             <UiIcon name="search" size={27} />
             <input
@@ -3113,7 +3113,7 @@ export default function App() {
                     <div className="connect-ios-header">
                       <div>
                         <strong id="connect-modal-title">Kết nối</strong>
-                        <small>Tìm bạn bè trên ChatNet</small>
+                        <small>Tìm bạn bè trên SOCO</small>
                       </div>
                       <button
                         type="button"
@@ -4341,8 +4341,8 @@ export default function App() {
             <section className="profile-hero">
               <div className={`profile-cover-art ${profileMedia?.coverSet ? 'has-cover' : ''}`}>
                 <div className="profile-cover-placeholder">
-                  <strong>ChatNet</strong>
-                  <small>{t('profile.tagline')}</small>
+                  <strong>SOCO</strong>
+                  <small>Understand. Connect. Together.</small>
                 </div>
                 {profileMedia?.coverSet && (
                   <img

@@ -1,0 +1,510 @@
+/*
+ * SOCO Brand DNA 1.0 — mobile-first visual layer for ChatNet.
+ * Presentation branding only: existing API, routes, notifications and storage stay unchanged.
+ * Loaded last so design tokens and screen refinements can evolve without rewriting feature CSS.
+ */
+:root {
+  color-scheme: light;
+  --soco-blue: #2563eb;
+  --soco-violet: #8b5cf6;
+  --soco-orange: #ff9f0e;
+  --soco-teal: #14b8a6;
+  --soco-navy: #0f172a;
+  --soco-text: #17233d;
+  --soco-muted: #697894;
+  --soco-line: #e8ecf7;
+  --soco-surface: #ffffff;
+  --soco-canvas: #f5f7fd;
+  --soco-soft-blue: #eff4ff;
+  --soco-gradient: linear-gradient(115deg, #1769f8 0%, #4267fd 49%, #8955f6 100%);
+  --soco-shadow: 0 14px 40px rgba(33, 56, 130, .09);
+  --soco-radius-card: 22px;
+  --chatnet-accent: var(--soco-blue);
+  --chatnet-accent-ink: #2353d6;
+  --chatnet-accent-soft: #eef3ff;
+  --chatnet-text: var(--soco-text);
+  --chatnet-muted: var(--soco-muted);
+  --chatnet-line: var(--soco-line);
+  --chatnet-soft: var(--soco-canvas);
+  --chatnet-glass: rgba(255, 255, 255, .90);
+  --chatnet-glass-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 8px 26px rgba(35,64,140,.08);
+  --accent: var(--soco-blue);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Arial, sans-serif;
+}
+
+html, body, #root { max-width: 100%; }
+html { background: var(--soco-canvas); }
+body { color: var(--soco-text); background: #eff3fa; }
+button, input, select, textarea { font-family: inherit; }
+button, [role="button"] { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, .42);
+  outline-offset: 2px;
+}
+button { transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease; }
+
+/* Global app frame */
+.modern-shell { background: #f0f4fb; }
+.modern-frame {
+  border: 1px solid rgba(208, 218, 240, .7);
+  border-radius: 22px;
+  box-shadow: var(--soco-shadow);
+}
+.chatnet-appbar {
+  min-height: 76px;
+  gap: 16px;
+  padding: 12px 20px;
+  border: 1px solid rgba(224, 232, 248, .8);
+  border-radius: 20px 20px 0 0;
+  background: rgba(255,255,255,.95);
+  box-shadow: 0 8px 28px rgba(32, 54, 126, .035);
+}
+.appbar-brand { gap: 9px; }
+.appbar-brand img {
+  width: 39px;
+  height: 39px;
+  border-radius: 13px;
+  box-shadow: 0 7px 14px rgba(43, 105, 235, .16);
+}
+.appbar-brand strong {
+  font-size: 23px;
+  font-weight: 850;
+  letter-spacing: -.85px;
+  background: var(--soco-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.appbar-search {
+  height: 46px;
+  min-height: 46px;
+  margin-left: 16px;
+  padding: 0 14px;
+  border: 1px solid #e7ecf7;
+  border-radius: 16px;
+  background: #f4f6fc;
+  box-shadow: none;
+  color: #8490a8;
+}
+.appbar-search:focus-within {
+  background: #fff;
+  border-color: #aec6ff;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+}
+.appbar-search input { font-size: 15px; color: var(--soco-text); }
+.appbar-search input::placeholder { color: #8995ad; }
+.appbar-icon-button {
+  width: 44px;
+  height: 44px;
+  color: var(--soco-blue);
+  border-radius: 14px;
+}
+.appbar-icon-button:hover, .appbar-icon-button:active {
+  color: #2353d6;
+  background: var(--soco-soft-blue);
+}
+.appbar-badge { background: var(--soco-orange); border-color: #fff; color: #0f172a; }
+
+/* Conversation list */
+.conversation-sidebar { background: #fff; border-right-color: var(--soco-line); }
+.zalo-conversation-list { background: #fff; }
+.zalo-conversation-list .conversation-item {
+  min-height: 78px;
+  border-radius: 16px;
+  margin: 3px 9px;
+  padding: 9px 11px;
+  gap: 12px;
+}
+.zalo-conversation-list .conversation-item:hover,
+.zalo-conversation-list .conversation-item.active {
+  background: linear-gradient(100deg, #edf3ff, #f7f5ff);
+}
+.zalo-conversation-list .conversation-item.active { box-shadow: inset 3px 0 0 var(--soco-blue); }
+.zalo-conversation-list .conversation-avatar {
+  width: 52px;
+  height: 52px;
+  flex-basis: 52px;
+  border: 2px solid #fff;
+  border-radius: 18px;
+  background: linear-gradient(130deg, #e5f6ff 0%, #e8eaff 55%, #eadfff 100%);
+  color: #3556e8;
+  box-shadow: 0 5px 14px rgba(47,85,183,.1);
+}
+.zalo-conversation-list .conversation-avatar.group {
+  color: #7650dc;
+  background: linear-gradient(140deg, #ede8ff, #d9e8ff);
+}
+.zalo-conversation-list .conversation-copy { border-bottom-color: #eef1f8; }
+.zalo-conversation-list .conversation-copy strong { color: var(--soco-navy); font-weight: 720; }
+.zalo-conversation-list .conversation-copy span { color: var(--soco-muted); }
+.zalo-conversation-list .conversation-copy b,
+.nav-icon b {
+  background: var(--soco-gradient);
+  border-color: #fff;
+  color: white;
+}
+.conversation-list-empty { color: var(--soco-muted); }
+
+/* Conversation room */
+.conversation-panel { background: #f7f9fe; }
+.conversation-panel .chat-head {
+  min-height: 74px;
+  border-color: var(--soco-line);
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 3px 14px rgba(42,58,118,.04);
+}
+.chat-head .room-info strong { color: var(--soco-navy); font-size: 16px; font-weight: 750; }
+.chat-head .room-info small { color: var(--soco-muted); }
+.room-avatar {
+  border: 2px solid #fff;
+  border-radius: 16px;
+  color: #fff;
+  background: var(--soco-gradient);
+  box-shadow: 0 5px 13px rgba(63,81,216,.16);
+}
+.mobile-back { color: var(--soco-blue); }
+.call-header-actions button,
+.chat-head .shared-content-trigger,
+.chat-head .group-settings-toggle {
+  color: #3164e8;
+  background: #eff4ff;
+  border: 1px solid #e7ecff;
+  border-radius: 13px;
+}
+.call-header-actions button:hover,
+.chat-head .shared-content-trigger:hover,
+.chat-head .group-settings-toggle:hover { background: #e5edff; }
+.messages {
+  background:
+    radial-gradient(ellipse at 10% 15%, rgba(35, 120, 252, .055), transparent 45%),
+    radial-gradient(ellipse at 94% 80%, rgba(139, 92, 246, .055), transparent 42%),
+    #f6f8fd;
+}
+.message .bubble {
+  border: 1px solid rgba(227, 233, 245, .85);
+  border-radius: 19px 19px 19px 7px;
+  background: #fff;
+  color: var(--soco-text);
+  box-shadow: 0 5px 14px rgba(37, 55, 108, .052);
+}
+.message.mine .bubble {
+  border-color: transparent;
+  border-radius: 19px 19px 7px 19px;
+  background: var(--soco-gradient);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(51, 91, 237, .18);
+}
+.message-meta { color: #8693ad; }
+.day-divider span {
+  border-color: rgba(220,228,243,.7);
+  border-radius: 999px;
+  background: rgba(255,255,255,.82);
+  color: #77849c;
+  box-shadow: 0 4px 12px rgba(37,55,108,.04);
+}
+.translation {
+  border: 1px solid #e8e1ff;
+  border-radius: 14px;
+  background: #f5f0ff;
+  color: #5e4b95;
+}
+.translation-flip-pill,
+.chat-head .translation-hub-trigger {
+  border-color: #ded8ff;
+  background: #f3efff;
+  color: #6846cc;
+}
+.chat-head .translation-hub-trigger.active {
+  border-color: #cbbcff;
+  background: linear-gradient(130deg, #efeaff, #eaf2ff);
+  color: #6043bc;
+}
+.translation-hub-popover, .translation-language-list {
+  border-color: var(--soco-line);
+  box-shadow: var(--soco-shadow);
+}
+.media-composer.composer {
+  border-top: 1px solid var(--soco-line);
+  background: rgba(255,255,255,.98);
+}
+.composer input,
+.media-composer textarea {
+  border: 1px solid #e5ebf7;
+  border-radius: 18px;
+  background: #f7f9fd;
+  color: var(--soco-text);
+  box-shadow: none;
+}
+.composer input:focus, .media-composer textarea:focus {
+  border-color: #a6befd;
+  background: white;
+}
+.composer input::placeholder, .media-composer textarea::placeholder { color: #8e9ab2; }
+.send-button, .ghost-action,
+.composer button[type="submit"] {
+  border-radius: 16px;
+}
+.send-button, .composer button[type="submit"] {
+  background: var(--soco-gradient);
+  box-shadow: 0 7px 17px rgba(39,95,227,.16);
+  color: #fff;
+}
+.ghost-action { background: #eef3ff; color: var(--soco-blue); }
+.composer-pending { border-color: var(--soco-line); }
+
+/* Contacts, discovery, group management, shared files */
+.simple-view, .zalo-feed-view, .nearby-explorer { background: var(--soco-canvas); color: var(--soco-text); }
+.simple-view-title {
+  background: transparent;
+  padding: 24px 20px 12px;
+}
+.simple-view-title strong { color: var(--soco-navy); font-weight: 800; font-size: 24px; letter-spacing: -.6px; }
+.simple-view-title small { color: var(--soco-muted); }
+.contact-shortcuts {
+  margin: 6px 14px 12px;
+  border: 1px solid var(--soco-line);
+  border-radius: var(--soco-radius-card);
+  overflow: hidden;
+  box-shadow: 0 7px 24px rgba(36,53,114,.05);
+}
+.contact-shortcuts > button { border-bottom-color: #edf0f8; padding: 10px 14px; min-height: 70px; }
+.contact-shortcuts > button:hover { background: #f6f8ff; }
+.contact-shortcuts .shortcut-icon { border-radius: 15px; background: #edf2ff; color: var(--soco-blue); }
+.contacts-suggestions {
+  margin: 12px 14px;
+  border: 1px solid var(--soco-line);
+  border-radius: var(--soco-radius-card);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 7px 24px rgba(36,53,114,.04);
+}
+.contacts-heading { color: var(--soco-navy); }
+.contact-result { background: #fff; }
+.contact-result:hover { background: var(--soco-soft-blue); }
+.friend-result-action { color: var(--soco-blue); }
+.friend-search-panel.connect-modal,
+.connection-dialog,
+.shared-content-sheet {
+  border: 1px solid #e5e9f5;
+  background: #fff;
+  box-shadow: 0 -10px 44px rgba(35,53,115,.13);
+}
+.connect-ios-header strong { color: var(--soco-navy); }
+.connect-ios-header small { color: var(--soco-muted); }
+.friend-search-input-wrap:focus-within, .connect-search-input:focus-within {
+  border-color: #aac1fb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+}
+.connect-identity-card { border-color: var(--soco-line); background: #f6f8ff; }
+.connect-result:hover { background: #f5f7ff; }
+.nearby-explorer { background: var(--soco-canvas); }
+.nearby-explorer .nearby-connect,
+.nearby-explorer .nearby-visibility button.active { background: var(--soco-blue); color: white; }
+.nearby-explorer .nearby-avatar { background: linear-gradient(135deg, #e9f4ff, #eeeaff); color: #315cdb; }
+
+/* News feed, story cards and user profile */
+.zalo-feed-view { padding: 13px 16px 22px; }
+.zalo-post-composer, .zalo-post {
+  border: 1px solid var(--soco-line);
+  border-radius: var(--soco-radius-card);
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(29,50,106,.055);
+}
+.zalo-post-composer { margin-bottom: 14px; padding: 14px; }
+.zalo-post { margin-bottom: 14px; overflow: hidden; }
+.zalo-post .post-author strong { color: var(--soco-navy); }
+.zalo-post .post-toolbar { border-color: #edf0f8; }
+.zalo-post .post-toolbar button.liked { color: #e76d85; }
+.composer-shortcuts button { background: #f0f4fe; color: #3754a7; }
+.composer-shortcuts button:hover { background: #e6edff; }
+.feed-submit, .auth-submit {
+  border: 0;
+  border-radius: 15px;
+  color: #fff;
+  background: var(--soco-gradient);
+  box-shadow: 0 8px 23px rgba(37, 99, 235, .17);
+}
+.stories-row { gap: 11px; padding-bottom: 12px; }
+.story-card {
+  border-radius: 19px;
+  border-color: #e3e9f7;
+  box-shadow: 0 6px 16px rgba(37,56,110,.055);
+}
+.story-visual { border-radius: 16px; }
+.profile-view { background: var(--soco-canvas); }
+.profile-hero {
+  background: #fff;
+  margin: 13px 14px 0;
+  border: 1px solid var(--soco-line);
+  border-radius: 23px;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(35,55,112,.055);
+}
+.profile-cover-art, .profile-cover-placeholder {
+  background: radial-gradient(circle at 15% 120%, rgba(255,159,14,.43), transparent 38%),
+              radial-gradient(circle at 88% -15%, rgba(20,184,166,.54), transparent 33%),
+              var(--soco-gradient);
+}
+.profile-cover-placeholder strong { color: white; letter-spacing: -.6px; }
+.profile-avatar {
+  background: var(--soco-gradient);
+  border: 4px solid white;
+  box-shadow: 0 6px 20px rgba(39,93,224,.16);
+}
+.profile-actions { padding-inline: 14px; }
+.profile-actions button:not(.danger-action) { background: var(--soco-gradient); color: #fff; }
+.profile-actions .danger-action { background: #fff1f2; color: #b42343; }
+
+/* Invite, notification, shared-content, secure call and account entry */
+.push-onboarding, .new-chat-panel, .quick-create-menu {
+  border: 1px solid var(--soco-line);
+  border-radius: 18px;
+  background: white;
+  box-shadow: var(--soco-shadow);
+}
+.push-onboarding-enable, .new-chat-panel > button:last-child { color: white; background: var(--soco-gradient); }
+.auth-screen {
+  max-width: none;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(139,92,246,.13), transparent 40%),
+    radial-gradient(circle at 0% 100%, rgba(37,99,235,.12), transparent 42%),
+    #f8faff;
+}
+.auth-copy { text-align: center; }
+.auth-copy img { width: 76px; height: 76px; border-radius: 22px; box-shadow: 0 12px 28px rgba(37,99,235,.14); }
+.auth-copy h1 {
+  font-size: 38px;
+  font-weight: 850;
+  letter-spacing: -1.7px;
+  background: var(--soco-gradient);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.auth-copy p { color: #657491; }
+.auth-card {
+  border: 1px solid rgba(224,230,246,.95);
+  border-radius: 28px;
+  background: rgba(255,255,255,.95);
+  box-shadow: 0 22px 55px rgba(30,56,125,.10);
+}
+.auth-card input { border: 1px solid #e4e9f5; border-radius: 14px; background: #f8faff; }
+.auth-card input:focus { border-color: #9db7f8; box-shadow: 0 0 0 3px rgba(37,99,235,.07); }
+.auth-tabs { background: #f0f3fc; border-radius: 15px; }
+.auth-tabs button.active { color: var(--soco-blue); background: #fff; }
+.secure-call-overlay, .incoming-call-layer { color: #fff; }
+.secure-call-controls button:not(.call-end-button) { background: rgba(255,255,255,.12); }
+
+/* Compact, polished bottom navigation */
+.bottom-navigation {
+  border-top: 1px solid var(--soco-line);
+  background: rgba(255,255,255,.96);
+  backdrop-filter: saturate(170%) blur(22px);
+  -webkit-backdrop-filter: saturate(170%) blur(22px);
+  box-shadow: 0 -6px 22px rgba(42,62,125,.045);
+}
+.bottom-navigation > button { color: #8792a8; font-weight: 650; }
+.bottom-navigation > button.active { color: var(--soco-blue); }
+.bottom-navigation .nav-icon {
+  min-width: 42px;
+  min-height: 30px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+}
+.bottom-navigation > button.active .nav-icon { color: var(--soco-blue); background: #edf3ff; }
+
+/* Desktop and tablet: retain real two-panel functionality */
+@media (min-width: 761px) {
+  .modern-shell { max-width: 1440px; }
+  .zalo-conversation-list .conversation-item { margin: 4px 10px; }
+  .modern-frame { border-radius: 0 0 20px 20px; }
+}
+
+/* Native-feeling mobile viewport without sideways scrolling */
+@media (max-width: 760px) {
+  html, body, #root { width: 100%; height: 100%; overflow-x: hidden; }
+  body { background: #fff; }
+  .modern-shell { width: 100%; max-width: none; height: 100dvh; padding: 0; overflow: hidden; background: #fff; }
+  .modern-frame { border: 0; border-radius: 0; box-shadow: none; }
+  .chatnet-appbar {
+    min-height: 66px;
+    gap: 8px;
+    padding: max(9px, env(safe-area-inset-top)) 14px 9px;
+    border: 0;
+    border-bottom: 1px solid var(--soco-line);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .appbar-brand { gap: 6px; }
+  .appbar-brand img { width: 32px; height: 32px; border-radius: 10px; }
+  .appbar-brand strong { font-size: 19px; }
+  .appbar-search { margin-left: 2px; height: 39px; min-height: 39px; padding: 0 9px; border-radius: 13px; }
+  .appbar-search input { min-width: 0; font-size: 16px !important; }
+  .appbar-actions { gap: 0; }
+  .appbar-icon-button { width: 39px; height: 39px; border-radius: 12px; }
+  .zalo-conversation-list .conversation-item {
+    min-height: 76px;
+    margin: 3px 10px;
+    padding: 8px 8px;
+    gap: 10px;
+    border-radius: 16px;
+  }
+  .zalo-conversation-list .conversation-avatar { width: 50px; height: 50px; flex-basis: 50px; border-radius: 17px; }
+  .zalo-conversation-list .conversation-copy { min-width: 0; }
+  .zalo-conversation-list .conversation-copy strong { font-size: 15px; }
+  .zalo-conversation-list .conversation-copy span { font-size: 12px; }
+  .conversation-panel .chat-head {
+    min-height: 58px;
+    padding: 7px 9px;
+    gap: 6px;
+  }
+  .chat-head .room-info { gap: 7px; }
+  .chat-head .room-info strong { font-size: 14px; }
+  .chat-head .room-avatar { width: 36px; height: 36px; flex-basis: 36px; border-radius: 13px; }
+  .chat-head .mobile-back { color: var(--soco-blue); }
+  .call-header-actions { gap: 3px; margin-right: 2px; }
+  .call-header-actions button { width: 35px; height: 35px; border-radius: 11px; }
+  .chat-head .shared-content-trigger { width: 35px; min-width: 35px; height: 35px; min-height: 35px; border-radius: 11px; }
+  .messages { padding: 15px 12px 16px; }
+  .message { max-width: 86%; margin-bottom: 14px; }
+  .message .bubble { padding: 11px 13px; border-radius: 18px 18px 18px 6px; line-height: 1.48; }
+  .message.mine .bubble { border-radius: 18px 18px 6px 18px; }
+  .media-composer.composer { padding: 10px max(11px, env(safe-area-inset-right)) max(9px, env(safe-area-inset-bottom)) max(11px, env(safe-area-inset-left)); gap: 7px; }
+  .composer input { min-height: 44px; font-size: 16px !important; }
+  .send-button { min-height: 44px; border-radius: 14px; }
+  .simple-view-title { padding: 21px 17px 12px; }
+  .simple-view-title strong { font-size: 23px; }
+  .zalo-feed-view { padding: 10px 12px max(18px, env(safe-area-inset-bottom)); }
+  .zalo-post-composer { margin: 0 0 12px; border-radius: 19px; padding: 11px; }
+  .zalo-post { border-radius: 19px; margin-bottom: 12px; }
+  .profile-hero { margin: 10px 11px 0; border-radius: 20px; }
+  .contact-shortcuts, .contacts-suggestions { margin-inline: 11px; border-radius: 19px; }
+  .friend-search-panel.connect-modal {
+    width: 100%;
+    height: 50svh;
+    min-height: 50svh;
+    max-height: 50svh;
+    border-radius: 27px 27px 0 0;
+    box-shadow: 0 -18px 50px rgba(25,42,96,.16);
+  }
+  .bottom-navigation {
+    flex-shrink: 0;
+    padding-bottom: max(5px, env(safe-area-inset-bottom));
+  }
+  .bottom-navigation > button { min-height: 57px; font-size: 10px; gap: 3px; }
+  .bottom-navigation .nav-icon { min-height: 30px; }
+  .mobile-conversation-open ~ .bottom-navigation, .conversation-open > .bottom-navigation { display: none; }
+  .mobile-conversation-open .chatnet-appbar { display: none; }
+  .chat-head .translation-hub-popover { max-height: min(68dvh, 550px); }
+}
+
+@media (max-width: 360px) {
+  .appbar-brand strong { font-size: 17px; }
+  .appbar-search { padding-inline: 7px; }
+  .appbar-icon-button { width: 36px; }
+  .chat-head .room-avatar { display: none; }
+  .bottom-navigation > button { font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0ms !important; }
+}
