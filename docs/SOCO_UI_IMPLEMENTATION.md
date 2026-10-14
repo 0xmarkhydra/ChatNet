@@ -83,3 +83,21 @@ Repeatable regression test:
 Caveat: these mocked UI tests do not verify live uploads, push notifications or actual voice/video calls. Production Railway deployment and real device checks require separate validation.
 
 Deployment gate: run build, PWA, session, optimistic/notification checks and UI layout checks; only merge reviewed paths into main while preserving existing uncommitted Live Project changes.
+
+## SOCO UI Refinement 2.0 — 2026-10-15
+
+This pass focuses on visual density and readability on iPhone while retaining the SOCO Brand DNA 1.0 palette and all existing operations.
+
+- Language selection: removed leftover dark-theme white-on-white typography, updated all selection rows and search input to an accessible light palette, and added an iOS-style focus-within ring. Close target is 44x44px.
+- Conversation on mobile: the global SOCO brand/search header is hidden only while a conversation is open, making room for messages. At narrow phone widths the recipient avatar is omitted in the compact header so the full name can fit without removing call/media/translation controls.
+- Feed: removed the edge-to-edge white story shelf, reduced story cards, and fitted the four post media actions into one compact row on modern iPhones (two rows on very narrow screens).
+- Profile: removed the duplicate section caption before the profile edit card.
+- Desktop: bottom navigation becomes a compact centered dock rather than a full-width tab strip.
+- Notifications: restored floating toast behavior to avoid inserting an extra full-width layout row and shrinking active content.
+- Find-friends and language search fields: rounded focus treatment rather than a rectangular input focus outline.
+- Automated UI layout runner now uses a fresh ephemeral port and confirms that its own Vite process is ready; this avoids accidentally testing another server on port 5173.
+- Automated checks include a minimum 4.5:1 contrast ratio for title, subtitle and search field text in the locale picker.
+
+Verification: frontend build, check:ui (42 viewport × screen combinations, fixed-height connection & language sheets), check:pwa, check:session, check:optimistic, check:onesignal, and git diff --check passed in the refinement worktree. Browser screenshots were inspected at 390px and 1440px.
+
+This is web/PWA UI refinement. It does not certify Flutter/TestFlight parity or the unmocked call, upload, notification or language catalog workflows; those need real-device integration verification.

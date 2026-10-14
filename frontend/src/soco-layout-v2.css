@@ -428,9 +428,16 @@
 }
 
 @media (min-width: 761px) {
+  /* Desktop navigation is a compact floating dock, not a 1440px-wide tab bar. */
   .modern-shell .bottom-navigation {
+    width: min(620px, calc(100% - 48px));
     min-height: 64px;
+    align-self: center;
+    margin: 9px auto 10px;
     padding-block: 6px;
+    border: 1px solid #e4eafa;
+    border-radius: 22px;
+    box-shadow: 0 8px 28px rgba(31, 56, 117, .09);
   }
 
   .modern-shell .bottom-navigation > button {

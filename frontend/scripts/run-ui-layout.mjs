@@ -1,14 +1,25 @@
 import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
+import { createServer } from 'node:net'
 import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 
-const origin = 'http://127.0.0.1:5173'
+// Reserve a fresh port for each run. Reusing 5173 could silently test a stale Vite process.
+const port = await new Promise((resolvePort, reject) => {
+  const probe = createServer()
+  probe.once('error', reject)
+  probe.listen(0, '127.0.0.1', () => {
+    const value = probe.address().port
+    probe.close(() => resolvePort(value))
+  })
+})
+const origin = 'http://127.0.0.1:' + port
 mkdirSync('output/playwright/layout', { recursive: true })
-const server = spawn(process.execPath, [resolve('node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', '5173', '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'] })
+const server = spawn(process.execPath, [resolve('node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'] })
 let logs = ''
-server.stdout.on('data', chunk => { logs += chunk.toString() })
+let serverStarted = false
+server.stdout.on('data', chunk => { logs += chunk.toString(); if (logs.includes('ready in') && logs.includes('http://127.0.0.1')) serverStarted = true })
 server.stderr.on('data', chunk => { logs += chunk.toString() })
 let browser
 const check = (value, message) => { if (!value) throw new Error(message) }
@@ -29,7 +40,9 @@ try {
   let ready = false
   for (let i = 0; i < 60; i++) {
     if (server.exitCode !== null) throw new Error('Vite exited: ' + logs)
-    try { if ((await fetch(origin)).ok) { ready = true; break } } catch { /* retry */ }
+    if (serverStarted) {
+      try { if ((await fetch(origin)).ok) { ready = true; break } } catch { /* retry */ }
+    }
     await delay(200)
   }
   check(ready, 'Vite startup failed: ' + logs)
@@ -55,6 +68,10 @@ try {
     if (path === '/api/users/suggestions' || path === '/api/users/search') return json(friends)
     if (path === '/api/profile') return json({ username: session.user.username, displayName: session.user.displayName, avatarSet: false, coverSet: false, updatedAt: '2026-10-02T07:00:00Z' })
     if (path === '/api/preferences' || path === '/api/preferences/translation') return json({ autoTranslate: true, targetLanguage: 'en', appLocale: 'auto' })
+    if (path === '/api/translate') {
+      const text = req.postDataJSON()?.text || ''
+      return json({ translatedText: text, translation: text, sourceLanguage: 'vi', targetLanguage: 'en' })
+    }
     if (path === '/api/posts') return json([{ id: 1, author: 'minhanh', content: 'Bài viết kiểm thử giao diện SOCO trên thiết bị nhỏ và desktop.', likes: 8, liked: false, comments: [], createdAt: '2026-10-02T07:00:00Z' }])
     if (path === '/api/stories' || path === '/api/calls') return json([])
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
@@ -152,6 +169,30 @@ try {
   check(beforeLocaleSearch && afterLocaleSearch &&
     Math.abs(beforeLocaleSearch.height - afterLocaleSearch.height) < 2,
     'Language sheet changes height after searching')
+  // White-on-white modal labels were a real release regression; validate color contrast.
+  const modalColors = await locale.evaluate(element => {
+    const rgb = node => getComputedStyle(node).color
+    return {
+      bg: getComputedStyle(element).backgroundColor,
+      title: rgb(element.querySelector('header strong')),
+      input: rgb(element.querySelector('input[type="search"]')),
+      description: rgb(element.querySelector('header small')),
+    }
+  })
+  const luminance = value => {
+    const channels = value.match(/[\d.]+/g).slice(0, 3).map(Number).map(n => {
+      const c = n / 255
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    })
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
+  }
+  const contrast = (a, b) => {
+    const x = luminance(a); const y = luminance(b)
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+  }
+  check(contrast(modalColors.bg, modalColors.title) >= 4.5, 'Language modal title contrast regression')
+  check(contrast(modalColors.bg, modalColors.input) >= 4.5, 'Language modal search contrast regression')
+  check(contrast(modalColors.bg, modalColors.description) >= 4.5, 'Language modal subtitle contrast regression')
   await page.screenshot({ path: 'output/playwright/layout/language-390.png' })
   check(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
   console.log('PASS: SOCO layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')

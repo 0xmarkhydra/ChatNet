@@ -297,6 +297,11 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   border-color: #aac1fb;
   box-shadow: 0 0 0 3px rgba(37,99,235,.08);
 }
+.friend-search-input-wrap input:focus-visible,
+.connect-search-input input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
 .connect-identity-card { border-color: var(--soco-line); background: #f6f8ff; }
 .connect-result:hover { background: #f5f7ff; }
 .nearby-explorer { background: var(--soco-canvas); }
@@ -320,15 +325,26 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
 .composer-shortcuts button { background: #f0f4fe; color: #3754a7; }
 .composer-shortcuts button:hover { background: #e6edff; }
 @media (max-width: 430px) {
-  /* Keep all media actions accessible without sideways scrolling or clipped pills. */
-  .modern-shell .composer-shortcuts { flex-wrap: wrap; overflow-x: visible; }
+  /* Keep the recipient name readable when call, media and translation actions share the title row. */
+  .modern-shell .chat-head .room-avatar { display: none; }
+  /* Four compact actions fit on modern iPhones; smaller phones keep a readable 2x2 grid. */
+  .modern-shell .composer-shortcuts { flex-wrap: nowrap; gap: 5px; overflow-x: visible; }
   .modern-shell .composer-shortcuts button {
     min-width: 0;
     box-sizing: border-box;
-    flex: 1 1 calc(50% - 7px);
+    flex: 1 1 0;
     justify-content: center;
-    padding-inline: 6px;
+    gap: 4px;
+    min-height: 39px;
+    padding-inline: 4px;
+    font-size: 11px;
+    white-space: nowrap;
   }
+  .modern-shell .composer-shortcuts button svg { width: 16px; height: 16px; flex-shrink: 0; }
+}
+@media (max-width: 360px) {
+  .modern-shell .composer-shortcuts { flex-wrap: wrap; }
+  .modern-shell .composer-shortcuts button { flex: 1 1 calc(50% - 5px); }
 }
 .feed-submit, .auth-submit {
   border: 0;
@@ -337,7 +353,7 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   background: var(--soco-gradient);
   box-shadow: 0 8px 23px rgba(37, 99, 235, .17);
 }
-.stories-row { gap: 11px; padding-bottom: 12px; }
+.stories-row { gap: 11px; padding: 0 2px 12px; border-bottom: 0; background: transparent; }
 .story-card {
   border-radius: 19px;
   border-color: #e3e9f7;
@@ -488,6 +504,10 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   .simple-view-title { padding: 21px 17px 12px; }
   .simple-view-title strong { font-size: 23px; }
   .zalo-feed-view { padding: 10px 12px max(18px, env(safe-area-inset-bottom)); }
+  .modern-shell .stories-row { padding: 0 0 10px; gap: 9px; background: transparent; border-bottom: 0; }
+  .modern-shell .story-card { width: 80px; flex: 0 0 80px; gap: 3px; border-radius: 17px; }
+  .modern-shell .story-visual { height: 106px; border-radius: 15px; }
+  .modern-shell .story-card > span { font-size: 10px; }
   .zalo-post-composer { margin: 0 0 12px; border-radius: 19px; padding: 11px; }
   .zalo-post { border-radius: 19px; margin-bottom: 12px; }
   .profile-hero { margin: 10px 11px 0; border-radius: 20px; }
@@ -507,7 +527,8 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   .bottom-navigation > button { min-height: 57px; font-size: 10px; gap: 3px; }
   .bottom-navigation .nav-icon { min-height: 30px; }
   .mobile-conversation-open ~ .bottom-navigation, .conversation-open > .bottom-navigation { display: none; }
-  .mobile-conversation-open .chatnet-appbar { display: none; }
+  /* The appbar is a direct child of the shell, not of the conversation frame. */
+  .modern-shell.conversation-open > .chatnet-appbar { display: none; }
   .chat-head .translation-hub-popover { max-height: min(68dvh, 550px); }
 }
 

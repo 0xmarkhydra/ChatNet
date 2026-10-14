@@ -4426,7 +4426,6 @@ export default function App() {
               </div>
             </section>
 
-            <div className="soco-profile-section-label">THÔNG TIN CÁ NHÂN</div>
             <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
               <div className="profile-edit-heading">
                 <div>
