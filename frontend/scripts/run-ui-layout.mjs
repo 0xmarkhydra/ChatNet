@@ -194,6 +194,38 @@ try {
   check(contrast(modalColors.bg, modalColors.input) >= 4.5, 'Language modal search contrast regression')
   check(contrast(modalColors.bg, modalColors.description) >= 4.5, 'Language modal subtitle contrast regression')
   await page.screenshot({ path: 'output/playwright/layout/language-390.png' })
+
+  // Motion regression: iOS press feedback, sheet entrance and reduced-motion support.
+  const reduceMotionSheet = await locale.evaluate(node => getComputedStyle(node).animationName)
+  check(reduceMotionSheet === 'none', 'Reduced-motion language sheet should not animate')
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  const sheetMotion = await locale.evaluate(node => ({
+    name: getComputedStyle(node).animationName,
+    duration: getComputedStyle(node).animationDuration,
+  }))
+  check(sheetMotion.name.includes('soco-sheet-in'), 'Language sheet entrance motion missing')
+  check(parseFloat(sheetMotion.duration) >= .2, 'Language sheet motion should feel smooth')
+  await locale.locator('header button').first().click()
+  await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
+  const activeNav = page.locator('.bottom-navigation > button.active').first()
+  const tabMotion = await activeNav.locator('.nav-icon').evaluate(node => getComputedStyle(node).animationName)
+  check(tabMotion.includes('soco-tab-pop'), 'Active tab spring effect missing')
+  await activeNav.scrollIntoViewIfNeeded()
+  const rect = await activeNav.boundingBox()
+  check(rect !== null, 'Active tab missing for press test')
+  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2)
+  await page.mouse.down()
+  await page.waitForTimeout(90)
+  const pressScale = await activeNav.evaluate(node => {
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(node).transform)
+    return matrix.a
+  })
+  await page.mouse.up()
+  check(pressScale < .995 && pressScale > .91, 'Touch-down scale feedback missing: ' + pressScale)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const reducedMotion = await activeNav.locator('.nav-icon').evaluate(node => getComputedStyle(node).animationName)
+  check(reducedMotion === 'none', 'Reduced-motion must remove tab animation')
+
   check(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
   console.log('PASS: SOCO layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')
 } catch (error) {

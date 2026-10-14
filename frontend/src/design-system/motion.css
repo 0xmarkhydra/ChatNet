@@ -1,0 +1,211 @@
+/*
+ * SOCO iOS Motion System — composited micro-interactions.
+ *
+ * Keep motion owned by one place instead of stacking ad-hoc CSS overrides.
+ * Animates opacity/transform for fluid 60fps-feeling feedback without changing
+ * layout, business state, hitboxes, scrolling or API behavior.
+ * User reduced-motion preference is always respected.
+ */
+:root {
+  --soco-motion-touch: 115ms;
+  --soco-motion-quick: 180ms;
+  --soco-motion-standard: 245ms;
+  --soco-motion-sheet: 340ms;
+  --soco-motion-ease: cubic-bezier(.2,.8,.2,1);
+  --soco-motion-spring: cubic-bezier(.22,1.25,.36,1);
+}
+
+/* The app's actual interactive controls, not full-screen backdrops. */
+.modern-shell :is(
+  .appbar-icon-button,
+  .bottom-navigation > button,
+  .call-header-actions button,
+  .shared-content-trigger,
+  .send-button,
+  .composer button,
+  .soco-text-action,
+  .contact-shortcuts > button,
+  .contact-result,
+  .friend-result,
+  .connect-identity-actions > button,
+  .story-card,
+  .post-toolbar button,
+  .composer-shortcuts button,
+  .profile-actions button,
+  .settings-row button,
+  .feed-submit,
+  .auth-submit,
+  .quick-create-menu > button,
+  .nearby-mode button,
+  .nearby-categories button,
+  .nearby-view button
+),
+.locale-picker-sheet :is(.locale-option, .locale-picker-search button, header button),
+.connection-dialog button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transform-origin: center;
+  transition:
+    transform var(--soco-motion-touch) ease-out,
+    background-color var(--soco-motion-quick) ease,
+    border-color var(--soco-motion-quick) ease,
+    color var(--soco-motion-quick) ease,
+    box-shadow var(--soco-motion-quick) ease,
+    opacity var(--soco-motion-quick) ease;
+}
+
+.modern-shell :is(
+  .appbar-icon-button,
+  .bottom-navigation > button,
+  .call-header-actions button,
+  .shared-content-trigger,
+  .send-button,
+  .composer button,
+  .soco-text-action,
+  .contact-shortcuts > button,
+  .contact-result,
+  .friend-result,
+  .connect-identity-actions > button,
+  .story-card,
+  .post-toolbar button,
+  .composer-shortcuts button,
+  .profile-actions button,
+  .settings-row button,
+  .feed-submit,
+  .auth-submit,
+  .quick-create-menu > button,
+  .nearby-mode button,
+  .nearby-categories button,
+  .nearby-view button
+):not(:disabled):active,
+.locale-picker-sheet :is(.locale-option, .locale-picker-search button, header button):not(:disabled):active,
+.connection-dialog button:not(:disabled):active {
+  transform: scale(.965);
+  opacity: .88;
+}
+
+.modern-shell :is(button, [role="button"]):disabled {
+  cursor: not-allowed;
+}
+
+/* Hover depth applies only on devices with a physical pointing device. */
+@media (hover: hover) and (pointer: fine) {
+  .modern-shell :is(.appbar-icon-button, .call-header-actions button, .soco-text-action):not(:disabled):hover {
+    box-shadow: 0 4px 14px rgba(37,99,235,.11);
+    transform: translateY(-1px);
+  }
+  .modern-shell :is(.story-card, .zalo-post, .shared-media-card):hover {
+    transition: transform var(--soco-motion-standard) var(--soco-motion-ease),
+      box-shadow var(--soco-motion-standard) var(--soco-motion-ease);
+  }
+  .modern-shell .story-card:not(:disabled):hover { transform: translateY(-3px); }
+  .modern-shell .story-card:not(:disabled):active { transform: scale(.965); }
+}
+
+/* The active tab has a tiny iOS-style spring response; no layout reflow. */
+.modern-shell .bottom-navigation .nav-icon {
+  transition: transform var(--soco-motion-standard) var(--soco-motion-spring),
+    background-color var(--soco-motion-standard) ease, color var(--soco-motion-quick) ease;
+}
+.modern-shell .bottom-navigation > button.active .nav-icon {
+  animation: soco-tab-pop var(--soco-motion-standard) var(--soco-motion-spring) both;
+}
+.modern-shell .bottom-navigation > button.active::before {
+  animation: soco-indicator-in var(--soco-motion-quick) var(--soco-motion-ease) both;
+}
+@keyframes soco-tab-pop {
+  0% { transform: scale(.88); }
+  68% { transform: scale(1.075); }
+  100% { transform: scale(1); }
+}
+@keyframes soco-indicator-in {
+  from { opacity: 0; transform: translateX(-50%) scaleX(.5); }
+  to { opacity: 1; transform: translateX(-50%) scaleX(1); }
+}
+
+/* Page-level motion uses only opacity: transforming scrollable ancestors
+   would change the containing block of their position:fixed modals. */
+.modern-shell :is(.simple-view, .zalo-feed-view, .nearby-explorer, .messenger-layout) {
+  animation: soco-screen-in var(--soco-motion-standard) var(--soco-motion-ease);
+}
+@keyframes soco-screen-in {
+  from { opacity: .82; }
+  to { opacity: 1; }
+}
+
+/* Sheets are composited. The outer modal height stays fixed while searching. */
+.modern-shell .friend-search-panel.connect-modal,
+.locale-picker-sheet,
+.modern-shell :is(.shared-content-sheet, .message-context-sheet),
+.connection-dialog[open] {
+  animation: soco-sheet-in var(--soco-motion-sheet) var(--soco-motion-spring) both;
+  transform-origin: center bottom;
+}
+@keyframes soco-sheet-in {
+  from { opacity: .55; transform: translate3d(0, 18px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.modern-shell :is(.connect-modal-scrim, .shared-content-scrim, .message-context-backdrop),
+.locale-picker-backdrop {
+  animation: soco-dim-in var(--soco-motion-standard) ease both;
+}
+@keyframes soco-dim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Small action menus, toasts and freshly visible chat bubbles. */
+.modern-shell :is(.quick-create-menu, .new-chat-panel, .translation-hub-popover) {
+  animation: soco-menu-in var(--soco-motion-standard) var(--soco-motion-ease) both;
+  transform-origin: top right;
+}
+@keyframes soco-menu-in {
+  from { opacity: 0; transform: translate3d(0, -7px, 0) scale(.97); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.modern-shell .message.mine:last-child {
+  animation: soco-message-in var(--soco-motion-quick) var(--soco-motion-ease) both;
+}
+@keyframes soco-message-in {
+  from { opacity: .6; transform: translate3d(0, 5px, 0) scale(.99); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.modern-shell > .notice.toast {
+  animation: soco-toast-in var(--soco-motion-standard) var(--soco-motion-ease) both;
+}
+@keyframes soco-toast-in {
+  from { opacity: 0; transform: translate3d(0, -10px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+/* Respect accessibility preference; also avoid animating during automation. */
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell :is(
+    .simple-view, .zalo-feed-view, .nearby-explorer, .messenger-layout,
+    .friend-search-panel.connect-modal, .shared-content-sheet,
+    .message-context-sheet, .connect-modal-scrim,
+    .shared-content-scrim, .message-context-backdrop,
+    .quick-create-menu, .new-chat-panel, .translation-hub-popover,
+    .bottom-navigation > button.active .nav-icon,
+    .bottom-navigation > button.active::before,
+    .message.mine:last-child
+  ),
+  .modern-shell > .notice.toast,
+  .locale-picker-sheet,
+  .locale-picker-backdrop,
+  .connection-dialog[open] {
+    animation: none !important;
+  }
+  .modern-shell button,
+  .locale-picker-sheet button,
+  .connection-dialog button,
+  .modern-shell .bottom-navigation .nav-icon {
+    transition: none !important;
+  }
+  .modern-shell button:active,
+  .locale-picker-sheet button:active,
+  .connection-dialog button:active {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

@@ -101,3 +101,26 @@ This pass focuses on visual density and readability on iPhone while retaining th
 Verification: frontend build, check:ui (42 viewport × screen combinations, fixed-height connection & language sheets), check:pwa, check:session, check:optimistic, check:onesignal, and git diff --check passed in the refinement worktree. Browser screenshots were inspected at 390px and 1440px.
 
 This is web/PWA UI refinement. It does not certify Flutter/TestFlight parity or the unmocked call, upload, notification or language catalog workflows; those need real-device integration verification.
+
+## SOCO iOS Motion System — 2026-10-15
+
+A single reusable motion layer is loaded last in `frontend/src/main.tsx`:
+`frontend/src/design-system/motion.css`. It adds touch press-down scale (.965),
+active navigation spring, subtle screen fades, sheet entrances, contextual menus,
+new sent-message feedback and floating toast entrances. Animation durations are
+115–340ms, with opacity and transform used instead of animating layout dimensions.
+Hover elevation only appears on fine-pointer devices.
+
+- Interactions do not change route state, modal height, scrolling regions, auth,
+  translation, upload or notification behavior.
+- Full-screen scrims/backdrops are excluded from press scaling.
+- Page transitions fade **without transforms on layout containers** to avoid
+  breaking fixed-position overlays.
+- `prefers-reduced-motion: reduce` removes nonessential animations and press
+  transforms for users who need reduced motion.
+- Existing Playwright layout smoke now checks motion presence, actual press
+  scale, and reduced-motion behavior. It continues to check seven viewport
+  widths, 50% connection sheet height and language picker contrast.
+
+The motion layer is for the Web/PWA app. The Flutter native app needs a separate
+motion audit and real iOS device verification.
