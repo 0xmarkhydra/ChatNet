@@ -9,17 +9,8 @@
   font-weight: 680;
   letter-spacing: -.1px;
 }
-.modern-shell .bottom-navigation > button.active::before {
-  position: absolute;
-  top: 2px;
-  left: 50%;
-  width: 28px;
-  height: 3px;
-  transform: translateX(-50%);
-  border-radius: 0 0 9px 9px;
-  background: var(--soco-gradient);
-  content: "";
-}
+/* Active state relies on color and icon weight; no oversized capsule or stripe. */
+.modern-shell .bottom-navigation > button.active::before { content: none; }
 .modern-shell .bottom-navigation .nav-icon svg { stroke-width: 2; }
 .modern-shell .bottom-navigation button.active .nav-icon svg { stroke-width: 2.45; }
 

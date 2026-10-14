@@ -1,4 +1,4 @@
-import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
@@ -104,6 +104,9 @@ type Message = {
 
 type MessageDraft = { text: string; attachments: MediaAttachment[] }
 const emptyDraft: MessageDraft = { text: '', attachments: [] }
+const FEED_PAGE_SIZE = 15
+const CHAT_LIST_PAGE_SIZE = 25
+const MESSAGE_PAGE_SIZE = 40
 
 type Conversation = {
   id: number
@@ -446,9 +449,18 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState('')
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const [hasMoreConversations, setHasMoreConversations] = useState(false)
+  const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
+  const conversationPagingBusy = useRef(false)
+  const conversationOffset = useRef(0)
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
   const activeConversationIdRef = useRef<number | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
+  const messagesPagingBusy = useRef(false)
+  const pendingMessageScrollRestore = useRef<{ height: number; top: number } | null>(null)
+  const messagesScrollRef = useRef<HTMLDivElement>(null)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
   const messageLongPressTimer = useRef<number | null>(null)
@@ -507,6 +519,9 @@ export default function App() {
   const nearbyRequest = useRef(0)
 
   const [posts, setPosts] = useState<Post[]>([])
+  const [hasMorePosts, setHasMorePosts] = useState(false)
+  const [postsLoadingMore, setPostsLoadingMore] = useState(false)
+  const postsPagingBusy = useRef(false)
   const [activePostId, setActivePostId] = useState<number | null>(null)
   const [stories, setStories] = useState<Story[]>([])
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null)
@@ -741,6 +756,9 @@ export default function App() {
     cancelMessageLongPress()
     setMessageActionId(null)
     setMessages([])
+    setHasMoreMessages(false)
+    setMessagesLoadingMore(false)
+    messagesPagingBusy.current = false
     setReplyingTo(null)
     setGroupSettingsOpen(false)
     setSharedContentOpen(false)
@@ -1770,28 +1788,90 @@ export default function App() {
   }, [friendQuery, newChatMode, session?.token, tab])
 
   async function refreshConversations() {
+    const sessionId = session?.sessionId
     try {
-      const response = await apiFetch('/api/conversations')
+      const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}`)
       if (!response.ok) return
       const data = (await response.json()) as Conversation[]
-      if (sessionRef.current?.sessionId === session?.sessionId) setConversations(data)
+      if (sessionRef.current?.sessionId !== sessionId) return
+      setConversations((current) => {
+        const freshIds = new Set(data.map((item) => item.id))
+        return [...data, ...current.filter((item) => !freshIds.has(item.id))]
+      })
+      conversationOffset.current = Math.max(conversationOffset.current, data.length)
+      if (conversationOffset.current === data.length) setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
     } catch {
       setStatus('Đang kết nối lại...')
+    }
+  }
+
+  async function loadMoreConversations() {
+    if (!session || conversationPagingBusy.current || !hasMoreConversations) return
+    const sessionId = session.sessionId
+    conversationPagingBusy.current = true
+    setConversationLoadingMore(true)
+    try {
+      const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}&offset=${conversationOffset.current}`)
+      if (!response.ok) throw new Error('Không tải thêm được hội thoại')
+      const data = (await response.json()) as Conversation[]
+      if (sessionRef.current?.sessionId !== sessionId) return
+      conversationOffset.current += data.length
+      setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
+      setConversations((current) => {
+        const ids = new Set(current.map((item) => item.id))
+        return [...current, ...data.filter((item) => !ids.has(item.id))]
+      })
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
+    } finally {
+      conversationPagingBusy.current = false
+      if (sessionRef.current?.sessionId === sessionId) setConversationLoadingMore(false)
     }
   }
 
   async function refreshPosts() {
     const revision = feedRevision.current
     const request = ++feedLoads.current
+    const sessionId = session?.sessionId
     try {
-      const response = await apiFetch('/api/posts')
+      const response = await apiFetch(`/api/posts?limit=${FEED_PAGE_SIZE}`)
       if (!response.ok) return
       const data = (await response.json()) as Post[]
-      if (sessionRef.current?.sessionId === session?.sessionId
-        && revision === feedRevision.current && request === feedLoads.current
-        && ![...actionLocks.current].some((key) => key.startsWith('feed:'))) setPosts(data)
+      if (sessionRef.current?.sessionId !== sessionId ||
+        revision !== feedRevision.current || request !== feedLoads.current ||
+        [...actionLocks.current].some((key) => key.startsWith('feed:'))) return
+      setPosts((current) => {
+        const ids = new Set(data.map((item) => item.id))
+        return [...data, ...current.filter((item) => !ids.has(item.id))]
+      })
+      if (data.length < FEED_PAGE_SIZE) setHasMorePosts(false)
+      else if (posts.length === 0) setHasMorePosts(true)
     } catch {
       setStatus('Đang kết nối lại...')
+    }
+  }
+
+  async function loadMorePosts() {
+    if (!session || postsPagingBusy.current || !hasMorePosts || posts.length === 0) return
+    const sessionId = session.sessionId
+    const before = Math.min(...posts.map((item) => item.id))
+    postsPagingBusy.current = true
+    setPostsLoadingMore(true)
+    try {
+      const response = await apiFetch(`/api/posts?limit=${FEED_PAGE_SIZE}&before=${before}`)
+      if (!response.ok) throw new Error('Không tải thêm được bài viết')
+      const data = (await response.json()) as Post[]
+      if (sessionRef.current?.sessionId !== sessionId) return
+      setHasMorePosts(data.length === FEED_PAGE_SIZE)
+      setPosts((current) => {
+        const ids = new Set(current.map((item) => item.id))
+        return [...current, ...data.filter((item) => !ids.has(item.id))]
+      })
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được bài viết. Hãy thử lại.', 'error')
+    } finally {
+      postsPagingBusy.current = false
+      if (sessionRef.current?.sessionId === sessionId) setPostsLoadingMore(false)
     }
   }
 
@@ -1974,8 +2054,15 @@ export default function App() {
     setAuthMode('login')
     setSession(null)
     setConversations([])
+    setHasMoreConversations(false)
+    setConversationLoadingMore(false)
+    conversationOffset.current = 0
+    conversationPagingBusy.current = false
     setActiveConversationId(null)
     setMessages([])
+    setHasMoreMessages(false)
+    setMessagesLoadingMore(false)
+    messagesPagingBusy.current = false
     setOutgoingMessage(null)
     setPendingPost(null)
     setPendingComments({})
@@ -2002,6 +2089,9 @@ export default function App() {
     setFriendRequests([])
     setPostText('')
     setPosts([])
+    setHasMorePosts(false)
+    setPostsLoadingMore(false)
+    postsPagingBusy.current = false
     setStories([])
     setActiveStoryId(null)
     setCommentEditors({})
@@ -2198,13 +2288,14 @@ export default function App() {
     messageChanges.current = changes
     setTranslations({})
     apiFetch(
-      `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}`,
+      `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}`,
     )
       .then(async (response) => {
         if (!response.ok) throw new Error('Không tải được tin nhắn')
         const data = (await response.json()) as Message[]
         if (cancelled) return
 
+        setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
         setMessages((current) => {
           const live = current.filter((item) => item.conversationId === activeConversationId && changes.has(item.id))
           const liveIds = new Set(live.map((item) => item.id))
@@ -2245,7 +2336,57 @@ export default function App() {
     translationPreferencesLoaded,
   ])
 
-  useEffect(() => {
+  async function loadOlderMessages() {
+    if (!session || !activeConversationId || messagesPagingBusy.current ||
+        !hasMoreMessages || messages.length === 0) return
+    const conversationId = activeConversationId
+    const sessionId = session.sessionId
+    const before = Math.min(...messages.map((message) => message.id))
+    messagesPagingBusy.current = true
+    setMessagesLoadingMore(true)
+    try {
+      const response = await apiFetch(
+        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}&before=${before}`,
+      )
+      if (!response.ok) throw new Error('Không tải thêm được lịch sử tin nhắn')
+      const data = (await response.json()) as Message[]
+      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId) return
+      setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
+      if (data.length > 0) {
+        const container = messagesScrollRef.current
+        if (container) pendingMessageScrollRestore.current = { height: container.scrollHeight, top: container.scrollTop }
+        setMessages((current) => {
+          const ids = new Set(current.map((message) => message.id))
+          return [...data.filter((message) => !ids.has(message.id)), ...current].sort((a, b) => a.id - b.id)
+        })
+        setTranslations((current) => {
+          const restored = { ...current }
+          for (const message of data) {
+            if (message.translatedText && message.translationLanguage === targetLanguage) {
+              restored[message.id] = message.translatedText
+            }
+          }
+          return restored
+        })
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+        setNotice('Không tải được tin nhắn cũ. Hãy thử lại.', 'error')
+    } finally {
+      messagesPagingBusy.current = false
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+        setMessagesLoadingMore(false)
+    }
+  }
+
+  useLayoutEffect(() => {
+    const restore = pendingMessageScrollRestore.current
+    const container = messagesScrollRef.current
+    if (restore && container) {
+      container.scrollTop = restore.top + container.scrollHeight - restore.height
+      pendingMessageScrollRestore.current = null
+      return
+    }
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, outgoingMessage])
 
@@ -3264,6 +3405,14 @@ export default function App() {
                     </div>
                   </button>
                 ))}
+                {hasMoreConversations && (
+                  <button type="button" className="soco-load-more soco-conversation-load-more"
+                    onClick={() => void loadMoreConversations()} disabled={conversationLoadingMore}
+                    aria-busy={conversationLoadingMore}>
+                    <RefreshCw size={15} aria-hidden="true" />
+                    {conversationLoadingMore ? 'Đang tải...' : 'Tải thêm hội thoại'}
+                  </button>
+                )}
               </div>
             </aside>
 
@@ -3634,7 +3783,15 @@ export default function App() {
                     />
                   )}
 
-                  <div className="messages">
+                  <div className="messages" ref={messagesScrollRef}>
+                    {hasMoreMessages && (
+                      <button type="button" className="soco-load-more soco-older-messages"
+                        onClick={() => void loadOlderMessages()} disabled={messagesLoadingMore}
+                        aria-busy={messagesLoadingMore}>
+                        <RefreshCw size={16} aria-hidden="true" />
+                        {messagesLoadingMore ? 'Đang tải...' : 'Tải thêm tin nhắn cũ'}
+                      </button>
+                    )}
                     <div className="day-divider"><span>Cuộc trò chuyện</span></div>
                     {visibleMessages.map((message) => {
                       const mine = message.senderId === session.user.id
@@ -3947,9 +4104,6 @@ export default function App() {
 
         {tab === 'feed' && (
           <div className="feed-view zalo-feed-view">
-            <SocoSectionHeading eyebrow="CỘNG ĐỒNG" title="Bảng tin"
-              description="Chia sẻ khoảnh khắc và câu chuyện của bạn."
-            />
             <input
               ref={storyFileInputRef}
               className="hidden-media-input"
@@ -4066,7 +4220,7 @@ export default function App() {
               )}
             </form>
 
-            <div className="soco-feed-section-label soco-feed-posts-label"><strong>Bài viết mới</strong><small>${searchedPosts.length} bài viết</small></div>
+            <div className="soco-feed-section-label soco-feed-posts-label"><strong>Bài viết mới</strong></div>
             <div className="feed zalo-feed">
               {pendingPost && (
                 <article className="post zalo-post outgoing-preview" aria-busy="true">
@@ -4112,6 +4266,14 @@ export default function App() {
                   </div>
                 </article>
               ))}
+              {hasMorePosts && (
+                <button type="button" className="soco-load-more soco-feed-load-more"
+                  onClick={() => void loadMorePosts()} disabled={postsLoadingMore}
+                  aria-busy={postsLoadingMore}>
+                  <RefreshCw size={17} aria-hidden="true" />
+                  {postsLoadingMore ? 'Đang tải...' : 'Tải thêm bài viết'}
+                </button>
+              )}
               {searchedPosts.length === 0 && (
                 <div className="feed-empty">
                   <SocoEmptyState title={normalizedSearch ? 'Không tìm thấy bài viết' : 'Chưa có bài viết'}

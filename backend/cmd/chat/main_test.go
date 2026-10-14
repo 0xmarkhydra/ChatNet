@@ -168,3 +168,15 @@ func TestMessageClientID(t *testing.T) {
 		t.Fatalf("lost correlation id: %s, %v", body, err)
 	}
 }
+func TestConversationPaginationRejectsInvalidParameters(t *testing.T) {
+	for _, query := range []string{
+		"?limit=0", "?limit=101", "?limit=abc",
+		"?offset=-1", "?offset=1000001", "?offset=abc",
+	} {
+		w := httptest.NewRecorder()
+		(&server{}).listConversations(w, httptest.NewRequest(http.MethodGet, "/api/conversations"+query, nil))
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("%s: got %d; expected 400", query, w.Code)
+		}
+	}
+}

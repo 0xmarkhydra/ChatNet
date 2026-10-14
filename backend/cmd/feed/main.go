@@ -88,10 +88,30 @@ func main() {
 
 func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	// Backwards-compatible default; clients using load-more request bounded pages.
+	limit := 100
+	if value := r.URL.Query().Get("limit"); value != "" {
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 1 || n > 100 {
+			httpx.Error(w, http.StatusBadRequest, "invalid limit (1-100)")
+			return
+		}
+		limit = n
+	}
+	var before int64
+	if value := r.URL.Query().Get("before"); value != "" {
+		n, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || n < 1 {
+			httpx.Error(w, http.StatusBadRequest, "invalid before cursor")
+			return
+		}
+		before = n
+	}
 	rows, err := s.db.Query(r.Context(), `
 		SELECT p.id,u.username,p.content,p.likes_count,p.created_at
 		FROM posts p JOIN users u ON u.id=p.user_id
-		ORDER BY p.id DESC LIMIT 100`)
+		WHERE ($1::bigint=0 OR p.id<$1)
+		ORDER BY p.id DESC LIMIT $2`, before, limit)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")
 		return

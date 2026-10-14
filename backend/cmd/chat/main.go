@@ -461,6 +461,24 @@ func validTranslationTarget(value string) bool {
 
 func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	limit := 2147483647 // Preserve the original unpaginated response for older app versions.
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > 100 {
+			httpx.Error(w, http.StatusBadRequest, "invalid limit (1-100)")
+			return
+		}
+		limit = n
+	}
+	offset := 0
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 || n > 1000000 {
+			httpx.Error(w, http.StatusBadRequest, "invalid offset")
+			return
+		}
+		offset = n
+	}
 	rows, err := s.db.Query(r.Context(), `
 		SELECT c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,
 		       COALESCE((SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id=c.id),0),
@@ -490,8 +508,9 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		WHERE cm.user_id=$1
-		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id), c.created_at) DESC`,
-		claims.UserID)
+		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id), c.created_at) DESC, c.id DESC
+		LIMIT $2 OFFSET $3`,
+		claims.UserID, limit, offset)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
@@ -693,6 +712,24 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "unsupported translation language")
 		return
 	}
+	limit := 200
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > 200 {
+			httpx.Error(w, http.StatusBadRequest, "invalid limit (1-200)")
+			return
+		}
+		limit = n
+	}
+	var before int64
+	if raw := r.URL.Query().Get("before"); raw != "" {
+		n, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || n < 1 {
+			httpx.Error(w, http.StatusBadRequest, "invalid before cursor")
+			return
+		}
+		before = n
+	}
 
 	rows, err := s.db.Query(r.Context(), `
 		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
@@ -713,8 +750,8 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
-		WHERE m.conversation_id=$1
-		ORDER BY m.id DESC LIMIT 200`, conversationID, target)
+		WHERE m.conversation_id=$1 AND ($3::bigint=0 OR m.id<$3)
+		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return

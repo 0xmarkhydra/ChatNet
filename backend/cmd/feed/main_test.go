@@ -234,3 +234,15 @@ func TestStoryExpiryAndOwnershipIntegration(t *testing.T) {
 		t.Fatalf("delete own story got %d: %s", got.Code, got.Body.String())
 	}
 }
+func TestPostListPaginationRejectsInvalidParameters(t *testing.T) {
+	for _, query := range []string{
+		"?limit=0", "?limit=101", "?limit=not-a-number",
+		"?before=0", "?before=-1", "?before=abc",
+	} {
+		w := httptest.NewRecorder()
+		(&server{}).list(w, httptest.NewRequest(http.MethodGet, "/api/posts"+query, nil))
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("%s: got %d; expected 400", query, w.Code)
+		}
+	}
+}

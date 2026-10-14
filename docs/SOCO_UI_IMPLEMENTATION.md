@@ -124,3 +124,20 @@ Hover elevation only appears on fine-pointer devices.
 
 The motion layer is for the Web/PWA app. The Flutter native app needs a separate
 motion audit and real iOS device verification.
+
+## SOCO Feed & Chat Pagination — 2026-10-15
+
+Requested on production screenshot:
+- Removed the redundant “CỘNG ĐỒNG / Bảng tin” introduction block from the Feed.
+- Removed “N bài viết” on the right of the “Bài viết mới” heading.
+- Replaced the active bottom-navigation oversized rounded block/top indicator with a minimal blue active icon.
+- Added iOS-style API-backed load-more actions:
+  - Feed posts: 15 per request, cursor `before=<post id>`.
+  - Chat conversation list: 25 per request, `offset` and stable secondary `id DESC` sorting.
+  - Older messages: 40 per request, cursor `before=<message id>`, query retains translation target.
+- Older messages are prepended with scroll position compensated; incoming realtime messages remain visible. Loaded pages deduplicate IDs; request locks and per-session guards protect rapid taps and session changes.
+- The previous API responses remain arrays and legacy no-query clients keep their original defaults.
+- Pagination limits and cursor/offset values are validated server side.
+- The Playwright UI suite now mocks 18 feed posts, 30 conversations and 45 chat messages and verifies page appending, no remaining button at the end, active tab styling, layout and scroll preservation.
+
+QA scope: automated checks use Chromium and mocked API responses. Production DB pagination and real iPhone scroll behavior still need a real-user or staging-device check. Do not claim infinite scroll; this intentionally uses explicit load-more buttons.

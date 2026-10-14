@@ -28,6 +28,22 @@ const conversations = [
   { id: 2, name: 'hoangnam', type: 'direct', otherUserId: 3, memberCount: 2, unreadCount: 0, lastMessage: 'Cảm ơn bạn, mình nhận được rồi.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
   { id: 3, name: 'Nhóm SOCO kiểm thử giao diện mobile và desktop với tên rất dài', type: 'group', memberCount: 5, unreadCount: 0, lastMessage: 'Hẹn cả nhóm ngày mai.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
 ]
+const pagedConversations = [...conversations, ...Array.from({ length: 27 }, (_, index) => ({
+  id: index + 4, name: 'user_' + (index + 4), type: 'direct',
+  memberCount: 2, unreadCount: 0, lastMessage: 'Bản tin chào mừng',
+  online: false, createdAt: '2026-10-02T07:00:00Z',
+  lastMessageAt: new Date(Date.UTC(2026, 9, 2, 6, 59 - index)).toISOString(),
+}))]
+// Keep the newest 40 messages in the first response and add older messages on demand.
+const pagedMessages = Array.from({ length: 45 }, (_, index) => ({
+  id: index + 1, conversationId: 1, senderId: 1, sender: 'soco_user',
+  text: 'Lịch sử tin nhắn ' + (index + 1),
+  createdAt: new Date(Date.UTC(2026, 9, 2, 7, index)).toISOString(),
+}))
+const pagedPosts = Array.from({ length: 18 }, (_, index) => ({
+  id: 18 - index, author: 'minhanh', content: 'Bài viết kiểm thử phân trang số ' + (18 - index),
+  likes: 8, liked: false, comments: [], createdAt: '2026-10-02T07:00:00Z',
+}))
 const friends = [{ id: 2, username: 'minhanh', displayName: 'Minh Anh', status: 'accepted', online: true, updatedAt: '2026-10-02T07:00:00Z' }]
 const session = {
   token: 'mock.' + Buffer.from(JSON.stringify({ exp: 4102444800 })).toString('base64url') + '.signed',
@@ -54,15 +70,18 @@ try {
   page.on('pageerror', e => errors.push(e.message))
   await page.route('http://localhost:8080/**', route => {
     const req = route.request()
-    const path = new URL(req.url()).pathname
+    const currentURL = new URL(req.url())
+    const path = currentURL.pathname
+    const limit = Number(currentURL.searchParams.get('limit') || 100)
+    const before = Number(currentURL.searchParams.get('before') || 0)
+    const offset = Number(currentURL.searchParams.get('offset') || 0)
     const json = (data, status = 200) => route.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify(data) })
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
     if (path === '/api/events') return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: ': connected\n\n' })
-    if (path === '/api/conversations') return json(conversations)
-    if (path.endsWith('/messages')) return json([
-      { id: 10, conversationId: 1, senderId: 2, sender: 'minhanh', text: 'Đã nhận tài liệu, chiều nay mình gọi nhé.', createdAt: '2026-10-02T07:00:00Z' },
-      { id: 11, conversationId: 1, senderId: 1, sender: 'soco_user', text: 'Được, cảm ơn bạn!', createdAt: '2026-10-02T07:01:00Z' },
-    ])
+    if (path === '/api/conversations') return json(pagedConversations.slice(offset, offset + limit))
+    if (path.endsWith('/messages')) return json(
+      pagedMessages.filter(message => !before || message.id < before).slice(-limit),
+    )
     if (path === '/api/friends') return json(friends)
     if (path === '/api/friends/requests') return json([])
     if (path === '/api/users/suggestions' || path === '/api/users/search') return json(friends)
@@ -72,7 +91,7 @@ try {
       const text = req.postDataJSON()?.text || ''
       return json({ translatedText: text, translation: text, sourceLanguage: 'vi', targetLanguage: 'en' })
     }
-    if (path === '/api/posts') return json([{ id: 1, author: 'minhanh', content: 'Bài viết kiểm thử giao diện SOCO trên thiết bị nhỏ và desktop.', likes: 8, liked: false, comments: [], createdAt: '2026-10-02T07:00:00Z' }])
+    if (path === '/api/posts') return json(pagedPosts.filter(post => !before || post.id < before).slice(0, limit))
     if (path === '/api/stories' || path === '/api/calls') return json([])
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     if (path === '/api/i18n/bundle') return json({ locale: 'vi', version: 'mock', messages: {}, cache: 'hit' })
@@ -118,7 +137,7 @@ try {
     await page.getByRole('button', { name: 'Danh bạ', exact: true }).click()
     await geometry('contacts', width, ['.modern-frame', '.contacts-view', '.contact-shortcuts', '.soco-section-heading'])
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
-    await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-section-heading'])
+    await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
     await page.getByRole('button', { name: /Cá nhân/ }).click()
     await geometry('profile', width, ['.modern-frame', '.profile-view', '.profile-hero', '.soco-section-heading'])
     const cover = await page.locator('.profile-cover-art').boundingBox()
@@ -225,6 +244,43 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   const reducedMotion = await activeNav.locator('.nav-icon').evaluate(node => getComputedStyle(node).animationName)
   check(reducedMotion === 'none', 'Reduced-motion must remove tab animation')
+
+  // API-backed pagination: pages append once and older chat does not jump to the bottom.
+  check(await page.locator('.feed-view > .soco-section-heading').count() === 0,
+    'Feed still contains the removed introduction banner')
+  check(await page.locator('.soco-feed-posts-label small').count() === 0,
+    'Feed still displays the removed post count')
+  const activeNavStyle = await activeNav.evaluate(node => ({
+    bg: getComputedStyle(node).backgroundColor,
+    indicator: getComputedStyle(node, '::before').content,
+  }))
+  check(activeNavStyle.bg === 'rgba(0, 0, 0, 0)' && (activeNavStyle.indicator === 'none' || activeNavStyle.indicator === 'normal'),
+    'Bulky active navigation highlight was not removed')
+  check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 15, 'Feed first page must have 15 posts')
+  await page.getByRole('button', { name: 'Tải thêm bài viết' }).click()
+  check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 18,
+    'Feed load more did not append the remaining 3 posts')
+  check(await page.getByRole('button', { name: 'Tải thêm bài viết' }).count() === 0,
+    'Feed load more should stop at the end of the list')
+  await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
+  check(await page.locator('.conversation-item').count() === 25, 'Initial conversation page must show 25 items')
+  await page.getByRole('button', { name: 'Tải thêm hội thoại' }).click()
+  await page.waitForFunction(() => document.querySelectorAll('.conversation-item').length === 30, null, { timeout: 6000 })
+  check(await page.locator('.conversation-item').count() === 30, 'Conversation load more did not add the next 5 items')
+  await page.locator('.conversation-item').first().click()
+  await page.waitForFunction(() => document.querySelectorAll('.message-press-target').length === 40, null, { timeout: 6000 })
+  check(await page.locator('.message-press-target').count() === 40, 'Initial message page must show 40 items')
+  const oldList = page.locator('.messages')
+  const beforePosition = await oldList.evaluate(node => ({ scrollTop: node.scrollTop, height: node.scrollHeight }))
+  await page.getByRole('button', { name: 'Tải thêm tin nhắn cũ' }).click()
+  await page.waitForFunction(() => document.querySelectorAll('.message-press-target').length === 45, null, { timeout: 6000 })
+  check(await page.locator('.message-press-target').count() === 45, 'Older messages were not appended')
+  const afterPosition = await oldList.evaluate(node => ({ scrollTop: node.scrollTop, height: node.scrollHeight }))
+  check(Math.abs((afterPosition.scrollTop - beforePosition.scrollTop) -
+    (afterPosition.height - beforePosition.height)) < 10,
+    'Loading older messages must preserve the visible scroll position')
+  check(await page.getByRole('button', { name: 'Tải thêm tin nhắn cũ' }).count() === 0,
+    'Message pagination must stop when history is exhausted')
 
   check(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
   console.log('PASS: SOCO layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')

@@ -444,3 +444,56 @@
     min-height: 52px;
   }
 }
+/* SOCO feed and navigation simplification (approved mobile review). */
+.modern-shell .bottom-navigation > button.active,
+.modern-shell .bottom-navigation > button.active .nav-icon {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+.modern-shell .bottom-navigation > button.active .nav-icon {
+  color: var(--soco-blue);
+}
+.modern-shell .bottom-navigation > button.active::before { display: none; }
+.modern-shell .feed-view.zalo-feed-view > .soco-feed-section-label:first-of-type {
+  margin-top: 12px;
+}
+
+/* Real API-backed load-more controls. No layout shift while a page is loading. */
+.modern-shell .soco-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px auto 24px;
+  min-height: 42px;
+  max-width: min(100% - 24px, 280px);
+  padding: 9px 18px;
+  border: 1px solid #dbe6ff;
+  border-radius: 999px;
+  background: #edf3ff;
+  color: #2b5ad3;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background-color .18s ease, transform .16s ease;
+}
+.modern-shell .soco-load-more:hover { background: #e3ecff; }
+.modern-shell .soco-load-more:active:not(:disabled) { transform: scale(.97); }
+.modern-shell .soco-load-more:disabled { opacity: .65; cursor: wait; }
+.modern-shell .soco-load-more[aria-busy="true"] svg { animation: soco-loading-spin 850ms linear infinite; }
+@keyframes soco-loading-spin { to { transform: rotate(360deg); } }
+.modern-shell .soco-older-messages {
+  margin: 8px auto 16px;
+  min-height: 36px;
+  font-size: 12px;
+}
+.modern-shell .soco-conversation-load-more { margin: 14px auto 18px; }
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell .soco-load-more,
+  .modern-shell .soco-load-more[aria-busy="true"] svg {
+    transition: none;
+    animation: none;
+  }
+}
