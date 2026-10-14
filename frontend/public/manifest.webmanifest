@@ -1,26 +1,33 @@
 {
   "id": "/",
-  "name": "ChatNet",
-  "short_name": "ChatNet",
-  "description": "ChatNet – Kết nối không biên giới. Trò chuyện, kết bạn và giao tiếp xuyên ngôn ngữ với dịch tự động bằng AI.",
+  "name": "SOCO",
+  "short_name": "SOCO",
+  "description": "SOCO – Understand. Connect. Together. Trò chuyện, kết bạn và giao tiếp xuyên ngôn ngữ với AI.",
   "lang": "vi",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
-  "theme_color": "#191c17",
-  "categories": ["social", "communication", "productivity"],
+  "theme_color": "#2563eb",
+  "categories": [
+    "social",
+    "communication",
+    "productivity"
+  ],
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/soco-mark.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icon-maskable.svg",
+      "src": "/soco-maskable.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"

@@ -1,0 +1,308 @@
+/*
+ * SOCO screen-level refinements — the same design language for every feature surface.
+ * Visual only. Keep feature state, API contracts, security and navigation unchanged.
+ */
+
+/* Navigation: visible active affordance without relying on color alone */
+.modern-shell .bottom-navigation > button {
+  position: relative;
+  font-weight: 680;
+  letter-spacing: -.1px;
+}
+.modern-shell .bottom-navigation > button.active::before {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 28px;
+  height: 3px;
+  transform: translateX(-50%);
+  border-radius: 0 0 9px 9px;
+  background: var(--soco-gradient);
+  content: "";
+}
+.modern-shell .bottom-navigation .nav-icon svg { stroke-width: 2; }
+.modern-shell .bottom-navigation button.active .nav-icon svg { stroke-width: 2.45; }
+
+/* Conversation: panel states, attachments, long-press and message reactions */
+.modern-shell .conversation-empty {
+  background:
+    radial-gradient(circle at 45% 37%, rgba(139,92,246,.095), transparent 43%),
+    radial-gradient(circle at 60% 63%, rgba(37,99,235,.1), transparent 46%),
+    #f7f9ff;
+}
+.modern-shell .conversation-empty .empty-icon {
+  width: 76px;
+  height: 76px;
+  border: 1px solid #e9eaff;
+  border-radius: 25px;
+  background: linear-gradient(145deg, #eaf3ff, #eee8ff);
+  color: var(--soco-blue);
+  box-shadow: 0 12px 30px rgba(62,93,202,.10);
+}
+.modern-shell .conversation-empty h2 { color: var(--soco-navy); font-size: 21px; }
+.modern-shell .conversation-empty p { color: var(--soco-muted); max-width: 290px; }
+.modern-shell .reaction-chip { border: 1px solid #dfe6f7; background: #fff; color: #5c6f98; }
+.modern-shell .reaction-chip.active { background: #eaf1ff; border-color: #9fb6fe; color: #3154c9; }
+.modern-shell .message-context-backdrop { background: rgba(17, 24, 50, .49); backdrop-filter: blur(7px); }
+.modern-shell .message-context-sheet {
+  border: 1px solid #e9edf9;
+  border-radius: 26px;
+  background: #f9faff;
+  box-shadow: 0 26px 75px rgba(20,36,87,.23);
+}
+.modern-shell .message-context-preview.mine .message-context-preview-bubble {
+  background: var(--soco-gradient);
+  color: #fff;
+}
+.modern-shell .message-context-reactions,
+.modern-shell .message-context-actions { border: 1px solid #eef0f8; box-shadow: 0 8px 23px rgba(22,43,94,.06); }
+.modern-shell .message-context-actions button > span { background: #eef3ff; color: #315de2; }
+.modern-shell .message-context-cancel { background: #f0f3ff; color: #42599a; }
+.modern-shell .composer-reply-preview {
+  border: 1px solid #dce5ff;
+  border-radius: 14px;
+  background: #f3f6ff;
+  color: #415eb1;
+}
+.modern-shell .media-file-card,
+.modern-shell .feed-media-preview .media-item {
+  border-color: #e4ebf7;
+  border-radius: 14px;
+  background: white;
+}
+.modern-shell .group-settings-toggle.active { background: #ede8ff; color: #6448c6; }
+.modern-shell .group-settings-panel {
+  background: #fff;
+  border-color: #e5eafd;
+  box-shadow: 0 12px 30px rgba(43,64,120,.09);
+}
+.modern-shell .group-tool-row input,
+.modern-shell .group-invite-search,
+.modern-shell .new-chat-panel input {
+  border: 1px solid #dfe6f5;
+  border-radius: 13px;
+  background: #f8faff;
+  color: var(--soco-text);
+}
+.modern-shell .group-tool-row button,
+.modern-shell .group-member-actions button:not(.danger) {
+  border: 1px solid #dfe5ff;
+  border-radius: 12px;
+  background: #edf2ff;
+  color: #3157da;
+}
+.modern-shell .group-member-row:hover,
+.modern-shell .group-invite-friend:hover,
+.modern-shell .group-invite-friend.selected { background: #f2f5ff; }
+.modern-shell .group-invite-check { border-color: #bcc9e8; }
+.modern-shell .group-invite-friend.selected .group-invite-check { background: var(--soco-blue); border-color: var(--soco-blue); }
+
+/* Shared photo, video, file and link collection */
+.modern-shell .shared-content-scrim { background: rgba(14,24,55,.44); }
+.modern-shell .shared-content-sheet {
+  border: 1px solid #e5ebfa;
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: 0 25px 80px rgba(28,42,91,.23);
+}
+.modern-shell .shared-content-header strong { color: var(--soco-navy); }
+.modern-shell .shared-content-header > button { background: #f1f4fc; color: #4b5b81; }
+.modern-shell .shared-content-tabs { border-radius: 16px; background: #eff2fa; }
+.modern-shell .shared-content-tabs button { border-radius: 12px; }
+.modern-shell .shared-content-tabs button.active { color: var(--soco-blue); box-shadow: 0 3px 9px rgba(38,69,149,.08); }
+.modern-shell .shared-media-card { border-radius: 15px; border-color: #e6eaf4; }
+.modern-shell .shared-file-row, .modern-shell .shared-link-row { border-bottom-color: #e9edf6; }
+.modern-shell .shared-file-icon, .modern-shell .shared-link-icon { color: var(--soco-blue); background: #eff4ff; border-radius: 14px; }
+.modern-shell .shared-content-more, .modern-shell .shared-content-state button { border-radius: 13px; background: #eef3ff; color: #2858d3; }
+
+/* QR connect and group creation: loaded dynamically in their feature modules */
+.modern-shell .connection-dialog {
+  max-width: calc(100vw - 20px);
+  border: 1px solid #e3e9f7;
+  border-radius: 26px;
+  background: #fff;
+  color: var(--soco-text);
+  box-shadow: 0 28px 72px rgba(20,38,84,.20);
+}
+.modern-shell .connection-dialog::backdrop { background: rgba(13,22,51,.52); backdrop-filter: blur(6px); }
+.modern-shell .connection-dialog h2 { font-size: 22px; font-weight: 800; color: var(--soco-navy); }
+.modern-shell .connection-dialog header button { border-radius: 50%; background: #f0f3ff; color: #445a91; }
+.modern-shell .connection-segments { border-radius: 15px; background: #eef2fa; padding: 5px; }
+.modern-shell .connection-segments button { border-radius: 11px; }
+.modern-shell .connection-segments button[aria-pressed="true"] { color: #2356d4; }
+.modern-shell .qr-identity strong { color: var(--soco-navy); }
+.modern-shell .qr-identity span { color: var(--soco-muted); }
+.modern-shell .qr-image { padding: 9px; border-radius: 20px; box-shadow: 0 6px 22px rgba(37,67,135,.09); }
+.modern-shell .qr-camera { border-radius: 18px; background: #edf3ff; }
+.modern-shell .qr-upload { border: 1px dashed #b6c8f3; border-radius: 14px; background: #f9fbff; color: #4160a0; }
+.modern-shell .connection-actions button, .modern-shell .connection-primary {
+  min-height: 44px;
+  border: none;
+  border-radius: 13px;
+  background: var(--soco-gradient);
+  color: #fff;
+}
+.modern-shell .connection-actions a { color: #3158d5; }
+.modern-shell .group-create-form input:not([type="checkbox"]) { border: 1px solid #dfe6f4; border-radius: 13px; background: #f8faff; color: var(--soco-text); }
+.modern-shell .group-member input { accent-color: var(--soco-blue); }
+.modern-shell .group-selection button { border-radius: 12px; background: #f2f5ff; border-color: #dce5ff; color: #3d5a9d; }
+.modern-shell .chat-friend-bar { background: #f9fbff; border-color: #edf1fb; color: #50678f; }
+.modern-shell .chat-friend-bar button { border-radius: 12px; border-color: #dbe4f7; color: #3b5594; }
+.modern-shell .chat-friend-bar button.primary { background: var(--soco-gradient); border-color: transparent; color: #fff; }
+
+/* Find people modal and contact search */
+.modern-shell .connect-search-input { border-radius: 15px; border-color: #e6ebf8; background: #f6f8fc; }
+.modern-shell .connect-identity-card { border-radius: 17px; }
+.modern-shell .connect-identity-card .connect-identity-actions > button { border-radius: 11px; color: var(--soco-blue); }
+.modern-shell .connect-results .friend-suggestion-label { color: #54658a; }
+.modern-shell .connect-result { border-radius: 14px; }
+.modern-shell .connect-result .friend-result-action.relationship-incoming,
+.modern-shell .connect-result .friend-result-action.relationship-none { color: #fff; background: var(--soco-gradient); }
+.modern-shell .connect-result .friend-result-action.relationship-accepted { background: #eef3ff; color: #365acc; }
+.modern-shell .connect-result .friend-result-action.relationship-outgoing { background: #f0f2f6; color: #7c89a4; }
+.modern-shell .friend-request-actions button { border-radius: 12px; }
+.modern-shell .friend-request-actions button:not(.secondary) { color: #fff; background: var(--soco-blue); }
+
+/* Discover/nearby map: use higher specificity than asynchronously loaded CSS */
+.modern-shell .nearby-explorer { background: #f5f7fd; color: var(--soco-text); gap: 7px; }
+.modern-shell .nearby-heading h1 { color: var(--soco-navy); font-size: 24px; font-weight: 800; letter-spacing: -.6px; }
+.modern-shell .nearby-visibility { color: #576b93; }
+.modern-shell .nearby-visibility input:checked { background: var(--soco-blue); }
+.modern-shell .nearby-mode { border-color: #e7ecf7; }
+.modern-shell .nearby-mode button { color: #7d8ba4; }
+.modern-shell .nearby-mode button[aria-pressed="true"] { color: var(--soco-blue); border-bottom-color: var(--soco-blue); }
+.modern-shell .nearby-search {
+  height: 46px;
+  border: 1px solid #e3e9f6;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(33,53,107,.05);
+}
+.modern-shell .nearby-search:focus-within { border-color: #aac4ff; box-shadow: 0 0 0 3px rgba(37,99,235,.08); }
+.modern-shell .nearby-search svg { color: #788cba; }
+.modern-shell .nearby-search input { color: var(--soco-text); }
+.modern-shell .nearby-radius-field { color: #677794; }
+.modern-shell .nearby-radius-field select { border: 1px solid #e4eaf6; border-radius: 12px; color: #37517d; }
+.modern-shell .nearby-refresh, .modern-shell .nearby-route, .modern-shell .nearby-view button {
+  border: 1px solid #e2e8f6;
+  border-radius: 12px;
+  color: #385abb;
+  background: #fff;
+}
+.modern-shell .nearby-results-heading strong { color: #172642; }
+.modern-shell .nearby-results-heading span { color: #7887a1; }
+.modern-shell .nearby-person, .modern-shell .nearby-place-row { border-color: #e9edf6; }
+.modern-shell .nearby-person-copy > span, .modern-shell .nearby-place-row span, .modern-shell .nearby-place-row small { color: #7886a0; }
+.modern-shell .nearby-explorer .nearby-primary, .modern-shell .nearby-explorer .nearby-connect {
+  border: 0;
+  border-radius: 13px;
+  background: var(--soco-gradient);
+  color: white;
+}
+.modern-shell .nearby-categories button { border: 1px solid #e1e8f7; border-radius: 999px; color: #53709e; background: #fff; }
+.modern-shell .nearby-categories button[aria-pressed="true"] { border-color: #a7c3ff; color: #245add; background: #eaf1ff; }
+.modern-shell .nearby-view button[aria-pressed="true"] { background: #eaf1ff; color: #245add; }
+.modern-shell .nearby-place-row.selected { background: #edf3ff; border-radius: 14px; }
+.modern-shell .nearby-place-number { border-radius: 12px; color: #4065a9; background: #edf4ff; }
+.modern-shell .nearby-place-marker { border: 2px solid #406ae8; color: #2f5add; }
+.modern-shell .nearby-place-marker.selected { background: var(--soco-gradient); border-color: var(--soco-blue); color: #fff; }
+.modern-shell .nearby-map { border: 1px solid #e4e9f6; border-radius: 17px; overflow: hidden; background: #ebf2ff; }
+
+/* Feed stories, post interactions, account preferences, notifications */
+.modern-shell .story-card { background: #fff; }
+.modern-shell .story-camera, .modern-shell .story-avatar-mini { border-color: white; }
+.modern-shell .story-progress > span.running { background: var(--soco-blue); }
+.modern-shell .post-box textarea,
+.modern-shell .comment-box input,
+.modern-shell .feed-comment-compose textarea {
+  border: 1px solid #e3e9f7;
+  border-radius: 15px;
+  color: var(--soco-text);
+  background: #f8faff;
+}
+.modern-shell .post-box textarea:focus,
+.modern-shell .comment-box input:focus,
+.modern-shell .feed-comment-compose textarea:focus { border-color: #adbef5; }
+.modern-shell .feed-comment-compose button,
+.modern-shell .comment-box button { border-radius: 12px; background: var(--soco-gradient); color: #fff; }
+.modern-shell .feed-comment-bubble { border-radius: 17px; background: #f2f5fc; color: var(--soco-text); }
+.modern-shell .profile-view > section:not(.profile-hero),
+.modern-shell .profile-view > div:not(.profile-hero) { color: var(--soco-text); }
+.modern-shell .profile-field input,
+.modern-shell .profile-view select { border: 1px solid #e0e6f4; border-radius: 13px; color: #273a62; background: #f8faff; }
+.modern-shell .profile-view button:not(.danger-action) { border-radius: 13px; }
+.modern-shell .notification-appbar { color: var(--soco-blue); }
+.modern-shell .notice.toast { border-radius: 15px; box-shadow: 0 12px 38px rgba(31,54,108,.15); }
+.modern-shell .push-onboarding { color: var(--soco-text); }
+.modern-shell .push-onboarding-actions button { border-radius: 12px; }
+
+/* Secure calls are rendered in separate fixed fullscreen layers */
+.incoming-call-layer {
+  background:
+    radial-gradient(circle at 22% 8%, rgba(20,184,166,.16), transparent 36%),
+    radial-gradient(circle at 70% 26%, rgba(139,92,246,.25), transparent 42%),
+    linear-gradient(165deg, #0f1735 0%, #050a1c 100%);
+}
+.incoming-call-card { border: 1px solid rgba(212,219,255,.18); background: rgba(255,255,255,.065); }
+.incoming-call-orb {
+  border-radius: 30px;
+  background: var(--soco-gradient);
+  box-shadow: 0 0 0 12px rgba(89,105,235,.085), 0 20px 50px rgba(44,90,227,.28);
+}
+.secure-call-layer { background: #080e25; }
+.secure-call-topbar { border-bottom-color: rgba(167,182,247,.12); background: linear-gradient(180deg, #111a38 0%, #0f172b 100%); }
+.secure-call-grid { background: radial-gradient(circle at 50% 5%, #162752, #070d23 74%); }
+.call-participant-tile { border: 1px solid rgba(158,176,248,.14); border-radius: 22px; background: linear-gradient(145deg, #192445, #101a36); }
+.call-avatar-fallback span { background: var(--soco-gradient); }
+.secure-call-controls { border-top-color: rgba(163,174,231,.14); background: #0d152e; }
+.secure-call-controls button.is-on svg { background: var(--soco-gradient); }
+.secure-call-controls .hangup-button svg { background: #ee4658; }
+.call-header-actions button { color: var(--soco-blue); background: #eef3ff; }
+.call-header-actions button:hover { background: #e4ebff; }
+
+/* Explicit mobile fixes for narrow headers, safe area and modal usable space */
+@media (max-width: 760px) {
+  .modern-shell .chatnet-appbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "brand actions" "search search";
+    column-gap: 6px;
+    row-gap: 8px;
+    min-height: 108px;
+    padding:
+      max(10px, env(safe-area-inset-top))
+      max(13px, env(safe-area-inset-right))
+      11px
+      max(13px, env(safe-area-inset-left));
+  }
+  .modern-shell .appbar-brand { grid-area: brand; min-width: 0; }
+  .modern-shell .appbar-brand strong { display: inline-block; font-size: 22px; }
+  .modern-shell .appbar-actions { grid-area: actions; }
+  .modern-shell .appbar-search { grid-area: search; width: 100%; min-height: 41px; height: 41px; margin: 0; padding: 0 12px; }
+  .modern-shell .appbar-icon-button { width: 41px; height: 41px; }
+  .modern-shell .conversation-open > .bottom-navigation { display: none; }
+  .modern-shell .nearby-explorer { padding: 14px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left)); }
+  .modern-shell .nearby-heading { flex-wrap: wrap; gap: 8px; }
+  .modern-shell .nearby-toolbar { min-width: 0; flex-wrap: wrap; }
+  .modern-shell .nearby-search { flex-basis: min(100%, 230px); }
+  .modern-shell .nearby-radius-field { max-width: 120px; }
+  .modern-shell .nearby-mode { gap: 17px; }
+  .modern-shell .nearby-categories { flex-shrink: 0; }
+  .modern-shell .group-settings-panel { max-height: 52dvh; overflow-y: auto; overscroll-behavior: contain; }
+  .modern-shell .shared-content-sheet { width: 100%; max-height: 82dvh; border-radius: 24px 24px 0 0; }
+  .modern-shell .connection-dialog { width: min(100%, calc(100vw - 22px)); padding: 18px; border-radius: 23px; }
+  .modern-shell .message-context-backdrop { align-items: end; padding: 11px 9px max(12px, env(safe-area-inset-bottom)); }
+  .modern-shell .message-context-sheet { width: 100%; max-height: 82dvh; overflow-y: auto; border-radius: 24px; }
+  .modern-shell .message-context-actions { gap: 5px; }
+  .modern-shell .message-context-actions button { min-height: 69px; padding: 6px 2px; }
+  .modern-shell .media-composer { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .secure-call-controls { overflow-x: auto; justify-content: space-around; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+}
+@media (max-width: 380px) {
+  .modern-shell .appbar-brand strong { font-size: 21px; }
+  .modern-shell .chat-head .room-info strong { font-size: 13px; }
+  .modern-shell .message-context-actions button b { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .incoming-call-orb { animation: none; }
+}

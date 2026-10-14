@@ -1,9 +1,9 @@
-/* iOS glass surfaces with NVIDIA-inspired green brand accents. */
+/* iOS glass surfaces with SOCO blue-violet brand accents. */
 
 :root {
-  --chatnet-accent: #76b900;
-  --chatnet-accent-ink: #4c7800;
-  --chatnet-accent-soft: #eef5e2;
+  --chatnet-accent: #2563eb;
+  --chatnet-accent-ink: #2859d8;
+  --chatnet-accent-soft: #eff4ff;
   --chatnet-text: #15171a;
   --chatnet-muted: #656a61;
   --chatnet-line: #e6e7e9;
@@ -106,7 +106,7 @@
   display: grid;
   place-items: center;
   padding: 0 5px;
-  border: 2px solid #4c7800;
+  border: 2px solid #2859d8;
   border-radius: 999px;
   background: #ff4f55;
   color: #fff;
@@ -255,8 +255,8 @@
   width: 52px;
   height: 52px;
   flex-basis: 52px;
-  background: linear-gradient(150deg, #e7f2ff, #eef5e2);
-  color: #4c7800;
+  background: linear-gradient(150deg, #e7f2ff, #eff4ff);
+  color: #2859d8;
   font-size: 18px;
 }
 
@@ -344,7 +344,7 @@
   padding: 7px 11px;
   border: 0;
   border-radius: 11px;
-  background: #76b900;
+  background: #2563eb;
   color: #172700;
   font: inherit;
   font-size: 11px;
@@ -585,7 +585,7 @@
   min-height: 44px;
   border: 0;
   border-radius: 14px;
-  background: #76b900;
+  background: #2563eb;
   color: #172700;
   font-weight: 600;
   cursor: pointer;
@@ -819,7 +819,7 @@
   padding: 10px 16px;
   border: 0;
   border-radius: 14px;
-  background: #76b900;
+  background: #2563eb;
   color: #172700;
   font: inherit;
   font-weight: 600;
@@ -919,7 +919,7 @@
   place-items: center;
   border-radius: 13px;
   background: #eaf5ff;
-  color: #4c7800;
+  color: #2859d8;
   font-size: 22px;
 }
 
@@ -1023,7 +1023,7 @@
   place-items: center;
   overflow: hidden;
   border-radius: 10px;
-  background: linear-gradient(160deg, #4c7800, #4c7800);
+  background: linear-gradient(160deg, #2859d8, #2859d8);
   font-size: 34px;
   font-weight: 800;
 }
@@ -1047,7 +1047,7 @@
 }
 
 .self-story {
-  background: linear-gradient(160deg, #d5dfc5, #4c7800);
+  background: linear-gradient(160deg, #d5dfc5, #2859d8);
 }
 
 .story-camera,
@@ -1063,7 +1063,7 @@
   place-items: center;
   border: 3px solid #fff;
   border-radius: 50%;
-  background: linear-gradient(135deg, #4c7800, #7156ea);
+  background: linear-gradient(135deg, #2859d8, #7156ea);
   color: #fff;
   font-size: 13px;
 }
@@ -1310,8 +1310,8 @@
 
 .composer-shortcuts button:nth-child(1) svg { color: #3cad70; }
 .composer-shortcuts button:nth-child(2) svg { color: #dc34bd; }
-.composer-shortcuts button:nth-child(3) svg { color: #4c7800; }
-.composer-shortcuts button:nth-child(4) svg { color: #4c7800; }
+.composer-shortcuts button:nth-child(3) svg { color: #2859d8; }
+.composer-shortcuts button:nth-child(4) svg { color: #2859d8; }
 
 .feed-submit {
   justify-self: end;
@@ -1320,7 +1320,7 @@
   border: 0;
   border-radius: 9px;
   padding: 0 11px;
-  background: #4c7800;
+  background: #2859d8;
   color: #fff;
   font-weight: 700;
 }
@@ -1356,7 +1356,7 @@
 }
 
 .zalo-post .post-author strong {
-  color: #4c7800;
+  color: #2859d8;
   font-size: 15px;
 }
 
@@ -1439,7 +1439,7 @@
   place-items: center;
   border: 3px solid #fff;
   border-radius: 50%;
-  background: linear-gradient(145deg, #4c7800, #4c7800);
+  background: linear-gradient(145deg, #2859d8, #2859d8);
   color: #fff;
   font-size: 28px;
   font-weight: 900;
@@ -1530,7 +1530,7 @@
 }
 
 .switch-button.on {
-  background: #4c7800;
+  background: #2859d8;
 }
 
 .switch-button.on span {
@@ -1543,7 +1543,7 @@
   border-radius: 9px;
   padding: 0 13px;
   background: #e8f4ff;
-  color: #4c7800;
+  color: #2859d8;
   font-weight: 700;
 }
 
@@ -1779,8 +1779,8 @@
 }
 
 .locale-option.active {
-  border-color: rgba(118,185,0,.44);
-  background: rgba(118,185,0,.13);
+  border-color: rgba(37,99,235,.44);
+  background: rgba(37,99,235,.13);
 }
 
 .locale-option-flag {
@@ -1837,7 +1837,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(118,185,0,.18);
+  background: rgba(37,99,235,.18);
   color: #a8d56a;
   font-size: 10px;
   font-style: normal;
@@ -1863,7 +1863,7 @@
   border: 0;
   border-bottom: 1px solid #edf0f2;
   background: #fff;
-  color: #4c7800;
+  color: #2859d8;
   font-weight: 700;
 }
 
@@ -1894,7 +1894,7 @@
 }
 
 .bottom-navigation > button.active {
-  color: #4c7800;
+  color: #2859d8;
 }
 
 .nav-icon {
@@ -2063,7 +2063,7 @@
   display: grid;
   place-items: center;
   flex: 0 0 42px;
-  color: #4c7800;
+  color: #2859d8;
 }
 
 .feed-pending-media {
@@ -2110,7 +2110,7 @@
   position: relative;
   isolation: isolate;
   overflow: visible;
-  background: linear-gradient(145deg, #4c7800, #6157e8);
+  background: linear-gradient(145deg, #2859d8, #6157e8);
   color: #fff;
   box-shadow: 0 7px 18px rgba(44, 98, 180, .18);
 }
@@ -2163,17 +2163,17 @@
   pointer-events: none;
 }
 
-.avatar-tone-0 { background: linear-gradient(145deg, #4c7800, #4c7800); }
+.avatar-tone-0 { background: linear-gradient(145deg, #2859d8, #2859d8); }
 .avatar-tone-1 { background: linear-gradient(145deg, #6d65ef, #a850d5); }
-.avatar-tone-2 { background: linear-gradient(145deg, #18ad91, #4c7800); }
+.avatar-tone-2 { background: linear-gradient(145deg, #18ad91, #2859d8); }
 .avatar-tone-3 { background: linear-gradient(145deg, #f2984a, #df5b79); }
 .avatar-tone-4 { background: linear-gradient(145deg, #6ba85b, #1f887c); }
 .avatar-tone-5 { background: linear-gradient(145deg, #e06f9a, #8a62dc); }
 .avatar-tone-6 { background: linear-gradient(145deg, #df8051, #ba4d58); }
-.avatar-tone-7 { background: linear-gradient(145deg, #4c7800, #4c7800); }
+.avatar-tone-7 { background: linear-gradient(145deg, #2859d8, #2859d8); }
 
 .smart-avatar.group {
-  background: linear-gradient(145deg, #4c7800, #8e58de);
+  background: linear-gradient(145deg, #2859d8, #8e58de);
 }
 
 .smart-avatar .presence-dot {
@@ -2402,7 +2402,7 @@
   flex-basis: 44px;
   border-radius: 50%;
   background: transparent;
-  color: #4c7800;
+  color: #2859d8;
 }
 
 .attach-button:hover {
@@ -2764,7 +2764,7 @@
 }
 
 .profile-edit-field input:focus {
-  border-color: #4c7800;
+  border-color: #2859d8;
   background: #fff;
   box-shadow: none;
 }
@@ -2786,7 +2786,7 @@
 }
 
 .profile-username-input:focus-within {
-  border-color: #4c7800;
+  border-color: #2859d8;
   background: #fff;
   box-shadow: none;
 }
@@ -3285,7 +3285,7 @@ body { background: #e9ecef; }
 .bottom-navigation > button { border-radius: 18px; }
 .bottom-navigation > button.active {
   color: var(--chatnet-accent-ink);
-  background: rgba(118, 185, 0, .12);
+  background: rgba(37, 99, 235, .12);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
 }
 .bottom-navigation {
@@ -3586,7 +3586,7 @@ select:focus-visible {
   padding: 7px 10px;
   border-left: 3px solid var(--chatnet-accent);
   border-radius: 10px;
-  background: rgba(118, 185, 0, .08);
+  background: rgba(37, 99, 235, .08);
   color: var(--chatnet-muted);
   font-size: 12px;
 }
@@ -4089,12 +4089,12 @@ select:focus-visible {
 .translation-hub-trigger:hover,
 .translation-hub-trigger:focus-visible {
   transform: translateY(-1px);
-  border-color: rgba(118, 185, 0, .28);
+  border-color: rgba(37, 99, 235, .28);
   box-shadow: 0 7px 20px rgba(55, 76, 42, .11);
 }
 
 .translation-hub-trigger.active {
-  border-color: rgba(118, 185, 0, .26);
+  border-color: rgba(37, 99, 235, .26);
   background:
     linear-gradient(135deg, rgba(245, 251, 237, .98), rgba(233, 245, 217, .97));
   color: #2d4315;
@@ -4109,7 +4109,7 @@ select:focus-visible {
   color: #79b91a;
   font-size: 14px;
   line-height: 1;
-  filter: drop-shadow(0 0 6px rgba(118, 185, 0, .22));
+  filter: drop-shadow(0 0 6px rgba(37, 99, 235, .22));
 }
 
 .translation-hub-trigger b,
@@ -4156,7 +4156,7 @@ select:focus-visible {
   border: 1px solid rgba(255, 255, 255, .11);
   border-radius: 19px;
   background:
-    radial-gradient(circle at top right, rgba(118, 185, 0, .14), transparent 36%),
+    radial-gradient(circle at top right, rgba(37, 99, 235, .14), transparent 36%),
     rgba(24, 31, 29, .96);
   color: #f6f8f5;
   box-shadow: 0 22px 60px rgba(13, 19, 17, .3);
@@ -4220,7 +4220,7 @@ select:focus-visible {
 }
 
 .translation-hub-switch.active {
-  background: #76b900;
+  background: #2563eb;
 }
 
 .translation-hub-switch.active > span {
@@ -4341,8 +4341,8 @@ select:focus-visible {
 }
 
 .translation-language-list > button.active {
-  border-color: rgba(118, 185, 0, .42);
-  background: rgba(118, 185, 0, .12);
+  border-color: rgba(37, 99, 235, .42);
+  background: rgba(37, 99, 235, .12);
 }
 
 .translation-language-flag {
@@ -4400,7 +4400,7 @@ select:focus-visible {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: rgba(118, 185, 0, .18);
+  background: rgba(37, 99, 235, .18);
   color: #a8d56a;
   font-size: 10px;
   font-style: normal;
@@ -4449,7 +4449,7 @@ select:focus-visible {
 }
 
 .translation-flip-pill.translated {
-  border-color: rgba(118, 185, 0, .17);
+  border-color: rgba(37, 99, 235, .17);
   background: rgba(244, 250, 236, .88);
 }
 

@@ -637,8 +637,8 @@ export default function App() {
     if (!session?.user.username) return
     const url = connectUrl(session.user.username)
     const shareData = {
-      title: `Kết nối với @${session.user.username} trên ChatNet`,
-      text: `Kết nối với ${session.user.displayName || '@' + session.user.username} trên ChatNet`,
+      title: `Kết nối với @${session.user.username} trên SOCO`,
+      text: `Kết nối với ${session.user.displayName || '@' + session.user.username} trên SOCO`,
       url,
     }
     try {
@@ -647,7 +647,7 @@ export default function App() {
         return
       }
       await navigator.clipboard.writeText(url)
-      setNotice('Đã sao chép link hồ sơ ChatNet.', 'success')
+      setNotice('Đã sao chép link hồ sơ SOCO.', 'success')
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
       setNotice('Không thể chia sẻ hồ sơ trên thiết bị này.', 'error')
@@ -658,7 +658,7 @@ export default function App() {
     if (!session?.user.username) return
     try {
       await navigator.clipboard.writeText(connectUrl(session.user.username))
-      setNotice('Đã sao chép link kết nối ChatNet.', 'success')
+      setNotice('Đã sao chép link kết nối SOCO.', 'success')
     } catch {
       setNotice('Không sao chép được link trên trình duyệt này.', 'error')
     }
@@ -785,7 +785,7 @@ export default function App() {
     const handleInstalled = () => {
       setInstallPrompt(null)
       setIsStandalone(true)
-      setNotice('ChatNet đã được cài vào thiết bị')
+      setNotice('SOCO đã được cài vào thiết bị')
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall)
@@ -1559,7 +1559,7 @@ export default function App() {
 
     const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
     if (isiOS && !isStandalone && !pushEnabled) {
-      setNotice('Trên iPhone: thêm ChatNet vào Màn hình chính trước, rồi mở app và bật thông báo.')
+      setNotice('Trên iPhone: thêm SOCO vào Màn hình chính trước, rồi mở app và bật thông báo.')
       return
     }
 
@@ -1575,7 +1575,7 @@ export default function App() {
 
       if (state.permission === 'denied') {
         setNotice(
-          'Thông báo đang bị chặn. Hãy mở cài đặt của trình duyệt/PWA → Notifications → Allow rồi quay lại ChatNet.',
+          'Thông báo đang bị chặn. Hãy mở cài đặt của trình duyệt/PWA → Notifications → Allow rồi quay lại SOCO.',
         )
       } else if (state.permission === 'unsupported') {
         setNotice('Thiết bị hoặc trình duyệt này chưa hỗ trợ Web Push.')
@@ -1584,9 +1584,9 @@ export default function App() {
           'Chưa bật được thông báo. Vui lòng thử lại và chọn Cho phép.',
         )
       } else if (state.optedIn) {
-        setNotice('Đã bật thông báo ChatNet.')
+        setNotice('Đã bật thông báo SOCO.')
       } else {
-        setNotice('Đã tắt thông báo ChatNet')
+        setNotice('Đã tắt thông báo SOCO')
       }
     } catch {
       setNotice('Không thể bật thông báo. Kiểm tra quyền Notification của trình duyệt/PWA rồi thử lại.')

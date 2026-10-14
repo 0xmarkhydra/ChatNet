@@ -1,4 +1,4 @@
-export const UI_BUNDLE_VERSION = '2026-10-04.1'
+export const UI_BUNDLE_VERSION = '2026-10-14.1'
 
 export const UI_MESSAGES = {
   'nav.chat': 'Tin nhắn',
@@ -15,7 +15,7 @@ export const UI_MESSAGES = {
   'common.loading': 'Đang tải...',
   'common.test': 'Test',
 
-  'profile.tagline': 'Kết nối không biên giới',
+  'profile.tagline': 'Understand. Connect. Together.',
   'profile.addCover': 'Thêm ảnh bìa',
   'profile.changeCover': 'Đổi ảnh bìa',
   'profile.changeAvatar': 'Đổi ảnh đại diện',
@@ -36,11 +36,11 @@ export const UI_MESSAGES = {
   'profile.translationLanguageHint': 'Giữ nguyên sau khi F5/mở lại app',
   'profile.appLanguage': 'Ngôn ngữ ứng dụng',
   'profile.appLanguageHint': 'Tự động theo thiết bị hoặc chọn ngôn ngữ riêng',
-  'profile.install': 'Cài ChatNet vào điện thoại',
+  'profile.install': 'Cài SOCO vào điện thoại',
   'profile.logout': 'Đăng xuất',
 
   'locale.title': 'Ngôn ngữ ứng dụng',
-  'locale.subtitle': 'Giao diện ChatNet sẽ dùng ngôn ngữ này',
+  'locale.subtitle': 'Giao diện SOCO sẽ dùng ngôn ngữ này',
   'locale.device': 'Theo ngôn ngữ thiết bị',
   'locale.deviceHint': 'Tự nhận diện ngôn ngữ của điện thoại hoặc trình duyệt',
   'locale.searchPlaceholder': 'Tìm ngôn ngữ, quốc gia hoặc mã...',
