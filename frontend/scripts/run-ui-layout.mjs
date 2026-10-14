@@ -258,6 +258,7 @@ try {
     'Bulky active navigation highlight was not removed')
   check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 15, 'Feed first page must have 15 posts')
   await page.getByRole('button', { name: 'Tải thêm bài viết' }).click()
+  await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 18, null, { timeout: 6000 })
   check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 18,
     'Feed load more did not append the remaining 3 posts')
   check(await page.getByRole('button', { name: 'Tải thêm bài viết' }).count() === 0,
