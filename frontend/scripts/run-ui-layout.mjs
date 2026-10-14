@@ -272,6 +272,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.message-press-target').length === 40, null, { timeout: 6000 })
   check(await page.locator('.message-press-target').count() === 40, 'Initial message page must show 40 items')
   const oldList = page.locator('.messages')
+  await page.getByRole('button', { name: 'Tải thêm tin nhắn cũ' }).scrollIntoViewIfNeeded()
   const beforePosition = await oldList.evaluate(node => ({ scrollTop: node.scrollTop, height: node.scrollHeight }))
   await page.getByRole('button', { name: 'Tải thêm tin nhắn cũ' }).click()
   await page.waitForFunction(() => document.querySelectorAll('.message-press-target').length === 45, null, { timeout: 6000 })
@@ -279,7 +280,7 @@ try {
   const afterPosition = await oldList.evaluate(node => ({ scrollTop: node.scrollTop, height: node.scrollHeight }))
   check(Math.abs((afterPosition.scrollTop - beforePosition.scrollTop) -
     (afterPosition.height - beforePosition.height)) < 10,
-    'Loading older messages must preserve the visible scroll position')
+    'Loading older messages must preserve the visible scroll position: ' + JSON.stringify({ beforePosition, afterPosition }))
   check(await page.getByRole('button', { name: 'Tải thêm tin nhắn cũ' }).count() === 0,
     'Message pagination must stop when history is exhausted')
 
