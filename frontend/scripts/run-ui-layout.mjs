@@ -79,6 +79,13 @@ try {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
     if (path === '/api/events') return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: ': connected\n\n' })
     if (path === '/api/conversations') return json(pagedConversations.slice(offset, offset + limit))
+    if (/^\/api\/conversations\/\d+\/members$/.test(path)) return json([
+      { id: 1, username: 'soco_user', displayName: 'SOCO Test User', role: 'owner', online: true },
+      ...Array.from({ length: 8 }, (_, index) => ({
+        id: index + 2, username: 'member_' + (index + 2),
+        displayName: 'Thành viên ' + (index + 2), role: index === 0 ? 'admin' : 'member', online: index % 2 === 0,
+      })),
+    ])
     if (path.endsWith('/messages')) return json(
       pagedMessages.filter(message => !before || message.id < before).slice(-limit),
     )
@@ -283,6 +290,59 @@ try {
     'Loading older messages must preserve the visible scroll position: ' + JSON.stringify({ beforePosition, afterPosition }))
   check(await page.getByRole('button', { name: 'Tải thêm tin nhắn cũ' }).count() === 0,
     'Message pagination must stop when history is exhausted')
+
+  // Regression: group management is a dedicated iPhone screen, not a 52vh panel
+  // squeezing chat messages/composer into the remaining half.
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  for (const width of [320, 375, 390, 430]) {
+    await page.setViewportSize({ width, height: width <= 375 ? 667 : width === 390 ? 844 : 932 })
+    await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
+    await page.locator('.conversation-item').filter({ hasText: 'Nhóm SOCO' }).first().click()
+    const headerAction = await page.locator('.chat-head .call-header-actions button').first().boundingBox()
+    const backAction = await page.getByRole('button', { name: 'Quay lại danh sách' }).boundingBox()
+    check(headerAction && backAction && headerAction.width > 25 && headerAction.x >= 0 &&
+      headerAction.x + headerAction.width <= width && headerAction.y >= backAction.y + backAction.height - 1,
+      'Group header actions must be visible below the back/name row: ' + JSON.stringify({ width, headerAction, backAction }))
+    if (width === 320 || width === 390)
+      await page.screenshot({ path: 'output/playwright/layout/group-chat-header-' + width + '.png' })
+    await page.locator('.chat-head .group-settings-toggle:not(.shared-content-trigger)').click()
+    const group = page.locator('.group-settings-panel')
+    await group.waitFor()
+    await group.getByText('Bạn là chủ nhóm').waitFor()
+    const geometry = await group.evaluate(node => {
+      const panel = node.getBoundingClientRect()
+      const frame = node.closest('.conversation-panel').getBoundingClientRect()
+      const header = node.querySelector('.group-settings-heading').getBoundingClientRect()
+      return {
+        panelHeight: panel.height, frameHeight: frame.height,
+        panelTop: panel.top, frameTop: frame.top,
+        scrollHeight: node.scrollHeight, clientHeight: node.clientHeight,
+        headerTop: header.top, viewport: innerHeight,
+      }
+    })
+    check(Math.abs(geometry.panelHeight - geometry.frameHeight) < 3 && Math.abs(geometry.panelTop - geometry.frameTop) < 3,
+      'Group management must fill the entire chat region: ' + JSON.stringify({ width, geometry }))
+    check(geometry.scrollHeight > geometry.clientHeight, 'Long member lists must scroll independently: ' + width)
+    check(await page.locator('.conversation-panel > .messages').isVisible() === false,
+      'Chat messages must not render behind group management: ' + width)
+    check(await page.locator('.conversation-panel > .media-composer').isVisible() === false,
+      'Composer must not render behind group management: ' + width)
+    await group.evaluate(node => { node.scrollTop = node.scrollHeight })
+    await page.waitForTimeout(80)
+    const sticky = await group.evaluate(node => {
+      const panel = node.getBoundingClientRect()
+      const header = node.querySelector('.group-settings-heading').getBoundingClientRect()
+      return { top: header.top, panelTop: panel.top }
+    })
+    check(Math.abs(sticky.top - sticky.panelTop) < 3, 'Group header must remain sticky while scrolling: ' + width)
+    await group.evaluate(node => { node.scrollTop = 0 })
+    if (width === 390) await page.screenshot({ path: 'output/playwright/layout/group-settings-390.png' })
+    await group.getByRole('button', { name: 'Quay lại cuộc trò chuyện' }).click()
+    check(await page.locator('.group-settings-panel').count() === 0 && await page.locator('.messages').isVisible(),
+      'Closing group management must restore messages: ' + width)
+    check(await page.locator('.media-composer').isVisible(), 'Closing group management must restore the composer: ' + width)
+    await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  }
 
   check(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
   console.log('PASS: SOCO layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')

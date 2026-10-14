@@ -3416,7 +3416,9 @@ export default function App() {
               </div>
             </aside>
 
-            <section className="conversation-panel">
+            <section className={activeConversation?.type === 'group'
+              ? `conversation-panel group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}`
+              : 'conversation-panel'}>
               {!activeConversation ? (
                 <div className="conversation-empty">
                   <SocoEmptyState kind="chat" title="Kết nối không biên giới"
@@ -3613,7 +3615,7 @@ export default function App() {
                   )}
 
                   {groupSettingsOpen && activeConversation.type === 'group' && (
-                    <section className="group-settings-panel" aria-label="Quản lý nhóm">
+                    <section className="group-settings-panel" role="region" aria-label="Quản lý nhóm">
                       <div className="group-settings-heading">
                         <div>
                           <strong>Quản lý nhóm</strong>
@@ -3627,7 +3629,9 @@ export default function App() {
                               : 'Đang tải quyền...'}
                           </small>
                         </div>
-                        <button type="button" onClick={() => setGroupSettingsOpen(false)} aria-label="Đóng quản lý nhóm">×</button>
+                        <button type="button" onClick={() => setGroupSettingsOpen(false)} aria-label="Quay lại cuộc trò chuyện">
+                          <X size={21} aria-hidden="true" />
+                        </button>
                       </div>
 
                       {canManageActiveGroup && (
@@ -3715,6 +3719,10 @@ export default function App() {
                         </div>
                       )}
 
+                      <div className="group-members-heading">
+                        <strong>Thành viên nhóm</strong>
+                        <span>{groupMembers.length} thành viên</span>
+                      </div>
                       <div className="group-member-list">
                         {groupMembers.map((member) => (
                           <div className="group-member-row" key={member.id}>

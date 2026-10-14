@@ -497,3 +497,256 @@
     animation: none;
   }
 }
+
+/* Group management is a separate in-room screen on iPhone, NOT a half-height
+   expandable section pushing the message history and composer down. */
+@media (max-width: 760px) {
+  .modern-shell .conversation-panel.group-settings-visible {
+    position: relative;
+    isolation: isolate;
+    min-height: 0;
+    overflow: hidden;
+    background: #f7f9ff;
+  }
+
+  .modern-shell .conversation-panel.group-settings-visible > .chat-head,
+  .modern-shell .conversation-panel.group-settings-visible > .chat-friend-bar,
+  .modern-shell .conversation-panel.group-settings-visible > .messages,
+  .modern-shell .conversation-panel.group-settings-visible > .media-composer,
+  .modern-shell .conversation-panel.group-settings-visible > .group-settings-panel ~ .composer {
+    display: none;
+  }
+
+  .modern-shell .conversation-panel.group-settings-visible > .group-settings-panel {
+    position: absolute;
+    z-index: 20;
+    inset: 0;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+    padding: 0 0 max(20px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    border: 0;
+    border-radius: 0;
+    background: #f7f9ff;
+    box-shadow: none;
+    animation: soco-group-screen-in 240ms cubic-bezier(.2,.8,.2,1) both;
+  }
+
+  .modern-shell .group-settings-heading {
+    position: sticky;
+    z-index: 2;
+    top: 0;
+    box-sizing: border-box;
+    min-height: 78px;
+    margin: 0 0 15px;
+    padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+    background: rgba(255,255,255,.96);
+    border-bottom: 1px solid #e7ecf8;
+    box-shadow: 0 3px 18px rgba(37,60,113,.035);
+    backdrop-filter: saturate(160%) blur(18px);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+  }
+  .modern-shell .group-settings-heading strong {
+    color: #172646;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -.5px;
+  }
+  .modern-shell .group-settings-heading small {
+    margin-top: 5px;
+    color: #70809d;
+    font-size: 12px;
+  }
+  .modern-shell .group-settings-heading > button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #e6edfa;
+    border-radius: 14px;
+    background: #f1f5ff;
+    color: #3a5dca;
+    cursor: pointer;
+  }
+  .modern-shell .group-admin-tools,
+  .modern-shell .group-member-list,
+  .modern-shell .group-members-heading {
+    box-sizing: border-box;
+    min-width: 0;
+    margin-inline: 14px;
+  }
+  .modern-shell .group-admin-tools { gap: 12px; margin-bottom: 25px; }
+  .modern-shell .group-tool-row { min-width: 0; gap: 9px; }
+  .modern-shell .group-tool-row input {
+    width: 0;
+    min-width: 0;
+    min-height: 46px;
+    flex: 1 1 auto;
+    padding: 11px 12px;
+    border-radius: 15px;
+    font-size: 16px;
+  }
+  .modern-shell .group-tool-row button {
+    flex: 0 0 auto;
+    min-height: 46px;
+    padding: 9px 13px;
+    border-radius: 14px;
+    font-size: 13px;
+  }
+  .modern-shell .group-tool-row button:disabled { opacity: .48; }
+  .modern-shell .group-invite-friends {
+    min-width: 0;
+    gap: 10px;
+    padding: 14px 12px;
+    border: 1px solid #e3eafb;
+    border-radius: 19px;
+    background: #fff;
+    box-shadow: 0 4px 24px rgba(36,58,113,.035);
+  }
+  .modern-shell .group-invite-title {
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 5px 10px;
+  }
+  .modern-shell .group-invite-title strong { font-size: 14px; color: #172646; }
+  .modern-shell .group-invite-title span { font-size: 11px; color: #7886a0; }
+  .modern-shell .group-invite-search {
+    min-width: 0;
+    min-height: 45px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: #f6f8ff;
+    font-size: 16px;
+  }
+  .modern-shell .group-invite-list {
+    min-height: 0;
+    max-height: 220px;
+    gap: 4px;
+    overscroll-behavior: contain;
+  }
+  .modern-shell .group-invite-friend {
+    min-width: 0;
+    min-height: 57px;
+    padding: 7px 5px;
+    border-radius: 13px;
+  }
+  .modern-shell .group-invite-friend strong { font-size: 13px; }
+  .modern-shell .group-invite-friend small { font-size: 11px; }
+  .modern-shell .group-invite-check { width: 25px; height: 25px; flex-basis: 25px; }
+  .modern-shell .group-members-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 2px 10px;
+    color: #172646;
+  }
+  .modern-shell .group-members-heading strong { font-size: 15px; }
+  .modern-shell .group-members-heading span { font-size: 12px; color: #74829a; }
+  .modern-shell .group-member-list {
+    gap: 7px;
+    padding: 5px 9px;
+    border: 1px solid #e4eaf8;
+    border-radius: 19px;
+    background: #fff;
+  }
+  .modern-shell .group-member-row {
+    box-sizing: border-box;
+    min-width: 0;
+    gap: 9px;
+    padding: 11px 6px;
+    border-radius: 12px;
+    border-bottom: 1px solid #eff2f9;
+  }
+  .modern-shell .group-member-row:last-child { border-bottom: 0; }
+  .modern-shell .group-member-avatar {
+    flex-shrink: 0;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    border-radius: 14px;
+  }
+  .modern-shell .group-member-copy { min-width: 0; }
+  .modern-shell .group-member-copy strong { font-size: 13px; }
+  .modern-shell .group-member-copy span { font-size: 11px; }
+  .modern-shell .group-member-actions {
+    padding-left: 0;
+    gap: 6px;
+  }
+  .modern-shell .group-member-actions button {
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 11px;
+  }
+}
+
+@keyframes soco-group-screen-in {
+  from { opacity: .6; transform: translate3d(12px,0,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell .conversation-panel.group-settings-visible > .group-settings-panel {
+    animation: none;
+  }
+}
+
+/* Group rooms have more actions than a direct chat: keep the back target clear
+   by separating identity and actions instead of squeezing both into 320px. */
+@media (max-width: 760px) {
+  .modern-shell .group-chat-panel:not(.group-settings-visible) > .chat-head {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 0;
+    padding-bottom: 6px;
+    min-height: 0;
+    height: auto;
+  }
+  .modern-shell .group-chat-panel .chat-head > .room-info {
+    box-sizing: border-box;
+    width: 100%;
+    flex: 1 1 100%;
+    min-height: 43px;
+    padding-inline: 3px;
+  }
+  .modern-shell .group-chat-panel .chat-head .room-info > div:last-child { flex: 1; }
+  .modern-shell .group-chat-panel .chat-head .room-info strong {
+    max-width: none;
+    font-size: 15px;
+  }
+  .modern-shell .group-chat-panel .chat-head .mobile-back {
+    position: relative;
+    z-index: 3;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    margin-left: 0;
+  }
+  .modern-shell .group-chat-panel .chat-head > .translate-controls {
+    box-sizing: border-box;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 1px 3px 3px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modern-shell .group-chat-panel .chat-head > .translate-controls::-webkit-scrollbar { display: none; }
+  .modern-shell .group-chat-panel .chat-head > .translate-controls > * { flex-shrink: 0; }
+}

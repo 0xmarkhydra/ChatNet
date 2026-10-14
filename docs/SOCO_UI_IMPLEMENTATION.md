@@ -141,3 +141,19 @@ Requested on production screenshot:
 - The Playwright UI suite now mocks 18 feed posts, 30 conversations and 45 chat messages and verifies page appending, no remaining button at the end, active tab styling, layout and scroll preservation.
 
 QA scope: automated checks use Chromium and mocked API responses. Production DB pagination and real iPhone scroll behavior still need a real-user or staging-device check. Do not claim infinite scroll; this intentionally uses explicit load-more buttons.
+
+## iPhone group management layout correction — 2026-10-15
+
+Production screenshot revealed group settings rendered as an inline section limited to
+approximately 48–52dvh, with truncated member management and chat bubbles/composer
+visible underneath. Fixed as a **dedicated group management view** on mobile:
+
+- The group settings content occupies the full chat panel height below the iOS app safe area, with an independent scroll container and sticky management header.
+- While open, the conversation header, messages and composer are hidden; closing instantly restores the existing conversation state.
+- Rename, invite, role management, remove/leave group APIs are unchanged.
+- On group chats, the overloaded top action bar is a deliberate two-row layout on mobile. Back/name stays unobstructed; call, video, shared files, group and translation controls remain accessible on the second row.
+- Member rows, invite search (16px input prevents iPhone zoom), button targets, wrapping and safe-area spacing are tuned for narrow phones.
+- Playwright now checks group settings at 320, 375, 390 and 430 px, including panel bounds, independent scroll, sticky header, hidden chat/composer and restoration on close. Screenshots: `frontend/output/playwright/layout/group-settings-390.png`, `group-chat-header-{320,390}.png` (local, Git ignored).
+- Keep this regression in automated QA alongside the existing 42 viewport/screen checks and load-more tests.
+
+Live device validation is still required for keyboard, iOS Safari/PWA safe area, real membership and API responses.
