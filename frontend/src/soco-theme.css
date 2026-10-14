@@ -109,6 +109,8 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
 .conversation-sidebar { background: #fff; border-right-color: var(--soco-line); }
 .zalo-conversation-list { background: #fff; }
 .zalo-conversation-list .conversation-item {
+  box-sizing: border-box;
+  width: calc(100% - 18px); /* A full-width item plus 9px side margins otherwise overflows. */
   min-height: 78px;
   border-radius: 16px;
   margin: 3px 9px;
@@ -317,6 +319,17 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
 .zalo-post .post-toolbar button.liked { color: #e76d85; }
 .composer-shortcuts button { background: #f0f4fe; color: #3754a7; }
 .composer-shortcuts button:hover { background: #e6edff; }
+@media (max-width: 430px) {
+  /* Keep all media actions accessible without sideways scrolling or clipped pills. */
+  .modern-shell .composer-shortcuts { flex-wrap: wrap; overflow-x: visible; }
+  .modern-shell .composer-shortcuts button {
+    min-width: 0;
+    box-sizing: border-box;
+    flex: 1 1 calc(50% - 7px);
+    justify-content: center;
+    padding-inline: 6px;
+  }
+}
 .feed-submit, .auth-submit {
   border: 0;
   border-radius: 15px;

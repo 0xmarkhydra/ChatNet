@@ -6,3 +6,5 @@ frontend/dist/
 !.env.example
 .playwright-cli/
 output/playwright/
+# Local visual regression screenshots; never publish customer/test content.
+frontend/output/

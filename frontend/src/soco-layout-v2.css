@@ -308,7 +308,7 @@
   .modern-shell .zalo-post-composer { margin: 0 0 15px; }
   .modern-shell .profile-view > .soco-section-heading { padding: 19px 17px 7px; }
   .modern-shell .soco-profile-section-label { margin: 20px 17px 9px; }
-  .modern-shell .profile-hero { margin-top: 10px; }
+  .modern-shell .profile-hero { margin-top: 10px; width: calc(100% - 22px); box-sizing: border-box; }
   .modern-shell .settings-row > div { flex: 1 1 auto; }
   .modern-shell .settings-current-locale { flex: 0 1 auto; max-width: 45%; }
   .modern-shell .locale-picker-sheet { max-width: 100%; }

@@ -61,3 +61,25 @@ SOCO visual identity follows the customer brand board for review: blue `#2563EB`
 - `npm run check:pwa`, `check:session`, `check:optimistic`, `check:onesignal`: passed.
 - Local browser: unauthenticated signup screen rendered, 0 console errors.
 - **Still required**: browser/device validation of authenticated page flows and screenshots at narrow viewport sizes. Do not claim pixel-perfect 18 mockups yet.
+
+## SOCO layout stabilization — 2026-10-15
+
+The production UI regression stems from legacy grid/flex styles conflicting with the SOCO responsive layer, plus percentage-width elements with extra horizontal margins. These changes retain ChatNet business logic.
+
+Confirmed fixes:
+- Desktop profile: use a stacked page layout instead of legacy two-column grid, with independently scrollable cards.
+- Chat list: prevent 100% width plus side margins from overflowing at 320px.
+- Feed: wrap narrow-screen media actions rather than cutting off trailing buttons.
+- Mobile profile hero: account for horizontal margins in card width.
+- App Shell: contain scrolling panels and preserve fixed navigation.
+
+Repeatable regression test:
+- In the frontend folder run npm ci, then npx playwright install chromium once, followed by npm run check:ui.
+- Tests run local Vite and mocked authenticated API responses; no production user data is involved.
+- Covers Chat List, Contacts, Feed, Profile, Discover, Chat Room at 320, 375, 390, 430, 768, 1024 and 1440px (42 combinations).
+- Also checks the fixed-height friend connection sheet, language picker stability, profile stacking and uncaught runtime errors.
+- Local screenshots stay in frontend/output/playwright/layout/ (Git ignored).
+
+Caveat: these mocked UI tests do not verify live uploads, push notifications or actual voice/video calls. Production Railway deployment and real device checks require separate validation.
+
+Deployment gate: run build, PWA, session, optimistic/notification checks and UI layout checks; only merge reviewed paths into main while preserving existing uncommitted Live Project changes.
