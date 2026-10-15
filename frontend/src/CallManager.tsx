@@ -12,7 +12,7 @@ import {
 } from 'livekit-client'
 import {
   Languages, Mic, MicOff, MonitorUp, MonitorX, Phone, PhoneOff, ShieldCheck,
-  Users, Video, VideoOff, Volume2, VolumeX, X,
+  Users, Video, VideoOff, Volume2, VolumeX, X, MoreHorizontal, Sparkles, ChevronDown, Settings2,
 } from 'lucide-react'
 import {
   createCall, declineCall, endCall, getCurrentCalls, getE2EEEnvelope,
@@ -261,6 +261,11 @@ function SecureCallRoom({
   const [screenOn, setScreenOn] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
   const [translationOn, setTranslationOn] = useState(false)
+  const [translationSheetOpen, setTranslationSheetOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLDivElement>(null)
+  const [mediaPermissionError, setMediaPermissionError] = useState('')
+  const [permissionRetrying, setPermissionRetrying] = useState(false)
   const [callTargetLanguage, setCallTargetLanguage] = useState<string>(() => {
     const lang = targetLanguage.toLowerCase().split('-')[0]
     return lang === 'zh' ? 'zh-Hans' : lang === 'pt' ? 'pt-BR' : lang === 'tl' ? 'fil' : lang
@@ -301,6 +306,36 @@ function SecureCallRoom({
   }, [sourceLanguage, availableLanguages])
 
   const [ending, setEnding] = useState(false)
+
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (moreOpen) setMoreOpen(false)
+      else if (translationSheetOpen) setTranslationSheetOpen(false)
+    }
+    const closeMenuOutside = (event: PointerEvent) => {
+      if (moreOpen && event.target instanceof Node && !moreRef.current?.contains(event.target)) {
+        setMoreOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onEscape)
+    window.addEventListener('pointerdown', closeMenuOutside)
+    return () => {
+      window.removeEventListener('keydown', onEscape)
+      window.removeEventListener('pointerdown', closeMenuOutside)
+    }
+  }, [moreOpen, translationSheetOpen])
+
+  // Consent is scoped to the current call. Never carry an AI voice grant to a new room.
+  useEffect(() => {
+    setAllowMyVoice(false)
+    setRemoteConsent({})
+    setConsentRequested(false)
+    setTranslationOn(false)
+    setTranslationSheetOpen(false)
+    setMoreOpen(false)
+    setMediaPermissionError('')
+  }, [call.id])
   const lastEnvelopeGeneration = useRef('')
   const hostWrappedKeys = useRef(new Map<number, string>())
   const disposed = useRef(false)
@@ -369,11 +404,21 @@ function SecureCallRoom({
         setPhase('connected')
         setDetail('Mã hóa đầu cuối đang bật')
 
-        await room.localParticipant.setMicrophoneEnabled(true)
-        setMicOn(true)
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true)
+          setMicOn(true)
+        } catch (permissionError) {
+          setMicOn(false)
+          setMediaPermissionError(friendlyCallError(permissionError))
+        }
         if (call.mediaType === 'video') {
-          await room.localParticipant.setCameraEnabled(true)
-          setCameraOn(true)
+          try {
+            await room.localParticipant.setCameraEnabled(true)
+            setCameraOn(true)
+          } catch (permissionError) {
+            setCameraOn(false)
+            setMediaPermissionError(friendlyCallError(permissionError))
+          }
         }
         try { await room.startAudio() } catch { /* user can re-enable audio from the control */ }
 
@@ -480,13 +525,32 @@ function SecureCallRoom({
       } catch { /* Ignore unrecognized control payloads. */ }
     }
     room.on(RoomEvent.DataReceived, onData)
-    room.on(RoomEvent.ParticipantConnected, announce)
+    const onJoined = () => {
+      announce()
+      if (translationOn) {
+        void room.localParticipant.publishData(
+          new TextEncoder().encode(JSON.stringify({ type: 'request' })),
+          { reliable: true, topic: CONSENT_TOPIC },
+        ).catch(() => undefined)
+      }
+    }
+    const onLeft = (participant: Participant) => {
+      setRemoteConsent((current) => {
+        if (!Object.prototype.hasOwnProperty.call(current, participant.identity)) return current
+        const next = { ...current }
+        delete next[participant.identity]
+        return next
+      })
+    }
+    room.on(RoomEvent.ParticipantConnected, onJoined)
+    room.on(RoomEvent.ParticipantDisconnected, onLeft)
     announce()
     return () => {
       room.off(RoomEvent.DataReceived, onData)
-      room.off(RoomEvent.ParticipantConnected, announce)
+      room.off(RoomEvent.ParticipantConnected, onJoined)
+      room.off(RoomEvent.ParticipantDisconnected, onLeft)
     }
-  }, [room, allowMyVoice])
+  }, [room, allowMyVoice, translationOn])
 
   useEffect(() => {
     if (!room || !translationOn) return
@@ -507,6 +571,9 @@ function SecureCallRoom({
   )
   const remoteTrackKey = remoteTracks.map((entry) => entry.speakerId + ':' + entry.trackSid).join('|')
   const remoteConsentKey = JSON.stringify(remoteConsent)
+  const latestCaption = [...captions].reverse().find((item) => item.translated.trim())
+  const waitingConsentCount = Math.max(0, participants.length - 1 - Object.values(remoteConsent).filter(Boolean).length)
+  const statusLabel = phase === 'connected' ? 'Bảo mật' : phase === 'reconnecting' ? 'Đang nối lại' : phase === 'error' ? 'Đã ngắt' : 'Đang kết nối'
   useEffect(() => {
     let cancelled = false
     const stopAll = () => {
@@ -550,9 +617,32 @@ function SecureCallRoom({
   }, [room, translationOn, call.id, callTargetLanguage, remoteTrackKey, remoteConsentKey, request, translationRetryEpoch, apiBase])
 
   useEffect(() => {
-    setAllowMyVoice(translationOn)
-    if (!translationOn) { setCaptions([]); setTranslationError('') }
+    if (!translationOn) {
+      setCaptions([])
+      setTranslationError('')
+      setTranslationSheetOpen(false)
+    }
   }, [translationOn])
+
+  async function requestCallMediaPermission() {
+    if (!room || permissionRetrying) return
+    setPermissionRetrying(true)
+    try {
+      if (!micOn) {
+        await room.localParticipant.setMicrophoneEnabled(true)
+        setMicOn(true)
+      }
+      if (call.mediaType === 'video' && !cameraOn) {
+        await room.localParticipant.setCameraEnabled(true)
+        setCameraOn(true)
+      }
+      setMediaPermissionError('')
+    } catch (err) {
+      setMediaPermissionError(friendlyCallError(err))
+    } finally {
+      setPermissionRetrying(false)
+    }
+  }
 
   async function toggleMic() {
     if (!room) return
@@ -560,7 +650,7 @@ function SecureCallRoom({
       const next = !micOn
       await room.localParticipant.setMicrophoneEnabled(next)
       setMicOn(next)
-    } catch (err) { onError(friendlyCallError(err)) }
+    } catch (err) { setMediaPermissionError(friendlyCallError(err)) }
   }
 
   async function toggleCamera() {
@@ -569,7 +659,7 @@ function SecureCallRoom({
       const next = !cameraOn
       await room.localParticipant.setCameraEnabled(next)
       setCameraOn(next)
-    } catch (err) { onError(friendlyCallError(err)) }
+    } catch (err) { setMediaPermissionError(friendlyCallError(err)) }
   }
 
   async function toggleScreen() {
@@ -613,102 +703,217 @@ function SecureCallRoom({
     }
   }
 
+  const toggleTranslation = () => {
+    setMoreOpen(false)
+    if (translationOn) {
+      setTranslationOn(false)
+    } else {
+      setTranslationOn(true)
+      setTranslationSheetOpen(true)
+    }
+  }
+
   return (
     <div className="secure-call-layer" role="dialog" aria-modal="true" aria-label={`Cuộc gọi với ${title}`}>
       <div className="secure-call-stage">
         <header className="secure-call-topbar">
-          <div>
-            <strong>{title}</strong>
-            <span className={`call-security-state phase-${phase}`}>
-              <ShieldCheck size={14} /> {detail}
-            </span>
+          <div className="call-heading">
+            <div className="call-top-avatar" aria-hidden="true">{title.trim().slice(0, 1).toUpperCase()}</div>
+            <div className="call-heading-copy">
+              <strong>{title}</strong>
+              <span className={`call-security-state phase-${phase}`} title={detail}>
+                <ShieldCheck size={13} /> {statusLabel}
+                <span className="call-top-separator">·</span>
+                <Users size={13} /> {Math.max(1, participants.length)} người
+              </span>
+            </div>
           </div>
           <div className="secure-call-topmeta">
-            <span><Users size={15} /> {Math.max(1, participants.length)}</span>
-            <span>E2EE</span>
+            {translationOn && (
+              <button type="button" className="call-live-status" onClick={() => setTranslationSheetOpen(true)}
+                aria-label="Mở phiên dịch đang hoạt động">
+                <Sparkles size={14} /> <span>Đang dịch</span>
+              </button>
+            )}
+            <span className="call-encrypted-chip" title="Cuộc gọi được mã hóa đầu cuối">
+              <ShieldCheck size={15} /> E2EE
+            </span>
           </div>
         </header>
 
-        <div className={translationOn ? 'call-main-layout has-translation' : 'call-main-layout'}>
-          <div className={`secure-call-grid count-${Math.min(participants.length, 6)}`}>
-            {participants.length === 0 ? (
-              <div className="call-connecting-state">
-                <div className="call-secure-spinner" />
-                <ShieldCheck size={28} />
-                <strong>{phase === 'error' ? 'Không thể kết nối an toàn' : 'Đang bảo vệ cuộc gọi…'}</strong>
-                <span>{detail}</span>
+        <div className={`call-main-layout ${translationOn && translationSheetOpen ? 'has-translation' : ''}`}>
+          <section className="call-stage-media" aria-label="Người tham gia cuộc gọi">
+            <div className={`secure-call-grid count-${Math.min(participants.length, 6)}`}>
+              {participants.length === 0 ? (
+                <div className="call-connecting-state">
+                  <div className="call-secure-spinner" />
+                  <ShieldCheck size={28} />
+                  <strong>{phase === 'error' ? 'Không thể kết nối an toàn' : 'Đang kết nối cuộc gọi…'}</strong>
+                  <span>{detail}</span>
+                </div>
+              ) : participants.map((participant) => (
+                <ParticipantTile key={participant.identity} participant={participant} local={participant === room?.localParticipant} />
+              ))}
+            </div>
+            {translationOn && latestCaption && (
+              <div className="call-caption-overlay" aria-live="polite" aria-atomic="true">
+                <div className="call-caption-overlay-speaker">
+                  <Sparkles size={13} /> {identityLabel(latestCaption.speakerId)}
+                </div>
+                <strong>{latestCaption.translated}</strong>
               </div>
-            ) : participants.map((participant) => (
-              <ParticipantTile key={participant.identity} participant={participant} local={participant === room?.localParticipant} />
-            ))}
-          </div>
-          {translationOn && (
-<aside className="call-live-panel" aria-label="Phiên dịch trực tiếp">
+            )}
+            {translationOn && !translationSheetOpen && (
+              <button type="button" className="call-open-translation" onClick={() => setTranslationSheetOpen(true)}>
+                <Languages size={16} /> Đang dịch · {callTargetLanguage} <ChevronDown size={15} />
+              </button>
+            )}
+          </section>
+          {translationOn && translationSheetOpen && (
+            <aside className="call-live-panel" aria-label="Dịch trực tiếp">
+              <div className="call-sheet-grabber" aria-hidden="true" />
               <header className="call-live-heading">
-                <div><Languages size={18} /><strong>Phiên dịch trực tiếp</strong><small>AI</small></div>
-                <button type="button" aria-label="Tắt phiên dịch" onClick={() => setTranslationOn(false)}><X size={18}/></button>
+                <div className="call-live-title-icon"><Languages size={19} /></div>
+                <div className="call-live-heading-copy">
+                  <strong>Dịch trực tiếp</strong>
+                  <small>Phụ đề và giọng dịch tự động</small>
+                </div>
+                <button type="button" aria-label="Thu gọn bảng dịch" onClick={() => setTranslationSheetOpen(false)}>
+                  <ChevronDown size={20} />
+                </button>
               </header>
               <div className="call-live-settings">
-                <label>Ngôn ngữ bạn muốn nghe
-                  <select value={callTargetLanguage} onChange={(event) => setCallTargetLanguage(event.target.value)}>
+                <label htmlFor="call-translation-target">Nghe bằng ngôn ngữ</label>
+                <div className="call-language-select">
+                  <Languages size={16} />
+                  <select id="call-translation-target" value={callTargetLanguage}
+                    onChange={(event) => setCallTargetLanguage(event.target.value)}>
                     {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
-                </label>
-                <small>AI tự động dịch phụ đề và phát tiếng dịch khi người nói cho phép. Không lưu bản ghi cuộc gọi.</small>
+                  <ChevronDown size={15} />
+                </div>
+                <div className="call-translation-state">
+                  <span className={`call-translation-dot ${translatingIds.length ? 'is-live' : ''}`} />
+                  <span>{translatingIds.length
+                    ? `Đang nghe ${translatingIds.length} người`
+                    : waitingConsentCount > 0 ? 'Đang chờ người tham gia cho phép' : 'Đang kết nối phiên dịch'}</span>
+                </div>
               </div>
-              {translationError && <div className="call-live-error" role="alert">
-                <span>{translationError}</span>
-                <button type="button" onClick={() => { setTranslationError(''); setTranslationRetryEpoch((value) => value + 1) }}>Kết nối lại</button>
-              </div>}
+              {translationError && (
+                <div className="call-live-error" role="alert">
+                  <span>{translationError}</span>
+                  <button type="button" onClick={() => { setTranslationError(''); setTranslationRetryEpoch((value) => value + 1) }}>Thử lại</button>
+                </div>
+              )}
               <div className="call-live-transcript" aria-live="polite">
-                {captions.length === 0 && <div className="call-live-placeholder">
-                  <Languages size={25}/>
-                  <strong>{translatingIds.length ? 'Đang lắng nghe…' : 'Chờ kết nối phiên dịch'}</strong>
-                  <span>{Object.values(remoteConsent).some(Boolean)
-                    ? 'Khi người khác nói, phụ đề sẽ xuất hiện tại đây.'
-                    : 'Người tham gia cần đồng ý dịch giọng nói để bắt đầu.'}</span>
-                </div>}
-                {captions.map((caption) => (
+                {captions.length === 0 ? (
+                  <div className="call-live-placeholder">
+                    <span className="call-live-placeholder-icon"><Sparkles size={25} /></span>
+                    <strong>{translatingIds.length ? 'Đang lắng nghe…' : 'Dịch AI đã bật'}</strong>
+                    <span>{waitingConsentCount > 0
+                      ? 'Chờ người còn lại đồng ý dịch giọng nói trong cuộc gọi này.'
+                      : 'Phụ đề sẽ hiển thị khi mọi người bắt đầu trò chuyện.'}</span>
+                  </div>
+                ) : captions.map((caption) => (
                   <div className="call-live-entry" key={caption.id}>
-                    <strong>{identityLabel(caption.speakerId)}</strong>
+                    <div className="call-live-entry-user">
+                      <span className="call-live-entry-avatar">{identityLabel(caption.speakerId).slice(0, 2)}</span>
+                      <strong>{identityLabel(caption.speakerId)}</strong>
+                    </div>
                     {caption.original && <p className="call-live-original">{caption.original}</p>}
                     {caption.translated && <p className="call-live-translated">{caption.translated}</p>}
                   </div>
                 ))}
               </div>
-              <footer className="call-live-footnote">Chỉ dịch âm thanh của những người đã đồng ý • Tối đa 5 luồng đồng thời</footer>
+              <footer className="call-live-footnote">
+                <ShieldCheck size={14} /> Chỉ xử lý giọng nói đã được người tham gia cho phép.
+              </footer>
             </aside>
           )}
         </div>
-        {room && <RemoteAudioSinks room={room} muted={!soundOn} volume={translationOn && translatingIds.length ? 0.2 : 1} revision={revision} />}
+        {room && <RemoteAudioSinks room={room} muted={!soundOn}
+          volume={translationOn && translatingIds.length ? 0.2 : 1} revision={revision} />}
+
+        {translationOn && translationSheetOpen && (
+          <button type="button" className="call-sheet-backdrop" aria-label="Thu gọn phụ đề" onClick={() => setTranslationSheetOpen(false)} />
+        )}
+
+        {mediaPermissionError && (
+          <div className="call-permission-prompt" role="alert">
+            <div className="call-notice-icon"><Mic size={18} /></div>
+            <div className="call-notice-copy">
+              <strong>Cần quyền micro{call.mediaType === 'video' ? ' / camera' : ''}</strong>
+              <span>{mediaPermissionError} Nếu đã chặn, hãy bật quyền trong cài đặt trình duyệt.</span>
+            </div>
+            <button type="button" disabled={!room || permissionRetrying}
+              onClick={() => void requestCallMediaPermission()}>
+              {permissionRetrying ? 'Đang mở…' : 'Cấp quyền'}
+            </button>
+          </div>
+        )}
         {consentRequested && !allowMyVoice && (
-          <div className="call-translation-consent-prompt" role="status">
-            <span>Một người tham gia muốn bật AI phiên dịch giọng nói của bạn.</span>
-            <button type="button" onClick={() => { setAllowMyVoice(true); setConsentRequested(false) }}>Cho phép</button>
-            <button type="button" aria-label="Từ chối" onClick={() => setConsentRequested(false)}><X size={16}/></button>
+          <div className="call-translation-consent-prompt" role="alert">
+            <div className="call-notice-icon"><Sparkles size={18} /></div>
+            <div className="call-notice-copy">
+              <strong>Cho phép dịch giọng nói?</strong>
+              <span>Chỉ áp dụng cuộc gọi này. Âm thanh sẽ được AI xử lý sau khi bạn đồng ý.</span>
+            </div>
+            <div className="call-consent-actions">
+              <button type="button" onClick={() => { setAllowMyVoice(true); setConsentRequested(false) }}>Cho phép</button>
+              <button type="button" className="call-consent-decline" onClick={() => setConsentRequested(false)}>Để sau</button>
+            </div>
           </div>
         )}
 
         <footer className="secure-call-controls">
-          <button type="button" className={!micOn ? 'is-off' : ''} disabled={!room || ending} onClick={() => void toggleMic()}>
-            {micOn ? <Mic /> : <MicOff />}<span>{micOn ? 'Mic' : 'Tắt mic'}</span>
-          </button>
-          <button type="button" className={!cameraOn ? 'is-off' : ''} disabled={!room || ending} onClick={() => void toggleCamera()}>
-            {cameraOn ? <Video /> : <VideoOff />}<span>Camera</span>
-          </button>
-          <button type="button" className={screenOn ? 'is-on' : ''} disabled={!room || ending} onClick={() => void toggleScreen()}>
-            {screenOn ? <MonitorX /> : <MonitorUp />}<span>Chia sẻ</span>
-          </button>
-          <button type="button" className={!soundOn ? 'is-off' : ''} disabled={!room || ending} onClick={() => void toggleSound()}>
-            {soundOn ? <Volume2 /> : <VolumeX />}<span>Âm thanh</span>
-          </button>
-          <button type="button" className={translationOn ? 'is-on' : ''} disabled={!room || ending}
-            aria-pressed={translationOn} title="Dịch thoại trực tiếp"
-            onClick={() => setTranslationOn((value) => !value)}
-          ><Languages /><span>{translationOn ? 'Đang dịch' : 'Dịch AI'}</span></button>
-          <button type="button" className="hangup-button" disabled={ending} onClick={() => void closeCall(canEnd)}>
-            <PhoneOff /><span>{canEnd ? 'Kết thúc' : 'Rời'}</span>
-          </button>
+          <div className="call-primary-controls">
+            <button type="button" className={!micOn ? 'is-off' : ''} disabled={!room || ending}
+              aria-label={micOn ? 'Tắt micro' : 'Bật micro'} aria-pressed={!micOn}
+              onClick={() => void toggleMic()}>
+              {micOn ? <Mic /> : <MicOff />}<span>{micOn ? 'Mic' : 'Tắt mic'}</span>
+            </button>
+            <button type="button" className={!cameraOn ? 'is-off' : ''} disabled={!room || ending}
+              aria-label={cameraOn ? 'Tắt camera' : 'Bật camera'} aria-pressed={!cameraOn}
+              onClick={() => void toggleCamera()}>
+              {cameraOn ? <Video /> : <VideoOff />}<span>Camera</span>
+            </button>
+            <button type="button" className={translationOn ? 'is-on call-ai-action' : 'call-ai-action'}
+              disabled={!room || ending} aria-pressed={translationOn} title="Bật hoặc tắt dịch trực tiếp"
+              onClick={toggleTranslation}>
+              <Languages /><span>{translationOn ? 'Đang dịch' : 'Dịch AI'}</span>
+            </button>
+            <div className="call-more-wrapper" ref={moreRef}>
+              <button type="button" aria-label="Thêm tùy chọn cuộc gọi" aria-expanded={moreOpen}
+                disabled={!room || ending} onClick={() => setMoreOpen((value) => !value)}>
+                <MoreHorizontal /><span>Thêm</span>
+              </button>
+              {moreOpen && (
+                <div className="call-more-popover">
+                  <button type="button" onClick={() => { setMoreOpen(false); void toggleScreen() }}>
+                    {screenOn ? <MonitorX size={17} /> : <MonitorUp size={17} />} {screenOn ? 'Dừng chia sẻ màn hình' : 'Chia sẻ màn hình'}
+                  </button>
+                  <button type="button" onClick={() => { setMoreOpen(false); void toggleSound() }}>
+                    {soundOn ? <Volume2 size={17} /> : <VolumeX size={17} />} {soundOn ? 'Tắt loa' : 'Bật loa'}
+                  </button>
+                  {translationOn && (
+                    <button type="button" onClick={() => { setMoreOpen(false); setTranslationSheetOpen(true) }}>
+                      <Languages size={17} /> Mở phụ đề dịch
+                    </button>
+                  )}
+                  <button type="button" onClick={() => {
+                    setAllowMyVoice((value) => !value)
+                    setMoreOpen(false)
+                    setConsentRequested(false)
+                  }}>
+                    <Settings2 size={17} /> {allowMyVoice ? 'Thu hồi quyền AI dịch giọng nói' : 'Cho phép AI dịch giọng nói'}
+                  </button>
+                </div>
+              )}
+            </div>
+            <button type="button" className="hangup-button" disabled={ending} onClick={() => void closeCall(canEnd)}>
+              <PhoneOff /><span>{canEnd ? 'Kết thúc' : 'Rời'}</span>
+            </button>
+          </div>
         </footer>
       </div>
     </div>
@@ -768,7 +973,7 @@ function ParticipantTile({ participant, local }: { participant: Participant; loc
   const videoPublication = screen?.track ? screen : camera
   const muted = !videoPublication?.track || videoPublication.isMuted
   return (
-    <div className={`call-participant-tile ${screen?.track ? 'screen-tile' : ''}`}>
+    <div className={`call-participant-tile ${screen?.track ? 'screen-tile' : ''} ${participant.isSpeaking ? 'is-speaking' : ''}`}>
       {!muted && videoPublication?.track ? (
         <VideoTrackView publication={videoPublication} mirror={local && videoPublication.source === Track.Source.Camera} />
       ) : (
