@@ -1,4 +1,4 @@
-export const UI_BUNDLE_VERSION = '2026-10-14.1'
+export const UI_BUNDLE_VERSION = '2026-10-15.2'
 
 export const UI_MESSAGES = {
   'nav.chat': 'Tin nhắn',
@@ -29,6 +29,12 @@ export const UI_MESSAGES = {
   'profile.usernameHint': '3–32 ký tự: chữ thường, số, dấu chấm, _ hoặc -',
   'profile.notifications': 'Thông báo',
   'profile.notificationsHint': 'Cho phép bật/tắt bất cứ lúc nào',
+  'profile.messageSound': 'Âm báo tin nhắn',
+  'profile.messageSoundHint': 'Phát âm khi nhận tin mới lúc SOCO đang mở',
+  'profile.soundOn': 'Bật âm báo tin nhắn',
+  'profile.soundOff': 'Tắt âm báo tin nhắn',
+  'profile.soundPreview': 'Nghe thử',
+  'profile.soundPreviewHint': 'Âm báo ngắn, nhẹ · lưu trên thiết bị này',
   'profile.testNotification': 'Test thông báo',
   'profile.testNotificationHint': 'Bắn một push thử tới thiết bị này',
   'profile.autoTranslate': 'Tự động dịch tin nhắn',

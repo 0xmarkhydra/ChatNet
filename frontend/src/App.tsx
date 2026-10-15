@@ -2,7 +2,8 @@ import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEff
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
-import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, X, Download } from 'lucide-react'
+import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
+import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from './incomingSound'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
@@ -572,6 +573,32 @@ export default function App() {
   const [pushConfigured, setPushConfigured] = useState(false)
   const [pushAppId, setPushAppId] = useState('')
   const [pushEnabled, setPushEnabled] = useState(false)
+  const [messageSoundEnabled, setMessageSoundEnabled] = useState(readMessageSoundEnabled)
+  const messageSoundEnabledRef = useRef(messageSoundEnabled)
+  messageSoundEnabledRef.current = messageSoundEnabled
+  const messageSound = useRef<IncomingMessageSound | null>(null)
+  if (!messageSound.current) messageSound.current = new IncomingMessageSound()
+  useEffect(() => {
+    // Browsers permit sound only after an interaction. Warm up Web Audio on a
+    // real user gesture, without playing a notification just for opening SOCO.
+    const unlockAudio = () => {
+      if (messageSoundEnabledRef.current) messageSound.current?.unlock()
+    }
+    const syncPreference = (event: StorageEvent) => {
+      if (event.key !== MESSAGE_SOUND_SETTING_KEY && event.key !== null) return
+      const enabled = readMessageSoundEnabled()
+      messageSoundEnabledRef.current = enabled
+      setMessageSoundEnabled(enabled)
+    }
+    window.addEventListener('pointerdown', unlockAudio, { passive: true })
+    window.addEventListener('keydown', unlockAudio)
+    window.addEventListener('storage', syncPreference)
+    return () => {
+      window.removeEventListener('pointerdown', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
+      window.removeEventListener('storage', syncPreference)
+    }
+  }, [])
   const [pushBusy, setPushBusy] = useState(false)
   const [pushInitFailed, setPushInitFailed] = useState(false)
   const [pushPrompt, setPushPrompt] = useState(false)
@@ -1568,6 +1595,19 @@ export default function App() {
     return true
   }
 
+  async function previewMessageSound() {
+    const played = await messageSound.current?.preview()
+    if (!played) setNotice('Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SOCO.', 'warning')
+  }
+
+  function toggleMessageSound() {
+    const enabled = !messageSoundEnabledRef.current
+    messageSoundEnabledRef.current = enabled
+    setMessageSoundEnabled(enabled)
+    persistMessageSoundEnabled(enabled)
+    if (enabled) void previewMessageSound()
+  }
+
   async function togglePush() {
     if (pushBusy) return
 
@@ -2088,6 +2128,7 @@ export default function App() {
     pendingRequests.current.clear()
     mutationRequests.current.clear()
     messageReceipts.current.clear()
+    messageSound.current?.clearSeen()
     ++preferenceRevision.current
     setPendingActions(0)
     sendingRef.current = false
@@ -2230,6 +2271,9 @@ export default function App() {
 
       if (update.type === 'message' && update.message) {
         const incoming = update.message
+        // Only genuine, recent messages from other users make a sound. Loading
+        // history, updating reactions and our own sends never trigger one.
+        messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
           if (messageReceipts.current.has(incoming.clientId)) messageReceipts.current.set(incoming.clientId, incoming)
@@ -4741,6 +4785,27 @@ export default function App() {
                   aria-checked={pushEnabled}
                 ><span /></button>
               </div>
+              <div className="settings-row message-sound-row">
+                <div><strong>{t('profile.messageSound')}</strong><small>{t('profile.messageSoundHint')}</small></div>
+                <button
+                  type="button"
+                  className={`switch-button ${messageSoundEnabled ? 'on' : ''}`}
+                  onClick={toggleMessageSound}
+                  aria-label={messageSoundEnabled ? t('profile.soundOff') : t('profile.soundOn')}
+                  role="switch"
+                  aria-checked={messageSoundEnabled}
+                ><span /></button>
+              </div>
+              {messageSoundEnabled && (
+                <div className="settings-row message-sound-preview-row">
+                  <div><strong>{t('profile.soundPreview')}</strong><small>{t('profile.soundPreviewHint')}</small></div>
+                  <button type="button" className="settings-action message-sound-preview-button"
+                    onClick={() => void previewMessageSound()} aria-label={t('profile.soundPreview')}>
+                    <Volume2 size={17} aria-hidden="true" />
+                    {t('profile.soundPreview')}
+                  </button>
+                </div>
+              )}
               <div className="settings-row">
                 <div><strong>{t('profile.testNotification')}</strong><small>{t('profile.testNotificationHint')}</small></div>
                 <button type="button" className="settings-action" onClick={() => void sendTestPush()} disabled={pushBusy || !pushEnabled}>{t('common.test')}</button>

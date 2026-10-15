@@ -66,6 +66,34 @@ try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
+  // Spy on generated sound without using the machine's real speakers. Deliver
+  // synthetic SSE updates to the exact registered realtime event handler.
+  await page.addInitScript(() => {
+    window.__socoTonesPlayed = 0
+    window.AudioContext = class MockNotificationAudioContext {
+      state = 'suspended'
+      currentTime = 0
+      destination = {}
+      resume() { this.state = 'running'; return Promise.resolve() }
+      close() { this.state = 'closed'; return Promise.resolve() }
+      createOscillator() {
+        return {
+          type: 'sine', frequency: { setValueAtTime() {} }, connect() {}, disconnect() {},
+          start() { window.__socoTonesPlayed += 1 }, stop() {}, onended: null,
+        }
+      }
+      createGain() {
+        return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, disconnect() {} }
+      }
+    }
+    const nativeListen = EventSource.prototype.addEventListener
+    EventSource.prototype.addEventListener = function (type, listener, options) {
+      if (type === 'update') {
+        window.__socoEmitRealtime = payload => listener({ data: JSON.stringify(payload) })
+      }
+      return nativeListen.call(this, type, listener, options)
+    }
+  })
   const errors = []
   let submittedStory = null
   page.on('pageerror', e => errors.push(e.message))
@@ -488,6 +516,44 @@ try {
     !Object.hasOwn(submittedStory.attachment, 'url') &&
     !Object.hasOwn(submittedStory.attachment, 'id'),
     'Story payload must contain only fields accepted by strict backend decoder')
+
+  // Integration: real UI setting + the App's EventSource handler + Web Audio
+  // oscillator. No beep for our own messages, duplicates or disabled sound.
+  await page.getByRole('button', { name: /Cá nhân/ }).click()
+  const soundSwitch = page.locator('.message-sound-row button[role="switch"]')
+  await soundSwitch.waitFor()
+  check(await soundSwitch.getAttribute('aria-checked') === 'true',
+    'Incoming sound must default to enabled, separate from push permissions')
+  await page.waitForFunction(() => typeof window.__socoEmitRealtime === 'function')
+  const emitMessage = (id, senderId, type = 'message') => page.evaluate(
+    ({ id, senderId, type }) => window.__socoEmitRealtime({
+      type, conversationId: 1,
+      message: { id, senderId, conversationId: 1, text: 'Tin kiểm thử âm báo',
+        createdAt: new Date().toISOString() },
+    }),
+    { id, senderId, type },
+  )
+  const tones = () => page.evaluate(() => window.__socoTonesPlayed)
+  const beforeTone = await tones()
+  await emitMessage(92001, 2)
+  check(await tones() === beforeTone + 2,
+    'Incoming message from another user must emit one two-tone notification')
+  await emitMessage(92001, 2)
+  await emitMessage(92002, 1)
+  await emitMessage(92003, 2, 'message.updated')
+  check(await tones() === beforeTone + 2,
+    'Duplicate, own message and edit must not play additional sounds')
+  await soundSwitch.click()
+  check(await soundSwitch.getAttribute('aria-checked') === 'false' &&
+    await page.evaluate(() => localStorage.getItem('chatnet-message-sound-enabled-v1')) === 'false',
+    'Mute switch must persist locally')
+  await emitMessage(92004, 2)
+  check(await tones() === beforeTone + 2, 'Disabled sound must suppress incoming message')
+  await soundSwitch.click()
+  check(await soundSwitch.getAttribute('aria-checked') === 'true',
+    'Sound should be re-enabled without affecting push settings')
+  await page.getByRole('button', { name: 'Nghe thử' }).click()
+  check(await tones() >= beforeTone + 6, 'Manual sound preview must generate sound')
   check(!errors.length, 'Uncaught JS errors: ' + errors.join('; '))
   console.log('PASS: SOCO layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')
 } catch (error) {

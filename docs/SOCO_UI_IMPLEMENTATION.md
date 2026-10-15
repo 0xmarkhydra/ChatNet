@@ -232,3 +232,33 @@ and a Story creation failure (`invalid body`).
 
 Mocked media tests do not verify a real S3 bucket or production user authorization; these
 remain final device/integration acceptance checks.
+
+## Realtime incoming-message sound — 2026-10-15
+
+SOCO Web/PWA has a short, low-volume two-tone notification, generated locally
+with Web Audio (no licensed audio assets or additional external services).
+It is triggered ONLY by the SSE `type: "message"` event when the sender is
+not the current user. It never plays for the initial message-history fetch,
+`message.updated`, read receipts, own messages or background synchronization.
+
+- Sound is enabled by default. Profile → Notifications section has an independent
+  **Âm báo tin nhắn** on/off switch and an explicit **Nghe thử** button. Preference
+  `chatnet-message-sound-enabled-v1` is stored per browser/device; tabs sync it
+  via StorageEvent and it is distinct from OneSignal/Web Push permissions.
+- AudioContext is unlocked on trusted pointer/key interaction (mobile Safari and
+  Chrome autoplay require this). Never assume audio will work before a gesture.
+- Dedupe by message ID with a bounded 512-entry set; suppress bursts closer than
+  900ms; ignore events older than two minutes / implausibly future dated to
+  avoid replay storms after disconnect.
+- No Web Audio when the page is hidden. OS push handles background/closed-app
+  notification sounds according to notification permissions and OS settings.
+  Browsers do not guarantee background media playback or an audible push.
+- No backend/API, storage schema, chat message or OneSignal deployment changes.
+- `npm run check:incoming-sound`: verifies local preference, audio unlock,
+  dedupe, self-message silence, batching, disabled/background/stale behavior,
+  preview and reset. `npm run check:ui`: invokes the real registered SSE handler
+  with simulated new messages and spies on AudioContext; verifies the profile
+  controls and absence of false-positive sound.
+
+QA still recommended on a real iPhone PWA/Safari and desktop browsers, especially
+after first user interaction and with the device in silent/focus mode.

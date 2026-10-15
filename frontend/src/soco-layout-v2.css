@@ -1266,3 +1266,42 @@
     flex: 0 0 auto;
   }
 }
+
+/* Browser-local incoming chat sound: independent of OS push permissions. */
+.modern-shell .settings-card .message-sound-row,
+.modern-shell .settings-card .message-sound-preview-row {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+.modern-shell .settings-card .message-sound-preview-row {
+  background: #fbfcff;
+}
+.modern-shell .settings-card .message-sound-preview-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #edf3ff;
+  color: #295bd2;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.modern-shell .settings-card .message-sound-preview-button:active {
+  transform: scale(.97);
+}
+@media (max-width: 370px) {
+  .modern-shell .settings-card .message-sound-preview-button {
+    padding-inline: 8px;
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell .settings-card .message-sound-preview-button:active { transform: none; }
+}
