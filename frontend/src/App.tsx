@@ -1,5 +1,6 @@
 import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
+import FeedPostActions from './FeedPostActions'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
@@ -145,6 +146,10 @@ type Post = {
   liked: boolean
   comments: FeedComment[]
   attachments?: MediaAttachment[]
+  visibility?: 'public' | 'friends' | 'private'
+  background?: string
+  updatedAt?: string
+  saved?: boolean
   createdAt: string
 }
 
@@ -536,15 +541,43 @@ export default function App() {
   const nearbyRequest = useRef(0)
 
   const [posts, setPosts] = useState<Post[]>([])
+  const [savedPosts, setSavedPosts] = useState<Post[]>([])
+  const [feedFilter, setFeedFilter] = useState<'all' | 'saved'>('all')
+  const [hasMoreSavedPosts, setHasMoreSavedPosts] = useState(false)
+  const [savedPostsBusy, setSavedPostsBusy] = useState(false)
+  const savedPagingBusy = useRef(false)
   const [hasMorePosts, setHasMorePosts] = useState(false)
   const [postsLoadingMore, setPostsLoadingMore] = useState(false)
   const postsPagingBusy = useRef(false)
   const [activePostId, setActivePostId] = useState<number | null>(null)
+  useEffect(() => {
+    if (!session?.token) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('tab') !== 'feed') return
+    setTab('feed')
+    const id = Number(params.get('post'))
+    if (!Number.isSafeInteger(id) || id <= 0) return
+    let cancelled = false
+    void apiFetch('/api/posts/' + id).then(async response => {
+      if (!response.ok) throw new Error(response.status === 404 ? 'Bài viết không tồn tại hoặc bạn không có quyền xem.' : 'Không thể mở bài viết.')
+      return response.json() as Promise<Post>
+    }).then(post => {
+      if (cancelled) return
+      setPosts(current => [post, ...current.filter(item => item.id !== post.id)])
+      setActivePostId(post.id)
+    }).catch(error => {
+      if (!cancelled) setNotice(error instanceof Error ? error.message : 'Không thể mở bài viết.', 'error')
+    })
+    return () => { cancelled = true }
+  }, [session?.token])
   const [stories, setStories] = useState<Story[]>([])
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null)
   const [storyBusy, setStoryBusy] = useState(false)
   const [commentEditors, setCommentEditors] = useState<Record<number, DiscussionDraft>>({})
   const [postText, setPostText] = useState('')
+  const [postVisibility, setPostVisibility] = useState<'public' | 'friends' | 'private'>('public')
+  const [postBackground, setPostBackground] = useState('')
+  const [showPostBackgrounds, setShowPostBackgrounds] = useState(false)
   const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([])
   const [mediaUploading, setMediaUploading] = useState<'chat' | 'feed' | 'story' | 'profile' | null>(null)
   const [profileMedia, setProfileMedia] = useState<ProfileMediaState | null>(null)
@@ -638,7 +671,7 @@ export default function App() {
   const visibleMessages = messages.map((message) => reactionPreviews[message.id] ? {
     ...message, reactions: message.deleted ? [] : reactionPreviews[message.id],
   } : message)
-  const activePost = activePostId ? visiblePosts.find((item) => item.id === activePostId) || null : null
+  const activePost = activePostId ? [...visiblePosts, ...savedPosts].find((item) => item.id === activePostId) || null : null
   const activeMessageAction = messageActionId
     ? messages.find((item) => item.id === messageActionId) || null
     : null
@@ -1931,6 +1964,46 @@ export default function App() {
     }
   }
 
+  async function loadSavedPosts(more = false) {
+    if (!session || savedPagingBusy.current) return
+    const sessionId = session.sessionId
+    savedPagingBusy.current = true
+    setSavedPostsBusy(true)
+    try {
+      const before = more && savedPosts.length ? '&before=' + Math.min(...savedPosts.map(p => p.id)) : ''
+      const response = await apiFetch('/api/posts?scope=saved&limit=' + FEED_PAGE_SIZE + before)
+      if (!response.ok) throw new Error('Không tải được các bài đã lưu.')
+      const data = await response.json() as Post[]
+      if (sessionRef.current?.sessionId !== sessionId) return
+      setSavedPosts(current => {
+        if (!more) return data
+        const ids = new Set(current.map(p => p.id))
+        return [...current, ...data.filter(p => !ids.has(p.id))]
+      })
+      setHasMoreSavedPosts(data.length === FEED_PAGE_SIZE)
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không tải được bài đã lưu.', 'error')
+    } finally {
+      savedPagingBusy.current = false
+      if (sessionRef.current?.sessionId === sessionId) setSavedPostsBusy(false)
+    }
+  }
+
+  function syncFeedPost(updated: Post) {
+    setPosts(current => current.map(p => p.id === updated.id ? updated : p))
+    setSavedPosts(current => {
+      if (!updated.saved) return current.filter(p => p.id !== updated.id)
+      const exists = current.some(p => p.id === updated.id)
+      return exists ? current.map(p => p.id === updated.id ? updated : p) : [updated, ...current]
+    })
+  }
+
+  function removeFeedPost(id: number) {
+    setPosts(current => current.filter(p => p.id !== id))
+    setSavedPosts(current => current.filter(p => p.id !== id))
+    setActivePostId(current => current === id ? null : current)
+  }
+
   async function refreshStories() {
     try {
       const response = await apiFetch('/api/stories')
@@ -2941,14 +3014,16 @@ export default function App() {
 
     const content = postText.trim()
     const attachments = postAttachments
+    const visibility = postVisibility
+    const background = postBackground
     const sessionId = session.sessionId
     actionLocks.current.add('feed:create')
     ++feedRevision.current
-    setPendingPost({ id: -1, author: name, content, attachments, likes: 0, liked: false, comments: [], createdAt: new Date().toISOString() })
+    setPendingPost({ id: -1, author: name, content, visibility, background, attachments, likes: 0, liked: false, comments: [], createdAt: new Date().toISOString() })
     try {
       const response = await apiFetch('/api/posts', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, attachments: attachments.map(attachmentRequestBody) }),
+        body: JSON.stringify({ content, attachments: attachments.map(attachmentRequestBody), visibility, background }),
       })
       const post = await response.json() as Post & { error?: string }
       if (sessionRef.current?.sessionId !== sessionId) return
@@ -2956,6 +3031,8 @@ export default function App() {
       setPosts((current) => [post, ...current.filter((item) => item.id !== post.id)])
       setPostText('')
       setPostAttachments([])
+      setPostBackground('')
+      setShowPostBackgrounds(false)
       setNotice('Đã đăng bài viết.', 'success')
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không đăng được bài viết. Bản nháp được giữ lại.', 'error')
@@ -2983,6 +3060,7 @@ export default function App() {
         throw new Error(updated.error || 'Không cập nhật được lượt thích.')
       }
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
+      setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được lượt thích.', 'error')
     } finally {
@@ -2993,6 +3071,28 @@ export default function App() {
         void refreshPosts()
       }
     }
+  }
+
+  async function manageFeedComment(post: Post, commentId: number, method: 'PATCH' | 'DELETE', content?: string) {
+    const response = await apiFetch('/api/posts/' + post.id + '/comments/' + commentId, {
+      method,
+      ...(method === 'PATCH' ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) } : {}),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({})) as { error?: string }
+      throw new Error(data.error || 'Không cập nhật được bình luận')
+    }
+    const updated = await response.json() as Post
+    syncFeedPost(updated)
+    setNotice(method === 'PATCH' ? 'Đã sửa bình luận.' : 'Đã xóa bình luận.', 'success')
+  }
+  async function reportFeedComment(commentId: number, reason: string) {
+    const response = await apiFetch('/api/feed/reports', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetType: 'comment', targetId: commentId, reason }),
+    })
+    if (!response.ok) throw new Error('Không thể gửi báo cáo bình luận.')
+    setNotice('Đã gửi báo cáo bình luận.', 'success')
   }
 
   async function addComment(post: Post, content: string, parentId?: number) {
@@ -3015,6 +3115,7 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId) return
       if (updated.id !== post.id || !Array.isArray(updated.comments)) throw new Error('Phản hồi không hợp lệ. Bản nháp được giữ lại.')
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
+      setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         ++feedRevision.current
@@ -3141,7 +3242,7 @@ export default function App() {
     )
   })
   const visibleConversations = searchedConversations
-  const searchedPosts = visiblePosts.filter((post) => {
+  const searchedPosts = (feedFilter === 'saved' ? savedPosts : visiblePosts).filter((post) => {
     if (!normalizedSearch || tab !== 'feed') return true
     return (
       post.author.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
@@ -4265,6 +4366,7 @@ export default function App() {
                 <UserAvatar name={name} className="avatar self-avatar" />
                 <textarea
                   ref={postComposerRef}
+                  className={postBackground ? 'feed-composer-bg bg-' + postBackground : ''}
                   disabled={!!pendingPost}
                   aria-label="Nội dung bài viết"
                   placeholder="Hôm nay bạn thế nào?"
@@ -4321,7 +4423,24 @@ export default function App() {
                 <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedImageInputRef.current?.click()}><UiIcon name="photo" size={20} />Ảnh</button>
                 <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedVideoInputRef.current?.click()}><UiIcon name="video" size={20} />Video</button>
                 <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedAlbumInputRef.current?.click()}><UiIcon name="album" size={20} />Album</button>
-                <button type="button" onClick={() => postComposerRef.current?.focus()}><UiIcon name="text" size={20} />Nền chữ</button>
+                <button type="button" aria-expanded={showPostBackgrounds} onClick={() => { setShowPostBackgrounds(v => !v); postComposerRef.current?.focus() }}><UiIcon name="text" size={20} />Nền chữ</button>
+              </div>
+              <div className="feed-composer-settings">
+                <label>Ai có thể xem?
+                  <select value={postVisibility} onChange={event => setPostVisibility(event.target.value as typeof postVisibility)}>
+                    <option value="public">🌐 Công khai</option>
+                    <option value="friends">👥 Bạn bè</option>
+                    <option value="private">🔒 Chỉ mình tôi</option>
+                  </select>
+                </label>
+                {showPostBackgrounds && <div className="feed-background-palette" aria-label="Chọn nền bài viết">
+                  {['', 'violet', 'blue', 'sunset', 'mint', 'night'].map(bg => (
+                    <button key={bg || 'none'} type="button" className={'feed-palette-dot bg-' + (bg || 'none')}
+                      aria-pressed={postBackground === bg} aria-label={bg || 'Không nền'} onClick={() => setPostBackground(bg)}>
+                      {postBackground === bg ? '✓' : ''}
+                    </button>
+                  ))}
+                </div>}
               </div>
               {mediaUploading === 'feed' && <div className="media-uploading-note">Đang tải media thẳng lên kho lưu trữ…</div>}
               {(postText.trim() || postAttachments.length > 0) && (
@@ -4329,7 +4448,13 @@ export default function App() {
               )}
             </form>
 
-            <div className="soco-feed-section-label soco-feed-posts-label"><strong>Bài viết mới</strong></div>
+            <div className="soco-feed-section-label soco-feed-posts-label">
+              <strong>{feedFilter === 'saved' ? 'Bài viết đã lưu' : 'Bài viết mới'}</strong>
+              <div className="feed-filter-tabs" role="group" aria-label="Lọc bảng tin">
+                <button type="button" aria-pressed={feedFilter === 'all'} onClick={() => setFeedFilter('all')}>Mới nhất</button>
+                <button type="button" aria-pressed={feedFilter === 'saved'} onClick={() => { setFeedFilter('saved'); void loadSavedPosts() }}>Đã lưu</button>
+              </div>
+            </div>
             <div className="feed zalo-feed">
               {pendingPost && (
                 <article className="post zalo-post outgoing-preview" aria-busy="true">
@@ -4347,17 +4472,16 @@ export default function App() {
                   <div className="post-body">
                     <div className="post-author">
                       <div><strong>{post.author}</strong><small>{new Date(post.createdAt).toLocaleString('vi-VN')}</small></div>
-                      <button type="button" className="post-more" aria-label="Thêm">•••</button>
+                      <FeedPostActions post={post} mine={post.author === name} request={apiFetch}
+                        onUpdated={syncFeedPost} onDeleted={removeFeedPost}
+                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
                     </div>
                     {post.content && (
-                      <FeedText
-                        api={API}
-                        token={session.token}
-                        target={translationPreferencesLoaded ? targetLanguage : ''}
-                        text={post.content}
-                        maxLines={5}
-                        onExpand={() => setActivePostId(post.id)}
-                      />
+                      <div className={post.background ? 'feed-text-background bg-' + post.background : ''}>
+                        <FeedText api={API} token={session.token}
+                          target={translationPreferencesLoaded ? targetLanguage : ''}
+                          text={post.content} maxLines={5} onExpand={() => setActivePostId(post.id)} />
+                      </div>
                     )}
                     <div className="feed-media-preview" onClick={() => setActivePostId(post.id)}>
                       <MediaAttachmentsView items={post.attachments} />
@@ -4375,12 +4499,12 @@ export default function App() {
                   </div>
                 </article>
               ))}
-              {hasMorePosts && (
+              {(feedFilter === 'saved' ? hasMoreSavedPosts : hasMorePosts) && (
                 <button type="button" className="soco-load-more soco-feed-load-more"
-                  onClick={() => void loadMorePosts()} disabled={postsLoadingMore}
-                  aria-busy={postsLoadingMore}>
+                  onClick={() => void (feedFilter === 'saved' ? loadSavedPosts(true) : loadMorePosts())}
+                  disabled={feedFilter === 'saved' ? savedPostsBusy : postsLoadingMore}>
                   <RefreshCw size={17} aria-hidden="true" />
-                  {postsLoadingMore ? 'Đang tải...' : 'Tải thêm bài viết'}
+                  {(feedFilter === 'saved' ? savedPostsBusy : postsLoadingMore) ? 'Đang tải...' : 'Tải thêm bài viết'}
                 </button>
               )}
               {searchedPosts.length === 0 && (
@@ -4562,6 +4686,10 @@ export default function App() {
                       token={session.token}
                       target={translationPreferencesLoaded ? targetLanguage : ''}
                       submit={(content, parentId) => addComment(activePost, content, parentId)}
+                      currentUser={name}
+                      onEdit={(commentId, content) => manageFeedComment(activePost, commentId, 'PATCH', content)}
+                      onDelete={(commentId) => manageFeedComment(activePost, commentId, 'DELETE')}
+                      onReport={reportFeedComment}
                     />
                   </div>
                 </article>

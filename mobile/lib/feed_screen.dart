@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
+import 'package:flutter/services.dart';
 
 import 'api.dart';
 import 'media_viewer.dart';
@@ -23,6 +24,13 @@ class _FeedScreenState extends State<FeedScreen> {
   List<Json> posts = [];
   List<Json> stories = [];
   List<Json> attachments = [];
+  List<Json> savedPosts = [];
+  bool showingSaved = false;
+  bool morePosts = false;
+  bool moreSaved = false;
+  bool loadingMore = false;
+  String postVisibility = 'public';
+  String postBackground = '';
   bool loading = true;
   bool posting = false;
   bool uploading = false;
@@ -38,12 +46,13 @@ class _FeedScreenState extends State<FeedScreen> {
   Future<void> _load() async {
     try {
       final values = await Future.wait([
-        widget.api.request('GET', '/api/posts'),
+        widget.api.request('GET', '/api/posts?limit=20'),
         widget.api.request('GET', '/api/stories'),
       ]);
       if (!mounted) return;
       setState(() {
         posts = objects(values[0]);
+        morePosts = posts.length == 20;
         stories = objects(values[1]).where((item) {
           final expiry = DateTime.tryParse(item['expiresAt']?.toString() ?? '');
           return expiry == null || expiry.isAfter(DateTime.now());
@@ -59,6 +68,58 @@ class _FeedScreenState extends State<FeedScreen> {
         });
       }
     }
+  }
+
+  Future<void> _loadSaved({bool append = false}) async {
+    if (loadingMore) return;
+    setState(() => loadingMore = true);
+    try {
+      final before = append && savedPosts.isNotEmpty
+          ? '&before=${savedPosts.map((p) => (p['id'] as num).toInt()).reduce((a, b) => a < b ? a : b)}'
+          : '';
+      final response = await widget.api.request('GET', '/api/posts?scope=saved&limit=20$before');
+      final result = objects(response);
+      if (!mounted) return;
+      setState(() {
+        savedPosts = append
+            ? [...savedPosts, ...result.where((p) => !savedPosts.any((old) => old['id'] == p['id']))]
+            : result;
+        moreSaved = result.length == 20;
+      });
+    } catch (err) { _show(err.toString()); }
+    finally { if (mounted) setState(() => loadingMore = false); }
+  }
+
+  Future<void> _loadMore() async {
+    if (loadingMore) return;
+    if (showingSaved) { await _loadSaved(append: true); return; }
+    if (posts.isEmpty || !morePosts) return;
+    setState(() => loadingMore = true);
+    try {
+      final before = posts.map((p) => (p['id'] as num).toInt()).reduce((a,b) => a < b ? a : b);
+      final items = objects(await widget.api.request('GET', '/api/posts?limit=20&before=$before'));
+      if (!mounted) return;
+      setState(() {
+        posts = [...posts, ...items.where((p) => !posts.any((old) => old['id'] == p['id']))];
+        morePosts = items.length == 20;
+      });
+    } catch (err) { _show(err.toString()); }
+    finally { if (mounted) setState(() => loadingMore = false); }
+  }
+
+  void _applyUpdatedPost(Json updated) {
+    if (!mounted) return;
+    final id = updated['id'];
+    setState(() {
+      posts = [for (final p in posts) if (p['id'] == id) updated else p];
+      if (updated['saved'] == true) {
+        savedPosts = savedPosts.any((p) => p['id'] == id)
+          ? [for (final p in savedPosts) if (p['id'] == id) updated else p]
+          : [updated, ...savedPosts];
+      } else {
+        savedPosts.removeWhere((p) => p['id'] == id);
+      }
+    });
   }
 
   Future<Json?> _pickAndUpload(String scope, {bool multiple = false}) async {
@@ -104,6 +165,8 @@ class _FeedScreenState extends State<FeedScreen> {
         await widget.api.request('POST', '/api/posts', {
           'content': text,
           'attachments': attachments,
+          'visibility': postVisibility,
+          'background': postBackground,
         }),
       );
       if (!mounted) return;
@@ -111,6 +174,7 @@ class _FeedScreenState extends State<FeedScreen> {
         posts = [post, ...posts];
         postController.clear();
         attachments = [];
+        postBackground = '';
       });
     } catch (value) {
       _show(value.toString());
@@ -140,12 +204,7 @@ class _FeedScreenState extends State<FeedScreen> {
         await widget.api.request('POST', '/api/posts/$id/like'),
       );
       if (!mounted) return;
-      setState(() {
-        posts = [
-          for (final item in posts)
-            if (item['id'] == id) updated else item,
-        ];
-      });
+      _applyUpdatedPost(updated);
     } catch (value) {
       _show(value.toString());
     } finally {
@@ -162,6 +221,32 @@ class _FeedScreenState extends State<FeedScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) {
           final comments = objects(post['comments']);
+          Widget actions(Json comment, {bool root = false}) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (root) TextButton(
+                onPressed: () => setSheetState(() => replyingTo = comment),
+                child: const Text('Trả lời'),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Tùy chọn bình luận',
+                icon: const Icon(Icons.more_horiz_rounded, size: 20),
+                onSelected: (action) async {
+                  final updated = await _manageComment(post, comment, action);
+                  if (updated == null || !context.mounted) return;
+                  _applyUpdatedPost(updated);
+                  post..clear()..addAll(updated);
+                  setSheetState(() {});
+                },
+                itemBuilder: (ctx) => comment['author'] == widget.api.user['username']
+                  ? [
+                      const PopupMenuItem(value: 'edit', child: Text('Sửa bình luận')),
+                      const PopupMenuItem(value: 'delete', child: Text('Xóa bình luận')),
+                    ]
+                  : [const PopupMenuItem(value: 'report', child: Text('Báo cáo bình luận'))],
+              ),
+            ],
+          );
           return Padding(
             padding: EdgeInsets.fromLTRB(
               16,
@@ -206,12 +291,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                   subtitle: Text(
                                     comment['content']?.toString() ?? '',
                                   ),
-                                  trailing: TextButton(
-                                    onPressed: () => setSheetState(
-                                      () => replyingTo = comment,
-                                    ),
-                                    child: const Text('Trả lời'),
-                                  ),
+                                  trailing: actions(comment, root: true),
                                 ),
                                 for (final reply in comments.where(
                                   (item) => item['parentId'] == comment['id'],
@@ -234,6 +314,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                       subtitle: Text(
                                         reply['content']?.toString() ?? '',
                                       ),
+                                      trailing: actions(reply),
                                     ),
                                   ),
                               ],
@@ -292,15 +373,7 @@ class _FeedScreenState extends State<FeedScreen> {
                             );
                             final updated = object(result);
                             if (!mounted) return;
-                            setState(() {
-                              posts = [
-                                for (final item in posts)
-                                  if (item['id'] == post['id'])
-                                    updated
-                                  else
-                                    item,
-                              ];
-                            });
+                            _applyUpdatedPost(updated);
                             post
                               ..clear()
                               ..addAll(updated);
@@ -457,6 +530,192 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
+  Future<Json?> _manageComment(Json post, Json comment, String action) async {
+    final postId = (post['id'] as num).toInt();
+    final commentId = (comment['id'] as num).toInt();
+    if (action == 'report') {
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          title: const Text('Báo cáo bình luận'),
+          children: [
+            for (final reason in ['Nội dung spam', 'Quấy rối hoặc xúc phạm', 'Lừa đảo hoặc giả mạo', 'Nội dung không phù hợp'])
+              SimpleDialogOption(onPressed: () => Navigator.pop(ctx, reason), child: Text(reason)),
+          ],
+        ),
+      );
+      if (reason == null) return null;
+      try {
+        await widget.api.request('POST', '/api/feed/reports', {
+          'targetType': 'comment', 'targetId': commentId, 'reason': reason,
+        });
+        _show('Đã gửi báo cáo.');
+      } catch (err) { _show(err.toString()); }
+      return null;
+    }
+    if (action == 'delete') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Xóa bình luận?'),
+          content: const Text('Các phản hồi bên dưới bình luận cũng sẽ bị xóa.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Xóa')),
+          ],
+        ),
+      ) ?? false;
+      if (!confirmed) return null;
+      try {
+        return object(await widget.api.request('DELETE', '/api/posts/$postId/comments/$commentId'));
+      } catch (err) { _show(err.toString());return null; }
+    }
+    if (action == 'edit') {
+      final editor = TextEditingController(text: comment['content']?.toString() ?? '');
+      final content = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Chỉnh sửa bình luận'),
+          content: TextField(controller: editor, minLines: 2, maxLines: 5, maxLength: 1000,
+            decoration: const InputDecoration(hintText: 'Nội dung bình luận')),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, editor.text.trim()), child: const Text('Lưu')),
+          ],
+        ),
+      );
+      editor.dispose();
+      if (content == null || content.isEmpty) return null;
+      try {
+        return object(await widget.api.request('PATCH', '/api/posts/$postId/comments/$commentId', {'content': content}));
+      } catch (err) { _show(err.toString());return null; }
+    }
+    return null;
+  }
+
+  Future<void> _postAction(Json post, String action) async {
+    final id = (post['id'] as num).toInt();
+    switch (action) {
+      case 'copy':
+        final link = 'https://chat.codelocal.cloud/?tab=feed&post=$id';
+        await Clipboard.setData(ClipboardData(text: link));
+        _show('Đã sao chép liên kết bài viết.');
+        return;
+      case 'save':
+        try {
+          final updated = object(await widget.api.request('POST', '/api/posts/$id/save'));
+          _applyUpdatedPost(updated);
+          _show(updated['saved'] == true ? 'Đã lưu bài viết.' : 'Đã bỏ lưu.');
+        } catch (err) { _show(err.toString()); }
+        return;
+      case 'delete':
+        final yes = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Xóa bài viết?'),
+            content: const Text('Bài viết cùng các bình luận sẽ bị xóa.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Xóa')),
+            ],
+          ),
+        ) ?? false;
+        if (!yes) return;
+        try {
+          await widget.api.request('DELETE', '/api/posts/$id');
+          if (mounted) {
+            setState(() {
+              posts.removeWhere((item) => item['id'] == id);
+              savedPosts.removeWhere((item) => item['id'] == id);
+            });
+          }
+          _show('Đã xóa bài viết.');
+        } catch (err) { _show(err.toString()); }
+        return;
+      case 'report':
+        final reason = await showDialog<String>(
+          context: context,
+          builder: (ctx) => SimpleDialog(
+            title: const Text('Báo cáo bài viết'),
+            children: [
+              for (final reason in [
+                'Nội dung spam', 'Quấy rối hoặc xúc phạm',
+                'Lừa đảo hoặc giả mạo', 'Nội dung không phù hợp',
+              ])
+                SimpleDialogOption(onPressed: () => Navigator.pop(ctx, reason), child: Text(reason)),
+            ],
+          ),
+        );
+        if (reason == null) return;
+        try {
+          await widget.api.request('POST', '/api/feed/reports', {
+            'targetType': 'post', 'targetId': id, 'reason': reason,
+          });
+          _show('Đã gửi báo cáo.');
+        } catch (err) { _show(err.toString()); }
+        return;
+      case 'edit':
+        final editor = TextEditingController(text: post['content']?.toString() ?? '');
+        var visibility = post['visibility']?.toString() ?? 'public';
+        var background = post['background']?.toString() ?? '';
+        var busy = false;
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          builder: (ctx) => StatefulBuilder(builder: (ctx, setSheetState) => Padding(
+            padding: EdgeInsets.fromLTRB(18, 18, 18, MediaQuery.viewInsetsOf(ctx).bottom + 24),
+            child: SingleChildScrollView(child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Chỉnh sửa bài viết', style: Theme.of(ctx).textTheme.titleLarge),
+                const SizedBox(height: 16),
+                TextField(controller: editor, maxLines: 5, minLines: 2, maxLength: 5000,
+                  decoration: const InputDecoration(labelText: 'Nội dung bài viết')),
+                const SizedBox(height: 10),
+                DropdownButton<String>(
+                  value: visibility,
+                  isExpanded: true,
+                  items: const [
+                    DropdownMenuItem(value: 'public', child: Text('🌐 Công khai')),
+                    DropdownMenuItem(value: 'friends', child: Text('👥 Bạn bè')),
+                    DropdownMenuItem(value: 'private', child: Text('🔒 Chỉ mình tôi')),
+                  ],
+                  onChanged: busy ? null : (value) { if (value != null) setSheetState(() => visibility = value); },
+                ),
+                Wrap(spacing: 7, children: [
+                  for (final item in ['', 'violet', 'blue', 'sunset', 'mint', 'night'])
+                    ChoiceChip(label: Text(item.isEmpty ? 'Không nền' : item),
+                      selected: background == item,
+                      onSelected: busy ? null : (_) => setSheetState(() => background = item)),
+                ]),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: busy ? null : () async {
+                    setSheetState(() => busy = true);
+                    try {
+                      final updated = object(await widget.api.request('PATCH', '/api/posts/$id', {
+                        'content': editor.text.trim(), 'visibility': visibility, 'background': background,
+                      }));
+                      _applyUpdatedPost(updated);
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      _show('Đã cập nhật bài viết.');
+                    } catch (err) {
+                      _show(err.toString());
+                      if (ctx.mounted) setSheetState(() => busy = false);
+                    }
+                  },
+                  child: Text(busy ? 'Đang lưu...' : 'Lưu thay đổi'),
+                ),
+              ],
+            )),
+          )),
+        );
+        editor.dispose();
+        return;
+    }
+  }
+
   void _show(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
@@ -481,14 +740,14 @@ class _FeedScreenState extends State<FeedScreen> {
       );
     }
     final query = widget.query.trim().toLowerCase();
-    final visible = posts.where((post) {
+    final visible = (showingSaved ? savedPosts : posts).where((post) {
       return query.isEmpty ||
           '${post['author']} ${post['content']}'.toLowerCase().contains(query);
     }).toList();
     return ColoredBox(
       color: socoCanvas,
       child: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => showingSaved ? _loadSaved() : _load(),
         child: ListView(
           padding: const EdgeInsets.only(bottom: 30),
           children: [
@@ -645,6 +904,19 @@ class _FeedScreenState extends State<FeedScreen> {
                               ),
                             ),
                           const SizedBox(height: 9),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: DropdownButton<String>(
+                              value: postVisibility,
+                              underline: const SizedBox.shrink(),
+                              items: const [
+                                DropdownMenuItem(value: 'public', child: Text('🌐 Công khai')),
+                                DropdownMenuItem(value: 'friends', child: Text('👥 Bạn bè')),
+                                DropdownMenuItem(value: 'private', child: Text('🔒 Chỉ mình tôi')),
+                              ],
+                              onChanged: (value) { if (value != null) setState(() => postVisibility = value); },
+                            ),
+                          ),
                           GridView.count(
                             crossAxisCount: 2,
                             shrinkWrap: true,
@@ -690,9 +962,18 @@ class _FeedScreenState extends State<FeedScreen> {
                                 icon: SocoIconType.text,
                                 color: socoBlue,
                                 label: 'Nền chữ',
-                                onTap: postFocusNode.requestFocus,
+                                onTap: () => setState(() { postBackground = postBackground.isEmpty ? 'violet' : ''; postFocusNode.requestFocus(); }),
                               ),
                             ],
+                          ),
+                          if (postBackground.isNotEmpty) Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Wrap(spacing: 5, runSpacing: 4, children: [
+                              for (final color in ['violet','blue','sunset','mint','night'])
+                                ChoiceChip(label: Text(color), selected: postBackground == color,
+                                  onSelected: (_) => setState(() => postBackground = color)),
+                              ActionChip(label: const Text('Bỏ nền'), onPressed: () => setState(() => postBackground = '')),
+                            ]),
                           ),
                           if (postController.text.trim().isNotEmpty ||
                               attachments.isNotEmpty) ...[
@@ -712,9 +993,9 @@ class _FeedScreenState extends State<FeedScreen> {
                       padding: const EdgeInsets.fromLTRB(15, 8, 15, 12),
                       child: Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Bài viết mới',
+                              showingSaved ? 'Bài đã lưu' : 'Bài viết mới',
                               style: TextStyle(
                                 color: Color(0xFF1B2944),
                                 fontSize: 16,
@@ -732,6 +1013,17 @@ class _FeedScreenState extends State<FeedScreen> {
                         ],
                       ),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 15),
+                      child: Row(children: [
+                        ChoiceChip(label: const Text('Mới nhất'), selected: !showingSaved,
+                          onSelected: (_) => setState(() => showingSaved = false)),
+                        const SizedBox(width: 9),
+                        ChoiceChip(label: const Text('Đã lưu'), selected: showingSaved,
+                          onSelected: (_) { setState(() => showingSaved = true); _loadSaved(); }),
+                      ]),
+                    ),
+                    const SizedBox(height: 10),
                     if (visible.isEmpty)
                       const EmptyState(
                         icon: Icons.dynamic_feed_outlined,
@@ -741,6 +1033,14 @@ class _FeedScreenState extends State<FeedScreen> {
                       )
                     else
                       for (final post in visible) _post(post),
+                    if (showingSaved ? moreSaved : morePosts)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 6, 24, 18),
+                        child: OutlinedButton(
+                          onPressed: loadingMore ? null : _loadMore,
+                          child: Text(loadingMore ? 'Đang tải...' : 'Tải thêm bài viết'),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -793,12 +1093,35 @@ class _FeedScreenState extends State<FeedScreen> {
                   ],
                 ),
               ),
-              const Icon(Icons.more_horiz_rounded, color: socoMuted),
+              PopupMenuButton<String>(
+                tooltip: 'Tùy chọn bài viết',
+                icon: const Icon(Icons.more_horiz_rounded, color: socoMuted),
+                onSelected: (action) => _postAction(post, action),
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'save', child: Text(post['saved'] == true ? 'Bỏ lưu bài' : 'Lưu bài viết')),
+                  const PopupMenuItem(value: 'copy', child: Text('Sao chép liên kết')),
+                  if (post['author'] == widget.api.user['username']) ...[
+                    const PopupMenuItem(value: 'edit', child: Text('Sửa bài viết')),
+                    const PopupMenuItem(value: 'delete', child: Text('Xóa bài viết')),
+                  ] else
+                    const PopupMenuItem(value: 'report', child: Text('Báo cáo bài viết')),
+                ],
+              ),
             ],
           ),
           if (post['content']?.toString().isNotEmpty == true) ...[
             const SizedBox(height: 12),
-            Text(post['content'].toString()),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all((post['background']?.toString().isNotEmpty ?? false) ? 20 : 0),
+              decoration: _backgroundDecoration(post['background']?.toString() ?? ''),
+              child: Text(post['content'].toString(),
+                textAlign: (post['background']?.toString().isNotEmpty ?? false) ? TextAlign.center : TextAlign.start,
+                style: TextStyle(
+                  color: (post['background']?.toString().isNotEmpty ?? false) ? Colors.white : null,
+                  fontWeight: (post['background']?.toString().isNotEmpty ?? false) ? FontWeight.w700 : FontWeight.normal,
+                )),
+            ),
           ],
           if (media.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -838,6 +1161,20 @@ class _FeedScreenState extends State<FeedScreen> {
         ],
       ),
     );
+  }
+
+  BoxDecoration? _backgroundDecoration(String name) {
+    const gradients = <String, List<Color>>{
+      'violet': [Color(0xFF536BE9), Color(0xFFAD52D5)],
+      'blue': [Color(0xFF1D70E9), Color(0xFF19BAD1)],
+      'sunset': [Color(0xFFEC668F), Color(0xFFFEAE5E)],
+      'mint': [Color(0xFF0D9488), Color(0xFF5BAA99)],
+      'night': [Color(0xFF121D3D), Color(0xFF49527C)],
+    };
+    final colors = gradients[name];
+    if (colors == null) return null;
+    return BoxDecoration(borderRadius: BorderRadius.circular(16),
+      gradient: LinearGradient(colors: colors));
   }
 
   Widget _mediaGrid(List<Json> media) {

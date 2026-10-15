@@ -1,0 +1,42 @@
+
+.feed-actions-root {position:relative;z-index:5}
+.feed-actions-panel {position:absolute;z-index:30;top:35px;right:0;width:min(330px,calc(100vw - 36px));max-height:72dvh;overflow:auto;border:1px solid #e6e9f5;border-radius:20px;background:#fff;box-shadow:0 18px 60px #1c2e5f2a;padding:10px;color:#17264d}
+.feed-actions-header {display:flex;align-items:center;justify-content:space-between;padding:6px 8px 10px}
+.feed-actions-header button {border:0;background:#f2f5fc;border-radius:10px;padding:6px;display:flex;color:#53627e}
+.feed-actions-list {display:flex;flex-direction:column;gap:3px}
+.feed-actions-list button {border:0;background:transparent;display:flex;align-items:center;gap:11px;text-align:left;padding:12px 11px;border-radius:12px;color:#243654;font:inherit;font-size:14px}
+.feed-actions-list button:hover,.feed-actions-list button:focus-visible {background:#f1f4ff}
+.feed-actions-list button.danger {color:#d63349}
+.feed-actions-editor {display:flex;flex-direction:column;gap:12px;padding:5px}
+.feed-actions-editor label {display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
+.feed-actions-editor textarea,.feed-actions-editor select {font:inherit;border:1px solid #dfe5f3;background:#f7f9fe;border-radius:12px;padding:10px;max-width:100%;width:100%;box-sizing:border-box;color:#1c2e4a}
+.feed-actions-editor textarea {resize:vertical;min-height:90px}
+.feed-actions-footer {display:flex;gap:8px;justify-content:flex-end}
+.feed-actions-footer button {padding:9px 15px;border:0;border-radius:12px;background:#edf1f9;color:#273a62}
+.feed-actions-footer button:last-child {color:white;background:linear-gradient(120deg,#2563eb,#8b5cf6)}
+.feed-actions-footer button:disabled {opacity:.5}
+.feed-composer-settings {display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 4px}
+.feed-composer-settings label {display:flex;gap:8px;align-items:center;color:#65748e;font-size:12px}
+.feed-composer-settings select {max-width:155px;padding:8px 10px;border:1px solid #e0e7f5;border-radius:11px;background:#f7f9ff;color:#2b4b87}
+.feed-background-palette {display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.feed-palette-dot {width:30px;height:30px;border:2px solid #ffffffba;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 0 0 1px #dbe1ed;font-weight:700}
+.feed-palette-dot[aria-pressed=true] {outline:2px solid #6c68e7;outline-offset:1px}
+.bg-none {background:#f7f8fc;color:#415371}
+.bg-violet {background:linear-gradient(130deg,#536be9,#ad52d5)!important;color:#fff!important}
+.bg-blue {background:linear-gradient(135deg,#1d70e9,#19bad1)!important;color:#fff!important}
+.bg-sunset {background:linear-gradient(135deg,#ec668f,#feae5e)!important;color:#fff!important}
+.bg-mint {background:linear-gradient(135deg,#0d9488,#5ba6e9)!important;color:#fff!important}
+.bg-night {background:linear-gradient(135deg,#121d3d,#49527c)!important;color:#fff!important}
+.feed-text-background {border-radius:17px;padding:24px 15px;text-align:center;margin:10px 0}
+.feed-text-background p,.feed-text-background button,.feed-text-background small {color:inherit!important}
+.feed-composer-bg {border-radius:14px!important;padding:15px!important}
+.feed-filter-tabs {display:flex;gap:5px;border:1px solid #e4eafa;background:#f7f9fe;border-radius:12px;padding:3px}
+.feed-filter-tabs button {border:0;border-radius:9px;background:transparent;color:#697995;padding:7px 10px;font-size:12px}
+.feed-filter-tabs button[aria-pressed=true] {color:#335ddd;background:#fff;box-shadow:0 1px 6px #2a4c8a20;font-weight:700}
+.feed-comment-menu {display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.feed-comment-menu button {border:0;background:transparent;color:#6a7891;font-size:12px;padding:3px}
+.feed-comment-edit {display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.feed-comment-edit textarea {width:100%;border:1px solid #ccd7f3;border-radius:11px;padding:10px;box-sizing:border-box}
+.feed-comment-edit > div {display:flex;justify-content:flex-end;gap:10px}
+.feed-comment-edit button {border:0;border-radius:9px;background:#e8eeff;color:#3156c6;padding:7px 12px}
+@media(max-width:760px) {.feed-actions-panel{position:fixed;top:auto;bottom:max(78px,env(safe-area-inset-bottom));right:10px;left:10px;width:auto;max-height:70dvh;border-radius:22px}}

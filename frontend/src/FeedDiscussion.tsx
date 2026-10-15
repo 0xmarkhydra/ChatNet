@@ -6,6 +6,7 @@ export type FeedComment = {
   author: string
   content: string
   createdAt: string
+  updatedAt?: string | null
 }
 
 type TranslationProps = { api: string; token: string; target: string }
@@ -109,15 +110,33 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
   )
 }
 
-export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, ...translation }: TranslationProps & {
+export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, ...translation }: TranslationProps & {
   comments: FeedComment[]
   pending?: FeedComment
   submit: (content: string, parentId?: number) => Promise<void>
   editor: DiscussionDraft
   updateEditor: (value: DiscussionDraft) => void
+  currentUser: string
+  onEdit: (id: number, content: string) => Promise<void>
+  onDelete: (id: number) => Promise<void>
+  onReport: (id: number, reason: string) => Promise<void>
 }) {
   const { replyTo, drafts } = editor
   const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
+  const [editingComment, setEditingComment] = useState<number | null>(null)
+  const [editingText, setEditingText] = useState('')
+  const [reportingComment, setReportingComment] = useState<number | null>(null)
+  const [reportReason, setReportReason] = useState('Nội dung spam')
+  const [commentActionBusy, setCommentActionBusy] = useState(false)
+  const [commentActionError, setCommentActionError] = useState('')
+  async function runAction(action: () => Promise<void>) {
+    if (commentActionBusy) return
+    setCommentActionBusy(true)
+    setCommentActionError('')
+    try { await action() }
+    catch (error) { setCommentActionError(error instanceof Error ? error.message : 'Không thể thực hiện thao tác.') }
+    finally { setCommentActionBusy(false) }
+  }
   const sending = editor.sending ?? false
   const error = editor.error || ''
   const busy = useRef(false)
@@ -166,12 +185,41 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
           <div className="feed-comment-bubble">
             <strong>@{comment.author}</strong>
             {parent && <small className="feed-reply-to">Trả lời @{parent.author}</small>}
-            <FeedText {...translation} text={comment.content} maxLines={3} />
+            {editingComment === comment.id ? (
+              <div className="feed-comment-edit">
+                <textarea maxLength={1000} rows={3} value={editingText} onChange={event => setEditingText(event.target.value)} aria-label="Chỉnh sửa bình luận" />
+                <div>
+                  <button type="button" onClick={() => setEditingComment(null)}>Hủy</button>
+                  <button type="button" disabled={commentActionBusy || !editingText.trim()} onClick={() => void runAction(async () => {
+                    await onEdit(comment.id, editingText.trim()); setEditingComment(null)
+                  })}>Lưu</button>
+                </div>
+              </div>
+            ) : <FeedText {...translation} text={comment.content} maxLines={3} />}
           </div>
           <div className="feed-comment-actions">
             <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
             <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời @${comment.author}`}>Trả lời</button>
+            <div className="feed-comment-menu">
+              {comment.author === currentUser ? (
+                <>
+                  <button type="button" disabled={commentActionBusy} onClick={() => { setEditingComment(comment.id); setEditingText(comment.content); setReportingComment(null) }}>Sửa</button>
+                  <button type="button" disabled={commentActionBusy} onClick={() => {
+                    if (window.confirm('Xóa bình luận và các phản hồi bên dưới?')) void runAction(() => onDelete(comment.id))
+                  }}>Xóa</button>
+                </>
+              ) : <button type="button" onClick={() => { setReportingComment(reportingComment === comment.id ? null : comment.id); setEditingComment(null) }}>Báo cáo</button>}
+            </div>
           </div>
+          {reportingComment === comment.id && <div className="feed-comment-edit">
+            <select aria-label="Lý do báo cáo bình luận" value={reportReason} onChange={event => setReportReason(event.target.value)}>
+              {['Nội dung spam','Quấy rối hoặc xúc phạm','Lừa đảo hoặc giả mạo','Nội dung không phù hợp'].map(reason => <option key={reason}>{reason}</option>)}
+            </select>
+            <div><button type="button" onClick={() => setReportingComment(null)}>Hủy</button>
+              <button type="button" disabled={commentActionBusy} onClick={() => void runAction(async () => {
+                await onReport(comment.id, reportReason); setReportingComment(null)
+              })}>Gửi báo cáo</button></div>
+          </div>}
         </div>
       </div>
     )
@@ -204,6 +252,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
           </li>
         ))}
       </ul>
+      {commentActionError && <p role="alert" className="feed-comment-error">{commentActionError}</p>}
       {pending && (
         <div className="feed-comment-row outgoing-preview" aria-busy="true">
           <span className="feed-comment-avatar" aria-hidden="true">{pending.author.slice(0, 2).toUpperCase()}</span>

@@ -146,6 +146,32 @@ CREATE TABLE IF NOT EXISTS posts (
 
 CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
 
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS visibility VARCHAR(12) NOT NULL DEFAULT 'public';
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS background VARCHAR(16) NOT NULL DEFAULT '';
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+CREATE INDEX IF NOT EXISTS idx_posts_visibility_id ON posts(visibility,id DESC);
+
+CREATE TABLE IF NOT EXISTS saved_posts (
+    post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY(post_id,user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_saved_posts_user ON saved_posts(user_id,post_id DESC);
+
+CREATE TABLE IF NOT EXISTS feed_reports (
+    id BIGSERIAL PRIMARY KEY,
+    reporter_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_type VARCHAR(12) NOT NULL CHECK(target_type IN ('post','comment','story')),
+    target_id BIGINT NOT NULL,
+    reason VARCHAR(500) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(reporter_id,target_type,target_id)
+);
+CREATE INDEX IF NOT EXISTS idx_feed_reports_status ON feed_reports(status,created_at DESC);
+
+
 CREATE TABLE IF NOT EXISTS post_attachments (
     id BIGSERIAL PRIMARY KEY,
     post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
@@ -192,6 +218,7 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id, created_at);
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
 
 ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id BIGINT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_post_comment ON comments(post_id, id);

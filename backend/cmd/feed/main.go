@@ -22,6 +22,7 @@ import (
 )
 
 type comment struct {
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	ID        int64     `json:"id"`
 	ParentID  *int64    `json:"parentId"`
 	Author    string    `json:"author"`
@@ -30,6 +31,10 @@ type comment struct {
 }
 
 type post struct {
+	Visibility string `json:"visibility"`
+	Background string `json:"background"`
+	Saved bool `json:"saved"`
+	UpdatedAt time.Time `json:"updatedAt"`
 	ID          int64               `json:"id"`
 	Author      string              `json:"author"`
 	Content     string              `json:"content"`
@@ -62,6 +67,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	if err := database.Migrate(ctx, db); err != nil {
+		log.Fatal(err)
+	}
 
 	s := &server{
 		db:        db,
@@ -74,6 +82,13 @@ func main() {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "feed"})
 	})
 	mux.Handle("GET /api/posts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.list)))
+	mux.Handle("GET /api/posts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.detailPost)))
+	mux.Handle("PATCH /api/posts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.editPost)))
+	mux.Handle("DELETE /api/posts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deletePost)))
+	mux.Handle("POST /api/posts/{id}/save", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.toggleSave)))
+	mux.Handle("PATCH /api/posts/{id}/comments/{commentId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.editComment)))
+	mux.Handle("DELETE /api/posts/{id}/comments/{commentId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteComment)))
+	mux.Handle("POST /api/feed/reports", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reportFeed)))
 	mux.Handle("POST /api/posts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.create)))
 	mux.Handle("POST /api/posts/{id}/like", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.like)))
 	mux.Handle("POST /api/posts/{id}/comments", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.addComment)))
@@ -98,6 +113,12 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
+	scope := r.URL.Query().Get("scope")
+	if scope != "" && scope != "saved" {
+		httpx.Error(w, http.StatusBadRequest, "invalid scope")
+		return
+	}
+	if scope == "" { scope = "all" }
 	var before int64
 	if value := r.URL.Query().Get("before"); value != "" {
 		n, err := strconv.ParseInt(value, 10, 64)
@@ -108,10 +129,13 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		before = n
 	}
 	rows, err := s.db.Query(r.Context(), `
-		SELECT p.id,u.username,p.content,p.likes_count,p.created_at
+		SELECT p.id,u.username,p.content,p.likes_count,p.created_at,
+		       p.visibility,p.background,p.updated_at,
+		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
 		FROM posts p JOIN users u ON u.id=p.user_id
-		WHERE ($1::bigint=0 OR p.id<$1)
-		ORDER BY p.id DESC LIMIT $2`, before, limit)
+		WHERE ($1::bigint=0 OR p.id<$1) AND `+feedAccessSQL+`
+		  AND ($4='all' OR EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2))
+		ORDER BY p.id DESC LIMIT $3`, before, claims.UserID, limit, scope)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")
 		return
@@ -121,7 +145,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	posts := []post{}
 	for rows.Next() {
 		var p post
-		if rows.Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt) != nil {
+		if rows.Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.Saved) != nil {
 			continue
 		}
 		_ = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id=$1 AND user_id=$2)`, p.ID, claims.UserID).Scan(&p.Liked)
@@ -134,7 +158,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) comments(r *http.Request, postID int64) []comment {
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id,c.parent_id,u.username,c.content,c.created_at
+		SELECT c.id,c.parent_id,u.username,c.content,c.created_at,c.updated_at
 		FROM comments c JOIN users u ON u.id=c.user_id
 		WHERE c.post_id=$1 ORDER BY c.id ASC`, postID)
 	if err != nil {
@@ -145,7 +169,7 @@ func (s *server) comments(r *http.Request, postID int64) []comment {
 	items := []comment{}
 	for rows.Next() {
 		var c comment
-		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.Content, &c.CreatedAt) == nil {
+		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.Content, &c.CreatedAt, &c.UpdatedAt) == nil {
 			items = append(items, c)
 		}
 	}
@@ -185,6 +209,8 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	var body struct {
 		Content     string                   `json:"content"`
+		Visibility  string                   `json:"visibility"`
+		Background  string                   `json:"background"`
 		Attachments []mediax.AttachmentInput `json:"attachments"`
 	}
 	if json.NewDecoder(r.Body).Decode(&body) != nil {
@@ -192,6 +218,11 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Content = strings.TrimSpace(body.Content)
+	if body.Visibility == "" { body.Visibility = "public" }
+	if !validVisibility(body.Visibility) || !validBackground(body.Background) {
+		httpx.Error(w, http.StatusBadRequest, "invalid post visibility or background")
+		return
+	}
 	if utf8.RuneCountInString(body.Content) > 5000 {
 		httpx.Error(w, http.StatusBadRequest, "content must be <= 5000 characters")
 		return
@@ -223,13 +254,15 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 
 	var p post
 	p.Author = claims.Username
+	p.Visibility = body.Visibility
+	p.Background = body.Background
 	p.Attachments = attachments
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO posts(user_id,content)
-		VALUES($1,$2)
-		RETURNING id,content,likes_count,created_at`,
-		claims.UserID, body.Content,
-	).Scan(&p.ID, &p.Content, &p.Likes, &p.CreatedAt)
+		INSERT INTO posts(user_id,content,visibility,background)
+		VALUES($1,$2,$3,$4)
+		RETURNING id,content,likes_count,created_at,updated_at`,
+		claims.UserID, body.Content, body.Visibility, body.Background,
+	).Scan(&p.ID, &p.Content, &p.Likes, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create post")
 		return
@@ -379,6 +412,10 @@ func (s *server) like(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !s.canReadPost(r.Context(), id, claims.UserID) {
+		httpx.Error(w, http.StatusNotFound, "post not found")
+		return
+	}
 	tx, err := s.db.Begin(r.Context())
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot update like")
@@ -430,9 +467,7 @@ func (s *server) like(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot save like")
 		return
 	}
-	p.Comments = s.comments(r, p.ID)
-	p.Attachments = s.postAttachments(r.Context(), p.ID)
-	httpx.JSON(w, http.StatusOK, p)
+	s.respondPost(w, r, id, claims.UserID, http.StatusOK)
 }
 
 func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
@@ -458,6 +493,10 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !s.canReadPost(r.Context(), postID, claims.UserID) {
+		httpx.Error(w, http.StatusNotFound, "post not found")
+		return
+	}
 	tag, err := s.db.Exec(r.Context(), `
 		INSERT INTO comments(post_id,user_id,content,parent_id)
 		SELECT $1,$2,$3,$4::bigint
@@ -523,8 +562,5 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "post not found")
 		return
 	}
-	p.Comments = s.comments(r, p.ID)
-	_ = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id=$1 AND user_id=$2)`, p.ID, claims.UserID).Scan(&p.Liked)
-	p.Attachments = s.postAttachments(r.Context(), p.ID)
-	httpx.JSON(w, http.StatusCreated, p)
+	s.respondPost(w, r, postID, claims.UserID, http.StatusCreated)
 }
