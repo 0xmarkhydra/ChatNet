@@ -68,6 +68,11 @@ type MediaAttachment = {
   url?: string
 }
 
+/** Only trusted upload input fields are accepted by strict Go JSON decoders.
+ * Public signed URLs and response IDs must never be sent back in API requests. */
+const attachmentRequestBody = ({ storageRef, name, sizeBytes, contentType, kind }: MediaAttachment) =>
+  ({ storageRef, name, sizeBytes, contentType, kind })
+
 type PresignedUpload = {
   uploadUrl: string
   storageRef: string
@@ -1232,7 +1237,7 @@ export default function App() {
       const response = await apiFetch('/api/stories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachment }),
+        body: JSON.stringify({ attachment: attachmentRequestBody(attachment) }),
       })
       const result = await response.json().catch(() => null) as (Story & { error?: string }) | null
       if (sessionRef.current?.sessionId !== sessionId) return
@@ -2545,7 +2550,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
-          attachments,
+          attachments: attachments.map(attachmentRequestBody),
           clientId,
           ...(reply ? { replyToMessageId: reply.id } : {}),
         }),
@@ -2899,7 +2904,7 @@ export default function App() {
     try {
       const response = await apiFetch('/api/posts', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, attachments }),
+        body: JSON.stringify({ content, attachments: attachments.map(attachmentRequestBody) }),
       })
       const post = await response.json() as Post & { error?: string }
       if (sessionRef.current?.sessionId !== sessionId) return

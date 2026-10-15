@@ -67,7 +67,10 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
   const errors = []
+  let submittedStory = null
   page.on('pageerror', e => errors.push(e.message))
+  await page.route(origin + '/mock-story-upload', route =>
+    route.fulfill({ status: 200, body: '' }))
   await page.route('http://localhost:8080/**', route => {
     const req = route.request()
     const currentURL = new URL(req.url())
@@ -99,6 +102,22 @@ try {
       return json({ translatedText: text, translation: text, sourceLanguage: 'vi', targetLanguage: 'en' })
     }
     if (path === '/api/posts') return json(pagedPosts.filter(post => !before || post.id < before).slice(0, limit))
+    if (path === '/api/media/presign' && req.method() === 'POST') return json({
+      uploadUrl: origin + '/mock-story-upload',
+      storageRef: 'story/1/upload.png', kind: 'image', downloadUrl: origin + '/mock-story-image.png',
+    })
+    if (path === '/api/stories' && req.method() === 'POST') {
+      submittedStory = req.postDataJSON()
+      const keys = Object.keys(submittedStory?.attachment || {}).sort()
+      const expected = ['contentType', 'kind', 'name', 'sizeBytes', 'storageRef']
+      if (JSON.stringify(keys) !== JSON.stringify(expected)) return json({ error: 'invalid body' }, 400)
+      return json({
+        id: 99, author: session.user.username,
+        attachment: { ...submittedStory.attachment, url: origin + '/mock-story-image.png' },
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      }, 201)
+    }
     if (path === '/api/stories' || path === '/api/calls') return json([])
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     if (path === '/api/i18n/bundle') return json({ locale: 'vi', version: 'mock', messages: {}, cache: 'hit' })
@@ -152,6 +171,19 @@ try {
     check(await page.locator('.profile-view > .soco-section-heading').count() === 0, 'Removed Profile banner reappeared: ' + width)
     const cover = await page.locator('.profile-cover-art').boundingBox()
     const name = await page.locator('.profile-identity-copy > strong').boundingBox()
+    if (width <= 430) {
+      const hero = await page.locator('.profile-view > .profile-hero').boundingBox()
+      const edit = await page.locator('.profile-view > .profile-edit-card').boundingBox()
+      const settings = await page.locator('.profile-view > .settings-card').boundingBox()
+      const avatar = await page.locator('.profile-avatar-editor').boundingBox()
+      check(hero && edit && settings && avatar &&
+        hero.height <= 250 && edit.height <= 350 &&
+        edit.y >= hero.y + hero.height - 1 &&
+        settings.y >= edit.y + edit.height - 1 &&
+        name && name.x >= avatar.x + avatar.width - 2,
+        'Profile cards must be compact, ordered and not overlap on iPhone: ' +
+        JSON.stringify({ width, hero, edit, settings, avatar, name }))
+    }
     check(cover && name && name.y >= cover.y + cover.height - 3, 'Profile ' + width + 'px identity overlaps cover: ' + JSON.stringify({ cover, name }))
     if (width >= 900) {
       const hero = await page.locator('.profile-view > .profile-hero').boundingBox()
@@ -443,7 +475,20 @@ try {
       await page.screenshot({ path: 'output/playwright/layout/profile-actions-' + width + '.png' })
   }
 
-  check(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
+  // Regression: frontend must POST only strict AttachmentInput fields.
+  // A presigned download URL in POST /api/stories previously triggered "invalid body".
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
+  await page.locator('input[aria-label="Chọn ảnh hoặc video cho Story"]').setInputFiles({
+    name: 'soco-story.png', mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+bS8EAAAAASUVORK5CYII=', 'base64'),
+  })
+  await page.waitForFunction(() => document.querySelectorAll('.story-card').length >= 2, null, { timeout: 12000 })
+  check(submittedStory?.attachment?.storageRef === 'story/1/upload.png' &&
+    !Object.hasOwn(submittedStory.attachment, 'url') &&
+    !Object.hasOwn(submittedStory.attachment, 'id'),
+    'Story payload must contain only fields accepted by strict backend decoder')
+  check(!errors.length, 'Uncaught JS errors: ' + errors.join('; '))
   console.log('PASS: SOCO layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')
 } catch (error) {
   console.error(error)

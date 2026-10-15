@@ -38,6 +38,39 @@ func TestCommentValidation(t *testing.T) {
 	}
 }
 
+func TestStoryAcceptsLegacySignedURLButRejectsUnknownFields(t *testing.T) {
+	// Old iOS/PWA bundles may send upload response URL/ID in POST; these known
+	// fields are safely ignored while storage ownership is re-validated.
+	// Unknown fields must still be rejected by strict JSON decoding.
+	token, err := authx.Sign("test", 1, "story_test", "story_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	mux.Handle("POST /api/stories", authx.Middleware("test", http.HandlerFunc((&server{}).createStory)))
+	base := `{"attachment":{"storageRef":"story/1/upload.png","name":"upload.png","sizeBytes":68,"contentType":"image/png","kind":"image"`
+	for _, tc := range []struct {
+		name, body string
+		badJSON    bool
+	}{
+		{"legacy signed URL", base + `,"url":"https://cdn.example.invalid/file"}}`, false},
+		{"legacy signed URL and ID", base + `,"url":"https://cdn.example.invalid/file","id":123}}`, false},
+		{"unknown field rejected", base + `,"arbitraryField":true}}`, true},
+		{"valid input shape", base + `}}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/stories", strings.NewReader(tc.body))
+			req.Header.Set("Authorization", "Bearer "+token)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			hasDecoderError := strings.Contains(rec.Body.String(), "invalid body")
+			if hasDecoderError != tc.badJSON {
+				t.Errorf("decoder invalid body mismatch: got %d %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestStoryValidation(t *testing.T) {
 	token, err := authx.Sign("test", 1, "story_test", "story_test")
 	if err != nil {

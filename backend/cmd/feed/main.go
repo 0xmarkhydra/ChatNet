@@ -300,8 +300,15 @@ func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	// Older PWA bundles may resend signed download URL and attachment ID received
+	// from the upload response. Accept only these known legacy response fields,
+	// but NEVER trust them: ownership and storage metadata are verified below.
 	var body struct {
-		Attachment mediax.AttachmentInput `json:"attachment"`
+		Attachment struct {
+			mediax.AttachmentInput
+			URL string `json:"url"`
+			ID int64 `json:"id"`
+		} `json:"attachment"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8*1024))
 	decoder.DisallowUnknownFields()
@@ -314,7 +321,7 @@ func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
 		s.storage,
 		"story",
 		claims.UserID,
-		[]mediax.AttachmentInput{body.Attachment},
+		[]mediax.AttachmentInput{body.Attachment.AttachmentInput},
 		1,
 	)
 	if err != nil || len(attachments) != 1 {

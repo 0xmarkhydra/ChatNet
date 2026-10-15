@@ -208,3 +208,27 @@ without losing its prior full-height/sticky/scrollable behavior. Build, PWA,
 session, optimistic UI, OneSignal and Go backend checks passed. This does
 not certify physical iPhone/Safari gestures or authenticated production calls;
 the corresponding integrations should be accepted on a real device.
+
+## Profile mobile layout and Story upload fix — 2026-10-15
+
+Production iPhone screenshots identified an over-expanded profile (cover/avatar/form/settings)
+and a Story creation failure (`invalid body`).
+
+- Mobile Profile (up to 760px): reduced cover/hero height, reorganized avatar/name alignment,
+  eliminated redundant avatar help text, tightened form and settings spacing, and preserved
+  independent scrolling above the bottom navigation. Inputs remain at least 44px high, with
+  16px text to prevent Safari input zoom.
+- Story upload: `POST /api/stories` now submits only `storageRef`, `name`, `sizeBytes`,
+  `contentType`, and `kind`. The upload service's signed download `url` is a display-only
+  response field and must not be sent to strict Go JSON decoders. The same safe field projection
+  is used for attachment-bearing posts and messages.
+- Backend accepts the two known legacy response-only fields (`url`, `id`) from older
+  cached PWA Story requests, but ignores their values and validates stored object ownership,
+  content type, size and signed URLs independently. Unknown fields remain rejected.
+- Browser regression test simulates a valid Story image being presigned, uploaded and posted,
+  rejects extra request fields as the real API would, and asserts the new story renders.
+- Responsive UI tests cover profile layout ordering, compact card heights, and no horizontal
+  overflow at 320/375/390/430/768/1024/1440px.
+
+Mocked media tests do not verify a real S3 bucket or production user authorization; these
+remain final device/integration acceptance checks.
