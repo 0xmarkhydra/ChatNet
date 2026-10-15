@@ -167,3 +167,17 @@ Two customer screenshot regressions were corrected:
 Automated Chromium regression checks validate popup placement, three menu actions, keyboard and backdrop dismissal, profile settings row geometry, 42 screen/viewport layouts, feed pagination, group management and iOS motion. Added targeted 320 / 390 / 768 / 1440 px checks for both screenshot issues, while checking that the popup does not overlap the desktop conversation sidebar. QA screenshots are retained locally at `frontend/output/playwright/layout/quick-create-{390,1440}.png` and `profile-actions-{390,1440}.png` (gitignored).
 
 Existing auth, notifications, translation, messaging, profile APIs and other business flows have not been changed. Production real-user verification should follow the Railway deployment.
+
+## SOCO compact headers and account/create menu — 2026-10-15
+
+Mobile screenshots approved removal of the three redundant full-width banner headings and their subtitles:
+- Chat sidebar: removed the `TIN NHẮN / Trò chuyện` intro and its `Kết nối` action; search, QR and "+" remain in the app bar, and find/connect remains accessible through "+" or empty state.
+- Contacts: removed `KẾT NỐI / Danh bạ` intro, friend count/status and redundant `Thêm bạn` button. The existing friend invitation and group shortcuts remain first.
+- Profile: removed `KHÔNG GIAN CỦA BẠN / Cá nhân` banner; profile cover/identity now begins immediately.
+
+Also finished the prior UX fixes:
+- Account install/logout controls are now consistent, full-width settings rows. They no longer occupy a detached footer with a right-aligned logout button.
+- "+" quick-create belongs to the appbar action, with three properly labelled actions, outside-click/Escape dismissal, an anchored desktop popover, and a compact iPhone bottom sheet. The conversation-list title and content are no longer obscured by a popup positioned relative to the sidebar.
+- UI regression tests on 7 viewport widths assert absence of the deleted heading blocks, correct quick-create position/dismissal, and aligned logout settings row, in addition to existing messaging/group/feed regression coverage.
+
+Validation: Vite/TypeScript build and authenticated UI layout smoke passed in the development worktree. Production requires post-deploy confirmation; mocked data cannot replace iPhone Safari/PWA acceptance.
