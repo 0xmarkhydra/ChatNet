@@ -140,23 +140,22 @@ try {
   for (const width of widths) {
     await page.setViewportSize({ width, height: width <= 375 ? 667 : width <= 430 ? 844 : 900 })
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
-    await geometry('chat-list', width, ['.modern-frame', '.conversation-sidebar', '.soco-chat-list-heading', '.conversation-list'])
+    await geometry('chat-list', width, ['.modern-frame', '.conversation-sidebar', '.conversation-list'])
+    check(await page.locator('.soco-chat-list-heading').count() === 0, 'Removed Chat banner reappeared: ' + width)
     await page.getByRole('button', { name: 'Danh bạ', exact: true }).click()
-    await geometry('contacts', width, ['.modern-frame', '.contacts-view', '.contact-shortcuts', '.soco-section-heading'])
+    await geometry('contacts', width, ['.modern-frame', '.contacts-view', '.contact-shortcuts'])
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
     await page.getByRole('button', { name: /Cá nhân/ }).click()
-    await geometry('profile', width, ['.modern-frame', '.profile-view', '.profile-hero', '.soco-section-heading'])
+    await geometry('profile', width, ['.modern-frame', '.profile-view', '.profile-hero'])
     const cover = await page.locator('.profile-cover-art').boundingBox()
     const name = await page.locator('.profile-identity-copy > strong').boundingBox()
     check(cover && name && name.y >= cover.y + cover.height - 3, 'Profile ' + width + 'px identity overlaps cover: ' + JSON.stringify({ cover, name }))
     if (width >= 900) {
-      const heading = await page.locator('.profile-view > .soco-section-heading').boundingBox()
       const hero = await page.locator('.profile-view > .profile-hero').boundingBox()
       const edit = await page.locator('.profile-view > .profile-edit-card').boundingBox()
       const settings = await page.locator('.profile-view > .settings-card').boundingBox()
-      check(heading && hero && edit && settings, 'Profile blocks absent at ' + width)
-      check(hero.y >= heading.y + heading.height - 1, 'Profile hero overlaps title at ' + width)
+      check(hero && edit && settings, 'Profile blocks absent at ' + width)
       check(edit.y >= hero.y + hero.height - 1, 'Profile edit overlaps hero at ' + width)
       check(settings.y >= edit.y + edit.height - 1, 'Profile settings overlap edit at ' + width)
     }
@@ -170,7 +169,8 @@ try {
   // Regression: connection sheet stays a fixed 50% of the viewport while results change.
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
-  await page.locator('.soco-chat-list-heading .soco-text-action').click()
+  await page.getByRole('button', { name: 'Tạo mới', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Tìm & kết nối/ }).click()
   const connect = page.locator('.connect-modal')
   await connect.waitFor()
   const beforeSearch = await connect.boundingBox()
@@ -342,6 +342,65 @@ try {
       'Closing group management must restore messages: ' + width)
     check(await page.locator('.media-composer').isVisible(), 'Closing group management must restore the composer: ' + width)
     await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  }
+
+  // Regression: the quick-create menu is attached to the + action, not to the
+  // conversation sidebar where it used to hide the heading/list on desktop.
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: width === 320 ? 667 : width === 390 ? 844 : 900 })
+    await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
+    const create = page.getByRole('button', { name: 'Tạo mới', exact: true })
+    await create.click()
+    const menu = page.getByRole('menu', { name: 'Tạo cuộc trò chuyện mới' })
+    await menu.waitFor()
+    check(await menu.getByRole('menuitem').count() === 3, 'Quick-create must show 3 actions')
+    const placement = await page.evaluate(() => {
+      const menu = document.querySelector('.appbar-create-anchor > .quick-create-menu').getBoundingClientRect()
+      const trigger = document.querySelector('.appbar-create-trigger').getBoundingClientRect()
+      const list = document.querySelector('.conversation-sidebar').getBoundingClientRect()
+      return { menu: { x: menu.x, y: menu.y, right: menu.right, bottom: menu.bottom },
+        trigger: { y: trigger.y, bottom: trigger.bottom }, sidebarRight: list.right, viewport: innerWidth }
+    })
+    check(placement.menu.x >= 0 && placement.menu.right <= width + 1,
+      'Quick-create popup horizontal overflow: ' + JSON.stringify({ width, placement }))
+    if (width > 760) check(placement.menu.x >= placement.sidebarRight - 3 &&
+      placement.menu.y >= placement.trigger.bottom - 2,
+      'Desktop quick-create must open under +, clear of the conversation list: ' + JSON.stringify(placement))
+    else check(placement.menu.y > placement.trigger.bottom + 70 &&
+      placement.menu.bottom <= (width === 320 ? 667 : 844) - 60,
+      'Mobile quick-create must be a bottom sheet, not cover the chat-list title: ' + JSON.stringify(placement))
+    if (width === 390 || width === 1440)
+      await page.screenshot({ path: 'output/playwright/layout/quick-create-' + width + '.png' })
+    await page.keyboard.press('Escape')
+    check(await page.getByRole('menu', { name: 'Tạo cuộc trò chuyện mới' }).count() === 0,
+      'Escape must close the create menu')
+    await create.click()
+    await page.getByRole('button', { name: 'Đóng menu tạo mới' }).click({ position: { x: 5, y: 5 } })
+    check(await page.getByRole('menu', { name: 'Tạo cuộc trò chuyện mới' }).count() === 0,
+      'Tapping outside must close create menu')
+  }
+
+  // Logout must be one full-width settings row, not a detached right-aligned button.
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: width === 320 ? 667 : width === 390 ? 844 : 900 })
+    await page.getByRole('button', { name: /Cá nhân/ }).click()
+    const signout = page.locator('.settings-card .settings-logout-row')
+    await signout.waitFor()
+    check(await page.locator('.profile-actions').count() === 0,
+      'Detached account actions footer must be removed')
+    const placement = await page.evaluate(() => {
+      const button = document.querySelector('.settings-logout-row').getBoundingClientRect()
+      const card = document.querySelector('.profile-view .settings-card').getBoundingClientRect()
+      return { button: { x: button.x, right: button.right, width: button.width, y: button.y },
+        card: { x: card.x, right: card.right, width: card.width } }
+    })
+    check(Math.abs(placement.button.x - placement.card.x) < 2 &&
+      Math.abs(placement.button.right - placement.card.right) < 2 &&
+      placement.button.width > 250,
+      'Sign-out row must fill settings card: ' + JSON.stringify({ width, placement }))
+    await signout.scrollIntoViewIfNeeded()
+    if (width === 390 || width === 1440)
+      await page.screenshot({ path: 'output/playwright/layout/profile-actions-' + width + '.png' })
   }
 
   check(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))

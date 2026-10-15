@@ -750,3 +750,192 @@
   .modern-shell .group-chat-panel .chat-head > .translate-controls::-webkit-scrollbar { display: none; }
   .modern-shell .group-chat-panel .chat-head > .translate-controls > * { flex-shrink: 0; }
 }
+
+/* SOCO account actions: Logout belongs to the settings card, not a detached
+   wide footer with one red button pushed to the far right. */
+.modern-shell .profile-view > .settings-card { overflow: hidden; }
+.modern-shell .settings-card > .settings-row:last-child { border-bottom: 0; }
+.modern-shell .settings-card .settings-install-row,
+.modern-shell .settings-card .settings-logout-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  min-height: 60px;
+  padding: 14px 20px;
+  font: inherit;
+  text-align: left;
+  border-left: 0;
+  border-right: 0;
+  background: #fff;
+}
+.modern-shell .settings-card .settings-install-row { color: #315fd1; }
+.modern-shell .settings-card .settings-logout-row {
+  border-top: 1px solid #e9edf6;
+  color: #ba3650;
+}
+.modern-shell .settings-card .settings-logout-row:hover { background: #fff7f8; }
+.modern-shell .settings-card .settings-install-row:hover { background: #f5f8ff; }
+.modern-shell .settings-card .settings-account-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 750;
+}
+.modern-shell .settings-card .settings-account-label svg { flex: 0 0 auto; }
+.modern-shell .settings-card .settings-account-chevron {
+  flex: 0 0 auto;
+  color: #8d9ab1;
+  font-size: 23px;
+  font-weight: 400;
+}
+.modern-shell .settings-card .settings-logout-row .settings-account-chevron { color: #d29aa6; }
+.modern-shell .settings-card .settings-logout-row:focus-visible,
+.modern-shell .settings-card .settings-install-row:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, .28);
+  outline-offset: -3px;
+}
+
+/* The new conversation menu belongs to the "+" button in the app header,
+   rather than using a fixed top offset in the sidebar and hiding its heading. */
+.modern-shell .chatnet-appbar:has(.appbar-create-trigger[aria-expanded="true"]) {
+  position: relative;
+  z-index: 100;
+  overflow: visible;
+}
+.modern-shell .appbar-create-anchor {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+}
+.modern-shell .appbar-create-trigger.active {
+  background: #e9efff;
+  color: #2459d9;
+}
+.modern-shell .appbar-create-anchor .quick-create-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100vw;
+  height: 100dvh;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+.modern-shell .appbar-create-anchor > .quick-create-menu {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 12px);
+  right: 0;
+  left: auto;
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  padding: 7px;
+  overflow: hidden;
+  border: 1px solid #e5ebfb;
+  border-radius: 20px;
+  background: rgba(255,255,255,.99);
+  box-shadow: 0 16px 46px rgba(23,43,94,.17), 0 3px 12px rgba(23,43,94,.05);
+  backdrop-filter: saturate(165%) blur(22px);
+  -webkit-backdrop-filter: saturate(165%) blur(22px);
+}
+.modern-shell .appbar-create-anchor .quick-create-caption {
+  padding: 9px 11px 5px;
+  color: #7a8cae;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .11em;
+}
+.modern-shell .appbar-create-anchor .quick-create-menu > button[role="menuitem"] {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 60px;
+  gap: 11px;
+  padding: 9px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: #182a4e;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 130ms ease;
+}
+.modern-shell .appbar-create-anchor .quick-create-menu > button[role="menuitem"]:hover,
+.modern-shell .appbar-create-anchor .quick-create-menu > button[role="menuitem"]:focus-visible {
+  background: #f1f5ff;
+}
+.modern-shell .appbar-create-anchor .quick-create-menu > button[role="menuitem"]:active {
+  transform: scale(.985);
+  background: #e9efff;
+}
+.modern-shell .appbar-create-anchor .quick-create-symbol {
+  display: grid;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 13px;
+  background: #eaf0ff;
+  color: #3767dc;
+}
+.modern-shell .appbar-create-anchor .quick-create-menu > button[role="menuitem"]:nth-of-type(3) .quick-create-symbol {
+  background: #f0ebff;
+  color: #7650cf;
+}
+.modern-shell .appbar-create-anchor .quick-create-menu strong {
+  display: block;
+  color: #172747;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 760;
+}
+.modern-shell .appbar-create-anchor .quick-create-menu small {
+  display: block;
+  margin-top: 3px;
+  color: #71819f;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  /* A backdrop-filter on the header creates a containing block for position:fixed.
+     Disable it only while the menu is open so the sheet anchors to the viewport. */
+  .modern-shell .chatnet-appbar:has(.appbar-create-trigger[aria-expanded="true"]) {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  /* iPhone actions use a compact bottom sheet so the chat-list title remains visible. */
+  .modern-shell .appbar-create-anchor > .quick-create-menu {
+    position: fixed;
+    top: auto;
+    bottom: max(83px, calc(env(safe-area-inset-bottom) + 72px));
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+    border-radius: 23px;
+    padding: 10px;
+  }
+  .modern-shell .appbar-create-anchor .quick-create-dismiss {
+    background: rgba(22, 38, 75, .18);
+  }
+  .modern-shell .settings-card .settings-logout-row,
+  .modern-shell .settings-card .settings-install-row {
+    min-height: 56px;
+    padding: 12px 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell .appbar-create-anchor .quick-create-menu > button[role="menuitem"] {
+    transition: none;
+  }
+}

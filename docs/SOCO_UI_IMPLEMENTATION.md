@@ -157,3 +157,13 @@ visible underneath. Fixed as a **dedicated group management view** on mobile:
 - Keep this regression in automated QA alongside the existing 42 viewport/screen checks and load-more tests.
 
 Live device validation is still required for keyboard, iOS Safari/PWA safe area, real membership and API responses.
+
+## SOCO quick-create and profile settings polish — 2026-10-15
+
+Two customer screenshot regressions were corrected:
+- The global plus (+) action used to render its menu inside the conversation sidebar with a fixed 60px top position, covering the conversation heading and first chats. The menu is now anchored to the actual appbar plus button on desktop (right-aligned popover); on iPhone it opens as a compact bottom action sheet, retaining chat-list visibility. It includes typed Lucide icons, accessible menuitem roles, aria-expanded, click-outside dismissal and Escape dismissal. Disabling appbar backdrop blur while the sheet is open avoids mispositioning fixed descendants.
+- The isolated right-aligned red logout button and large empty footer have been removed. 'Log out' (and install when relevant) now appears as a full-width row at the bottom of the existing profile settings card, with an icon, a subtle danger color and consistent padding. The existing logout/install actions are reused unchanged.
+
+Automated Chromium regression checks validate popup placement, three menu actions, keyboard and backdrop dismissal, profile settings row geometry, 42 screen/viewport layouts, feed pagination, group management and iOS motion. Added targeted 320 / 390 / 768 / 1440 px checks for both screenshot issues, while checking that the popup does not overlap the desktop conversation sidebar. QA screenshots are retained locally at `frontend/output/playwright/layout/quick-create-{390,1440}.png` and `profile-actions-{390,1440}.png` (gitignored).
+
+Existing auth, notifications, translation, messaging, profile APIs and other business flows have not been changed. Production real-user verification should follow the Railway deployment.

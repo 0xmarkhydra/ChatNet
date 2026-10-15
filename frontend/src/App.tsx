@@ -2,12 +2,12 @@ import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEff
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
-import { Bell, Check, Images, RefreshCw, UserCheck, UserPlus, X } from 'lucide-react'
+import { Bell, Check, Images, LogOut, MessageCircle, RefreshCw, Search, UserCheck, UserPlus, Users, X, Download } from 'lucide-react'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
 import SharedContent from './SharedContent'
-import { SocoSectionHeading, SocoEmptyState, SocoTextAction } from './SocoUI'
+import { SocoEmptyState, SocoTextAction } from './SocoUI'
 import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
@@ -448,6 +448,14 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('chat')
   const [globalSearch, setGlobalSearch] = useState('')
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
+  useEffect(() => {
+    if (!quickCreateOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setQuickCreateOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [quickCreateOpen])
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [hasMoreConversations, setHasMoreConversations] = useState(false)
   const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
@@ -3123,14 +3131,43 @@ export default function App() {
               >
                 <UiIcon name="qr" size={28} />
               </button>
-              <button
-                className="appbar-icon-button"
-                type="button"
-                aria-label="Tạo mới"
-                onClick={() => setQuickCreateOpen((current) => !current)}
-              >
-                <UiIcon name="plus" size={31} />
-              </button>
+              <div className="appbar-create-anchor">
+                <button
+                  className={quickCreateOpen ? 'appbar-icon-button appbar-create-trigger active' : 'appbar-icon-button appbar-create-trigger'}
+                  type="button"
+                  aria-label="Tạo mới"
+                  aria-expanded={quickCreateOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setQuickCreateOpen((current) => !current)}
+                >
+                  <UiIcon name="plus" size={29} />
+                </button>
+                {quickCreateOpen && (
+                  <>
+                    <button
+                      type="button"
+                      className="quick-create-dismiss"
+                      aria-label="Đóng menu tạo mới"
+                      onClick={() => setQuickCreateOpen(false)}
+                    />
+                    <div className="quick-create-menu" role="menu" aria-label="Tạo cuộc trò chuyện mới">
+                      <div className="quick-create-caption">TẠO MỚI</div>
+                      <button type="button" role="menuitem" onClick={() => openConnectSurface()}>
+                        <span className="quick-create-symbol"><Search size={19} aria-hidden="true" /></span>
+                        <div><strong>Tìm & kết nối</strong><small>Tìm bạn bè bằng tên hoặc @username</small></div>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => { setNewChatMode('direct'); setQuickCreateOpen(false) }}>
+                        <span className="quick-create-symbol"><MessageCircle size={19} aria-hidden="true" /></span>
+                        <div><strong>Chat riêng</strong><small>Bắt đầu cuộc trò chuyện 1-1</small></div>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => { setFriendQuery(''); setChatCreateError(''); setNewChatMode('group'); setQuickCreateOpen(false) }}>
+                        <span className="quick-create-symbol"><Users size={19} aria-hidden="true" /></span>
+                        <div><strong>Tạo nhóm</strong><small>Trò chuyện cùng nhiều người</small></div>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </>
           )}
 
@@ -3223,20 +3260,6 @@ export default function App() {
         {tab === 'chat' && (
           <div className={`messenger-layout modern-messenger ${activeConversation ? 'has-active' : ''}`}>
             <aside className="conversation-sidebar">
-              {quickCreateOpen && (
-                <div className="quick-create-menu">
-                  <button type="button" onClick={() => openConnectSurface()}>
-                    <span>⌕</span><div><strong>Tìm & kết nối</strong><small>Tên, username, email hoặc link mời</small></div>
-                  </button>
-                  <button type="button" onClick={() => { setNewChatMode('direct'); setQuickCreateOpen(false) }}>
-                    <span>＋</span><div><strong>Chat riêng</strong><small>Bắt đầu cuộc trò chuyện 1-1</small></div>
-                  </button>
-                  <button type="button" onClick={() => { setFriendQuery(''); setChatCreateError(''); setNewChatMode('group'); setQuickCreateOpen(false) }}>
-                    <span>👥</span><div><strong>Tạo nhóm</strong><small>Nhắn tin với nhiều người</small></div>
-                  </button>
-                </div>
-              )}
-
               {newChatMode === 'friends' && (
                 <div className="connect-modal-layer">
                   <button
@@ -3357,13 +3380,6 @@ export default function App() {
 
               {chatCreateError && newChatMode !== 'group' && <div className="inline-error">{chatCreateError}</div>}
 
-              <SocoSectionHeading
-                eyebrow="TIN NHẮN"
-                title="Trò chuyện"
-                description={`${conversations.length} cuộc trò chuyện · Kết nối không biên giới`}
-                className="soco-chat-list-heading"
-                action={<SocoTextAction onClick={() => openConnectSurface()} label="Tìm và kết nối bạn bè">Kết nối</SocoTextAction>}
-              />
               <div className="conversation-list zalo-conversation-list">
                 {visibleConversations.length === 0 && (
                   <div className="conversation-list-empty">
@@ -3969,10 +3985,6 @@ export default function App() {
 
         {tab === 'contacts' && (
           <div className="simple-view contacts-view">
-            <SocoSectionHeading eyebrow="KẾT NỐI" title="Danh bạ"
-              description={`${friends.length} bạn bè · ${status}`}
-              action={<SocoTextAction onClick={() => { setTab('chat'); setNewChatMode('friends') }}>Thêm bạn</SocoTextAction>}
-            />
             <div className="contact-shortcuts">
               <button type="button" onClick={() => { setTab('chat'); setNewChatMode('friends') }}>
                 <span className="shortcut-icon">＋</span><div><strong>Lời mời kết bạn</strong><small>Tìm và kết nối người mới</small></div><b>›</b>
@@ -4515,9 +4527,6 @@ export default function App() {
 
         {tab === 'profile' && (
           <div className="simple-view profile-view">
-            <SocoSectionHeading eyebrow="KHÔNG GIAN CỦA BẠN" title="Cá nhân"
-              description="Hồ sơ, ngôn ngữ và quyền riêng tư."
-            />
             <input
               ref={avatarFileInputRef}
               className="hidden-media-input"
@@ -4720,6 +4729,16 @@ export default function App() {
                   <i aria-hidden="true">›</i>
                 </span>
               </button>
+              {!isStandalone && (
+                <button type="button" className="settings-row settings-row-button settings-install-row" onClick={() => void installApp()}>
+                  <span className="settings-account-label"><Download size={19} aria-hidden="true" />{t('profile.install')}</span>
+                  <span className="settings-account-chevron" aria-hidden="true">›</span>
+                </button>
+              )}
+              <button type="button" className="settings-row settings-row-button settings-logout-row" onClick={() => logout()}>
+                <span className="settings-account-label"><LogOut size={19} aria-hidden="true" />{t('profile.logout')}</span>
+                <span className="settings-account-chevron" aria-hidden="true">›</span>
+              </button>
             </section>
 
             {translationPickerOpen && (
@@ -4864,10 +4883,6 @@ export default function App() {
               </div>
             )}
 
-            <section className="profile-actions">
-              {!isStandalone && <button type="button" onClick={() => void installApp()}>{t('profile.install')}</button>}
-              <button type="button" className="danger-action" onClick={() => logout()}>{t('profile.logout')}</button>
-            </section>
           </div>
         )}
       </section>
