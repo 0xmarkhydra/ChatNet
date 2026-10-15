@@ -33,4 +33,4 @@ class ChatNetCallAudioProcessor extends AudioWorkletProcessor {
     return true;
   }
 }
-registerProcessor('chatnet-call-audio', ChatNetCallAudioProcessor);
+registerProcessor('chatnet-media-translation', ChatNetCallAudioProcessor);

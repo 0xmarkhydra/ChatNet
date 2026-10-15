@@ -24,9 +24,8 @@ import {
   generateEphemeralCallKeyPair, generateKeyGeneration, generateMediaKey,
   mediaKeyBuffer, unwrapMediaKey, wrapMediaKey, type EphemeralCallKeyPair,
 } from './callCrypto'
-import { startGeminiInterpreter, type InterpreterSession, type InterpreterUpdate } from './geminiCallLive'
+import { startCallMediaInterpreter, type InterpreterSession, type InterpreterUpdate } from './callMediaInterpreter'
 import { buildLanguageOptions } from './languages'
-import { GEMINI_LIVE_LANGUAGES, normalizeGeminiLanguage } from './geminiLanguages'
 import './call.css'
 
 type ConversationLite = { id: number; name: string; type: 'direct' | 'group' }
@@ -215,6 +214,7 @@ export default function CallManager({
         <SecureCallRoom
           call={active}
           title={activeName}
+          apiBase={apiBase}
           request={callRequest}
           userId={userId}
           sourceLanguage={sourceLanguage}
@@ -231,6 +231,7 @@ export default function CallManager({
 type SecureCallRoomProps = {
   call: CallSession
   title: string
+  apiBase: string
   request: CallRequest
   userId: number
   sourceLanguage: string
@@ -249,7 +250,7 @@ type RoomRuntime = {
 }
 
 function SecureCallRoom({
-  call, title, request, userId, sourceLanguage, targetLanguage, canEnd, onClosed, onError,
+  call, title, apiBase, request, userId, sourceLanguage, targetLanguage, canEnd, onClosed, onError,
 }: SecureCallRoomProps) {
   const [phase, setPhase] = useState<'securing' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('securing')
   const [detail, setDetail] = useState('Đang thiết lập mã hóa đầu cuối…')
@@ -260,26 +261,45 @@ function SecureCallRoom({
   const [screenOn, setScreenOn] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
   const [translationOn, setTranslationOn] = useState(false)
-  const [callTargetLanguage, setCallTargetLanguage] = useState<string>(() => normalizeGeminiLanguage(targetLanguage))
+  const [callTargetLanguage, setCallTargetLanguage] = useState<string>(() => {
+    const lang = targetLanguage.toLowerCase().split('-')[0]
+    return lang === 'zh' ? 'zh-Hans' : lang === 'pt' ? 'pt-BR' : lang === 'tl' ? 'fil' : lang
+  })
   const [translationError, setTranslationError] = useState('')
   const [translationRetryEpoch, setTranslationRetryEpoch] = useState(0)
-  const [translatedAudioOn, setTranslatedAudioOn] = useState(false)
   const [allowMyVoice, setAllowMyVoice] = useState(false)
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>([])
   const [consentRequested, setConsentRequested] = useState(false)
   const [remoteConsent, setRemoteConsent] = useState<Record<string, boolean>>({})
   const [translatingIds, setTranslatingIds] = useState<string[]>([])
   const [captions, setCaptions] = useState<CallCaption[]>([])
   const interpreters = useRef(new Map<string, InterpreterSession>())
   const interpreterPending = useRef(new Set<string>())
+  useEffect(() => {
+    let mounted = true
+    request('/api/calls/translation/languages').then(async (response) => {
+      if (!response.ok) return
+      const body = await response.json() as { languages?: string[] }
+      if (mounted && Array.isArray(body.languages)) {
+        setAvailableLanguages(body.languages)
+        if (!body.languages.includes(callTargetLanguage)) {
+          setCallTargetLanguage(body.languages.includes(targetLanguage.split('-')[0]) ? targetLanguage.split('-')[0] : 'en')
+        }
+      }
+    }).catch(() => undefined)
+    return () => { mounted = false }
+  }, [request])
+
   const languageOptions = useMemo(() => {
     const catalog = buildLanguageOptions(sourceLanguage)
-    return GEMINI_LIVE_LANGUAGES.map((value) => {
+    return availableLanguages.map((value) => {
       const option = catalog.find((item) => item.code === value.split('-')[0])
       const fallback = new Intl.DisplayNames([sourceLanguage], { type: 'language' }).of(value) || value
       return { value, label: (option?.flag || '🌐') + ' ' + (option?.localizedLanguage || fallback) +
         (value.includes('-') ? ' (' + value + ')' : '') + ' · ' + (option?.nativeLanguage || value) }
-    })
-  }, [sourceLanguage])
+    }).sort((a,b) => a.label.localeCompare(b.label, sourceLanguage))
+  }, [sourceLanguage, availableLanguages])
+
   const [ending, setEnding] = useState(false)
   const lastEnvelopeGeneration = useRef('')
   const hostWrappedKeys = useRef(new Map<number, string>())
@@ -498,7 +518,7 @@ function SecureCallRoom({
       stopAll()
       return
     }
-    // One isolated Gemini stream per remote speaker so group voices never get mixed.
+    // Translate each remote speaker separately so simultaneous speech is not mixed.
     const consent = JSON.parse(remoteConsentKey) as Record<string, boolean>
     const tracks = Array.from(room.remoteParticipants.values()).flatMap((participant) =>
       Array.from(participant.audioTrackPublications.values())
@@ -509,8 +529,8 @@ function SecureCallRoom({
       if (interpreterPending.current.has(id) || interpreters.current.has(id)) return
       interpreterPending.current.add(id)
       try {
-        const session = await startGeminiInterpreter({
-          speakerId: id, track, callId: call.id, targetLanguage: callTargetLanguage, request,
+        const session = await startCallMediaInterpreter({
+          speakerId: id, track, callId: call.id, targetLanguage: callTargetLanguage, apiBase, request,
           onUpdate: (update: InterpreterUpdate) => {
             if (cancelled) return
             setCaptions((current) => appendCallCaption(current, update))
@@ -519,7 +539,7 @@ function SecureCallRoom({
           onReady: () => { if (!cancelled) setTranslatingIds((current) => Array.from(new Set([...current, id]))) },
         })
         if (cancelled) session.stop()
-        else { session.setVolume(translatedAudioOn ? 1 : 0); interpreters.current.set(id, session) }
+        else { interpreters.current.set(id, session) }
       } catch (error) {
         if (!cancelled) setTranslationError(error instanceof Error ? error.message : 'Không thể bật phiên dịch.')
       } finally { interpreterPending.current.delete(id) }
@@ -527,14 +547,11 @@ function SecureCallRoom({
     return () => { cancelled = true; stopAll(); setTranslatingIds([]) }
   // Stable stream IDs and consent data are the only topology dependencies.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room, translationOn, call.id, callTargetLanguage, remoteTrackKey, remoteConsentKey, request, translationRetryEpoch])
+  }, [room, translationOn, call.id, callTargetLanguage, remoteTrackKey, remoteConsentKey, request, translationRetryEpoch, apiBase])
 
   useEffect(() => {
-    for (const interpreter of interpreters.current.values()) interpreter.setVolume(translatedAudioOn ? 1 : 0)
-  }, [translatedAudioOn])
-
-  useEffect(() => {
-    if (!translationOn) { setTranslatedAudioOn(false); setCaptions([]); setTranslationError('') }
+    setAllowMyVoice(translationOn)
+    if (!translationOn) { setCaptions([]); setTranslationError('') }
   }, [translationOn])
 
   async function toggleMic() {
@@ -626,9 +643,9 @@ function SecureCallRoom({
             ))}
           </div>
           {translationOn && (
-            <aside className="call-live-panel" aria-label="Phiên dịch Gemini Live">
+<aside className="call-live-panel" aria-label="Phiên dịch trực tiếp">
               <header className="call-live-heading">
-                <div><Languages size={18} /><strong>Phiên dịch trực tiếp</strong><small>Gemini Live</small></div>
+                <div><Languages size={18} /><strong>Phiên dịch trực tiếp</strong><small>AI</small></div>
                 <button type="button" aria-label="Tắt phiên dịch" onClick={() => setTranslationOn(false)}><X size={18}/></button>
               </header>
               <div className="call-live-settings">
@@ -637,18 +654,7 @@ function SecureCallRoom({
                     {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
                 </label>
-                <label className="call-live-check">
-                  <input type="checkbox" checked={translatedAudioOn} onChange={(event) => setTranslatedAudioOn(event.target.checked)} />
-                  <span>Phát giọng dịch (âm thanh gốc nhỏ hơn)</span>
-                </label>
-                <label className="call-live-check">
-                  <input type="checkbox" checked={allowMyVoice} onChange={(event) => {
-                    setAllowMyVoice(event.target.checked)
-                    setConsentRequested(false)
-                  }} />
-                  <span>Cho phép người trong cuộc gọi dùng AI dịch giọng nói của tôi</span>
-                </label>
-                <small>Âm thanh được gửi từ trình duyệt của người nghe tới Gemini chỉ khi người nói cho phép. Không tự lưu bản ghi cuộc gọi.</small>
+                <small>AI tự động dịch phụ đề và phát tiếng dịch khi người nói cho phép. Không lưu bản ghi cuộc gọi.</small>
               </div>
               {translationError && <div className="call-live-error" role="alert">
                 <span>{translationError}</span>
@@ -674,7 +680,7 @@ function SecureCallRoom({
             </aside>
           )}
         </div>
-        {room && <RemoteAudioSinks room={room} muted={!soundOn} volume={translationOn && translatedAudioOn && translatingIds.length ? 0.2 : 1} revision={revision} />}
+        {room && <RemoteAudioSinks room={room} muted={!soundOn} volume={translationOn && translatingIds.length ? 0.2 : 1} revision={revision} />}
         {consentRequested && !allowMyVoice && (
           <div className="call-translation-consent-prompt" role="status">
             <span>Một người tham gia muốn bật AI phiên dịch giọng nói của bạn.</span>
@@ -697,7 +703,7 @@ function SecureCallRoom({
             {soundOn ? <Volume2 /> : <VolumeX />}<span>Âm thanh</span>
           </button>
           <button type="button" className={translationOn ? 'is-on' : ''} disabled={!room || ending}
-            aria-pressed={translationOn} title="Dịch thoại và phụ đề bằng Gemini Live"
+            aria-pressed={translationOn} title="Dịch thoại trực tiếp"
             onClick={() => setTranslationOn((value) => !value)}
           ><Languages /><span>{translationOn ? 'Đang dịch' : 'Dịch AI'}</span></button>
           <button type="button" className="hangup-button" disabled={ending} onClick={() => void closeCall(canEnd)}>

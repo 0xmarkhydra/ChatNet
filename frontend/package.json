@@ -12,7 +12,7 @@
     "check:optimistic": "node --experimental-strip-types scripts/optimistic-check.mjs",
     "check:ui": "node scripts/run-ui-layout.mjs",
     "check:call-translation": "node --experimental-strip-types scripts/call-translation-check.mjs",
-    "check:gemini-call": "node --experimental-strip-types scripts/gemini-call-check.mjs",
+    "check:call-live": "node scripts/call-live-check.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

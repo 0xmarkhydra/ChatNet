@@ -243,7 +243,7 @@
   .call-caption-line { font-size: 13px; }
   .call-caption-line small { display: none; }
 }
-/* Gemini Live call translation: a stable split layout, never an overlay on faces. */
+/* Call translation uses a stable split layout, never an overlay on faces. */
 .call-main-layout { display:grid; grid-template-columns:minmax(0,1fr); min-height:0; overflow:hidden; }
 .call-main-layout.has-translation { grid-template-columns:minmax(0,1fr) minmax(290px,350px); gap:1px; background:#1d2435; }
 .call-main-layout .secure-call-grid { height:100%; min-height:0; }
@@ -282,10 +282,8 @@
   .call-main-layout.has-translation { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(115px,1fr) minmax(190px,48%); }
   .call-live-panel { border-left:0; border-top:1px solid rgba(153,162,250,.25); }
   .call-live-heading { min-height:45px; padding:8px 12px; }
-  .call-live-settings { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px 12px; padding:8px 12px; }
-  .call-live-settings > label:not(.call-live-check) { grid-column:1; grid-row:1 / 3; }
-  .call-live-settings .call-live-check { grid-column:2; }
-  .call-live-settings > small { grid-column:1 / -1; }
+  .call-live-settings { grid-template-columns:1fr; gap:6px; padding:8px 12px; }
+  .call-live-settings > label:not(.call-live-check), .call-live-settings > small { grid-column:1; }
   .call-live-footnote { display:none; }
   .call-live-transcript { padding:8px; gap:7px; }
   .call-live-entry { padding:7px 10px; }
