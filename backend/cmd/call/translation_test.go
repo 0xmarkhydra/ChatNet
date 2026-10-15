@@ -23,11 +23,17 @@ func TestLiveTranslationSetup(t *testing.T) {
 	if !ok || tr["targetLanguageCode"] != "vi" {
 		t.Fatal("target language missing")
 	}
-	if _, ok := config["inputAudioTranscription"]; !ok {
-		t.Fatal("input transcript disabled")
+	if _, ok := setup["inputAudioTranscription"]; !ok {
+		t.Fatal("input transcript must be in setup")
 	}
-	if _, ok := config["outputAudioTranscription"]; !ok {
-		t.Fatal("output transcript disabled")
+	if _, ok := setup["outputAudioTranscription"]; !ok {
+		t.Fatal("output transcript must be in setup")
+	}
+	if _, wrong := config["inputAudioTranscription"]; wrong {
+		t.Fatal("input transcript must not be nested in generationConfig")
+	}
+	if _, wrong := config["outputAudioTranscription"]; wrong {
+		t.Fatal("output transcript must not be nested in generationConfig")
 	}
 	raw, _ := json.Marshal(setup)
 	if len(raw) == 0 {

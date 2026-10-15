@@ -320,11 +320,14 @@ func geminiLiveSetup(target string) map[string]any {
 		"setup": map[string]any{
 			"model": "models/" + geminiTranslationModel,
 			"generationConfig": map[string]any{
-				"responseModalities":       []string{"AUDIO"},
-				"inputAudioTranscription":  map[string]any{},
-				"outputAudioTranscription": map[string]any{},
-				"translationConfig":        map[string]any{"targetLanguageCode": target, "echoTargetLanguage": false},
+				"responseModalities": []string{"AUDIO"},
+				"translationConfig": map[string]any{
+					"targetLanguageCode": target,
+					"echoTargetLanguage": false,
+				},
 			},
+			"inputAudioTranscription":  map[string]any{},
+			"outputAudioTranscription": map[string]any{},
 		},
 	}
 }
