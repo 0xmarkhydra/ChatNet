@@ -335,7 +335,7 @@ func safeTranslationError(err error) string {
 	}
 	var closeErr *websocket.CloseError
 	if errors.As(err, &closeErr) {
-		return fmt.Sprintf("websocket close code=%d", closeErr.Code)
+		return fmt.Sprintf("websocket close code=%d reason=%q", closeErr.Code, sanitizeGeminiDiagnostic(closeErr.Text))
 	}
 	return fmt.Sprintf("%T", err) // Avoid URLs and credential-bearing handshake details in logs.
 }
@@ -425,4 +425,14 @@ func parseGeminiLiveError(raw []byte) (string, string) {
 		return reply.Error.Status, "provider rejected credentials or request"
 	}
 	return reply.Error.Status, message
+}
+func sanitizeGeminiDiagnostic(value string) string {
+	if key := strings.TrimSpace(config.Env("GEMINI_API_KEY", "")); key != "" {
+		value = strings.ReplaceAll(value, key, "[redacted]")
+	}
+	value = strings.Join(strings.Fields(value), " ")
+	if len(value) > 400 {
+		value = value[:400]
+	}
+	return value
 }
