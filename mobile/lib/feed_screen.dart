@@ -1158,6 +1158,29 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ],
           ),
+          if (post['author'] == widget.api.user['username']) ...[
+            const SizedBox(height: 5),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: () => _postAction(post, 'edit'),
+                  icon: const Icon(Icons.edit_outlined, size: 17),
+                  label: const Text('Sửa'),
+                ),
+                TextButton.icon(
+                  onPressed: () => _postAction(post, 'delete'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFBE3D56),
+                  ),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 17),
+                  label: const Text('Xóa'),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

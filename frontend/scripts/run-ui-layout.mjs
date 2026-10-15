@@ -41,7 +41,7 @@ const pagedMessages = Array.from({ length: 45 }, (_, index) => ({
   createdAt: new Date(Date.UTC(2026, 9, 2, 7, index)).toISOString(),
 }))
 const pagedPosts = Array.from({ length: 18 }, (_, index) => ({
-  id: 18 - index, author: 'minhanh', content: 'Bài viết kiểm thử phân trang số ' + (18 - index),
+  id: 18 - index, author: index === 0 ? 'soco_user' : 'minhanh', content: 'Bài viết kiểm thử phân trang số ' + (18 - index),
   likes: 8, liked: false, comments: [], createdAt: '2026-10-02T07:00:00Z',
 }))
 const friends = [{ id: 2, username: 'minhanh', displayName: 'Minh Anh', status: 'accepted', online: true, updatedAt: '2026-10-02T07:00:00Z' }]
@@ -194,6 +194,23 @@ try {
     check(await page.locator('.contacts-view > .soco-section-heading').count() === 0, 'Removed Contacts banner reappeared: ' + width)
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
+    // Regression: edit/delete must be immediately visible on own posts, without opening the overflow menu.
+    const ownPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 18' })
+    const editPost = ownPost.getByRole('button', { name: 'Sửa bài viết', exact: true })
+    const deletePost = ownPost.getByRole('button', { name: 'Xóa bài viết', exact: true })
+    check(await editPost.isVisible() && await deletePost.isVisible(),
+      'Own-post Edit/Delete quick actions must be visible: ' + width)
+    check(await page.locator('.feed-owner-shortcuts').count() === 1,
+      'Other authors must not receive owner quick actions: ' + width)
+    const buttonsArea = await ownPost.locator('.feed-owner-shortcuts').boundingBox()
+    check(buttonsArea && buttonsArea.x >= -2 && buttonsArea.x + buttonsArea.width <= width + 2,
+      'Owner actions overflow iPhone layout: ' + width)
+    if (width === 320 || width === 390 || width === 1440) {
+      await editPost.click()
+      const editor = ownPost.locator('.feed-actions-panel .feed-actions-editor')
+      check(await editor.isVisible(), 'Own-post Edit must open the editor: ' + width)
+      await ownPost.getByRole('button', { name: 'Đóng', exact: true }).click()
+    }
     await page.getByRole('button', { name: /Cá nhân/ }).click()
     await geometry('profile', width, ['.modern-frame', '.profile-view', '.profile-hero'])
     check(await page.locator('.profile-view > .soco-section-heading').count() === 0, 'Removed Profile banner reappeared: ' + width)

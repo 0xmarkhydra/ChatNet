@@ -4495,6 +4495,11 @@ export default function App() {
                         <UiIcon name="comment" size={21} />
                         <span>{post.comments?.length ? `${post.comments.length} bình luận` : 'Xem chi tiết'}</span>
                       </button>
+                      {post.author === name && (
+                        <FeedPostActions quick post={post} mine request={apiFetch}
+                          onUpdated={syncFeedPost} onDeleted={removeFeedPost}
+                          onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
+                      )}
                     </div>
                   </div>
                 </article>
