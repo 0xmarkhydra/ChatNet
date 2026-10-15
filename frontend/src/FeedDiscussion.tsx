@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Ellipsis } from 'lucide-react'
 
 export type FeedComment = {
   id: number
@@ -124,6 +125,22 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   const { replyTo, drafts } = editor
   const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
   const [editingComment, setEditingComment] = useState<number | null>(null)
+  const [commentOptionsId, setCommentOptionsId] = useState<number | null>(null)
+  useEffect(() => {
+    if (commentOptionsId === null) return
+    function onDismiss(event: PointerEvent) {
+      if (!(event.target as HTMLElement).closest('.feed-comment-menu')) setCommentOptionsId(null)
+    }
+    function onEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setCommentOptionsId(null)
+    }
+    document.addEventListener('pointerdown', onDismiss)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('pointerdown', onDismiss)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [commentOptionsId])
   const [editingText, setEditingText] = useState('')
   const [reportingComment, setReportingComment] = useState<number | null>(null)
   const [reportReason, setReportReason] = useState('Nội dung spam')
@@ -201,14 +218,27 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
             <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
             <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời @${comment.author}`}>Trả lời</button>
             <div className="feed-comment-menu">
-              {comment.author === currentUser ? (
-                <>
-                  <button type="button" disabled={commentActionBusy} onClick={() => { setEditingComment(comment.id); setEditingText(comment.content); setReportingComment(null) }}>Sửa</button>
-                  <button type="button" disabled={commentActionBusy} onClick={() => {
-                    if (window.confirm('Xóa bình luận và các phản hồi bên dưới?')) void runAction(() => onDelete(comment.id))
-                  }}>Xóa</button>
-                </>
-              ) : <button type="button" onClick={() => { setReportingComment(reportingComment === comment.id ? null : comment.id); setEditingComment(null) }}>Báo cáo</button>}
+              <button type="button" aria-label="Tùy chọn bình luận" aria-expanded={commentOptionsId === comment.id}
+                onClick={() => setCommentOptionsId(current => current === comment.id ? null : comment.id)}>
+                <Ellipsis size={16} />
+              </button>
+              {commentOptionsId === comment.id && (
+                <div className="feed-comment-options" role="group" aria-label="Thao tác bình luận">
+                  {comment.author === currentUser ? (
+                    <>
+                      <button type="button" disabled={commentActionBusy} onClick={() => {
+                        setEditingComment(comment.id); setEditingText(comment.content); setReportingComment(null); setCommentOptionsId(null)
+                      }}>Chỉnh sửa bình luận</button>
+                      <button type="button" className="danger" disabled={commentActionBusy} onClick={() => {
+                        setCommentOptionsId(null)
+                        if (window.confirm('Xóa bình luận và các phản hồi bên dưới?')) void runAction(() => onDelete(comment.id))
+                      }}>Xóa bình luận</button>
+                    </>
+                  ) : <button type="button" onClick={() => {
+                    setReportingComment(comment.id); setEditingComment(null); setCommentOptionsId(null)
+                  }}>Báo cáo bình luận</button>}
+                </div>
+              )}
             </div>
           </div>
           {reportingComment === comment.id && <div className="feed-comment-edit">

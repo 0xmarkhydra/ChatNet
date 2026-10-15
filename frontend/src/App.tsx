@@ -1,6 +1,6 @@
 import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
-import FeedPostActions from './FeedPostActions'
+import FeedPostActions, { FeedShareAction } from './FeedPostActions'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
@@ -4486,20 +4486,23 @@ export default function App() {
                     <div className="feed-media-preview" onClick={() => setActivePostId(post.id)}>
                       <MediaAttachmentsView items={post.attachments} />
                     </div>
+                    {(post.likes > 0 || (post.comments?.length || 0) > 0) && (
+                      <div className="post-engagement-summary">
+                        {post.likes > 0 && <span>{post.likes} lượt thích</span>}
+                        {(post.comments?.length || 0) > 0 && <span>{post.comments.length} bình luận</span>}
+                      </div>
+                    )}
                     <div className="post-toolbar">
                       <button type="button" className={post.liked ? 'liked' : ''} disabled={likePreviews[post.id] !== undefined}
                         aria-pressed={post.liked} aria-busy={likePreviews[post.id] !== undefined} onClick={() => void like(post)}>
-                        <UiIcon name="heart" size={21} /><span>Thích</span>{post.likes > 0 && <b>{post.likes}</b>}
+                        <UiIcon name="heart" size={21} /><span>Thích</span>
                       </button>
                       <button type="button" className="post-stat post-detail-trigger" onClick={() => setActivePostId(post.id)}>
                         <UiIcon name="comment" size={21} />
-                        <span>{post.comments?.length ? `${post.comments.length} bình luận` : 'Xem chi tiết'}</span>
+                        <span>Bình luận</span>
                       </button>
-                      {post.author === name && (
-                        <FeedPostActions quick post={post} mine request={apiFetch}
-                          onUpdated={syncFeedPost} onDeleted={removeFeedPost}
-                          onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
-                      )}
+                      <FeedShareAction postId={post.id}
+                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
                     </div>
                   </div>
                 </article>

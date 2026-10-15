@@ -1,20 +1,40 @@
 
-.feed-actions-root {position:relative;z-index:5}
-.feed-actions-panel {position:absolute;z-index:30;top:35px;right:0;width:min(330px,calc(100vw - 36px));max-height:72dvh;overflow:auto;border:1px solid #e6e9f5;border-radius:20px;background:#fff;box-shadow:0 18px 60px #1c2e5f2a;padding:10px;color:#17264d}
-.feed-actions-header {display:flex;align-items:center;justify-content:space-between;padding:6px 8px 10px}
-.feed-actions-header button {border:0;background:#f2f5fc;border-radius:10px;padding:6px;display:flex;color:#53627e}
+/* Post options use a portal to escape clipped feed cards. */
+.feed-actions-root {position:relative;flex-shrink:0}
+.feed-actions-root .post-more {display:inline-grid;place-items:center;min-width:40px;min-height:40px;border:0;border-radius:999px;background:transparent;color:#64748b;cursor:pointer;touch-action:manipulation}
+.feed-actions-root .post-more:hover,.feed-actions-root .post-more[aria-expanded=true] {background:#f0f3ff;color:#454ccc}
+.feed-actions-root .post-more:focus-visible {outline:2px solid #6366f1;outline-offset:2px}
+.feed-actions-overlay {position:fixed;inset:0;z-index:99999;pointer-events:none}
+.feed-actions-backdrop {position:absolute;inset:0;width:100%;height:100%;padding:0;margin:0;border:0;background:transparent;pointer-events:auto;cursor:default}
+.feed-actions-panel {position:fixed;width:min(330px,calc(100vw - 24px));max-height:min(80dvh,560px);overflow-y:auto;overscroll-behavior:contain;box-sizing:border-box;border:1px solid #e5eafb;border-radius:20px;background:rgba(255,255,255,.98);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 55px rgba(20,39,83,.21);padding:9px;color:#1e2c4a;pointer-events:auto}
+.feed-actions-grabber {display:none}
+.feed-actions-header {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 9px 11px}
+.feed-actions-header strong {font-size:15px;font-weight:750}
+.feed-actions-header button {display:grid;place-items:center;width:32px;height:32px;border:0;background:#f2f4fb;border-radius:50%;color:#53627e;cursor:pointer}
 .feed-actions-list {display:flex;flex-direction:column;gap:3px}
-.feed-actions-list button {border:0;background:transparent;display:flex;align-items:center;gap:11px;text-align:left;padding:12px 11px;border-radius:12px;color:#243654;font:inherit;font-size:14px}
-.feed-actions-list button:hover,.feed-actions-list button:focus-visible {background:#f1f4ff}
-.feed-actions-list button.danger {color:#d63349}
-.feed-actions-editor {display:flex;flex-direction:column;gap:12px;padding:5px}
-.feed-actions-editor label {display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
-.feed-actions-editor textarea,.feed-actions-editor select {font:inherit;border:1px solid #dfe5f3;background:#f7f9fe;border-radius:12px;padding:10px;max-width:100%;width:100%;box-sizing:border-box;color:#1c2e4a}
-.feed-actions-editor textarea {resize:vertical;min-height:90px}
-.feed-actions-footer {display:flex;gap:8px;justify-content:flex-end}
-.feed-actions-footer button {padding:9px 15px;border:0;border-radius:12px;background:#edf1f9;color:#273a62}
+.feed-actions-list button {border:0;background:transparent;display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:12px 13px;min-height:45px;border-radius:13px;color:#243654;font:inherit;font-size:14px;font-weight:500;cursor:pointer}
+.feed-actions-list button:hover,.feed-actions-list button:focus-visible {background:#eef1fe;color:#384dcc}
+.feed-actions-list button.danger {color:#cc3854}
+.feed-actions-list button.danger:hover {background:#fff0f3;color:#b62844}
+.feed-actions-separator {height:1px;background:#eef0f5;margin:5px 9px}
+.feed-actions-editor {display:flex;flex-direction:column;gap:13px;padding:5px 8px 10px}
+.feed-actions-editor label {display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600}
+.feed-actions-editor textarea,.feed-actions-editor select {font:inherit;border:1px solid #dfe5f3;background:#f7f9fe;border-radius:12px;padding:11px;max-width:100%;width:100%;box-sizing:border-box;color:#1c2e4a}
+.feed-actions-editor textarea {resize:vertical;min-height:100px}
+.feed-actions-footer {display:flex;gap:8px;justify-content:flex-end;margin-top:2px}
+.feed-actions-footer button {padding:10px 15px;border:0;border-radius:12px;min-height:42px;background:#edf1f9;color:#273a62;cursor:pointer}
 .feed-actions-footer button:last-child {color:white;background:linear-gradient(120deg,#2563eb,#8b5cf6)}
-.feed-actions-footer button:disabled {opacity:.5}
+.feed-actions-footer .feed-confirm-delete {background:#cc3955!important}
+.feed-actions-footer button:disabled,.feed-actions-list button:disabled {opacity:.5;cursor:wait}
+.feed-delete-warning {font-size:14px;line-height:1.6;color:#56617a;margin:3px 0 7px}
+
+.post-engagement-summary {display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:12px;padding:8px 3px 0;color:#6b7893;font-size:12px}
+.post-toolbar {display:flex;align-items:center;gap:5px;flex-wrap:nowrap;min-width:0}
+.post-toolbar > button {flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:42px;padding:7px 4px;border-radius:12px;white-space:nowrap}
+.post-toolbar button span {font-size:12px;line-height:1.25}
+.post-toolbar button svg {flex-shrink:0}
+.feed-share-action {display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;flex:1 1 0;min-width:0}
+
 .feed-composer-settings {display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 4px}
 .feed-composer-settings label {display:flex;gap:8px;align-items:center;color:#65748e;font-size:12px}
 .feed-composer-settings select {max-width:155px;padding:8px 10px;border:1px solid #e0e7f5;border-radius:11px;background:#f7f9ff;color:#2b4b87}
@@ -33,25 +53,23 @@
 .feed-filter-tabs {display:flex;gap:5px;border:1px solid #e4eafa;background:#f7f9fe;border-radius:12px;padding:3px}
 .feed-filter-tabs button {border:0;border-radius:9px;background:transparent;color:#697995;padding:7px 10px;font-size:12px}
 .feed-filter-tabs button[aria-pressed=true] {color:#335ddd;background:#fff;box-shadow:0 1px 6px #2a4c8a20;font-weight:700}
-.feed-comment-menu {display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.feed-comment-menu button {border:0;background:transparent;color:#6a7891;font-size:12px;padding:3px}
+.feed-comment-menu {position:relative;display:flex;align-items:center;z-index:4}
+.feed-comment-menu > button {display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;padding:5px;border:0;border-radius:999px;background:transparent;color:#67748c;cursor:pointer}
+.feed-comment-menu > button:hover,.feed-comment-menu > button[aria-expanded=true] {background:#eff2fc}
+.feed-comment-options {position:absolute;top:calc(100% + 3px);left:0;z-index:20;display:grid;min-width:188px;overflow:hidden;padding:5px;border:1px solid #e4e8f4;border-radius:13px;background:white;box-shadow:0 12px 38px rgba(27,40,83,.2)}
+.feed-comment-options button {border:0;background:transparent;border-radius:9px;color:#263450;text-align:left;font-size:12px;padding:10px 12px;cursor:pointer}
+.feed-comment-options button:hover {background:#edf2ff}
+.feed-comment-options .danger {color:#c93d54}
 .feed-comment-edit {display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .feed-comment-edit textarea {width:100%;border:1px solid #ccd7f3;border-radius:11px;padding:10px;box-sizing:border-box}
 .feed-comment-edit > div {display:flex;justify-content:flex-end;gap:10px}
 .feed-comment-edit button {border:0;border-radius:9px;background:#e8eeff;color:#3156c6;padding:7px 12px}
-@media(max-width:760px) {.feed-actions-panel{position:fixed;top:auto;bottom:max(78px,env(safe-area-inset-bottom));right:10px;left:10px;width:auto;max-height:70dvh;border-radius:22px}}
-/* Post ownership actions are intentionally visible; three-dot menu remains for secondary actions. */
-.post-toolbar {flex-wrap:wrap;align-items:center}
-.feed-actions-quick {margin-left:auto;max-width:100%}
-.feed-owner-shortcuts {display:flex;align-items:center;gap:6px}
-.post-toolbar .feed-owner-shortcuts button {display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:36px;padding:7px 11px;border-radius:11px;font:inherit;font-size:12px;font-weight:700;white-space:nowrap;touch-action:manipulation}
-.post-toolbar .feed-owner-shortcuts .feed-owner-edit {color:#3455d1;background:#edf1ff}
-.post-toolbar .feed-owner-shortcuts .feed-owner-delete {color:#c33c56;background:#fff1f3}
-.post-toolbar .feed-owner-shortcuts button:focus-visible {outline:2px solid #625be8;outline-offset:2px}
-.post-toolbar .feed-owner-shortcuts button:disabled {opacity:.55}
-@media(max-width:420px) {
- .post-toolbar {gap:5px}
- .post-toolbar > button {font-size:12px;padding:7px 8px}
- .feed-actions-quick {margin-left:0}
- .post-toolbar .feed-owner-shortcuts button {min-height:38px}
+
+@media(max-width:760px) {
+ .feed-actions-backdrop {background:rgba(15,23,42,.35)}
+ .feed-actions-panel {left:10px!important;right:10px!important;top:auto!important;bottom:max(12px,env(safe-area-inset-bottom))!important;width:auto;max-height:calc(85dvh - env(safe-area-inset-bottom));border-radius:26px;padding:10px 12px 15px;background:#fff;box-shadow:0 -10px 40px rgba(16,24,54,.2)}
+ .feed-actions-grabber {display:block;width:38px;height:5px;background:#d9deeb;border-radius:99px;margin:2px auto 12px}
+ .feed-actions-list button {min-height:50px;padding:13px}
+ .feed-actions-header strong {font-size:16px}
+ .feed-share-action span {font-size:12px}
 }

@@ -194,22 +194,42 @@ try {
     check(await page.locator('.contacts-view > .soco-section-heading').count() === 0, 'Removed Contacts banner reappeared: ' + width)
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
-    // Regression: edit/delete must be immediately visible on own posts, without opening the overflow menu.
+    // Only social engagement actions belong in the footer. Manage post from •••.
     const ownPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 18' })
-    const editPost = ownPost.getByRole('button', { name: 'Sửa bài viết', exact: true })
-    const deletePost = ownPost.getByRole('button', { name: 'Xóa bài viết', exact: true })
-    check(await editPost.isVisible() && await deletePost.isVisible(),
-      'Own-post Edit/Delete quick actions must be visible: ' + width)
-    check(await page.locator('.feed-owner-shortcuts').count() === 1,
-      'Other authors must not receive owner quick actions: ' + width)
-    const buttonsArea = await ownPost.locator('.feed-owner-shortcuts').boundingBox()
-    check(buttonsArea && buttonsArea.x >= -2 && buttonsArea.x + buttonsArea.width <= width + 2,
-      'Owner actions overflow iPhone layout: ' + width)
-    if (width === 320 || width === 390 || width === 1440) {
-      await editPost.click()
-      const editor = ownPost.locator('.feed-actions-panel .feed-actions-editor')
-      check(await editor.isVisible(), 'Own-post Edit must open the editor: ' + width)
-      await ownPost.getByRole('button', { name: 'Đóng', exact: true }).click()
+    check(await ownPost.locator('.feed-share-action').isVisible(),
+      'Sharing must appear alongside Like and Comment: ' + width)
+    check(await page.locator('.feed-owner-shortcuts').count() === 0,
+      'Do not put Edit/Delete next to engagement buttons: ' + width)
+    if ([320, 390, 1440].includes(width)) {
+      await ownPost.getByRole('button', { name: 'Tùy chọn bài viết' }).click()
+      const options = page.getByRole('dialog', { name: 'Tùy chọn bài viết' })
+      check(await options.isVisible(), 'Post menu must open: ' + width)
+      check(await options.getByRole('button', { name: 'Chỉnh sửa bài viết' }).isVisible(),
+        'Author Edit must be inside the options menu: ' + width)
+      check(await options.getByRole('button', { name: 'Xóa bài viết' }).isVisible(),
+        'Author Delete must be inside the options menu: ' + width)
+      if (width <= 390) {
+        const bounds = await options.boundingBox()
+        check(bounds && bounds.x >= -1 && bounds.x + bounds.width <= width + 1 && bounds.y >= 0,
+          'Mobile options sheet must fit the viewport: ' + width)
+      }
+      await options.getByRole('button', { name: 'Chỉnh sửa bài viết' }).click()
+      check(await options.locator('.feed-actions-editor').isVisible(),
+        'Edit action must open the editor: ' + width)
+      await options.getByRole('button', { name: 'Hủy' }).click()
+      await options.getByRole('button', { name: 'Xóa bài viết' }).click()
+      check(await options.getByText('Bài viết và các bình luận sẽ bị xóa vĩnh viễn.', { exact: false }).isVisible(),
+        'Delete action must show confirmation: ' + width)
+      await options.getByRole('button', { name: 'Hủy' }).click()
+      await options.getByRole('button', { name: 'Đóng', exact: true }).click()
+      const otherPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 17' })
+      await otherPost.getByRole('button', { name: 'Tùy chọn bài viết' }).click()
+      check(await page.getByRole('dialog').getByRole('button', { name: 'Báo cáo bài viết' }).isVisible(),
+        'Other posts must show reporting: ' + width)
+      check(await page.getByRole('dialog').getByRole('button', { name: 'Chỉnh sửa bài viết' }).count() === 0,
+        'Other posts must not allow editing: ' + width)
+      await page.keyboard.press('Escape')
+      check(await page.getByRole('dialog').count() === 0, 'Escape should dismiss menu: ' + width)
     }
     await page.getByRole('button', { name: /Cá nhân/ }).click()
     await geometry('profile', width, ['.modern-frame', '.profile-view', '.profile-hero'])
