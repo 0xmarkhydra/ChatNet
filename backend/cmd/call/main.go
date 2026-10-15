@@ -152,6 +152,7 @@ func main() {
 	}
 	s.limiter.Redis = rdb
 	go s.reapExpiredCalls(ctx)
+	go diagnoseGeminiLiveOnBoot()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)

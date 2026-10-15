@@ -72,24 +72,7 @@ func (s *server) callTranslationToken(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusServiceUnavailable, "Gemini Live translation is not configured")
 		return
 	}
-	now := time.Now().UTC()
-	payload := map[string]any{
-		"uses":                 1,
-		"newSessionExpireTime": now.Add(time.Minute).Format(time.RFC3339),
-		"expireTime":           now.Add(30 * time.Minute).Format(time.RFC3339),
-		"liveConnectConstraints": map[string]any{
-			"model": "models/" + geminiTranslationModel,
-			"config": map[string]any{
-				"responseModalities":       []string{"AUDIO"},
-				"inputAudioTranscription":  map[string]any{},
-				"outputAudioTranscription": map[string]any{},
-				"translationConfig": map[string]any{
-					"targetLanguageCode": target,
-					"echoTargetLanguage": false,
-				},
-			},
-		},
-	}
+	payload := geminiTokenPayload(target, time.Now().UTC())
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "invalid Gemini configuration")
@@ -158,4 +141,60 @@ func geminiTokenError(raw []byte) (status, reason string) {
 		reason = "no provider message"
 	}
 	return
+}
+
+// Request body is shared by the live endpoint and one-time startup diagnostic.
+func geminiTokenPayload(target string, now time.Time) map[string]any {
+	return map[string]any{
+		"uses":                 1,
+		"newSessionExpireTime": now.Add(time.Minute).Format(time.RFC3339),
+		"expireTime":           now.Add(30 * time.Minute).Format(time.RFC3339),
+		"liveConnectConstraints": map[string]any{
+			"model": "models/" + geminiTranslationModel,
+			"config": map[string]any{
+				"responseModalities":       []string{"AUDIO"},
+				"inputAudioTranscription":  map[string]any{},
+				"outputAudioTranscription": map[string]any{},
+				"translationConfig": map[string]any{
+					"targetLanguageCode": target,
+					"echoTargetLanguage": false,
+				},
+			},
+		},
+	}
+}
+
+func diagnoseGeminiLiveOnBoot() {
+	apiKey := strings.TrimSpace(config.Env("GEMINI_API_KEY", ""))
+	if apiKey == "" {
+		log.Print("Gemini Live diagnostic: GEMINI_API_KEY missing on backend service")
+		return
+	}
+	// Startup check never exposes the key or generated session token and sends no audio.
+	payload, _ := json.Marshal(geminiTokenPayload("en", time.Now().UTC()))
+	req, err := http.NewRequest(http.MethodPost, "https://generativelanguage.googleapis.com/v1beta/auth_tokens", bytes.NewReader(payload))
+	if err != nil {
+		log.Printf("Gemini Live diagnostic: malformed request: %v", err)
+		return
+	}
+	req.Header.Set("x-goog-api-key", apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Gemini Live diagnostic: network error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	reply, err := io.ReadAll(io.LimitReader(resp.Body, 16<<10))
+	if err != nil {
+		log.Printf("Gemini Live diagnostic: response error: %v", err)
+		return
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		providerCode, providerReason := geminiTokenError(reply)
+		log.Printf("Gemini Live diagnostic: http_status=%d provider_status=%s provider_reason=%q", resp.StatusCode, providerCode, providerReason)
+		return
+	}
+	log.Printf("Gemini Live diagnostic: token provisioning succeeded")
 }
