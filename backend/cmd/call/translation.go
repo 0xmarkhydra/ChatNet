@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -111,7 +112,8 @@ func (s *server) callTranslationToken(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 	reply, err := io.ReadAll(io.LimitReader(resp.Body, 16<<10))
 	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Printf("Gemini token issue status=%d read_error=%v", resp.StatusCode, err)
+		googleCode, googleReason := geminiTokenError(reply)
+		log.Printf("Gemini token issue http_status=%d provider_status=%s provider_reason=%q read_error=%v", resp.StatusCode, googleCode, googleReason, err)
 		httpx.Error(w, http.StatusBadGateway, "Gemini Live translation unavailable")
 		return
 	}
@@ -128,4 +130,32 @@ func (s *server) callTranslationToken(w http.ResponseWriter, r *http.Request) {
 		"model":          geminiTranslationModel,
 		"targetLanguage": target,
 	})
+}
+
+var geminiSensitiveTokenPattern = regexp.MustCompile(`(?i)(?:AIza[0-9a-z_-]{15,}|AQ[.][0-9a-z_.-]{15,}|auth_tokens/[0-9a-z_-]{12,})`)
+
+// Return only a sanitized provider diagnostic. Never log the request's API key or an issued token.
+func geminiTokenError(raw []byte) (status, reason string) {
+	var reply struct {
+		Error struct {
+			Status  string `json:"status"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(raw, &reply) != nil {
+		return "unparseable", "provider response could not be parsed"
+	}
+	status = strings.TrimSpace(reply.Error.Status)
+	if status == "" {
+		status = "unknown"
+	}
+	reason = strings.Join(strings.Fields(reply.Error.Message), " ")
+	reason = geminiSensitiveTokenPattern.ReplaceAllString(reason, "[redacted]")
+	if len(reason) > 360 {
+		reason = reason[:360]
+	}
+	if reason == "" {
+		reason = "no provider message"
+	}
+	return
 }
