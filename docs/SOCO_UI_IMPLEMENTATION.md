@@ -181,3 +181,30 @@ Also finished the prior UX fixes:
 - UI regression tests on 7 viewport widths assert absence of the deleted heading blocks, correct quick-create position/dismissal, and aligned logout settings row, in addition to existing messaging/group/feed regression coverage.
 
 Validation: Vite/TypeScript build and authenticated UI layout smoke passed in the development worktree. Production requires post-deploy confirmation; mocked data cannot replace iPhone Safari/PWA acceptance.
+
+## Mobile group chat: compact header + three-dot action sheet — 2026-10-15
+
+User feedback: a two-row mobile group header with phone, video, media, group
+management, and the flag/AI/language chip felt crowded. Only on mobile
+(<=760px), group conversations now show one row with back, group name/member
+count, one-touch audio call, and a "Tùy chọn nhóm" three-dot button.
+The old multi-action strip is hidden **only for group chats on mobile**.
+Direct chats and desktop retain their existing actions.
+
+New `frontend/src/GroupActionsSheet.tsx` is portaled to `document.body`
+with styling in `group-actions-sheet.css` so frosted/sticky app bars do not
+misposition it. The menu provides existing call audio/video, shared media,
+member management, automatic translation toggle, and searchable translation
+language selection (full language catalog). It invokes existing application
+actions, never duplicate API logic. Tap-outside, Escape, focus trapping/
+restoration, touch target sizing, safe areas, reduced motion and scroll within
+the sheet are supported.
+
+Automated Playwright coverage opens the menu at 320/375/390/430px, checks
+the single-row geometry and absence of the old action strip, checks that
+call/media/group/translation affordances exist, uses language search,
+toggles auto-translation, confirms Escape dismissal and enters group management
+without losing its prior full-height/sticky/scrollable behavior. Build, PWA,
+session, optimistic UI, OneSignal and Go backend checks passed. This does
+not certify physical iPhone/Safari gestures or authenticated production calls;
+the corresponding integrations should be accepted on a real device.

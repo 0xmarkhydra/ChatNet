@@ -2,10 +2,11 @@ import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEff
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
-import { Bell, Check, Images, LogOut, MessageCircle, RefreshCw, Search, UserCheck, UserPlus, Users, X, Download } from 'lucide-react'
+import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, X, Download } from 'lucide-react'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
+import GroupActionsSheet from './GroupActionsSheet'
 import SharedContent from './SharedContent'
 import { SocoEmptyState, SocoTextAction } from './SocoUI'
 import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
@@ -474,6 +475,8 @@ export default function App() {
   const messageLongPressTimer = useRef<number | null>(null)
   const messageLongPressStart = useRef<{ x: number; y: number; messageId: number } | null>(null)
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
+  const [groupActionsOpen, setGroupActionsOpen] = useState(false)
+  useEffect(() => setGroupActionsOpen(false), [activeConversationId, tab])
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [groupNameDraft, setGroupNameDraft] = useState('')
   const [groupInviteDraft, setGroupInviteDraft] = useState('')
@@ -2587,6 +2590,24 @@ export default function App() {
     }
   }
 
+  function openGroupSettings(conversation: Conversation) {
+    setGroupActionsOpen(false)
+    setGroupSettingsOpen(true)
+    setGroupNameDraft(conversation.name)
+    setGroupInviteSearch('')
+    setGroupInviteSelection([])
+    void Promise.all([
+      refreshGroupMembers(conversation.id),
+      refreshFriendConnections(),
+    ])
+  }
+
+  function launchGroupCall(conversationId: number, mediaType: 'audio' | 'video') {
+    window.dispatchEvent(new CustomEvent('chatnet:start-call', {
+      detail: { conversationId, mediaType },
+    }))
+  }
+
   async function refreshGroupMembers(conversationId = activeConversationId || undefined) {
     if (!conversationId) return
     try {
@@ -3463,6 +3484,18 @@ export default function App() {
                       </div>
                     </div>
 
+                    {activeConversation.type === 'group' && (
+                      <div className="group-mobile-actions">
+                        <CallHeaderActions conversationId={activeConversation.id} />
+                        <button type="button" className="group-more-trigger"
+                          aria-label="Tùy chọn nhóm" aria-haspopup="dialog"
+                          aria-expanded={groupActionsOpen}
+                          onClick={() => setGroupActionsOpen((open) => !open)}>
+                          <MoreHorizontal size={23} aria-hidden="true" />
+                        </button>
+                      </div>
+                    )}
+
                     <div className="translate-controls">
                       <CallHeaderActions conversationId={activeConversation.id} />
                       <button
@@ -3480,17 +3513,8 @@ export default function App() {
                           type="button"
                           className={groupSettingsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
                           onClick={() => {
-                            const next = !groupSettingsOpen
-                            setGroupSettingsOpen(next)
-                            if (next) {
-                              setGroupNameDraft(activeConversation.name)
-                              setGroupInviteSearch('')
-                              setGroupInviteSelection([])
-                              void Promise.all([
-                                refreshGroupMembers(activeConversation.id),
-                                refreshFriendConnections(),
-                              ])
-                            }
+                            if (groupSettingsOpen) setGroupSettingsOpen(false)
+                            else openGroupSettings(activeConversation)
                           }}
                         >
                           👥 Nhóm
@@ -3594,6 +3618,22 @@ export default function App() {
                       </div>
                     </div>
                   </header>
+
+                  {groupActionsOpen && activeConversation.type === 'group' && !groupSettingsOpen && (
+                    <GroupActionsSheet
+                      groupName={activeConversation.name}
+                      memberCount={activeConversation.memberCount}
+                      autoTranslate={autoTranslate}
+                      targetLanguage={targetLanguage}
+                      languages={languageOptions}
+                      onClose={() => setGroupActionsOpen(false)}
+                      onCall={(mediaType) => launchGroupCall(activeConversation.id, mediaType)}
+                      onSharedContent={() => setSharedContentOpen(true)}
+                      onManageGroup={() => openGroupSettings(activeConversation)}
+                      onToggleAutoTranslate={() => changeAutoTranslate(!autoTranslate)}
+                      onChangeLanguage={(language) => changeTargetLanguage(language)}
+                    />
+                  )}
 
                   {chatFriend && (
                     <div className={`chat-friend-bar relationship-${chatFriendRelationship}`} aria-label="Kết bạn trong cuộc trò chuyện">

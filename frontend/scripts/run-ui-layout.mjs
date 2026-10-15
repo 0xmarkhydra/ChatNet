@@ -300,14 +300,52 @@ try {
     await page.setViewportSize({ width, height: width <= 375 ? 667 : width === 390 ? 844 : 932 })
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
     await page.locator('.conversation-item').filter({ hasText: 'Nhóm SOCO' }).first().click()
-    const headerAction = await page.locator('.chat-head .call-header-actions button').first().boundingBox()
+    const headerAction = await page.locator('.chat-head .group-mobile-actions .call-header-actions button').first().boundingBox()
     const backAction = await page.getByRole('button', { name: 'Quay lại danh sách' }).boundingBox()
-    check(headerAction && backAction && headerAction.width > 25 && headerAction.x >= 0 &&
-      headerAction.x + headerAction.width <= width && headerAction.y >= backAction.y + backAction.height - 1,
-      'Group header actions must be visible below the back/name row: ' + JSON.stringify({ width, headerAction, backAction }))
+    const more = page.getByRole('button', { name: 'Tùy chọn nhóm' })
+    const moreBox = await more.boundingBox()
+    check(headerAction && backAction && moreBox && headerAction.width >= 40 &&
+      headerAction.x >= backAction.x + backAction.width &&
+      moreBox.x >= headerAction.x + headerAction.width - 1 &&
+      moreBox.x + moreBox.width <= width + 1 && Math.abs(headerAction.y - backAction.y) < 8 &&
+      Math.abs(moreBox.y - backAction.y) < 8,
+      'Mobile group header must stay in one compact row: ' + JSON.stringify({ width, headerAction, backAction, moreBox }))
+    check(await page.locator('.group-chat-panel .chat-head > .translate-controls').isVisible() === false,
+      'Legacy multi-action row must be hidden on mobile')
     if (width === 320 || width === 390)
       await page.screenshot({ path: 'output/playwright/layout/group-chat-header-' + width + '.png' })
-    await page.locator('.chat-head .group-settings-toggle:not(.shared-content-trigger)').click()
+
+    await more.click()
+    const sheet = page.getByRole('dialog', { name: 'Tùy chọn cuộc trò chuyện nhóm' })
+    await sheet.waitFor()
+    check(await sheet.getByRole('button', { name: 'Gọi video' }).count() === 1 &&
+      await sheet.getByRole('button', { name: 'Gọi thoại' }).count() === 1 &&
+      await sheet.getByRole('button', { name: /Ảnh, tệp & liên kết/ }).count() === 1,
+      'Call/media actions must remain accessible in group sheet: ' + width)
+    const sheetRect = await sheet.boundingBox()
+    check(sheetRect && sheetRect.x >= -1 && sheetRect.x + sheetRect.width <= width + 1 &&
+      sheetRect.y > 0 && sheetRect.y + sheetRect.height <= page.viewportSize().height + 1,
+      'Group options sheet must respect phone viewport: ' + JSON.stringify({ width, sheetRect }))
+    if (width === 390) {
+      await page.screenshot({ path: 'output/playwright/layout/group-options-390.png' })
+      await sheet.getByRole('button', { name: 'Ngôn ngữ dịch' }).click()
+      const languages = page.getByRole('dialog', { name: 'Chọn ngôn ngữ dịch' })
+      await languages.waitFor()
+      await languages.getByRole('searchbox').fill('ja')
+      check(await languages.locator('.soco-group-actions-language-row').count() >= 1,
+        'Language search within group sheet must show supported languages')
+      await languages.getByRole('button', { name: 'Quay lại tùy chọn nhóm' }).click()
+      await sheet.getByRole('switch', { name: /Dịch tự động/ }).click()
+      check(await sheet.getByRole('switch', { name: /Dịch tự động/ }).getAttribute('aria-checked') === 'false',
+        'Group translation toggle must reuse existing preference state')
+      await sheet.getByRole('switch', { name: /Dịch tự động/ }).click()
+      await page.keyboard.press('Escape')
+      check(await page.getByRole('dialog', { name: 'Tùy chọn cuộc trò chuyện nhóm' }).count() === 0,
+        'Escape must close group sheet')
+      await more.click()
+    }
+    await page.getByRole('dialog', { name: 'Tùy chọn cuộc trò chuyện nhóm' })
+      .getByRole('button', { name: /Thành viên & quản lý nhóm/ }).click()
     const group = page.locator('.group-settings-panel')
     await group.waitFor()
     await group.getByText('Bạn là chủ nhóm').waitFor()
