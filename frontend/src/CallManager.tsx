@@ -11,7 +11,7 @@ import {
   type TrackPublication,
 } from 'livekit-client'
 import {
-  Mic, MicOff, MonitorUp, MonitorX, Phone, PhoneOff, ShieldCheck,
+  Languages, Mic, MicOff, MonitorUp, MonitorX, Phone, PhoneOff, ShieldCheck,
   Users, Video, VideoOff, Volume2, VolumeX, X,
 } from 'lucide-react'
 import {
@@ -24,6 +24,9 @@ import {
   generateEphemeralCallKeyPair, generateKeyGeneration, generateMediaKey,
   mediaKeyBuffer, unwrapMediaKey, wrapMediaKey, type EphemeralCallKeyPair,
 } from './callCrypto'
+import { startGeminiInterpreter, type InterpreterSession, type InterpreterUpdate } from './geminiCallLive'
+import { buildLanguageOptions } from './languages'
+import { GEMINI_LIVE_LANGUAGES, normalizeGeminiLanguage } from './geminiLanguages'
 import './call.css'
 
 type ConversationLite = { id: number; name: string; type: 'direct' | 'group' }
@@ -34,9 +37,19 @@ type CallManagerProps = {
   apiBase: string
   token: string
   userId: number
+  sourceLanguage: string
+  targetLanguage: string
   conversations: ConversationLite[]
 }
 
+type CallCaption = {
+  id: string
+  speakerId: string
+  original: string
+  translated: string
+  updatedAt: number
+}
+const CONSENT_TOPIC = 'chatnet.call.translation.consent.v1'
 export function CallHeaderActions({ conversationId }: { conversationId: number }) {
   const start = (mediaType: CallMediaType) => {
     window.dispatchEvent(new CustomEvent<CallLaunchDetail>('chatnet:start-call', {
@@ -55,7 +68,9 @@ export function CallHeaderActions({ conversationId }: { conversationId: number }
   )
 }
 
-export default function CallManager({ request, apiBase, token, userId, conversations }: CallManagerProps) {
+export default function CallManager({
+  request, apiBase, token, userId, sourceLanguage, targetLanguage, conversations,
+}: CallManagerProps) {
   const [incoming, setIncoming] = useState<CallView | null>(null)
   const [active, setActive] = useState<CallView | CallSession | null>(null)
   const [busy, setBusy] = useState(false)
@@ -202,6 +217,8 @@ export default function CallManager({ request, apiBase, token, userId, conversat
           title={activeName}
           request={callRequest}
           userId={userId}
+          sourceLanguage={sourceLanguage}
+          targetLanguage={targetLanguage}
           canEnd={'canEnd' in active ? active.canEnd : active.createdBy === userId}
           onClosed={() => { setActive(null); setIncoming(null); void refresh() }}
           onError={setError}
@@ -216,6 +233,8 @@ type SecureCallRoomProps = {
   title: string
   request: CallRequest
   userId: number
+  sourceLanguage: string
+  targetLanguage: string
   canEnd: boolean
   onClosed: () => void
   onError: (message: string) => void
@@ -229,7 +248,9 @@ type RoomRuntime = {
   credentials: CallJoinCredentials
 }
 
-function SecureCallRoom({ call, title, request, userId, canEnd, onClosed, onError }: SecureCallRoomProps) {
+function SecureCallRoom({
+  call, title, request, userId, sourceLanguage, targetLanguage, canEnd, onClosed, onError,
+}: SecureCallRoomProps) {
   const [phase, setPhase] = useState<'securing' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('securing')
   const [detail, setDetail] = useState('Đang thiết lập mã hóa đầu cuối…')
   const [runtime, setRuntime] = useState<RoomRuntime | null>(null)
@@ -238,6 +259,27 @@ function SecureCallRoom({ call, title, request, userId, canEnd, onClosed, onErro
   const [cameraOn, setCameraOn] = useState(call.mediaType === 'video')
   const [screenOn, setScreenOn] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
+  const [translationOn, setTranslationOn] = useState(false)
+  const [callTargetLanguage, setCallTargetLanguage] = useState<string>(() => normalizeGeminiLanguage(targetLanguage))
+  const [translationError, setTranslationError] = useState('')
+  const [translationRetryEpoch, setTranslationRetryEpoch] = useState(0)
+  const [translatedAudioOn, setTranslatedAudioOn] = useState(false)
+  const [allowMyVoice, setAllowMyVoice] = useState(false)
+  const [consentRequested, setConsentRequested] = useState(false)
+  const [remoteConsent, setRemoteConsent] = useState<Record<string, boolean>>({})
+  const [translatingIds, setTranslatingIds] = useState<string[]>([])
+  const [captions, setCaptions] = useState<CallCaption[]>([])
+  const interpreters = useRef(new Map<string, InterpreterSession>())
+  const interpreterPending = useRef(new Set<string>())
+  const languageOptions = useMemo(() => {
+    const catalog = buildLanguageOptions(sourceLanguage)
+    return GEMINI_LIVE_LANGUAGES.map((value) => {
+      const option = catalog.find((item) => item.code === value.split('-')[0])
+      const fallback = new Intl.DisplayNames([sourceLanguage], { type: 'language' }).of(value) || value
+      return { value, label: (option?.flag || '🌐') + ' ' + (option?.localizedLanguage || fallback) +
+        (value.includes('-') ? ' (' + value + ')' : '') + ' · ' + (option?.nativeLanguage || value) }
+    })
+  }, [sourceLanguage])
   const [ending, setEnding] = useState(false)
   const lastEnvelopeGeneration = useRef('')
   const hostWrappedKeys = useRef(new Map<number, string>())
@@ -394,9 +436,106 @@ function SecureCallRoom({ call, title, request, userId, canEnd, onClosed, onErro
   const room = runtime?.room
   const participants = useMemo(() => {
     if (!room) return [] as Participant[]
-    revision // force recomputation when LiveKit emits topology/track events
+    revision // Active tracks, participants and reconnections update the call UI.
     return [room.localParticipant, ...Array.from(room.remoteParticipants.values())]
   }, [revision, room])
+
+  // Voice consent is explicit; LiveKit already authenticates the sender identity.
+  useEffect(() => {
+    if (!room) return
+    const announce = () => {
+      void room.localParticipant.publishData(
+        new TextEncoder().encode(JSON.stringify({ type: 'consent', allowed: allowMyVoice })),
+        { reliable: true, topic: CONSENT_TOPIC },
+      ).catch(() => undefined)
+    }
+    const onData = (payload: Uint8Array, participant?: Participant, _kind?: unknown, topic?: string) => {
+      if (topic !== CONSENT_TOPIC || !participant || payload.byteLength > 256) return
+      try {
+        const message = JSON.parse(new TextDecoder().decode(payload)) as { type?: string; allowed?: boolean }
+        if (message.type === 'consent' && typeof message.allowed === 'boolean') {
+          setRemoteConsent((current) => ({ ...current, [participant.identity]: message.allowed! }))
+        }
+        if (message.type === 'request' && !allowMyVoice) setConsentRequested(true)
+      } catch { /* Ignore unrecognized control payloads. */ }
+    }
+    room.on(RoomEvent.DataReceived, onData)
+    room.on(RoomEvent.ParticipantConnected, announce)
+    announce()
+    return () => {
+      room.off(RoomEvent.DataReceived, onData)
+      room.off(RoomEvent.ParticipantConnected, announce)
+    }
+  }, [room, allowMyVoice])
+
+  useEffect(() => {
+    if (!room || !translationOn) return
+    void room.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ type: 'request' })),
+      { reliable: true, topic: CONSENT_TOPIC },
+    ).catch(() => undefined)
+  }, [room, translationOn])
+
+  const remoteTracks = participants.flatMap((participant) =>
+    participant === room?.localParticipant ? [] : Array.from(participant.audioTrackPublications.values())
+      .filter((publication) => publication.track && !publication.isMuted)
+      .map((publication) => ({
+        speakerId: participant.identity,
+        track: (publication.track as RemoteTrack).mediaStreamTrack,
+        trackSid: publication.trackSid,
+      })),
+  )
+  const remoteTrackKey = remoteTracks.map((entry) => entry.speakerId + ':' + entry.trackSid).join('|')
+  const remoteConsentKey = JSON.stringify(remoteConsent)
+  useEffect(() => {
+    let cancelled = false
+    const stopAll = () => {
+      for (const session of interpreters.current.values()) session.stop()
+      interpreters.current.clear()
+      interpreterPending.current.clear()
+    }
+    if (!translationOn || !room) {
+      stopAll()
+      return
+    }
+    // One isolated Gemini stream per remote speaker so group voices never get mixed.
+    const consent = JSON.parse(remoteConsentKey) as Record<string, boolean>
+    const tracks = Array.from(room.remoteParticipants.values()).flatMap((participant) =>
+      Array.from(participant.audioTrackPublications.values())
+        .filter((publication) => publication.track && !publication.isMuted && consent[participant.identity])
+        .map((publication) => ({ id: participant.identity, track: (publication.track as RemoteTrack).mediaStreamTrack })),
+    ).slice(0, 5)
+    void Promise.all(tracks.map(async ({ id, track }) => {
+      if (interpreterPending.current.has(id) || interpreters.current.has(id)) return
+      interpreterPending.current.add(id)
+      try {
+        const session = await startGeminiInterpreter({
+          speakerId: id, track, callId: call.id, targetLanguage: callTargetLanguage, request,
+          onUpdate: (update: InterpreterUpdate) => {
+            if (cancelled) return
+            setCaptions((current) => appendCallCaption(current, update))
+          },
+          onError: (message) => { if (!cancelled) setTranslationError(message) },
+          onReady: () => { if (!cancelled) setTranslatingIds((current) => Array.from(new Set([...current, id]))) },
+        })
+        if (cancelled) session.stop()
+        else { session.setVolume(translatedAudioOn ? 1 : 0); interpreters.current.set(id, session) }
+      } catch (error) {
+        if (!cancelled) setTranslationError(error instanceof Error ? error.message : 'Không thể bật phiên dịch.')
+      } finally { interpreterPending.current.delete(id) }
+    }))
+    return () => { cancelled = true; stopAll(); setTranslatingIds([]) }
+  // Stable stream IDs and consent data are the only topology dependencies.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room, translationOn, call.id, callTargetLanguage, remoteTrackKey, remoteConsentKey, request, translationRetryEpoch])
+
+  useEffect(() => {
+    for (const interpreter of interpreters.current.values()) interpreter.setVolume(translatedAudioOn ? 1 : 0)
+  }, [translatedAudioOn])
+
+  useEffect(() => {
+    if (!translationOn) { setTranslatedAudioOn(false); setCaptions([]); setTranslationError('') }
+  }, [translationOn])
 
   async function toggleMic() {
     if (!room) return
@@ -473,20 +612,76 @@ function SecureCallRoom({ call, title, request, userId, canEnd, onClosed, onErro
           </div>
         </header>
 
-        <div className={`secure-call-grid count-${Math.min(participants.length, 6)}`}>
-          {participants.length === 0 ? (
-            <div className="call-connecting-state">
-              <div className="call-secure-spinner" />
-              <ShieldCheck size={28} />
-              <strong>{phase === 'error' ? 'Không thể kết nối an toàn' : 'Đang bảo vệ cuộc gọi…'}</strong>
-              <span>{detail}</span>
-            </div>
-          ) : participants.map((participant) => (
-            <ParticipantTile key={participant.identity} participant={participant} local={participant === room?.localParticipant} />
-          ))}
+        <div className={translationOn ? 'call-main-layout has-translation' : 'call-main-layout'}>
+          <div className={`secure-call-grid count-${Math.min(participants.length, 6)}`}>
+            {participants.length === 0 ? (
+              <div className="call-connecting-state">
+                <div className="call-secure-spinner" />
+                <ShieldCheck size={28} />
+                <strong>{phase === 'error' ? 'Không thể kết nối an toàn' : 'Đang bảo vệ cuộc gọi…'}</strong>
+                <span>{detail}</span>
+              </div>
+            ) : participants.map((participant) => (
+              <ParticipantTile key={participant.identity} participant={participant} local={participant === room?.localParticipant} />
+            ))}
+          </div>
+          {translationOn && (
+            <aside className="call-live-panel" aria-label="Phiên dịch Gemini Live">
+              <header className="call-live-heading">
+                <div><Languages size={18} /><strong>Phiên dịch trực tiếp</strong><small>Gemini Live</small></div>
+                <button type="button" aria-label="Tắt phiên dịch" onClick={() => setTranslationOn(false)}><X size={18}/></button>
+              </header>
+              <div className="call-live-settings">
+                <label>Ngôn ngữ bạn muốn nghe
+                  <select value={callTargetLanguage} onChange={(event) => setCallTargetLanguage(event.target.value)}>
+                    {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label className="call-live-check">
+                  <input type="checkbox" checked={translatedAudioOn} onChange={(event) => setTranslatedAudioOn(event.target.checked)} />
+                  <span>Phát giọng dịch (âm thanh gốc nhỏ hơn)</span>
+                </label>
+                <label className="call-live-check">
+                  <input type="checkbox" checked={allowMyVoice} onChange={(event) => {
+                    setAllowMyVoice(event.target.checked)
+                    setConsentRequested(false)
+                  }} />
+                  <span>Cho phép người trong cuộc gọi dùng AI dịch giọng nói của tôi</span>
+                </label>
+                <small>Âm thanh được gửi từ trình duyệt của người nghe tới Gemini chỉ khi người nói cho phép. Không tự lưu bản ghi cuộc gọi.</small>
+              </div>
+              {translationError && <div className="call-live-error" role="alert">
+                <span>{translationError}</span>
+                <button type="button" onClick={() => { setTranslationError(''); setTranslationRetryEpoch((value) => value + 1) }}>Kết nối lại</button>
+              </div>}
+              <div className="call-live-transcript" aria-live="polite">
+                {captions.length === 0 && <div className="call-live-placeholder">
+                  <Languages size={25}/>
+                  <strong>{translatingIds.length ? 'Đang lắng nghe…' : 'Chờ kết nối phiên dịch'}</strong>
+                  <span>{Object.values(remoteConsent).some(Boolean)
+                    ? 'Khi người khác nói, phụ đề sẽ xuất hiện tại đây.'
+                    : 'Người tham gia cần đồng ý dịch giọng nói để bắt đầu.'}</span>
+                </div>}
+                {captions.map((caption) => (
+                  <div className="call-live-entry" key={caption.id}>
+                    <strong>{identityLabel(caption.speakerId)}</strong>
+                    {caption.original && <p className="call-live-original">{caption.original}</p>}
+                    {caption.translated && <p className="call-live-translated">{caption.translated}</p>}
+                  </div>
+                ))}
+              </div>
+              <footer className="call-live-footnote">Chỉ dịch âm thanh của những người đã đồng ý • Tối đa 5 luồng đồng thời</footer>
+            </aside>
+          )}
         </div>
-
-        {room && <RemoteAudioSinks room={room} muted={!soundOn} revision={revision} />}
+        {room && <RemoteAudioSinks room={room} muted={!soundOn} volume={translationOn && translatedAudioOn && translatingIds.length ? 0.2 : 1} revision={revision} />}
+        {consentRequested && !allowMyVoice && (
+          <div className="call-translation-consent-prompt" role="status">
+            <span>Một người tham gia muốn bật AI phiên dịch giọng nói của bạn.</span>
+            <button type="button" onClick={() => { setAllowMyVoice(true); setConsentRequested(false) }}>Cho phép</button>
+            <button type="button" aria-label="Từ chối" onClick={() => setConsentRequested(false)}><X size={16}/></button>
+          </div>
+        )}
 
         <footer className="secure-call-controls">
           <button type="button" className={!micOn ? 'is-off' : ''} disabled={!room || ending} onClick={() => void toggleMic()}>
@@ -501,6 +696,10 @@ function SecureCallRoom({ call, title, request, userId, canEnd, onClosed, onErro
           <button type="button" className={!soundOn ? 'is-off' : ''} disabled={!room || ending} onClick={() => void toggleSound()}>
             {soundOn ? <Volume2 /> : <VolumeX />}<span>Âm thanh</span>
           </button>
+          <button type="button" className={translationOn ? 'is-on' : ''} disabled={!room || ending}
+            aria-pressed={translationOn} title="Dịch thoại và phụ đề bằng Gemini Live"
+            onClick={() => setTranslationOn((value) => !value)}
+          ><Languages /><span>{translationOn ? 'Đang dịch' : 'Dịch AI'}</span></button>
           <button type="button" className="hangup-button" disabled={ending} onClick={() => void closeCall(canEnd)}>
             <PhoneOff /><span>{canEnd ? 'Kết thúc' : 'Rời'}</span>
           </button>
@@ -508,6 +707,26 @@ function SecureCallRoom({ call, title, request, userId, canEnd, onClosed, onErro
       </div>
     </div>
   )
+}
+
+function appendCallCaption(current: CallCaption[], update: InterpreterUpdate): CallCaption[] {
+  const text = (update.translated || update.original || '').trim()
+  if (!text) return current
+  const now = Date.now()
+  const previous = current.at(-1)
+  if (previous && previous.speakerId === update.speakerId && now - previous.updatedAt < 3500) {
+    const field = update.translated ? 'translated' : 'original'
+    const last = previous[field]
+    const nextText = text.startsWith(last) ? text : (last ? last + ' ' : '') + text
+    return [...current.slice(0, -1), { ...previous, [field]: nextText.slice(-1200), updatedAt: now }]
+  }
+  return [...current, {
+    id: crypto.randomUUID(),
+    speakerId: update.speakerId,
+    original: update.original || '',
+    translated: update.translated || '',
+    updatedAt: now,
+  }].slice(-80)
 }
 
 async function waitForEnvelope(
@@ -569,16 +788,19 @@ function VideoTrackView({ publication, mirror }: { publication: TrackPublication
   return <video ref={ref} autoPlay playsInline muted={mirror} className={mirror ? 'mirror' : ''} />
 }
 
-function RemoteAudioSinks({ room, muted, revision }: { room: Room; muted: boolean; revision: number }) {
+function RemoteAudioSinks({ room, muted, volume, revision }: { room: Room; muted: boolean; volume: number; revision: number }) {
   revision
   const tracks = Array.from(room.remoteParticipants.values()).flatMap((participant) =>
     Array.from(participant.audioTrackPublications.values()).filter((publication) => publication.track),
   )
-  return <>{tracks.map((publication) => <AudioTrackSink key={publication.trackSid} publication={publication} muted={muted} />)}</>
+  return <>{tracks.map((publication) => <AudioTrackSink key={publication.trackSid} publication={publication} muted={muted} volume={volume} />)}</>
 }
 
-function AudioTrackSink({ publication, muted }: { publication: TrackPublication; muted: boolean }) {
+function AudioTrackSink({ publication, muted, volume }: { publication: TrackPublication; muted: boolean; volume: number }) {
   const ref = useRef<HTMLAudioElement>(null)
+  useEffect(() => {
+    if (ref.current) ref.current.volume = volume
+  }, [volume])
   useEffect(() => {
     const element = ref.current
     const track = publication.track as RemoteTrack | undefined

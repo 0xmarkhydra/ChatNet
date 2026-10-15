@@ -4892,6 +4892,8 @@ export default function App() {
         apiBase={API}
         token={session.token}
         userId={session.user.id}
+        sourceLanguage={effectiveAppLocale}
+        targetLanguage={targetLanguage}
         conversations={conversations.map(({ id, name, type }) => ({ id, name, type }))}
       />
 

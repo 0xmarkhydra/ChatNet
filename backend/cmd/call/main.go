@@ -160,6 +160,7 @@ func main() {
 	mux.Handle("GET /api/calls/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getCall)))
 	mux.Handle("GET /api/calls/{id}/participants", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listParticipants)))
 	mux.Handle("POST /api/calls/{id}/join", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.joinCall)))
+	mux.Handle("POST /api/calls/{id}/translation-token", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.callTranslationToken)))
 	mux.Handle("POST /api/calls/{id}/decline", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.declineCall)))
 	mux.Handle("POST /api/calls/{id}/leave", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.leaveCall)))
 	mux.Handle("POST /api/calls/{id}/end", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.endCall)))
