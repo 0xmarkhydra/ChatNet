@@ -227,14 +227,14 @@ func (s *server) removeFriendConnection(w http.ResponseWriter, r *http.Request) 
 
 	low, high := orderedUserPair(claims.UserID, otherID)
 	direction := r.URL.Query().Get("direction")
-	if direction != "" && direction != "incoming" && direction != "outgoing" {
+	if direction != "" && direction != "incoming" && direction != "outgoing" && direction != "accepted" {
 		httpx.Error(w, http.StatusBadRequest, "invalid request direction")
 		return
 	}
 	tag, err := s.db.Exec(r.Context(), `
 		DELETE FROM friend_connections
 		WHERE user_low=$1 AND user_high=$2
-		  AND ($3='' OR (status='pending' AND (
+		  AND ($3='' OR ($3='accepted' AND status='accepted') OR (status='pending' AND (
 		    ($3='outgoing' AND requested_by=$4) OR
 		    ($3='incoming' AND requested_by<>$4)
 		  )))

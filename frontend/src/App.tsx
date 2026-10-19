@@ -521,10 +521,15 @@ export default function App() {
   const [friendQuery, setFriendQuery] = useState('')
   const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([])
   const [friendSearching, setFriendSearching] = useState(false)
+  const [friendSearchError, setFriendSearchError] = useState(false)
+  const [friendSearchRetry, setFriendSearchRetry] = useState(0)
   const [friends, setFriends] = useState<FriendConnection[]>([])
   const [friendRequests, setFriendRequests] = useState<FriendConnection[]>([])
   const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null)
-  const friendActionRef = useRef(false)
+  const friendActionRef = useRef(new Set<number>())
+  const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(() => new Set())
+  const [friendMenuId, setFriendMenuId] = useState<number | null>(null)
+  const [friendPreview, setFriendPreview] = useState<FriendSearchResult | null>(null)
   const friendSyncRequest = useRef(0)
   const [friendSyncSessionId, setFriendSyncSessionId] = useState('')
   const [friendSyncError, setFriendSyncError] = useState('')
@@ -1732,6 +1737,16 @@ export default function App() {
     }
   }
 
+  const contactQuery = friendQuery.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
+  const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
+    `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(contactQuery),
+  )
+  const localContactIds = new Set(localContactMatches.map((friend) => friend.id))
+  const contactSearchResults = [
+    ...localContactMatches,
+    ...friendResults.filter((friend) => !localContactIds.has(friend.id)),
+  ]
+
   function friendRelationship(userId: number) {
     if (friends.some((item) => item.id === userId)) return 'accepted' as const
     const request = friendRequests.find((item) => item.id === userId)
@@ -1742,7 +1757,7 @@ export default function App() {
 
   async function actOnFriend(friend: FriendSearchResult | FriendConnection, decline = false) {
     const sessionId = session?.sessionId
-    if (!sessionId || friendActionRef.current || friend.id === session.user.id) return
+    if (!sessionId || friendActionRef.current.has(friend.id) || friend.id === session.user.id) return
     const relationship = friendRelationship(friend.id)
     if (decline && relationship !== 'incoming') return
     if (relationship === 'accepted') {
@@ -1750,7 +1765,8 @@ export default function App() {
       return
     }
 
-    friendActionRef.current = true
+    friendActionRef.current.add(friend.id)
+    setFriendBusyIds((current) => new Set(current).add(friend.id))
     ++friendSyncRequest.current
     setFriendActionBusy(friend.id)
     try {
@@ -1794,14 +1810,57 @@ export default function App() {
       }
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
-        friendActionRef.current = false
-        setFriendActionBusy(null)
+        friendActionRef.current.delete(friend.id)
+        setFriendBusyIds((current) => {
+          const next = new Set(current)
+          next.delete(friend.id)
+          return next
+        })
+        setFriendActionBusy(friendActionRef.current.values().next().value ?? null)
       }
     }
   }
 
   async function declineFriendRequest(friend: FriendConnection) {
     await actOnFriend(friend, true)
+  }
+
+  async function removeAcceptedFriend(friend: FriendConnection) {
+    const sessionId = session?.sessionId
+    if (!sessionId || friendRelationship(friend.id) !== 'accepted' || friendActionRef.current.has(friend.id)) return
+    if (!window.confirm(`Hủy kết bạn với ${friend.displayName || '@' + friend.username}?`)) return
+    friendActionRef.current.add(friend.id)
+    setFriendBusyIds((current) => new Set(current).add(friend.id))
+    setFriendActionBusy(friend.id)
+    setFriendMenuId(null)
+    try {
+      const response = await apiFetch(`/api/friends/${friend.id}?direction=accepted`, { method: 'DELETE' })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok) {
+        setNotice(result?.error || 'Không thể hủy kết bạn. Vui lòng thử lại.')
+      } else {
+        setFriends((current) => current.filter((item) => item.id !== friend.id))
+        setFriendPreview(null)
+        setNotice('Đã hủy kết bạn')
+      }
+      await refreshFriendConnections()
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId) {
+        setNotice('Mạng gián đoạn. Đang đồng bộ lại danh sách bạn bè.')
+        await refreshFriendConnections()
+      }
+    } finally {
+      friendActionRef.current.delete(friend.id)
+      if (sessionRef.current?.sessionId === sessionId) {
+        setFriendBusyIds((current) => {
+          const next = new Set(current)
+          next.delete(friend.id)
+          return next
+        })
+        setFriendActionBusy(friendActionRef.current.values().next().value ?? null)
+      }
+    }
   }
 
   useEffect(() => {
@@ -1823,6 +1882,7 @@ export default function App() {
     if (!session?.token || !friendSurfaceOpen) {
       setFriendResults([])
       setFriendSearching(false)
+      setFriendSearchError(false)
       return
     }
 
@@ -1830,18 +1890,22 @@ export default function App() {
     const query = friendQuery.trim()
     setFriendResults([])
     setFriendSearching(true)
+    setFriendSearchError(false)
 
     if (!query) {
       apiFetch('/api/users/suggestions', { signal: controller.signal })
         .then(async (response) => {
-          if (!response.ok) return []
+          if (!response.ok) throw new Error('Cannot load suggestions')
           return response.json() as Promise<FriendSearchResult[]>
         })
         .then((items) => {
           if (!controller.signal.aborted) setFriendResults(items)
         })
         .catch(() => {
-          if (!controller.signal.aborted) setFriendResults([])
+          if (!controller.signal.aborted) {
+            setFriendResults([])
+            setFriendSearchError(true)
+          }
         })
         .finally(() => {
           if (!controller.signal.aborted) setFriendSearching(false)
@@ -1857,14 +1921,14 @@ export default function App() {
           `/api/users/search?q=${encodeURIComponent(query)}`,
           { signal: controller.signal },
         )
-        if (!response.ok) {
-          if (!controller.signal.aborted) setFriendResults([])
-          return
-        }
+        if (!response.ok) throw new Error('Cannot search users')
         const items = (await response.json()) as FriendSearchResult[]
         if (!controller.signal.aborted) setFriendResults(items)
       } catch {
-        if (!controller.signal.aborted) setFriendResults([])
+        if (!controller.signal.aborted) {
+          setFriendResults([])
+          setFriendSearchError(true)
+        }
       } finally {
         if (!controller.signal.aborted) setFriendSearching(false)
       }
@@ -1874,7 +1938,7 @@ export default function App() {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [friendQuery, newChatMode, session?.token, tab])
+  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, tab])
 
   async function refreshConversations() {
     const sessionId = session?.sessionId
@@ -2211,12 +2275,15 @@ export default function App() {
     setProfileSaving(false)
     setStoryBusy(false)
     setMediaUploading(null)
-    friendActionRef.current = false
+    friendActionRef.current.clear()
+    setFriendBusyIds(new Set())
     setFriendActionBusy(null)
     ++feedRevision.current
     setMessageDrafts({})
     setFriends([])
     setFriendRequests([])
+    setFriendMenuId(null)
+    setFriendPreview(null)
     setPostText('')
     setPosts([])
     setHasMorePosts(false)
@@ -3264,6 +3331,22 @@ export default function App() {
           url={connectUrl()} initialMode={qrOpen} onClose={() => setQrOpen(null)}
           onConnect={(username) => { setQrOpen(null); openConnectSurface(username) }} />
       </Suspense>}
+      {friendPreview && (
+        <div className="connect-modal-layer">
+          <button type="button" className="connect-modal-scrim" aria-label="Đóng hồ sơ" onClick={() => setFriendPreview(null)} />
+          <section className="friend-profile-preview" role="dialog" aria-modal="true" aria-label={`Hồ sơ ${friendPreview.displayName || friendPreview.username}`}>
+            <button type="button" className="friend-profile-close" aria-label="Đóng" onClick={() => setFriendPreview(null)}><X size={20} /></button>
+            <UserAvatar name={friendPreview.displayName || friendPreview.username} className="friend-profile-avatar" online={friendPreview.online} />
+            <h2>{friendPreview.displayName || friendPreview.username}</h2>
+            <p>@{friendPreview.username}</p>
+            <p>{friendPreview.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</p>
+            <div className="friend-profile-actions">
+              <button type="button" onClick={() => { setFriendPreview(null); void openDirectByUsername(friendPreview.username) }}>Nhắn tin</button>
+              <button type="button" onClick={() => setFriendPreview(null)}>Đóng</button>
+            </div>
+          </section>
+        </div>
+      )}
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
@@ -3498,7 +3581,10 @@ export default function App() {
                       {!friendSearching && !friendQuery.trim() && friendResults.length > 0 && (
                         <div className="friend-suggestion-label">Người bạn có thể biết</div>
                       )}
-                      {!friendSearching && friendQuery.trim() && friendResults.length === 0 && (
+                      {friendSearchError && !friendSearching && (
+                        <div className="friend-search-state" role="alert">Không tải được kết quả. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button></div>
+                      )}
+                      {!friendSearching && !friendSearchError && friendQuery.trim() && friendResults.length === 0 && (
                         <div className="friend-search-state">
                           <strong>Không tìm thấy người phù hợp</strong>
                           <span>Thử tên khác, @username hoặc email chính xác.</span>
@@ -3512,7 +3598,7 @@ export default function App() {
                             : relationship === 'incoming'
                               ? 'Chấp nhận'
                               : relationship === 'outgoing'
-                                ? 'Đã gửi'
+                                ? 'Hủy lời mời'
                                 : 'Kết bạn'
                         return (
                           <button
@@ -3520,7 +3606,7 @@ export default function App() {
                             className="friend-result connect-result"
                             key={friend.id}
                             onClick={() => void actOnFriend(friend)}
-                            disabled={friendActionBusy === friend.id}
+                            disabled={friendBusyIds.has(friend.id)}
                           >
                             <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                             <div className="friend-result-copy">
@@ -3803,7 +3889,7 @@ export default function App() {
                           <button
                             type="button"
                             className={chatFriendRelationship === 'outgoing' ? '' : 'primary'}
-                            disabled={friendActionBusy !== null}
+                            disabled={friendBusyIds.has(chatFriend.id)}
                             onClick={() => void actOnFriend(chatFriend)}
                           >
                             {chatFriendRelationship === 'incoming' ? <Check size={16} aria-hidden="true" /> :
@@ -3811,7 +3897,7 @@ export default function App() {
                             {chatFriendRelationship === 'incoming' ? 'Chấp nhận' : chatFriendRelationship === 'outgoing' ? 'Hủy lời mời' : 'Gửi lời mời kết bạn'}
                           </button>
                           {chatFriendRelationship === 'incoming' && (
-                            <button type="button" disabled={friendActionBusy !== null} onClick={() => void actOnFriend(chatFriend, true)}>
+                            <button type="button" disabled={friendBusyIds.has(chatFriend.id)} onClick={() => void actOnFriend(chatFriend, true)}>
                               <X size={16} aria-hidden="true" /> Từ chối
                             </button>
                           )}
@@ -4175,6 +4261,45 @@ export default function App() {
 
         {tab === 'contacts' && (
           <div className="simple-view contacts-view">
+            {friendQuery.trim() ? (
+              <section className="contacts-suggestions contacts-search-section" aria-label="Kết quả tìm kiếm bạn bè">
+                <div className="contacts-heading contacts-search-heading">
+                  <span>Kết quả tìm kiếm</span>
+                  <button type="button" onClick={() => setFriendQuery('')}>Xóa tìm kiếm</button>
+                </div>
+                {friendSearching && <div className="friend-search-state" role="status">Đang tìm người dùng...</div>}
+                {friendSearchError && !friendSearching && (
+                  <div className="friend-search-state" role="alert">
+                    Không thể tìm kiếm lúc này. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button>
+                  </div>
+                )}
+                {!friendSearching && !friendSearchError && contactSearchResults.length === 0 && (
+                  <div className="friend-search-state">Không tìm thấy kết quả. Thử tên, @username hoặc email chính xác.</div>
+                )}
+                {contactSearchResults.map((friend) => {
+                  const relationship = friendRelationship(friend.id)
+                  const actionLabel = relationship === 'accepted' ? 'Nhắn tin'
+                    : relationship === 'incoming' ? 'Chấp nhận'
+                      : relationship === 'outgoing' ? 'Hủy lời mời' : 'Kết bạn'
+                  return (
+                    <div className="friend-result contact-result contact-search-row" key={friend.id}>
+                      <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
+                      <div className="friend-result-copy">
+                        <strong>{friend.displayName || friend.username}</strong>
+                        <span>@{friend.username}{relationship === 'accepted' ? ' · Bạn bè' : relationship === 'incoming' ? ' · Đã nhận lời mời' : relationship === 'outgoing' ? ' · Đã gửi lời mời' : ''}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="contact-search-action"
+                        disabled={friendBusyIds.has(friend.id)}
+                        onClick={() => void actOnFriend(friend)}
+                      >{actionLabel}</button>
+                    </div>
+                  )
+                })}
+              </section>
+            ) : (
+              <>
             <div className="contact-shortcuts">
               <button type="button" onClick={() => { setTab('chat'); setNewChatMode('friends') }}>
                 <span className="shortcut-icon">＋</span><div><strong>Lời mời kết bạn</strong><small>Tìm và kết nối người mới</small></div><b>›</b>
@@ -4197,8 +4322,8 @@ export default function App() {
                       <span>Muốn kết bạn với bạn</span>
                     </div>
                     <div className="friend-request-actions">
-                      <button type="button" onClick={() => void actOnFriend(friend)} disabled={friendActionBusy === friend.id}>Chấp nhận</button>
-                      <button type="button" className="secondary" onClick={() => void declineFriendRequest(friend)} disabled={friendActionBusy === friend.id}>Từ chối</button>
+                      <button type="button" onClick={() => void actOnFriend(friend)} disabled={friendBusyIds.has(friend.id)}>Chấp nhận</button>
+                      <button type="button" className="secondary" onClick={() => void declineFriendRequest(friend)} disabled={friendBusyIds.has(friend.id)}>Từ chối</button>
                     </div>
                   </div>
                 ))}
@@ -4214,19 +4339,47 @@ export default function App() {
                 />
               )}
               {friends.map((friend) => (
-                <button
-                  type="button"
-                  className="friend-result contact-result"
+                <div
+                  className="friend-result contact-result friend-contact-row"
                   key={friend.id}
-                  onClick={() => void openDirectByUsername(friend.username)}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setFriendMenuId(null)
+                  }}
                 >
-                  <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                  <div className="friend-result-copy">
-                    <strong>@{friend.username}</strong>
-                    <span>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
+                  <button
+                    type="button"
+                    className="friend-contact-primary"
+                    onClick={() => void openDirectByUsername(friend.username)}
+                  >
+                    <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
+                    <span className="friend-result-copy">
+                      <strong>{friend.displayName || friend.username}</strong>
+                      <span>@{friend.username} · {friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
+                    </span>
+                  </button>
+                  <div className="friend-contact-controls">
+                    <button
+                      type="button"
+                      className="friend-contact-more"
+                      aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
+                      aria-expanded={friendMenuId === friend.id}
+                      aria-haspopup="menu"
+                      onClick={() => setFriendMenuId((current) => current === friend.id ? null : friend.id)}
+                    >
+                      <MoreHorizontal size={20} aria-hidden="true" />
+                    </button>
+                    {friendMenuId === friend.id && (
+                      <div className="friend-contact-popover" role="menu">
+                        <button type="button" role="menuitem" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem hồ sơ</button>
+                        <button type="button" role="menuitem" onClick={() => { setFriendMenuId(null); void openDirectByUsername(friend.username) }}>Nhắn tin</button>
+                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
+                      </div>
+                    )}
                   </div>
-                  <div className="friend-result-action"><small>Nhắn tin</small><span>›</span></div>
-                </button>
+                </div>
               ))}
             </section>
 
@@ -4239,7 +4392,7 @@ export default function App() {
                     className="friend-result contact-result"
                     key={friend.id}
                     onClick={() => void actOnFriend(friend)}
-                    disabled={friendActionBusy === friend.id}
+                    disabled={friendBusyIds.has(friend.id)}
                   >
                     <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                     <div className="friend-result-copy">
@@ -4264,7 +4417,7 @@ export default function App() {
                   className="friend-result contact-result"
                   key={friend.id}
                   onClick={() => void actOnFriend(friend)}
-                  disabled={friendActionBusy === friend.id}
+                  disabled={friendBusyIds.has(friend.id)}
                 >
                   <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                   <div className="friend-result-copy">
@@ -4275,6 +4428,8 @@ export default function App() {
                 </button>
               ))}
             </section>
+              </>
+            )}
           </div>
         )}
 

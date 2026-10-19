@@ -821,3 +821,139 @@
     min-height: 32px;
   }
 }
+
+/* Contacts: dedicated search and safe per-friend action menu */
+.contacts-search-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.contacts-search-heading button,
+.friend-search-state button {
+  border: 0;
+  background: transparent;
+  color: #4f46e5;
+  font-weight: 700;
+  cursor: pointer;
+}
+.contact-search-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+}
+.contact-search-action {
+  min-width: 82px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #dbe4ff;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.contact-search-action:disabled { opacity: .55; cursor: wait; }
+.friend-contact-row {
+  overflow: visible;
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+}
+.friend-contact-primary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.friend-contact-primary .friend-result-copy { flex: 1; min-width: 0; }
+.friend-contact-controls { position: relative; }
+.friend-contact-more {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  color: #475569;
+  background: #f1f5ff;
+  cursor: pointer;
+}
+.friend-contact-more[aria-expanded="true"] { color: #4338ca; background: #e5eaff; }
+.friend-contact-popover {
+  position: absolute;
+  z-index: 25;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 174px;
+  padding: 5px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 15px 40px rgba(15, 23, 42, .15);
+}
+.friend-contact-popover button {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #1e293b;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+.friend-contact-popover button:hover,
+.friend-contact-popover button:focus-visible { background: #f1f5ff; }
+.friend-contact-popover .friend-contact-danger { color: #be123c; }
+.friend-profile-preview {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 30px 22px 22px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 22px 70px rgba(15, 23, 42, .23);
+  text-align: center;
+}
+.friend-profile-preview h2 { margin: 5px 0 0; font-size: 21px; color: #0f172a; }
+.friend-profile-preview p { margin: 0; color: #64748b; font-size: 13px; }
+.friend-profile-avatar { width: 72px; height: 72px; font-size: 24px; }
+.friend-profile-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #f1f5f9;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+}
+.friend-profile-actions { display: flex; width: 100%; gap: 9px; margin-top: 17px; }
+.friend-profile-actions button {
+  flex: 1;
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: #4f46e5;
+  color: white;
+  font-weight: 700;
+}
+.friend-profile-actions button + button { background: #eef2ff; color: #4338ca; }
+@media (max-width: 390px) {
+  .contact-search-row { gap: 6px; }
+  .contact-search-action { min-width: 74px; padding-inline: 6px; font-size: 11px; }
+}

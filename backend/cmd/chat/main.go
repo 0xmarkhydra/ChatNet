@@ -302,6 +302,7 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 		FROM users u
 		LEFT JOIN shared_groups sg ON sg.user_id=u.id
 		WHERE u.id<>$1
+		  AND (u.searchable_by_username OR u.searchable_by_name)
 		  AND NOT EXISTS (
 			SELECT 1 FROM direct_contacts dc WHERE dc.user_id=u.id
 		  )
