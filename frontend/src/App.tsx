@@ -5,6 +5,7 @@ import GroupCreator from './GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, X, Download } from 'lucide-react'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from './chatPersistence'
+import { uploadPresignedFile } from './mediaUpload'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
 import GroupActionsSheet from './GroupActionsSheet'
@@ -553,6 +554,8 @@ export default function App() {
   const [postText, setPostText] = useState('')
   const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([])
   const [mediaUploading, setMediaUploading] = useState<'chat' | 'feed' | 'story' | 'profile' | null>(null)
+  const [mediaUploadProgress, setMediaUploadProgress] = useState<{ loaded: number; total: number } | null>(null)
+  const mediaUploadAbort = useRef<AbortController | null>(null)
   const [profileMedia, setProfileMedia] = useState<ProfileMediaState | null>(null)
   const [profileBusy, setProfileBusy] = useState<'avatar' | 'cover' | null>(null)
   const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState('')
@@ -1127,66 +1130,89 @@ export default function App() {
 
   async function uploadMediaFiles(files: File[], scope: 'chat' | 'feed' | 'story' | 'profile') {
     if (!files.length) return [] as MediaAttachment[]
+    if (mediaUploadAbort.current) throw new Error('Đang tải tệp khác. Hãy hoàn tất hoặc hủy trước khi tải tiếp.')
     const sessionId = session?.sessionId
+    const controller = new AbortController()
+    mediaUploadAbort.current = controller
     setMediaUploading(scope)
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0)
+    const loadedBytes = files.map(() => 0)
+    setMediaUploadProgress({ loaded: 0, total: Math.max(1, totalBytes) })
+    let lastReport = 0
+
+    function trackProgress(index: number, loaded: number) {
+      if (mediaUploadAbort.current !== controller) return
+      loadedBytes[index] = Math.min(files[index].size, Math.max(0, loaded))
+      const now = performance.now()
+      if (loadedBytes[index] < files[index].size && now - lastReport < 120) return
+      lastReport = now
+      setMediaUploadProgress({
+        loaded: loadedBytes.reduce((sum, value) => sum + value, 0),
+        total: Math.max(1, totalBytes),
+      })
+    }
+
     try {
       const result = new Array<MediaAttachment>(files.length)
       let nextIndex = 0
       const workerCount = Math.min(4, files.length)
 
       async function worker() {
-        while (true) {
-          const index = nextIndex++
-          if (index >= files.length) return
+        try {
+          while (true) {
+            if (controller.signal.aborted) throw new DOMException('Đã hủy tải tệp.', 'AbortError')
+            const index = nextIndex++
+            if (index >= files.length) return
 
-          const file = files[index]
-          const contentType = file.type || 'application/octet-stream'
-          const presignResponse = await apiFetch('/api/media/presign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              scope,
+            const file = files[index]
+            const contentType = file.type || 'application/octet-stream'
+            const presignResponse = await apiFetch('/api/media/presign', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                scope,
+                name: file.name,
+                sizeBytes: file.size,
+                contentType,
+              }),
+              signal: controller.signal,
+            })
+            if (controller.signal.aborted) throw new DOMException('Đã hủy tải tệp.', 'AbortError')
+            const ticket = (await presignResponse.json().catch(() => null)) as
+              | (PresignedUpload & { error?: string })
+              | null
+            if (!presignResponse.ok || !ticket?.uploadUrl) {
+              throw new Error(ticket?.error || 'Không cấp được quyền upload file. Hãy kiểm tra cấu hình S3.')
+            }
+
+            await uploadPresignedFile(ticket.uploadUrl, file, contentType, controller.signal, (loaded) => trackProgress(index, loaded))
+            if (controller.signal.aborted) throw new DOMException('Đã hủy tải tệp.', 'AbortError')
+            result[index] = {
+              storageRef: ticket.storageRef,
               name: file.name,
               sizeBytes: file.size,
               contentType,
-            }),
-          })
-          const ticket = (await presignResponse.json().catch(() => null)) as
-            | (PresignedUpload & { error?: string })
-            | null
-
-          if (!presignResponse.ok || !ticket?.uploadUrl) {
-            throw new Error(ticket?.error || 'Không cấp được quyền upload file. Hãy kiểm tra cấu hình S3.')
+              kind: ticket.kind,
+              url: ticket.downloadUrl,
+            }
           }
-
-          const put = await fetch(ticket.uploadUrl, {
-            method: 'PUT',
-            body: file,
-            headers: { 'Content-Type': contentType },
-            credentials: 'omit',
-            signal: AbortSignal.timeout(120_000),
-          })
-          if (!put.ok) {
-            throw new Error(`S3 từ chối upload ${file.name} (HTTP ${put.status}). Kiểm tra CORS/quyền bucket.`)
-          }
-
-          result[index] = {
-            storageRef: ticket.storageRef,
-            name: file.name,
-            sizeBytes: file.size,
-            contentType,
-            kind: ticket.kind,
-            url: ticket.downloadUrl,
-          }
+        } catch (error) {
+          controller.abort()
+          throw error
         }
       }
 
       const outcomes = await Promise.allSettled(Array.from({ length: workerCount }, () => worker()))
-      const failed = outcomes.find((outcome) => outcome.status === 'rejected')
-      if (failed?.status === 'rejected') throw failed.reason
+      const errors = outcomes.filter((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected')
+      const firstError = errors.find((item) => !(item.reason instanceof DOMException && item.reason.name === 'AbortError')) ?? errors[0]
+      if (firstError) throw firstError.reason
       return result
     } finally {
-      if (sessionRef.current?.sessionId === sessionId) setMediaUploading(null)
+      if (mediaUploadAbort.current === controller) {
+        mediaUploadAbort.current = null
+        setMediaUploadProgress(null)
+        if (sessionRef.current?.sessionId === sessionId) setMediaUploading(null)
+      }
     }
   }
 
@@ -2106,7 +2132,10 @@ export default function App() {
     setProfileBusy(null)
     setProfileSaving(false)
     setStoryBusy(false)
+    mediaUploadAbort.current?.abort()
+    mediaUploadAbort.current = null
     setMediaUploading(null)
+    setMediaUploadProgress(null)
     friendActionRef.current = false
     setFriendActionBusy(null)
     ++feedRevision.current
@@ -3191,6 +3220,13 @@ export default function App() {
           url={connectUrl()} initialMode={qrOpen} onClose={() => setQrOpen(null)}
           onConnect={(username) => { setQrOpen(null); openConnectSurface(username) }} />
       </Suspense>}
+      {mediaUploading && mediaUploadProgress && (
+        <div className="media-upload-progress" role="status" aria-live="polite">
+          <span>Đang tải tệp: {Math.round(mediaUploadProgress.loaded / Math.max(1, mediaUploadProgress.total) * 100)}%</span>
+          <progress value={mediaUploadProgress.loaded} max={mediaUploadProgress.total} aria-label="Tiến độ tải tệp" />
+          <button type="button" onClick={() => mediaUploadAbort.current?.abort()}>Hủy tải</button>
+        </div>
+      )}
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}

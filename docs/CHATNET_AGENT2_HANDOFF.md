@@ -58,6 +58,13 @@
 - **Automated verification**: `frontend npm run check:chat` validates per-account drafts, expiry, replay keys, malformed/sessionStorage-denied data and logout cleanup; `npm run build` / TypeScript PASS; `git diff --check` PASS. Existing chunk >500kB warning persists.
 - **Important limitation:** plain text kept in browser sessionStorage is readable by scripts executing on this origin (like existing localStorage session); it is not an end-to-end encrypted multi-device draft store. Never store access tokens/download URLs there. This increment is not release approval.
 
+## Batch 3 — upload progress and media MIME hardening (2026-10-19)
+
+- **MEDIA-01 P0 (improved)**: browser uses `XMLHttpRequest` to PUT directly to presigned S3 URLs, reports real uploaded bytes (not simulated progress), and exposes **Hủy tải** for the current upload. Network error/HTTP error/timeout/cancel propagate to existing UI notices. A failure aborts sibling parallel uploads; logging out aborts the active transfer.
+- **MEDIA-04 P0 (improved)**: Go `mediax.classify` now accepts explicit MIME values for each permitted extension rather than generic `image/*`/`video/*`/any document content type. Rejects SVG disguised as JPEG, HTML disguised as PDF, JavaScript disguised as ZIP and other mismatches. Existing file size, type and ownership checks remain authoritative at backend.
+- **Automated verification**: `frontend npm run check:media` covers PUT progress, success, network/HTTP errors, timeout, abort and no bearer token to S3; `npm run build` PASS; `go test ./internal/mediax` PASS with executable-MIME denial/valid format cases.
+- **Limitations**: S3 real-environment/CORS/device/browser upload not yet exercised; presigned URLs remain usable until expiration even if membership is revoked; true content/magic-byte validation, quota controls, upload orphan cleanup and retention require additional backend/storage work. No release approval.
+
 ## Integration warnings
 
 1. The root checkout has substantial uncommitted work in unrelated areas; none of those changes were modified here.
