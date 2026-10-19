@@ -40,6 +40,8 @@ jobs:
       - run: npm run check:onesignal
       - run: npm run check:session
       - run: npm run check:optimistic
+      - run: npm run check:call-translation
+      - run: npm run check:call-live
 
   backend:
     name: Go API unit and integration packages
