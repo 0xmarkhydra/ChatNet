@@ -273,6 +273,10 @@ function SecureCallRoom({
   const [translationError, setTranslationError] = useState('')
   const [translationRetryEpoch, setTranslationRetryEpoch] = useState(0)
   const [allowMyVoice, setAllowMyVoice] = useState(false)
+  const [consentBusy, setConsentBusy] = useState(false)
+  const [consentError, setConsentError] = useState('')
+  const consentUpdating = useRef(false)
+  const consentRevision = useRef(0)
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([])
   const [consentRequested, setConsentRequested] = useState(false)
   const [remoteConsent, setRemoteConsent] = useState<Record<string, boolean>>({})
@@ -329,6 +333,7 @@ function SecureCallRoom({
   // Consent is scoped to the current call. Never carry an AI voice grant to a new room.
   useEffect(() => {
     setAllowMyVoice(false)
+    setConsentError('')
     setRemoteConsent({})
     setConsentRequested(false)
     setTranslationOn(false)
@@ -499,6 +504,48 @@ function SecureCallRoom({
   }, [call.id, call.createdBy, call.mediaType, onError, request, userId])
 
   const room = runtime?.room
+
+  useEffect(() => {
+    if (!room) return
+    let cancelled = false
+    const revisionAtLoad = consentRevision.current
+    request(`/api/calls/${encodeURIComponent(call.id)}/translation-consent`).then(async (response) => {
+      if (!response.ok) throw new Error('Không thể đọc quyền dịch giọng nói.')
+      const data = await response.json() as { allowed: boolean }
+      if (!cancelled && !consentUpdating.current && revisionAtLoad === consentRevision.current) setAllowMyVoice(data.allowed === true)
+    }).catch(() => { if (!cancelled) setConsentError('Không thể kiểm tra quyền dịch giọng nói. Hãy thử lại hoặc tắt micro.') })
+    return () => { cancelled = true }
+  }, [room, call.id, request])
+
+  async function updateVoiceConsent(allowed: boolean) {
+    if (!room || consentUpdating.current) return
+    consentUpdating.current = true
+    consentRevision.current += 1
+    setConsentBusy(true)
+    setConsentError('')
+    // Withdraw in the local UI immediately, before the backend responds.
+    if (!allowed) setAllowMyVoice(false)
+    try {
+      const response = await request(`/api/calls/${encodeURIComponent(call.id)}/translation-consent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowed }),
+      })
+      if (!response.ok) throw new Error('Không thể cập nhật quyền dịch giọng nói.')
+      setAllowMyVoice(allowed)
+      setConsentRequested(false)
+    } catch {
+      if (!allowed) {
+        // Revocation could not be confirmed by the backend. Stop sending new voice.
+        await room.localParticipant.setMicrophoneEnabled(false).then(() => setMicOn(false)).catch(() => undefined)
+        setConsentError('Không xác nhận được thu hồi quyền AI. Micro đã được yêu cầu tắt; hãy kiểm tra hoặc rời cuộc gọi.')
+      } else {
+        setConsentError('Không cấp được quyền xử lý giọng nói. AI sẽ không nhận âm thanh của bạn.')
+      }
+    } finally {
+      consentUpdating.current = false
+      setConsentBusy(false)
+    }
+  }
+
   const participants = useMemo(() => {
     if (!room) return [] as Participant[]
     revision // Active tracks, participants and reconnections update the call UI.
@@ -826,7 +873,7 @@ function SecureCallRoom({
                 ))}
               </div>
               <footer className="call-live-footnote">
-                <ShieldCheck size={14} /> Chỉ xử lý giọng nói đã được người tham gia cho phép.
+                <ShieldCheck size={14} /> Khi đồng ý, âm thanh người nói được giải mã trên thiết bị người nghe rồi gửi tới máy chủ ChatNet và Gemini để dịch.
               </footer>
             </aside>
           )}
@@ -851,16 +898,17 @@ function SecureCallRoom({
             </button>
           </div>
         )}
+        {consentError && <div className="call-global-error" role="alert">{consentError}</div>}
         {consentRequested && !allowMyVoice && (
           <div className="call-translation-consent-prompt" role="alert">
             <div className="call-notice-icon"><Sparkles size={18} /></div>
             <div className="call-notice-copy">
               <strong>Cho phép dịch giọng nói?</strong>
-              <span>Chỉ áp dụng cuộc gọi này. Âm thanh sẽ được AI xử lý sau khi bạn đồng ý.</span>
+              <span>Chỉ áp dụng cuộc gọi này. Người nghe có thể gửi giọng nói của bạn tới máy chủ ChatNet và Google Gemini để dịch.</span>
             </div>
             <div className="call-consent-actions">
-              <button type="button" onClick={() => { setAllowMyVoice(true); setConsentRequested(false) }}>Cho phép</button>
-              <button type="button" className="call-consent-decline" onClick={() => setConsentRequested(false)}>Để sau</button>
+              <button type="button" disabled={consentBusy} onClick={() => void updateVoiceConsent(true)}>{consentBusy ? 'Đang lưu…' : 'Cho phép'}</button>
+              <button type="button" className="call-consent-decline" disabled={consentBusy} onClick={() => setConsentRequested(false)}>Để sau</button>
             </div>
           </div>
         )}
@@ -900,10 +948,9 @@ function SecureCallRoom({
                       <Languages size={17} /> Mở phụ đề dịch
                     </button>
                   )}
-                  <button type="button" onClick={() => {
-                    setAllowMyVoice((value) => !value)
+                  <button type="button" disabled={consentBusy} onClick={() => {
                     setMoreOpen(false)
-                    setConsentRequested(false)
+                    void updateVoiceConsent(!allowMyVoice)
                   }}>
                     <Settings2 size={17} /> {allowMyVoice ? 'Thu hồi quyền AI dịch giọng nói' : 'Cho phép AI dịch giọng nói'}
                   </button>

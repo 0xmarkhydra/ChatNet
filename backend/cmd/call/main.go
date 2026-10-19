@@ -162,6 +162,8 @@ func main() {
 	mux.Handle("GET /api/calls/{id}/participants", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listParticipants)))
 	mux.Handle("POST /api/calls/{id}/join", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.joinCall)))
 	mux.Handle("GET /api/calls/translation/languages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.callTranslationLanguages)))
+	mux.Handle("GET /api/calls/{id}/translation-consent", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getCallTranslationConsent)))
+	mux.Handle("POST /api/calls/{id}/translation-consent", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.setCallTranslationConsent)))
 	mux.Handle("POST /api/calls/{id}/translation-session", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createCallTranslationSession)))
 	mux.HandleFunc("GET /api/calls/{id}/translation-stream", s.streamCallTranslation)
 	mux.Handle("POST /api/calls/{id}/decline", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.declineCall)))
@@ -437,6 +439,8 @@ func (s *server) joinCall(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot join call")
 		return
 	}
+	// Rejoining requires fresh voice consent; never reuse a grant from a prior connection.
+	s.revokeCallTranslationConsent(r.Context(), call.ID, claims.UserID)
 	if claims.UserID != call.CreatedBy {
 		_, _ = s.db.Exec(r.Context(), `
 			UPDATE call_sessions SET status='active',started_at=COALESCE(started_at,NOW())
@@ -483,6 +487,7 @@ func (s *server) declineCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.revokeCallTranslationConsent(r.Context(), call.ID, claims.UserID)
 	if member.ConversationType == "direct" || claims.UserID == call.CreatedBy {
 		if err := s.finishCall(r.Context(), &call, "cancelled"); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot cancel call")
@@ -518,6 +523,7 @@ func (s *server) leaveCall(w http.ResponseWriter, r *http.Request) {
 	_, _ = s.db.Exec(r.Context(), `
 		UPDATE call_participants SET left_at=NOW()
 		WHERE call_id=$1 AND user_id=$2 AND left_at IS NULL`, call.ID, claims.UserID)
+	s.revokeCallTranslationConsent(r.Context(), call.ID, claims.UserID)
 	s.publishCallEvent(r.Context(), s.callUserIDs(r.Context(), call.ID), "call.updated", call)
 	httpx.JSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -575,6 +581,7 @@ func (s *server) afterCallFinished(call callSession) {
 	users := s.callUserIDs(context.Background(), call.ID)
 	s.publishCallEvent(context.Background(), users, "call.ended", call)
 	s.cleanupCallCrypto(context.Background(), call.ID, users)
+	s.cleanupCallTranslationConsents(context.Background(), call.ID, users)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := s.deleteLiveKitRoom(ctx, call.RoomName); err != nil && s.liveKitConfigured() {
