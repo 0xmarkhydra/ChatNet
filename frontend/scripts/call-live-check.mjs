@@ -18,6 +18,12 @@ assert.ok(backend.includes('GetDel('), 'one-time tickets must be consumed once')
 assert.ok(ui.includes('/translation-consent') && ui.includes('updateVoiceConsent('), 'speaker consent must persist through authenticated API')
 assert.ok(callRoutes.includes('POST /api/calls/{id}/translation-consent') &&
   callRoutes.includes('GET /api/calls/{id}/translation-consent'), 'authenticated consent routes must be registered')
+assert.ok(callRoutes.includes('joinedCallParticipant(') &&
+  callRoutes.includes('joinedCallUserIDs('), 'E2EE key access must require joined call membership')
+assert.ok(callRoutes.includes('removeLiveKitParticipant(ctx, call.RoomName, claims.UserID)'),
+  'group departure must kick participant from LiveKit media')
+assert.ok(ui.includes("phase !== 'connected'") &&
+  ui.includes('[room, phase, translationOn,'), 'AI media streaming must stop on LiveKit reconnect/disconnect')
 assert.ok(backend.includes('callTranslationConsentAllowed(') && backend.includes('speaker has not consented to AI translation'), 'Gemini tickets require server-verified speaker consent')
 assert.ok(backend.includes('consentErr != nil || !consented'), 'AI streams must terminate after consent is revoked')
 console.log('PASS: provider secrets stay on backend; one-click UI; server-verified per-call consent')

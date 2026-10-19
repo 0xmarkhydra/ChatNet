@@ -628,10 +628,12 @@ function SecureCallRoom({
       interpreters.current.clear()
       interpreterPending.current.clear()
     }
-    if (!translationOn || !room) {
+    if (!translationOn || !room || phase !== 'connected') {
       stopAll()
+      setTranslatingIds([])
       return
     }
+    // Never send remote audio to AI while LiveKit signaling/media is reconnecting.
     // Translate each remote speaker separately so simultaneous speech is not mixed.
     const consent = JSON.parse(remoteConsentKey) as Record<string, boolean>
     const tracks = Array.from(room.remoteParticipants.values()).flatMap((participant) =>
@@ -661,7 +663,7 @@ function SecureCallRoom({
     return () => { cancelled = true; stopAll(); setTranslatingIds([]) }
   // Stable stream IDs and consent data are the only topology dependencies.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room, translationOn, call.id, callTargetLanguage, remoteTrackKey, remoteConsentKey, request, translationRetryEpoch, apiBase])
+  }, [room, phase, translationOn, call.id, callTargetLanguage, remoteTrackKey, remoteConsentKey, request, translationRetryEpoch, apiBase])
 
   useEffect(() => {
     if (!translationOn) {

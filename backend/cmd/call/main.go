@@ -520,10 +520,20 @@ func (s *server) leaveCall(w http.ResponseWriter, r *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
-	_, _ = s.db.Exec(r.Context(), `
+	if _, err := s.db.Exec(r.Context(), `
 		UPDATE call_participants SET left_at=NOW()
-		WHERE call_id=$1 AND user_id=$2 AND left_at IS NULL`, call.ID, claims.UserID)
+		WHERE call_id=$1 AND user_id=$2 AND left_at IS NULL`, call.ID, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot leave call")
+		return
+	}
 	s.revokeCallTranslationConsent(r.Context(), call.ID, claims.UserID)
+	// Reject new key relay requests immediately; also kick existing LiveKit media.
+	s.cleanupCallCrypto(r.Context(), call.ID, []int64{claims.UserID})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.removeLiveKitParticipant(ctx, call.RoomName, claims.UserID); err != nil {
+		log.Printf("livekit participant removal failed call=%s user=%d: %T", call.ID, claims.UserID, err)
+	}
 	s.publishCallEvent(r.Context(), s.callUserIDs(r.Context(), call.ID), "call.updated", call)
 	httpx.JSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -666,7 +676,12 @@ func (s *server) listPublicKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items := []publicKeyRecord{}
-	for _, userID := range s.callUserIDs(r.Context(), call.ID) {
+	ids, err := s.joinedCallUserIDs(r.Context(), call.ID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot check joined participants")
+		return
+	}
+	for _, userID := range ids {
 		raw, err := s.redis.Get(r.Context(), publicKeyRedisKey(call.ID, userID)).Bytes()
 		if err != nil {
 			continue
@@ -705,8 +720,13 @@ func (s *server) putEnvelope(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid encrypted key envelope")
 		return
 	}
-	if _, declined, err := s.callParticipantRole(r.Context(), call.ID, body.RecipientUserID); err != nil || declined {
-		httpx.Error(w, http.StatusForbidden, "recipient is not an active call participant")
+	joined, err := s.joinedCallParticipant(r.Context(), call.ID, body.RecipientUserID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify recipient membership")
+		return
+	}
+	if !joined {
+		httpx.Error(w, http.StatusForbidden, "recipient has not joined the call")
 		return
 	}
 	envelope := keyEnvelope{
@@ -754,11 +774,45 @@ func (s *server) authorizedActiveCall(ctx context.Context, callID string, userID
 	if call.Status != "ringing" && call.Status != "active" {
 		return call, member, errors.New("call is inactive")
 	}
-	_, declined, err := s.callParticipantRole(ctx, call.ID, userID)
-	if err != nil || declined {
-		return call, member, errors.New("participant is inactive")
+	joined, err := s.joinedCallParticipant(ctx, call.ID, userID)
+	if err != nil || !joined {
+		return call, member, errors.New("participant has not joined or already left")
 	}
 	return call, member, nil
+}
+
+func (s *server) joinedCallParticipant(ctx context.Context, callID string, userID int64) (bool, error) {
+	var joined bool
+	err := s.db.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM call_participants p
+		JOIN call_sessions cs ON cs.id=p.call_id
+		JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=p.user_id
+		WHERE p.call_id=$1 AND p.user_id=$2 AND p.joined_at IS NOT NULL
+		AND p.left_at IS NULL AND p.declined_at IS NULL
+	)`, callID, userID).Scan(&joined)
+	return joined, err
+}
+
+// Only joined participants may receive a wrapped E2EE media key.
+func (s *server) joinedCallUserIDs(ctx context.Context, callID string) ([]int64, error) {
+	rows, err := s.db.Query(ctx, `SELECT p.user_id FROM call_participants p
+		JOIN call_sessions cs ON cs.id=p.call_id
+		JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=p.user_id
+		WHERE p.call_id=$1 AND p.joined_at IS NOT NULL AND p.left_at IS NULL
+		AND p.declined_at IS NULL ORDER BY p.user_id`, callID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (s *server) authorizedCall(ctx context.Context, callID string, userID int64) (callSession, membership, error) {
@@ -901,6 +955,27 @@ func (s *server) liveKitJoinToken(roomName, identity string) (string, error) {
 	grant := &auth.VideoGrant{RoomJoin: true, Room: roomName, CanPublish: &canPublish, CanSubscribe: &canSubscribe, CanPublishData: &canPublishData}
 	return auth.NewAccessToken(s.liveKitAPIKey, s.liveKitAPISecret).
 		SetVideoGrant(grant).SetIdentity(identity).SetValidFor(liveKitTokenTTL).ToJWT()
+}
+
+func (s *server) liveKitParticipantRemovalToken(roomName string) (string, error) {
+	return auth.NewAccessToken(s.liveKitAPIKey, s.liveKitAPISecret).
+		SetVideoGrant(&auth.VideoGrant{RoomAdmin: true, Room: roomName}).
+		SetValidFor(time.Minute).ToJWT()
+}
+
+func (s *server) removeLiveKitParticipant(ctx context.Context, roomName string, userID int64) error {
+	if !s.liveKitConfigured() || roomName == "" {
+		return nil
+	}
+	token, err := s.liveKitParticipantRemovalToken(roomName)
+	if err != nil {
+		return err
+	}
+	baseURL := "https://" + strings.TrimPrefix(s.liveKitURL, "wss://")
+	client := &http.Client{Timeout: 5 * time.Second, Transport: bearerTransport{base: http.DefaultTransport, token: token}}
+	service := lk.NewRoomServiceProtobufClient(baseURL, client)
+	_, err = service.RemoveParticipant(ctx, &lk.RoomParticipantIdentity{Room: roomName, Identity: participantIdentity(userID)})
+	return err
 }
 
 func (s *server) deleteLiveKitRoom(ctx context.Context, roomName string) error {
