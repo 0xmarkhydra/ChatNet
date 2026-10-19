@@ -13,7 +13,7 @@ Base: `origin/main` at `348f91d`, branch `feat/chatnet-a5-platform-integration`,
 | UX-03 P0 | Service worker restricts cache to public app files and versioned build assets. Navigations use network with public offline fallback, rather than caching personalized HTML. API, media, dynamic routes, authenticated and query-string requests are network-only. No-store/private responses are not cached. Old ChatNet runtime caches are deleted on activation. | `npm run check:pwa` passed with security regression cases | Partial: still requires Safari/PWA, account-switch and offline/upgrade device QA |
 | NOTI-01 P0 / NOTI-07 P0 | Incoming message audio only plays in the visible, focused document; self-message, replay and mute suppression retained. | `npm run check:incoming-sound` passed | Partial: cross-device push/in-app dedup still needs live tests |
 | NOTI-02 / NOTI-04 | Existing OneSignal initialization/consent regression exercised without changing integration code. | `npm run check:onesignal` passed | Not accepted: needs real push and permission flows on supported browsers/iOS installed PWA |
-| QA-06 P0 | TypeScript + Vite production build and targeted PWA/notification regression suites. | Build and targeted tests passed on local worktree | Partial: full E2E, API security, supported-device matrix not run |
+| QA-06 P0 | TypeScript + Vite production build, Go package tests, PWA/notification regressions; added `.github/workflows/web-pwa-ci.yml` for automated feature/dev/main quality gates. | Local frontend build and targeted checks passed; `go test ./...` passed | Partial: hosted GitHub CI, full E2E, API security and real device matrix not yet run |
 
 ## Integration readiness
 
