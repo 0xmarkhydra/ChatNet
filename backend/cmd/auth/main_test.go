@@ -21,6 +21,32 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+func TestAuthBodiesRejectExtraOrOversizedJSON(t *testing.T) {
+	handlers := []struct {
+		path    string
+		handler func(http.ResponseWriter, *http.Request)
+	}{
+		{"/api/auth/email/start", (&server{}).registerStart},
+		{"/api/auth/email/verify", (&server{}).registerVerify},
+		{"/api/auth/email/resend", (&server{}).registerResend},
+		{"/api/auth/login", (&server{}).login},
+	}
+	for _, item := range handlers {
+		for _, raw := range []string{
+			`{"email":"a@example.com","unknown":true}`,
+			`{} {}`,
+			`{"padding":"` + strings.Repeat("x", 5000) + `"}`,
+		} {
+			r := httptest.NewRequest(http.MethodPost, item.path, strings.NewReader(raw))
+			w := httptest.NewRecorder()
+			item.handler(w, r)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("%s accepted unsafe JSON (%d): %s", item.path, w.Code, w.Body.String())
+			}
+		}
+	}
+}
+
 func TestGeneratedUsername(t *testing.T) {
 	seen := map[string]bool{}
 	for i := 0; i < 100; i++ {

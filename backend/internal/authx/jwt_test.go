@@ -1,6 +1,8 @@
 package authx
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -34,6 +36,28 @@ func TestSignAndParse(t *testing.T) {
 	}
 	if claims.UserID != 7 || claims.Username != "mong" || claims.DisplayName != "Mong" {
 		t.Fatalf("unexpected claims: %+v", claims)
+	}
+}
+
+func TestTokenFromRequestQueryOnlyForEvents(t *testing.T) {
+	for _, tc := range []struct {
+		method, path, header, expected string
+	}{
+		{http.MethodGet, "/api/events?token=event-token", "", "event-token"},
+		{http.MethodGet, "/api/users/search?token=stolen-token", "", ""},
+		{http.MethodPost, "/api/auth/logout?token=stolen-token", "", ""},
+		{http.MethodPost, "/api/events?token=stolen-token", "", ""},
+		{http.MethodGet, "/api/events/?token=stolen-token", "", ""},
+		{http.MethodGet, "/api/users/search?token=stolen-token", "Bearer header-token", "header-token"},
+		{http.MethodGet, "/api/events?token=stolen-token", "Bearer header-token", "header-token"},
+	} {
+		r := httptest.NewRequest(tc.method, tc.path, nil)
+		if tc.header != "" {
+			r.Header.Set("Authorization", tc.header)
+		}
+		if token := TokenFromRequest(r); token != tc.expected {
+			t.Errorf("%s %s: got %q, expected %q", tc.method, tc.path, token, tc.expected)
+		}
 	}
 }
 

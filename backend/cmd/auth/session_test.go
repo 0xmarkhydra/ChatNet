@@ -18,7 +18,7 @@ import (
 
 func TestRefreshRejectsInvalidCredentials(t *testing.T) {
 	s := &server{jwtSecret: "test"}
-	for _, body := range []string{`{`, `{"refreshToken":"short"}`, `{"refreshToken":123}`} {
+	for _, body := range []string{`{`, `{"refreshToken":"short"}`, `{"refreshToken":123}`, `{"unknown":"value"}`, `{} {}`, `{"refreshToken":"` + strings.Repeat("x", 2000) + `"}`} {
 		w := httptest.NewRecorder()
 		s.refresh(w, httptest.NewRequest("POST", "/api/auth/refresh", strings.NewReader(body)))
 		if w.Code != http.StatusBadRequest {

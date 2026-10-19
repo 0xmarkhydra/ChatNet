@@ -39,12 +39,30 @@ func (s *server) getPrivacy(w http.ResponseWriter, r *http.Request) {
 func (s *server) updatePrivacy(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	claims, _ := authx.ClaimsFromContext(r.Context())
-	var body userPrivacy
+	// Require every setting; decoding omitted booleans to false could
+	// silently disable all discovery after a partial client update.
+	var required struct {
+		SearchableByUsername *bool `json:"searchableByUsername"`
+		SearchableByName     *bool `json:"searchableByName"`
+		SearchableByEmail    *bool `json:"searchableByEmail"`
+		AllowFriendRequests  *bool `json:"allowFriendRequests"`
+		ShowOnlineStatus     *bool `json:"showOnlineStatus"`
+	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF {
+	if decoder.Decode(&required) != nil || decoder.Decode(new(any)) != io.EOF ||
+		required.SearchableByUsername == nil || required.SearchableByName == nil ||
+		required.SearchableByEmail == nil || required.AllowFriendRequests == nil ||
+		required.ShowOnlineStatus == nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid privacy settings")
 		return
+	}
+	body := userPrivacy{
+		SearchableByUsername: *required.SearchableByUsername,
+		SearchableByName:     *required.SearchableByName,
+		SearchableByEmail:    *required.SearchableByEmail,
+		AllowFriendRequests:  *required.AllowFriendRequests,
+		ShowOnlineStatus:     *required.ShowOnlineStatus,
 	}
 	_, err := s.db.Exec(r.Context(), `
         UPDATE users

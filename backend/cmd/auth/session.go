@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -25,7 +26,9 @@ func readRefreshToken(w http.ResponseWriter, r *http.Request) (string, bool) {
 		RefreshToken string `json:"refreshToken"`
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body) != nil ||
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF ||
 		(body.RefreshToken != "" && (len(body.RefreshToken) != 43 || !tokenRE.MatchString(body.RefreshToken))) {
 		httpx.Error(w, http.StatusBadRequest, "invalid refresh token")
 		return "", false

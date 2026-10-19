@@ -36,7 +36,7 @@ func (s *server) groupRole(ctx context.Context, conversationID, userID int64) (s
 
 func (s *server) groupMembers(ctx context.Context, conversationID int64) ([]groupMember, error) {
 	rows, err := s.db.Query(ctx, `
-		SELECT u.id,u.username,u.display_name,cm.role
+		SELECT u.id,u.username,u.display_name,u.show_online_status,cm.role
 		FROM conversation_members cm
 		JOIN users u ON u.id=cm.user_id
 		JOIN conversations c ON c.id=cm.conversation_id
@@ -53,10 +53,11 @@ func (s *server) groupMembers(ctx context.Context, conversationID int64) ([]grou
 	items := []groupMember{}
 	for rows.Next() {
 		var item groupMember
-		if err := rows.Scan(&item.ID, &item.Username, &item.DisplayName, &item.Role); err != nil {
+		var showOnline bool
+		if err := rows.Scan(&item.ID, &item.Username, &item.DisplayName, &showOnline, &item.Role); err != nil {
 			return nil, err
 		}
-		item.Online = s.redis.Exists(ctx, presenceKey(item.ID)).Val() > 0
+		item.Online = showOnline && s.redis.Exists(ctx, presenceKey(item.ID)).Val() > 0
 		items = append(items, item)
 	}
 	return items, rows.Err()

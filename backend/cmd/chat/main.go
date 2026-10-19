@@ -537,16 +537,17 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		if c.Type == "direct" {
 			var otherID int64
 			var displayName string
+			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username
+				SELECT u.id,u.username,u.show_online_status
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
-				c.ID, claims.UserID).Scan(&otherID, &displayName)
+				c.ID, claims.UserID).Scan(&otherID, &displayName, &showOnline)
 			if err == nil {
 				c.Name = displayName
 				c.OtherUserID = &otherID
-				c.Online = s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
+				c.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
 			}
 		}
 		items = append(items, c)
@@ -571,9 +572,10 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 
 	var otherID int64
 	var otherName string
+	var showOnline bool
 	if err := s.db.QueryRow(r.Context(),
-		`SELECT id,username FROM users WHERE username=$1`, username,
-	).Scan(&otherID, &otherName); err != nil {
+		`SELECT id,username,show_online_status FROM users WHERE username=$1`, username,
+	).Scan(&otherID, &otherName, &showOnline); err != nil {
 		httpx.Error(w, http.StatusNotFound, "user not found")
 		return
 	}
@@ -617,7 +619,7 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	c := conversation{
 		ID: id, Type: "direct", Name: otherName, OtherUserID: &otherID,
 		MemberCount: 2, CreatedAt: createdAt,
-		Online: s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0,
+		Online: showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0,
 	}
 	s.publishConversationEvent(r.Context(), ids, realtimeEvent{Type: "conversation.created", ConversationID: id, Conversation: &c})
 	httpx.JSON(w, http.StatusCreated, c)
