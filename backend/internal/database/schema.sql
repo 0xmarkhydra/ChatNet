@@ -94,6 +94,9 @@ ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_message_id BIGINT;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
+-- Immutable fingerprint of the original POST body for loss-of-ACK retries.
+-- Unlike messages.text/attachments, this never changes on edit or recall.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS request_fingerprint CHAR(64);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_sender_client_id
 ON messages(user_id, client_id) WHERE client_id IS NOT NULL;
 DO $$

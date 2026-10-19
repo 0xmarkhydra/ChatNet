@@ -6,6 +6,7 @@ import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, 
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from './chatPersistence'
 import { uploadPresignedFile } from './mediaUpload'
+import { canMarkConversationRead } from './conversationRead'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
 import GroupActionsSheet from './GroupActionsSheet'
@@ -449,6 +450,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false)
 
   const [tab, setTab] = useState<Tab>('chat')
+  const tabRef = useRef(tab)
+  tabRef.current = tab
   const [globalSearch, setGlobalSearch] = useState('')
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   useEffect(() => {
@@ -2308,7 +2311,8 @@ export default function App() {
                   lastMessage: incoming.text || attachmentLabel(incoming.attachments),
                   lastMessageAt: incoming.createdAt,
                   unreadCount:
-                    incoming.senderId !== session.user.id && currentId !== item.id
+                    incoming.senderId !== session.user.id &&
+                      !canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState)
                       ? item.unreadCount + 1
                       : item.unreadCount,
                 }
@@ -2327,8 +2331,11 @@ export default function App() {
               ? current
               : [...current, incoming],
           )
-          void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
-            .catch(() => setStatus('Đang kết nối lại...'))
+          if (incoming.senderId !== session.user.id &&
+              canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState)) {
+            void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
+              .catch(() => setStatus('Đang kết nối lại...'))
+          }
         }
       }
     })
@@ -2405,6 +2412,7 @@ export default function App() {
           }
         }
         setTranslations(restored)
+        if (!canMarkConversationRead(activeConversationIdRef.current, activeConversationId, tabRef.current, document.visibilityState)) return
         const read = await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
         if (!read.ok) return
         if (!cancelled) {
@@ -2428,6 +2436,29 @@ export default function App() {
     targetLanguage,
     translationPreferencesLoaded,
   ])
+
+  useEffect(() => {
+    if (!session?.token || !activeConversationId) return
+    const id = activeConversationId
+    const sessionId = session.sessionId
+    const markWhenVisible = () => {
+      if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState)) return
+      void apiFetch(`/api/conversations/${id}/read`, { method: 'POST' })
+        .then((response) => {
+          if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId) return
+          setConversations((current) =>
+            current.map((item) => item.id === id ? { ...item, unreadCount: 0 } : item),
+          )
+        })
+        .catch(() => undefined)
+    }
+    window.addEventListener('focus', markWhenVisible)
+    document.addEventListener('visibilitychange', markWhenVisible)
+    return () => {
+      window.removeEventListener('focus', markWhenVisible)
+      document.removeEventListener('visibilitychange', markWhenVisible)
+    }
+  }, [session?.sessionId, activeConversationId])
 
   async function loadOlderMessages() {
     if (!session || !activeConversationId || messagesPagingBusy.current ||

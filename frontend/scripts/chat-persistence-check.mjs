@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { canMarkConversationRead } from '../src/conversationRead.ts'
 import {
   clearChatPersistence, clearPendingSend, loadChatDrafts,
   loadPendingSend, saveChatDrafts, savePendingSend,
@@ -53,4 +54,10 @@ saveChatDrafts(100, draft, deniedStore)
 savePendingSend(100, previous, deniedStore)
 clearChatPersistence(100, deniedStore)
 
-console.log('PASS: chat drafts, isolation, lost-ACK recovery, expiry, malformed/denied storage, logout cleanup')
+assert.equal(canMarkConversationRead(42, 42, 'chat', 'visible'), true)
+assert.equal(canMarkConversationRead(42, 42, 'chat', 'hidden'), false, 'Background PWA must not mark read')
+assert.equal(canMarkConversationRead(42, 42, 'feed', 'visible'), false, 'Hidden chat tab must not mark read')
+assert.equal(canMarkConversationRead(42, 43, 'chat', 'visible'), false, 'Other conversation must stay unread')
+assert.equal(canMarkConversationRead(null, 42, 'chat', 'visible'), false, 'No open conversation stays unread')
+
+console.log('PASS: chat drafts, lost-ACK recovery, account isolation, read visibility, expiry, denied storage and logout')

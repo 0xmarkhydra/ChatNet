@@ -49,6 +49,41 @@ func TestSameMessageRequest(t *testing.T) {
 	}
 }
 
+func TestMessageRequestFingerprint(t *testing.T) {
+	reply := int64(17)
+	refs := []mediax.AttachmentInput{
+		{StorageRef: "s3://bucket/ref-1"},
+		{StorageRef: "s3://bucket/ref-2"},
+	}
+	baseline := messageRequestFingerprint(3, "hello", &reply, refs)
+	if baseline != messageRequestFingerprint(3, "hello", &reply, refs) || len(baseline) != 64 {
+		t.Fatal("fingerprint must be deterministic and SHA-256 hex")
+	}
+	for _, tc := range []struct {
+		name         string
+		conversation int64
+		text         string
+		reply        *int64
+		attachments  []mediax.AttachmentInput
+	}{
+		{"conversation change", 4, "hello", &reply, refs},
+		{"content change", 3, "edited", &reply, refs},
+		{"removed reply", 3, "hello", nil, refs},
+		{"removed media", 3, "hello", &reply, refs[:1]},
+		{"reordered media", 3, "hello", &reply, []mediax.AttachmentInput{refs[1], refs[0]}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := messageRequestFingerprint(tc.conversation, tc.text, tc.reply, tc.attachments); got == baseline {
+				t.Fatal("different message request must change immutable fingerprint")
+			}
+		})
+	}
+	if baseline != messageRequestFingerprint(3, "hello", &reply,
+		[]mediax.AttachmentInput{{StorageRef: " s3://bucket/ref-1 "}, {StorageRef: "s3://bucket/ref-2"}}) {
+		t.Fatal("whitespace around storage ref must be normalized")
+	}
+}
+
 func TestMessageIdempotencyIntegration(t *testing.T) {
 	dbURL, redisAddr := os.Getenv("CHATNET_TEST_DATABASE_URL"), os.Getenv("CHATNET_TEST_REDIS_ADDR")
 	if dbURL == "" || redisAddr == "" {
@@ -154,6 +189,35 @@ func TestMessageIdempotencyIntegration(t *testing.T) {
 		t.Fatalf("client ID collision should be 409, got %d", status)
 	}
 
+	// Lost HTTP ACK can arrive after the original has been edited/recalled.
+	// The immutable request fingerprint must still identify the original POST.
+	editReq := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/api/messages/%d", original.ID), strings.NewReader(`{"text":"updated on another device"}`))
+	editReq.SetPathValue("id", fmt.Sprint(original.ID))
+	editReq.Header.Set("Authorization", "Bearer "+token)
+	editResponse := httptest.NewRecorder()
+	authx.Middleware("test", http.HandlerFunc(s.editMessage)).ServeHTTP(editResponse, editReq)
+	if editResponse.Code != http.StatusOK {
+		t.Fatalf("could not edit original: %s", editResponse.Body.String())
+	}
+	if status, replay := send(clientID, "hello"); status != http.StatusOK || replay.ID != original.ID || replay.Text != "updated on another device" {
+		t.Fatalf("retry after edit must reuse original ID: status=%d msg=%+v", status, replay)
+	}
+	if status, _ := send(clientID, "updated on another device"); status != http.StatusConflict {
+		t.Fatalf("mutated text must not become accepted as original fingerprint, got %d", status)
+	}
+
+	revokeReq := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/messages/%d", original.ID), nil)
+	revokeReq.SetPathValue("id", fmt.Sprint(original.ID))
+	revokeReq.Header.Set("Authorization", "Bearer "+token)
+	revokeResponse := httptest.NewRecorder()
+	authx.Middleware("test", http.HandlerFunc(s.deleteMessage)).ServeHTTP(revokeResponse, revokeReq)
+	if revokeResponse.Code != http.StatusOK {
+		t.Fatalf("could not recall original: %s", revokeResponse.Body.String())
+	}
+	if status, replay := send(clientID, "hello"); status != http.StatusOK || replay.ID != original.ID || !replay.Deleted {
+		t.Fatalf("retry after recall must reuse recalled message ID: status=%d msg=%+v", status, replay)
+	}
+
 	var wg sync.WaitGroup
 	const parallel = 5
 	codes := make(chan int, parallel)
@@ -187,4 +251,84 @@ func TestMessageIdempotencyIntegration(t *testing.T) {
 		users[0], "parallel-"+clientID).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("expected exactly one durable message, count=%d err=%v", count, err)
 	}
+
+	t.Run("kicked member loses write and history privileges", func(t *testing.T) {
+		var groupID int64
+		if err := db.QueryRow(ctx, `INSERT INTO conversations(type,name,created_by)
+			VALUES('group','ACL integration', $1) RETURNING id`, users[0]).Scan(&groupID); err != nil {
+			t.Fatal(err)
+		}
+		defer db.Exec(ctx, "DELETE FROM conversations WHERE id=$1", groupID)
+		for i, userID := range users[:2] {
+			role := "member"
+			if i == 0 {
+				role = "owner"
+			}
+			if _, err := db.Exec(ctx, `INSERT INTO conversation_members(conversation_id,user_id,role)
+				VALUES($1,$2,$3)`, groupID, userID, role); err != nil {
+				t.Fatal(err)
+			}
+		}
+		memberToken, err := authx.Sign("test", users[1], "member", "Member")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sendGroup := func() (int, message) {
+			req := httptest.NewRequest(http.MethodPost,
+				fmt.Sprintf("/api/conversations/%d/messages", groupID),
+				strings.NewReader(`{"text":"before kick","clientId":"group-pre-kick"}`))
+			req.SetPathValue("id", fmt.Sprint(groupID))
+			req.Header.Set("Authorization", "Bearer "+memberToken)
+			result := httptest.NewRecorder()
+			authx.Middleware("test", http.HandlerFunc(s.createMessage)).ServeHTTP(result, req)
+			var saved message
+			_ = json.Unmarshal(result.Body.Bytes(), &saved)
+			return result.Code, saved
+		}
+		status, groupMessage := sendGroup()
+		if status != http.StatusCreated || groupMessage.ID <= 0 {
+			t.Fatalf("member could not send prior to kick: HTTP %d msg=%+v", status, groupMessage)
+		}
+		if _, err := db.Exec(ctx,
+			"DELETE FROM conversation_members WHERE conversation_id=$1 AND user_id=$2",
+			groupID, users[1]); err != nil {
+			t.Fatal(err)
+		}
+
+		if status, _ := sendGroup(); status != http.StatusForbidden {
+			t.Fatalf("kicked member sent message: HTTP %d", status)
+		}
+		call := func(method, endpoint, body, messageID string, handler http.HandlerFunc) int {
+			req := httptest.NewRequest(method, endpoint, strings.NewReader(body))
+			req.SetPathValue("id", messageID)
+			req.Header.Set("Authorization", "Bearer "+memberToken)
+			result := httptest.NewRecorder()
+			authx.Middleware("test", handler).ServeHTTP(result, req)
+			return result.Code
+		}
+		endpoint := fmt.Sprintf("/api/messages/%d", groupMessage.ID)
+		if code := call(http.MethodPatch, endpoint, `{"text":"illegal edit"}`, fmt.Sprint(groupMessage.ID), s.editMessage); code == http.StatusOK {
+			t.Fatal("kicked member edited old message")
+		}
+		if code := call(http.MethodDelete, endpoint, "", fmt.Sprint(groupMessage.ID), s.deleteMessage); code == http.StatusOK {
+			t.Fatal("kicked member recalled old message")
+		}
+		if code := call(http.MethodPost, endpoint+"/reactions", `{"emoji":"👍"}`, fmt.Sprint(groupMessage.ID), s.toggleMessageReaction); code != http.StatusForbidden {
+			t.Fatalf("kicked member reaction was not rejected: HTTP %d", code)
+		}
+		if code := call(http.MethodGet, fmt.Sprintf("/api/conversations/%d/messages", groupID),
+			"", fmt.Sprint(groupID), s.listMessages); code != http.StatusForbidden {
+			t.Fatalf("kicked member read history: HTTP %d", code)
+		}
+		if code := call(http.MethodGet, fmt.Sprintf("/api/conversations/%d/shared", groupID),
+			"", fmt.Sprint(groupID), s.listSharedContent); code != http.StatusForbidden {
+			t.Fatalf("kicked member read shared media: HTTP %d", code)
+		}
+		var savedText string
+		var deleted bool
+		if err := db.QueryRow(ctx, "SELECT text,deleted_at IS NOT NULL FROM messages WHERE id=$1",
+			groupMessage.ID).Scan(&savedText, &deleted); err != nil || savedText != "before kick" || deleted {
+			t.Fatalf("denied writes altered stored message: %q deleted=%v err=%v", savedText, deleted, err)
+		}
+	})
 }

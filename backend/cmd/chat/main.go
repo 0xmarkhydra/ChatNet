@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -796,6 +798,23 @@ func validClientID(id string) bool {
 	}) < 0
 }
 
+// messageRequestFingerprint is computed from the *original* validated request,
+// not the mutable message row. An edit/recall cannot turn a valid retry into 409.
+func messageRequestFingerprint(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) string {
+	refs := make([]string, 0, len(attachments))
+	for _, attachment := range attachments {
+		refs = append(refs, strings.TrimSpace(attachment.StorageRef))
+	}
+	payload, _ := json.Marshal(struct {
+		ConversationID int64    `json:"conversationId"`
+		Text           string   `json:"text"`
+		ReplyTo        *int64   `json:"replyTo"`
+		StorageRefs    []string `json:"storageRefs"`
+	}{conversationID, text, replyTo, refs})
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:])
+}
+
 func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
 	if m.ConversationID != conversationID || m.Text != text || len(m.Attachments) != len(attachments) {
 		return false
@@ -817,9 +836,10 @@ func sameMessageRequest(m message, conversationID int64, text string, replyTo *i
 // replyExistingMessage returns true once it wrote a response for an existing client ID.
 func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
 	var messageID int64
+	var fingerprint *string
 	err := s.db.QueryRow(r.Context(), `
-		SELECT id FROM messages WHERE user_id=$1 AND client_id=$2
-	`, senderID, clientID).Scan(&messageID)
+		SELECT id,request_fingerprint FROM messages WHERE user_id=$1 AND client_id=$2
+	`, senderID, clientID).Scan(&messageID, &fingerprint)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false
 	}
@@ -832,7 +852,13 @@ func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, se
 		httpx.Error(w, http.StatusInternalServerError, "cannot load message retry")
 		return true
 	}
-	if !sameMessageRequest(m, conversationID, text, replyTo, attachments) {
+	if fingerprint != nil {
+		if *fingerprint != messageRequestFingerprint(conversationID, text, replyTo, attachments) {
+			httpx.Error(w, http.StatusConflict, "client id was already used for another message")
+			return true
+		}
+	} else if !sameMessageRequest(m, conversationID, text, replyTo, attachments) {
+		// Compatibility for rows created before the additive fingerprint migration.
 		httpx.Error(w, http.StatusConflict, "client id was already used for another message")
 		return true
 	}
@@ -906,6 +932,21 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
+	// Lock active membership until the message commits. A group removal cannot
+	// race a slow S3 validation and leave a message sent after removal.
+	var membership int64
+	if err := tx.QueryRow(r.Context(), `
+		SELECT conversation_id FROM conversation_members
+		WHERE conversation_id=$1 AND user_id=$2 FOR SHARE
+	`, conversationID, claims.UserID).Scan(&membership); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.Error(w, http.StatusForbidden, "not a conversation member")
+		} else {
+			httpx.Error(w, http.StatusInternalServerError, "cannot verify conversation membership")
+		}
+		return
+	}
+
 	m := message{
 		ClientID:         body.ClientID,
 		ConversationID:   conversationID,
@@ -915,12 +956,16 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		Attachments:      attachments,
 		Reactions:        []messageReaction{},
 	}
+	fingerprint := ""
+	if body.ClientID != "" {
+		fingerprint = messageRequestFingerprint(conversationID, body.Text, body.ReplyToMessageID, body.Attachments)
+	}
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id)
-		VALUES($1,$2,$3,$4,NULLIF($5,''))
+		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint)
+		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''))
 		ON CONFLICT (user_id,client_id) WHERE client_id IS NOT NULL DO NOTHING
 		RETURNING id,text,created_at`,
-		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID,
+		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint,
 	).Scan(&m.ID, &m.Text, &m.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = tx.Rollback(r.Context())
@@ -1050,10 +1095,15 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		UPDATE messages
+		UPDATE messages m
 		SET text=$1,edited_at=NOW()
-		WHERE id=$2 AND user_id=$3 AND deleted_at IS NULL
-		RETURNING conversation_id`, body.Text, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		WHERE m.id=$2 AND m.user_id=$3 AND m.deleted_at IS NULL
+		  AND EXISTS (
+			SELECT 1 FROM conversation_members cm
+			WHERE cm.conversation_id=m.conversation_id AND cm.user_id=$3
+			FOR SHARE
+		  )
+		RETURNING m.conversation_id`, body.Text, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be edited")
 		return
 	}
@@ -1079,10 +1129,15 @@ func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		UPDATE messages
+		UPDATE messages m
 		SET text='',deleted_at=NOW(),edited_at=NULL
-		WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-		RETURNING conversation_id`, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		WHERE m.id=$1 AND m.user_id=$2 AND m.deleted_at IS NULL
+		  AND EXISTS (
+			SELECT 1 FROM conversation_members cm
+			WHERE cm.conversation_id=m.conversation_id AND cm.user_id=$2
+			FOR SHARE
+		  )
+		RETURNING m.conversation_id`, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be recalled")
 		return
 	}

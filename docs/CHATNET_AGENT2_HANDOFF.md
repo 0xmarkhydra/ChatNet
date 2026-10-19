@@ -3,7 +3,7 @@
 **Owner:** Agent 2 · Messaging / Realtime / Media · Web/PWA only
 **Working branch:** `feat/chatnet-a2-messaging-media` (worktree `.worktrees/chatnet-a2-messaging-media`)
 **Base:** `main` at `182da27`
-**Integration:** `dev` **does not exist locally or at origin** as inspected on 2026-10-19. Do not merge until Integration Owner creates/identifies the approved integration branch.
+**Integration:** `dev` now exists locally and as `origin/dev` as rechecked on 2026-10-19. Integration Owner (Agent 5) owns the review/merge; Agent 2 does **not** merge into `dev` or `main`.
 **Release:** Not approved. Do not claim Agent 2 is 100% complete.
 
 ## What changed in this batch
@@ -20,7 +20,7 @@
 - `GET /api/conversations/{id}/messages` and message-updated responses include `clientId` when the row has one.
 - Deployment ordering: run `database.Migrate` / `schema.sql` against PostgreSQL before serving changed Chat API. Migration is additive: `client_id VARCHAR(64)` and `idx_messages_sender_client_id`. Existing rows keep NULL.
 - React assumes HTTP 200 on replay is success. SSE should publish a single create event. No merge or deployment of frontend alone before compatible backend/database.
-- The client-id replay comparison uses current saved text/reply/media refs: retry of an already edited/recalled message may return 409 rather than historical original. Review when adding durable replay receipts.
+- **Batch 4 migration required:** add nullable `messages.request_fingerprint CHAR(64)` before deploying updated Chat API. New messages with `clientId` store a SHA-256 fingerprint of the original conversation ID, normalized text, reply ID and ordered storage refs. For these rows, retries succeed even after edit/recall; a different request returns 409. Rows created before the migration retain a NULL fingerprint and use legacy comparison.
 
 ## Verification evidence
 
@@ -64,6 +64,14 @@
 - **MEDIA-04 P0 (improved)**: Go `mediax.classify` now accepts explicit MIME values for each permitted extension rather than generic `image/*`/`video/*`/any document content type. Rejects SVG disguised as JPEG, HTML disguised as PDF, JavaScript disguised as ZIP and other mismatches. Existing file size, type and ownership checks remain authoritative at backend.
 - **Automated verification**: `frontend npm run check:media` covers PUT progress, success, network/HTTP errors, timeout, abort and no bearer token to S3; `npm run build` PASS; `go test ./internal/mediax` PASS with executable-MIME denial/valid format cases.
 - **Limitations**: S3 real-environment/CORS/device/browser upload not yet exercised; presigned URLs remain usable until expiration even if membership is revoked; true content/magic-byte validation, quota controls, upload orphan cleanup and retention require additional backend/storage work. No release approval.
+
+## Batch 4 — immutable retry receipts, membership enforcement, visibility-aware read (2026-10-19)
+
+- **CHAT-01 / CHAT-21 P0**: backend stores immutable `request_fingerprint` on original insert when `clientId` is present. An identical replay returns existing message after editing or recalling its content; an unrelated request reusing `clientId` still returns HTTP 409. PostgreSQL/Redis integration test exercises create, single Redis event, A/B/C isolation, lost ACK, edit, recall, and parallel sends. Legacy NULL fingerprints keep old behavior until migrated.
+- **SEC-08 / CHAT-04 P0**: `createMessage` locks the sending user's conversation membership transactionally after validating media and before inserting. The edit/recall SQL also requires live membership; removed users cannot mutate historical messages even if they authored them. Dedicated group integration tests remove the member, then assert message send/edit/recall/reaction, history and shared-media access are rejected and the stored message remains unchanged.
+- **CHAT-03 P0 (improved)**: background browser tabs/PWAs no longer automatically mark newly received messages read just because the conversation ID remains selected. The frontend only sends receipts when the chat view is visible, and synchronizes unread on focus/visibility restoration; `npm run check:chat` covers visibility predicate.
+- **Checks**: isolated PostgreSQL 17 + Redis 7.4 `go test -count=1 ./cmd/chat` PASS; `go test ./...` PASS; React/TypeScript `npm run build` PASS; `npm run check:chat` PASS; `git diff --check` PASS. Existing JS chunk warnings persist.
+- **Still outstanding**: live browser focus/background E2E, 3-account multi-device scenarios, S3 revocation/retention, and rest of CHAT/MEDIA P0/P1. This increment is not 100% completion or production approval.
 
 ## Integration warnings
 
