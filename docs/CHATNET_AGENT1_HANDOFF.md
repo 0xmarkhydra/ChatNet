@@ -18,6 +18,8 @@
 - **FR-07:** Thay khóa action toàn cục bằng khóa theo user ID để không khóa toàn trang; backend DELETE cho phép `direction=accepted` và chỉ xóa quan hệ accepted, tránh xóa một lời mời mới do race/stale action.
 - **FR-17/privacy:** API gợi ý không liệt kê người đã tắt cả searchable_by_username và searchable_by_name; API tìm người theo email chỉ khớp email nếu `searchable_by_email`, không gửi trường email cho client.
 - **Kiểm thử:** Mở rộng integration test để xác nhận hủy kết bạn `direction=accepted` và từ chối kiểu xóa accepted trong lúc vẫn pending.
+- **Đợt tiếp (FR-03/05/16):** Có GET/PUT `/api/privacy` (auth + no-store), 5 công tắc riêng tư ở Hồ sơ, schema mặc định tương thích ngược, Gateway proxy sang Chat service, backend từ chối lời mời mới khi người nhận không cho phép và giấu trạng thái online trong danh sách lời mời/bạn bè, tìm kiếm và gợi ý. Tìm theo email chỉ trả về định danh công khai khi đã opt-in, không trả email.
+- **Lưu ý tích hợp:** Đã chạm `backend/cmd/gateway/main.go` đúng 1 tuyến `/api/privacy` để FE gọi API thật; Agent 5 review route khi tích hợp. Các luồng presence khác (như nearby/chat/calls) và block/report chưa được enforce toàn hệ thống.
 
 ## Phân loại toàn bộ 34 task
 
@@ -27,9 +29,9 @@ Quy ước: **Cần cải tiến** nghĩa là có một phần luồng/đã sử
 |---|---|---|---|
 | FR-01 | P0 | Cần cải tiến | Đã nối UI tìm trong Danh bạ và API quyền tìm; chưa test 2 browser + 7 kích thước |
 | FR-02 | P0 | Cần cải tiến | Debounce/abort/error/retry đã có; cần test mạng chậm, timeout và race trên trình duyệt |
-| FR-03 | P0 | Cần cải tiến | Danh sách/chuyển chat đã có; avatar còn fallback, online chưa có privacy policy đầy đủ |
+| FR-03 | P0 | Cần cải tiến | Đã ẩn online theo opt-in ở Friends/search API; avatar còn fallback, các luồng presence khác chưa kiểm đủ |
 | FR-04 | P0 | Cần cải tiến | Menu và xác nhận hủy đã code; hồ sơ mới là preview tối thiểu, cần UX/a11y/E2E |
-| FR-05 | P0 | Cần cải tiến | API gửi/hủy + UI hiện có; cần case refresh, lỗi mạng, quyền lời mời |
+| FR-05 | P0 | Cần cải tiến | API chặn lời mời mới khi người nhận tắt quyền (integration PASS); cần case refresh/lỗi mạng/đa tab |
 | FR-06 | P0 | Cần cải tiến | Accept/decline + push + Redis integration PASS; chưa E2E browser/push thật |
 | FR-07 | P0 | Cần cải tiến | Lock theo ID, accepted guard và integration PASS; cần stress/race nhiều tab |
 | FR-08 | P0 | Cần cải tiến | `friend.updated` Redis 2 account integration PASS; SSE reconnect và browser đa tab chưa kiểm |
@@ -40,7 +42,7 @@ Quy ước: **Cần cải tiến** nghĩa là có một phần luồng/đã sử
 | FR-13 | P1 | Cần cải tiến | Có ProfileQr, chưa xác minh browser camera/deep link/PWA |
 | FR-14 | P1 | Chưa có | Chưa có policy block/unblock xuyên search, chat, calls, nhóm |
 | FR-15 | P1 | Chưa có | Thiếu report user đầy đủ, kiểm duyệt, chống spam |
-| FR-16 | P1 | Cần cải tiến | Có các cờ searchable server, thiếu bộ cài đặt privacy đầy đủ/enforcement mọi API |
+| FR-16 | P1 | Cần cải tiến | Có 5 công tắc Web/PWA lưu DB và enforce Friends/search; vẫn thiếu privacy profile/call/nearby/toàn hệ thống |
 | FR-17 | P2 | Cần cải tiến | Có mutual groups, giới hạn gợi ý riêng tư bước đầu; thiếu hide/block/consent |
 | FR-18 | P1 | Chưa có | Nickname riêng per-contact đồng bộ server |
 | FR-19 | P1 | Chưa có | Favorite/phân loại/nhóm liên hệ |
@@ -68,8 +70,9 @@ Quy ước: **Cần cải tiến** nghĩa là có một phần luồng/đã sử
 - **PASS:** `npm run check:session`: refresh, concurrency, legacy migration, offline, expiry, stale response, bounded retry.
 - **PASS (mock UI):** `npm run check:ui`: 42 viewport/screen checks về layout, overflow, profile stacking dùng dữ liệu/session mô phỏng. Đây không phải E2E hai tài khoản thực.
 - **PASS:** `TestFriendRequestsIntegration` với 2 user/token độc lập trên PostgreSQL 17 và Redis 7.4 container riêng Agent 1: gửi, gửi chéo, chấp nhận, từ chối, cancel, unfriend, Redis `friend.updated` hai phía và conflict.
+- **PASS:** `TestPrivacyIntegration` sử dụng 2 tài khoản và PostgreSQL/Redis riêng: GET/PUT riêng tư, tắt search/nhận lời mời, chặn tạo liên kết qua API, email không bị trả ra, opt-in online được phản ánh trong danh sách bạn bè. Không sử dụng dữ liệu production.
 - **NOT RUN:** E2E thực tế trên 2 browser profiles đăng nhập độc lập; kiểm tra offline/weak network/F5 nhiều tab, kích thước 320/375/390/430/768/1024/1440, quyền camera và iOS PWA.
-- **NOT RUN:** Review security toàn diện JWT, privacy, IDOR, brute-force/rate-limits và load test.
+- **NOT RUN:** Review security toàn diện JWT, IDOR, brute-force/rate-limits, toàn bộ bề mặt hiện diện/khám phá/call và load test.
 - **Tồn tại:** Vite build cảnh báo chunk >500KB; profile người khác mới là preview nhỏ, chưa phải màn profile P1 đầy đủ.
 
 ## Kế hoạch xử lý tiếp (P0 trước P1)

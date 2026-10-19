@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
     searchable_by_name BOOLEAN NOT NULL DEFAULT TRUE,
     searchable_by_email BOOLEAN NOT NULL DEFAULT TRUE,
     searchable_by_phone BOOLEAN NOT NULL DEFAULT FALSE,
+    allow_friend_requests BOOLEAN NOT NULL DEFAULT TRUE,
+    show_online_status BOOLEAN NOT NULL DEFAULT TRUE,
     avatar_ref TEXT,
     cover_ref TEXT,
     profile_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -24,6 +26,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_username BOOLEAN NOT NU
 ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_name BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_email BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_phone BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_friend_requests BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online_status BOOLEAN NOT NULL DEFAULT TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);

@@ -178,6 +178,14 @@ type FriendSearchResult = {
   reason?: string
 }
 
+type UserPrivacy = {
+  searchableByUsername: boolean
+  searchableByName: boolean
+  searchableByEmail: boolean
+  allowFriendRequests: boolean
+  showOnlineStatus: boolean
+}
+
 type FriendConnection = FriendSearchResult & {
   status: 'accepted' | 'pending'
   direction?: 'incoming' | 'outgoing'
@@ -590,6 +598,11 @@ export default function App() {
   const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState('')
   const [profileUsernameDraft, setProfileUsernameDraft] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
+  const [privacy, setPrivacy] = useState<UserPrivacy | null>(null)
+  const [privacyBusy, setPrivacyBusy] = useState(false)
+  const [privacyLoading, setPrivacyLoading] = useState(false)
+  const [privacyError, setPrivacyError] = useState('')
+  const [privacyRetry, setPrivacyRetry] = useState(0)
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
@@ -1705,6 +1718,61 @@ export default function App() {
       setNotice('Không thể bật thông báo. Kiểm tra quyền Notification của trình duyệt/PWA rồi thử lại.')
     } finally {
       setPushBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!session?.token) {
+      setPrivacy(null)
+      setPrivacyError('')
+      setPrivacyLoading(false)
+      return
+    }
+    const controller = new AbortController()
+    setPrivacy(null)
+    setPrivacyBusy(false)
+    setPrivacyLoading(true)
+    setPrivacyError('')
+    apiFetch('/api/privacy', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Không thể tải quyền riêng tư.')
+        return response.json() as Promise<UserPrivacy>
+      })
+      .then((value) => {
+        if (!controller.signal.aborted) setPrivacy(value)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setPrivacyError('Không thể tải cài đặt riêng tư.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPrivacyLoading(false)
+      })
+    return () => controller.abort()
+  }, [session?.sessionId, privacyRetry])
+
+  async function changePrivacy(key: keyof UserPrivacy) {
+    if (!privacy || privacyBusy || !session?.sessionId) return
+    const sessionId = session.sessionId
+    const next = { ...privacy, [key]: !privacy[key] }
+    setPrivacyBusy(true)
+    try {
+      const response = await apiFetch('/api/privacy', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      const result = await response.json().catch(() => null) as UserPrivacy | null
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || !result) throw new Error('Không lưu được quyền riêng tư.')
+      setPrivacy(result)
+      setNotice('Đã lưu cài đặt riêng tư')
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId) {
+        setPrivacyError('Lưu thất bại. Cài đặt trước đó vẫn được giữ.')
+        setNotice('Không thể lưu quyền riêng tư. Vui lòng thử lại.', 'error')
+      }
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) setPrivacyBusy(false)
     }
   }
 
@@ -5042,6 +5110,37 @@ export default function App() {
 
             <div className="soco-profile-section-label">TÙY CHỌN & CÀI ĐẶT</div>
             <section className="settings-card">
+              <div className="settings-row">
+                <div>
+                  <strong>Quyền riêng tư tài khoản</strong>
+                  <small>Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. Thiết lập lưu trên máy chủ.</small>
+                </div>
+              </div>
+              {privacyLoading && <div className="settings-row" role="status">Đang tải quyền riêng tư...</div>}
+              {privacyError && <div className="settings-row" role="alert">
+                <span>{privacyError}</span>
+                <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>Thử lại</button>
+              </div>}
+              {privacy && ([
+                ['searchableByUsername', 'Cho phép tìm bằng username', 'Người khác có thể tìm @username của bạn.'],
+                ['searchableByName', 'Cho phép tìm bằng tên', 'Tên hiển thị của bạn có thể xuất hiện trong kết quả.'],
+                ['searchableByEmail', 'Cho phép tìm bằng email', 'Chỉ tìm bằng email khớp chính xác; địa chỉ email không được hiển thị.'],
+                ['allowFriendRequests', 'Cho phép lời mời mới', 'Tắt để ngăn lời mời kết bạn mới từ người khác.'],
+                ['showOnlineStatus', 'Hiển thị trạng thái online', 'Ẩn sự hiện diện trong danh sách và kết quả tìm kiếm.'],
+              ] as const).map(([key, label, hint]) => (
+                <div className="settings-row" key={key}>
+                  <div><strong>{label}</strong><small>{hint}</small></div>
+                  <button
+                    type="button"
+                    className={`switch-button ${privacy[key] ? 'on' : ''}`}
+                    role="switch"
+                    aria-label={label}
+                    aria-checked={privacy[key]}
+                    disabled={privacyBusy}
+                    onClick={() => void changePrivacy(key)}
+                  ><span /></button>
+                </div>
+              ))}
               <button
                 type="button"
                 className="settings-row settings-row-button app-locale-row"

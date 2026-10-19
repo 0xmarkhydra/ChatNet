@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"chatnet/internal/authx"
 	"chatnet/internal/httpx"
 	"chatnet/internal/onesignalx"
+	"github.com/jackc/pgx/v5"
 )
 
 type friendConnection struct {
@@ -31,8 +33,9 @@ func orderedUserPair(a, b int64) (int64, int64) {
 func (s *server) friendConnectionFor(ctx context.Context, userID, otherID int64) (friendConnection, error) {
 	var item friendConnection
 	var requestedBy int64
+	var showOnline bool
 	err := s.db.QueryRow(ctx, `
-		SELECT u.id,u.username,u.display_name,fc.status,fc.requested_by,fc.updated_at
+		SELECT u.id,u.username,u.display_name,u.show_online_status,fc.status,fc.requested_by,fc.updated_at
 		FROM friend_connections fc
 		JOIN users u ON u.id=$2
 		WHERE fc.user_low=LEAST($1,$2)
@@ -42,6 +45,7 @@ func (s *server) friendConnectionFor(ctx context.Context, userID, otherID int64)
 		&item.ID,
 		&item.Username,
 		&item.DisplayName,
+		&showOnline,
 		&item.Status,
 		&requestedBy,
 		&item.UpdatedAt,
@@ -49,7 +53,7 @@ func (s *server) friendConnectionFor(ctx context.Context, userID, otherID int64)
 	if err != nil {
 		return friendConnection{}, err
 	}
-	item.Online = s.redis.Exists(ctx, presenceKey(otherID)).Val() > 0
+	item.Online = showOnline && s.redis.Exists(ctx, presenceKey(otherID)).Val() > 0
 	if item.Status == "pending" {
 		if requestedBy == userID {
 			item.Direction = "outgoing"
@@ -63,7 +67,7 @@ func (s *server) friendConnectionFor(ctx context.Context, userID, otherID int64)
 func (s *server) listFriends(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	rows, err := s.db.Query(r.Context(), `
-		SELECT u.id,u.username,u.display_name,fc.updated_at
+		SELECT u.id,u.username,u.display_name,u.show_online_status,fc.updated_at
 		FROM friend_connections fc
 		JOIN users u ON u.id=CASE WHEN fc.user_low=$1 THEN fc.user_high ELSE fc.user_low END
 		WHERE fc.status='accepted'
@@ -79,11 +83,12 @@ func (s *server) listFriends(w http.ResponseWriter, r *http.Request) {
 	items := []friendConnection{}
 	for rows.Next() {
 		var item friendConnection
-		if err := rows.Scan(&item.ID, &item.Username, &item.DisplayName, &item.UpdatedAt); err != nil {
+		var showOnline bool
+		if err := rows.Scan(&item.ID, &item.Username, &item.DisplayName, &showOnline, &item.UpdatedAt); err != nil {
 			continue
 		}
 		item.Status = "accepted"
-		item.Online = s.redis.Exists(r.Context(), presenceKey(item.ID)).Val() > 0
+		item.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(item.ID)).Val() > 0
 		items = append(items, item)
 	}
 	httpx.JSON(w, http.StatusOK, items)
@@ -92,7 +97,7 @@ func (s *server) listFriends(w http.ResponseWriter, r *http.Request) {
 func (s *server) listFriendRequests(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	rows, err := s.db.Query(r.Context(), `
-		SELECT u.id,u.username,u.display_name,fc.requested_by,fc.updated_at
+		SELECT u.id,u.username,u.display_name,u.show_online_status,fc.requested_by,fc.updated_at
 		FROM friend_connections fc
 		JOIN users u ON u.id=CASE WHEN fc.user_low=$1 THEN fc.user_high ELSE fc.user_low END
 		WHERE fc.status='pending'
@@ -109,17 +114,19 @@ func (s *server) listFriendRequests(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item friendConnection
 		var requestedBy int64
+		var showOnline bool
 		if err := rows.Scan(
 			&item.ID,
 			&item.Username,
 			&item.DisplayName,
+			&showOnline,
 			&requestedBy,
 			&item.UpdatedAt,
 		); err != nil {
 			continue
 		}
 		item.Status = "pending"
-		item.Online = s.redis.Exists(r.Context(), presenceKey(item.ID)).Val() > 0
+		item.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(item.ID)).Val() > 0
 		if requestedBy == claims.UserID {
 			item.Direction = "outgoing"
 		} else {
@@ -150,9 +157,11 @@ func (s *server) sendFriendRequest(w http.ResponseWriter, r *http.Request) {
 	low, high := orderedUserPair(claims.UserID, otherID)
 	tag, err := s.db.Exec(r.Context(), `
 		INSERT INTO friend_connections(user_low,user_high,requested_by,status,updated_at)
-		VALUES($1,$2,$3,'pending',NOW())
+		SELECT $1,$2,$3,'pending',NOW()
+		WHERE EXISTS(SELECT 1 FROM users WHERE id=$4 AND allow_friend_requests)
+		   OR EXISTS(SELECT 1 FROM friend_connections WHERE user_low=$1 AND user_high=$2)
 		ON CONFLICT(user_low,user_high) DO NOTHING
-	`, low, high, claims.UserID)
+	`, low, high, claims.UserID, otherID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot send friend request")
 		return
@@ -160,7 +169,11 @@ func (s *server) sendFriendRequest(w http.ResponseWriter, r *http.Request) {
 
 	item, err := s.friendConnectionFor(r.Context(), claims.UserID, otherID)
 	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot load friend request")
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.Error(w, http.StatusForbidden, "cannot send friend request")
+		} else {
+			httpx.Error(w, http.StatusInternalServerError, "cannot load friend request")
+		}
 		return
 	}
 	if tag.RowsAffected() > 0 {

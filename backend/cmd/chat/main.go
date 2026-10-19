@@ -124,6 +124,8 @@ func main() {
 	mux.Handle("POST /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.sendFriendRequest)))
 	mux.Handle("POST /api/friends/{id}/accept", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.acceptFriendRequest)))
 	mux.Handle("DELETE /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeFriendConnection)))
+	mux.Handle("GET /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPrivacy)))
+	mux.Handle("PUT /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePrivacy)))
 	mux.Handle("GET /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPreferences)))
 	mux.Handle("PUT /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePreferences)))
 	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
@@ -298,7 +300,7 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 				ON other.conversation_id=c.id AND other.user_id<>$1
 			WHERE c.type='direct'
 		)
-		SELECT u.id,u.username,u.display_name,COALESCE(sg.mutual_groups,0)
+		SELECT u.id,u.username,u.display_name,u.show_online_status,COALESCE(sg.mutual_groups,0)
 		FROM users u
 		LEFT JOIN shared_groups sg ON sg.user_id=u.id
 		WHERE u.id<>$1
@@ -318,8 +320,9 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int64
 		var username, displayName string
+		var showOnline bool
 		var mutualGroups int
-		if rows.Scan(&id, &username, &displayName, &mutualGroups) != nil {
+		if rows.Scan(&id, &username, &displayName, &showOnline, &mutualGroups) != nil {
 			continue
 		}
 
@@ -334,7 +337,7 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 			"id":           id,
 			"username":     username,
 			"displayName":  displayName,
-			"online":       s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
+			"online":       showOnline && s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
 			"mutualGroups": mutualGroups,
 			"reason":       reason,
 		})
@@ -356,7 +359,7 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT id,username,display_name
+		SELECT id,username,display_name,show_online_status
 		FROM users
 		WHERE id<>$1
 		  AND (
@@ -385,10 +388,11 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int64
 		var username, displayName string
-		if rows.Scan(&id, &username, &displayName) == nil {
+		var showOnline bool
+		if rows.Scan(&id, &username, &displayName, &showOnline) == nil {
 			items = append(items, map[string]any{
 				"id": id, "username": username, "displayName": displayName,
-				"online": s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
+				"online": showOnline && s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
 			})
 		}
 	}
