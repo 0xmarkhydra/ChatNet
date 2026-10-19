@@ -1,6 +1,7 @@
 import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import FeedPostActions, { FeedShareAction } from './FeedPostActions'
+import FeedModeration from './FeedModeration'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
@@ -130,7 +131,7 @@ type Conversation = {
 }
 
 type RealtimeEvent = {
-  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.read' | 'friend.updated'
+  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
   conversationId: number
   message?: Message
   conversation?: Conversation
@@ -469,6 +470,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [quickCreateOpen])
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const revokedConversationIds = useRef(new Set<number>())
   const [hasMoreConversations, setHasMoreConversations] = useState(false)
   const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
   const conversationPagingBusy = useRef(false)
@@ -1876,12 +1878,37 @@ export default function App() {
     }
   }, [friendQuery, newChatMode, session?.token, tab])
 
+  function purgeConversation(id: number) {
+    revokedConversationIds.current.add(id)
+    setConversations((current) => current.filter((item) => item.id !== id))
+    setMessageDrafts((current) => {
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+    if (activeConversationIdRef.current === id) {
+      activeConversationIdRef.current = null
+      setActiveConversationId(null)
+      setMessages([])
+      setHasMoreMessages(false)
+      setGroupMembers([])
+      setGroupSettingsOpen(false)
+      setGroupActionsOpen(false)
+      setSharedContentOpen(false)
+      setTranslations({})
+      setReplyingTo(null)
+      setMessageActionId(null)
+      setNotice('Bạn không còn là thành viên của nhóm này.')
+    }
+  }
+
   async function refreshConversations() {
     const sessionId = session?.sessionId
     try {
       const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}`)
       if (!response.ok) return
-      const data = (await response.json()) as Conversation[]
+      const data = ((await response.json()) as Conversation[])
+        .filter((item) => !revokedConversationIds.current.has(item.id))
       if (sessionRef.current?.sessionId !== sessionId) return
       setConversations((current) => {
         const freshIds = new Set(data.map((item) => item.id))
@@ -1908,7 +1935,7 @@ export default function App() {
       setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
       setConversations((current) => {
         const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id))]
+        return [...current, ...data.filter((item) => !ids.has(item.id) && !revokedConversationIds.current.has(item.id))]
       })
     } catch {
       if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
@@ -2183,6 +2210,7 @@ export default function App() {
     setAuthMode('login')
     setSession(null)
     setConversations([])
+    revokedConversationIds.current.clear()
     setHasMoreConversations(false)
     setConversationLoadingMore(false)
     conversationOffset.current = 0
@@ -2283,7 +2311,13 @@ export default function App() {
         return
       }
 
+      if (update.type === 'conversation.removed') {
+        purgeConversation(update.conversationId)
+        return
+      }
+
       if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
+        revokedConversationIds.current.delete(update.conversationId)
         void refreshConversations()
         if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
           void refreshGroupMembers(update.conversationId)
@@ -2424,6 +2458,10 @@ export default function App() {
       `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}`,
     )
       .then(async (response) => {
+        if (response.status === 403) {
+          if (!cancelled) purgeConversation(activeConversationId)
+          return
+        }
         if (!response.ok) throw new Error('Không tải được tin nhắn')
         const data = (await response.json()) as Message[]
         if (cancelled) return
@@ -4314,6 +4352,18 @@ export default function App() {
 
         {tab === 'feed' && (
           <div className="feed-view zalo-feed-view">
+            <FeedModeration request={apiFetch} onRemoved={(type, id) => {
+              if (type === 'post') {
+                setPosts((current) => current.filter((post) => post.id !== id))
+                setSavedPosts((current) => current.filter((post) => post.id !== id))
+                if (activePostId === id) setActivePostId(null)
+              } else if (type === 'comment') {
+                void refreshPosts()
+              } else {
+                setStories((current) => current.filter((story) => story.id !== id))
+                if (activeStoryId === id) setActiveStoryId(null)
+              }
+            }} />
             <input
               ref={storyFileInputRef}
               className="hidden-media-input"

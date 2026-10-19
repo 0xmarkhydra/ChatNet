@@ -98,6 +98,8 @@ func main() {
 	mux.Handle("PATCH /api/posts/{id}/comments/{commentId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.editComment)))
 	mux.Handle("DELETE /api/posts/{id}/comments/{commentId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteComment)))
 	mux.Handle("POST /api/feed/reports", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reportFeed)))
+	mux.Handle("GET /api/feed/moderation/reports", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listModerationReports)))
+	mux.Handle("PATCH /api/feed/moderation/reports/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reviewModerationReport)))
 	mux.Handle("POST /api/posts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.create)))
 	mux.Handle("POST /api/posts/{id}/like", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.like)))
 	mux.Handle("POST /api/posts/{id}/comments", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.addComment)))

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -102,7 +103,28 @@ func TestGroupRolesThreeAccountsIntegration(t *testing.T) {
 	req(0, "PATCH", memberPath(ids[2]), `{"role":"admin"}`, 403)
 	req(1, "PATCH", memberPath(ids[2]), `{"role":"admin"}`, 200)
 	req(0, "DELETE", memberPath(ids[2]), "", 403)
+	// Subscribe before the kick, as a connected browser would.
+	removedEvents := rdb.Subscribe(ctx, userChannel(ids[2]))
+	defer removedEvents.Close()
+	if _, err := removedEvents.Receive(ctx); err != nil {
+		t.Fatal(err)
+	}
 	req(1, "DELETE", memberPath(ids[2]), "", 200)
+	select {
+	case message := <-removedEvents.Channel():
+		if message == nil {
+			t.Fatal("kicked member event subscription closed")
+		}
+		var event realtimeEvent
+		if err := json.Unmarshal([]byte(message.Payload), &event); err != nil {
+			t.Fatal(err)
+		}
+		if event.Type != "conversation.removed" || event.ConversationID != groupID {
+			t.Fatalf("expected conversation.removed for group %d, got %+v", groupID, event)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("kicked member did not receive realtime removal event")
+	}
 	req(2, "GET", base+"/members", "", 403)
 	req(2, "PATCH", base, `{"name":"kicked"}`, 403)
 	req(0, "DELETE", memberPath(ids[0]), "", 200)

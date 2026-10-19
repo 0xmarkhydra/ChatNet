@@ -414,10 +414,14 @@ func (s *server) removeGroupMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recipients := s.memberIDs(r.Context(), conversationID)
-	recipients = append(recipients, targetID)
-	s.publishConversationEvent(r.Context(), recipients, realtimeEvent{
+	// Existing members refresh the group, but the removed user must purge the
+	// conversation immediately instead of retaining cached messages/media.
+	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
 		Type:           "conversation.updated",
+		ConversationID: conversationID,
+	})
+	s.publishConversationEvent(r.Context(), []int64{targetID}, realtimeEvent{
+		Type:           "conversation.removed",
 		ConversationID: conversationID,
 	})
 
