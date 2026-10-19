@@ -4,6 +4,7 @@ import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, X, Download } from 'lucide-react'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
+import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from './chatPersistence'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
 import GroupActionsSheet from './GroupActionsSheet'
@@ -470,6 +471,7 @@ export default function App() {
   const messagesPagingBusy = useRef(false)
   const pendingMessageScrollRestore = useRef<{ height: number; top: number } | null>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
+  const messageScrollAtBottom = useRef(true)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
   const messageLongPressTimer = useRef<number | null>(null)
@@ -484,8 +486,16 @@ export default function App() {
   const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
   const [sharedContentOpen, setSharedContentOpen] = useState(false)
   const [groupBusy, setGroupBusy] = useState(false)
-  // ponytail: drafts live in memory per conversation; add persistence only with an explicit retention policy.
-  const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>({})
+  // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
+  const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>(() => {
+    const saved = loadChatDrafts(session?.user.id ?? 0)
+    return Object.fromEntries(Object.entries(saved).map(([id, item]) => [Number(id), { text: item.text, attachments: [] }]))
+  })
+  useEffect(() => {
+    if (session?.user.id && sessionRef.current?.user.id === session.user.id) {
+      saveChatDrafts(session.user.id, messageDrafts)
+    }
+  }, [session?.user.id, messageDrafts])
   const draft = messageDrafts[activeConversationId ?? 0] ?? emptyDraft
   const messageText = draft.text
   const messageAttachments = draft.attachments
@@ -766,6 +776,7 @@ export default function App() {
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId
+    messageScrollAtBottom.current = true
     cancelMessageLongPress()
     setMessageActionId(null)
     setMessages([])
@@ -2061,6 +2072,8 @@ export default function App() {
       })
       .catch(() => undefined)
 
+    if (current?.user.id) clearChatPersistence(current.user.id)
+    pendingSend.current = null
     if (clearStorage) localStorage.removeItem('chatnet-session')
     sessionRef.current = null
     resetRegistration()
@@ -2229,6 +2242,17 @@ export default function App() {
         const incoming = update.message
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
+          const recovered = loadPendingSend(session.user.id, session.sessionId)
+          if (recovered?.clientId === incoming.clientId && recovered.conversationId === incoming.conversationId) {
+            clearPendingSend(session.user.id, incoming.clientId)
+            setMessageDrafts((current) => {
+              const existing = current[incoming.conversationId]
+              if (!existing || existing.text.trim() !== incoming.text || existing.attachments.length > 0) return current
+              const next = { ...current }
+              delete next[incoming.conversationId]
+              return next
+            })
+          }
           if (pendingSend.current?.clientId === incoming.clientId) {
             const confirmed = pendingSend.current
             pendingSend.current = null
@@ -2318,6 +2342,22 @@ export default function App() {
         if (!response.ok) throw new Error('Không tải được tin nhắn')
         const data = (await response.json()) as Message[]
         if (cancelled) return
+
+        // Reconcile a POST whose ACK vanished before refresh. A persisted
+        // clientId in history is proof of delivery; no second POST is needed.
+        const recovered = loadPendingSend(session.user.id, session.sessionId)
+        const confirmed = recovered && data.find((item) => item.clientId === recovered.clientId && item.conversationId === recovered.conversationId)
+        if (confirmed && recovered) {
+          clearPendingSend(session.user.id, recovered.clientId)
+          if (pendingSend.current?.clientId === recovered.clientId) pendingSend.current = null
+          setMessageDrafts((current) => {
+            const existing = current[confirmed.conversationId]
+            if (!existing || existing.text.trim() !== confirmed.text || existing.attachments.length > 0) return current
+            const next = { ...current }
+            delete next[confirmed.conversationId]
+            return next
+          })
+        }
 
         setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
         setMessages((current) => {
@@ -2411,7 +2451,9 @@ export default function App() {
       pendingMessageScrollRestore.current = null
       return
     }
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // Preserve scroll position when reading history; only follow new messages
+    // when the reader was already near the bottom of the conversation.
+    if (container && messageScrollAtBottom.current) container.scrollTop = container.scrollHeight
   }, [messages, outgoingMessage])
 
   useEffect(() => {
@@ -2543,10 +2585,22 @@ export default function App() {
     const sessionId = session.sessionId
     const reply = replyingTo
     const signature = JSON.stringify({ text, attachments: attachments.map((file) => file.storageRef), replyToMessageId: reply?.id ?? null })
-    const previous = pendingSend.current
+    const previous = pendingSend.current ?? loadPendingSend(session.user.id, sessionId)
+    // A refresh cannot restore unsigned media URLs. Never silently resend a
+    // text-only copy of an ambiguous attachment message as a new message.
+    if (previous?.conversationId === conversationId && messageAttachments.length === 0) {
+      try {
+        const earlier = JSON.parse(previous.signature) as { text?: string; attachments?: string[] }
+        if (earlier.text === text && Array.isArray(earlier.attachments) && earlier.attachments.length > 0) {
+          setNotice('Tin kèm tệp trước đó chưa được xác nhận. Hãy kiểm tra lịch sử hoặc thay đổi nội dung trước khi gửi lại.', 'warning')
+          return
+        }
+      } catch { /* Invalid old receipt is ignored. */ }
+    }
     const clientId = previous && previous.sessionId === sessionId && previous.conversationId === conversationId && previous.signature === signature
       ? previous.clientId : crypto.randomUUID()
     pendingSend.current = { sessionId, conversationId, signature, clientId, draft: submittedDraft }
+    savePendingSend(session.user.id, { sessionId, conversationId, signature, clientId })
     // A matching realtime receipt can confirm delivery even if the HTTP response is lost.
     messageReceipts.current.set(clientId, null)
     sendingRef.current = true
@@ -2570,7 +2624,10 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId) return
       const receipt = messageReceipts.current.get(clientId)
       if (!response.ok && !receipt?.id) {
-        if (response.status >= 400 && response.status < 500 && pendingSend.current?.clientId === clientId) pendingSend.current = null
+        if (response.status >= 400 && response.status < 500 && pendingSend.current?.clientId === clientId) {
+          pendingSend.current = null
+          clearPendingSend(session.user.id, clientId)
+        }
         const result = await response.json().catch(() => null) as { error?: string } | null
         setNotice(result?.error || 'Gửi tin nhắn thất bại')
         return
@@ -2580,6 +2637,7 @@ export default function App() {
         throw new Error('Invalid message response')
       }
       if (pendingSend.current?.clientId === clientId) pendingSend.current = null
+      clearPendingSend(session.user.id, clientId)
       if (activeConversationIdRef.current === conversationId) {
         messageChanges.current.add(sent.id)
         setMessages((current) => mergeById(current, sent).sort((a, b) => a.id - b.id))
@@ -3866,7 +3924,10 @@ export default function App() {
                     />
                   )}
 
-                  <div className="messages" ref={messagesScrollRef}>
+                  <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
+                    const element = event.currentTarget
+                    messageScrollAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100
+                  }}>
                     {hasMoreMessages && (
                       <button type="button" className="soco-load-more soco-older-messages"
                         onClick={() => void loadOlderMessages()} disabled={messagesLoadingMore}

@@ -10,6 +10,7 @@
     "check:pwa": "node --experimental-strip-types scripts/pwa-update-check.mjs",
     "check:session": "node --experimental-strip-types scripts/session-check.mjs",
     "check:optimistic": "node --experimental-strip-types scripts/optimistic-check.mjs",
+    "check:chat": "node --experimental-strip-types scripts/chat-persistence-check.mjs",
     "check:ui": "node scripts/run-ui-layout.mjs",
     "check:call-translation": "node --experimental-strip-types scripts/call-translation-check.mjs",
     "check:gemini-call": "node --experimental-strip-types scripts/gemini-call-check.mjs",

@@ -50,6 +50,14 @@
 | Notification sounds/push | Agent 5 interface, no changes in this batch |
 | Group/Call/Gemini | Agent 4/Agent 3 ownership, no changes in this batch |
 
+## Batch 2 — draft/retry and scroll (2026-10-19)
+
+- **CHAT-16 P1 (partial)**: draft **text** now survives a page refresh within the same browser tab and login, scoped to the active account ID in `sessionStorage`. Logs out and cross-account session changes wipe the local draft/pending receipt. Media blobs and signed S3 URLs are intentionally not persisted; attachments must be reselected after reload. No cross-device draft synchronization yet.
+- **CHAT-21 / CHAT-01 P0 (improved, still not full E2E)**: ambiguous-send client IDs now survive refresh within the same tab/session for 24 hours and matching retry reuses the original ID. Message history or SSE confirmation recognizes persisted `clientId` and clears a matching text draft. After refresh an unresolved attachment send is not silently resent as text-only. The server DB unique key is authoritative.
+- **CHAT-07 P0 (improved)**: message-list scroll only follows new messages while reader is near the bottom, and restores offset after pagination. Real iOS Safari/PWA and independent browser E2E remain outstanding.
+- **Automated verification**: `frontend npm run check:chat` validates per-account drafts, expiry, replay keys, malformed/sessionStorage-denied data and logout cleanup; `npm run build` / TypeScript PASS; `git diff --check` PASS. Existing chunk >500kB warning persists.
+- **Important limitation:** plain text kept in browser sessionStorage is readable by scripts executing on this origin (like existing localStorage session); it is not an end-to-end encrypted multi-device draft store. Never store access tokens/download URLs there. This increment is not release approval.
+
 ## Integration warnings
 
 1. The root checkout has substantial uncommitted work in unrelated areas; none of those changes were modified here.
