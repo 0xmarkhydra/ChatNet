@@ -4,6 +4,8 @@
 
 **Nhánh:** `feat/chatnet-a1-identity-friends` (từ `origin/main`, commit gốc `348f91d`)
 
+**Feature commit:** `624648c` (`feat(friends): improve contacts search and safe friend actions`).
+
 **Worktree:** `.worktrees/chatnet-a1-identity-friends`
 
 **Phạm vi:** Web/PWA, backend Go, frontend React; không sửa mobile native.
