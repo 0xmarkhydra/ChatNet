@@ -22,6 +22,7 @@
 - **Lưu ý tích hợp:** Đã chạm `backend/cmd/gateway/main.go` đúng 1 tuyến `/api/privacy` để FE gọi API thật; Agent 5 review route khi tích hợp. Block/report và quyền riêng tư trong Call service vẫn cần phối hợp Agent 3/5.
 - **Đợt bảo mật bổ sung (P0):** Trạng thái online trong danh sách chat 1–1, phản hồi tạo chat, danh sách thành viên nhóm và Nearby được ràng buộc bởi `show_online_status` từ PostgreSQL, không chỉ presence Redis. API PUT privacy bắt buộc đủ 5 trường boolean, tránh vô ý lưu `false` hàng loạt. Auth giới hạn 4KB/JSON strict cho đăng ký, xác thực OTP, gửi lại OTP và login; refresh/logout chỉ chấp nhận JSON 1KB/strict và reject trailing payload. Middleware chỉ cho token trên URL ở GET `/api/events` do trình duyệt EventSource không thiết lập được header Authorization. Đây là giảm bề mặt lộ token, không xóa bỏ rủi ro log URL SSE.
 - **FR-09:** Bổ sung test gửi tạo chat 1–1 đồng thời từ hai tài khoản, bảo đảm cùng conversation ID và chỉ một direct_key trong PostgreSQL.
+- **ACC-02 / quản lý phiên:** Ngăn cấp refresh token mới từ access token kiểu cũ (lỗ hổng tái tạo phiên sau logout); client cũ không có refresh token phải đăng nhập lại. Thêm ID phiên UUID, metadata User-Agent/lastSeen và API `/api/auth/sessions/list`, `/revoke`, `/revoke-others` dùng refresh token hợp lệ để xem và thu hồi chỉ các phiên thuộc cùng chủ tài khoản. Có UI Web/PWA trong Hồ sơ. Revocation ngăn gia hạn refresh; access JWT đang phát hành có thể còn được chấp nhận tối đa 24h, vì vậy **chưa thể gọi đây là thu hồi access token tức thì**. Phải tích hợp cơ chế session-bound access token trên mọi service trước khi nghiệm thu ACC-02.
 
 ## Phân loại toàn bộ 34 task
 
@@ -52,10 +53,10 @@ Quy ước: **Cần cải tiến** nghĩa là có một phần luồng/đã sử
 | FR-21 | P1 | Chưa có | Lịch sử lời mời/anti-harassment đầy đủ |
 | FR-22 | P1 | Chưa có | Quota lời mời theo ngày và UX cảnh báo |
 | ACC-01 | P0 | Cần cải tiến | Đã có auth/session; cần E2E OTP/refresh/logout/đa phiên |
-| ACC-02 | P0 | Cần cải tiến | JWT/session hiện có, chưa hoàn thành audit cookie/rotation/revocation |
+| ACC-02 | P0 | Cần cải tiến | Đã có quản lý thiết bị, revoke refresh, chặn tái tạo phiên legacy sau logout, test chống IDOR; còn thiếu revoke access JWT tức thì trên mọi service |
 | ACC-03 | P0 | Cần cải tiến | Đã có Redis rate limiting, OTP attempts và test strict/4KB body; còn audit proxy IP spoof, enumeration, UAT và load |
 | ACC-04 | P0 | Cần cải tiến | Có form sửa hồ sơ/ảnh, cần IDOR/media visibility tests |
-| ACC-05 | P1 | Chưa có | Quy trình hoàn chỉnh đổi/quên mật khẩu, email, device sessions |
+| ACC-05 | P1 | Cần cải tiến | Đã có danh sách/thu hồi device refresh sessions; còn thiếu đổi/quên mật khẩu, email và revoke access token tức thì |
 | ACC-06 | P1 | Cần cải tiến | Có UI ngôn ngữ/translation/push; cần cross-device permission/persistence |
 | ACC-07 | P1 | Chưa có | Xóa tài khoản, export dữ liệu và retention/terms |
 | ACC-08 | P1 | Chưa có | Tìm tổng hợp có enforcement privacy/block |
@@ -78,6 +79,8 @@ Quy ước: **Cần cải tiến** nghĩa là có một phần luồng/đã sử
 - **PASS:** JWT regression: query token chỉ được chấp nhận ở GET `/api/events`, REST yêu cầu bearer header; token query SSE vẫn cần privacy/security review khi ghi log.
 - **PASS:** PostgreSQL/Redis privacy integration cho chat/direct và nhóm, 12 lượt tạo chat 1–1 song song hai phía trước khi thêm test Nearby.
 - **CHƯA XÁC NHẬN:** Test mở rộng Nearby ẩn/hiện online mới thêm chưa được thực thi lại ở môi trường tích hợp vì công cụ thực thi chặn lệnh chạy có biến môi trường database/Redis; Go tests không có env vẫn PASS (test integration SKIP). Không gọi test chưa chạy là PASS.
+- **PASS:** `TestSessionManagementIntegration` trên PostgreSQL 17 riêng: nhiều phiên 2 tài khoản, phân biệt current/others, không trả token hash, từ chối IDOR khi A thu hồi phiên B, thu hồi phiên khác và thu hồi current, logout không thể tạo refresh token mới bằng access token cũ. `TestSessionIntegration` cũng PASS sau thay đổi, frontend `check:session` xác minh không dùng legacy upgrade.
+- **GIỚI HẠN AN NINH:** Thu hồi refresh session không thu hồi access JWT 24h đang lưu ở các service, ngoại lệ SSE sử dụng token trên URL vẫn cần hardening. Backend không tuyên bố revocation tức thì.
 - **NOT RUN:** Review security toàn diện JWT/IDOR, brute-force qua X-Forwarded-For/trusted-proxy, mọi service Calls, API media và load test.
 - **Tồn tại:** Vite build cảnh báo chunk >500KB; profile người khác mới là preview nhỏ, chưa phải màn profile P1 đầy đủ.
 

@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS session_id UUID NOT NULL DEFAULT gen_random_uuid();
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS user_agent VARCHAR(180) NOT NULL DEFAULT '';
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_sessions_public_id ON auth_sessions(session_id);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_expiry ON auth_sessions(user_id, expires_at DESC);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS conversations (

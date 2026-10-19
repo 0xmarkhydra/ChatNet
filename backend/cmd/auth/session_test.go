@@ -121,16 +121,11 @@ func TestSessionIntegration(t *testing.T) {
 	call(s.logout, initial.RefreshToken, "", http.StatusNoContent)
 	call(s.refresh, initial.RefreshToken, initial.Token, http.StatusUnauthorized)
 
-	// Existing unexpired clients can adopt refresh without entering OTP again.
-	result := call(s.refresh, "", initial.Token, http.StatusOK)
-	var migrated struct{ RefreshToken string }
-	if err := json.Unmarshal(result.Body.Bytes(), &migrated); err != nil || migrated.RefreshToken == "" {
-		t.Fatal("legacy session not migrated")
-	}
+	// Revoked access credentials must never mint a new refresh token.
+	call(s.refresh, "", initial.Token, http.StatusUnauthorized)
 	if _, err := db.Exec(ctx, "UPDATE auth_sessions SET expires_at=NOW()-INTERVAL '1 second' WHERE user_id=$1", u.ID); err != nil {
 		t.Fatal(err)
 	}
-	call(s.refresh, migrated.RefreshToken, "", http.StatusUnauthorized)
 	if _, err := db.Exec(ctx, "DELETE FROM users WHERE id=$1", u.ID); err != nil {
 		t.Fatal(err)
 	}

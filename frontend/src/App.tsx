@@ -178,6 +178,15 @@ type FriendSearchResult = {
   reason?: string
 }
 
+type ManagedAccountSession = {
+  id: string
+  userAgent: string
+  createdAt: string
+  lastSeenAt: string
+  expiresAt: string
+  current: boolean
+}
+
 type UserPrivacy = {
   searchableByUsername: boolean
   searchableByName: boolean
@@ -603,6 +612,10 @@ export default function App() {
   const [privacyLoading, setPrivacyLoading] = useState(false)
   const [privacyError, setPrivacyError] = useState('')
   const [privacyRetry, setPrivacyRetry] = useState(0)
+  const [sessionsOpen, setSessionsOpen] = useState(false)
+  const [managedSessions, setManagedSessions] = useState<ManagedAccountSession[]>([])
+  const [sessionsBusy, setSessionsBusy] = useState(false)
+  const [sessionsError, setSessionsError] = useState('')
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
@@ -1773,6 +1786,81 @@ export default function App() {
       }
     } finally {
       if (sessionRef.current?.sessionId === sessionId) setPrivacyBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    setManagedSessions([])
+    setSessionsOpen(false)
+    setSessionsBusy(false)
+    setSessionsError('')
+  }, [session?.sessionId])
+
+  async function fetchAccountSessions() {
+    const current = sessionRef.current
+    if (!current?.refreshToken || sessionsBusy) return
+    const identity = current.sessionId
+    setSessionsBusy(true)
+    setSessionsError('')
+    try {
+      const response = await fetch(`${API}/api/auth/sessions/list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ refreshToken: current.refreshToken }),
+      })
+      if (!response.ok) throw new Error('Không tải được phiên đăng nhập.')
+      const data = await response.json() as ManagedAccountSession[]
+      if (sessionRef.current?.sessionId === identity) {
+        setManagedSessions(data)
+        setSessionsOpen(true)
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === identity) {
+        setSessionsError('Không thể tải các thiết bị. Vui lòng thử lại.')
+      }
+    } finally {
+      if (sessionRef.current?.sessionId === identity) setSessionsBusy(false)
+    }
+  }
+
+  async function revokeAccountSessions(sessionID?: string) {
+    const current = sessionRef.current
+    if (!current?.refreshToken || sessionsBusy) return
+    const identity = current.sessionId
+    const selected = managedSessions.find((item) => item.id === sessionID)
+    if (sessionID && !selected) return
+    const message = sessionID
+      ? selected?.current
+        ? 'Bạn muốn đăng xuất khỏi thiết bị này?'
+        : 'Bạn muốn thu hồi phiên đăng nhập trên thiết bị đã chọn?'
+      : 'Bạn muốn đăng xuất tất cả thiết bị khác?'
+    if (!window.confirm(message)) return
+    setSessionsBusy(true)
+    setSessionsError('')
+    try {
+      const response = await fetch(`${API}/api/auth/sessions/${sessionID ? 'revoke' : 'revoke-others'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ refreshToken: current.refreshToken, ...(sessionID ? { sessionId: sessionID } : {}) }),
+      })
+      if (!response.ok) throw new Error('Không thu hồi được phiên đăng nhập.')
+      if (sessionRef.current?.sessionId !== identity) return
+      if (selected?.current) {
+        logout(false)
+      } else {
+        setManagedSessions((items) => sessionID
+          ? items.filter((item) => item.id !== sessionID)
+          : items.filter((item) => item.current))
+        setNotice('Đã thu hồi phiên đăng nhập được chọn.')
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === identity) {
+        setSessionsError('Không thu hồi được phiên. Vui lòng thử lại.')
+      }
+    } finally {
+      if (sessionRef.current?.sessionId === identity) setSessionsBusy(false)
     }
   }
 
@@ -5141,6 +5229,51 @@ export default function App() {
                   ><span /></button>
                 </div>
               ))}
+              <div className="settings-row">
+                <div>
+                  <strong>Thiết bị đã đăng nhập</strong>
+                  <small>Kiểm tra và thu hồi những phiên đăng nhập không còn sử dụng.</small>
+                </div>
+                <button type="button" className="settings-action"
+                  disabled={sessionsBusy || !session.refreshToken}
+                  onClick={() => {
+                    if (sessionsOpen) setSessionsOpen(false)
+                    else void fetchAccountSessions()
+                  }}>
+                  {sessionsBusy ? 'Đang xử lý...' : sessionsOpen ? 'Thu gọn' : 'Xem thiết bị'}
+                </button>
+              </div>
+              {sessionsError && <div className="settings-row" role="alert">
+                <small>{sessionsError}</small>
+                <button type="button" className="settings-action" disabled={sessionsBusy}
+                  onClick={() => void fetchAccountSessions()}>Thử lại</button>
+              </div>}
+              {sessionsOpen && (
+                <div className="account-sessions-panel">
+                  <p>Thu hồi phiên sẽ ngăn gia hạn đăng nhập bằng refresh token. Access token đã phát hành có thể tiếp tục hoạt động đến khi hết hạn (tối đa 24 giờ).</p>
+                  {managedSessions.length === 0 && <small>Không có phiên đang hoạt động.</small>}
+                  {managedSessions.map((device) => (
+                    <div className="account-session-item" key={device.id}>
+                      <div className="account-session-details">
+                        <strong>{device.current ? 'Thiết bị này' : device.userAgent || 'Trình duyệt khác'}</strong>
+                        {device.current && <small>{device.userAgent || 'Trình duyệt hiện tại'}</small>}
+                        <small>Hoạt động: {new Date(device.lastSeenAt).toLocaleString('vi-VN')}</small>
+                      </div>
+                      <button type="button" className="settings-action"
+                        disabled={sessionsBusy}
+                        onClick={() => void revokeAccountSessions(device.id)}>
+                        {device.current ? 'Đăng xuất' : 'Thu hồi'}
+                      </button>
+                    </div>
+                  ))}
+                  {managedSessions.some((device) => !device.current) && (
+                    <button type="button" className="settings-action account-revoke-others"
+                      disabled={sessionsBusy} onClick={() => void revokeAccountSessions()}>
+                      Đăng xuất tất cả thiết bị khác
+                    </button>
+                  )}
+                </div>
+              )}
               <button
                 type="button"
                 className="settings-row settings-row-button app-locale-row"

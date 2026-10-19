@@ -37,17 +37,14 @@ try {
   assert.equal(current.sessionId, 'login-1')
   assert.equal(expired, 0)
 
-  // Upgrade existing installs while their access credential is still valid.
+  // Old access-only installs must sign in again: legacy renewal bypassed logout.
   reset()
   delete current.refreshToken
   current.token = jwt(3600)
-  globalThis.fetch = async (_url, init) => {
-    assert.equal(init.headers.Authorization, `Bearer ${current.token}`)
-    return json({ ...current, refreshToken: 'n'.repeat(43) })
-  }
-  await client.refresh()
-  assert.equal(current.refreshToken, 'n'.repeat(43))
-  assert.equal(current.sessionId, 'login-1')
+  globalThis.fetch = async () => { throw new Error('legacy renew must never fetch') }
+  assert.equal(await client.refresh(), null)
+  assert.equal(expired, 1)
+  assert.equal(current, null)
 
   // Offline, upstream errors and malformed responses must preserve the saved session.
   for (const failure of [new Error('offline'), json({}, 503), json({}, 429), json({})]) {
@@ -109,7 +106,7 @@ try {
   assert.equal(parseSession({ ...original(), refreshToken: ['r'.repeat(43)] }), null)
   assert.equal(parseSession({ ...original(), sessionId: {} }), null)
   assert.equal(parseSession({ ...original(), user: { id: -1 } }), null)
-  console.log('Session checks passed: refresh, concurrency, legacy migration, offline, expiry, stale responses, bounded retry.')
+  console.log('Session checks passed: refresh, concurrency, legacy revocation safety, offline, expiry, stale responses, bounded retry.')
 } finally {
   globalThis.fetch = realFetch
 }

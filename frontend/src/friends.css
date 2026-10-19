@@ -953,7 +953,43 @@
   font-weight: 700;
 }
 .friend-profile-actions button + button { background: #eef2ff; color: #4338ca; }
+.account-sessions-panel {
+  padding: 12px 16px 18px;
+  background: #f8faff;
+  border-top: 1px solid #e7eafd;
+}
+.account-sessions-panel > p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #667085;
+}
+.account-session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid #e6eafd;
+}
+.account-session-details {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.account-session-details strong,
+.account-session-details small {
+  overflow-wrap: anywhere;
+}
+.account-session-details strong { font-size: 13px; color: #253168; }
+.account-session-details small { font-size: 11px; color: #667085; }
+.account-session-item > button { flex-shrink: 0; }
+.account-revoke-others { margin-top: 10px; }
 @media (max-width: 390px) {
+  .account-sessions-panel { padding-inline: 10px; }
+  .account-session-item { gap: 8px; }
   .contact-search-row { gap: 6px; }
   .contact-search-action { min-width: 74px; padding-inline: 6px; font-size: 11px; }
 }

@@ -48,11 +48,17 @@ export function createSessionClient(baseURL: string, state: {
   }
 
   async function renew(previous: Session): Promise<Session | null> {
+    // Legacy access-only credentials cannot safely recreate a refresh token.
+    // Otherwise logging out could be reversed while a JWT remains valid.
+    if (!previous.refreshToken) {
+      if (unchanged(previous)) state.expire()
+      return null
+    }
     const response = await fetch(`${baseURL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(previous.refreshToken ? {} : { Authorization: `Bearer ${previous.token}` }),
+        // The refresh credential is required; access tokens cannot renew sessions.
       },
       body: JSON.stringify({ refreshToken: previous.refreshToken || '' }),
       cache: 'no-store',

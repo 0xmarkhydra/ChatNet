@@ -113,6 +113,9 @@ func main() {
 	mux.HandleFunc("POST /api/auth/login", s.login)
 	mux.HandleFunc("POST /api/auth/refresh", s.refresh)
 	mux.HandleFunc("POST /api/auth/logout", s.logout)
+	mux.HandleFunc("POST /api/auth/sessions/list", s.listSessions)
+	mux.HandleFunc("POST /api/auth/sessions/revoke", s.revokeSession)
+	mux.HandleFunc("POST /api/auth/sessions/revoke-others", s.revokeOtherSessions)
 	mux.Handle("GET /api/auth/me", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.me)))
 
 	port := config.Env("PORT", "8081")
