@@ -505,7 +505,7 @@ export default function App() {
   const mutationRequests = useRef(new Map<string, Promise<Response>>())
   const messageReceipts = useRef(new Map<string, Message | null>())
   // Preserve the request ID for an ambiguous send so a retry cannot create another row.
-  const pendingSend = useRef<{ sessionId: string; conversationId: number; signature: string; clientId: string } | null>(null)
+  const pendingSend = useRef<{ sessionId: string; conversationId: number; signature: string; clientId: string; draft: MessageDraft } | null>(null)
   const preferenceQueue = useRef(Promise.resolve())
   const preferenceRevision = useRef(0)
   const [newChatMode, setNewChatMode] = useState<NewChatMode>('none')
@@ -2229,7 +2229,17 @@ export default function App() {
         const incoming = update.message
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
-          if (pendingSend.current?.clientId === incoming.clientId) pendingSend.current = null
+          if (pendingSend.current?.clientId === incoming.clientId) {
+            const confirmed = pendingSend.current
+            pendingSend.current = null
+            // A late SSE receipt also resolves an ambiguous HTTP send. Keep any newer draft.
+            setMessageDrafts((current) => {
+              if (current[confirmed.conversationId] !== confirmed.draft) return current
+              const next = { ...current }
+              delete next[confirmed.conversationId]
+              return next
+            })
+          }
           if (messageReceipts.current.has(incoming.clientId)) messageReceipts.current.set(incoming.clientId, incoming)
           setOutgoingMessage((current) => current?.clientId === incoming.clientId ? null : current)
         }
@@ -2536,7 +2546,7 @@ export default function App() {
     const previous = pendingSend.current
     const clientId = previous && previous.sessionId === sessionId && previous.conversationId === conversationId && previous.signature === signature
       ? previous.clientId : crypto.randomUUID()
-    pendingSend.current = { sessionId, conversationId, signature, clientId }
+    pendingSend.current = { sessionId, conversationId, signature, clientId, draft: submittedDraft }
     // A matching realtime receipt can confirm delivery even if the HTTP response is lost.
     messageReceipts.current.set(clientId, null)
     sendingRef.current = true
