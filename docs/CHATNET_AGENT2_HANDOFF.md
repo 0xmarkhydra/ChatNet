@@ -73,6 +73,12 @@
 - **Checks**: isolated PostgreSQL 17 + Redis 7.4 `go test -count=1 ./cmd/chat` PASS; `go test ./...` PASS; React/TypeScript `npm run build` PASS; `npm run check:chat` PASS; `git diff --check` PASS. Existing JS chunk warnings persist.
 - **Still outstanding**: live browser focus/background E2E, 3-account multi-device scenarios, S3 revocation/retention, and rest of CHAT/MEDIA P0/P1. This increment is not 100% completion or production approval.
 
+## Batch 5 — Web/PWA voice message capture (2026-10-19)
+
+- **MEDIA-06 P1 (partial)**: new `frontend/src/VoiceRecorder.tsx` adds an accessible 2-minute voice recorder to message composer. Prompts for microphone on a user gesture, supports stop-to-attach vs cancel, displays elapsed time, and releases `MediaStream`/timer on stop, navigation, session change or unmount. A saved recording becomes a real audio `File` and uses the existing authenticated presign + S3 upload path; user explicitly presses **Gửi** after upload. Incoming voice attachments use existing native browser audio controls.
+- **Browser compatibility**: chooses Opus/WebM when supported, MP4/M4A on Safari, and Ogg where available. Backend `mediax.classify` allows `voice.webm` with `audio/webm` while preserving video/webm support. Added `frontend npm run check:voice` and Go MIME unit case; TypeScript/Vite build and Go tests PASS.
+- **Remaining MEDIA-06 acceptance**: real microphone permissions denied/granted and recording/audio playback on Chrome, Firefox, Safari and installed iOS PWA; waveform and duration metadata in persisted message; interrupted-upload retry. This feature is **not** marked 100% accepted based solely on build/unit tests.
+
 ## Integration warnings
 
 1. The root checkout has substantial uncommitted work in unrelated areas; none of those changes were modified here.

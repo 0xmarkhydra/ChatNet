@@ -36,6 +36,7 @@ func TestClassifyAcceptsStandardBrowserMediaMIME(t *testing.T) {
 		{"iPhone HEIC", "photo.heic", "image/heic", "image"},
 		{"MP4", "movie.mp4", "video/mp4", "video"},
 		{"voice note", "voice.m4a", "audio/mp4", "audio"},
+		{"WebM voice note", "voice.webm", "audio/webm;codecs=opus", "audio"},
 		{"PDF", "invoice.pdf", "application/pdf", "file"},
 		{"Word", "report.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "file"},
 		{"CSV", "table.csv", "text/csv; charset=utf-8", "file"},

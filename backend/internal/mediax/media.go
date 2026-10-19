@@ -198,6 +198,7 @@ func classify(scope, fileName, contentType string) (string, int64, error) {
 		".mp3": {"audio/mpeg", "audio/mp3"}, ".m4a": {"audio/mp4", "audio/x-m4a"},
 		".aac": {"audio/aac", "audio/x-aac"},
 		".wav": {"audio/wav", "audio/x-wav", "audio/wave"}, ".ogg": {"audio/ogg"},
+		".webm": {"audio/webm"},
 	}
 	fileExt := map[string][]string{
 		".pdf": {"application/pdf"}, ".doc": {"application/msword"},

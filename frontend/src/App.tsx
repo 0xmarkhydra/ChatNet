@@ -11,6 +11,7 @@ import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
 import GroupActionsSheet from './GroupActionsSheet'
 import SharedContent from './SharedContent'
+import VoiceRecorder from './VoiceRecorder'
 import { SocoEmptyState, SocoTextAction } from './SocoUI'
 import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
 
@@ -4152,6 +4153,12 @@ export default function App() {
                     >
                       <UiIcon name="attach" size={22} />
                     </button>
+                    <VoiceRecorder
+                      key={`${session.sessionId}:${activeConversationId}`}
+                      disabled={Boolean(mediaUploading) || messageSending}
+                      onRecorded={(file) => { void addChatFiles([file]) }}
+                      onError={(message) => setNotice(message, 'error')}
+                    />
                     <input
                       ref={messageInputRef}
                       aria-label="Tin nhắn"
