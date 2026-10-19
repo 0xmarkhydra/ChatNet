@@ -66,4 +66,15 @@ time += 1200
 assert.equal(sound.onIncoming(incoming(2), 1, true), true, 'logout resets message IDs for next session')
 sound.dispose()
 
-console.log('PASS: preferences, unlock, SSE dedup, self-message, throttle, mute, background, stale events and preview')
+// A visible but unfocused window must not play over the active chat tab.
+let focused = false
+globalThis.document = { visibilityState: 'visible', hasFocus: () => focused }
+const focusedSound = new IncomingMessageSound(() => new MockAudioContext(), () => time)
+focusedSound.unlock()
+assert.equal(focusedSound.onIncoming(incoming(40), 1, true), false, 'unfocused tab is silent')
+focused = true
+time += 1200
+assert.equal(focusedSound.onIncoming(incoming(41), 1, true), true, 'focused tab plays incoming sound')
+focusedSound.dispose()
+
+console.log('PASS: preferences, unlock, self-message, throttle, mute, focus-only tabs, replay protection and preview')
