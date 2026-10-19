@@ -107,10 +107,14 @@ func (s *server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := s.db.Exec(r.Context(), `
-		UPDATE conversations
+		UPDATE conversations c
 		SET name=$1
-		WHERE id=$2 AND type='group'
-	`, name, conversationID)
+		WHERE c.id=$2 AND c.type='group'
+		  AND EXISTS (
+		    SELECT 1 FROM conversation_members cm
+		    WHERE cm.conversation_id=c.id AND cm.user_id=$3 AND cm.role IN ('owner','admin')
+		  )
+	`, name, conversationID, claims.UserID)
 	if err != nil || tag.RowsAffected() == 0 {
 		httpx.Error(w, http.StatusNotFound, "group not found")
 		return
@@ -182,9 +186,28 @@ func (s *server) addGroupMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Lock the acting membership until commit: a demoted/kicked admin cannot
+	// complete a partially authorized batch of new invitations.
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot add group members")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	var currentRole string
+	err = tx.QueryRow(r.Context(), `
+		SELECT cm.role FROM conversation_members cm
+		WHERE cm.conversation_id=$1 AND cm.user_id=$2
+		  AND EXISTS (SELECT 1 FROM conversations c WHERE c.id=cm.conversation_id AND c.type='group')
+		FOR UPDATE
+	`, conversationID, claims.UserID).Scan(&currentRole)
+	if err != nil || (currentRole != "owner" && currentRole != "admin") {
+		httpx.Error(w, http.StatusForbidden, "group admin permission required")
+		return
+	}
 	addedIDs := []int64{}
 	for _, candidate := range candidates {
-		tag, err := s.db.Exec(r.Context(), `
+		tag, err := tx.Exec(r.Context(), `
 			INSERT INTO conversation_members(conversation_id,user_id,role)
 			VALUES($1,$2,'member')
 			ON CONFLICT(conversation_id,user_id) DO NOTHING
@@ -196,6 +219,10 @@ func (s *server) addGroupMembers(w http.ResponseWriter, r *http.Request) {
 		if tag.RowsAffected() > 0 {
 			addedIDs = append(addedIDs, candidate.id)
 		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot add group members")
+		return
 	}
 
 	memberIDs := s.memberIDs(r.Context(), conversationID)
@@ -234,12 +261,6 @@ func (s *server) updateGroupMemberRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actorRole, err := s.groupRole(r.Context(), conversationID, claims.UserID)
-	if err != nil || actorRole != "owner" {
-		httpx.Error(w, http.StatusForbidden, "group owner permission required")
-		return
-	}
-
 	var body struct {
 		Role string `json:"role"`
 	}
@@ -251,57 +272,62 @@ func (s *server) updateGroupMemberRole(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "role must be owner, admin or member")
 		return
 	}
-
-	var targetRole string
-	if err := s.db.QueryRow(r.Context(), `
-		SELECT role
-		FROM conversation_members
-		WHERE conversation_id=$1 AND user_id=$2
-	`, conversationID, targetID).Scan(&targetRole); err != nil {
-		httpx.Error(w, http.StatusNotFound, "group member not found")
-		return
-	}
-	if targetRole == "owner" || targetID == claims.UserID {
+	if targetID == claims.UserID {
 		httpx.Error(w, http.StatusBadRequest, "owner role cannot be changed here")
 		return
 	}
 
+	// Serialize ownership changes with the acting owner's membership row.
+	// An owner demoted while this request was in flight must not update roles.
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update member role")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	var actorRole string
+	err = tx.QueryRow(r.Context(), `
+		SELECT cm.role FROM conversation_members cm
+		WHERE cm.conversation_id=$1 AND cm.user_id=$2
+		  AND EXISTS (SELECT 1 FROM conversations c WHERE c.id=cm.conversation_id AND c.type='group')
+		FOR UPDATE
+	`, conversationID, claims.UserID).Scan(&actorRole)
+	if err != nil || actorRole != "owner" {
+		httpx.Error(w, http.StatusForbidden, "group owner permission required")
+		return
+	}
+	var targetRole string
+	if err := tx.QueryRow(r.Context(), `
+		SELECT role FROM conversation_members
+		WHERE conversation_id=$1 AND user_id=$2 FOR UPDATE
+	`, conversationID, targetID).Scan(&targetRole); err != nil {
+		httpx.Error(w, http.StatusNotFound, "group member not found")
+		return
+	}
+	if targetRole == "owner" {
+		httpx.Error(w, http.StatusConflict, "group ownership changed")
+		return
+	}
+
 	if body.Role == "owner" {
-		tx, err := s.db.Begin(r.Context())
-		if err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot transfer ownership")
-			return
-		}
-		defer tx.Rollback(r.Context())
 		if _, err := tx.Exec(r.Context(), `
-			UPDATE conversation_members
-			SET role='admin'
+			UPDATE conversation_members SET role='admin'
 			WHERE conversation_id=$1 AND user_id=$2 AND role='owner'
 		`, conversationID, claims.UserID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot transfer ownership")
 			return
 		}
-		if _, err := tx.Exec(r.Context(), `
-			UPDATE conversation_members
-			SET role='owner'
-			WHERE conversation_id=$1 AND user_id=$2
-		`, conversationID, targetID); err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot transfer ownership")
-			return
-		}
-		if err := tx.Commit(r.Context()); err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot transfer ownership")
-			return
-		}
-	} else {
-		if _, err := s.db.Exec(r.Context(), `
-			UPDATE conversation_members
-			SET role=$1
-			WHERE conversation_id=$2 AND user_id=$3
-		`, body.Role, conversationID, targetID); err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot update member role")
-			return
-		}
+	}
+	if _, err := tx.Exec(r.Context(), `
+		UPDATE conversation_members SET role=$1
+		WHERE conversation_id=$2 AND user_id=$3
+	`, body.Role, conversationID, targetID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update member role")
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update member role")
+		return
 	}
 
 	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
@@ -366,11 +392,25 @@ func (s *server) removeGroupMember(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if _, err := s.db.Exec(r.Context(), `
-		DELETE FROM conversation_members
-		WHERE conversation_id=$1 AND user_id=$2
-	`, conversationID, targetID); err != nil {
+	tag, err := s.db.Exec(r.Context(), `
+		DELETE FROM conversation_members target
+		USING conversation_members actor
+		WHERE target.conversation_id=$1 AND target.user_id=$2
+		  AND actor.conversation_id=target.conversation_id AND actor.user_id=$3
+		  AND (
+		    ($2=$3 AND actor.role<>'owner')
+		    OR ($2<>$3 AND (
+		      (actor.role='owner' AND target.role<>'owner')
+		      OR (actor.role='admin' AND target.role='member')
+		    ))
+		  )
+	`, conversationID, targetID, claims.UserID)
+	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot remove group member")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httpx.Error(w, http.StatusForbidden, "group permission changed; try again")
 		return
 	}
 

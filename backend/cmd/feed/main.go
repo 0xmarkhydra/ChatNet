@@ -18,23 +18,25 @@ import (
 	"chatnet/internal/mediax"
 	"chatnet/internal/objectstore"
 	"chatnet/internal/onesignalx"
+	"chatnet/internal/redisx"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type comment struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	ID        int64     `json:"id"`
-	ParentID  *int64    `json:"parentId"`
-	Author    string    `json:"author"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID        int64      `json:"id"`
+	ParentID  *int64     `json:"parentId"`
+	Author    string     `json:"author"`
+	Content   string     `json:"content"`
+	CreatedAt time.Time  `json:"createdAt"`
 }
 
 type post struct {
-	Visibility string `json:"visibility"`
-	Background string `json:"background"`
-	Saved bool `json:"saved"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Visibility  string              `json:"visibility"`
+	Background  string              `json:"background"`
+	Saved       bool                `json:"saved"`
+	UpdatedAt   time.Time           `json:"updatedAt"`
 	ID          int64               `json:"id"`
 	Author      string              `json:"author"`
 	Content     string              `json:"content"`
@@ -55,6 +57,7 @@ type story struct {
 
 type server struct {
 	db        *pgxpool.Pool
+	redis     *redis.Client
 	jwtSecret string
 	push      *onesignalx.Client
 	storage   *objectstore.Client
@@ -70,9 +73,15 @@ func main() {
 	if err := database.Migrate(ctx, db); err != nil {
 		log.Fatal(err)
 	}
+	rdb, err := redisx.Open(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rdb.Close()
 
 	s := &server{
 		db:        db,
+		redis:     rdb,
 		jwtSecret: config.Env("JWT_SECRET", "dev-secret-change-me"),
 		push:      onesignalx.New(config.Env("ONESIGNAL_APP_ID", ""), config.Env("ONESIGNAL_REST_API_KEY", "")),
 		storage:   objectstore.NewFromEnv(),
@@ -118,7 +127,9 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid scope")
 		return
 	}
-	if scope == "" { scope = "all" }
+	if scope == "" {
+		scope = "all"
+	}
 	var before int64
 	if value := r.URL.Query().Get("before"); value != "" {
 		n, err := strconv.ParseInt(value, 10, 64)
@@ -207,6 +218,9 @@ func (s *server) postAttachments(ctx context.Context, postID int64) []mediax.Att
 
 func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	if !s.allowFeedWrite(w, r, "post", 12, 10*time.Minute) {
+		return
+	}
 	var body struct {
 		Content     string                   `json:"content"`
 		Visibility  string                   `json:"visibility"`
@@ -218,7 +232,9 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Content = strings.TrimSpace(body.Content)
-	if body.Visibility == "" { body.Visibility = "public" }
+	if body.Visibility == "" {
+		body.Visibility = "public"
+	}
 	if !validVisibility(body.Visibility) || !validBackground(body.Background) {
 		httpx.Error(w, http.StatusBadRequest, "invalid post visibility or background")
 		return
@@ -340,7 +356,7 @@ func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
 		Attachment struct {
 			mediax.AttachmentInput
 			URL string `json:"url"`
-			ID int64 `json:"id"`
+			ID  int64  `json:"id"`
 		} `json:"attachment"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8*1024))
@@ -472,6 +488,9 @@ func (s *server) like(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	if !s.allowFeedWrite(w, r, "comment", 30, time.Minute) {
+		return
+	}
 	postID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || postID <= 0 {
 		httpx.Error(w, http.StatusBadRequest, "invalid post id")
@@ -499,10 +518,11 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 	}
 	tag, err := s.db.Exec(r.Context(), `
 		INSERT INTO comments(post_id,user_id,content,parent_id)
-		SELECT $1,$2,$3,$4::bigint
-		WHERE EXISTS (SELECT 1 FROM posts WHERE id=$1)
+		SELECT p.id,$2,$3,$4::bigint
+		FROM posts p
+		WHERE p.id=$1 AND `+feedAccessSQL+`
 		  AND ($4::bigint IS NULL OR EXISTS (
-		    SELECT 1 FROM comments WHERE id=$4 AND post_id=$1
+		    SELECT 1 FROM comments WHERE id=$4 AND post_id=p.id
 		  ))`, postID, claims.UserID, body.Content, body.ParentID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create comment")
