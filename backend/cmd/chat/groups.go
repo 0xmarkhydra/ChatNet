@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -445,4 +446,59 @@ func (s *server) removeGroupMember(w http.ResponseWriter, r *http.Request) {
 		"left":      targetID == claims.UserID,
 		"updatedAt": time.Now().UTC(),
 	})
+}
+
+// listConversationMemberships provides a low-cost authenticated membership
+// snapshot after SSE disconnects or missed best-effort Redis Pub/Sub events.
+// Cursor pagination avoids fetching all chat metadata on large accounts.
+func (s *server) listConversationMemberships(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	var after int64
+	if raw := r.URL.Query().Get("after"); raw != "" {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || value < 0 {
+			httpx.Error(w, http.StatusBadRequest, "invalid after cursor")
+			return
+		}
+		after = value
+	}
+	limit := 500
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 1 || value > 500 {
+			httpx.Error(w, http.StatusBadRequest, "invalid limit (1-500)")
+			return
+		}
+		limit = value
+	}
+	rows, err := s.db.Query(r.Context(), `
+		SELECT conversation_id FROM conversation_members
+		WHERE user_id=$1 AND conversation_id>$2
+		ORDER BY conversation_id ASC LIMIT $3
+	`, claims.UserID, after, limit+1)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot reconcile memberships")
+		return
+	}
+	defer rows.Close()
+	ids := make([]int64, 0, limit)
+	var nextAfter *int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot read memberships")
+			return
+		}
+		if len(ids) == limit {
+			cursor := ids[len(ids)-1]
+			nextAfter = &cursor
+			break
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot reconcile memberships")
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"ids": ids, "nextAfter": nextAfter})
 }

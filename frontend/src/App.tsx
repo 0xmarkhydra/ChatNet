@@ -471,6 +471,9 @@ export default function App() {
   }, [quickCreateOpen])
   const [conversations, setConversations] = useState<Conversation[]>([])
   const revokedConversationIds = useRef(new Set<number>())
+  const membershipSnapshot = useRef<Set<number> | null>(null)
+  const membershipSyncSequence = useRef(0)
+  const membershipEventSequence = useRef(0)
   const [hasMoreConversations, setHasMoreConversations] = useState(false)
   const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
   const conversationPagingBusy = useRef(false)
@@ -1880,6 +1883,8 @@ export default function App() {
 
   function purgeConversation(id: number) {
     revokedConversationIds.current.add(id)
+    membershipSnapshot.current?.delete(id)
+    membershipEventSequence.current += 1
     setConversations((current) => current.filter((item) => item.id !== id))
     setMessageDrafts((current) => {
       const next = { ...current }
@@ -1902,13 +1907,56 @@ export default function App() {
     }
   }
 
+  async function reconcileConversationMemberships() {
+    const sessionId = session?.sessionId
+    if (!sessionId) return
+    const sequence = ++membershipSyncSequence.current
+    const membershipEventAtStart = membershipEventSequence.current
+    const authorized = new Set<number>()
+    let after = 0
+    try {
+      // Fetch only IDs, not full message metadata. Never prune on partial
+      // snapshots: a failed page is not proof of lost group membership.
+      for (let page = 0; page < 200; page += 1) {
+        const response = await apiFetch(`/api/conversations/memberships?limit=500&after=${after}`)
+        if (!response.ok) return
+        const data = (await response.json()) as { ids: number[]; nextAfter: number | null }
+        if (!Array.isArray(data.ids) || data.ids.length > 500 ||
+          data.ids.some((id) => !Number.isSafeInteger(id) || id <= after)) return
+        for (const id of data.ids) authorized.add(id)
+        if (data.nextAfter === null) {
+          if (sessionRef.current?.sessionId !== sessionId ||
+              sequence !== membershipSyncSequence.current ||
+              membershipEventAtStart !== membershipEventSequence.current) return
+          membershipSnapshot.current = authorized
+          for (const id of authorized) revokedConversationIds.current.delete(id)
+          setConversations((current) => current.filter((item) => authorized.has(item.id)))
+          setMessageDrafts((current) => Object.fromEntries(
+            Object.entries(current).filter(([id]) => authorized.has(Number(id))),
+          ))
+          if (activeConversationIdRef.current && !authorized.has(activeConversationIdRef.current)) {
+            purgeConversation(activeConversationIdRef.current)
+          }
+          void refreshConversations()
+          return
+        }
+        if (!Number.isSafeInteger(data.nextAfter) || data.nextAfter <= after ||
+            data.nextAfter !== data.ids[data.ids.length - 1]) return
+        after = data.nextAfter
+      }
+    } catch {
+      // Connectivity failures must never be interpreted as revoked rights.
+    }
+  }
+
   async function refreshConversations() {
     const sessionId = session?.sessionId
     try {
       const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}`)
       if (!response.ok) return
       const data = ((await response.json()) as Conversation[])
-        .filter((item) => !revokedConversationIds.current.has(item.id))
+        .filter((item) => !revokedConversationIds.current.has(item.id) &&
+          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
       if (sessionRef.current?.sessionId !== sessionId) return
       setConversations((current) => {
         const freshIds = new Set(data.map((item) => item.id))
@@ -1935,7 +1983,8 @@ export default function App() {
       setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
       setConversations((current) => {
         const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id) && !revokedConversationIds.current.has(item.id))]
+        return [...current, ...data.filter((item) => !ids.has(item.id) && !revokedConversationIds.current.has(item.id) &&
+          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))]
       })
     } catch {
       if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
@@ -2211,6 +2260,9 @@ export default function App() {
     setSession(null)
     setConversations([])
     revokedConversationIds.current.clear()
+    membershipSnapshot.current = null
+    membershipSyncSequence.current += 1
+    membershipEventSequence.current += 1
     setHasMoreConversations(false)
     setConversationLoadingMore(false)
     conversationOffset.current = 0
@@ -2301,6 +2353,7 @@ export default function App() {
     events.onopen = () => {
       setStatus('Đang online')
       void refreshFriendConnections()
+      void reconcileConversationMemberships()
     }
     events.onerror = () => setStatus('Đang kết nối lại...')
     events.addEventListener('update', (event) => {
@@ -2318,6 +2371,8 @@ export default function App() {
 
       if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
         revokedConversationIds.current.delete(update.conversationId)
+        membershipSnapshot.current?.add(update.conversationId)
+        membershipEventSequence.current += 1
         void refreshConversations()
         if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
           void refreshGroupMembers(update.conversationId)
@@ -2427,9 +2482,22 @@ export default function App() {
       void refreshConversations()
       void refreshFriendConnections()
     }, 20000)
+    const membershipTimer = window.setInterval(() => {
+      void reconcileConversationMemberships()
+    }, 90000)
+    const checkMembership = () => { void reconcileConversationMemberships() }
+    const checkVisibleMembership = () => {
+      if (document.visibilityState === 'visible') checkMembership()
+    }
+    window.addEventListener('online', checkMembership)
+    document.addEventListener('visibilitychange', checkVisibleMembership)
     return () => {
       events.close()
       window.clearInterval(refreshTimer)
+      window.clearInterval(membershipTimer)
+      window.removeEventListener('online', checkMembership)
+      document.removeEventListener('visibilitychange', checkVisibleMembership)
+      membershipSyncSequence.current += 1
     }
   }, [session?.token, groupSettingsOpen])
 
@@ -2625,6 +2693,9 @@ export default function App() {
 
       if (sessionRef.current?.sessionId !== session?.sessionId) return
       const created = result as Conversation
+      membershipSnapshot.current?.add(created.id)
+      revokedConversationIds.current.delete(created.id)
+      membershipEventSequence.current += 1
       setConversations((current) => [created, ...current.filter((item) => item.id !== created.id)])
       setActiveConversationId(created.id)
       setTab('chat')
@@ -2665,6 +2736,9 @@ export default function App() {
         return
       }
       const created = result as Conversation
+      membershipSnapshot.current?.add(created.id)
+      revokedConversationIds.current.delete(created.id)
+      membershipEventSequence.current += 1
       setConversations((current) => [created, ...current.filter((item) => item.id !== created.id)])
       setActiveConversationId(created.id)
       setTab('chat')
