@@ -56,7 +56,6 @@ export async function startCallMediaInterpreter(options: InterpreterOptions): Pr
   endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:'
   endpoint.pathname = '/api/calls/' + encodeURIComponent(options.callId) + '/translation-stream'
   endpoint.search = ''
-  endpoint.searchParams.set('ticket', ticket)
   const socket = new WebSocket(endpoint.toString())
   let disposed = false
   let ready = false
@@ -91,6 +90,7 @@ export async function startCallMediaInterpreter(options: InterpreterOptions): Pr
         else if (!disposed) { options.onError(message); stop() }
       }
       timeoutID = window.setTimeout(() => fail('Hết thời gian kết nối phiên dịch.'), 20000)
+      socket.onopen = () => socket.send(JSON.stringify({ ticket }))
       socket.onerror = () => fail('Không thể kết nối tới máy chủ phiên dịch.')
       socket.onclose = () => { if (!disposed) fail('Phiên dịch bị ngắt kết nối.') }
       socket.onmessage = async (event) => {
