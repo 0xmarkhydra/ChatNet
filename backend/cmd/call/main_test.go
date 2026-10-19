@@ -87,6 +87,18 @@ func TestLiveKitJoinTokenHasMinimalRoomGrant(t *testing.T) {
 	}
 }
 
+func TestCurrentCallsDoesNotResurfaceLeftOrDeclinedGroupMember(t *testing.T) {
+	for _, condition := range []string{
+		"cp.declined_at IS NULL",
+		"cp.left_at IS NULL",
+		"JOIN conversation_members cm",
+	} {
+		if !strings.Contains(currentCallsSQL, condition) {
+			t.Fatalf("current calls query must exclude departed and unauthorized members: %s", condition)
+		}
+	}
+}
+
 func TestLiveKitRemovalUsesScopedRoomAdminGrant(t *testing.T) {
 	secret := "0123456789abcdef0123456789abcdef"
 	s := server{liveKitAPIKey: "api-key", liveKitAPISecret: secret}

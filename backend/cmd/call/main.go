@@ -320,19 +320,21 @@ func (s *server) createCall(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, call)
 }
 
+const currentCallsSQL = `
+	SELECT cs.id,cs.conversation_id,cs.created_by,cs.media_type,cs.status,cs.livekit_room,
+	       cs.created_at,cs.started_at,cs.ended_at,cp.role,cp.joined_at,
+	       c.type,cm.role
+	FROM call_sessions cs
+	JOIN call_participants cp ON cp.call_id=cs.id AND cp.user_id=$1
+	JOIN conversations c ON c.id=cs.conversation_id
+	JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=$1
+	WHERE cs.status IN ('ringing','active') AND cp.declined_at IS NULL AND cp.left_at IS NULL
+	ORDER BY cs.created_at DESC
+	LIMIT 20`
+
 func (s *server) currentCalls(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
-	rows, err := s.db.Query(r.Context(), `
-		SELECT cs.id,cs.conversation_id,cs.created_by,cs.media_type,cs.status,cs.livekit_room,
-		       cs.created_at,cs.started_at,cs.ended_at,cp.role,cp.joined_at,
-		       c.type,cm.role
-		FROM call_sessions cs
-		JOIN call_participants cp ON cp.call_id=cs.id AND cp.user_id=$1
-		JOIN conversations c ON c.id=cs.conversation_id
-		JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=$1
-		WHERE cs.status IN ('ringing','active') AND cp.declined_at IS NULL
-		ORDER BY cs.created_at DESC
-		LIMIT 20`, claims.UserID)
+	rows, err := s.db.Query(r.Context(), currentCallsSQL, claims.UserID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load calls")
 		return
