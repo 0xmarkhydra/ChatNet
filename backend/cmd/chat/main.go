@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"chatnet/internal/objectstore"
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -732,7 +734,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
+		SELECT m.id,m.conversation_id,m.user_id,u.username,COALESCE(m.client_id,''),m.text,
 		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
@@ -762,7 +764,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m message
 		if rows.Scan(
-			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
+			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.ClientID, &m.Text,
 			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
 			&m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
 			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
@@ -794,6 +796,50 @@ func validClientID(id string) bool {
 	}) < 0
 }
 
+func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+	if m.ConversationID != conversationID || m.Text != text || len(m.Attachments) != len(attachments) {
+		return false
+	}
+	if (m.ReplyToMessageID == nil) != (replyTo == nil) {
+		return false
+	}
+	if replyTo != nil && *m.ReplyToMessageID != *replyTo {
+		return false
+	}
+	for i, item := range attachments {
+		if m.Attachments[i].StorageRef != strings.TrimSpace(item.StorageRef) {
+			return false
+		}
+	}
+	return true
+}
+
+// replyExistingMessage returns true once it wrote a response for an existing client ID.
+func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+	var messageID int64
+	err := s.db.QueryRow(r.Context(), `
+		SELECT id FROM messages WHERE user_id=$1 AND client_id=$2
+	`, senderID, clientID).Scan(&messageID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false
+	}
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot look up message retry")
+		return true
+	}
+	m, err := s.loadMessage(r.Context(), messageID, senderID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load message retry")
+		return true
+	}
+	if !sameMessageRequest(m, conversationID, text, replyTo, attachments) {
+		httpx.Error(w, http.StatusConflict, "client id was already used for another message")
+		return true
+	}
+	httpx.JSON(w, http.StatusOK, m)
+	return true
+}
+
 func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -815,13 +861,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Text = strings.TrimSpace(body.Text)
-	// ponytail: correlation only, not durable idempotency; do not auto-retry message creation.
 	if !validClientID(body.ClientID) {
 		httpx.Error(w, http.StatusBadRequest, "invalid client id")
 		return
 	}
 	if len(body.Text) > 4000 {
 		httpx.Error(w, http.StatusBadRequest, "text must be <= 4000 characters")
+		return
+	}
+	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
 		return
 	}
 
@@ -867,11 +915,21 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		Attachments:      attachments,
 		Reactions:        []messageReaction{},
 	}
-	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id)
-		VALUES($1,$2,$3,$4) RETURNING id,text,created_at`,
-		conversationID, claims.UserID, body.Text, body.ReplyToMessageID,
-	).Scan(&m.ID, &m.Text, &m.CreatedAt); err != nil {
+	err = tx.QueryRow(r.Context(), `
+		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id)
+		VALUES($1,$2,$3,$4,NULLIF($5,''))
+		ON CONFLICT (user_id,client_id) WHERE client_id IS NOT NULL DO NOTHING
+		RETURNING id,text,created_at`,
+		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID,
+	).Scan(&m.ID, &m.Text, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		_ = tx.Rollback(r.Context())
+		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
+			httpx.Error(w, http.StatusConflict, "message retry could not be resolved")
+		}
+		return
+	}
+	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create message")
 		return
 	}
@@ -933,7 +991,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (message, error) {
 	var m message
 	err := s.db.QueryRow(ctx, `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
+		SELECT m.id,m.conversation_id,m.user_id,u.username,COALESCE(m.client_id,''),m.text,
 		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
@@ -950,7 +1008,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		WHERE m.id=$1`, messageID).Scan(
-		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
+		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.ClientID, &m.Text,
 		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
 		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
 	)
@@ -1218,12 +1276,14 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 		WHERE conversation_id=$1
 	`, conversationID).Scan(&maxID)
 
+	lastReadID := previousReadID
 	if maxID > previousReadID {
-		if _, err := s.db.Exec(r.Context(), `
+		if err := s.db.QueryRow(r.Context(), `
 			UPDATE conversation_members
-			SET last_read_message_id=$1
+			SET last_read_message_id=GREATEST(last_read_message_id,$1)
 			WHERE conversation_id=$2 AND user_id=$3
-		`, maxID, conversationID, claims.UserID); err != nil {
+			RETURNING last_read_message_id
+		`, maxID, conversationID, claims.UserID).Scan(&lastReadID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot update read state")
 			return
 		}
@@ -1231,13 +1291,13 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 			Type:              "conversation.read",
 			ConversationID:    conversationID,
 			ReaderID:          claims.UserID,
-			LastReadMessageID: maxID,
+			LastReadMessageID: lastReadID,
 		})
 	}
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"conversationId":    conversationID,
-		"lastReadMessageId": maxID,
+		"lastReadMessageId": lastReadID,
 	})
 }
 

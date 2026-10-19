@@ -93,6 +93,9 @@ CREATE TABLE IF NOT EXISTS messages (
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_message_id BIGINT;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_sender_client_id
+ON messages(user_id, client_id) WHERE client_id IS NOT NULL;
 DO $$
 BEGIN
     IF NOT EXISTS (

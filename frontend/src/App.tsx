@@ -504,6 +504,8 @@ export default function App() {
   const pendingRequests = useRef(new Set<symbol>())
   const mutationRequests = useRef(new Map<string, Promise<Response>>())
   const messageReceipts = useRef(new Map<string, Message | null>())
+  // Preserve the request ID for an ambiguous send so a retry cannot create another row.
+  const pendingSend = useRef<{ sessionId: string; conversationId: number; signature: string; clientId: string } | null>(null)
   const preferenceQueue = useRef(Promise.resolve())
   const preferenceRevision = useRef(0)
   const [newChatMode, setNewChatMode] = useState<NewChatMode>('none')
@@ -2227,6 +2229,7 @@ export default function App() {
         const incoming = update.message
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
+          if (pendingSend.current?.clientId === incoming.clientId) pendingSend.current = null
           if (messageReceipts.current.has(incoming.clientId)) messageReceipts.current.set(incoming.clientId, incoming)
           setOutgoingMessage((current) => current?.clientId === incoming.clientId ? null : current)
         }
@@ -2526,10 +2529,14 @@ export default function App() {
     const submittedDraft = draft
     const text = messageText.trim()
     const attachments = messageAttachments
-    const sessionId = session?.sessionId
     if (!session) return
-    const clientId = crypto.randomUUID()
+    const sessionId = session.sessionId
     const reply = replyingTo
+    const signature = JSON.stringify({ text, attachments: attachments.map((file) => file.storageRef), replyToMessageId: reply?.id ?? null })
+    const previous = pendingSend.current
+    const clientId = previous && previous.sessionId === sessionId && previous.conversationId === conversationId && previous.signature === signature
+      ? previous.clientId : crypto.randomUUID()
+    pendingSend.current = { sessionId, conversationId, signature, clientId }
     // A matching realtime receipt can confirm delivery even if the HTTP response is lost.
     messageReceipts.current.set(clientId, null)
     sendingRef.current = true
@@ -2553,6 +2560,7 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId) return
       const receipt = messageReceipts.current.get(clientId)
       if (!response.ok && !receipt?.id) {
+        if (response.status >= 400 && response.status < 500 && pendingSend.current?.clientId === clientId) pendingSend.current = null
         const result = await response.json().catch(() => null) as { error?: string } | null
         setNotice(result?.error || 'Gửi tin nhắn thất bại')
         return
@@ -2561,6 +2569,7 @@ export default function App() {
       if (!Number.isSafeInteger(sent.id) || sent.id <= 0 || sent.conversationId !== conversationId) {
         throw new Error('Invalid message response')
       }
+      if (pendingSend.current?.clientId === clientId) pendingSend.current = null
       if (activeConversationIdRef.current === conversationId) {
         messageChanges.current.add(sent.id)
         setMessages((current) => mergeById(current, sent).sort((a, b) => a.id - b.id))
