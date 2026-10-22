@@ -1,4 +1,7 @@
-frontend/node_modules
-frontend/dist
+**/node_modules
+**/dist
+**/.env
+**/.env.*
 .git
+.worktrees
 .DS_Store
