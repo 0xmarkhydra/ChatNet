@@ -6,10 +6,14 @@ import GroupCreator from './GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from './incomingSound'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
+import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from './chatPersistence'
+import { uploadPresignedFile } from './mediaUpload'
+import { canMarkConversationRead } from './conversationRead'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
 import GroupActionsSheet from './GroupActionsSheet'
 import SharedContent from './SharedContent'
+import VoiceRecorder from './VoiceRecorder'
 import { SocoEmptyState, SocoTextAction } from './SocoUI'
 import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
 
@@ -458,6 +462,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false)
 
   const [tab, setTab] = useState<Tab>('chat')
+  const tabRef = useRef(tab)
+  tabRef.current = tab
   const [globalSearch, setGlobalSearch] = useState('')
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   useEffect(() => {
@@ -481,6 +487,7 @@ export default function App() {
   const messagesPagingBusy = useRef(false)
   const pendingMessageScrollRestore = useRef<{ height: number; top: number } | null>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
+  const messageScrollAtBottom = useRef(true)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
   const messageLongPressTimer = useRef<number | null>(null)
@@ -495,8 +502,16 @@ export default function App() {
   const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
   const [sharedContentOpen, setSharedContentOpen] = useState(false)
   const [groupBusy, setGroupBusy] = useState(false)
-  // ponytail: drafts live in memory per conversation; add persistence only with an explicit retention policy.
-  const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>({})
+  // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
+  const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>(() => {
+    const saved = loadChatDrafts(session?.user.id ?? 0)
+    return Object.fromEntries(Object.entries(saved).map(([id, item]) => [Number(id), { text: item.text, attachments: [] }]))
+  })
+  useEffect(() => {
+    if (session?.user.id && sessionRef.current?.user.id === session.user.id) {
+      saveChatDrafts(session.user.id, messageDrafts)
+    }
+  }, [session?.user.id, messageDrafts])
   const draft = messageDrafts[activeConversationId ?? 0] ?? emptyDraft
   const messageText = draft.text
   const messageAttachments = draft.attachments
@@ -515,6 +530,8 @@ export default function App() {
   const pendingRequests = useRef(new Set<symbol>())
   const mutationRequests = useRef(new Map<string, Promise<Response>>())
   const messageReceipts = useRef(new Map<string, Message | null>())
+  // Preserve the request ID for an ambiguous send so a retry cannot create another row.
+  const pendingSend = useRef<{ sessionId: string; conversationId: number; signature: string; clientId: string; draft: MessageDraft } | null>(null)
   const preferenceQueue = useRef(Promise.resolve())
   const preferenceRevision = useRef(0)
   const [newChatMode, setNewChatMode] = useState<NewChatMode>('none')
@@ -580,6 +597,8 @@ export default function App() {
   const [showPostBackgrounds, setShowPostBackgrounds] = useState(false)
   const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([])
   const [mediaUploading, setMediaUploading] = useState<'chat' | 'feed' | 'story' | 'profile' | null>(null)
+  const [mediaUploadProgress, setMediaUploadProgress] = useState<{ loaded: number; total: number } | null>(null)
+  const mediaUploadAbort = useRef<AbortController | null>(null)
   const [profileMedia, setProfileMedia] = useState<ProfileMediaState | null>(null)
   const [profileBusy, setProfileBusy] = useState<'avatar' | 'cover' | null>(null)
   const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState('')
@@ -829,6 +848,7 @@ export default function App() {
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId
+    messageScrollAtBottom.current = true
     cancelMessageLongPress()
     setMessageActionId(null)
     setMessages([])
@@ -1179,66 +1199,89 @@ export default function App() {
 
   async function uploadMediaFiles(files: File[], scope: 'chat' | 'feed' | 'story' | 'profile') {
     if (!files.length) return [] as MediaAttachment[]
+    if (mediaUploadAbort.current) throw new Error('Đang tải tệp khác. Hãy hoàn tất hoặc hủy trước khi tải tiếp.')
     const sessionId = session?.sessionId
+    const controller = new AbortController()
+    mediaUploadAbort.current = controller
     setMediaUploading(scope)
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0)
+    const loadedBytes = files.map(() => 0)
+    setMediaUploadProgress({ loaded: 0, total: Math.max(1, totalBytes) })
+    let lastReport = 0
+
+    function trackProgress(index: number, loaded: number) {
+      if (mediaUploadAbort.current !== controller) return
+      loadedBytes[index] = Math.min(files[index].size, Math.max(0, loaded))
+      const now = performance.now()
+      if (loadedBytes[index] < files[index].size && now - lastReport < 120) return
+      lastReport = now
+      setMediaUploadProgress({
+        loaded: loadedBytes.reduce((sum, value) => sum + value, 0),
+        total: Math.max(1, totalBytes),
+      })
+    }
+
     try {
       const result = new Array<MediaAttachment>(files.length)
       let nextIndex = 0
       const workerCount = Math.min(4, files.length)
 
       async function worker() {
-        while (true) {
-          const index = nextIndex++
-          if (index >= files.length) return
+        try {
+          while (true) {
+            if (controller.signal.aborted) throw new DOMException('Đã hủy tải tệp.', 'AbortError')
+            const index = nextIndex++
+            if (index >= files.length) return
 
-          const file = files[index]
-          const contentType = file.type || 'application/octet-stream'
-          const presignResponse = await apiFetch('/api/media/presign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              scope,
+            const file = files[index]
+            const contentType = file.type || 'application/octet-stream'
+            const presignResponse = await apiFetch('/api/media/presign', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                scope,
+                name: file.name,
+                sizeBytes: file.size,
+                contentType,
+              }),
+              signal: controller.signal,
+            })
+            if (controller.signal.aborted) throw new DOMException('Đã hủy tải tệp.', 'AbortError')
+            const ticket = (await presignResponse.json().catch(() => null)) as
+              | (PresignedUpload & { error?: string })
+              | null
+            if (!presignResponse.ok || !ticket?.uploadUrl) {
+              throw new Error(ticket?.error || 'Không cấp được quyền upload file. Hãy kiểm tra cấu hình S3.')
+            }
+
+            await uploadPresignedFile(ticket.uploadUrl, file, contentType, controller.signal, (loaded) => trackProgress(index, loaded))
+            if (controller.signal.aborted) throw new DOMException('Đã hủy tải tệp.', 'AbortError')
+            result[index] = {
+              storageRef: ticket.storageRef,
               name: file.name,
               sizeBytes: file.size,
               contentType,
-            }),
-          })
-          const ticket = (await presignResponse.json().catch(() => null)) as
-            | (PresignedUpload & { error?: string })
-            | null
-
-          if (!presignResponse.ok || !ticket?.uploadUrl) {
-            throw new Error(ticket?.error || 'Không cấp được quyền upload file. Hãy kiểm tra cấu hình S3.')
+              kind: ticket.kind,
+              url: ticket.downloadUrl,
+            }
           }
-
-          const put = await fetch(ticket.uploadUrl, {
-            method: 'PUT',
-            body: file,
-            headers: { 'Content-Type': contentType },
-            credentials: 'omit',
-            signal: AbortSignal.timeout(120_000),
-          })
-          if (!put.ok) {
-            throw new Error(`S3 từ chối upload ${file.name} (HTTP ${put.status}). Kiểm tra CORS/quyền bucket.`)
-          }
-
-          result[index] = {
-            storageRef: ticket.storageRef,
-            name: file.name,
-            sizeBytes: file.size,
-            contentType,
-            kind: ticket.kind,
-            url: ticket.downloadUrl,
-          }
+        } catch (error) {
+          controller.abort()
+          throw error
         }
       }
 
       const outcomes = await Promise.allSettled(Array.from({ length: workerCount }, () => worker()))
-      const failed = outcomes.find((outcome) => outcome.status === 'rejected')
-      if (failed?.status === 'rejected') throw failed.reason
+      const errors = outcomes.filter((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected')
+      const firstError = errors.find((item) => !(item.reason instanceof DOMException && item.reason.name === 'AbortError')) ?? errors[0]
+      if (firstError) throw firstError.reason
       return result
     } finally {
-      if (sessionRef.current?.sessionId === sessionId) setMediaUploading(null)
+      if (mediaUploadAbort.current === controller) {
+        mediaUploadAbort.current = null
+        setMediaUploadProgress(null)
+        if (sessionRef.current?.sessionId === sessionId) setMediaUploading(null)
+      }
     }
   }
 
@@ -2177,6 +2220,8 @@ export default function App() {
       })
       .catch(() => undefined)
 
+    if (current?.user.id) clearChatPersistence(current.user.id)
+    pendingSend.current = null
     if (clearStorage) localStorage.removeItem('chatnet-session')
     sessionRef.current = null
     resetRegistration()
@@ -2210,7 +2255,10 @@ export default function App() {
     setProfileBusy(null)
     setProfileSaving(false)
     setStoryBusy(false)
+    mediaUploadAbort.current?.abort()
+    mediaUploadAbort.current = null
     setMediaUploading(null)
+    setMediaUploadProgress(null)
     friendActionRef.current = false
     setFriendActionBusy(null)
     ++feedRevision.current
@@ -2349,6 +2397,28 @@ export default function App() {
         messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
+          const recovered = loadPendingSend(session.user.id, session.sessionId)
+          if (recovered?.clientId === incoming.clientId && recovered.conversationId === incoming.conversationId) {
+            clearPendingSend(session.user.id, incoming.clientId)
+            setMessageDrafts((current) => {
+              const existing = current[incoming.conversationId]
+              if (!existing || existing.text.trim() !== incoming.text || existing.attachments.length > 0) return current
+              const next = { ...current }
+              delete next[incoming.conversationId]
+              return next
+            })
+          }
+          if (pendingSend.current?.clientId === incoming.clientId) {
+            const confirmed = pendingSend.current
+            pendingSend.current = null
+            // A late SSE receipt also resolves an ambiguous HTTP send. Keep any newer draft.
+            setMessageDrafts((current) => {
+              if (current[confirmed.conversationId] !== confirmed.draft) return current
+              const next = { ...current }
+              delete next[confirmed.conversationId]
+              return next
+            })
+          }
           if (messageReceipts.current.has(incoming.clientId)) messageReceipts.current.set(incoming.clientId, incoming)
           setOutgoingMessage((current) => current?.clientId === incoming.clientId ? null : current)
         }
@@ -2364,7 +2434,8 @@ export default function App() {
                   lastMessage: incoming.text || attachmentLabel(incoming.attachments),
                   lastMessageAt: incoming.createdAt,
                   unreadCount:
-                    incoming.senderId !== session.user.id && currentId !== item.id
+                    incoming.senderId !== session.user.id &&
+                      !canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState)
                       ? item.unreadCount + 1
                       : item.unreadCount,
                 }
@@ -2383,8 +2454,11 @@ export default function App() {
               ? current
               : [...current, incoming],
           )
-          void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
-            .catch(() => setStatus('Đang kết nối lại...'))
+          if (incoming.senderId !== session.user.id &&
+              canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState)) {
+            void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
+              .catch(() => setStatus('Đang kết nối lại...'))
+          }
         }
       }
     })
@@ -2428,6 +2502,22 @@ export default function App() {
         const data = (await response.json()) as Message[]
         if (cancelled) return
 
+        // Reconcile a POST whose ACK vanished before refresh. A persisted
+        // clientId in history is proof of delivery; no second POST is needed.
+        const recovered = loadPendingSend(session.user.id, session.sessionId)
+        const confirmed = recovered && data.find((item) => item.clientId === recovered.clientId && item.conversationId === recovered.conversationId)
+        if (confirmed && recovered) {
+          clearPendingSend(session.user.id, recovered.clientId)
+          if (pendingSend.current?.clientId === recovered.clientId) pendingSend.current = null
+          setMessageDrafts((current) => {
+            const existing = current[confirmed.conversationId]
+            if (!existing || existing.text.trim() !== confirmed.text || existing.attachments.length > 0) return current
+            const next = { ...current }
+            delete next[confirmed.conversationId]
+            return next
+          })
+        }
+
         setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
         setMessages((current) => {
           const live = current.filter((item) => item.conversationId === activeConversationId && changes.has(item.id))
@@ -2445,6 +2535,7 @@ export default function App() {
           }
         }
         setTranslations(restored)
+        if (!canMarkConversationRead(activeConversationIdRef.current, activeConversationId, tabRef.current, document.visibilityState)) return
         const read = await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
         if (!read.ok) return
         if (!cancelled) {
@@ -2468,6 +2559,29 @@ export default function App() {
     targetLanguage,
     translationPreferencesLoaded,
   ])
+
+  useEffect(() => {
+    if (!session?.token || !activeConversationId) return
+    const id = activeConversationId
+    const sessionId = session.sessionId
+    const markWhenVisible = () => {
+      if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState)) return
+      void apiFetch(`/api/conversations/${id}/read`, { method: 'POST' })
+        .then((response) => {
+          if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId) return
+          setConversations((current) =>
+            current.map((item) => item.id === id ? { ...item, unreadCount: 0 } : item),
+          )
+        })
+        .catch(() => undefined)
+    }
+    window.addEventListener('focus', markWhenVisible)
+    document.addEventListener('visibilitychange', markWhenVisible)
+    return () => {
+      window.removeEventListener('focus', markWhenVisible)
+      document.removeEventListener('visibilitychange', markWhenVisible)
+    }
+  }, [session?.sessionId, activeConversationId])
 
   async function loadOlderMessages() {
     if (!session || !activeConversationId || messagesPagingBusy.current ||
@@ -2520,7 +2634,9 @@ export default function App() {
       pendingMessageScrollRestore.current = null
       return
     }
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // Preserve scroll position when reading history; only follow new messages
+    // when the reader was already near the bottom of the conversation.
+    if (container && messageScrollAtBottom.current) container.scrollTop = container.scrollHeight
   }, [messages, outgoingMessage])
 
   useEffect(() => {
@@ -2648,10 +2764,26 @@ export default function App() {
     const submittedDraft = draft
     const text = messageText.trim()
     const attachments = messageAttachments
-    const sessionId = session?.sessionId
     if (!session) return
-    const clientId = crypto.randomUUID()
+    const sessionId = session.sessionId
     const reply = replyingTo
+    const signature = JSON.stringify({ text, attachments: attachments.map((file) => file.storageRef), replyToMessageId: reply?.id ?? null })
+    const previous = pendingSend.current ?? loadPendingSend(session.user.id, sessionId)
+    // A refresh cannot restore unsigned media URLs. Never silently resend a
+    // text-only copy of an ambiguous attachment message as a new message.
+    if (previous?.conversationId === conversationId && messageAttachments.length === 0) {
+      try {
+        const earlier = JSON.parse(previous.signature) as { text?: string; attachments?: string[] }
+        if (earlier.text === text && Array.isArray(earlier.attachments) && earlier.attachments.length > 0) {
+          setNotice('Tin kèm tệp trước đó chưa được xác nhận. Hãy kiểm tra lịch sử hoặc thay đổi nội dung trước khi gửi lại.', 'warning')
+          return
+        }
+      } catch { /* Invalid old receipt is ignored. */ }
+    }
+    const clientId = previous && previous.sessionId === sessionId && previous.conversationId === conversationId && previous.signature === signature
+      ? previous.clientId : crypto.randomUUID()
+    pendingSend.current = { sessionId, conversationId, signature, clientId, draft: submittedDraft }
+    savePendingSend(session.user.id, { sessionId, conversationId, signature, clientId })
     // A matching realtime receipt can confirm delivery even if the HTTP response is lost.
     messageReceipts.current.set(clientId, null)
     sendingRef.current = true
@@ -2675,6 +2807,10 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId) return
       const receipt = messageReceipts.current.get(clientId)
       if (!response.ok && !receipt?.id) {
+        if (response.status >= 400 && response.status < 500 && pendingSend.current?.clientId === clientId) {
+          pendingSend.current = null
+          clearPendingSend(session.user.id, clientId)
+        }
         const result = await response.json().catch(() => null) as { error?: string } | null
         setNotice(result?.error || 'Gửi tin nhắn thất bại')
         return
@@ -2683,6 +2819,8 @@ export default function App() {
       if (!Number.isSafeInteger(sent.id) || sent.id <= 0 || sent.conversationId !== conversationId) {
         throw new Error('Invalid message response')
       }
+      if (pendingSend.current?.clientId === clientId) pendingSend.current = null
+      clearPendingSend(session.user.id, clientId)
       if (activeConversationIdRef.current === conversationId) {
         messageChanges.current.add(sent.id)
         setMessages((current) => mergeById(current, sent).sort((a, b) => a.id - b.id))
@@ -3264,6 +3402,13 @@ export default function App() {
           url={connectUrl()} initialMode={qrOpen} onClose={() => setQrOpen(null)}
           onConnect={(username) => { setQrOpen(null); openConnectSurface(username) }} />
       </Suspense>}
+      {mediaUploading && mediaUploadProgress && (
+        <div className="media-upload-progress" role="status" aria-live="polite">
+          <span>Đang tải tệp: {Math.round(mediaUploadProgress.loaded / Math.max(1, mediaUploadProgress.total) * 100)}%</span>
+          <progress value={mediaUploadProgress.loaded} max={mediaUploadProgress.total} aria-label="Tiến độ tải tệp" />
+          <button type="button" onClick={() => mediaUploadAbort.current?.abort()}>Hủy tải</button>
+        </div>
+      )}
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
@@ -3997,7 +4142,10 @@ export default function App() {
                     />
                   )}
 
-                  <div className="messages" ref={messagesScrollRef}>
+                  <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
+                    const element = event.currentTarget
+                    messageScrollAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100
+                  }}>
                     {hasMoreMessages && (
                       <button type="button" className="soco-load-more soco-older-messages"
                         onClick={() => void loadOlderMessages()} disabled={messagesLoadingMore}
@@ -4155,6 +4303,12 @@ export default function App() {
                     >
                       <UiIcon name="attach" size={22} />
                     </button>
+                    <VoiceRecorder
+                      key={`${session.sessionId}:${activeConversationId}`}
+                      disabled={Boolean(mediaUploading) || messageSending}
+                      onRecorded={(file) => { void addChatFiles([file]) }}
+                      onError={(message) => setNotice(message, 'error')}
+                    />
                     <input
                       ref={messageInputRef}
                       aria-label="Tin nhắn"

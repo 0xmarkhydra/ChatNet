@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,6 +22,7 @@ import (
 	"chatnet/internal/objectstore"
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -732,7 +736,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
+		SELECT m.id,m.conversation_id,m.user_id,u.username,COALESCE(m.client_id,''),m.text,
 		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
@@ -762,7 +766,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m message
 		if rows.Scan(
-			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
+			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.ClientID, &m.Text,
 			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
 			&m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
 			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
@@ -794,6 +798,74 @@ func validClientID(id string) bool {
 	}) < 0
 }
 
+// messageRequestFingerprint is computed from the *original* validated request,
+// not the mutable message row. An edit/recall cannot turn a valid retry into 409.
+func messageRequestFingerprint(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) string {
+	refs := make([]string, 0, len(attachments))
+	for _, attachment := range attachments {
+		refs = append(refs, strings.TrimSpace(attachment.StorageRef))
+	}
+	payload, _ := json.Marshal(struct {
+		ConversationID int64    `json:"conversationId"`
+		Text           string   `json:"text"`
+		ReplyTo        *int64   `json:"replyTo"`
+		StorageRefs    []string `json:"storageRefs"`
+	}{conversationID, text, replyTo, refs})
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:])
+}
+
+func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+	if m.ConversationID != conversationID || m.Text != text || len(m.Attachments) != len(attachments) {
+		return false
+	}
+	if (m.ReplyToMessageID == nil) != (replyTo == nil) {
+		return false
+	}
+	if replyTo != nil && *m.ReplyToMessageID != *replyTo {
+		return false
+	}
+	for i, item := range attachments {
+		if m.Attachments[i].StorageRef != strings.TrimSpace(item.StorageRef) {
+			return false
+		}
+	}
+	return true
+}
+
+// replyExistingMessage returns true once it wrote a response for an existing client ID.
+func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+	var messageID int64
+	var fingerprint *string
+	err := s.db.QueryRow(r.Context(), `
+		SELECT id,request_fingerprint FROM messages WHERE user_id=$1 AND client_id=$2
+	`, senderID, clientID).Scan(&messageID, &fingerprint)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false
+	}
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot look up message retry")
+		return true
+	}
+	m, err := s.loadMessage(r.Context(), messageID, senderID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load message retry")
+		return true
+	}
+	if fingerprint != nil {
+		if *fingerprint != messageRequestFingerprint(conversationID, text, replyTo, attachments) {
+			httpx.Error(w, http.StatusConflict, "client id was already used for another message")
+			return true
+		}
+	} else if !sameMessageRequest(m, conversationID, text, replyTo, attachments) {
+		// Compatibility for rows created before the additive fingerprint migration.
+		httpx.Error(w, http.StatusConflict, "client id was already used for another message")
+		return true
+	}
+	httpx.JSON(w, http.StatusOK, m)
+	return true
+}
+
 func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -815,13 +887,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Text = strings.TrimSpace(body.Text)
-	// ponytail: correlation only, not durable idempotency; do not auto-retry message creation.
 	if !validClientID(body.ClientID) {
 		httpx.Error(w, http.StatusBadRequest, "invalid client id")
 		return
 	}
 	if len(body.Text) > 4000 {
 		httpx.Error(w, http.StatusBadRequest, "text must be <= 4000 characters")
+		return
+	}
+	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
 		return
 	}
 
@@ -858,6 +932,21 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
+	// Lock active membership until the message commits. A group removal cannot
+	// race a slow S3 validation and leave a message sent after removal.
+	var membership int64
+	if err := tx.QueryRow(r.Context(), `
+		SELECT conversation_id FROM conversation_members
+		WHERE conversation_id=$1 AND user_id=$2 FOR SHARE
+	`, conversationID, claims.UserID).Scan(&membership); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.Error(w, http.StatusForbidden, "not a conversation member")
+		} else {
+			httpx.Error(w, http.StatusInternalServerError, "cannot verify conversation membership")
+		}
+		return
+	}
+
 	m := message{
 		ClientID:         body.ClientID,
 		ConversationID:   conversationID,
@@ -867,11 +956,25 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		Attachments:      attachments,
 		Reactions:        []messageReaction{},
 	}
-	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id)
-		VALUES($1,$2,$3,$4) RETURNING id,text,created_at`,
-		conversationID, claims.UserID, body.Text, body.ReplyToMessageID,
-	).Scan(&m.ID, &m.Text, &m.CreatedAt); err != nil {
+	fingerprint := ""
+	if body.ClientID != "" {
+		fingerprint = messageRequestFingerprint(conversationID, body.Text, body.ReplyToMessageID, body.Attachments)
+	}
+	err = tx.QueryRow(r.Context(), `
+		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint)
+		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''))
+		ON CONFLICT (user_id,client_id) WHERE client_id IS NOT NULL DO NOTHING
+		RETURNING id,text,created_at`,
+		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint,
+	).Scan(&m.ID, &m.Text, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		_ = tx.Rollback(r.Context())
+		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
+			httpx.Error(w, http.StatusConflict, "message retry could not be resolved")
+		}
+		return
+	}
+	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create message")
 		return
 	}
@@ -933,7 +1036,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (message, error) {
 	var m message
 	err := s.db.QueryRow(ctx, `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
+		SELECT m.id,m.conversation_id,m.user_id,u.username,COALESCE(m.client_id,''),m.text,
 		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
@@ -950,7 +1053,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		WHERE m.id=$1`, messageID).Scan(
-		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
+		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.ClientID, &m.Text,
 		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
 		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
 	)
@@ -992,10 +1095,15 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		UPDATE messages
+		UPDATE messages m
 		SET text=$1,edited_at=NOW()
-		WHERE id=$2 AND user_id=$3 AND deleted_at IS NULL
-		RETURNING conversation_id`, body.Text, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		WHERE m.id=$2 AND m.user_id=$3 AND m.deleted_at IS NULL
+		  AND EXISTS (
+			SELECT 1 FROM conversation_members cm
+			WHERE cm.conversation_id=m.conversation_id AND cm.user_id=$3
+			FOR SHARE
+		  )
+		RETURNING m.conversation_id`, body.Text, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be edited")
 		return
 	}
@@ -1021,10 +1129,15 @@ func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		UPDATE messages
+		UPDATE messages m
 		SET text='',deleted_at=NOW(),edited_at=NULL
-		WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-		RETURNING conversation_id`, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		WHERE m.id=$1 AND m.user_id=$2 AND m.deleted_at IS NULL
+		  AND EXISTS (
+			SELECT 1 FROM conversation_members cm
+			WHERE cm.conversation_id=m.conversation_id AND cm.user_id=$2
+			FOR SHARE
+		  )
+		RETURNING m.conversation_id`, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be recalled")
 		return
 	}
@@ -1218,12 +1331,14 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 		WHERE conversation_id=$1
 	`, conversationID).Scan(&maxID)
 
+	lastReadID := previousReadID
 	if maxID > previousReadID {
-		if _, err := s.db.Exec(r.Context(), `
+		if err := s.db.QueryRow(r.Context(), `
 			UPDATE conversation_members
-			SET last_read_message_id=$1
+			SET last_read_message_id=GREATEST(last_read_message_id,$1)
 			WHERE conversation_id=$2 AND user_id=$3
-		`, maxID, conversationID, claims.UserID); err != nil {
+			RETURNING last_read_message_id
+		`, maxID, conversationID, claims.UserID).Scan(&lastReadID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot update read state")
 			return
 		}
@@ -1231,13 +1346,13 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 			Type:              "conversation.read",
 			ConversationID:    conversationID,
 			ReaderID:          claims.UserID,
-			LastReadMessageID: maxID,
+			LastReadMessageID: lastReadID,
 		})
 	}
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"conversationId":    conversationID,
-		"lastReadMessageId": maxID,
+		"lastReadMessageId": lastReadID,
 	})
 }
 
