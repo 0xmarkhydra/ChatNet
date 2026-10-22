@@ -1,9 +1,15 @@
-FROM node:22-alpine AS frontend-build
+FROM node:24-alpine AS frontend-build
 WORKDIR /src/frontend
-COPY frontend/package.json ./
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
-RUN npm run build
+COPY backend/cmd/call/translation.go /src/backend/cmd/call/translation.go
+RUN npm run build \
+    && npm run check:pwa \
+    && npm run check:session \
+    && npm run check:incoming-sound \
+    && npm run check:onesignal \
+    && npm run check:call-live
 
 FROM golang:1.23-alpine AS gateway-build
 WORKDIR /src/backend
