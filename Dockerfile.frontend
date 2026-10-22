@@ -4,6 +4,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 COPY backend/cmd/call/translation.go /backend/cmd/call/translation.go
+COPY backend/cmd/call/main.go /backend/cmd/call/main.go
 RUN npm run build \
     && npm run check:pwa \
     && npm run check:session \
