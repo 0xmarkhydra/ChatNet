@@ -177,6 +177,16 @@ CREATE TABLE IF NOT EXISTS feed_reports (
 );
 CREATE INDEX IF NOT EXISTS idx_feed_reports_status ON feed_reports(status,created_at DESC);
 
+-- A trusted database administrator provisions reviewers; user-controlled profile
+-- settings must never be able to grant moderation permissions.
+CREATE TABLE IF NOT EXISTS feed_moderators (
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE feed_reports ADD COLUMN IF NOT EXISTS reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE feed_reports ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+
+
 
 CREATE TABLE IF NOT EXISTS post_attachments (
     id BIGSERIAL PRIMARY KEY,
