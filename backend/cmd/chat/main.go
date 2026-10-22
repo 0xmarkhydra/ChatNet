@@ -141,6 +141,7 @@ func main() {
 	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
 	mux.Handle("PUT /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateTranslationPreferences)))
 	mux.Handle("GET /api/conversations", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversations)))
+	mux.Handle("GET /api/conversations/memberships", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversationMemberships)))
 	mux.Handle("POST /api/conversations/direct", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createDirect)))
 	mux.Handle("POST /api/conversations/groups", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createGroup)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listMessages)))

@@ -1,0 +1,16 @@
+.soco-moderation { margin: 12px 0; border: 1px solid rgba(99,102,241,.2); border-radius: 16px; padding: 12px; background: var(--surface, #fff); color: var(--text-primary, #0f172a); }
+.soco-moderation-heading { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.soco-moderation-heading > svg { color: #6366f1; }
+.soco-moderation-heading > span { color: #64748b; font-size: .85rem; }
+.soco-moderation button { min-height: 40px; cursor: pointer; border-radius: 10px; border: 1px solid rgba(99,102,241,.25); padding: 8px 12px; background: transparent; color: inherit; display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
+.soco-moderation button:disabled { cursor: not-allowed; opacity: .5; }
+.soco-moderation-heading > button { margin-left: auto; color: #4f46e5; }
+.soco-moderation-list { display: grid; gap: 12px; padding-top: 12px; }
+.soco-moderation-list > button { justify-self: start; }
+.soco-moderation-report { border-radius: 12px; border: 1px solid rgba(100,116,139,.18); padding: 12px; overflow-wrap: anywhere; }
+.soco-moderation-report small { display: block; color: #64748b; font-size: .8rem; margin-top: 4px; }
+.soco-moderation-report p { margin: 10px 0; white-space: pre-wrap; }
+.soco-moderation-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.soco-moderation-actions button.danger { color: #be123c; border-color: rgba(190,18,60,.25); }
+.soco-moderation-error { color: #be123c; }
+@media (max-width: 430px) { .soco-moderation { padding: 10px; } .soco-moderation-heading > button { margin-left: 0; } }
