@@ -123,6 +123,18 @@ CREATE TABLE IF NOT EXISTS friend_request_events (
 CREATE INDEX IF NOT EXISTS idx_friend_request_events_sender_time
 ON friend_request_events(sender_id, created_at DESC);
 
+-- Personal friend labels are visible only to the owner of the account.
+CREATE TABLE IF NOT EXISTS friend_contact_metadata (
+    owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    contact_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    nickname VARCHAR(60) NOT NULL DEFAULT '',
+    note VARCHAR(1500) NOT NULL DEFAULT '',
+    favorite BOOLEAN NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (owner_id, contact_id),
+    CHECK (owner_id <> contact_id)
+);
+
 CREATE TABLE IF NOT EXISTS messages (
     id BIGSERIAL PRIMARY KEY,
     conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,

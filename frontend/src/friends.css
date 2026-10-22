@@ -927,6 +927,15 @@
   box-shadow: 0 22px 70px rgba(15, 23, 42, .23);
   text-align: center;
 }
+.friend-private-note {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #64748b;
+}
 .friend-profile-preview h2 { margin: 5px 0 0; font-size: 21px; color: #0f172a; }
 .friend-profile-preview p { margin: 0; color: #64748b; font-size: 13px; }
 .friend-profile-avatar { width: 72px; height: 72px; font-size: 24px; }

@@ -551,6 +551,7 @@ export default function App() {
   const [blockedOpen, setBlockedOpen] = useState(false)
   const [blockedBusy, setBlockedBusy] = useState(false)
   const [blockedError, setBlockedError] = useState('')
+  const [contactMetadata, setContactMetadata] = useState<Record<number, { nickname: string; note: string; favorite: boolean }>>({})
   const friendSyncRequest = useRef(0)
   const [friendSyncSessionId, setFriendSyncSessionId] = useState('')
   const [friendSyncError, setFriendSyncError] = useState('')
@@ -1874,9 +1875,10 @@ export default function App() {
     const request = ++friendSyncRequest.current
     setFriendSyncBusy(true)
     try {
-      const [friendsResponse, requestsResponse] = await Promise.all([
+      const [friendsResponse, requestsResponse, metadataResponse] = await Promise.all([
         apiFetch('/api/friends'),
         apiFetch('/api/friends/requests'),
+        apiFetch('/api/contacts'),
       ])
       if (!friendsResponse.ok || !requestsResponse.ok) throw new Error('Friend sync failed')
       const [nextFriends, nextRequests] = await Promise.all([
@@ -1886,6 +1888,13 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
       setFriends(nextFriends)
       setFriendRequests(nextRequests)
+      if (metadataResponse.ok) {
+        const records = await metadataResponse.json() as Array<{ id: number; nickname: string; note: string; favorite: boolean }>
+        if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
+        setContactMetadata(Object.fromEntries(records.map((item) => [item.id, {
+          nickname: item.nickname, note: item.note, favorite: item.favorite,
+        }])))
+      }
       setFriendSyncSessionId(sessionId)
       setFriendSyncError('')
     } catch {
@@ -1978,6 +1987,49 @@ export default function App() {
         })
         setFriendActionBusy(friendActionRef.current.values().next().value ?? null)
       }
+    }
+  }
+
+  async function changePersonalContact(friend: FriendConnection, field: 'nickname' | 'note' | 'favorite') {
+    const sid = session?.sessionId
+    if (!sid || friendBusyIds.has(friend.id)) return
+    const previous = contactMetadata[friend.id] || { nickname: '', note: '', favorite: false }
+    const next = { ...previous }
+    if (field === 'favorite') {
+      next.favorite = !next.favorite
+    } else {
+      const label = field === 'nickname' ? 'Biệt danh riêng (tối đa 60 ký tự)' : 'Ghi chú riêng (tối đa 1500 ký tự)'
+      const answer = window.prompt(label, previous[field])
+      if (answer === null) return
+      next[field] = answer.trim()
+      if (next[field].length > (field === 'nickname' ? 60 : 1500)) {
+        setNotice('Nội dung vượt quá độ dài cho phép.', 'warning')
+        return
+      }
+    }
+    setFriendMenuId(null)
+    setFriendBusyIds((ids) => new Set(ids).add(friend.id))
+    try {
+      const response = await apiFetch(`/api/contacts/${friend.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      const result = await response.json().catch(() => null) as { error?: string; id?: number; nickname?: string; note?: string; favorite?: boolean } | null
+      if (sessionRef.current?.sessionId !== sid) return
+      if (!response.ok || !result || result.id !== friend.id) {
+        setNotice(result?.error || 'Không lưu được liên hệ.', 'error')
+        return
+      }
+      setContactMetadata((old) => ({ ...old, [friend.id]: next }))
+      setNotice('Đã lưu thông tin liên hệ riêng.')
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setNotice('Không thể lưu liên hệ. Hãy thử lại.', 'error')
+    } finally {
+      setFriendBusyIds((ids) => {
+        const nextIDs = new Set(ids)
+        nextIDs.delete(friend.id)
+        return nextIDs
+      })
     }
   }
 
@@ -2134,6 +2186,7 @@ export default function App() {
     if (!session?.token) {
       setFriends([])
       setFriendRequests([])
+      setContactMetadata({})
       setFriendSyncSessionId('')
       setFriendSyncError('')
       setBlockedUsers([])
@@ -4627,7 +4680,7 @@ export default function App() {
                   action={<SocoTextAction onClick={() => { setTab('chat'); setNewChatMode('friends') }}>Tìm bạn bè</SocoTextAction>}
                 />
               )}
-              {friends.map((friend) => (
+              {[...friends].sort((a, b) => Number(Boolean(contactMetadata[b.id]?.favorite)) - Number(Boolean(contactMetadata[a.id]?.favorite))).map((friend) => (
                 <div
                   className="friend-result contact-result friend-contact-row"
                   key={friend.id}
@@ -4645,8 +4698,9 @@ export default function App() {
                   >
                     <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
                     <span className="friend-result-copy">
-                      <strong>{friend.displayName || friend.username}</strong>
+                      <strong>{contactMetadata[friend.id]?.favorite ? '⭐ ' : ''}{contactMetadata[friend.id]?.nickname || friend.displayName || friend.username}</strong>
                       <span>@{friend.username} · {friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
+                      {contactMetadata[friend.id]?.note && <small className="friend-private-note">{contactMetadata[friend.id].note}</small>}
                     </span>
                   </button>
                   <div className="friend-contact-controls">
@@ -4664,6 +4718,9 @@ export default function App() {
                       <div className="friend-contact-popover" role="menu">
                         <button type="button" role="menuitem" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem hồ sơ</button>
                         <button type="button" role="menuitem" onClick={() => { setFriendMenuId(null); void openDirectByUsername(friend.username) }}>Nhắn tin</button>
+                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'nickname')}>Đặt biệt danh</button>
+                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'note')}>Ghi chú riêng</button>
+                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'favorite')}>{contactMetadata[friend.id]?.favorite ? 'Bỏ bạn thân' : 'Đánh dấu bạn thân'}</button>
                         <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
                         <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void blockContact(friend)}>Chặn người dùng</button>
                         <button type="button" role="menuitem" onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>

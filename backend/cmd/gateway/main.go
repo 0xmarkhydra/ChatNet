@@ -66,6 +66,8 @@ func main() {
 	mux.Handle("/api/users/nearby", chatProxy)
 	mux.Handle("/api/friends", chatProxy)
 	mux.Handle("/api/friends/", chatProxy)
+	mux.Handle("/api/contacts", chatProxy)
+	mux.Handle("/api/contacts/", chatProxy)
 	mux.Handle("/api/privacy", chatProxy)
 	mux.Handle("/api/preferences/", chatProxy)
 	mux.Handle("/api/conversations", chatProxy)
