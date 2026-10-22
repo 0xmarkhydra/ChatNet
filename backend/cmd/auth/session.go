@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -25,7 +26,9 @@ func readRefreshToken(w http.ResponseWriter, r *http.Request) (string, bool) {
 		RefreshToken string `json:"refreshToken"`
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body) != nil ||
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF ||
 		(body.RefreshToken != "" && (len(body.RefreshToken) != 43 || !tokenRE.MatchString(body.RefreshToken))) {
 		httpx.Error(w, http.StatusBadRequest, "invalid refresh token")
 		return "", false
@@ -48,8 +51,9 @@ func (s *server) startSession(w http.ResponseWriter, r *http.Request, u user, st
 	// Delete expired credentials without extending the lifetime of active ones.
 	_, err = s.db.Exec(r.Context(), `
 		WITH expired AS (DELETE FROM auth_sessions WHERE expires_at <= NOW())
-		INSERT INTO auth_sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)`,
-		sessionHash(refresh), u.ID, time.Now().Add(sessionTTL))
+		INSERT INTO auth_sessions(token_hash,user_id,expires_at,user_agent)
+		VALUES($1,$2,$3,LEFT($4,180))`,
+		sessionHash(refresh), u.ID, time.Now().Add(sessionTTL), r.UserAgent())
 	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot save session")
 		return
@@ -64,28 +68,23 @@ func (s *server) refresh(w http.ResponseWriter, r *http.Request) {
 	}
 	var u user
 	if refresh == "" {
-		// Upgrade pre-refresh clients only while their signed access token is still valid.
-		claims, err := authx.Parse(s.jwtSecret, authx.TokenFromRequest(r))
-		if err != nil {
-			httpx.Error(w, http.StatusUnauthorized, "session expired")
-			return
-		}
-		err = s.db.QueryRow(r.Context(), `
-			SELECT id,email,username,display_name,created_at FROM users WHERE id=$1`, claims.UserID).
-			Scan(&u.ID, &u.Email, &u.Username, &u.DisplayName, &u.CreatedAt)
-		if err != nil {
-			sessionError(w, err)
-			return
-		}
-		s.startSession(w, r, u, http.StatusOK)
+		// Do not mint new refresh credentials from a long-lived access token:
+		// otherwise logging out would be reversible while that JWT is valid.
+		httpx.Error(w, http.StatusUnauthorized, "session expired; please sign in again")
 		return
 	}
-	// ponytail: fixed 90-day bearer session supports concurrent tabs and retry after a lost response;
-	// add rotating device sessions if device management becomes a product requirement.
+	// Fixed-expiry refresh tokens support concurrent tabs/retries. Each valid
+	// refresh updates the last-seen timestamp without prolonging its 90-day TTL.
 	err := s.db.QueryRow(r.Context(), `
+		WITH current_session AS (
+			UPDATE auth_sessions
+			SET last_seen_at=NOW()
+			WHERE token_hash=$1 AND expires_at>NOW()
+			RETURNING user_id
+		)
 		SELECT u.id,u.email,u.username,u.display_name,u.created_at
-		FROM auth_sessions s JOIN users u ON u.id=s.user_id
-		WHERE s.token_hash=$1 AND s.expires_at > NOW()`, sessionHash(refresh)).
+		FROM current_session s JOIN users u ON u.id=s.user_id
+	`, sessionHash(refresh)).
 		Scan(&u.ID, &u.Email, &u.Username, &u.DisplayName, &u.CreatedAt)
 	if err != nil {
 		sessionError(w, err)

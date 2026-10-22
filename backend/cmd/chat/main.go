@@ -124,10 +124,18 @@ func main() {
 	mux.Handle("POST /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.findNearby)))
 	mux.Handle("DELETE /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.stopNearby)))
 	mux.Handle("GET /api/friends", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriends)))
+	mux.Handle("GET /api/contacts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listContactMetadata)))
+	mux.Handle("PUT /api/contacts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateContactMetadata)))
 	mux.Handle("GET /api/friends/requests", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriendRequests)))
 	mux.Handle("POST /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.sendFriendRequest)))
 	mux.Handle("POST /api/friends/{id}/accept", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.acceptFriendRequest)))
 	mux.Handle("DELETE /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeFriendConnection)))
+	mux.Handle("GET /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPrivacy)))
+	mux.Handle("PUT /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePrivacy)))
+	mux.Handle("GET /api/users/blocked", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listBlockedUsers)))
+	mux.Handle("POST /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.blockUser)))
+	mux.Handle("DELETE /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.unblockUser)))
+	mux.Handle("POST /api/users/{id}/report", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reportUser)))
 	mux.Handle("GET /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPreferences)))
 	mux.Handle("PUT /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePreferences)))
 	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
@@ -302,10 +310,16 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 				ON other.conversation_id=c.id AND other.user_id<>$1
 			WHERE c.type='direct'
 		)
-		SELECT u.id,u.username,u.display_name,COALESCE(sg.mutual_groups,0)
+		SELECT u.id,u.username,u.display_name,u.show_online_status,COALESCE(sg.mutual_groups,0)
 		FROM users u
 		LEFT JOIN shared_groups sg ON sg.user_id=u.id
 		WHERE u.id<>$1
+		  AND (u.searchable_by_username OR u.searchable_by_name)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=u.id)
+		       OR (b.blocker_id=u.id AND b.blocked_id=$1)
+		  )
 		  AND NOT EXISTS (
 			SELECT 1 FROM direct_contacts dc WHERE dc.user_id=u.id
 		  )
@@ -321,8 +335,9 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int64
 		var username, displayName string
+		var showOnline bool
 		var mutualGroups int
-		if rows.Scan(&id, &username, &displayName, &mutualGroups) != nil {
+		if rows.Scan(&id, &username, &displayName, &showOnline, &mutualGroups) != nil {
 			continue
 		}
 
@@ -337,7 +352,7 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 			"id":           id,
 			"username":     username,
 			"displayName":  displayName,
-			"online":       s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
+			"online":       showOnline && s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
 			"mutualGroups": mutualGroups,
 			"reason":       reason,
 		})
@@ -359,9 +374,14 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT id,username,display_name
+		SELECT id,username,display_name,show_online_status
 		FROM users
 		WHERE id<>$1
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=users.id)
+		       OR (b.blocker_id=users.id AND b.blocked_id=$1)
+		  )
 		  AND (
 			(searchable_by_username AND strpos(lower(username), $2)>0)
 			OR (searchable_by_email AND lower(email)=$2)
@@ -388,10 +408,11 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int64
 		var username, displayName string
-		if rows.Scan(&id, &username, &displayName) == nil {
+		var showOnline bool
+		if rows.Scan(&id, &username, &displayName, &showOnline) == nil {
 			items = append(items, map[string]any{
 				"id": id, "username": username, "displayName": displayName,
-				"online": s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
+				"online": showOnline && s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
 			})
 		}
 	}
@@ -512,6 +533,13 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		WHERE cm.user_id=$1
+		  AND (c.type <> 'direct' OR NOT EXISTS (
+		    SELECT 1 FROM conversation_members other
+		    JOIN user_blocks b ON
+		      (b.blocker_id=$1 AND b.blocked_id=other.user_id)
+		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
+		    WHERE other.conversation_id=c.id AND other.user_id<>$1
+		  ))
 		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
 		claims.UserID, limit, offset)
@@ -536,16 +564,17 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		if c.Type == "direct" {
 			var otherID int64
 			var displayName string
+			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username
+				SELECT u.id,u.username,u.show_online_status
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
-				c.ID, claims.UserID).Scan(&otherID, &displayName)
+				c.ID, claims.UserID).Scan(&otherID, &displayName, &showOnline)
 			if err == nil {
 				c.Name = displayName
 				c.OtherUserID = &otherID
-				c.Online = s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
+				c.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
 			}
 		}
 		items = append(items, c)
@@ -570,10 +599,20 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 
 	var otherID int64
 	var otherName string
+	var showOnline bool
 	if err := s.db.QueryRow(r.Context(),
-		`SELECT id,username FROM users WHERE username=$1`, username,
-	).Scan(&otherID, &otherName); err != nil {
+		`SELECT id,username,show_online_status FROM users WHERE username=$1`, username,
+	).Scan(&otherID, &otherName, &showOnline); err != nil {
 		httpx.Error(w, http.StatusNotFound, "user not found")
+		return
+	}
+	blocked, err := s.blockedPair(r.Context(), claims.UserID, otherID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify contact policy")
+		return
+	}
+	if blocked {
+		httpx.Error(w, http.StatusForbidden, "direct contact is blocked")
 		return
 	}
 
@@ -616,7 +655,7 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	c := conversation{
 		ID: id, Type: "direct", Name: otherName, OtherUserID: &otherID,
 		MemberCount: 2, CreatedAt: createdAt,
-		Online: s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0,
+		Online: showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0,
 	}
 	s.publishConversationEvent(r.Context(), ids, realtimeEvent{Type: "conversation.created", ConversationID: id, Conversation: &c})
 	httpx.JSON(w, http.StatusCreated, c)
@@ -708,6 +747,9 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		if ok {
 			httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		}
+		return
+	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
 		return
 	}
 
@@ -873,6 +915,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		if ok {
 			httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		}
+		return
+	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
 		return
 	}
 

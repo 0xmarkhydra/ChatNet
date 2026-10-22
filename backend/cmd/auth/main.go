@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"net"
@@ -112,6 +113,9 @@ func main() {
 	mux.HandleFunc("POST /api/auth/login", s.login)
 	mux.HandleFunc("POST /api/auth/refresh", s.refresh)
 	mux.HandleFunc("POST /api/auth/logout", s.logout)
+	mux.HandleFunc("POST /api/auth/sessions/list", s.listSessions)
+	mux.HandleFunc("POST /api/auth/sessions/revoke", s.revokeSession)
+	mux.HandleFunc("POST /api/auth/sessions/revoke-others", s.revokeOtherSessions)
 	mux.Handle("GET /api/auth/me", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.me)))
 
 	port := config.Env("PORT", "8081")
@@ -129,6 +133,18 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// Auth credentials and OTP bodies are always small. Reject oversized, malformed,
+// ambiguous or multi-value JSON before touching Redis, PostgreSQL or email APIs.
+func decodeAuthBody(w http.ResponseWriter, r *http.Request, value any) bool {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(value) != nil || decoder.Decode(new(any)) != io.EOF {
+		httpx.Error(w, http.StatusBadRequest, "invalid body")
+		return false
+	}
+	return true
+}
+
 func (s *server) registerStart(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email       string `json:"email"`
@@ -136,8 +152,7 @@ func (s *server) registerStart(w http.ResponseWriter, r *http.Request) {
 		Password    string `json:"password"`
 		DisplayName string `json:"displayName"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid body")
+	if !decodeAuthBody(w, r, &body) {
 		return
 	}
 
@@ -248,8 +263,7 @@ func (s *server) registerVerify(w http.ResponseWriter, r *http.Request) {
 		Token string `json:"token"`
 		Code  string `json:"code"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid body")
+	if !decodeAuthBody(w, r, &body) {
 		return
 	}
 
@@ -318,8 +332,7 @@ func (s *server) registerResend(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Token string `json:"token"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid body")
+	if !decodeAuthBody(w, r, &body) {
 		return
 	}
 	token := strings.TrimSpace(body.Token)
@@ -380,8 +393,7 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid body")
+	if !decodeAuthBody(w, r, &body) {
 		return
 	}
 

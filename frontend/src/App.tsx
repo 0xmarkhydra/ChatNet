@@ -182,6 +182,23 @@ type FriendSearchResult = {
   reason?: string
 }
 
+type ManagedAccountSession = {
+  id: string
+  userAgent: string
+  createdAt: string
+  lastSeenAt: string
+  expiresAt: string
+  current: boolean
+}
+
+type UserPrivacy = {
+  searchableByUsername: boolean
+  searchableByName: boolean
+  searchableByEmail: boolean
+  allowFriendRequests: boolean
+  showOnlineStatus: boolean
+}
+
 type FriendConnection = FriendSearchResult & {
   status: 'accepted' | 'pending'
   direction?: 'incoming' | 'outgoing'
@@ -538,10 +555,20 @@ export default function App() {
   const [friendQuery, setFriendQuery] = useState('')
   const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([])
   const [friendSearching, setFriendSearching] = useState(false)
+  const [friendSearchError, setFriendSearchError] = useState(false)
+  const [friendSearchRetry, setFriendSearchRetry] = useState(0)
   const [friends, setFriends] = useState<FriendConnection[]>([])
   const [friendRequests, setFriendRequests] = useState<FriendConnection[]>([])
   const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null)
-  const friendActionRef = useRef(false)
+  const friendActionRef = useRef(new Set<number>())
+  const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(() => new Set())
+  const [friendMenuId, setFriendMenuId] = useState<number | null>(null)
+  const [friendPreview, setFriendPreview] = useState<FriendSearchResult | null>(null)
+  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: number; username: string; displayName: string }>>([])
+  const [blockedOpen, setBlockedOpen] = useState(false)
+  const [blockedBusy, setBlockedBusy] = useState(false)
+  const [blockedError, setBlockedError] = useState('')
+  const [contactMetadata, setContactMetadata] = useState<Record<number, { nickname: string; note: string; favorite: boolean }>>({})
   const friendSyncRequest = useRef(0)
   const [friendSyncSessionId, setFriendSyncSessionId] = useState('')
   const [friendSyncError, setFriendSyncError] = useState('')
@@ -604,6 +631,15 @@ export default function App() {
   const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState('')
   const [profileUsernameDraft, setProfileUsernameDraft] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
+  const [privacy, setPrivacy] = useState<UserPrivacy | null>(null)
+  const [privacyBusy, setPrivacyBusy] = useState(false)
+  const [privacyLoading, setPrivacyLoading] = useState(false)
+  const [privacyError, setPrivacyError] = useState('')
+  const [privacyRetry, setPrivacyRetry] = useState(0)
+  const [sessionsOpen, setSessionsOpen] = useState(false)
+  const [managedSessions, setManagedSessions] = useState<ManagedAccountSession[]>([])
+  const [sessionsBusy, setSessionsBusy] = useState(false)
+  const [sessionsError, setSessionsError] = useState('')
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
@@ -1746,15 +1782,146 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    if (!session?.token) {
+      setPrivacy(null)
+      setPrivacyError('')
+      setPrivacyLoading(false)
+      return
+    }
+    const controller = new AbortController()
+    setPrivacy(null)
+    setPrivacyBusy(false)
+    setPrivacyLoading(true)
+    setPrivacyError('')
+    apiFetch('/api/privacy', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Không thể tải quyền riêng tư.')
+        return response.json() as Promise<UserPrivacy>
+      })
+      .then((value) => {
+        if (!controller.signal.aborted) setPrivacy(value)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setPrivacyError('Không thể tải cài đặt riêng tư.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPrivacyLoading(false)
+      })
+    return () => controller.abort()
+  }, [session?.sessionId, privacyRetry])
+
+  async function changePrivacy(key: keyof UserPrivacy) {
+    if (!privacy || privacyBusy || !session?.sessionId) return
+    const sessionId = session.sessionId
+    const next = { ...privacy, [key]: !privacy[key] }
+    setPrivacyBusy(true)
+    try {
+      const response = await apiFetch('/api/privacy', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      const result = await response.json().catch(() => null) as UserPrivacy | null
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || !result) throw new Error('Không lưu được quyền riêng tư.')
+      setPrivacy(result)
+      setNotice('Đã lưu cài đặt riêng tư')
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId) {
+        setPrivacyError('Lưu thất bại. Cài đặt trước đó vẫn được giữ.')
+        setNotice('Không thể lưu quyền riêng tư. Vui lòng thử lại.', 'error')
+      }
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) setPrivacyBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    setManagedSessions([])
+    setSessionsOpen(false)
+    setSessionsBusy(false)
+    setSessionsError('')
+  }, [session?.sessionId])
+
+  async function fetchAccountSessions() {
+    const current = sessionRef.current
+    if (!current?.refreshToken || sessionsBusy) return
+    const identity = current.sessionId
+    setSessionsBusy(true)
+    setSessionsError('')
+    try {
+      const response = await fetch(`${API}/api/auth/sessions/list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ refreshToken: current.refreshToken }),
+      })
+      if (!response.ok) throw new Error('Không tải được phiên đăng nhập.')
+      const data = await response.json() as ManagedAccountSession[]
+      if (sessionRef.current?.sessionId === identity) {
+        setManagedSessions(data)
+        setSessionsOpen(true)
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === identity) {
+        setSessionsError('Không thể tải các thiết bị. Vui lòng thử lại.')
+      }
+    } finally {
+      if (sessionRef.current?.sessionId === identity) setSessionsBusy(false)
+    }
+  }
+
+  async function revokeAccountSessions(sessionID?: string) {
+    const current = sessionRef.current
+    if (!current?.refreshToken || sessionsBusy) return
+    const identity = current.sessionId
+    const selected = managedSessions.find((item) => item.id === sessionID)
+    if (sessionID && !selected) return
+    const message = sessionID
+      ? selected?.current
+        ? 'Bạn muốn đăng xuất khỏi thiết bị này?'
+        : 'Bạn muốn thu hồi phiên đăng nhập trên thiết bị đã chọn?'
+      : 'Bạn muốn đăng xuất tất cả thiết bị khác?'
+    if (!window.confirm(message)) return
+    setSessionsBusy(true)
+    setSessionsError('')
+    try {
+      const response = await fetch(`${API}/api/auth/sessions/${sessionID ? 'revoke' : 'revoke-others'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ refreshToken: current.refreshToken, ...(sessionID ? { sessionId: sessionID } : {}) }),
+      })
+      if (!response.ok) throw new Error('Không thu hồi được phiên đăng nhập.')
+      if (sessionRef.current?.sessionId !== identity) return
+      if (selected?.current) {
+        logout(false)
+      } else {
+        setManagedSessions((items) => sessionID
+          ? items.filter((item) => item.id !== sessionID)
+          : items.filter((item) => item.current))
+        setNotice('Đã thu hồi phiên đăng nhập được chọn.')
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === identity) {
+        setSessionsError('Không thu hồi được phiên. Vui lòng thử lại.')
+      }
+    } finally {
+      if (sessionRef.current?.sessionId === identity) setSessionsBusy(false)
+    }
+  }
+
   async function refreshFriendConnections() {
     const sessionId = session?.sessionId
     if (!sessionId) return
     const request = ++friendSyncRequest.current
     setFriendSyncBusy(true)
     try {
-      const [friendsResponse, requestsResponse] = await Promise.all([
+      const [friendsResponse, requestsResponse, metadataResponse] = await Promise.all([
         apiFetch('/api/friends'),
         apiFetch('/api/friends/requests'),
+        apiFetch('/api/contacts'),
       ])
       if (!friendsResponse.ok || !requestsResponse.ok) throw new Error('Friend sync failed')
       const [nextFriends, nextRequests] = await Promise.all([
@@ -1764,6 +1931,13 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
       setFriends(nextFriends)
       setFriendRequests(nextRequests)
+      if (metadataResponse.ok) {
+        const records = await metadataResponse.json() as Array<{ id: number; nickname: string; note: string; favorite: boolean }>
+        if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
+        setContactMetadata(Object.fromEntries(records.map((item) => [item.id, {
+          nickname: item.nickname, note: item.note, favorite: item.favorite,
+        }])))
+      }
       setFriendSyncSessionId(sessionId)
       setFriendSyncError('')
     } catch {
@@ -1775,6 +1949,16 @@ export default function App() {
     }
   }
 
+  const contactQuery = friendQuery.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
+  const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
+    `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(contactQuery),
+  )
+  const localContactIds = new Set(localContactMatches.map((friend) => friend.id))
+  const contactSearchResults = [
+    ...localContactMatches,
+    ...friendResults.filter((friend) => !localContactIds.has(friend.id)),
+  ]
+
   function friendRelationship(userId: number) {
     if (friends.some((item) => item.id === userId)) return 'accepted' as const
     const request = friendRequests.find((item) => item.id === userId)
@@ -1785,7 +1969,7 @@ export default function App() {
 
   async function actOnFriend(friend: FriendSearchResult | FriendConnection, decline = false) {
     const sessionId = session?.sessionId
-    if (!sessionId || friendActionRef.current || friend.id === session.user.id) return
+    if (!sessionId || friendActionRef.current.has(friend.id) || friend.id === session.user.id) return
     const relationship = friendRelationship(friend.id)
     if (decline && relationship !== 'incoming') return
     if (relationship === 'accepted') {
@@ -1793,7 +1977,8 @@ export default function App() {
       return
     }
 
-    friendActionRef.current = true
+    friendActionRef.current.add(friend.id)
+    setFriendBusyIds((current) => new Set(current).add(friend.id))
     ++friendSyncRequest.current
     setFriendActionBusy(friend.id)
     try {
@@ -1837,9 +2022,164 @@ export default function App() {
       }
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
-        friendActionRef.current = false
-        setFriendActionBusy(null)
+        friendActionRef.current.delete(friend.id)
+        setFriendBusyIds((current) => {
+          const next = new Set(current)
+          next.delete(friend.id)
+          return next
+        })
+        setFriendActionBusy(friendActionRef.current.values().next().value ?? null)
       }
+    }
+  }
+
+  async function changePersonalContact(friend: FriendConnection, field: 'nickname' | 'note' | 'favorite') {
+    const sid = session?.sessionId
+    if (!sid || friendBusyIds.has(friend.id)) return
+    const previous = contactMetadata[friend.id] || { nickname: '', note: '', favorite: false }
+    const next = { ...previous }
+    if (field === 'favorite') {
+      next.favorite = !next.favorite
+    } else {
+      const label = field === 'nickname' ? 'Biệt danh riêng (tối đa 60 ký tự)' : 'Ghi chú riêng (tối đa 1500 ký tự)'
+      const answer = window.prompt(label, previous[field])
+      if (answer === null) return
+      next[field] = answer.trim()
+      if (next[field].length > (field === 'nickname' ? 60 : 1500)) {
+        setNotice('Nội dung vượt quá độ dài cho phép.', 'warning')
+        return
+      }
+    }
+    setFriendMenuId(null)
+    setFriendBusyIds((ids) => new Set(ids).add(friend.id))
+    try {
+      const response = await apiFetch(`/api/contacts/${friend.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      const result = await response.json().catch(() => null) as { error?: string; id?: number; nickname?: string; note?: string; favorite?: boolean } | null
+      if (sessionRef.current?.sessionId !== sid) return
+      if (!response.ok || !result || result.id !== friend.id) {
+        setNotice(result?.error || 'Không lưu được liên hệ.', 'error')
+        return
+      }
+      setContactMetadata((old) => ({ ...old, [friend.id]: next }))
+      setNotice('Đã lưu thông tin liên hệ riêng.')
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setNotice('Không thể lưu liên hệ. Hãy thử lại.', 'error')
+    } finally {
+      setFriendBusyIds((ids) => {
+        const nextIDs = new Set(ids)
+        nextIDs.delete(friend.id)
+        return nextIDs
+      })
+    }
+  }
+
+  async function blockContact(friend: FriendSearchResult | FriendConnection) {
+    const sid = session?.sessionId
+    if (!sid || friendBusyIds.has(friend.id)) return
+    if (!window.confirm(`Chặn @${friend.username}? Người này sẽ không thể nhắn tin trực tiếp hoặc kết bạn với bạn.`)) return
+    setFriendBusyIds((old) => new Set(old).add(friend.id))
+    setFriendMenuId(null)
+    try {
+      const response = await apiFetch(`/api/users/${friend.id}/block`, { method: 'POST' })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sid) return
+      if (!response.ok) {
+        setNotice(result?.error || 'Không thể chặn người dùng.', 'error')
+        return
+      }
+      setFriends((old) => old.filter((item) => item.id !== friend.id))
+      setFriendRequests((old) => old.filter((item) => item.id !== friend.id))
+      setFriendResults((old) => old.filter((item) => item.id !== friend.id))
+      setBlockedUsers((old) => [...old.filter((item) => item.id !== friend.id), {
+        id: friend.id, username: friend.username, displayName: friend.displayName,
+      }])
+      setFriendPreview(null)
+      setConversations((old) => old.filter((item) => item.otherUserId !== friend.id))
+      const currentConversation = conversations.find((item) => item.id === activeConversationId)
+      if (currentConversation?.otherUserId === friend.id) setActiveConversationId(null)
+      setNotice(`Đã chặn @${friend.username}.`)
+      await refreshFriendConnections()
+      void refreshConversations()
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setNotice('Không thể chặn người dùng. Hãy thử lại.', 'error')
+    } finally {
+      setFriendBusyIds((old) => {
+        const next = new Set(old)
+        next.delete(friend.id)
+        return next
+      })
+    }
+  }
+
+  async function reportContact(friend: FriendSearchResult | FriendConnection) {
+    const sid = session?.sessionId
+    if (!sid) return
+    const answer = window.prompt('Lý do báo cáo: 1 - Spam, 2 - Quấy rối, 3 - Giả mạo, 4 - Khác')
+    if (answer === null) return
+    const reason = ({ '1': 'spam', '2': 'harassment', '3': 'impersonation', '4': 'other' } as Record<string, string>)[answer.trim()]
+    if (!reason) {
+      setNotice('Vui lòng chọn lý do từ 1 đến 4.', 'warning')
+      return
+    }
+    const details = window.prompt('Mô tả sự việc (không quá 1000 ký tự, có thể để trống):')
+    if (details === null) return
+    if (details.length > 1000) {
+      setNotice('Mô tả không được quá 1000 ký tự.', 'warning')
+      return
+    }
+    setFriendMenuId(null)
+    try {
+      const response = await apiFetch(`/api/users/${friend.id}/report`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason, details: details.trim() }),
+      })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sid) return
+      setNotice(response.ok ? 'Đã gửi báo cáo. Cảm ơn bạn.' : result?.error || 'Không thể gửi báo cáo.', response.ok ? 'success' : 'error')
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setNotice('Không thể gửi báo cáo. Hãy thử lại.', 'error')
+    }
+  }
+
+  async function loadBlockedUsers() {
+    const sid = session?.sessionId
+    if (!sid || blockedBusy) return
+    setBlockedBusy(true)
+    setBlockedError('')
+    try {
+      const response = await apiFetch('/api/users/blocked')
+      if (!response.ok) throw new Error()
+      const data = await response.json() as Array<{id: number; username: string; displayName: string}>
+      if (sessionRef.current?.sessionId === sid) {
+        setBlockedUsers(data)
+        setBlockedOpen(true)
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setBlockedError('Không tải được danh sách chặn.')
+    } finally {
+      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false)
+    }
+  }
+
+  async function unblockContact(userId: number) {
+    const sid = session?.sessionId
+    if (!sid || blockedBusy || !window.confirm('Bỏ chặn người dùng này?')) return
+    setBlockedBusy(true)
+    setBlockedError('')
+    try {
+      const response = await apiFetch(`/api/users/${userId}/block`, { method: 'DELETE' })
+      if (!response.ok) throw new Error()
+      if (sessionRef.current?.sessionId === sid) {
+        setBlockedUsers((old) => old.filter((item) => item.id !== userId))
+        setNotice('Đã bỏ chặn người dùng.')
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setBlockedError('Không thể bỏ chặn. Hãy thử lại.')
+    } finally {
+      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false)
     }
   }
 
@@ -1847,12 +2187,54 @@ export default function App() {
     await actOnFriend(friend, true)
   }
 
+  async function removeAcceptedFriend(friend: FriendConnection) {
+    const sessionId = session?.sessionId
+    if (!sessionId || friendRelationship(friend.id) !== 'accepted' || friendActionRef.current.has(friend.id)) return
+    if (!window.confirm(`Hủy kết bạn với ${friend.displayName || '@' + friend.username}?`)) return
+    friendActionRef.current.add(friend.id)
+    setFriendBusyIds((current) => new Set(current).add(friend.id))
+    setFriendActionBusy(friend.id)
+    setFriendMenuId(null)
+    try {
+      const response = await apiFetch(`/api/friends/${friend.id}?direction=accepted`, { method: 'DELETE' })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok) {
+        setNotice(result?.error || 'Không thể hủy kết bạn. Vui lòng thử lại.')
+      } else {
+        setFriends((current) => current.filter((item) => item.id !== friend.id))
+        setFriendPreview(null)
+        setNotice('Đã hủy kết bạn')
+      }
+      await refreshFriendConnections()
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId) {
+        setNotice('Mạng gián đoạn. Đang đồng bộ lại danh sách bạn bè.')
+        await refreshFriendConnections()
+      }
+    } finally {
+      friendActionRef.current.delete(friend.id)
+      if (sessionRef.current?.sessionId === sessionId) {
+        setFriendBusyIds((current) => {
+          const next = new Set(current)
+          next.delete(friend.id)
+          return next
+        })
+        setFriendActionBusy(friendActionRef.current.values().next().value ?? null)
+      }
+    }
+  }
+
   useEffect(() => {
     if (!session?.token) {
       setFriends([])
       setFriendRequests([])
+      setContactMetadata({})
       setFriendSyncSessionId('')
       setFriendSyncError('')
+      setBlockedUsers([])
+      setBlockedOpen(false)
+      setBlockedError('')
       ++friendSyncRequest.current
       return
     }
@@ -1866,6 +2248,7 @@ export default function App() {
     if (!session?.token || !friendSurfaceOpen) {
       setFriendResults([])
       setFriendSearching(false)
+      setFriendSearchError(false)
       return
     }
 
@@ -1873,18 +2256,22 @@ export default function App() {
     const query = friendQuery.trim()
     setFriendResults([])
     setFriendSearching(true)
+    setFriendSearchError(false)
 
     if (!query) {
       apiFetch('/api/users/suggestions', { signal: controller.signal })
         .then(async (response) => {
-          if (!response.ok) return []
+          if (!response.ok) throw new Error('Cannot load suggestions')
           return response.json() as Promise<FriendSearchResult[]>
         })
         .then((items) => {
           if (!controller.signal.aborted) setFriendResults(items)
         })
         .catch(() => {
-          if (!controller.signal.aborted) setFriendResults([])
+          if (!controller.signal.aborted) {
+            setFriendResults([])
+            setFriendSearchError(true)
+          }
         })
         .finally(() => {
           if (!controller.signal.aborted) setFriendSearching(false)
@@ -1900,14 +2287,14 @@ export default function App() {
           `/api/users/search?q=${encodeURIComponent(query)}`,
           { signal: controller.signal },
         )
-        if (!response.ok) {
-          if (!controller.signal.aborted) setFriendResults([])
-          return
-        }
+        if (!response.ok) throw new Error('Cannot search users')
         const items = (await response.json()) as FriendSearchResult[]
         if (!controller.signal.aborted) setFriendResults(items)
       } catch {
-        if (!controller.signal.aborted) setFriendResults([])
+        if (!controller.signal.aborted) {
+          setFriendResults([])
+          setFriendSearchError(true)
+        }
       } finally {
         if (!controller.signal.aborted) setFriendSearching(false)
       }
@@ -1917,7 +2304,7 @@ export default function App() {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [friendQuery, newChatMode, session?.token, tab])
+  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, tab])
 
   async function refreshConversations() {
     const sessionId = session?.sessionId
@@ -2259,12 +2646,15 @@ export default function App() {
     mediaUploadAbort.current = null
     setMediaUploading(null)
     setMediaUploadProgress(null)
-    friendActionRef.current = false
+    friendActionRef.current.clear()
+    setFriendBusyIds(new Set())
     setFriendActionBusy(null)
     ++feedRevision.current
     setMessageDrafts({})
     setFriends([])
     setFriendRequests([])
+    setFriendMenuId(null)
+    setFriendPreview(null)
     setPostText('')
     setPosts([])
     setHasMorePosts(false)
@@ -3409,6 +3799,22 @@ export default function App() {
           <button type="button" onClick={() => mediaUploadAbort.current?.abort()}>Hủy tải</button>
         </div>
       )}
+      {friendPreview && (
+        <div className="connect-modal-layer">
+          <button type="button" className="connect-modal-scrim" aria-label="Đóng hồ sơ" onClick={() => setFriendPreview(null)} />
+          <section className="friend-profile-preview" role="dialog" aria-modal="true" aria-label={`Hồ sơ ${friendPreview.displayName || friendPreview.username}`}>
+            <button type="button" className="friend-profile-close" aria-label="Đóng" onClick={() => setFriendPreview(null)}><X size={20} /></button>
+            <UserAvatar name={friendPreview.displayName || friendPreview.username} className="friend-profile-avatar" online={friendPreview.online} />
+            <h2>{friendPreview.displayName || friendPreview.username}</h2>
+            <p>@{friendPreview.username}</p>
+            <p>{friendPreview.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</p>
+            <div className="friend-profile-actions">
+              <button type="button" onClick={() => { setFriendPreview(null); void openDirectByUsername(friendPreview.username) }}>Nhắn tin</button>
+              <button type="button" onClick={() => setFriendPreview(null)}>Đóng</button>
+            </div>
+          </section>
+        </div>
+      )}
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
@@ -3643,7 +4049,10 @@ export default function App() {
                       {!friendSearching && !friendQuery.trim() && friendResults.length > 0 && (
                         <div className="friend-suggestion-label">Người bạn có thể biết</div>
                       )}
-                      {!friendSearching && friendQuery.trim() && friendResults.length === 0 && (
+                      {friendSearchError && !friendSearching && (
+                        <div className="friend-search-state" role="alert">Không tải được kết quả. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button></div>
+                      )}
+                      {!friendSearching && !friendSearchError && friendQuery.trim() && friendResults.length === 0 && (
                         <div className="friend-search-state">
                           <strong>Không tìm thấy người phù hợp</strong>
                           <span>Thử tên khác, @username hoặc email chính xác.</span>
@@ -3657,7 +4066,7 @@ export default function App() {
                             : relationship === 'incoming'
                               ? 'Chấp nhận'
                               : relationship === 'outgoing'
-                                ? 'Đã gửi'
+                                ? 'Hủy lời mời'
                                 : 'Kết bạn'
                         return (
                           <button
@@ -3665,7 +4074,7 @@ export default function App() {
                             className="friend-result connect-result"
                             key={friend.id}
                             onClick={() => void actOnFriend(friend)}
-                            disabled={friendActionBusy === friend.id}
+                            disabled={friendBusyIds.has(friend.id)}
                           >
                             <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                             <div className="friend-result-copy">
@@ -3948,7 +4357,7 @@ export default function App() {
                           <button
                             type="button"
                             className={chatFriendRelationship === 'outgoing' ? '' : 'primary'}
-                            disabled={friendActionBusy !== null}
+                            disabled={friendBusyIds.has(chatFriend.id)}
                             onClick={() => void actOnFriend(chatFriend)}
                           >
                             {chatFriendRelationship === 'incoming' ? <Check size={16} aria-hidden="true" /> :
@@ -3956,7 +4365,7 @@ export default function App() {
                             {chatFriendRelationship === 'incoming' ? 'Chấp nhận' : chatFriendRelationship === 'outgoing' ? 'Hủy lời mời' : 'Gửi lời mời kết bạn'}
                           </button>
                           {chatFriendRelationship === 'incoming' && (
-                            <button type="button" disabled={friendActionBusy !== null} onClick={() => void actOnFriend(chatFriend, true)}>
+                            <button type="button" disabled={friendBusyIds.has(chatFriend.id)} onClick={() => void actOnFriend(chatFriend, true)}>
                               <X size={16} aria-hidden="true" /> Từ chối
                             </button>
                           )}
@@ -4329,6 +4738,64 @@ export default function App() {
 
         {tab === 'contacts' && (
           <div className="simple-view contacts-view">
+            {friendQuery.trim() ? (
+              <section className="contacts-suggestions contacts-search-section" aria-label="Kết quả tìm kiếm bạn bè">
+                <div className="contacts-heading contacts-search-heading">
+                  <span>Kết quả tìm kiếm</span>
+                  <button type="button" onClick={() => setFriendQuery('')}>Xóa tìm kiếm</button>
+                </div>
+                {friendSearching && <div className="friend-search-state" role="status">Đang tìm người dùng...</div>}
+                {friendSearchError && !friendSearching && (
+                  <div className="friend-search-state" role="alert">
+                    Không thể tìm kiếm lúc này. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button>
+                  </div>
+                )}
+                {!friendSearching && !friendSearchError && contactSearchResults.length === 0 && (
+                  <div className="friend-search-state">Không tìm thấy kết quả. Thử tên, @username hoặc email chính xác.</div>
+                )}
+                {contactSearchResults.map((friend) => {
+                  const relationship = friendRelationship(friend.id)
+                  const actionLabel = relationship === 'accepted' ? 'Nhắn tin'
+                    : relationship === 'incoming' ? 'Chấp nhận'
+                      : relationship === 'outgoing' ? 'Hủy lời mời' : 'Kết bạn'
+                  return (
+                    <div className="friend-result contact-result contact-search-row" key={friend.id}>
+                      <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
+                      <div className="friend-result-copy">
+                        <strong>{friend.displayName || friend.username}</strong>
+                        <span>@{friend.username}{relationship === 'accepted' ? ' · Bạn bè' : relationship === 'incoming' ? ' · Đã nhận lời mời' : relationship === 'outgoing' ? ' · Đã gửi lời mời' : ''}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="contact-search-action"
+                        disabled={friendBusyIds.has(friend.id)}
+                        onClick={() => void actOnFriend(friend)}
+                      >{actionLabel}</button>
+                      <div className="friend-contact-controls" onBlur={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
+                      }}>
+                        <button type="button" className="friend-contact-more"
+                          aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
+                          aria-expanded={friendMenuId === friend.id} aria-haspopup="menu"
+                          onClick={() => setFriendMenuId((old) => old === friend.id ? null : friend.id)}>
+                          <MoreHorizontal size={19} aria-hidden="true" />
+                        </button>
+                        {friendMenuId === friend.id && (
+                          <div className="friend-contact-popover" role="menu">
+                            <button type="button" role="menuitem" className="friend-contact-danger"
+                              disabled={friendBusyIds.has(friend.id)}
+                              onClick={() => void blockContact(friend)}>Chặn người dùng</button>
+                            <button type="button" role="menuitem"
+                              onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </section>
+            ) : (
+              <>
             <div className="contact-shortcuts">
               <button type="button" onClick={() => { setTab('chat'); setNewChatMode('friends') }}>
                 <span className="shortcut-icon">＋</span><div><strong>Lời mời kết bạn</strong><small>Tìm và kết nối người mới</small></div><b>›</b>
@@ -4351,8 +4818,8 @@ export default function App() {
                       <span>Muốn kết bạn với bạn</span>
                     </div>
                     <div className="friend-request-actions">
-                      <button type="button" onClick={() => void actOnFriend(friend)} disabled={friendActionBusy === friend.id}>Chấp nhận</button>
-                      <button type="button" className="secondary" onClick={() => void declineFriendRequest(friend)} disabled={friendActionBusy === friend.id}>Từ chối</button>
+                      <button type="button" onClick={() => void actOnFriend(friend)} disabled={friendBusyIds.has(friend.id)}>Chấp nhận</button>
+                      <button type="button" className="secondary" onClick={() => void declineFriendRequest(friend)} disabled={friendBusyIds.has(friend.id)}>Từ chối</button>
                     </div>
                   </div>
                 ))}
@@ -4367,20 +4834,54 @@ export default function App() {
                   action={<SocoTextAction onClick={() => { setTab('chat'); setNewChatMode('friends') }}>Tìm bạn bè</SocoTextAction>}
                 />
               )}
-              {friends.map((friend) => (
-                <button
-                  type="button"
-                  className="friend-result contact-result"
+              {[...friends].sort((a, b) => Number(Boolean(contactMetadata[b.id]?.favorite)) - Number(Boolean(contactMetadata[a.id]?.favorite))).map((friend) => (
+                <div
+                  className="friend-result contact-result friend-contact-row"
                   key={friend.id}
-                  onClick={() => void openDirectByUsername(friend.username)}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setFriendMenuId(null)
+                  }}
                 >
-                  <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                  <div className="friend-result-copy">
-                    <strong>@{friend.username}</strong>
-                    <span>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
+                  <button
+                    type="button"
+                    className="friend-contact-primary"
+                    onClick={() => void openDirectByUsername(friend.username)}
+                  >
+                    <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
+                    <span className="friend-result-copy">
+                      <strong>{contactMetadata[friend.id]?.favorite ? '⭐ ' : ''}{contactMetadata[friend.id]?.nickname || friend.displayName || friend.username}</strong>
+                      <span>@{friend.username} · {friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
+                      {contactMetadata[friend.id]?.note && <small className="friend-private-note">{contactMetadata[friend.id].note}</small>}
+                    </span>
+                  </button>
+                  <div className="friend-contact-controls">
+                    <button
+                      type="button"
+                      className="friend-contact-more"
+                      aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
+                      aria-expanded={friendMenuId === friend.id}
+                      aria-haspopup="menu"
+                      onClick={() => setFriendMenuId((current) => current === friend.id ? null : friend.id)}
+                    >
+                      <MoreHorizontal size={20} aria-hidden="true" />
+                    </button>
+                    {friendMenuId === friend.id && (
+                      <div className="friend-contact-popover" role="menu">
+                        <button type="button" role="menuitem" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem hồ sơ</button>
+                        <button type="button" role="menuitem" onClick={() => { setFriendMenuId(null); void openDirectByUsername(friend.username) }}>Nhắn tin</button>
+                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'nickname')}>Đặt biệt danh</button>
+                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'note')}>Ghi chú riêng</button>
+                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'favorite')}>{contactMetadata[friend.id]?.favorite ? 'Bỏ bạn thân' : 'Đánh dấu bạn thân'}</button>
+                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
+                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void blockContact(friend)}>Chặn người dùng</button>
+                        <button type="button" role="menuitem" onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
+                      </div>
+                    )}
                   </div>
-                  <div className="friend-result-action"><small>Nhắn tin</small><span>›</span></div>
-                </button>
+                </div>
               ))}
             </section>
 
@@ -4393,7 +4894,7 @@ export default function App() {
                     className="friend-result contact-result"
                     key={friend.id}
                     onClick={() => void actOnFriend(friend)}
-                    disabled={friendActionBusy === friend.id}
+                    disabled={friendBusyIds.has(friend.id)}
                   >
                     <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                     <div className="friend-result-copy">
@@ -4418,7 +4919,7 @@ export default function App() {
                   className="friend-result contact-result"
                   key={friend.id}
                   onClick={() => void actOnFriend(friend)}
-                  disabled={friendActionBusy === friend.id}
+                  disabled={friendBusyIds.has(friend.id)}
                 >
                   <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                   <div className="friend-result-copy">
@@ -4429,6 +4930,8 @@ export default function App() {
                 </button>
               ))}
             </section>
+              </>
+            )}
           </div>
         )}
 
@@ -5041,6 +5544,109 @@ export default function App() {
 
             <div className="soco-profile-section-label">TÙY CHỌN & CÀI ĐẶT</div>
             <section className="settings-card">
+              <div className="settings-row">
+                <div>
+                  <strong>Quyền riêng tư tài khoản</strong>
+                  <small>Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. Thiết lập lưu trên máy chủ.</small>
+                </div>
+              </div>
+              {privacyLoading && <div className="settings-row" role="status">Đang tải quyền riêng tư...</div>}
+              {privacyError && <div className="settings-row" role="alert">
+                <span>{privacyError}</span>
+                <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>Thử lại</button>
+              </div>}
+              {privacy && ([
+                ['searchableByUsername', 'Cho phép tìm bằng username', 'Người khác có thể tìm @username của bạn.'],
+                ['searchableByName', 'Cho phép tìm bằng tên', 'Tên hiển thị của bạn có thể xuất hiện trong kết quả.'],
+                ['searchableByEmail', 'Cho phép tìm bằng email', 'Chỉ tìm bằng email khớp chính xác; địa chỉ email không được hiển thị.'],
+                ['allowFriendRequests', 'Cho phép lời mời mới', 'Tắt để ngăn lời mời kết bạn mới từ người khác.'],
+                ['showOnlineStatus', 'Hiển thị trạng thái online', 'Ẩn sự hiện diện trong danh sách và kết quả tìm kiếm.'],
+              ] as const).map(([key, label, hint]) => (
+                <div className="settings-row" key={key}>
+                  <div><strong>{label}</strong><small>{hint}</small></div>
+                  <button
+                    type="button"
+                    className={`switch-button ${privacy[key] ? 'on' : ''}`}
+                    role="switch"
+                    aria-label={label}
+                    aria-checked={privacy[key]}
+                    disabled={privacyBusy}
+                    onClick={() => void changePrivacy(key)}
+                  ><span /></button>
+                </div>
+              ))}
+              <div className="settings-row">
+                <div>
+                  <strong>Thiết bị đã đăng nhập</strong>
+                  <small>Kiểm tra và thu hồi những phiên đăng nhập không còn sử dụng.</small>
+                </div>
+                <button type="button" className="settings-action"
+                  disabled={sessionsBusy || !session.refreshToken}
+                  onClick={() => {
+                    if (sessionsOpen) setSessionsOpen(false)
+                    else void fetchAccountSessions()
+                  }}>
+                  {sessionsBusy ? 'Đang xử lý...' : sessionsOpen ? 'Thu gọn' : 'Xem thiết bị'}
+                </button>
+              </div>
+              {sessionsError && <div className="settings-row" role="alert">
+                <small>{sessionsError}</small>
+                <button type="button" className="settings-action" disabled={sessionsBusy}
+                  onClick={() => void fetchAccountSessions()}>Thử lại</button>
+              </div>}
+              {sessionsOpen && (
+                <div className="account-sessions-panel">
+                  <p>Thu hồi phiên sẽ ngăn gia hạn đăng nhập bằng refresh token. Access token đã phát hành có thể tiếp tục hoạt động đến khi hết hạn (tối đa 24 giờ).</p>
+                  {managedSessions.length === 0 && <small>Không có phiên đang hoạt động.</small>}
+                  {managedSessions.map((device) => (
+                    <div className="account-session-item" key={device.id}>
+                      <div className="account-session-details">
+                        <strong>{device.current ? 'Thiết bị này' : device.userAgent || 'Trình duyệt khác'}</strong>
+                        {device.current && <small>{device.userAgent || 'Trình duyệt hiện tại'}</small>}
+                        <small>Hoạt động: {new Date(device.lastSeenAt).toLocaleString('vi-VN')}</small>
+                      </div>
+                      <button type="button" className="settings-action"
+                        disabled={sessionsBusy}
+                        onClick={() => void revokeAccountSessions(device.id)}>
+                        {device.current ? 'Đăng xuất' : 'Thu hồi'}
+                      </button>
+                    </div>
+                  ))}
+                  {managedSessions.some((device) => !device.current) && (
+                    <button type="button" className="settings-action account-revoke-others"
+                      disabled={sessionsBusy} onClick={() => void revokeAccountSessions()}>
+                      Đăng xuất tất cả thiết bị khác
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="settings-row">
+                <div><strong>Người dùng đã chặn</strong><small>Quản lý những tài khoản không thể nhắn tin hoặc kết bạn với bạn.</small></div>
+                <button type="button" className="settings-action" disabled={blockedBusy}
+                  onClick={() => blockedOpen ? setBlockedOpen(false) : void loadBlockedUsers()}>
+                  {blockedBusy ? 'Đang tải...' : blockedOpen ? 'Thu gọn' : 'Xem danh sách'}
+                </button>
+              </div>
+              {blockedError && <div className="settings-row" role="alert">
+                <small>{blockedError}</small>
+                <button type="button" className="settings-action" disabled={blockedBusy}
+                  onClick={() => void loadBlockedUsers()}>Thử lại</button>
+              </div>}
+              {blockedOpen && (
+                <div className="account-sessions-panel">
+                  {blockedUsers.length === 0 && <p>Chưa chặn tài khoản nào.</p>}
+                  {blockedUsers.map((item) => (
+                    <div className="account-session-item" key={item.id}>
+                      <div className="account-session-details">
+                        <strong>{item.displayName || item.username}</strong>
+                        <small>@{item.username}</small>
+                      </div>
+                      <button type="button" className="settings-action" disabled={blockedBusy}
+                        onClick={() => void unblockContact(item.id)}>Bỏ chặn</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <button
                 type="button"
                 className="settings-row settings-row-button app-locale-row"
