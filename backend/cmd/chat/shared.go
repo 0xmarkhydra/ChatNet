@@ -24,6 +24,9 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		return
 	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
+		return
+	}
 
 	kind := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("kind")))
 	if kind == "" {

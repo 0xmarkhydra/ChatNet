@@ -547,6 +547,10 @@ export default function App() {
   const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(() => new Set())
   const [friendMenuId, setFriendMenuId] = useState<number | null>(null)
   const [friendPreview, setFriendPreview] = useState<FriendSearchResult | null>(null)
+  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: number; username: string; displayName: string }>>([])
+  const [blockedOpen, setBlockedOpen] = useState(false)
+  const [blockedBusy, setBlockedBusy] = useState(false)
+  const [blockedError, setBlockedError] = useState('')
   const friendSyncRequest = useRef(0)
   const [friendSyncSessionId, setFriendSyncSessionId] = useState('')
   const [friendSyncError, setFriendSyncError] = useState('')
@@ -1977,6 +1981,113 @@ export default function App() {
     }
   }
 
+  async function blockContact(friend: FriendSearchResult | FriendConnection) {
+    const sid = session?.sessionId
+    if (!sid || friendBusyIds.has(friend.id)) return
+    if (!window.confirm(`Chặn @${friend.username}? Người này sẽ không thể nhắn tin trực tiếp hoặc kết bạn với bạn.`)) return
+    setFriendBusyIds((old) => new Set(old).add(friend.id))
+    setFriendMenuId(null)
+    try {
+      const response = await apiFetch(`/api/users/${friend.id}/block`, { method: 'POST' })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sid) return
+      if (!response.ok) {
+        setNotice(result?.error || 'Không thể chặn người dùng.', 'error')
+        return
+      }
+      setFriends((old) => old.filter((item) => item.id !== friend.id))
+      setFriendRequests((old) => old.filter((item) => item.id !== friend.id))
+      setFriendResults((old) => old.filter((item) => item.id !== friend.id))
+      setBlockedUsers((old) => [...old.filter((item) => item.id !== friend.id), {
+        id: friend.id, username: friend.username, displayName: friend.displayName,
+      }])
+      setFriendPreview(null)
+      setConversations((old) => old.filter((item) => item.otherUserId !== friend.id))
+      const currentConversation = conversations.find((item) => item.id === activeConversationId)
+      if (currentConversation?.otherUserId === friend.id) setActiveConversationId(null)
+      setNotice(`Đã chặn @${friend.username}.`)
+      await refreshFriendConnections()
+      void refreshConversations()
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setNotice('Không thể chặn người dùng. Hãy thử lại.', 'error')
+    } finally {
+      setFriendBusyIds((old) => {
+        const next = new Set(old)
+        next.delete(friend.id)
+        return next
+      })
+    }
+  }
+
+  async function reportContact(friend: FriendSearchResult | FriendConnection) {
+    const sid = session?.sessionId
+    if (!sid) return
+    const answer = window.prompt('Lý do báo cáo: 1 - Spam, 2 - Quấy rối, 3 - Giả mạo, 4 - Khác')
+    if (answer === null) return
+    const reason = ({ '1': 'spam', '2': 'harassment', '3': 'impersonation', '4': 'other' } as Record<string, string>)[answer.trim()]
+    if (!reason) {
+      setNotice('Vui lòng chọn lý do từ 1 đến 4.', 'warning')
+      return
+    }
+    const details = window.prompt('Mô tả sự việc (không quá 1000 ký tự, có thể để trống):')
+    if (details === null) return
+    if (details.length > 1000) {
+      setNotice('Mô tả không được quá 1000 ký tự.', 'warning')
+      return
+    }
+    setFriendMenuId(null)
+    try {
+      const response = await apiFetch(`/api/users/${friend.id}/report`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason, details: details.trim() }),
+      })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sid) return
+      setNotice(response.ok ? 'Đã gửi báo cáo. Cảm ơn bạn.' : result?.error || 'Không thể gửi báo cáo.', response.ok ? 'success' : 'error')
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setNotice('Không thể gửi báo cáo. Hãy thử lại.', 'error')
+    }
+  }
+
+  async function loadBlockedUsers() {
+    const sid = session?.sessionId
+    if (!sid || blockedBusy) return
+    setBlockedBusy(true)
+    setBlockedError('')
+    try {
+      const response = await apiFetch('/api/users/blocked')
+      if (!response.ok) throw new Error()
+      const data = await response.json() as Array<{id: number; username: string; displayName: string}>
+      if (sessionRef.current?.sessionId === sid) {
+        setBlockedUsers(data)
+        setBlockedOpen(true)
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setBlockedError('Không tải được danh sách chặn.')
+    } finally {
+      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false)
+    }
+  }
+
+  async function unblockContact(userId: number) {
+    const sid = session?.sessionId
+    if (!sid || blockedBusy || !window.confirm('Bỏ chặn người dùng này?')) return
+    setBlockedBusy(true)
+    setBlockedError('')
+    try {
+      const response = await apiFetch(`/api/users/${userId}/block`, { method: 'DELETE' })
+      if (!response.ok) throw new Error()
+      if (sessionRef.current?.sessionId === sid) {
+        setBlockedUsers((old) => old.filter((item) => item.id !== userId))
+        setNotice('Đã bỏ chặn người dùng.')
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setBlockedError('Không thể bỏ chặn. Hãy thử lại.')
+    } finally {
+      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false)
+    }
+  }
+
   async function declineFriendRequest(friend: FriendConnection) {
     await actOnFriend(friend, true)
   }
@@ -2025,6 +2136,9 @@ export default function App() {
       setFriendRequests([])
       setFriendSyncSessionId('')
       setFriendSyncError('')
+      setBlockedUsers([])
+      setBlockedOpen(false)
+      setBlockedError('')
       ++friendSyncRequest.current
       return
     }
@@ -4450,6 +4564,25 @@ export default function App() {
                         disabled={friendBusyIds.has(friend.id)}
                         onClick={() => void actOnFriend(friend)}
                       >{actionLabel}</button>
+                      <div className="friend-contact-controls" onBlur={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
+                      }}>
+                        <button type="button" className="friend-contact-more"
+                          aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
+                          aria-expanded={friendMenuId === friend.id} aria-haspopup="menu"
+                          onClick={() => setFriendMenuId((old) => old === friend.id ? null : friend.id)}>
+                          <MoreHorizontal size={19} aria-hidden="true" />
+                        </button>
+                        {friendMenuId === friend.id && (
+                          <div className="friend-contact-popover" role="menu">
+                            <button type="button" role="menuitem" className="friend-contact-danger"
+                              disabled={friendBusyIds.has(friend.id)}
+                              onClick={() => void blockContact(friend)}>Chặn người dùng</button>
+                            <button type="button" role="menuitem"
+                              onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
@@ -4532,6 +4665,8 @@ export default function App() {
                         <button type="button" role="menuitem" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem hồ sơ</button>
                         <button type="button" role="menuitem" onClick={() => { setFriendMenuId(null); void openDirectByUsername(friend.username) }}>Nhắn tin</button>
                         <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
+                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void blockContact(friend)}>Chặn người dùng</button>
+                        <button type="button" role="menuitem" onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
                       </div>
                     )}
                   </div>
@@ -5272,6 +5407,33 @@ export default function App() {
                       Đăng xuất tất cả thiết bị khác
                     </button>
                   )}
+                </div>
+              )}
+              <div className="settings-row">
+                <div><strong>Người dùng đã chặn</strong><small>Quản lý những tài khoản không thể nhắn tin hoặc kết bạn với bạn.</small></div>
+                <button type="button" className="settings-action" disabled={blockedBusy}
+                  onClick={() => blockedOpen ? setBlockedOpen(false) : void loadBlockedUsers()}>
+                  {blockedBusy ? 'Đang tải...' : blockedOpen ? 'Thu gọn' : 'Xem danh sách'}
+                </button>
+              </div>
+              {blockedError && <div className="settings-row" role="alert">
+                <small>{blockedError}</small>
+                <button type="button" className="settings-action" disabled={blockedBusy}
+                  onClick={() => void loadBlockedUsers()}>Thử lại</button>
+              </div>}
+              {blockedOpen && (
+                <div className="account-sessions-panel">
+                  {blockedUsers.length === 0 && <p>Chưa chặn tài khoản nào.</p>}
+                  {blockedUsers.map((item) => (
+                    <div className="account-session-item" key={item.id}>
+                      <div className="account-session-details">
+                        <strong>{item.displayName || item.username}</strong>
+                        <small>@{item.username}</small>
+                      </div>
+                      <button type="button" className="settings-action" disabled={blockedBusy}
+                        onClick={() => void unblockContact(item.id)}>Bỏ chặn</button>
+                    </div>
+                  ))}
                 </div>
               )}
               <button

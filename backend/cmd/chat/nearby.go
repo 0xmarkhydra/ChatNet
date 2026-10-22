@@ -150,7 +150,15 @@ func (s *server) findNearby(w http.ResponseWriter, r *http.Request) {
 	ids, distances := parseNearbyMatches(found, claims.UserID)
 	users := make([]map[string]any, 0, len(ids))
 	if len(ids) > 0 {
-		rows, err := s.db.Query(ctx, "SELECT id,username,display_name,show_online_status FROM users WHERE id=ANY($1)", ids)
+		rows, err := s.db.Query(ctx, `
+			SELECT id,username,display_name,show_online_status FROM users
+			WHERE id=ANY($1)
+			  AND NOT EXISTS(
+			    SELECT 1 FROM user_blocks b WHERE
+			      (b.blocker_id=$2 AND b.blocked_id=users.id)
+			      OR (b.blocker_id=users.id AND b.blocked_id=$2)
+			  )
+		`, ids, claims.UserID)
 		if err != nil {
 			httpx.Error(w, http.StatusServiceUnavailable, "nearby unavailable")
 			return

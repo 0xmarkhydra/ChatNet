@@ -126,6 +126,10 @@ func main() {
 	mux.Handle("DELETE /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeFriendConnection)))
 	mux.Handle("GET /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPrivacy)))
 	mux.Handle("PUT /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePrivacy)))
+	mux.Handle("GET /api/users/blocked", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listBlockedUsers)))
+	mux.Handle("POST /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.blockUser)))
+	mux.Handle("DELETE /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.unblockUser)))
+	mux.Handle("POST /api/users/{id}/report", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reportUser)))
 	mux.Handle("GET /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPreferences)))
 	mux.Handle("PUT /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePreferences)))
 	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
@@ -306,6 +310,11 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 		WHERE u.id<>$1
 		  AND (u.searchable_by_username OR u.searchable_by_name)
 		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=u.id)
+		       OR (b.blocker_id=u.id AND b.blocked_id=$1)
+		  )
+		  AND NOT EXISTS (
 			SELECT 1 FROM direct_contacts dc WHERE dc.user_id=u.id
 		  )
 		ORDER BY COALESCE(sg.mutual_groups,0) DESC, u.created_at DESC
@@ -362,6 +371,11 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 		SELECT id,username,display_name,show_online_status
 		FROM users
 		WHERE id<>$1
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=users.id)
+		       OR (b.blocker_id=users.id AND b.blocked_id=$1)
+		  )
 		  AND (
 			(searchable_by_username AND strpos(lower(username), $2)>0)
 			OR (searchable_by_email AND lower(email)=$2)
@@ -513,6 +527,13 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		WHERE cm.user_id=$1
+		  AND (c.type <> 'direct' OR NOT EXISTS (
+		    SELECT 1 FROM conversation_members other
+		    JOIN user_blocks b ON
+		      (b.blocker_id=$1 AND b.blocked_id=other.user_id)
+		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
+		    WHERE other.conversation_id=c.id AND other.user_id<>$1
+		  ))
 		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
 		claims.UserID, limit, offset)
@@ -577,6 +598,15 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 		`SELECT id,username,show_online_status FROM users WHERE username=$1`, username,
 	).Scan(&otherID, &otherName, &showOnline); err != nil {
 		httpx.Error(w, http.StatusNotFound, "user not found")
+		return
+	}
+	blocked, err := s.blockedPair(r.Context(), claims.UserID, otherID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify contact policy")
+		return
+	}
+	if blocked {
+		httpx.Error(w, http.StatusForbidden, "direct contact is blocked")
 		return
 	}
 
@@ -713,6 +743,9 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
+		return
+	}
 
 	target := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("target")))
 	if target != "" && !validTranslationTarget(target) {
@@ -808,6 +841,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		if ok {
 			httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		}
+		return
+	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
 		return
 	}
 

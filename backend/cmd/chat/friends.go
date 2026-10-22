@@ -41,6 +41,11 @@ func (s *server) friendConnectionFor(ctx context.Context, userID, otherID int64)
 		WHERE fc.user_low=LEAST($1,$2)
 		  AND fc.user_high=GREATEST($1,$2)
 		  AND ($1=fc.user_low OR $1=fc.user_high)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$1 AND b.blocked_id=$2)
+		      OR (b.blocked_id=$1 AND b.blocker_id=$2)
+		  )
 	`, userID, otherID).Scan(
 		&item.ID,
 		&item.Username,
@@ -72,6 +77,11 @@ func (s *server) listFriends(w http.ResponseWriter, r *http.Request) {
 		JOIN users u ON u.id=CASE WHEN fc.user_low=$1 THEN fc.user_high ELSE fc.user_low END
 		WHERE fc.status='accepted'
 		  AND ($1=fc.user_low OR $1=fc.user_high)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$1 AND b.blocked_id=u.id)
+		      OR (b.blocked_id=$1 AND b.blocker_id=u.id)
+		  )
 		ORDER BY fc.updated_at DESC,u.username ASC
 	`, claims.UserID)
 	if err != nil {
@@ -102,6 +112,11 @@ func (s *server) listFriendRequests(w http.ResponseWriter, r *http.Request) {
 		JOIN users u ON u.id=CASE WHEN fc.user_low=$1 THEN fc.user_high ELSE fc.user_low END
 		WHERE fc.status='pending'
 		  AND ($1=fc.user_low OR $1=fc.user_high)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$1 AND b.blocked_id=u.id)
+		      OR (b.blocked_id=$1 AND b.blocker_id=u.id)
+		  )
 		ORDER BY fc.updated_at DESC
 	`, claims.UserID)
 	if err != nil {
@@ -155,15 +170,64 @@ func (s *server) sendFriendRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	low, high := orderedUserPair(claims.UserID, otherID)
-	tag, err := s.db.Exec(r.Context(), `
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot send friend request")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	// Serialize by sender so send/cancel/re-send or concurrent API instances
+	// cannot bypass the persistent rolling 24-hour friend-invitation budget.
+	if _, err := tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock($1::bigint)", claims.UserID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot send friend request")
+		return
+	}
+	var alreadyConnected bool
+	err = tx.QueryRow(r.Context(), `
+		SELECT EXISTS(SELECT 1 FROM friend_connections
+			WHERE user_low=$1 AND user_high=$2)`, low, high).Scan(&alreadyConnected)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot send friend request")
+		return
+	}
+	var issuedToday int
+	if !alreadyConnected {
+		err = tx.QueryRow(r.Context(), `
+			SELECT COUNT(*) FROM friend_request_events
+			WHERE sender_id=$1 AND created_at>NOW()-INTERVAL '24 hours'
+		`, claims.UserID).Scan(&issuedToday)
+		if err != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "cannot send friend request")
+			return
+		}
+		if issuedToday >= maxDailyFriendRequests {
+			httpx.Error(w, http.StatusTooManyRequests, "daily friend request limit reached")
+			return
+		}
+	}
+	tag, err := tx.Exec(r.Context(), `
 		INSERT INTO friend_connections(user_low,user_high,requested_by,status,updated_at)
 		SELECT $1,$2,$3,'pending',NOW()
 		WHERE EXISTS(SELECT 1 FROM users WHERE id=$4 AND allow_friend_requests)
-		   OR EXISTS(SELECT 1 FROM friend_connections WHERE user_low=$1 AND user_high=$2)
+		  AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+		       (b.blocker_id=$3 AND b.blocked_id=$4) OR
+		       (b.blocker_id=$4 AND b.blocked_id=$3))
 		ON CONFLICT(user_low,user_high) DO NOTHING
 	`, low, high, claims.UserID, otherID)
 	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot send friend request")
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot send friend request")
+		return
+	}
+	if tag.RowsAffected() > 0 {
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO friend_request_events(sender_id,recipient_id)
+			VALUES($1,$2)`, claims.UserID, otherID); err != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "cannot record friend request")
+			return
+		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot save friend request")
 		return
 	}
 
@@ -202,6 +266,11 @@ func (s *server) acceptFriendRequest(w http.ResponseWriter, r *http.Request) {
 		WHERE user_low=$1 AND user_high=$2
 		  AND status='pending'
 		  AND requested_by<>$3
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$3 AND b.blocked_id=CASE WHEN $3=$1 THEN $2 ELSE $1 END)
+		      OR (b.blocked_id=$3 AND b.blocker_id=CASE WHEN $3=$1 THEN $2 ELSE $1 END)
+		  )
 	`, low, high, claims.UserID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot accept friend request")

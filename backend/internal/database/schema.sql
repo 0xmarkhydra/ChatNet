@@ -88,6 +88,41 @@ ON friend_connections(user_low, status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_friend_connections_high
 ON friend_connections(user_high, status, updated_at DESC);
 
+-- Blocks are directional, but neither party can contact the other directly.
+CREATE TABLE IF NOT EXISTS user_blocks (
+    blocker_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (blocker_id, blocked_id),
+    CHECK (blocker_id <> blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_blocks_target ON user_blocks(blocked_id,blocker_id);
+
+-- Reports are private moderation records. Never include them in public profiles.
+CREATE TABLE IF NOT EXISTS user_reports (
+    id BIGSERIAL PRIMARY KEY,
+    reporter_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reported_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(24) NOT NULL CHECK (reason IN ('spam','harassment','impersonation','other')),
+    details VARCHAR(1000) NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (reporter_id <> reported_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_reports_reporter_time
+ON user_reports(reporter_id, created_at DESC);
+
+-- A friend-request ledger persists independently of cancellation/unfriend;
+-- otherwise send/cancel loops could bypass anti-harassment controls.
+CREATE TABLE IF NOT EXISTS friend_request_events (
+    id BIGSERIAL PRIMARY KEY,
+    sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (sender_id <> recipient_id)
+);
+CREATE INDEX IF NOT EXISTS idx_friend_request_events_sender_time
+ON friend_request_events(sender_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS messages (
     id BIGSERIAL PRIMARY KEY,
     conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
