@@ -44,7 +44,7 @@ export async function startCallMediaInterpreter(options: InterpreterOptions): Pr
   if (!response.ok) {
     const reason = response.status === 503 ? 'Máy chủ phiên dịch chưa sẵn sàng.'
       : response.status === 429 ? 'Quá nhiều phiên dịch đang hoạt động.'
-      : response.status === 403 ? 'Bạn hoặc người nói đã rời cuộc gọi.'
+      : response.status === 403 ? 'Người nói chưa cho phép dịch giọng nói hoặc đã rời cuộc gọi.'
       : 'Không thể bắt đầu dịch trực tiếp (' + response.status + ').'
     throw new Error(reason)
   }

@@ -21,12 +21,14 @@ import (
 	"chatnet/internal/config"
 	"chatnet/internal/httpx"
 	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
 	geminiTranslationModel  = "gemini-3.5-live-translate-preview"
 	geminiLiveURL           = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
 	translationTicketTTL    = 40 * time.Second
+	translationConsentTTL   = 2 * time.Hour
 	translationSessionLimit = 5
 	translationMaxPCM       = 8192 // 250 ms max @ 16 kHz mono PCM16
 )
@@ -58,6 +60,97 @@ type translationTicket struct {
 func translationTicketKey(ticket string) string {
 	hash := sha256.Sum256([]byte(ticket))
 	return "chatnet:call:translation:ticket:" + hex.EncodeToString(hash[:])
+}
+
+func translationConsentKey(callID string, speakerID int64) string {
+	return fmt.Sprintf("chatnet:call:translation:consent:%s:%d", callID, speakerID)
+}
+
+func (s *server) revokeCallTranslationConsent(ctx context.Context, callID string, userID int64) {
+	if err := s.redis.Del(ctx, translationConsentKey(callID, userID)).Err(); err != nil {
+		log.Printf("call consent revoke failed call=%s: %T", callID, err)
+	}
+}
+
+func (s *server) cleanupCallTranslationConsents(ctx context.Context, callID string, userIDs []int64) {
+	if len(userIDs) == 0 {
+		return
+	}
+	keys := make([]string, 0, len(userIDs))
+	for _, id := range userIDs {
+		keys = append(keys, translationConsentKey(callID, id))
+	}
+	if err := s.redis.Del(ctx, keys...).Err(); err != nil {
+		log.Printf("call consent cleanup failed call=%s: %T", callID, err)
+	}
+}
+
+func (s *server) callTranslationConsentAllowed(ctx context.Context, callID string, speakerID int64) (bool, error) {
+	value, err := s.redis.Get(ctx, translationConsentKey(callID, speakerID)).Result()
+	if errors.Is(err, redis.Nil) {
+		return false, nil
+	}
+	return value == "granted" && err == nil, err
+}
+
+// Consent may only be granted or withdrawn by the authenticated speaker.
+func (s *server) setCallTranslationConsent(w http.ResponseWriter, r *http.Request) {
+	claims, ok := authx.ClaimsFromContext(r.Context())
+	if !ok {
+		httpx.Error(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	callID := strings.TrimSpace(r.PathValue("id"))
+	if err := s.verifyLiveCallParticipant(r, callID, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusForbidden, "not a joined call participant")
+		return
+	}
+	var body struct {
+		Allowed *bool `json:"allowed"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || body.Allowed == nil || decoder.Decode(&struct{}{}) != io.EOF {
+		httpx.Error(w, http.StatusBadRequest, "invalid consent decision")
+		return
+	}
+	// Never rate-limit withdrawal of permission. Throttle new grants only.
+	if *body.Allowed && !s.allow(w, r, "call-translation-consent-grant", claims.UserID, 20, time.Minute) {
+		return
+	}
+	key := translationConsentKey(callID, claims.UserID)
+	var err error
+	if *body.Allowed {
+		err = s.redis.Set(r.Context(), key, "granted", translationConsentTTL).Err()
+	} else {
+		err = s.redis.Del(r.Context(), key).Err()
+	}
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "consent service unavailable")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, http.StatusOK, map[string]bool{"allowed": *body.Allowed})
+}
+
+func (s *server) getCallTranslationConsent(w http.ResponseWriter, r *http.Request) {
+	claims, ok := authx.ClaimsFromContext(r.Context())
+	if !ok {
+		httpx.Error(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	callID := strings.TrimSpace(r.PathValue("id"))
+	if err := s.verifyLiveCallParticipant(r, callID, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusForbidden, "not a joined call participant")
+		return
+	}
+	allowed, err := s.callTranslationConsentAllowed(r.Context(), callID, claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "consent service unavailable")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, http.StatusOK, map[string]bool{"allowed": allowed})
 }
 
 func parseRemoteSpeakerID(identity string) (int64, bool) {
@@ -137,6 +230,15 @@ func (s *server) createCallTranslationSession(w http.ResponseWriter, r *http.Req
 	}
 	if err := s.verifyLiveCallParticipant(r, callID, speakerID); err != nil {
 		httpx.Error(w, 403, "speaker is not a joined call member")
+		return
+	}
+	consented, err := s.callTranslationConsentAllowed(r.Context(), callID, speakerID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "consent service unavailable")
+		return
+	}
+	if !consented {
+		httpx.Error(w, http.StatusForbidden, "speaker has not consented to AI translation")
 		return
 	}
 	ticket, err := secureID("cnlt_", 24)
@@ -228,6 +330,11 @@ func (s *server) streamCallTranslation(w http.ResponseWriter, r *http.Request) {
 		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Người nói không còn trong cuộc gọi."})
 		return
 	}
+	consented, consentErr := s.callTranslationConsentAllowed(r.Context(), ticket.CallID, ticket.SpeakerID)
+	if consentErr != nil || !consented {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Người nói chưa đồng ý hoặc đã thu hồi quyền dịch."})
+		return
+	}
 
 	quotaKey := fmt.Sprintf("chatnet:call:translation:active:%s:%d", ticket.CallID, ticket.UserID)
 	active, err := s.redis.Incr(r.Context(), quotaKey).Result()
@@ -265,15 +372,16 @@ func (s *server) streamCallTranslation(w http.ResponseWriter, r *http.Request) {
 	// A participant can be removed while the stream is running. Revoke AI access
 	// independently of LiveKit so the existing call is unaffected.
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				consented, consentErr := s.callTranslationConsentAllowed(ctx, ticket.CallID, ticket.SpeakerID)
 				if s.verifyLiveCallParticipant(r, ticket.CallID, ticket.UserID) != nil ||
-					s.verifyLiveCallParticipant(r, ticket.CallID, ticket.SpeakerID) != nil {
+					s.verifyLiveCallParticipant(r, ticket.CallID, ticket.SpeakerID) != nil || consentErr != nil || !consented {
 					_ = send(map[string]string{"type": "error", "message": "Quyền dịch cuộc gọi đã thay đổi."})
 					cancel()
 					_ = client.Close()

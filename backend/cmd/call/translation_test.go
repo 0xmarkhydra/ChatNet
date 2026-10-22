@@ -72,6 +72,42 @@ func TestGeminiErrorCategoryDoesNotLeakProviderDetails(t *testing.T) {
 	}
 }
 
+func TestTranslationConsentScopedToCallAndSpeaker(t *testing.T) {
+	key := translationConsentKey("call_alpha", 101)
+	if key == translationConsentKey("call_beta", 101) ||
+		key == translationConsentKey("call_alpha", 102) {
+		t.Fatal("consent must not be shared across calls or speakers")
+	}
+	if translationConsentTTL <= 0 || translationConsentTTL > 2*time.Hour {
+		t.Fatal("voice consent must be short lived and call scoped")
+	}
+}
+
+func TestTranslationConsentRequiresAuthentication(t *testing.T) {
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		request := httptest.NewRequest(method, "/api/calls/call_alpha/translation-consent", nil)
+		request.SetPathValue("id", "call_alpha")
+		recorder := httptest.NewRecorder()
+		if method == http.MethodGet {
+			(&server{}).getCallTranslationConsent(recorder, request)
+		} else {
+			(&server{}).setCallTranslationConsent(recorder, request)
+		}
+		if recorder.Code != http.StatusUnauthorized {
+			t.Fatalf("%s without identity must be denied; got %d", method, recorder.Code)
+		}
+	}
+}
+
+func TestTranslationSessionRequiresAuthentication(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/api/calls/call_alpha/translation-session", nil)
+	recorder := httptest.NewRecorder()
+	(&server{}).createCallTranslationSession(recorder, request)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("translation ticket without identity must be denied; got %d", recorder.Code)
+	}
+}
+
 func TestRemoteSpeakerIdentityMustBeExact(t *testing.T) {
 	for _, identity := range []string{"u_0", "u_-5", "u_42junk", "u_42/anything", "other_42", "u_"} {
 		if _, ok := parseRemoteSpeakerID(identity); ok {
