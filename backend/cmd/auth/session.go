@@ -118,23 +118,29 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	}
 	if refresh != "" {
 		var userID int64
-		err := s.db.QueryRow(r.Context(), "DELETE FROM auth_sessions WHERE token_hash=$1 RETURNING user_id", sessionHash(refresh)).Scan(&userID)
+		var sessionID string
+		err := s.db.QueryRow(r.Context(), "DELETE FROM auth_sessions WHERE token_hash=$1 RETURNING user_id,session_id::text", sessionHash(refresh)).Scan(&userID, &sessionID)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			httpx.Error(w, http.StatusServiceUnavailable, "cannot revoke session")
 			return
 		}
 		if err == nil {
-			s.notifySessionRevoked(r.Context(), userID)
+			s.notifySessionRevoked(r.Context(), userID, sessionID)
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *server) notifySessionRevoked(ctx context.Context, userID int64) {
+func (s *server) notifySessionRevoked(ctx context.Context, userID int64, sessionIDs ...string) {
 	if s.redis == nil || userID <= 0 {
 		return
 	}
-	// PostgreSQL is authoritative; clients also detect missed Redis events via SSE checks.
+	// PostgreSQL is authoritative. Invalidate positive caches before notifying clients.
+	// If Redis disconnects during a revocation, HTTP guards use PostgreSQL and
+	// any remaining positive cache entry expires within ten seconds.
+	if err := authx.InvalidateSessions(ctx, s.redis, userID, sessionIDs...); err != nil {
+		log.Printf("session revocation cache invalidation failed: %v", err)
+	}
 	if err := s.redis.Publish(ctx, authx.UserChannel(userID), authx.SessionRevocationSignal).Err(); err != nil {
 		log.Printf("session revocation notification failed: %v", err)
 	}

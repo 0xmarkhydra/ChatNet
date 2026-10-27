@@ -94,8 +94,8 @@ export function createSessionClient(baseURL: string, state: {
     return operation.promise
   }
 
-  // Check the refresh session without rotating the access JWT or reconnecting SSE.
-  // This also protects mutations if a running Chat/Feed instance is out of date.
+  // Verify the session-bound access JWT through the lightweight Redis-backed
+  // Auth endpoint. No refresh rotation or extra PostgreSQL write per mutation.
   function check(): Promise<boolean> {
     const current = state.get()
     if (!current) return Promise.resolve(false)
@@ -113,14 +113,13 @@ export function createSessionClient(baseURL: string, state: {
       if (state.get()?.sessionId === previous.sessionId) state.expire()
       return false
     }
-    const response = await fetch(`${baseURL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: previous.refreshToken }),
+    const response = await fetch(`${baseURL}/api/auth/session/status`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${previous.token}` },
       cache: 'no-store',
       signal: AbortSignal.timeout(15_000),
     })
-    if (state.get()?.sessionId !== previous.sessionId) return false
+    if (!unchanged(previous)) return false
     if (response.status === 401) {
       state.expire()
       return false

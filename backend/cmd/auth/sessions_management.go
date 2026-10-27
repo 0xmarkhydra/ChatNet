@@ -103,6 +103,7 @@ func (s *server) revokeSession(w http.ResponseWriter, r *http.Request) {
 	// One statement binds the target to the owner of the active refresh token.
 	// A leaked session ID alone never grants permission to revoke another user.
 	var userID int64
+	var sessionID string
 	err := s.db.QueryRow(r.Context(), `
 		DELETE FROM auth_sessions
 		WHERE session_id=$2::uuid
@@ -110,8 +111,8 @@ func (s *server) revokeSession(w http.ResponseWriter, r *http.Request) {
 		    SELECT user_id FROM auth_sessions
 		    WHERE token_hash=$1 AND expires_at>NOW()
 		  )
-		RETURNING user_id
-	`, sessionHash(request.RefreshToken), request.SessionID).Scan(&userID)
+		RETURNING user_id,session_id::text
+	`, sessionHash(request.RefreshToken), request.SessionID).Scan(&userID, &sessionID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Do not leak whether the target exists on another account.
 		httpx.Error(w, http.StatusNotFound, "session not found")
@@ -121,7 +122,7 @@ func (s *server) revokeSession(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot revoke session")
 		return
 	}
-	s.notifySessionRevoked(r.Context(), userID)
+	s.notifySessionRevoked(r.Context(), userID, sessionID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -140,20 +141,39 @@ func (s *server) revokeOtherSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Keep current session even if an old tab races another revocation.
-	tag, err := s.db.Exec(r.Context(), `
+	// RETURNING gives Redis the exact revoked sessions instead of flushing every
+	// other device's positive cache (or invalidating this device).
+	rows, err := s.db.Query(r.Context(), `
 		DELETE FROM auth_sessions
 		WHERE user_id=$1 AND token_hash<>$2
 		  AND EXISTS(
 		    SELECT 1 FROM auth_sessions
 		    WHERE token_hash=$2 AND user_id=$1 AND expires_at>NOW()
 		  )
+		RETURNING session_id::text
 	`, userID, sessionHash(request.RefreshToken))
 	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot revoke other sessions")
 		return
 	}
-	if tag.RowsAffected() > 0 {
-		s.notifySessionRevoked(r.Context(), userID)
+	var sessionIDs []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			httpx.Error(w, http.StatusServiceUnavailable, "cannot revoke other sessions")
+			return
+		}
+		sessionIDs = append(sessionIDs, id)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot revoke other sessions")
+		return
+	}
+	if len(sessionIDs) > 0 {
+		s.notifySessionRevoked(r.Context(), userID, sessionIDs...)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

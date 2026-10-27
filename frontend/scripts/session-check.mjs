@@ -7,7 +7,7 @@ const original = () => ({
   user: { id: 1, email: 'test@example.com', username: 'tester', displayName: 'Test' },
 })
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
-let current, expired, refreshes, requests
+let current, expired, refreshes, requests, checks
 const client = createSessionClient('https://local.test', {
   get: () => current,
   save: (next) => { current = next },
@@ -15,7 +15,7 @@ const client = createSessionClient('https://local.test', {
 })
 function reset() {
   current = original()
-  expired = refreshes = requests = 0
+  expired = refreshes = requests = checks = 0
 }
 const realFetch = globalThis.fetch
 try {
@@ -87,6 +87,10 @@ try {
   reset()
   current.token = jwt(86400)
   globalThis.fetch = async (url) => {
+    if (url.endsWith('/session/status')) {
+      checks++
+      return new Response(null, { status: 204 })
+    }
     if (url.endsWith('/refresh')) {
       refreshes++
       return json({ ...current, token: jwt(80000) })
@@ -97,7 +101,8 @@ try {
   const response = await client.request('/api/posts', { method: 'POST', body: 'unchanged' }, 'login-1')
   assert.equal(response.status, 401)
   assert.equal(requests, 2, 'retry at most once')
-  assert.equal(refreshes, 2, 'one preflight check and one retry refresh')
+  assert.equal(refreshes, 1, 'only the 401 retry renews the refresh credential')
+  assert.equal(checks, 1, 'preflight validation uses Redis-backed status')
   assert.equal(expired, 0, 'only auth service can expire a session')
   await assert.rejects(client.request('/api/posts', {}, 'old-login'))
   assert.equal(requests, 2)
@@ -108,15 +113,16 @@ try {
     reset()
     current.token = jwt(86400)
     globalThis.fetch = async (url) => {
-      if (url.endsWith('/refresh')) {
-        refreshes++
+      if (url.endsWith('/session/status')) {
+        checks++
         return json({}, 401)
       }
       requests++
       return json({ id: 1 }, 201)
     }
     await assert.rejects(client.request(path, { method: 'POST' }, 'login-1'))
-    assert.equal(refreshes, 1)
+    assert.equal(checks, 1)
+    assert.equal(refreshes, 0)
     assert.equal(requests, 0, 'revoked credentials reached ' + path)
     assert.equal(expired, 1)
     assert.equal(current, null)
@@ -126,9 +132,10 @@ try {
   reset()
   current.token = jwt(86400)
   const stored = current
-  globalThis.fetch = async (url) => {
-    assert.ok(url.endsWith('/refresh'))
-    return json({ token: jwt(86400) })
+  globalThis.fetch = async (url, init) => {
+    assert.ok(url.endsWith('/session/status'))
+    assert.equal(init.headers.Authorization, `Bearer ${stored.token}`)
+    return new Response(null, { status: 204 })
   }
   assert.equal(await client.check(), true)
   assert.equal(current, stored)
@@ -158,7 +165,7 @@ try {
   assert.equal(parseSession({ ...original(), refreshToken: ['r'.repeat(43)] }), null)
   assert.equal(parseSession({ ...original(), sessionId: {} }), null)
   assert.equal(parseSession({ ...original(), user: { id: -1 } }), null)
-  console.log('Session checks passed: refresh, concurrency, revoked chat/feed mutation preflight, proactive revocation checks, legacy safety, offline, expiry, stale responses, bounded retry.')
+  console.log('Session checks passed: refresh, concurrency, cached Auth session checks for chat/feed writes, revocation, offline, expiry, stale responses, bounded retry.')
 } finally {
   globalThis.fetch = realFetch
 }

@@ -17,6 +17,10 @@ async (page) => {
         contentType: 'text/event-stream',
         body: mode === 'signal-revoked' ? 'event: session-revoked\ndata: {}\n\n' : '',
       })
+      if (path === '/api/auth/session/status') {
+        if (mode === 'offline') return route.abort('internetdisconnected')
+        return route.fulfill({ status: mode === 'revoked' ? 401 : 204 })
+      }
       if (path === '/api/auth/refresh') {
         refreshes++
         if (mode === 'offline') return route.abort('internetdisconnected')
