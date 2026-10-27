@@ -135,7 +135,7 @@ type Conversation = {
 }
 
 type RealtimeEvent = {
-  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
+  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated' | 'privacy.updated'
   conversationId: number
   message?: Message
   conversation?: Conversation
@@ -504,6 +504,7 @@ export default function App() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
   const activeConversationIdRef = useRef<number | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [blockPolicyVersion, setBlockPolicyVersion] = useState(0)
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
   const messagesPagingBusy = useRef(false)
@@ -2084,7 +2085,7 @@ export default function App() {
   async function blockContact(friend: FriendSearchResult | FriendConnection) {
     const sid = session?.sessionId
     if (!sid || friendBusyIds.has(friend.id)) return
-    if (!window.confirm(`Chặn @${friend.username}? Người này sẽ không thể nhắn tin trực tiếp hoặc kết bạn với bạn.`)) return
+    if (!window.confirm(`Chặn @${friend.username}? Hai bạn sẽ không thấy tin nhắn của nhau trong nhóm, bài đăng hoặc liên hệ trực tiếp.`)) return
     setFriendBusyIds((old) => new Set(old).add(friend.id))
     setFriendMenuId(null)
     try {
@@ -2105,6 +2106,10 @@ export default function App() {
       setConversations((old) => old.filter((item) => item.otherUserId !== friend.id))
       const currentConversation = conversations.find((item) => item.id === activeConversationId)
       if (currentConversation?.otherUserId === friend.id) setActiveConversationId(null)
+      setMessages([])
+      setBlockPolicyVersion((version) => version + 1)
+      void refreshPosts()
+      void refreshStories()
       setNotice(`Đã chặn @${friend.username}.`)
       await refreshFriendConnections()
       void refreshConversations()
@@ -2179,6 +2184,10 @@ export default function App() {
       if (!response.ok) throw new Error()
       if (sessionRef.current?.sessionId === sid) {
         setBlockedUsers((old) => old.filter((item) => item.id !== userId))
+        setBlockPolicyVersion((version) => version + 1)
+        void refreshConversations()
+        void refreshPosts()
+        void refreshStories()
         setNotice('Đã bỏ chặn người dùng.')
       }
     } catch {
@@ -2797,6 +2806,15 @@ export default function App() {
     events.addEventListener('update', (event) => {
       if (sessionRef.current?.sessionId !== session.sessionId) return
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
+      if (update.type === 'privacy.updated') {
+        setMessages([]) // Remove now-hidden content before the authorized refetch.
+        setBlockPolicyVersion((version) => version + 1)
+        void refreshConversations()
+        void refreshFriendConnections()
+        void refreshPosts()
+        void refreshStories()
+        return
+      }
       if (update.type === 'friend.updated') {
         void refreshFriendConnections()
         return
@@ -3054,6 +3072,7 @@ export default function App() {
     session?.token,
     targetLanguage,
     translationPreferencesLoaded,
+    blockPolicyVersion,
   ])
 
   useEffect(() => {

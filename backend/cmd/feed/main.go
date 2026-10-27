@@ -162,18 +162,20 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		_ = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id=$1 AND user_id=$2)`, p.ID, claims.UserID).Scan(&p.Liked)
-		p.Comments = s.comments(r, p.ID)
+		p.Comments = s.comments(r, p.ID, claims.UserID)
 		p.Attachments = s.postAttachments(r.Context(), p.ID)
 		posts = append(posts, p)
 	}
 	httpx.JSON(w, http.StatusOK, posts)
 }
 
-func (s *server) comments(r *http.Request, postID int64) []comment {
+func (s *server) comments(r *http.Request, postID, viewerID int64) []comment {
 	rows, err := s.db.Query(r.Context(), `
 		SELECT c.id,c.parent_id,u.username,c.content,c.created_at,c.updated_at
 		FROM comments c JOIN users u ON u.id=c.user_id
-		WHERE c.post_id=$1 ORDER BY c.id ASC`, postID)
+		WHERE c.post_id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))
+		ORDER BY c.id ASC`, postID, viewerID)
 	if err != nil {
 		return []comment{}
 	}
@@ -320,6 +322,8 @@ func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 		SELECT s.id,u.username,s.storage_ref,s.original_name,s.content_type,s.size_bytes,s.kind,s.created_at,s.expires_at
 		FROM stories s JOIN users u ON u.id=s.user_id
 		WHERE s.expires_at > NOW()
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$1 AND b.blocked_id=s.user_id) OR (b.blocked_id=$1 AND b.blocker_id=s.user_id))
 		ORDER BY (s.user_id=$1) DESC,s.created_at DESC
 		LIMIT 100`, claims.UserID)
 	if err != nil {
@@ -524,7 +528,9 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 		FROM posts p
 		WHERE p.id=$1 AND `+feedAccessSQL+`
 		  AND ($4::bigint IS NULL OR EXISTS (
-		    SELECT 1 FROM comments WHERE id=$4 AND post_id=p.id
+		    SELECT 1 FROM comments c WHERE c.id=$4 AND c.post_id=p.id
+		    AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))
 		  ))`, postID, claims.UserID, body.Content, body.ParentID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create comment")
