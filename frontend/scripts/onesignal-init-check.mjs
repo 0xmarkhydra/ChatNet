@@ -148,7 +148,9 @@ OneSignal.init = async () => {
 }
 const failedModule = await import('../src/onesignal.ts?failed-init')
 await assert.rejects(failedModule.setupOneSignal('test-app'), /first init failed/)
-await assert.rejects(failedModule.setupOneSignal('test-app'), /first init failed/)
-assert.equal(initCalls, failedInitCalls + 1, 'failed init must not be retried in the same page')
+OneSignal.init = async () => { initCalls += 1 }
+const retried = await failedModule.setupOneSignal('test-app')
+assert.equal(retried.supported, false, 'successful retry must read the current browser support')
+assert.equal(initCalls, failedInitCalls + 2, 'failed initialization must be retryable without a page reload')
 
-console.log('PASS: OneSignal initialization, consent, automatic connection, opt-out and delayed subscription')
+console.log('PASS: OneSignal initialization, consent, automatic connection, opt-out, retry and delayed subscription')

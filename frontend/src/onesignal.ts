@@ -174,7 +174,12 @@ async function initializeSDK(OneSignal: OneSignalAPI, appId: string) {
     initializedAppId = appId
   })
   initialization = { appId, promise }
-  await promise
+  try {
+    await promise
+  } catch (error) {
+    if (initialization?.promise === promise) initialization = null
+    throw error
+  }
 }
 
 export async function setupOneSignal(
