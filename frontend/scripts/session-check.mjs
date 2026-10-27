@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createSessionClient, parseSession } from '../src/session.ts'
+import { createSessionClient, parseSession } from '../src/features/auth/session.ts'
 
 const jwt = (seconds) => `header.${Buffer.from(JSON.stringify({ exp: Date.now() / 1000 + seconds })).toString('base64url')}.signature`
 const original = () => ({

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import QrScanner from 'qr-scanner'
 import { X, Share2, Download } from 'lucide-react'
-import './connection-tools.css'
+import '../../styles/connection-tools.css'
 
 export function profileFromQr(value: string, origin: string) {
   let url: URL
