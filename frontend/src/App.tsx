@@ -220,7 +220,7 @@ type InstallPromptEvent = Event & {
 }
 
 type ToastKind = 'success' | 'error' | 'warning' | 'info'
-type ToastNotice = { id: number; message: string; kind: ToastKind }
+type ToastNotice = { id: number; message: string; kind: ToastKind; title?: string }
 
 
 function inferToastKind(message: string): ToastKind {
@@ -463,10 +463,11 @@ function NearbyRadar({ scanning = false, large = false }: { scanning?: boolean; 
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession)
   const sessionRef = useRef(session)
+  const lastSSECheckAt = useRef(0)
   const [sessionClient] = useState(() => createSessionClient(API, {
     get: () => sessionRef.current,
     save: saveSession,
-    expire: () => logout(false),
+    expire: () => expireSession(),
   }))
   const [authMode, setAuthMode] = useState<AuthMode>('register')
   const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
@@ -756,7 +757,7 @@ export default function App() {
   const selectedAppLanguage = languageOptions.find((language) => language.value === effectiveAppLocale) || languageOptions[0]
   const t = (key: keyof typeof UI_MESSAGES) => translateUI(uiBundle, key)
 
-  function setNotice(message: string, kind?: ToastKind) {
+  function setNotice(message: string, kind?: ToastKind, title?: string) {
     const clean = message.trim()
     if (!clean) {
       setNoticeState(null)
@@ -766,6 +767,7 @@ export default function App() {
       id: Date.now(),
       message: clean,
       kind: kind || inferToastKind(clean),
+      title,
     })
   }
 
@@ -862,7 +864,7 @@ export default function App() {
   useEffect(() => {
     if (!notice) return
     const timeout =
-      notice.kind === 'error' ? 8000 :
+      notice.title === 'Phiên đăng nhập đã hết hạn' || notice.kind === 'error' ? 8000 :
       notice.kind === 'warning' ? 6000 :
       4500
     const timer = window.setTimeout(() => {
@@ -2646,6 +2648,16 @@ export default function App() {
     return () => window.clearInterval(timer)
   }, [registerStep, otpExpiresAt])
 
+  function expireSession() {
+    if (!sessionRef.current) return
+    logout(false)
+    setNotice(
+      'Phiên này đã hết hạn hoặc bị thu hồi từ thiết bị khác. Vui lòng đăng nhập lại để tiếp tục.',
+      'warning',
+      'Phiên đăng nhập đã hết hạn',
+    )
+  }
+
   function logout(revoke = true, clearStorage = true) {
     const current = sessionRef.current
     const currentToken = current?.token
@@ -2763,15 +2775,16 @@ export default function App() {
     if (!session) return
     const refresh = () => {
       if (document.visibilityState === 'hidden') return
-      void sessionClient.refresh().catch(() => setStatus('Đang kết nối lại...'))
+      // SSE events may be missed across restarts: verify even when JWT has not expired.
+      void sessionClient.refresh()
+        .then((current) => current && sessionClient.check())
+        .catch(() => setStatus('Đang kết nối lại...'))
     }
     refresh()
-    const timer = window.setInterval(refresh, 60_000)
     window.addEventListener('focus', refresh)
     window.addEventListener('online', refresh)
     document.addEventListener('visibilitychange', refresh)
     return () => {
-      window.clearInterval(timer)
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refresh)
       document.removeEventListener('visibilitychange', refresh)
@@ -2789,11 +2802,25 @@ export default function App() {
       `${API}/api/events?token=${encodeURIComponent(session.token)}`,
     )
     events.onopen = () => {
+      lastSSECheckAt.current = Date.now()
       setStatus('Đang online')
       void refreshFriendConnections()
       void reconcileConversationMemberships()
     }
-    events.onerror = () => setStatus('Đang kết nối lại...')
+    events.onerror = () => {
+      setStatus('Đang kết nối lại...')
+      // A 401 handshake cannot carry SSE data. Throttle fallback checks to avoid
+      // refresh/reconnect loops when the stream is temporarily unavailable.
+      if (Date.now() - lastSSECheckAt.current < 30_000) return
+      lastSSECheckAt.current = Date.now()
+      if (document.visibilityState === 'visible' && sessionRef.current?.sessionId === session.sessionId) {
+        void sessionClient.check().catch(() => undefined)
+      }
+    }
+    events.addEventListener('session-revoked', () => {
+      if (sessionRef.current?.sessionId !== session.sessionId) return
+      expireSession()
+    })
     events.addEventListener('update', (event) => {
       if (sessionRef.current?.sessionId !== session.sessionId) return
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
@@ -3765,9 +3792,39 @@ export default function App() {
     }
   }
 
+  const noticeBanner = notice && (
+    <div
+      className={`notice toast toast-${notice.kind}`}
+      role={notice.kind === 'error' || notice.title ? 'alert' : 'status'}
+      aria-live={notice.kind === 'error' || notice.title ? 'assertive' : 'polite'}
+      aria-atomic="true"
+    >
+      <span className="toast-icon" aria-hidden="true">
+        <span className={notice.kind === 'warning' || notice.kind === 'error' ? 'toast-exclamation' : undefined}>
+          {notice.kind === 'success' ? '✓' : notice.kind === 'error' ? '!' : notice.kind === 'warning' ? '!' : 'i'}
+        </span>
+      </span>
+      <div className="toast-copy">
+        <strong>
+          {notice.title || (notice.kind === 'success' ? 'Thành công' : notice.kind === 'error' ? 'Có lỗi' : notice.kind === 'warning' ? 'Lưu ý' : 'Thông báo')}
+        </strong>
+        <span>{notice.message}</span>
+      </div>
+      <button
+        type="button"
+        className="toast-close"
+        aria-label="Đóng thông báo"
+        onClick={() => setNoticeState(null)}
+      >
+        <X size={16} strokeWidth={2.25} aria-hidden="true" />
+      </button>
+    </div>
+  )
+
   if (!session) {
     return (
       <main className="auth-screen">
+        {noticeBanner}
         <section className="auth-copy">
           <img src="/soco-mark.svg" width="52" height="52" alt="SOCO" />
           <h1>SOCO</h1>
@@ -4065,24 +4122,7 @@ export default function App() {
         </section>
       )}
 
-      {notice && (
-        <div
-          className={`notice toast toast-${notice.kind}`}
-          role={notice.kind === 'error' ? 'alert' : 'status'}
-          aria-live={notice.kind === 'error' ? 'assertive' : 'polite'}
-        >
-          <span className="toast-icon" aria-hidden="true">
-            {notice.kind === 'success' ? '✓' : notice.kind === 'error' ? '!' : notice.kind === 'warning' ? '!' : 'i'}
-          </span>
-          <div className="toast-copy">
-            <strong>
-              {notice.kind === 'success' ? 'Thành công' : notice.kind === 'error' ? 'Có lỗi' : notice.kind === 'warning' ? 'Lưu ý' : 'Thông báo'}
-            </strong>
-            <span>{notice.message}</span>
-          </div>
-          <button type="button" aria-label="Đóng thông báo" onClick={() => setNoticeState(null)}>×</button>
-        </div>
-      )}
+      {noticeBanner}
       {pendingActions > 0 && (
         <div className="request-progress" role="status" aria-live="polite">
           <RefreshCw size={16} aria-hidden="true" />

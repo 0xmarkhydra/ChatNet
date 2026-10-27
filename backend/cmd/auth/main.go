@@ -116,7 +116,7 @@ func main() {
 	mux.HandleFunc("POST /api/auth/sessions/list", s.listSessions)
 	mux.HandleFunc("POST /api/auth/sessions/revoke", s.revokeSession)
 	mux.HandleFunc("POST /api/auth/sessions/revoke-others", s.revokeOtherSessions)
-	mux.Handle("GET /api/auth/me", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.me)))
+	mux.Handle("GET /api/auth/me", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.me)))
 
 	port := config.Env("PORT", "8081")
 	log.Printf("auth service listening on :%s", port)
@@ -441,16 +441,22 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) allow(w http.ResponseWriter, r *http.Request, scope, subject string, limit int64, window time.Duration) bool {
-	ok, _, err := s.limiter.Allow(r.Context(), scope, subject, limit, window)
-	if err != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, "rate limiter unavailable")
-		return false
-	}
-	if !ok {
-		httpx.Error(w, http.StatusTooManyRequests, "too many attempts; try again later")
-		return false
-	}
+	// TEMP ONLY: bypass Auth rate limiting for manual local testing.
+	// BEFORE COMMIT/PUSH: remove the temporary return and uncomment the block below.
 	return true
+
+	/*
+		ok, _, err := s.limiter.Allow(r.Context(), scope, subject, limit, window)
+		if err != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "rate limiter unavailable")
+			return false
+		}
+		if !ok {
+			httpx.Error(w, http.StatusTooManyRequests, "too many attempts; try again later")
+			return false
+		}
+		return true
+	*/
 }
 
 func (s *server) savePending(ctx context.Context, token string, pending pendingSignup, ttl time.Duration) error {

@@ -13,7 +13,10 @@ async (page) => {
   try {
     await context.route('https://api-chat.codelocal.cloud/**', async (route) => {
       const path = new URL(route.request().url()).pathname
-      if (path === '/api/events') return route.fulfill({ contentType: 'text/event-stream', body: '' })
+      if (path === '/api/events') return route.fulfill({
+        contentType: 'text/event-stream',
+        body: mode === 'signal-revoked' ? 'event: session-revoked\ndata: {}\n\n' : '',
+      })
       if (path === '/api/auth/refresh') {
         refreshes++
         if (mode === 'offline') return route.abort('internetdisconnected')
@@ -37,7 +40,7 @@ async (page) => {
     const nav = p.getByRole('navigation', { name: 'Điều hướng chính' })
     await nav.waitFor()
     await p.waitForFunction((old) => JSON.parse(localStorage.getItem('chatnet-session')).token !== old, initial.token)
-    assert(refreshes === 1, 'Startup requests should share one refresh')
+    assert(refreshes >= 1 && refreshes <= 2, 'Startup should share token renewal and bound the extra session check')
     await nav.getByRole('button', { name: 'Cá nhân' }).click()
     const name = p.locator('.profile-edit-card input[autocomplete="name"]')
     await name.waitFor()
@@ -76,10 +79,23 @@ async (page) => {
     await other.evaluate((session) => localStorage.setItem('chatnet-session', JSON.stringify(session)), initial)
     await p.evaluate(() => window.dispatchEvent(new Event('focus')))
     await nav.waitFor({ state: 'hidden' })
+    await p.getByRole('alert').getByText('Phiên đăng nhập đã hết hạn').waitFor()
     await other.getByRole('navigation', { name: 'Điều hướng chính' }).waitFor({ state: 'hidden' })
     assert(await p.evaluate(() => localStorage.getItem('chatnet-session')) === null, 'Revoked session retained')
+
+    // Server-initiated revocation must log out even while the JWT has time left.
+    mode = 'signal-revoked'
+    await p.evaluate((session) => localStorage.setItem('chatnet-session', JSON.stringify(session)),
+      { ...initial, token: token(86400) })
+    await p.reload()
+    await p.waitForFunction(() => localStorage.getItem('chatnet-session') === null)
+    assert(await nav.isHidden(), 'SSE session-revoked should immediately log out')
+    await p.getByRole('alert').getByText('Phiên đăng nhập đã hết hạn').waitFor()
+    assert(await p.getByText('Vui lòng đăng nhập lại để tiếp tục.', { exact: false }).isVisible(),
+      'Revoked device must show a helpful toast on the login screen')
+
     assert(errors.length === 0, errors.join('\n'))
-    return { passed: true, refreshes, checks: 'expired startup, shared refresh, cross-tab sync, drafts, offline recovery, reopen, revocation' }
+    return { passed: true, refreshes, checks: 'expired startup, shared refresh, cross-tab sync, drafts, offline recovery, reopen, revocation, SSE notification' }
   } finally {
     await context.close()
   }

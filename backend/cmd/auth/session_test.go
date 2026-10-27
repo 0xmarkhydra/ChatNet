@@ -80,6 +80,14 @@ func TestSessionIntegration(t *testing.T) {
 	if w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("credentials must not be cached")
 	}
+	initialClaims, err := authx.Parse(s.jwtSecret, initial.Token)
+	if err != nil || initialClaims.SessionID == "" {
+		t.Fatal("access token must be bound to its session")
+	}
+	active, err := authx.SessionActive(ctx, db, initialClaims)
+	if err != nil || !active {
+		t.Fatal("newly created access token should be authorized")
+	}
 	var hash string
 	var expires time.Time
 	if err := db.QueryRow(ctx, "SELECT token_hash,expires_at FROM auth_sessions WHERE user_id=$1", u.ID).Scan(&hash, &expires); err != nil {
@@ -118,6 +126,10 @@ func TestSessionIntegration(t *testing.T) {
 	}
 	call(s.refresh, strings.Repeat("x", 43), initial.Token, http.StatusUnauthorized)
 	call(s.logout, initial.RefreshToken, "", http.StatusNoContent)
+	active, err = authx.SessionActive(ctx, db, initialClaims)
+	if err != nil || active {
+		t.Fatal("revoked session still authorizes its access token")
+	}
 	call(s.logout, initial.RefreshToken, "", http.StatusNoContent)
 	call(s.refresh, initial.RefreshToken, initial.Token, http.StatusUnauthorized)
 

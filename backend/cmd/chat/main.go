@@ -109,54 +109,54 @@ func main() {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
 	})
-	mux.Handle("GET /api/push/config", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.pushConfig)))
-	mux.Handle("POST /api/push/subscription", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.upsertPushSubscription)))
-	mux.Handle("DELETE /api/push/subscription", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deletePushSubscription)))
-	mux.Handle("POST /api/push/test", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.testPushNotification)))
-	mux.Handle("POST /api/media/presign", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.presignMedia)))
-	mux.Handle("GET /api/profile", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getProfile)))
-	mux.Handle("PUT /api/profile", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateProfile)))
-	mux.Handle("PUT /api/profile/media", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateProfileMedia)))
+	mux.Handle("GET /api/push/config", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.pushConfig)))
+	mux.Handle("POST /api/push/subscription", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.upsertPushSubscription)))
+	mux.Handle("DELETE /api/push/subscription", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.deletePushSubscription)))
+	mux.Handle("POST /api/push/test", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.testPushNotification)))
+	mux.Handle("POST /api/media/presign", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.presignMedia)))
+	mux.Handle("GET /api/profile", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.getProfile)))
+	mux.Handle("PUT /api/profile", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.updateProfile)))
+	mux.Handle("PUT /api/profile/media", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.updateProfileMedia)))
 	mux.HandleFunc("GET /api/users/{username}/avatar", func(w http.ResponseWriter, r *http.Request) { s.profileAsset(w, r, "avatar") })
 	mux.HandleFunc("GET /api/users/{username}/cover", func(w http.ResponseWriter, r *http.Request) { s.profileAsset(w, r, "cover") })
-	mux.Handle("GET /api/users/search", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.searchUsers)))
-	mux.Handle("GET /api/users/suggestions", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.suggestUsers)))
-	mux.Handle("POST /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.findNearby)))
-	mux.Handle("DELETE /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.stopNearby)))
-	mux.Handle("GET /api/friends", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriends)))
-	mux.Handle("GET /api/contacts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listContactMetadata)))
-	mux.Handle("PUT /api/contacts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateContactMetadata)))
-	mux.Handle("GET /api/friends/requests", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriendRequests)))
-	mux.Handle("POST /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.sendFriendRequest)))
-	mux.Handle("POST /api/friends/{id}/accept", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.acceptFriendRequest)))
-	mux.Handle("DELETE /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeFriendConnection)))
-	mux.Handle("GET /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPrivacy)))
-	mux.Handle("PUT /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePrivacy)))
-	mux.Handle("GET /api/users/blocked", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listBlockedUsers)))
-	mux.Handle("POST /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.blockUser)))
-	mux.Handle("DELETE /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.unblockUser)))
-	mux.Handle("POST /api/users/{id}/report", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reportUser)))
-	mux.Handle("GET /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPreferences)))
-	mux.Handle("PUT /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePreferences)))
-	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
-	mux.Handle("PUT /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateTranslationPreferences)))
-	mux.Handle("GET /api/conversations", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversations)))
-	mux.Handle("GET /api/conversations/memberships", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversationMemberships)))
-	mux.Handle("POST /api/conversations/direct", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createDirect)))
-	mux.Handle("POST /api/conversations/groups", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createGroup)))
-	mux.Handle("GET /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listMessages)))
-	mux.Handle("GET /api/conversations/{id}/shared", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listSharedContent)))
-	mux.Handle("POST /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createMessage)))
-	mux.Handle("PATCH /api/messages/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.editMessage)))
-	mux.Handle("DELETE /api/messages/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteMessage)))
-	mux.Handle("POST /api/messages/{id}/reactions", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.toggleMessageReaction)))
-	mux.Handle("POST /api/conversations/{id}/read", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.markRead)))
-	mux.Handle("PATCH /api/conversations/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateGroup)))
-	mux.Handle("GET /api/conversations/{id}/members", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listGroupMembers)))
-	mux.Handle("POST /api/conversations/{id}/members", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.addGroupMembers)))
-	mux.Handle("PATCH /api/conversations/{id}/members/{userId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateGroupMemberRole)))
-	mux.Handle("DELETE /api/conversations/{id}/members/{userId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeGroupMember)))
-	mux.Handle("GET /api/events", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.events)))
+	mux.Handle("GET /api/users/search", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.searchUsers)))
+	mux.Handle("GET /api/users/suggestions", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.suggestUsers)))
+	mux.Handle("POST /api/users/nearby", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.findNearby)))
+	mux.Handle("DELETE /api/users/nearby", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.stopNearby)))
+	mux.Handle("GET /api/friends", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.listFriends)))
+	mux.Handle("GET /api/contacts", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.listContactMetadata)))
+	mux.Handle("PUT /api/contacts/{id}", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.updateContactMetadata)))
+	mux.Handle("GET /api/friends/requests", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.listFriendRequests)))
+	mux.Handle("POST /api/friends/{id}", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.sendFriendRequest)))
+	mux.Handle("POST /api/friends/{id}/accept", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.acceptFriendRequest)))
+	mux.Handle("DELETE /api/friends/{id}", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.removeFriendConnection)))
+	mux.Handle("GET /api/privacy", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.getPrivacy)))
+	mux.Handle("PUT /api/privacy", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.updatePrivacy)))
+	mux.Handle("GET /api/users/blocked", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.listBlockedUsers)))
+	mux.Handle("POST /api/users/{id}/block", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.blockUser)))
+	mux.Handle("DELETE /api/users/{id}/block", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.unblockUser)))
+	mux.Handle("POST /api/users/{id}/report", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.reportUser)))
+	mux.Handle("GET /api/preferences", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.getPreferences)))
+	mux.Handle("PUT /api/preferences", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.updatePreferences)))
+	mux.Handle("GET /api/preferences/translation", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.getTranslationPreferences)))
+	mux.Handle("PUT /api/preferences/translation", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.updateTranslationPreferences)))
+	mux.Handle("GET /api/conversations", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.listConversations)))
+	mux.Handle("GET /api/conversations/memberships", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.listConversationMemberships)))
+	mux.Handle("POST /api/conversations/direct", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.createDirect)))
+	mux.Handle("POST /api/conversations/groups", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.createGroup)))
+	mux.Handle("GET /api/conversations/{id}/messages", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.listMessages)))
+	mux.Handle("GET /api/conversations/{id}/shared", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.listSharedContent)))
+	mux.Handle("POST /api/conversations/{id}/messages", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.createMessage)))
+	mux.Handle("PATCH /api/messages/{id}", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.editMessage)))
+	mux.Handle("DELETE /api/messages/{id}", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.deleteMessage)))
+	mux.Handle("POST /api/messages/{id}/reactions", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.toggleMessageReaction)))
+	mux.Handle("POST /api/conversations/{id}/read", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.markRead)))
+	mux.Handle("PATCH /api/conversations/{id}", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.updateGroup)))
+	mux.Handle("GET /api/conversations/{id}/members", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.listGroupMembers)))
+	mux.Handle("POST /api/conversations/{id}/members", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.addGroupMembers)))
+	mux.Handle("PATCH /api/conversations/{id}/members/{userId}", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.updateGroupMemberRole)))
+	mux.Handle("DELETE /api/conversations/{id}/members/{userId}", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.removeGroupMember)))
+	mux.Handle("GET /api/events", authx.SessionMiddleware(s.jwtSecret, s.db, http.HandlerFunc(s.events)))
 
 	port := config.Env("PORT", "8082")
 	log.Printf("chat service listening on :%s", port)
@@ -1423,8 +1423,9 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	ch := pubsub.Channel()
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	lastPing := time.Now()
 
 	for {
 		select {
@@ -1434,12 +1435,36 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 			if !open {
 				return
 			}
+			if item.Payload == authx.SessionRevocationSignal {
+				active, err := authx.SessionActive(r.Context(), s.db, claims)
+				if err != nil {
+					return
+				}
+				if !active {
+					fmt.Fprint(w, "event: session-revoked\ndata: {}\n\n")
+					flusher.Flush()
+					return
+				}
+				continue
+			}
 			fmt.Fprintf(w, "event: update\ndata: %s\n\n", item.Payload)
 			flusher.Flush()
 		case <-ticker.C:
-			_ = s.redis.Expire(r.Context(), key, 45*time.Second).Err()
-			fmt.Fprint(w, ": ping\n\n")
-			flusher.Flush()
+			active, err := authx.SessionActive(r.Context(), s.db, claims)
+			if err != nil {
+				return // Stream is closed on database outage; never treat it as a revocation.
+			}
+			if !active {
+				fmt.Fprint(w, "event: session-revoked\ndata: {}\n\n")
+				flusher.Flush()
+				return
+			}
+			if time.Since(lastPing) >= 20*time.Second {
+				_ = s.redis.Expire(r.Context(), key, 45*time.Second).Err()
+				fmt.Fprint(w, ": ping\n\n")
+				flusher.Flush()
+				lastPing = time.Now()
+			}
 		}
 	}
 }
@@ -1544,7 +1569,7 @@ func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, 
 }
 
 func userChannel(userID int64) string {
-	return fmt.Sprintf("chatnet:user:%d", userID)
+	return authx.UserChannel(userID)
 }
 
 func presenceKey(userID int64) string {

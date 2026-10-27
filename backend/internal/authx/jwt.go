@@ -15,6 +15,7 @@ type Claims struct {
 	UserID      int64  `json:"uid"`
 	Username    string `json:"username"`
 	DisplayName string `json:"displayName"`
+	SessionID   string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -22,12 +23,17 @@ type contextKey string
 
 const claimsKey contextKey = "claims"
 
-func Sign(secret string, userID int64, username, displayName string) (string, error) {
+func Sign(secret string, userID int64, username, displayName string, sessionIDs ...string) (string, error) {
 	now := time.Now()
+	sid := ""
+	if len(sessionIDs) > 0 {
+		sid = sessionIDs[0]
+	}
 	claims := Claims{
 		UserID:      userID,
 		Username:    username,
 		DisplayName: displayName,
+		SessionID:   sid,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   strconv.FormatInt(userID, 10),
 			IssuedAt:  jwt.NewNumericDate(now),

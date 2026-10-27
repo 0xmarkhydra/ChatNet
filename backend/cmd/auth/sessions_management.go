@@ -102,23 +102,26 @@ func (s *server) revokeSession(w http.ResponseWriter, r *http.Request) {
 	}
 	// One statement binds the target to the owner of the active refresh token.
 	// A leaked session ID alone never grants permission to revoke another user.
-	tag, err := s.db.Exec(r.Context(), `
+	var userID int64
+	err := s.db.QueryRow(r.Context(), `
 		DELETE FROM auth_sessions
 		WHERE session_id=$2::uuid
 		  AND user_id=(
 		    SELECT user_id FROM auth_sessions
 		    WHERE token_hash=$1 AND expires_at>NOW()
 		  )
-	`, sessionHash(request.RefreshToken), request.SessionID)
-	if err != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, "cannot revoke session")
-		return
-	}
-	if tag.RowsAffected() == 0 {
+		RETURNING user_id
+	`, sessionHash(request.RefreshToken), request.SessionID).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
 		// Do not leak whether the target exists on another account.
 		httpx.Error(w, http.StatusNotFound, "session not found")
 		return
 	}
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot revoke session")
+		return
+	}
+	s.notifySessionRevoked(r.Context(), userID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -137,7 +140,7 @@ func (s *server) revokeOtherSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Keep current session even if an old tab races another revocation.
-	_, err = s.db.Exec(r.Context(), `
+	tag, err := s.db.Exec(r.Context(), `
 		DELETE FROM auth_sessions
 		WHERE user_id=$1 AND token_hash<>$2
 		  AND EXISTS(
@@ -148,6 +151,9 @@ func (s *server) revokeOtherSessions(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot revoke other sessions")
 		return
+	}
+	if tag.RowsAffected() > 0 {
+		s.notifySessionRevoked(r.Context(), userID)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
