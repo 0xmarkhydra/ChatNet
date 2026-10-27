@@ -1,15 +1,20 @@
 import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import FeedPostActions, { FeedShareAction } from './FeedPostActions'
+import FeedModeration from './FeedModeration'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from './incomingSound'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
+import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from './chatPersistence'
+import { uploadPresignedFile } from './mediaUpload'
+import { canMarkConversationRead } from './conversationRead'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
 import GroupActionsSheet from './GroupActionsSheet'
 import SharedContent from './SharedContent'
+import VoiceRecorder from './VoiceRecorder'
 import { SocoEmptyState, SocoTextAction } from './SocoUI'
 import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
 
@@ -130,7 +135,7 @@ type Conversation = {
 }
 
 type RealtimeEvent = {
-  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.read' | 'friend.updated'
+  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
   conversationId: number
   message?: Message
   conversation?: Conversation
@@ -176,6 +181,23 @@ type FriendSearchResult = {
   locationUpdatedAt?: string
   mutualGroups?: number
   reason?: string
+}
+
+type ManagedAccountSession = {
+  id: string
+  userAgent: string
+  createdAt: string
+  lastSeenAt: string
+  expiresAt: string
+  current: boolean
+}
+
+type UserPrivacy = {
+  searchableByUsername: boolean
+  searchableByName: boolean
+  searchableByEmail: boolean
+  allowFriendRequests: boolean
+  showOnlineStatus: boolean
 }
 
 type FriendConnection = FriendSearchResult & {
@@ -458,6 +480,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false)
 
   const [tab, setTab] = useState<Tab>('chat')
+  const tabRef = useRef(tab)
+  tabRef.current = tab
   const [globalSearch, setGlobalSearch] = useState('')
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   useEffect(() => {
@@ -469,6 +493,10 @@ export default function App() {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [quickCreateOpen])
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const revokedConversationIds = useRef(new Set<number>())
+  const membershipSnapshot = useRef<Set<number> | null>(null)
+  const membershipSyncSequence = useRef(0)
+  const membershipEventSequence = useRef(0)
   const [hasMoreConversations, setHasMoreConversations] = useState(false)
   const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
   const conversationPagingBusy = useRef(false)
@@ -481,6 +509,7 @@ export default function App() {
   const messagesPagingBusy = useRef(false)
   const pendingMessageScrollRestore = useRef<{ height: number; top: number } | null>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
+  const messageScrollAtBottom = useRef(true)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
   const messageLongPressTimer = useRef<number | null>(null)
@@ -495,8 +524,16 @@ export default function App() {
   const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
   const [sharedContentOpen, setSharedContentOpen] = useState(false)
   const [groupBusy, setGroupBusy] = useState(false)
-  // ponytail: drafts live in memory per conversation; add persistence only with an explicit retention policy.
-  const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>({})
+  // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
+  const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>(() => {
+    const saved = loadChatDrafts(session?.user.id ?? 0)
+    return Object.fromEntries(Object.entries(saved).map(([id, item]) => [Number(id), { text: item.text, attachments: [] }]))
+  })
+  useEffect(() => {
+    if (session?.user.id && sessionRef.current?.user.id === session.user.id) {
+      saveChatDrafts(session.user.id, messageDrafts)
+    }
+  }, [session?.user.id, messageDrafts])
   const draft = messageDrafts[activeConversationId ?? 0] ?? emptyDraft
   const messageText = draft.text
   const messageAttachments = draft.attachments
@@ -515,16 +552,28 @@ export default function App() {
   const pendingRequests = useRef(new Set<symbol>())
   const mutationRequests = useRef(new Map<string, Promise<Response>>())
   const messageReceipts = useRef(new Map<string, Message | null>())
+  // Preserve the request ID for an ambiguous send so a retry cannot create another row.
+  const pendingSend = useRef<{ sessionId: string; conversationId: number; signature: string; clientId: string; draft: MessageDraft } | null>(null)
   const preferenceQueue = useRef(Promise.resolve())
   const preferenceRevision = useRef(0)
   const [newChatMode, setNewChatMode] = useState<NewChatMode>('none')
   const [friendQuery, setFriendQuery] = useState('')
   const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([])
   const [friendSearching, setFriendSearching] = useState(false)
+  const [friendSearchError, setFriendSearchError] = useState(false)
+  const [friendSearchRetry, setFriendSearchRetry] = useState(0)
   const [friends, setFriends] = useState<FriendConnection[]>([])
   const [friendRequests, setFriendRequests] = useState<FriendConnection[]>([])
   const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null)
-  const friendActionRef = useRef(false)
+  const friendActionRef = useRef(new Set<number>())
+  const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(() => new Set())
+  const [friendMenuId, setFriendMenuId] = useState<number | null>(null)
+  const [friendPreview, setFriendPreview] = useState<FriendSearchResult | null>(null)
+  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: number; username: string; displayName: string }>>([])
+  const [blockedOpen, setBlockedOpen] = useState(false)
+  const [blockedBusy, setBlockedBusy] = useState(false)
+  const [blockedError, setBlockedError] = useState('')
+  const [contactMetadata, setContactMetadata] = useState<Record<number, { nickname: string; note: string; favorite: boolean }>>({})
   const friendSyncRequest = useRef(0)
   const [friendSyncSessionId, setFriendSyncSessionId] = useState('')
   const [friendSyncError, setFriendSyncError] = useState('')
@@ -580,11 +629,22 @@ export default function App() {
   const [showPostBackgrounds, setShowPostBackgrounds] = useState(false)
   const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([])
   const [mediaUploading, setMediaUploading] = useState<'chat' | 'feed' | 'story' | 'profile' | null>(null)
+  const [mediaUploadProgress, setMediaUploadProgress] = useState<{ loaded: number; total: number } | null>(null)
+  const mediaUploadAbort = useRef<AbortController | null>(null)
   const [profileMedia, setProfileMedia] = useState<ProfileMediaState | null>(null)
   const [profileBusy, setProfileBusy] = useState<'avatar' | 'cover' | null>(null)
   const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState('')
   const [profileUsernameDraft, setProfileUsernameDraft] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
+  const [privacy, setPrivacy] = useState<UserPrivacy | null>(null)
+  const [privacyBusy, setPrivacyBusy] = useState(false)
+  const [privacyLoading, setPrivacyLoading] = useState(false)
+  const [privacyError, setPrivacyError] = useState('')
+  const [privacyRetry, setPrivacyRetry] = useState(0)
+  const [sessionsOpen, setSessionsOpen] = useState(false)
+  const [managedSessions, setManagedSessions] = useState<ManagedAccountSession[]>([])
+  const [sessionsBusy, setSessionsBusy] = useState(false)
+  const [sessionsError, setSessionsError] = useState('')
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
@@ -773,7 +833,7 @@ export default function App() {
 
   function beginMessageLongPress(message: Message, x: number, y: number, button: number, target: EventTarget | null) {
     if (message.deleted || button !== 0) return
-    if (target instanceof Element && target.closest('button,a,input,textarea,select,video,audio')) return
+    if (target instanceof Element && target.closest('button,a,input,textarea,select,video,audio,.message-selectable-text')) return
     cancelMessageLongPress()
     messageLongPressStart.current = { x, y, messageId: message.id }
     messageLongPressTimer.current = window.setTimeout(() => {
@@ -829,6 +889,7 @@ export default function App() {
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId
+    messageScrollAtBottom.current = true
     cancelMessageLongPress()
     setMessageActionId(null)
     setMessages([])
@@ -1179,66 +1240,89 @@ export default function App() {
 
   async function uploadMediaFiles(files: File[], scope: 'chat' | 'feed' | 'story' | 'profile') {
     if (!files.length) return [] as MediaAttachment[]
+    if (mediaUploadAbort.current) throw new Error('Đang tải tệp khác. Hãy hoàn tất hoặc hủy trước khi tải tiếp.')
     const sessionId = session?.sessionId
+    const controller = new AbortController()
+    mediaUploadAbort.current = controller
     setMediaUploading(scope)
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0)
+    const loadedBytes = files.map(() => 0)
+    setMediaUploadProgress({ loaded: 0, total: Math.max(1, totalBytes) })
+    let lastReport = 0
+
+    function trackProgress(index: number, loaded: number) {
+      if (mediaUploadAbort.current !== controller) return
+      loadedBytes[index] = Math.min(files[index].size, Math.max(0, loaded))
+      const now = performance.now()
+      if (loadedBytes[index] < files[index].size && now - lastReport < 120) return
+      lastReport = now
+      setMediaUploadProgress({
+        loaded: loadedBytes.reduce((sum, value) => sum + value, 0),
+        total: Math.max(1, totalBytes),
+      })
+    }
+
     try {
       const result = new Array<MediaAttachment>(files.length)
       let nextIndex = 0
       const workerCount = Math.min(4, files.length)
 
       async function worker() {
-        while (true) {
-          const index = nextIndex++
-          if (index >= files.length) return
+        try {
+          while (true) {
+            if (controller.signal.aborted) throw new DOMException('Đã hủy tải tệp.', 'AbortError')
+            const index = nextIndex++
+            if (index >= files.length) return
 
-          const file = files[index]
-          const contentType = file.type || 'application/octet-stream'
-          const presignResponse = await apiFetch('/api/media/presign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              scope,
+            const file = files[index]
+            const contentType = file.type || 'application/octet-stream'
+            const presignResponse = await apiFetch('/api/media/presign', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                scope,
+                name: file.name,
+                sizeBytes: file.size,
+                contentType,
+              }),
+              signal: controller.signal,
+            })
+            if (controller.signal.aborted) throw new DOMException('Đã hủy tải tệp.', 'AbortError')
+            const ticket = (await presignResponse.json().catch(() => null)) as
+              | (PresignedUpload & { error?: string })
+              | null
+            if (!presignResponse.ok || !ticket?.uploadUrl) {
+              throw new Error(ticket?.error || 'Không cấp được quyền upload file. Hãy kiểm tra cấu hình S3.')
+            }
+
+            await uploadPresignedFile(ticket.uploadUrl, file, contentType, controller.signal, (loaded) => trackProgress(index, loaded))
+            if (controller.signal.aborted) throw new DOMException('Đã hủy tải tệp.', 'AbortError')
+            result[index] = {
+              storageRef: ticket.storageRef,
               name: file.name,
               sizeBytes: file.size,
               contentType,
-            }),
-          })
-          const ticket = (await presignResponse.json().catch(() => null)) as
-            | (PresignedUpload & { error?: string })
-            | null
-
-          if (!presignResponse.ok || !ticket?.uploadUrl) {
-            throw new Error(ticket?.error || 'Không cấp được quyền upload file. Hãy kiểm tra cấu hình S3.')
+              kind: ticket.kind,
+              url: ticket.downloadUrl,
+            }
           }
-
-          const put = await fetch(ticket.uploadUrl, {
-            method: 'PUT',
-            body: file,
-            headers: { 'Content-Type': contentType },
-            credentials: 'omit',
-            signal: AbortSignal.timeout(120_000),
-          })
-          if (!put.ok) {
-            throw new Error(`S3 từ chối upload ${file.name} (HTTP ${put.status}). Kiểm tra CORS/quyền bucket.`)
-          }
-
-          result[index] = {
-            storageRef: ticket.storageRef,
-            name: file.name,
-            sizeBytes: file.size,
-            contentType,
-            kind: ticket.kind,
-            url: ticket.downloadUrl,
-          }
+        } catch (error) {
+          controller.abort()
+          throw error
         }
       }
 
       const outcomes = await Promise.allSettled(Array.from({ length: workerCount }, () => worker()))
-      const failed = outcomes.find((outcome) => outcome.status === 'rejected')
-      if (failed?.status === 'rejected') throw failed.reason
+      const errors = outcomes.filter((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected')
+      const firstError = errors.find((item) => !(item.reason instanceof DOMException && item.reason.name === 'AbortError')) ?? errors[0]
+      if (firstError) throw firstError.reason
       return result
     } finally {
-      if (sessionRef.current?.sessionId === sessionId) setMediaUploading(null)
+      if (mediaUploadAbort.current === controller) {
+        mediaUploadAbort.current = null
+        setMediaUploadProgress(null)
+        if (sessionRef.current?.sessionId === sessionId) setMediaUploading(null)
+      }
     }
   }
 
@@ -1703,15 +1787,146 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    if (!session?.token) {
+      setPrivacy(null)
+      setPrivacyError('')
+      setPrivacyLoading(false)
+      return
+    }
+    const controller = new AbortController()
+    setPrivacy(null)
+    setPrivacyBusy(false)
+    setPrivacyLoading(true)
+    setPrivacyError('')
+    apiFetch('/api/privacy', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Không thể tải quyền riêng tư.')
+        return response.json() as Promise<UserPrivacy>
+      })
+      .then((value) => {
+        if (!controller.signal.aborted) setPrivacy(value)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setPrivacyError('Không thể tải cài đặt riêng tư.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPrivacyLoading(false)
+      })
+    return () => controller.abort()
+  }, [session?.sessionId, privacyRetry])
+
+  async function changePrivacy(key: keyof UserPrivacy) {
+    if (!privacy || privacyBusy || !session?.sessionId) return
+    const sessionId = session.sessionId
+    const next = { ...privacy, [key]: !privacy[key] }
+    setPrivacyBusy(true)
+    try {
+      const response = await apiFetch('/api/privacy', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      const result = await response.json().catch(() => null) as UserPrivacy | null
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok || !result) throw new Error('Không lưu được quyền riêng tư.')
+      setPrivacy(result)
+      setNotice('Đã lưu cài đặt riêng tư')
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId) {
+        setPrivacyError('Lưu thất bại. Cài đặt trước đó vẫn được giữ.')
+        setNotice('Không thể lưu quyền riêng tư. Vui lòng thử lại.', 'error')
+      }
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) setPrivacyBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    setManagedSessions([])
+    setSessionsOpen(false)
+    setSessionsBusy(false)
+    setSessionsError('')
+  }, [session?.sessionId])
+
+  async function fetchAccountSessions() {
+    const current = sessionRef.current
+    if (!current?.refreshToken || sessionsBusy) return
+    const identity = current.sessionId
+    setSessionsBusy(true)
+    setSessionsError('')
+    try {
+      const response = await fetch(`${API}/api/auth/sessions/list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ refreshToken: current.refreshToken }),
+      })
+      if (!response.ok) throw new Error('Không tải được phiên đăng nhập.')
+      const data = await response.json() as ManagedAccountSession[]
+      if (sessionRef.current?.sessionId === identity) {
+        setManagedSessions(data)
+        setSessionsOpen(true)
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === identity) {
+        setSessionsError('Không thể tải các thiết bị. Vui lòng thử lại.')
+      }
+    } finally {
+      if (sessionRef.current?.sessionId === identity) setSessionsBusy(false)
+    }
+  }
+
+  async function revokeAccountSessions(sessionID?: string) {
+    const current = sessionRef.current
+    if (!current?.refreshToken || sessionsBusy) return
+    const identity = current.sessionId
+    const selected = managedSessions.find((item) => item.id === sessionID)
+    if (sessionID && !selected) return
+    const message = sessionID
+      ? selected?.current
+        ? 'Bạn muốn đăng xuất khỏi thiết bị này?'
+        : 'Bạn muốn thu hồi phiên đăng nhập trên thiết bị đã chọn?'
+      : 'Bạn muốn đăng xuất tất cả thiết bị khác?'
+    if (!window.confirm(message)) return
+    setSessionsBusy(true)
+    setSessionsError('')
+    try {
+      const response = await fetch(`${API}/api/auth/sessions/${sessionID ? 'revoke' : 'revoke-others'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ refreshToken: current.refreshToken, ...(sessionID ? { sessionId: sessionID } : {}) }),
+      })
+      if (!response.ok) throw new Error('Không thu hồi được phiên đăng nhập.')
+      if (sessionRef.current?.sessionId !== identity) return
+      if (selected?.current) {
+        logout(false)
+      } else {
+        setManagedSessions((items) => sessionID
+          ? items.filter((item) => item.id !== sessionID)
+          : items.filter((item) => item.current))
+        setNotice('Đã thu hồi phiên đăng nhập được chọn.')
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === identity) {
+        setSessionsError('Không thu hồi được phiên. Vui lòng thử lại.')
+      }
+    } finally {
+      if (sessionRef.current?.sessionId === identity) setSessionsBusy(false)
+    }
+  }
+
   async function refreshFriendConnections() {
     const sessionId = session?.sessionId
     if (!sessionId) return
     const request = ++friendSyncRequest.current
     setFriendSyncBusy(true)
     try {
-      const [friendsResponse, requestsResponse] = await Promise.all([
+      const [friendsResponse, requestsResponse, metadataResponse] = await Promise.all([
         apiFetch('/api/friends'),
         apiFetch('/api/friends/requests'),
+        apiFetch('/api/contacts'),
       ])
       if (!friendsResponse.ok || !requestsResponse.ok) throw new Error('Friend sync failed')
       const [nextFriends, nextRequests] = await Promise.all([
@@ -1721,6 +1936,13 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
       setFriends(nextFriends)
       setFriendRequests(nextRequests)
+      if (metadataResponse.ok) {
+        const records = await metadataResponse.json() as Array<{ id: number; nickname: string; note: string; favorite: boolean }>
+        if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
+        setContactMetadata(Object.fromEntries(records.map((item) => [item.id, {
+          nickname: item.nickname, note: item.note, favorite: item.favorite,
+        }])))
+      }
       setFriendSyncSessionId(sessionId)
       setFriendSyncError('')
     } catch {
@@ -1732,6 +1954,16 @@ export default function App() {
     }
   }
 
+  const contactQuery = friendQuery.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
+  const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
+    `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(contactQuery),
+  )
+  const localContactIds = new Set(localContactMatches.map((friend) => friend.id))
+  const contactSearchResults = [
+    ...localContactMatches,
+    ...friendResults.filter((friend) => !localContactIds.has(friend.id)),
+  ]
+
   function friendRelationship(userId: number) {
     if (friends.some((item) => item.id === userId)) return 'accepted' as const
     const request = friendRequests.find((item) => item.id === userId)
@@ -1742,7 +1974,7 @@ export default function App() {
 
   async function actOnFriend(friend: FriendSearchResult | FriendConnection, decline = false) {
     const sessionId = session?.sessionId
-    if (!sessionId || friendActionRef.current || friend.id === session.user.id) return
+    if (!sessionId || friendActionRef.current.has(friend.id) || friend.id === session.user.id) return
     const relationship = friendRelationship(friend.id)
     if (decline && relationship !== 'incoming') return
     if (relationship === 'accepted') {
@@ -1750,7 +1982,8 @@ export default function App() {
       return
     }
 
-    friendActionRef.current = true
+    friendActionRef.current.add(friend.id)
+    setFriendBusyIds((current) => new Set(current).add(friend.id))
     ++friendSyncRequest.current
     setFriendActionBusy(friend.id)
     try {
@@ -1794,9 +2027,164 @@ export default function App() {
       }
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
-        friendActionRef.current = false
-        setFriendActionBusy(null)
+        friendActionRef.current.delete(friend.id)
+        setFriendBusyIds((current) => {
+          const next = new Set(current)
+          next.delete(friend.id)
+          return next
+        })
+        setFriendActionBusy(friendActionRef.current.values().next().value ?? null)
       }
+    }
+  }
+
+  async function changePersonalContact(friend: FriendConnection, field: 'nickname' | 'note' | 'favorite') {
+    const sid = session?.sessionId
+    if (!sid || friendBusyIds.has(friend.id)) return
+    const previous = contactMetadata[friend.id] || { nickname: '', note: '', favorite: false }
+    const next = { ...previous }
+    if (field === 'favorite') {
+      next.favorite = !next.favorite
+    } else {
+      const label = field === 'nickname' ? 'Biệt danh riêng (tối đa 60 ký tự)' : 'Ghi chú riêng (tối đa 1500 ký tự)'
+      const answer = window.prompt(label, previous[field])
+      if (answer === null) return
+      next[field] = answer.trim()
+      if (next[field].length > (field === 'nickname' ? 60 : 1500)) {
+        setNotice('Nội dung vượt quá độ dài cho phép.', 'warning')
+        return
+      }
+    }
+    setFriendMenuId(null)
+    setFriendBusyIds((ids) => new Set(ids).add(friend.id))
+    try {
+      const response = await apiFetch(`/api/contacts/${friend.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      const result = await response.json().catch(() => null) as { error?: string; id?: number; nickname?: string; note?: string; favorite?: boolean } | null
+      if (sessionRef.current?.sessionId !== sid) return
+      if (!response.ok || !result || result.id !== friend.id) {
+        setNotice(result?.error || 'Không lưu được liên hệ.', 'error')
+        return
+      }
+      setContactMetadata((old) => ({ ...old, [friend.id]: next }))
+      setNotice('Đã lưu thông tin liên hệ riêng.')
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setNotice('Không thể lưu liên hệ. Hãy thử lại.', 'error')
+    } finally {
+      setFriendBusyIds((ids) => {
+        const nextIDs = new Set(ids)
+        nextIDs.delete(friend.id)
+        return nextIDs
+      })
+    }
+  }
+
+  async function blockContact(friend: FriendSearchResult | FriendConnection) {
+    const sid = session?.sessionId
+    if (!sid || friendBusyIds.has(friend.id)) return
+    if (!window.confirm(`Chặn @${friend.username}? Người này sẽ không thể nhắn tin trực tiếp hoặc kết bạn với bạn.`)) return
+    setFriendBusyIds((old) => new Set(old).add(friend.id))
+    setFriendMenuId(null)
+    try {
+      const response = await apiFetch(`/api/users/${friend.id}/block`, { method: 'POST' })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sid) return
+      if (!response.ok) {
+        setNotice(result?.error || 'Không thể chặn người dùng.', 'error')
+        return
+      }
+      setFriends((old) => old.filter((item) => item.id !== friend.id))
+      setFriendRequests((old) => old.filter((item) => item.id !== friend.id))
+      setFriendResults((old) => old.filter((item) => item.id !== friend.id))
+      setBlockedUsers((old) => [...old.filter((item) => item.id !== friend.id), {
+        id: friend.id, username: friend.username, displayName: friend.displayName,
+      }])
+      setFriendPreview(null)
+      setConversations((old) => old.filter((item) => item.otherUserId !== friend.id))
+      const currentConversation = conversations.find((item) => item.id === activeConversationId)
+      if (currentConversation?.otherUserId === friend.id) setActiveConversationId(null)
+      setNotice(`Đã chặn @${friend.username}.`)
+      await refreshFriendConnections()
+      void refreshConversations()
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setNotice('Không thể chặn người dùng. Hãy thử lại.', 'error')
+    } finally {
+      setFriendBusyIds((old) => {
+        const next = new Set(old)
+        next.delete(friend.id)
+        return next
+      })
+    }
+  }
+
+  async function reportContact(friend: FriendSearchResult | FriendConnection) {
+    const sid = session?.sessionId
+    if (!sid) return
+    const answer = window.prompt('Lý do báo cáo: 1 - Spam, 2 - Quấy rối, 3 - Giả mạo, 4 - Khác')
+    if (answer === null) return
+    const reason = ({ '1': 'spam', '2': 'harassment', '3': 'impersonation', '4': 'other' } as Record<string, string>)[answer.trim()]
+    if (!reason) {
+      setNotice('Vui lòng chọn lý do từ 1 đến 4.', 'warning')
+      return
+    }
+    const details = window.prompt('Mô tả sự việc (không quá 1000 ký tự, có thể để trống):')
+    if (details === null) return
+    if (details.length > 1000) {
+      setNotice('Mô tả không được quá 1000 ký tự.', 'warning')
+      return
+    }
+    setFriendMenuId(null)
+    try {
+      const response = await apiFetch(`/api/users/${friend.id}/report`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason, details: details.trim() }),
+      })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sid) return
+      setNotice(response.ok ? 'Đã gửi báo cáo. Cảm ơn bạn.' : result?.error || 'Không thể gửi báo cáo.', response.ok ? 'success' : 'error')
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setNotice('Không thể gửi báo cáo. Hãy thử lại.', 'error')
+    }
+  }
+
+  async function loadBlockedUsers() {
+    const sid = session?.sessionId
+    if (!sid || blockedBusy) return
+    setBlockedBusy(true)
+    setBlockedError('')
+    try {
+      const response = await apiFetch('/api/users/blocked')
+      if (!response.ok) throw new Error()
+      const data = await response.json() as Array<{id: number; username: string; displayName: string}>
+      if (sessionRef.current?.sessionId === sid) {
+        setBlockedUsers(data)
+        setBlockedOpen(true)
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setBlockedError('Không tải được danh sách chặn.')
+    } finally {
+      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false)
+    }
+  }
+
+  async function unblockContact(userId: number) {
+    const sid = session?.sessionId
+    if (!sid || blockedBusy || !window.confirm('Bỏ chặn người dùng này?')) return
+    setBlockedBusy(true)
+    setBlockedError('')
+    try {
+      const response = await apiFetch(`/api/users/${userId}/block`, { method: 'DELETE' })
+      if (!response.ok) throw new Error()
+      if (sessionRef.current?.sessionId === sid) {
+        setBlockedUsers((old) => old.filter((item) => item.id !== userId))
+        setNotice('Đã bỏ chặn người dùng.')
+      }
+    } catch {
+      if (sessionRef.current?.sessionId === sid) setBlockedError('Không thể bỏ chặn. Hãy thử lại.')
+    } finally {
+      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false)
     }
   }
 
@@ -1804,12 +2192,54 @@ export default function App() {
     await actOnFriend(friend, true)
   }
 
+  async function removeAcceptedFriend(friend: FriendConnection) {
+    const sessionId = session?.sessionId
+    if (!sessionId || friendRelationship(friend.id) !== 'accepted' || friendActionRef.current.has(friend.id)) return
+    if (!window.confirm(`Hủy kết bạn với ${friend.displayName || '@' + friend.username}?`)) return
+    friendActionRef.current.add(friend.id)
+    setFriendBusyIds((current) => new Set(current).add(friend.id))
+    setFriendActionBusy(friend.id)
+    setFriendMenuId(null)
+    try {
+      const response = await apiFetch(`/api/friends/${friend.id}?direction=accepted`, { method: 'DELETE' })
+      const result = await response.json().catch(() => null) as { error?: string } | null
+      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!response.ok) {
+        setNotice(result?.error || 'Không thể hủy kết bạn. Vui lòng thử lại.')
+      } else {
+        setFriends((current) => current.filter((item) => item.id !== friend.id))
+        setFriendPreview(null)
+        setNotice('Đã hủy kết bạn')
+      }
+      await refreshFriendConnections()
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId) {
+        setNotice('Mạng gián đoạn. Đang đồng bộ lại danh sách bạn bè.')
+        await refreshFriendConnections()
+      }
+    } finally {
+      friendActionRef.current.delete(friend.id)
+      if (sessionRef.current?.sessionId === sessionId) {
+        setFriendBusyIds((current) => {
+          const next = new Set(current)
+          next.delete(friend.id)
+          return next
+        })
+        setFriendActionBusy(friendActionRef.current.values().next().value ?? null)
+      }
+    }
+  }
+
   useEffect(() => {
     if (!session?.token) {
       setFriends([])
       setFriendRequests([])
+      setContactMetadata({})
       setFriendSyncSessionId('')
       setFriendSyncError('')
+      setBlockedUsers([])
+      setBlockedOpen(false)
+      setBlockedError('')
       ++friendSyncRequest.current
       return
     }
@@ -1823,6 +2253,7 @@ export default function App() {
     if (!session?.token || !friendSurfaceOpen) {
       setFriendResults([])
       setFriendSearching(false)
+      setFriendSearchError(false)
       return
     }
 
@@ -1830,18 +2261,22 @@ export default function App() {
     const query = friendQuery.trim()
     setFriendResults([])
     setFriendSearching(true)
+    setFriendSearchError(false)
 
     if (!query) {
       apiFetch('/api/users/suggestions', { signal: controller.signal })
         .then(async (response) => {
-          if (!response.ok) return []
+          if (!response.ok) throw new Error('Cannot load suggestions')
           return response.json() as Promise<FriendSearchResult[]>
         })
         .then((items) => {
           if (!controller.signal.aborted) setFriendResults(items)
         })
         .catch(() => {
-          if (!controller.signal.aborted) setFriendResults([])
+          if (!controller.signal.aborted) {
+            setFriendResults([])
+            setFriendSearchError(true)
+          }
         })
         .finally(() => {
           if (!controller.signal.aborted) setFriendSearching(false)
@@ -1857,14 +2292,14 @@ export default function App() {
           `/api/users/search?q=${encodeURIComponent(query)}`,
           { signal: controller.signal },
         )
-        if (!response.ok) {
-          if (!controller.signal.aborted) setFriendResults([])
-          return
-        }
+        if (!response.ok) throw new Error('Cannot search users')
         const items = (await response.json()) as FriendSearchResult[]
         if (!controller.signal.aborted) setFriendResults(items)
       } catch {
-        if (!controller.signal.aborted) setFriendResults([])
+        if (!controller.signal.aborted) {
+          setFriendResults([])
+          setFriendSearchError(true)
+        }
       } finally {
         if (!controller.signal.aborted) setFriendSearching(false)
       }
@@ -1874,14 +2309,84 @@ export default function App() {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [friendQuery, newChatMode, session?.token, tab])
+  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, tab])
+
+  function purgeConversation(id: number) {
+    revokedConversationIds.current.add(id)
+    membershipSnapshot.current?.delete(id)
+    membershipEventSequence.current += 1
+    setConversations((current) => current.filter((item) => item.id !== id))
+    setMessageDrafts((current) => {
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+    if (activeConversationIdRef.current === id) {
+      activeConversationIdRef.current = null
+      setActiveConversationId(null)
+      setMessages([])
+      setHasMoreMessages(false)
+      setGroupMembers([])
+      setGroupSettingsOpen(false)
+      setGroupActionsOpen(false)
+      setSharedContentOpen(false)
+      setTranslations({})
+      setReplyingTo(null)
+      setMessageActionId(null)
+      setNotice('Bạn không còn là thành viên của nhóm này.')
+    }
+  }
+
+  async function reconcileConversationMemberships() {
+    const sessionId = session?.sessionId
+    if (!sessionId) return
+    const sequence = ++membershipSyncSequence.current
+    const membershipEventAtStart = membershipEventSequence.current
+    const authorized = new Set<number>()
+    let after = 0
+    try {
+      // Fetch only IDs, not full message metadata. Never prune on partial
+      // snapshots: a failed page is not proof of lost group membership.
+      for (let page = 0; page < 200; page += 1) {
+        const response = await apiFetch(`/api/conversations/memberships?limit=500&after=${after}`)
+        if (!response.ok) return
+        const data = (await response.json()) as { ids: number[]; nextAfter: number | null }
+        if (!Array.isArray(data.ids) || data.ids.length > 500 ||
+          data.ids.some((id) => !Number.isSafeInteger(id) || id <= after)) return
+        for (const id of data.ids) authorized.add(id)
+        if (data.nextAfter === null) {
+          if (sessionRef.current?.sessionId !== sessionId ||
+              sequence !== membershipSyncSequence.current ||
+              membershipEventAtStart !== membershipEventSequence.current) return
+          membershipSnapshot.current = authorized
+          for (const id of authorized) revokedConversationIds.current.delete(id)
+          setConversations((current) => current.filter((item) => authorized.has(item.id)))
+          setMessageDrafts((current) => Object.fromEntries(
+            Object.entries(current).filter(([id]) => authorized.has(Number(id))),
+          ))
+          if (activeConversationIdRef.current && !authorized.has(activeConversationIdRef.current)) {
+            purgeConversation(activeConversationIdRef.current)
+          }
+          void refreshConversations()
+          return
+        }
+        if (!Number.isSafeInteger(data.nextAfter) || data.nextAfter <= after ||
+            data.nextAfter !== data.ids[data.ids.length - 1]) return
+        after = data.nextAfter
+      }
+    } catch {
+      // Connectivity failures must never be interpreted as revoked rights.
+    }
+  }
 
   async function refreshConversations() {
     const sessionId = session?.sessionId
     try {
       const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}`)
       if (!response.ok) return
-      const data = (await response.json()) as Conversation[]
+      const data = ((await response.json()) as Conversation[])
+        .filter((item) => !revokedConversationIds.current.has(item.id) &&
+          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
       if (sessionRef.current?.sessionId !== sessionId) return
       setConversations((current) => {
         const freshIds = new Set(data.map((item) => item.id))
@@ -1908,7 +2413,8 @@ export default function App() {
       setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
       setConversations((current) => {
         const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id))]
+        return [...current, ...data.filter((item) => !ids.has(item.id) && !revokedConversationIds.current.has(item.id) &&
+          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))]
       })
     } catch {
       if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
@@ -2177,12 +2683,18 @@ export default function App() {
       })
       .catch(() => undefined)
 
+    if (current?.user.id) clearChatPersistence(current.user.id)
+    pendingSend.current = null
     if (clearStorage) localStorage.removeItem('chatnet-session')
     sessionRef.current = null
     resetRegistration()
     setAuthMode('login')
     setSession(null)
     setConversations([])
+    revokedConversationIds.current.clear()
+    membershipSnapshot.current = null
+    membershipSyncSequence.current += 1
+    membershipEventSequence.current += 1
     setHasMoreConversations(false)
     setConversationLoadingMore(false)
     conversationOffset.current = 0
@@ -2210,13 +2722,19 @@ export default function App() {
     setProfileBusy(null)
     setProfileSaving(false)
     setStoryBusy(false)
+    mediaUploadAbort.current?.abort()
+    mediaUploadAbort.current = null
     setMediaUploading(null)
-    friendActionRef.current = false
+    setMediaUploadProgress(null)
+    friendActionRef.current.clear()
+    setFriendBusyIds(new Set())
     setFriendActionBusy(null)
     ++feedRevision.current
     setMessageDrafts({})
     setFriends([])
     setFriendRequests([])
+    setFriendMenuId(null)
+    setFriendPreview(null)
     setPostText('')
     setPosts([])
     setHasMorePosts(false)
@@ -2273,6 +2791,7 @@ export default function App() {
     events.onopen = () => {
       setStatus('Đang online')
       void refreshFriendConnections()
+      void reconcileConversationMemberships()
     }
     events.onerror = () => setStatus('Đang kết nối lại...')
     events.addEventListener('update', (event) => {
@@ -2283,7 +2802,15 @@ export default function App() {
         return
       }
 
+      if (update.type === 'conversation.removed') {
+        purgeConversation(update.conversationId)
+        return
+      }
+
       if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
+        revokedConversationIds.current.delete(update.conversationId)
+        membershipSnapshot.current?.add(update.conversationId)
+        membershipEventSequence.current += 1
         void refreshConversations()
         if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
           void refreshGroupMembers(update.conversationId)
@@ -2349,6 +2876,28 @@ export default function App() {
         messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
+          const recovered = loadPendingSend(session.user.id, session.sessionId)
+          if (recovered?.clientId === incoming.clientId && recovered.conversationId === incoming.conversationId) {
+            clearPendingSend(session.user.id, incoming.clientId)
+            setMessageDrafts((current) => {
+              const existing = current[incoming.conversationId]
+              if (!existing || existing.text.trim() !== incoming.text || existing.attachments.length > 0) return current
+              const next = { ...current }
+              delete next[incoming.conversationId]
+              return next
+            })
+          }
+          if (pendingSend.current?.clientId === incoming.clientId) {
+            const confirmed = pendingSend.current
+            pendingSend.current = null
+            // A late SSE receipt also resolves an ambiguous HTTP send. Keep any newer draft.
+            setMessageDrafts((current) => {
+              if (current[confirmed.conversationId] !== confirmed.draft) return current
+              const next = { ...current }
+              delete next[confirmed.conversationId]
+              return next
+            })
+          }
           if (messageReceipts.current.has(incoming.clientId)) messageReceipts.current.set(incoming.clientId, incoming)
           setOutgoingMessage((current) => current?.clientId === incoming.clientId ? null : current)
         }
@@ -2364,7 +2913,8 @@ export default function App() {
                   lastMessage: incoming.text || attachmentLabel(incoming.attachments),
                   lastMessageAt: incoming.createdAt,
                   unreadCount:
-                    incoming.senderId !== session.user.id && currentId !== item.id
+                    incoming.senderId !== session.user.id &&
+                      !canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState)
                       ? item.unreadCount + 1
                       : item.unreadCount,
                 }
@@ -2383,8 +2933,11 @@ export default function App() {
               ? current
               : [...current, incoming],
           )
-          void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
-            .catch(() => setStatus('Đang kết nối lại...'))
+          if (incoming.senderId !== session.user.id &&
+              canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState)) {
+            void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
+              .catch(() => setStatus('Đang kết nối lại...'))
+          }
         }
       }
     })
@@ -2393,9 +2946,22 @@ export default function App() {
       void refreshConversations()
       void refreshFriendConnections()
     }, 20000)
+    const membershipTimer = window.setInterval(() => {
+      void reconcileConversationMemberships()
+    }, 90000)
+    const checkMembership = () => { void reconcileConversationMemberships() }
+    const checkVisibleMembership = () => {
+      if (document.visibilityState === 'visible') checkMembership()
+    }
+    window.addEventListener('online', checkMembership)
+    document.addEventListener('visibilitychange', checkVisibleMembership)
     return () => {
       events.close()
       window.clearInterval(refreshTimer)
+      window.clearInterval(membershipTimer)
+      window.removeEventListener('online', checkMembership)
+      document.removeEventListener('visibilitychange', checkVisibleMembership)
+      membershipSyncSequence.current += 1
     }
   }, [session?.token, groupSettingsOpen])
 
@@ -2424,9 +2990,29 @@ export default function App() {
       `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}`,
     )
       .then(async (response) => {
+        if (response.status === 403) {
+          if (!cancelled) purgeConversation(activeConversationId)
+          return
+        }
         if (!response.ok) throw new Error('Không tải được tin nhắn')
         const data = (await response.json()) as Message[]
         if (cancelled) return
+
+        // Reconcile a POST whose ACK vanished before refresh. A persisted
+        // clientId in history is proof of delivery; no second POST is needed.
+        const recovered = loadPendingSend(session.user.id, session.sessionId)
+        const confirmed = recovered && data.find((item) => item.clientId === recovered.clientId && item.conversationId === recovered.conversationId)
+        if (confirmed && recovered) {
+          clearPendingSend(session.user.id, recovered.clientId)
+          if (pendingSend.current?.clientId === recovered.clientId) pendingSend.current = null
+          setMessageDrafts((current) => {
+            const existing = current[confirmed.conversationId]
+            if (!existing || existing.text.trim() !== confirmed.text || existing.attachments.length > 0) return current
+            const next = { ...current }
+            delete next[confirmed.conversationId]
+            return next
+          })
+        }
 
         setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
         setMessages((current) => {
@@ -2445,6 +3031,7 @@ export default function App() {
           }
         }
         setTranslations(restored)
+        if (!canMarkConversationRead(activeConversationIdRef.current, activeConversationId, tabRef.current, document.visibilityState)) return
         const read = await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
         if (!read.ok) return
         if (!cancelled) {
@@ -2468,6 +3055,29 @@ export default function App() {
     targetLanguage,
     translationPreferencesLoaded,
   ])
+
+  useEffect(() => {
+    if (!session?.token || !activeConversationId) return
+    const id = activeConversationId
+    const sessionId = session.sessionId
+    const markWhenVisible = () => {
+      if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState)) return
+      void apiFetch(`/api/conversations/${id}/read`, { method: 'POST' })
+        .then((response) => {
+          if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId) return
+          setConversations((current) =>
+            current.map((item) => item.id === id ? { ...item, unreadCount: 0 } : item),
+          )
+        })
+        .catch(() => undefined)
+    }
+    window.addEventListener('focus', markWhenVisible)
+    document.addEventListener('visibilitychange', markWhenVisible)
+    return () => {
+      window.removeEventListener('focus', markWhenVisible)
+      document.removeEventListener('visibilitychange', markWhenVisible)
+    }
+  }, [session?.sessionId, activeConversationId])
 
   async function loadOlderMessages() {
     if (!session || !activeConversationId || messagesPagingBusy.current ||
@@ -2520,7 +3130,9 @@ export default function App() {
       pendingMessageScrollRestore.current = null
       return
     }
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // Preserve scroll position when reading history; only follow new messages
+    // when the reader was already near the bottom of the conversation.
+    if (container && messageScrollAtBottom.current) container.scrollTop = container.scrollHeight
   }, [messages, outgoingMessage])
 
   useEffect(() => {
@@ -2587,6 +3199,9 @@ export default function App() {
 
       if (sessionRef.current?.sessionId !== session?.sessionId) return
       const created = result as Conversation
+      membershipSnapshot.current?.add(created.id)
+      revokedConversationIds.current.delete(created.id)
+      membershipEventSequence.current += 1
       setConversations((current) => [created, ...current.filter((item) => item.id !== created.id)])
       setActiveConversationId(created.id)
       setTab('chat')
@@ -2627,6 +3242,9 @@ export default function App() {
         return
       }
       const created = result as Conversation
+      membershipSnapshot.current?.add(created.id)
+      revokedConversationIds.current.delete(created.id)
+      membershipEventSequence.current += 1
       setConversations((current) => [created, ...current.filter((item) => item.id !== created.id)])
       setActiveConversationId(created.id)
       setTab('chat')
@@ -2648,10 +3266,26 @@ export default function App() {
     const submittedDraft = draft
     const text = messageText.trim()
     const attachments = messageAttachments
-    const sessionId = session?.sessionId
     if (!session) return
-    const clientId = crypto.randomUUID()
+    const sessionId = session.sessionId
     const reply = replyingTo
+    const signature = JSON.stringify({ text, attachments: attachments.map((file) => file.storageRef), replyToMessageId: reply?.id ?? null })
+    const previous = pendingSend.current ?? loadPendingSend(session.user.id, sessionId)
+    // A refresh cannot restore unsigned media URLs. Never silently resend a
+    // text-only copy of an ambiguous attachment message as a new message.
+    if (previous?.conversationId === conversationId && messageAttachments.length === 0) {
+      try {
+        const earlier = JSON.parse(previous.signature) as { text?: string; attachments?: string[] }
+        if (earlier.text === text && Array.isArray(earlier.attachments) && earlier.attachments.length > 0) {
+          setNotice('Tin kèm tệp trước đó chưa được xác nhận. Hãy kiểm tra lịch sử hoặc thay đổi nội dung trước khi gửi lại.', 'warning')
+          return
+        }
+      } catch { /* Invalid old receipt is ignored. */ }
+    }
+    const clientId = previous && previous.sessionId === sessionId && previous.conversationId === conversationId && previous.signature === signature
+      ? previous.clientId : crypto.randomUUID()
+    pendingSend.current = { sessionId, conversationId, signature, clientId, draft: submittedDraft }
+    savePendingSend(session.user.id, { sessionId, conversationId, signature, clientId })
     // A matching realtime receipt can confirm delivery even if the HTTP response is lost.
     messageReceipts.current.set(clientId, null)
     sendingRef.current = true
@@ -2675,6 +3309,10 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId) return
       const receipt = messageReceipts.current.get(clientId)
       if (!response.ok && !receipt?.id) {
+        if (response.status >= 400 && response.status < 500 && pendingSend.current?.clientId === clientId) {
+          pendingSend.current = null
+          clearPendingSend(session.user.id, clientId)
+        }
         const result = await response.json().catch(() => null) as { error?: string } | null
         setNotice(result?.error || 'Gửi tin nhắn thất bại')
         return
@@ -2683,6 +3321,8 @@ export default function App() {
       if (!Number.isSafeInteger(sent.id) || sent.id <= 0 || sent.conversationId !== conversationId) {
         throw new Error('Invalid message response')
       }
+      if (pendingSend.current?.clientId === clientId) pendingSend.current = null
+      clearPendingSend(session.user.id, clientId)
       if (activeConversationIdRef.current === conversationId) {
         messageChanges.current.add(sent.id)
         setMessages((current) => mergeById(current, sent).sort((a, b) => a.id - b.id))
@@ -3264,6 +3904,29 @@ export default function App() {
           url={connectUrl()} initialMode={qrOpen} onClose={() => setQrOpen(null)}
           onConnect={(username) => { setQrOpen(null); openConnectSurface(username) }} />
       </Suspense>}
+      {mediaUploading && mediaUploadProgress && (
+        <div className="media-upload-progress" role="status" aria-live="polite">
+          <span>Đang tải tệp: {Math.round(mediaUploadProgress.loaded / Math.max(1, mediaUploadProgress.total) * 100)}%</span>
+          <progress value={mediaUploadProgress.loaded} max={mediaUploadProgress.total} aria-label="Tiến độ tải tệp" />
+          <button type="button" onClick={() => mediaUploadAbort.current?.abort()}>Hủy tải</button>
+        </div>
+      )}
+      {friendPreview && (
+        <div className="connect-modal-layer">
+          <button type="button" className="connect-modal-scrim" aria-label="Đóng hồ sơ" onClick={() => setFriendPreview(null)} />
+          <section className="friend-profile-preview" role="dialog" aria-modal="true" aria-label={`Hồ sơ ${friendPreview.displayName || friendPreview.username}`}>
+            <button type="button" className="friend-profile-close" aria-label="Đóng" onClick={() => setFriendPreview(null)}><X size={20} /></button>
+            <UserAvatar name={friendPreview.displayName || friendPreview.username} className="friend-profile-avatar" online={friendPreview.online} />
+            <h2>{friendPreview.displayName || friendPreview.username}</h2>
+            <p>@{friendPreview.username}</p>
+            <p>{friendPreview.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</p>
+            <div className="friend-profile-actions">
+              <button type="button" onClick={() => { setFriendPreview(null); void openDirectByUsername(friendPreview.username) }}>Nhắn tin</button>
+              <button type="button" onClick={() => setFriendPreview(null)}>Đóng</button>
+            </div>
+          </section>
+        </div>
+      )}
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
@@ -3498,7 +4161,10 @@ export default function App() {
                       {!friendSearching && !friendQuery.trim() && friendResults.length > 0 && (
                         <div className="friend-suggestion-label">Người bạn có thể biết</div>
                       )}
-                      {!friendSearching && friendQuery.trim() && friendResults.length === 0 && (
+                      {friendSearchError && !friendSearching && (
+                        <div className="friend-search-state" role="alert">Không tải được kết quả. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button></div>
+                      )}
+                      {!friendSearching && !friendSearchError && friendQuery.trim() && friendResults.length === 0 && (
                         <div className="friend-search-state">
                           <strong>Không tìm thấy người phù hợp</strong>
                           <span>Thử tên khác, @username hoặc email chính xác.</span>
@@ -3512,7 +4178,7 @@ export default function App() {
                             : relationship === 'incoming'
                               ? 'Chấp nhận'
                               : relationship === 'outgoing'
-                                ? 'Đã gửi'
+                                ? 'Hủy lời mời'
                                 : 'Kết bạn'
                         return (
                           <button
@@ -3520,7 +4186,7 @@ export default function App() {
                             className="friend-result connect-result"
                             key={friend.id}
                             onClick={() => void actOnFriend(friend)}
-                            disabled={friendActionBusy === friend.id}
+                            disabled={friendBusyIds.has(friend.id)}
                           >
                             <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                             <div className="friend-result-copy">
@@ -3803,7 +4469,7 @@ export default function App() {
                           <button
                             type="button"
                             className={chatFriendRelationship === 'outgoing' ? '' : 'primary'}
-                            disabled={friendActionBusy !== null}
+                            disabled={friendBusyIds.has(chatFriend.id)}
                             onClick={() => void actOnFriend(chatFriend)}
                           >
                             {chatFriendRelationship === 'incoming' ? <Check size={16} aria-hidden="true" /> :
@@ -3811,7 +4477,7 @@ export default function App() {
                             {chatFriendRelationship === 'incoming' ? 'Chấp nhận' : chatFriendRelationship === 'outgoing' ? 'Hủy lời mời' : 'Gửi lời mời kết bạn'}
                           </button>
                           {chatFriendRelationship === 'incoming' && (
-                            <button type="button" disabled={friendActionBusy !== null} onClick={() => void actOnFriend(chatFriend, true)}>
+                            <button type="button" disabled={friendBusyIds.has(chatFriend.id)} onClick={() => void actOnFriend(chatFriend, true)}>
                               <X size={16} aria-hidden="true" /> Từ chối
                             </button>
                           )}
@@ -3997,7 +4663,10 @@ export default function App() {
                     />
                   )}
 
-                  <div className="messages" ref={messagesScrollRef}>
+                  <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
+                    const element = event.currentTarget
+                    messageScrollAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100
+                  }}>
                     {hasMoreMessages && (
                       <button type="button" className="soco-load-more soco-older-messages"
                         onClick={() => void loadOlderMessages()} disabled={messagesLoadingMore}
@@ -4023,6 +4692,7 @@ export default function App() {
                           onPointerLeave={cancelMessageLongPress}
                           onContextMenu={(event) => {
                             if (message.deleted) return
+                            if (event.target instanceof Element && event.target.closest('.message-selectable-text')) return
                             event.preventDefault()
                             openMessageActions(message)
                           }}
@@ -4042,7 +4712,7 @@ export default function App() {
                                 <div className={translatedText ? 'bubble translated-bubble translation-flip-bubble' : 'bubble'}>
                                   <span
                                     key={translatedText ? `${message.id}-${originalVisible ? 'original' : 'translated'}` : `${message.id}-plain`}
-                                    className="translation-flip-content"
+                                    className="translation-flip-content message-selectable-text"
                                   >
                                     {translatedText
                                       ? originalVisible ? message.text : translatedText
@@ -4107,7 +4777,11 @@ export default function App() {
                             <strong>@{outgoingMessage.replyToSender}</strong><span>{outgoingMessage.replyToText}</span>
                           </div>
                         )}
-                        {outgoingMessage.text && <div className="bubble">{outgoingMessage.text}</div>}
+                        {outgoingMessage.text && (
+                          <div className="bubble">
+                            <span className="message-selectable-text">{outgoingMessage.text}</span>
+                          </div>
+                        )}
                         <MediaAttachmentsView items={outgoingMessage.attachments} />
                         <div className="message-stamp" role="status">Đang gửi...</div>
                       </article>
@@ -4155,6 +4829,12 @@ export default function App() {
                     >
                       <UiIcon name="attach" size={22} />
                     </button>
+                    <VoiceRecorder
+                      key={`${session.sessionId}:${activeConversationId}`}
+                      disabled={Boolean(mediaUploading) || messageSending}
+                      onRecorded={(file) => { void addChatFiles([file]) }}
+                      onError={(message) => setNotice(message, 'error')}
+                    />
                     <input
                       ref={messageInputRef}
                       aria-label="Tin nhắn"
@@ -4175,6 +4855,64 @@ export default function App() {
 
         {tab === 'contacts' && (
           <div className="simple-view contacts-view">
+            {friendQuery.trim() ? (
+              <section className="contacts-suggestions contacts-search-section" aria-label="Kết quả tìm kiếm bạn bè">
+                <div className="contacts-heading contacts-search-heading">
+                  <span>Kết quả tìm kiếm</span>
+                  <button type="button" onClick={() => setFriendQuery('')}>Xóa tìm kiếm</button>
+                </div>
+                {friendSearching && <div className="friend-search-state" role="status">Đang tìm người dùng...</div>}
+                {friendSearchError && !friendSearching && (
+                  <div className="friend-search-state" role="alert">
+                    Không thể tìm kiếm lúc này. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button>
+                  </div>
+                )}
+                {!friendSearching && !friendSearchError && contactSearchResults.length === 0 && (
+                  <div className="friend-search-state">Không tìm thấy kết quả. Thử tên, @username hoặc email chính xác.</div>
+                )}
+                {contactSearchResults.map((friend) => {
+                  const relationship = friendRelationship(friend.id)
+                  const actionLabel = relationship === 'accepted' ? 'Nhắn tin'
+                    : relationship === 'incoming' ? 'Chấp nhận'
+                      : relationship === 'outgoing' ? 'Hủy lời mời' : 'Kết bạn'
+                  return (
+                    <div className="friend-result contact-result contact-search-row" key={friend.id}>
+                      <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
+                      <div className="friend-result-copy">
+                        <strong>{friend.displayName || friend.username}</strong>
+                        <span>@{friend.username}{relationship === 'accepted' ? ' · Bạn bè' : relationship === 'incoming' ? ' · Đã nhận lời mời' : relationship === 'outgoing' ? ' · Đã gửi lời mời' : ''}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="contact-search-action"
+                        disabled={friendBusyIds.has(friend.id)}
+                        onClick={() => void actOnFriend(friend)}
+                      >{actionLabel}</button>
+                      <div className="friend-contact-controls" onBlur={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
+                      }}>
+                        <button type="button" className="friend-contact-more"
+                          aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
+                          aria-expanded={friendMenuId === friend.id} aria-haspopup="menu"
+                          onClick={() => setFriendMenuId((old) => old === friend.id ? null : friend.id)}>
+                          <MoreHorizontal size={19} aria-hidden="true" />
+                        </button>
+                        {friendMenuId === friend.id && (
+                          <div className="friend-contact-popover" role="menu">
+                            <button type="button" role="menuitem" className="friend-contact-danger"
+                              disabled={friendBusyIds.has(friend.id)}
+                              onClick={() => void blockContact(friend)}>Chặn người dùng</button>
+                            <button type="button" role="menuitem"
+                              onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </section>
+            ) : (
+              <>
             <div className="contact-shortcuts">
               <button type="button" onClick={() => { setTab('chat'); setNewChatMode('friends') }}>
                 <span className="shortcut-icon">＋</span><div><strong>Lời mời kết bạn</strong><small>Tìm và kết nối người mới</small></div><b>›</b>
@@ -4197,8 +4935,8 @@ export default function App() {
                       <span>Muốn kết bạn với bạn</span>
                     </div>
                     <div className="friend-request-actions">
-                      <button type="button" onClick={() => void actOnFriend(friend)} disabled={friendActionBusy === friend.id}>Chấp nhận</button>
-                      <button type="button" className="secondary" onClick={() => void declineFriendRequest(friend)} disabled={friendActionBusy === friend.id}>Từ chối</button>
+                      <button type="button" onClick={() => void actOnFriend(friend)} disabled={friendBusyIds.has(friend.id)}>Chấp nhận</button>
+                      <button type="button" className="secondary" onClick={() => void declineFriendRequest(friend)} disabled={friendBusyIds.has(friend.id)}>Từ chối</button>
                     </div>
                   </div>
                 ))}
@@ -4213,20 +4951,54 @@ export default function App() {
                   action={<SocoTextAction onClick={() => { setTab('chat'); setNewChatMode('friends') }}>Tìm bạn bè</SocoTextAction>}
                 />
               )}
-              {friends.map((friend) => (
-                <button
-                  type="button"
-                  className="friend-result contact-result"
+              {[...friends].sort((a, b) => Number(Boolean(contactMetadata[b.id]?.favorite)) - Number(Boolean(contactMetadata[a.id]?.favorite))).map((friend) => (
+                <div
+                  className="friend-result contact-result friend-contact-row"
                   key={friend.id}
-                  onClick={() => void openDirectByUsername(friend.username)}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setFriendMenuId(null)
+                  }}
                 >
-                  <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                  <div className="friend-result-copy">
-                    <strong>@{friend.username}</strong>
-                    <span>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
+                  <button
+                    type="button"
+                    className="friend-contact-primary"
+                    onClick={() => void openDirectByUsername(friend.username)}
+                  >
+                    <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
+                    <span className="friend-result-copy">
+                      <strong>{contactMetadata[friend.id]?.favorite ? '⭐ ' : ''}{contactMetadata[friend.id]?.nickname || friend.displayName || friend.username}</strong>
+                      <span>@{friend.username} · {friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
+                      {contactMetadata[friend.id]?.note && <small className="friend-private-note">{contactMetadata[friend.id].note}</small>}
+                    </span>
+                  </button>
+                  <div className="friend-contact-controls">
+                    <button
+                      type="button"
+                      className="friend-contact-more"
+                      aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
+                      aria-expanded={friendMenuId === friend.id}
+                      aria-haspopup="menu"
+                      onClick={() => setFriendMenuId((current) => current === friend.id ? null : friend.id)}
+                    >
+                      <MoreHorizontal size={20} aria-hidden="true" />
+                    </button>
+                    {friendMenuId === friend.id && (
+                      <div className="friend-contact-popover" role="menu">
+                        <button type="button" role="menuitem" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem hồ sơ</button>
+                        <button type="button" role="menuitem" onClick={() => { setFriendMenuId(null); void openDirectByUsername(friend.username) }}>Nhắn tin</button>
+                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'nickname')}>Đặt biệt danh</button>
+                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'note')}>Ghi chú riêng</button>
+                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'favorite')}>{contactMetadata[friend.id]?.favorite ? 'Bỏ bạn thân' : 'Đánh dấu bạn thân'}</button>
+                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
+                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void blockContact(friend)}>Chặn người dùng</button>
+                        <button type="button" role="menuitem" onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
+                      </div>
+                    )}
                   </div>
-                  <div className="friend-result-action"><small>Nhắn tin</small><span>›</span></div>
-                </button>
+                </div>
               ))}
             </section>
 
@@ -4239,7 +5011,7 @@ export default function App() {
                     className="friend-result contact-result"
                     key={friend.id}
                     onClick={() => void actOnFriend(friend)}
-                    disabled={friendActionBusy === friend.id}
+                    disabled={friendBusyIds.has(friend.id)}
                   >
                     <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                     <div className="friend-result-copy">
@@ -4264,7 +5036,7 @@ export default function App() {
                   className="friend-result contact-result"
                   key={friend.id}
                   onClick={() => void actOnFriend(friend)}
-                  disabled={friendActionBusy === friend.id}
+                  disabled={friendBusyIds.has(friend.id)}
                 >
                   <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
                   <div className="friend-result-copy">
@@ -4275,6 +5047,8 @@ export default function App() {
                 </button>
               ))}
             </section>
+              </>
+            )}
           </div>
         )}
 
@@ -4314,6 +5088,18 @@ export default function App() {
 
         {tab === 'feed' && (
           <div className="feed-view zalo-feed-view">
+            <FeedModeration request={apiFetch} onRemoved={(type, id) => {
+              if (type === 'post') {
+                setPosts((current) => current.filter((post) => post.id !== id))
+                setSavedPosts((current) => current.filter((post) => post.id !== id))
+                if (activePostId === id) setActivePostId(null)
+              } else if (type === 'comment') {
+                void refreshPosts()
+              } else {
+                setStories((current) => current.filter((story) => story.id !== id))
+                if (activeStoryId === id) setActiveStoryId(null)
+              }
+            }} />
             <input
               ref={storyFileInputRef}
               className="hidden-media-input"
@@ -4887,6 +5673,109 @@ export default function App() {
 
             <div className="soco-profile-section-label">TÙY CHỌN & CÀI ĐẶT</div>
             <section className="settings-card">
+              <div className="settings-row">
+                <div>
+                  <strong>Quyền riêng tư tài khoản</strong>
+                  <small>Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. Thiết lập lưu trên máy chủ.</small>
+                </div>
+              </div>
+              {privacyLoading && <div className="settings-row" role="status">Đang tải quyền riêng tư...</div>}
+              {privacyError && <div className="settings-row" role="alert">
+                <span>{privacyError}</span>
+                <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>Thử lại</button>
+              </div>}
+              {privacy && ([
+                ['searchableByUsername', 'Cho phép tìm bằng username', 'Người khác có thể tìm @username của bạn.'],
+                ['searchableByName', 'Cho phép tìm bằng tên', 'Tên hiển thị của bạn có thể xuất hiện trong kết quả.'],
+                ['searchableByEmail', 'Cho phép tìm bằng email', 'Chỉ tìm bằng email khớp chính xác; địa chỉ email không được hiển thị.'],
+                ['allowFriendRequests', 'Cho phép lời mời mới', 'Tắt để ngăn lời mời kết bạn mới từ người khác.'],
+                ['showOnlineStatus', 'Hiển thị trạng thái online', 'Ẩn sự hiện diện trong danh sách và kết quả tìm kiếm.'],
+              ] as const).map(([key, label, hint]) => (
+                <div className="settings-row" key={key}>
+                  <div><strong>{label}</strong><small>{hint}</small></div>
+                  <button
+                    type="button"
+                    className={`switch-button ${privacy[key] ? 'on' : ''}`}
+                    role="switch"
+                    aria-label={label}
+                    aria-checked={privacy[key]}
+                    disabled={privacyBusy}
+                    onClick={() => void changePrivacy(key)}
+                  ><span /></button>
+                </div>
+              ))}
+              <div className="settings-row">
+                <div>
+                  <strong>Thiết bị đã đăng nhập</strong>
+                  <small>Kiểm tra và thu hồi những phiên đăng nhập không còn sử dụng.</small>
+                </div>
+                <button type="button" className="settings-action"
+                  disabled={sessionsBusy || !session.refreshToken}
+                  onClick={() => {
+                    if (sessionsOpen) setSessionsOpen(false)
+                    else void fetchAccountSessions()
+                  }}>
+                  {sessionsBusy ? 'Đang xử lý...' : sessionsOpen ? 'Thu gọn' : 'Xem thiết bị'}
+                </button>
+              </div>
+              {sessionsError && <div className="settings-row" role="alert">
+                <small>{sessionsError}</small>
+                <button type="button" className="settings-action" disabled={sessionsBusy}
+                  onClick={() => void fetchAccountSessions()}>Thử lại</button>
+              </div>}
+              {sessionsOpen && (
+                <div className="account-sessions-panel">
+                  <p>Thu hồi phiên sẽ ngăn gia hạn đăng nhập bằng refresh token. Access token đã phát hành có thể tiếp tục hoạt động đến khi hết hạn (tối đa 24 giờ).</p>
+                  {managedSessions.length === 0 && <small>Không có phiên đang hoạt động.</small>}
+                  {managedSessions.map((device) => (
+                    <div className="account-session-item" key={device.id}>
+                      <div className="account-session-details">
+                        <strong>{device.current ? 'Thiết bị này' : device.userAgent || 'Trình duyệt khác'}</strong>
+                        {device.current && <small>{device.userAgent || 'Trình duyệt hiện tại'}</small>}
+                        <small>Hoạt động: {new Date(device.lastSeenAt).toLocaleString('vi-VN')}</small>
+                      </div>
+                      <button type="button" className="settings-action"
+                        disabled={sessionsBusy}
+                        onClick={() => void revokeAccountSessions(device.id)}>
+                        {device.current ? 'Đăng xuất' : 'Thu hồi'}
+                      </button>
+                    </div>
+                  ))}
+                  {managedSessions.some((device) => !device.current) && (
+                    <button type="button" className="settings-action account-revoke-others"
+                      disabled={sessionsBusy} onClick={() => void revokeAccountSessions()}>
+                      Đăng xuất tất cả thiết bị khác
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="settings-row">
+                <div><strong>Người dùng đã chặn</strong><small>Quản lý những tài khoản không thể nhắn tin hoặc kết bạn với bạn.</small></div>
+                <button type="button" className="settings-action" disabled={blockedBusy}
+                  onClick={() => blockedOpen ? setBlockedOpen(false) : void loadBlockedUsers()}>
+                  {blockedBusy ? 'Đang tải...' : blockedOpen ? 'Thu gọn' : 'Xem danh sách'}
+                </button>
+              </div>
+              {blockedError && <div className="settings-row" role="alert">
+                <small>{blockedError}</small>
+                <button type="button" className="settings-action" disabled={blockedBusy}
+                  onClick={() => void loadBlockedUsers()}>Thử lại</button>
+              </div>}
+              {blockedOpen && (
+                <div className="account-sessions-panel">
+                  {blockedUsers.length === 0 && <p>Chưa chặn tài khoản nào.</p>}
+                  {blockedUsers.map((item) => (
+                    <div className="account-session-item" key={item.id}>
+                      <div className="account-session-details">
+                        <strong>{item.displayName || item.username}</strong>
+                        <small>@{item.username}</small>
+                      </div>
+                      <button type="button" className="settings-action" disabled={blockedBusy}
+                        onClick={() => void unblockContact(item.id)}>Bỏ chặn</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <button
                 type="button"
                 className="settings-row settings-row-button app-locale-row"

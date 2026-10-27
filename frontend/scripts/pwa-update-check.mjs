@@ -134,4 +134,76 @@ assert.equal(skipped, 1, 'SW must accept explicit activation')
 events.activate(event)
 await work
 assert.deepEqual(deleted, ['chatnet-old-runtime'], 'only obsolete ChatNet caches are removed')
-console.log('PASS: PWA polling, update consent, activation, offline behavior and cleanup')
+
+// Security regression: authenticated content must never enter the shared SW cache.
+const fetchEvents = {}
+const cachedPaths = []
+const cachedResponses = new Map([['/offline.html', 'offline fallback']])
+let networkResponse
+let networkFails = false
+runInNewContext(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), {
+  URL,
+  self: {
+    location: { origin: 'https://soco.test' },
+    addEventListener(name, handler) { fetchEvents[name] = handler },
+  },
+  caches: {
+    match: async (request) => cachedResponses.get(typeof request === 'string' ? request : request.url),
+    open: async () => ({
+      put: async (request, response) => {
+        cachedPaths.push(request.url)
+        cachedResponses.set(request.url, response)
+      },
+    }),
+  },
+  fetch: async () => {
+    if (networkFails) throw new Error('offline')
+    return networkResponse
+  },
+})
+
+function swFetch(path, { mode = 'cors', method = 'GET', headers = {} } = {}) {
+  let reply
+  const pending = []
+  fetchEvents.fetch({
+    request: { url: 'https://soco.test' + path, mode, method, headers: new Headers(headers) },
+    respondWith(promise) { reply = promise },
+    waitUntil(promise) { pending.push(promise) },
+  })
+  return { reply, pending }
+}
+function publicResponse(cacheControl = '') {
+  return {
+    ok: true, type: 'basic',
+    headers: new Headers(cacheControl ? { 'Cache-Control': cacheControl } : {}),
+    clone() { return this },
+  }
+}
+networkResponse = publicResponse()
+for (const path of ['/api/chat/messages', '/media/secret.png', '/profile/123', '/assets/user-avatar.jpg', '/assets/index-12345678.js?token=abc']) {
+  assert.equal(swFetch(path).reply, undefined, path + ' must remain network-only')
+}
+assert.equal(swFetch('/assets/index-12345678.js', { headers: { Authorization: 'Bearer token' } }).reply, undefined)
+assert.equal(swFetch('/assets/index-12345678.js', { method: 'POST' }).reply, undefined)
+let result = swFetch('/conversation/42', { mode: 'navigate' })
+assert.equal(await result.reply, networkResponse, 'navigation uses network response')
+assert.deepEqual(cachedPaths, [], 'navigation must not cache user-specific HTML')
+networkFails = true
+result = swFetch('/conversation/42', { mode: 'navigate' })
+assert.equal(await result.reply, 'offline fallback', 'offline page is public, not a stale user session')
+networkFails = false
+networkResponse = publicResponse('private, no-store')
+result = swFetch('/assets/index-12345678.js')
+await result.reply
+await Promise.all(result.pending)
+assert.deepEqual(cachedPaths, [], 'private or no-store response must not be cached')
+networkResponse = publicResponse()
+result = swFetch('/assets/index-12345678.js')
+await result.reply
+await Promise.all(result.pending)
+assert.deepEqual(cachedPaths, ['https://soco.test/assets/index-12345678.js'], 'only public build assets may be cached')
+networkFails = true
+result = swFetch('/assets/index-12345678.js')
+assert.equal(await result.reply, networkResponse, 'public built asset remains usable offline')
+
+console.log('PASS: PWA update consent, offline fallback and private cache isolation')

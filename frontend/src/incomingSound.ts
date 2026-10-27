@@ -42,7 +42,7 @@ export class IncomingMessageSound {
     },
     now: () => number = Date.now,
     visible: () => boolean =
-      () => typeof document !== 'undefined' && document.visibilityState === 'visible',
+      () => typeof document !== 'undefined' && document.visibilityState === 'visible' && document.hasFocus(),
   ) {
     this.createContext = createContext
     this.now = now

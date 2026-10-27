@@ -59,7 +59,12 @@ func TokenFromRequest(r *http.Request) string {
 	if strings.HasPrefix(strings.ToLower(header), "bearer ") {
 		return strings.TrimSpace(header[7:])
 	}
-	return strings.TrimSpace(r.URL.Query().Get("token"))
+	// Only native EventSource (which cannot set Authorization headers) accepts
+	// a query bearer. Never accept URL tokens for ordinary REST endpoints.
+	if r.Method == http.MethodGet && r.URL.Path == "/api/events" {
+		return strings.TrimSpace(r.URL.Query().Get("token"))
+	}
+	return ""
 }
 
 func Middleware(secret string, next http.Handler) http.Handler {
