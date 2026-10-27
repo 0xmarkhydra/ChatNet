@@ -374,3 +374,57 @@ ALTER TABLE call_participants ALTER COLUMN joined_at DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_call_participants_user_invited
 ON call_participants(user_id, invited_at DESC);
+
+-- Marketplace v1: product price unit is seller-supplied catalog metadata,
+-- NOT an approved payment method. No customer funds are held or moved here.
+CREATE TABLE IF NOT EXISTS market_products (
+    id BIGSERIAL PRIMARY KEY,
+    seller_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(160) NOT NULL CHECK (length(trim(title)) > 0),
+    description TEXT NOT NULL DEFAULT '',
+    price_amount BIGINT NOT NULL CHECK (price_amount > 0),
+    price_unit VARCHAR(16) NOT NULL CHECK (length(trim(price_unit)) > 0),
+    stock INTEGER NOT NULL CHECK (stock >= 0),
+    status VARCHAR(16) NOT NULL DEFAULT 'draft'
+       CHECK (status IN ('draft','published','archived')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_market_products_published
+    ON market_products(id DESC) WHERE status='published';
+CREATE INDEX IF NOT EXISTS idx_market_products_seller
+    ON market_products(seller_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS market_cart_items (
+    buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
+    quantity INTEGER NOT NULL CHECK (quantity > 0 AND quantity <= 99),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (buyer_id, product_id)
+);
+
+-- Checkout creates a non-binding preview order until payment method,
+-- compliance, funds flow, inventory reservation and refund rules are approved.
+CREATE TABLE IF NOT EXISTS market_orders (
+    id BIGSERIAL PRIMARY KEY,
+    buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    seller_id BIGINT NOT NULL REFERENCES users(id),
+    idempotency_key VARCHAR(100) NOT NULL,
+    amount_total BIGINT NOT NULL CHECK (amount_total > 0),
+    price_unit VARCHAR(16) NOT NULL,
+    status VARCHAR(40) NOT NULL DEFAULT 'awaiting_payment_configuration'
+        CHECK (status = 'awaiting_payment_configuration'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (buyer_id, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_market_orders_buyer
+    ON market_orders(buyer_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS market_order_items (
+    order_id BIGINT NOT NULL REFERENCES market_orders(id) ON DELETE CASCADE,
+    product_id BIGINT NOT NULL REFERENCES market_products(id),
+    title VARCHAR(160) NOT NULL,
+    unit_price BIGINT NOT NULL CHECK (unit_price > 0),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    PRIMARY KEY (order_id, product_id)
+);

@@ -106,6 +106,7 @@ func main() {
 	mux.Handle("GET /api/stories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listStories)))
 	mux.Handle("POST /api/stories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createStory)))
 	mux.Handle("DELETE /api/stories/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteStory)))
+	s.mountMarketplace(mux)
 
 	port := config.Env("PORT", "8083")
 	log.Printf("feed service listening on :%s", port)

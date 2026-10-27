@@ -81,6 +81,7 @@ func main() {
 	mux.Handle("/api/feed/", feedProxy)
 	mux.Handle("/api/stories", feedProxy)
 	mux.Handle("/api/stories/", feedProxy)
+	mux.Handle("/api/marketplace/", feedProxy)
 
 	if staticDir := strings.TrimSpace(os.Getenv("STATIC_DIR")); staticDir != "" {
 		mux.Handle("/", spaHandler(staticDir))

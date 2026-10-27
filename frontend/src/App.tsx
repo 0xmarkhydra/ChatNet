@@ -19,6 +19,7 @@ import { SocoEmptyState, SocoTextAction } from './SocoUI'
 import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
+const Marketplace = lazy(() => import('./Marketplace'))
 const ProfileQr = lazy(() => import('./ProfileQr'))
 import {
   defaultBundle,
@@ -166,7 +167,7 @@ type Story = {
   expiresAt: string
 }
 
-type Tab = 'chat' | 'contacts' | 'discover' | 'feed' | 'profile'
+type Tab = 'chat' | 'contacts' | 'discover' | 'market' | 'feed' | 'profile'
 type AuthMode = 'login' | 'register'
 type RegisterStep = 'details' | 'otp'
 type NewChatMode = 'none' | 'friends' | 'direct' | 'group'
@@ -3931,7 +3932,7 @@ export default function App() {
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
-      {tab !== 'profile' && tab !== 'discover' && (
+      {tab !== 'profile' && tab !== 'discover' && tab !== 'market' && (
       <header className="chatnet-appbar">
         <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SOCO</strong></div>
           <label className="appbar-search">
@@ -5048,6 +5049,13 @@ export default function App() {
         )}
 
         {tab === 'discover' && (
+          <div className="marketplace-entry">
+            <div><h3>SOCO Market</h3><p>Mua bán trong ChatNet — trò chuyện, giỏ hàng và theo dõi yêu cầu đơn.</p></div>
+            <button type="button" onClick={() => switchTab('market')}>Mở sàn mua bán</button>
+          </div>
+        )}
+
+        {tab === 'discover' && (
           <Suspense
             fallback={(
               <p role="status">Đang mở Quanh đây...</p>
@@ -5078,6 +5086,12 @@ export default function App() {
                       : 'Kết bạn'
               }}
             />
+          </Suspense>
+        )}
+
+        {tab === 'market' && (
+          <Suspense fallback={<p role="status">Đang mở SOCO Market...</p>}>
+            <Marketplace key={session.sessionId} userId={session.user.id} request={apiFetch} onBack={() => switchTab('discover')} />
           </Suspense>
         )}
 
