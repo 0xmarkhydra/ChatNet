@@ -6,7 +6,7 @@ import 'package:soco/demo.dart';
 import 'package:soco/profile_qr.dart';
 
 void main() {
-  testWidgets('demo opens responsive SOCO shell', (tester) async {
+  testWidgets('demo opens responsive SocCo shell', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -14,7 +14,7 @@ void main() {
     await tester.pumpWidget(SocoApp(api: DemoApi()));
     await tester.pumpAndSettle();
 
-    expect(find.text('SOCO'), findsWidgets);
+    expect(find.text('SocCo'), findsWidgets);
     expect(find.text('Trò chuyện'), findsOneWidget);
     expect(find.text('Kết nối'), findsOneWidget);
     expect(find.text('14:00'), findsNWidgets(3));
@@ -37,7 +37,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('web-appbar')), findsOneWidget);
     expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
-    expect(find.text('SOCO'), findsWidgets);
+    expect(find.text('SocCo'), findsWidgets);
     expect(find.text('Kết nối'), findsOneWidget);
   });
 
@@ -77,7 +77,7 @@ void main() {
 
     await tester.pumpWidget(SocoApp(api: DemoApi()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SOCO Design Team').first);
+    await tester.tap(find.text('SocCo Design Team').first);
     await tester.pumpAndSettle();
     expect(find.textContaining('Sẵn sàng!'), findsOneWidget);
     expect(find.byKey(const ValueKey('web-appbar')), findsOneWidget);
@@ -215,7 +215,7 @@ void main() {
     await tester.tap(find.byTooltip('Gọi video'));
     await tester.pump();
 
-    expect(find.text('SOCO SECURE CALL'), findsOneWidget);
+    expect(find.text('SocCo SECURE CALL'), findsOneWidget);
     expect(find.text('Tắt mic'), findsOneWidget);
     expect(find.text('Tắt camera'), findsOneWidget);
     expect(find.text('Kết thúc'), findsOneWidget);

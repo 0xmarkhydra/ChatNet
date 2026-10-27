@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "cloud.codelocal" "\0"
-            VALUE "FileDescription", "SOCO" "\0"
+            VALUE "FileDescription", "SocCo" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "soco" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 cloud.codelocal. All rights reserved." "\0"
             VALUE "OriginalFilename", "soco.exe" "\0"
-            VALUE "ProductName", "SOCO" "\0"
+            VALUE "ProductName", "SocCo" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

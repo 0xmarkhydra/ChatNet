@@ -4,7 +4,7 @@
 Chỉ đổi giao diện `SecureCallRoom` và xử lý quyền cho cuộc gọi trên Web/PWA. Không đổi Flutter/iOS native; giữ LiveKit E2EE, Gemini backend proxy, JWT, Redis session, quy tắc audio permission.
 
 ## Thiết kế
-- Đồng bộ ChatNet/SOCO: gradient xanh tím, nền midnight navy, kính mờ nhẹ, góc bo iOS, shadow tinh tế, Lucide React.
+- Đồng bộ ChatNet/SocCo: gradient xanh tím, nền midnight navy, kính mờ nhẹ, góc bo iOS, shadow tinh tế, Lucide React.
 - Topbar: avatar tên cuộc gọi, "Bảo mật", số người, trạng thái dịch; chi tiết kỹ thuật chỉ trong tooltip.
 - Khu vực video: tile lớn, viền phát sáng tinh tế ở người đang nói, nhãn tên dạng pill.
 - 5 điều khiển: Mic, Camera, Dịch AI, Thêm, Kết thúc. Menu Thêm: chia sẻ màn hình, âm thanh, phụ đề, cấp/thu hồi đồng ý AI.

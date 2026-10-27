@@ -1,4 +1,4 @@
-/* Mobile-first SOCO conversation actions. Rendered in a body portal so iOS
+/* Mobile-first SocCo conversation actions. Rendered in a body portal so iOS
    safe areas / frosted headers never become a containing block for the sheet. */
 .soco-group-actions-overlay {
   position: fixed;

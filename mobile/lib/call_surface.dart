@@ -88,7 +88,7 @@ class _CallSurfaceState extends State<_CallSurface> {
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'SOCO SECURE CALL',
+                        'SocCo SECURE CALL',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 12,

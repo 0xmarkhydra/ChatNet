@@ -15,11 +15,11 @@
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>NSCameraUsageDescription</key>
-	<string>SOCO uses the camera for profile QR scanning and video calls.</string>
+	<string>SocCo uses the camera for profile QR scanning and video calls.</string>
 	<key>NSLocationUsageDescription</key>
-	<string>SOCO uses your temporary location to find nearby people.</string>
+	<string>SocCo uses your temporary location to find nearby people.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>SOCO uses the microphone for voice messages and calls.</string>
+	<string>SocCo uses the microphone for voice messages and calls.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
