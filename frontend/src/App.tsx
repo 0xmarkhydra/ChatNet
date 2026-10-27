@@ -833,7 +833,7 @@ export default function App() {
 
   function beginMessageLongPress(message: Message, x: number, y: number, button: number, target: EventTarget | null) {
     if (message.deleted || button !== 0) return
-    if (target instanceof Element && target.closest('button,a,input,textarea,select,video,audio')) return
+    if (target instanceof Element && target.closest('button,a,input,textarea,select,video,audio,.message-selectable-text')) return
     cancelMessageLongPress()
     messageLongPressStart.current = { x, y, messageId: message.id }
     messageLongPressTimer.current = window.setTimeout(() => {
@@ -4692,6 +4692,7 @@ export default function App() {
                           onPointerLeave={cancelMessageLongPress}
                           onContextMenu={(event) => {
                             if (message.deleted) return
+                            if (event.target instanceof Element && event.target.closest('.message-selectable-text')) return
                             event.preventDefault()
                             openMessageActions(message)
                           }}
@@ -4711,7 +4712,7 @@ export default function App() {
                                 <div className={translatedText ? 'bubble translated-bubble translation-flip-bubble' : 'bubble'}>
                                   <span
                                     key={translatedText ? `${message.id}-${originalVisible ? 'original' : 'translated'}` : `${message.id}-plain`}
-                                    className="translation-flip-content"
+                                    className="translation-flip-content message-selectable-text"
                                   >
                                     {translatedText
                                       ? originalVisible ? message.text : translatedText
@@ -4776,7 +4777,11 @@ export default function App() {
                             <strong>@{outgoingMessage.replyToSender}</strong><span>{outgoingMessage.replyToText}</span>
                           </div>
                         )}
-                        {outgoingMessage.text && <div className="bubble">{outgoingMessage.text}</div>}
+                        {outgoingMessage.text && (
+                          <div className="bubble">
+                            <span className="message-selectable-text">{outgoingMessage.text}</span>
+                          </div>
+                        )}
                         <MediaAttachmentsView items={outgoingMessage.attachments} />
                         <div className="message-stamp" role="status">Đang gửi...</div>
                       </article>

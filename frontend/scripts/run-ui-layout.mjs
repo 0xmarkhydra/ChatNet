@@ -377,6 +377,27 @@ try {
   await page.locator('.conversation-item').first().click()
   await page.waitForFunction(() => document.querySelectorAll('.message-press-target').length === 40, null, { timeout: 6000 })
   check(await page.locator('.message-press-target').count() === 40, 'Initial message page must show 40 items')
+  const selectableMessageText = page.locator('.message-press-target .message-selectable-text').first()
+  const selectableMessageResult = await selectableMessageText.evaluate(node => {
+    const style = getComputedStyle(node)
+    const textNode = Array.from(node.childNodes).find(child => child.nodeType === Node.TEXT_NODE)
+    if (!(textNode instanceof Text) || textNode.data.length < 2) {
+      return { cursor: style.cursor, userSelect: style.userSelect, selected: '', total: textNode?.textContent?.length || 0 }
+    }
+    const range = document.createRange()
+    range.setStart(textNode, 0)
+    range.setEnd(textNode, Math.min(5, textNode.data.length - 1))
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    const selected = selection?.toString() || ''
+    selection?.removeAllRanges()
+    return { cursor: style.cursor, userSelect: style.userSelect, selected, total: textNode.data.length }
+  })
+  check(selectableMessageResult.cursor === 'text' && selectableMessageResult.userSelect === 'text',
+    'Message text must show an I-beam cursor and allow text selection: ' + JSON.stringify(selectableMessageResult))
+  check(selectableMessageResult.selected.length > 0 && selectableMessageResult.selected.length < selectableMessageResult.total,
+    'Message text must allow selecting only part of its content: ' + JSON.stringify(selectableMessageResult))
   const oldList = page.locator('.messages')
   await page.getByRole('button', { name: 'Tải thêm tin nhắn cũ' }).scrollIntoViewIfNeeded()
   const beforePosition = await oldList.evaluate(node => ({ scrollTop: node.scrollTop, height: node.scrollHeight }))
