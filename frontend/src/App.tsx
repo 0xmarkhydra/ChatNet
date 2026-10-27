@@ -673,7 +673,7 @@ export default function App() {
   if (!messageSound.current) messageSound.current = new IncomingMessageSound()
   useEffect(() => {
     // Browsers permit sound only after an interaction. Warm up Web Audio on a
-    // real user gesture, without playing a notification just for opening SOCO.
+    // real user gesture, without playing a notification just for opening SocCo.
     const unlockAudio = () => {
       if (messageSoundEnabledRef.current) messageSound.current?.unlock()
     }
@@ -789,8 +789,8 @@ export default function App() {
     if (!session?.user.username) return
     const url = connectUrl(session.user.username)
     const shareData = {
-      title: `Kết nối với @${session.user.username} trên SOCO`,
-      text: `Kết nối với ${session.user.displayName || '@' + session.user.username} trên SOCO`,
+      title: `Kết nối với @${session.user.username} trên SocCo`,
+      text: `Kết nối với ${session.user.displayName || '@' + session.user.username} trên SocCo`,
       url,
     }
     try {
@@ -799,7 +799,7 @@ export default function App() {
         return
       }
       await navigator.clipboard.writeText(url)
-      setNotice('Đã sao chép link hồ sơ SOCO.', 'success')
+      setNotice('Đã sao chép link hồ sơ SocCo.', 'success')
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
       setNotice('Không thể chia sẻ hồ sơ trên thiết bị này.', 'error')
@@ -810,7 +810,7 @@ export default function App() {
     if (!session?.user.username) return
     try {
       await navigator.clipboard.writeText(connectUrl(session.user.username))
-      setNotice('Đã sao chép link kết nối SOCO.', 'success')
+      setNotice('Đã sao chép link kết nối SocCo.', 'success')
     } catch {
       setNotice('Không sao chép được link trên trình duyệt này.', 'error')
     }
@@ -941,7 +941,7 @@ export default function App() {
     const handleInstalled = () => {
       setInstallPrompt(null)
       setIsStandalone(true)
-      setNotice('SOCO đã được cài vào thiết bị')
+      setNotice('SocCo đã được cài vào thiết bị')
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall)
@@ -1714,7 +1714,7 @@ export default function App() {
 
   async function previewMessageSound() {
     const played = await messageSound.current?.preview()
-    if (!played) setNotice('Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SOCO.', 'warning')
+    if (!played) setNotice('Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SocCo.', 'warning')
   }
 
   function toggleMessageSound() {
@@ -1751,7 +1751,7 @@ export default function App() {
 
     const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
     if (isiOS && !isStandalone && !pushEnabled) {
-      setNotice('Trên iPhone: thêm SOCO vào Màn hình chính trước, rồi mở app và bật thông báo.')
+      setNotice('Trên iPhone: thêm SocCo vào Màn hình chính trước, rồi mở app và bật thông báo.')
       return
     }
 
@@ -1767,7 +1767,7 @@ export default function App() {
 
       if (state.permission === 'denied') {
         setNotice(
-          'Thông báo đang bị chặn. Hãy mở cài đặt của trình duyệt/PWA → Notifications → Allow rồi quay lại SOCO.',
+          'Thông báo đang bị chặn. Hãy mở cài đặt của trình duyệt/PWA → Notifications → Allow rồi quay lại SocCo.',
         )
       } else if (state.permission === 'unsupported') {
         setNotice('Thiết bị hoặc trình duyệt này chưa hỗ trợ Web Push.')
@@ -1776,9 +1776,9 @@ export default function App() {
           'Chưa bật được thông báo. Vui lòng thử lại và chọn Cho phép.',
         )
       } else if (state.optedIn) {
-        setNotice('Đã bật thông báo SOCO.')
+        setNotice('Đã bật thông báo SocCo.')
       } else {
-        setNotice('Đã tắt thông báo SOCO')
+        setNotice('Đã tắt thông báo SocCo')
       }
     } catch {
       setNotice('Không thể bật thông báo. Kiểm tra quyền Notification của trình duyệt/PWA rồi thử lại.')
@@ -3769,8 +3769,8 @@ export default function App() {
     return (
       <main className="auth-screen">
         <section className="auth-copy">
-          <img src="/soco-mark.svg" width="52" height="52" alt="SOCO" />
-          <h1>SOCO</h1>
+          <img src="/soco-mark.svg" width="52" height="52" alt="SocCo" />
+          <h1>SocCo</h1>
           <p>Understand. Connect. Together.</p>
         </section>
 
@@ -3779,7 +3779,7 @@ export default function App() {
             <div className="otp-icon">✉️</div>
             <h2>Kiểm tra email của bạn</h2>
             <p className="auth-hint">
-              SOCO đã gửi mã xác minh 6 số tới <strong>{verificationEmail || 'email của bạn'}</strong>.
+              SocCo đã gửi mã xác minh 6 số tới <strong>{verificationEmail || 'email của bạn'}</strong>.
               Mã có hiệu lực trong 10 phút.
             </p>
 
@@ -3813,7 +3813,7 @@ export default function App() {
 
             {authError && <div className="auth-error">{authError}</div>}
             <button className="auth-submit" disabled={authLoading || otpCode.length !== 6 || otpSecondsLeft <= 0}>
-              {authLoading ? 'Đang xác minh...' : 'Xác minh & vào SOCO'}
+              {authLoading ? 'Đang xác minh...' : 'Xác minh & vào SocCo'}
             </button>
             <button type="button" className="auth-secondary" onClick={resetRegistration} disabled={authLoading}>
               Dùng email khác
@@ -3933,7 +3933,7 @@ export default function App() {
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
       {tab !== 'profile' && tab !== 'discover' && (
       <header className="chatnet-appbar">
-        <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SOCO</strong></div>
+        <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SocCo</strong></div>
           <label className="appbar-search">
             <UiIcon name="search" size={27} />
             <input
@@ -4112,7 +4112,7 @@ export default function App() {
                     <div className="connect-ios-header">
                       <div>
                         <strong id="connect-modal-title">Kết nối</strong>
-                        <small>Tìm bạn bè trên SOCO</small>
+                        <small>Tìm bạn bè trên SocCo</small>
                       </div>
                       <button
                         type="button"
@@ -5561,7 +5561,7 @@ export default function App() {
             <section className="profile-hero">
               <div className={`profile-cover-art ${profileMedia?.coverSet ? 'has-cover' : ''}`}>
                 <div className="profile-cover-placeholder">
-                  <strong>SOCO</strong>
+                  <strong>SocCo</strong>
                   <small>Understand. Connect. Together.</small>
                 </div>
                 {profileMedia?.coverSet && (

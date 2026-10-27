@@ -1,5 +1,5 @@
 /*
- * SOCO 1.1: reusable screen layout and iOS-inspired interaction polish.
+ * SocCo 1.1: reusable screen layout and iOS-inspired interaction polish.
  * Unlike the legacy skin, this sheet styles the new semantic screen components.
  * Keep all behavior, routes and API requests in existing React feature modules.
  */
@@ -329,7 +329,7 @@
   .soco-text-action { transition: none; transform: none !important; }
 }
 
-/* Regression fix: legacy desktop profile uses a two-column grid; SOCO headings
+/* Regression fix: legacy desktop profile uses a two-column grid; SocCo headings
    were inserted as grid children and split the page into alternating columns. */
 @media (min-width: 900px) {
   .modern-shell .simple-view.profile-view {
@@ -444,7 +444,7 @@
     min-height: 52px;
   }
 }
-/* SOCO feed and navigation simplification (approved mobile review). */
+/* SocCo feed and navigation simplification (approved mobile review). */
 .modern-shell .bottom-navigation > button.active,
 .modern-shell .bottom-navigation > button.active .nav-icon {
   background: transparent;
@@ -802,7 +802,7 @@
   }
 }
 
-/* SOCO account actions: Logout belongs to the settings card, not a detached
+/* SocCo account actions: Logout belongs to the settings card, not a detached
    wide footer with one red button pushed to the far right. */
 .modern-shell .profile-view > .settings-card { overflow: hidden; }
 .modern-shell .settings-card > .settings-row:last-child { border-bottom: 0; }
@@ -1109,7 +1109,7 @@
   .modern-shell .profile-view .settings-current-locale { max-width: 42%; }
 }
 
-/* SOCO compact iPhone profile — one readable screen, no oversized edit form.
+/* SocCo compact iPhone profile — one readable screen, no oversized edit form.
    Controls stay >=44px high and font-size 16px prevents Safari input zoom. */
 @media (max-width: 760px) {
   .modern-shell .simple-view.profile-view {

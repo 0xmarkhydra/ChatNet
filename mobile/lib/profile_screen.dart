@@ -269,7 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           const Text(
-                                            'SOCO',
+                                            'SocCo',
                                             style: TextStyle(
                                               color: Colors.white,
                                               fontSize: 27,

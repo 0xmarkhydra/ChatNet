@@ -1,6 +1,6 @@
-# SOCO Flutter
+# SocCo Flutter
 
-Cross-platform SOCO client for mobile, tablet, web, and desktop.
+Cross-platform SocCo client for mobile, tablet, web, and desktop.
 
 ## Run
 
