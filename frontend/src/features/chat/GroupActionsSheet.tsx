@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Check, ChevronRight, Images, Languages, MoreHorizontal, Phone, Search, Settings2, Users, Video, X } from 'lucide-react'
-import { filterLanguageOptions, type LanguageOption } from './languages'
+import { filterLanguageOptions, type LanguageOption } from '../i18n/languages'
 import './group-actions-sheet.css'
 
 type GroupActionsSheetProps = {

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const root = new URL('../', import.meta.url)
 const read = (file) => readFileSync(new URL(file, root), 'utf8')
-const ui = read('src/CallManager.tsx')
-const transport = read('src/callMediaInterpreter.ts')
+const ui = read('src/features/calls/CallManager.tsx')
+const transport = read('src/features/calls/callMediaInterpreter.ts')
 const backend = read('../backend/cmd/call/translation.go')
 const callRoutes = read('../backend/cmd/call/main.go')
 const secrets = ['GEMINI_API_KEY', 'generativelanguage.googleapis.com', 'auth_tokens', 'BidiGenerateContent', 'liveConnectConstraints', 'gemini-3.5-live']
