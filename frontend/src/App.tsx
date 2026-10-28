@@ -2,9 +2,10 @@ import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEff
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
 import FeedPostActions, { FeedShareAction } from './FeedPostActions'
 import FeedModeration from './FeedModeration'
+import ProfileOverlay from './ProfileOverlay'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
-import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
+import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from './incomingSound'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from './chatPersistence'
@@ -590,6 +591,30 @@ export default function App() {
   const nearbyRequest = useRef(0)
 
   const [posts, setPosts] = useState<Post[]>([])
+  const [profileTimelineOpen, setProfileTimelineOpen] = useState(false)
+  const [profileComposerOpen, setProfileComposerOpen] = useState(false)
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false)
+  const [postSubmitError, setPostSubmitError] = useState('')
+  useEffect(() => {
+    if (tab !== 'profile' || !profileTimelineOpen) {
+      setProfileComposerOpen(false)
+      setProfileEditorOpen(false)
+    }
+  }, [tab, profileTimelineOpen])
+  const [profilePosts, setProfilePosts] = useState<Post[]>([])
+  const [profilePostsBusy, setProfilePostsBusy] = useState(false)
+  const [profilePostsError, setProfilePostsError] = useState('')
+  const [profileHasMore, setProfileHasMore] = useState(false)
+  const profileLoadSequence = useRef(0)
+  const profilePagingBusy = useRef(false)
+  const profileIdentityRef = useRef<HTMLButtonElement>(null)
+  const profileHeadingRef = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (!profileTimelineOpen || tab !== 'profile' || !session?.sessionId) return
+    void loadProfilePosts()
+    profileHeadingRef.current?.focus()
+    return () => { ++profileLoadSequence.current; profilePagingBusy.current = false }
+  }, [profileTimelineOpen, tab, session?.sessionId, session?.user.username])
   const [savedPosts, setSavedPosts] = useState<Post[]>([])
   const [feedFilter, setFeedFilter] = useState<'all' | 'saved'>('all')
   const [hasMoreSavedPosts, setHasMoreSavedPosts] = useState(false)
@@ -731,7 +756,11 @@ export default function App() {
   const visibleMessages = messages.map((message) => reactionPreviews[message.id] ? {
     ...message, reactions: message.deleted ? [] : reactionPreviews[message.id],
   } : message)
-  const activePost = activePostId ? [...visiblePosts, ...savedPosts].find((item) => item.id === activePostId) || null : null
+  const visibleProfilePosts = profilePosts.map(post => likePreviews[post.id] === undefined ? post : {
+    ...post, liked: likePreviews[post.id],
+    likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
+  })
+  const activePost = activePostId ? [...visibleProfilePosts, ...visiblePosts, ...savedPosts].find((item) => item.id === activePostId) || null : null
   const activeMessageAction = messageActionId
     ? messages.find((item) => item.id === messageActionId) || null
     : null
@@ -1831,6 +1860,7 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok || !result) throw new Error('Không lưu được quyền riêng tư.')
       setPrivacy(result)
+      setPrivacyError('')
       setNotice('Đã lưu cài đặt riêng tư')
     } catch {
       if (sessionRef.current?.sessionId === sessionId) {
@@ -2424,6 +2454,43 @@ export default function App() {
     }
   }
 
+  async function loadProfilePosts(more = false) {
+    if (!session || profilePagingBusy.current) return
+    const sessionId = session.sessionId
+    const sequence = ++profileLoadSequence.current
+    const revision = feedRevision.current
+    const before = more && profilePosts.length ? Math.min(...profilePosts.map(post => post.id)) : 0
+    profilePagingBusy.current = true
+    setProfilePostsBusy(true)
+    setProfilePostsError('')
+    try {
+      const response = await apiFetch(`/api/posts?scope=mine&limit=${FEED_PAGE_SIZE}${before ? '&before=' + before : ''}`)
+      if (!response.ok) throw new Error('Không tải được dòng thời gian. Hãy thử lại.')
+      const data = await response.json() as Post[]
+      if (sessionRef.current?.sessionId !== sessionId || sequence !== profileLoadSequence.current) return
+      if (revision !== feedRevision.current) throw new Error('Dòng thời gian vừa thay đổi. Hãy tải lại để cập nhật.')
+      if (!Array.isArray(data) || data.some(post => !Number.isSafeInteger(post.id) || post.id <= 0 || post.author !== sessionRef.current?.user.username)) {
+        throw new Error('Dữ liệu dòng thời gian không hợp lệ. Hãy tải lại.')
+      }
+      setProfilePosts(current => more ? data.reduce((items, post) => mergeById(items, post), current) : data)
+      setProfileHasMore(data.length === FEED_PAGE_SIZE)
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId && sequence === profileLoadSequence.current) {
+        setProfilePostsError(error instanceof Error ? error.message : 'Không tải được dòng thời gian. Hãy thử lại.')
+      }
+    } finally {
+      if (sequence === profileLoadSequence.current) {
+        profilePagingBusy.current = false
+        if (sessionRef.current?.sessionId === sessionId) setProfilePostsBusy(false)
+      }
+    }
+  }
+
+  function closeProfileTimeline() {
+    setProfileTimelineOpen(false)
+    requestAnimationFrame(() => profileIdentityRef.current?.focus())
+  }
+
   async function refreshPosts() {
     const revision = feedRevision.current
     const request = ++feedLoads.current
@@ -2496,6 +2563,8 @@ export default function App() {
   }
 
   function syncFeedPost(updated: Post) {
+    ++feedRevision.current
+    setProfilePosts(current => current.map(p => p.id === updated.id ? updated : p))
     setPosts(current => current.map(p => p.id === updated.id ? updated : p))
     setSavedPosts(current => {
       if (!updated.saved) return current.filter(p => p.id !== updated.id)
@@ -2505,6 +2574,8 @@ export default function App() {
   }
 
   function removeFeedPost(id: number) {
+    ++feedRevision.current
+    setProfilePosts(current => current.filter(p => p.id !== id))
     setPosts(current => current.filter(p => p.id !== id))
     setSavedPosts(current => current.filter(p => p.id !== id))
     setActivePostId(current => current === id ? null : current)
@@ -2737,6 +2808,16 @@ export default function App() {
     setFriendPreview(null)
     setPostText('')
     setPosts([])
+    ++profileLoadSequence.current
+    profilePagingBusy.current = false
+    setProfileTimelineOpen(false)
+    setProfileComposerOpen(false)
+    setProfileEditorOpen(false)
+    setPostSubmitError('')
+    setProfilePosts([])
+    setProfileHasMore(false)
+    setProfilePostsBusy(false)
+    setProfilePostsError('')
     setHasMorePosts(false)
     setPostsLoadingMore(false)
     postsPagingBusy.current = false
@@ -3652,6 +3733,7 @@ export default function App() {
     event.preventDefault()
     if (!session || actionLocks.current.has('feed:create') || mediaUploading || (!postText.trim() && postAttachments.length === 0)) return
 
+    setPostSubmitError('')
     const content = postText.trim()
     const attachments = postAttachments
     const visibility = postVisibility
@@ -3669,13 +3751,19 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok || !Number.isSafeInteger(post.id) || post.id <= 0) throw new Error(post.error || 'Không đăng được bài viết')
       setPosts((current) => [post, ...current.filter((item) => item.id !== post.id)])
+      setProfilePosts(current => [post, ...current.filter(item => item.id !== post.id)])
       setPostText('')
       setPostAttachments([])
       setPostBackground('')
       setShowPostBackgrounds(false)
+      setProfileComposerOpen(false)
       setNotice('Đã đăng bài viết.', 'success')
     } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không đăng được bài viết. Bản nháp được giữ lại.', 'error')
+      if (sessionRef.current?.sessionId === sessionId) {
+        const message = error instanceof Error ? error.message : 'Không đăng được bài viết. Bản nháp được giữ lại.'
+        setPostSubmitError(message)
+        setNotice(message, 'error')
+      }
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         ++feedRevision.current
@@ -3701,6 +3789,7 @@ export default function App() {
       }
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
+      setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được lượt thích.', 'error')
     } finally {
@@ -3756,6 +3845,7 @@ export default function App() {
       if (updated.id !== post.id || !Array.isArray(updated.comments)) throw new Error('Phản hồi không hợp lệ. Bản nháp được giữ lại.')
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
+      setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, comments: updated.comments } : item))
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         ++feedRevision.current
@@ -3896,6 +3986,238 @@ export default function App() {
     if (nextTab !== 'chat') setActiveConversationId(null)
     if (nextTab !== 'contacts') setFriendQuery('')
   }
+
+  const profileIdentityForm = (
+    <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
+              <div className="profile-edit-heading">
+                <div>
+                  <strong>{t('profile.personalInfo')}</strong>
+                  <small>{t('profile.personalInfoHint')}</small>
+                </div>
+              </div>
+              <label className="profile-edit-field">
+                <span>{t('profile.displayName')}</span>
+                <input
+                  type="text"
+                  value={profileDisplayNameDraft}
+                  onChange={(event) => setProfileDisplayNameDraft(event.target.value)}
+                  maxLength={100}
+                  autoComplete="name"
+                  placeholder={t('profile.displayNamePlaceholder')}
+                  disabled={profileSaving}
+                />
+              </label>
+              <label className="profile-edit-field">
+                <span>{t('profile.username')}</span>
+                <div className="profile-username-input">
+                  <b aria-hidden="true">@</b>
+                  <input
+                    type="text"
+                    value={profileUsernameDraft}
+                    onChange={(event) => setProfileUsernameDraft(event.target.value.toLowerCase())}
+                    minLength={3}
+                    maxLength={32}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoComplete="username"
+                    placeholder="username"
+                    disabled={profileSaving}
+                  />
+                </div>
+                <small>{t('profile.usernameHint')}</small>
+              </label>
+              <button
+                type="submit"
+                className="profile-save-button"
+                disabled={
+                  profileSaving ||
+                  !profileMedia ||
+                  (
+                    profileDisplayNameDraft.trim() === profileMedia.displayName &&
+                    profileUsernameDraft.trim().toLowerCase() === profileMedia.username
+                  )
+                }
+              >
+                {profileSaving ? t('common.saving') : t('common.save')}
+              </button>
+            </form>
+  )
+  const profilePrivacyControls = (
+    <>
+      <div className="settings-row">
+                <div>
+                  <strong>Quyền riêng tư tài khoản</strong>
+                  <small>Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. Thiết lập lưu trên máy chủ.</small>
+                </div>
+              </div>
+              {privacyLoading && <div className="settings-row" role="status">Đang tải quyền riêng tư...</div>}
+              {privacyError && <div className="settings-row" role="alert">
+                <span>{privacyError}</span>
+                <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>Thử lại</button>
+              </div>}
+              {privacy && ([
+                ['searchableByUsername', 'Cho phép tìm bằng username', 'Người khác có thể tìm @username của bạn.'],
+                ['searchableByName', 'Cho phép tìm bằng tên', 'Tên hiển thị của bạn có thể xuất hiện trong kết quả.'],
+                ['searchableByEmail', 'Cho phép tìm bằng email', 'Chỉ tìm bằng email khớp chính xác; địa chỉ email không được hiển thị.'],
+                ['allowFriendRequests', 'Cho phép lời mời mới', 'Tắt để ngăn lời mời kết bạn mới từ người khác.'],
+                ['showOnlineStatus', 'Hiển thị trạng thái online', 'Ẩn sự hiện diện trong danh sách và kết quả tìm kiếm.'],
+              ] as const).map(([key, label, hint]) => (
+                <div className="settings-row" key={key}>
+                  <div><strong>{label}</strong><small>{hint}</small></div>
+                  <button
+                    type="button"
+                    className={`switch-button ${privacy[key] ? 'on' : ''}`}
+                    role="switch"
+                    aria-label={label}
+                    aria-checked={privacy[key]}
+                    disabled={privacyBusy}
+                    onClick={() => void changePrivacy(key)}
+                  ><span /></button>
+                </div>
+              ))}
+    </>
+  )
+  const postAudience = (
+    <label>Ai có thể xem?
+      <select disabled={!!pendingPost} value={postVisibility} onChange={event => setPostVisibility(event.target.value as typeof postVisibility)}>
+        <option value="public">🌐 Công khai</option>
+        <option value="friends">👥 Bạn bè</option>
+        <option value="private">🔒 Chỉ mình tôi</option>
+      </select>
+    </label>
+  )
+  const postComposer = (
+    <form className={`post-box zalo-post-composer ${profileComposerOpen ? 'profile-popup-composer' : ''}`} onSubmit={createPost}>
+              <div className="post-prompt compact-post-prompt">
+                <UserAvatar name={name} className="avatar self-avatar" />
+                {profileComposerOpen && <div className="profile-post-author">
+                  <strong>{profileMedia?.displayName || session.user.displayName || name}</strong>
+                  {postAudience}
+                </div>}
+                <textarea
+                  ref={postComposerRef}
+                  className={postBackground ? 'feed-composer-bg bg-' + postBackground : ''}
+                  disabled={!!pendingPost}
+                  aria-label="Nội dung bài viết"
+                  placeholder="Hôm nay bạn thế nào?"
+                  value={postText}
+                  onChange={(event) => setPostText(event.target.value)}
+                  rows={1}
+                  maxLength={5000}
+                />
+              </div>
+              <input
+                ref={feedImageInputRef}
+                className="hidden-media-input"
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  const files = Array.from(event.currentTarget.files || [])
+                  event.currentTarget.value = ''
+                  void addFeedFiles(files)
+                }}
+              />
+              <input
+                ref={feedVideoInputRef}
+                className="hidden-media-input"
+                type="file"
+                accept="video/*"
+                onChange={(event) => {
+                  const files = Array.from(event.currentTarget.files || [])
+                  event.currentTarget.value = ''
+                  void addFeedFiles(files)
+                }}
+              />
+              <input
+                ref={feedAlbumInputRef}
+                className="hidden-media-input"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(event) => {
+                  const files = Array.from(event.currentTarget.files || [])
+                  event.currentTarget.value = ''
+                  void addFeedFiles(files)
+                }}
+              />
+              {postAttachments.length > 0 && (
+                <div className="feed-pending-media">
+                  <MediaAttachmentsView
+                    items={postAttachments}
+                    pending
+                    onRemove={pendingPost ? undefined : (index) => setPostAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                  />
+                </div>
+              )}
+              <div className="composer-shortcuts">
+                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedImageInputRef.current?.click()}><UiIcon name="photo" size={20} />Ảnh</button>
+                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedVideoInputRef.current?.click()}><UiIcon name="video" size={20} />Video</button>
+                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedAlbumInputRef.current?.click()}><UiIcon name="album" size={20} />Album</button>
+                <button type="button" aria-expanded={showPostBackgrounds} onClick={() => { setShowPostBackgrounds(v => !v); postComposerRef.current?.focus() }}><UiIcon name="text" size={20} />Nền chữ</button>
+              </div>
+              <div className="feed-composer-settings">
+                {!profileComposerOpen && postAudience}
+                {showPostBackgrounds && <div className="feed-background-palette" aria-label="Chọn nền bài viết">
+                  {['', 'violet', 'blue', 'sunset', 'mint', 'night'].map(bg => (
+                    <button key={bg || 'none'} type="button" className={'feed-palette-dot bg-' + (bg || 'none')}
+                      aria-pressed={postBackground === bg} aria-label={bg || 'Không nền'} onClick={() => setPostBackground(bg)}>
+                      {postBackground === bg ? '✓' : ''}
+                    </button>
+                  ))}
+                </div>}
+              </div>
+              {mediaUploading === 'feed' && <div className="media-uploading-note">Đang tải media thẳng lên kho lưu trữ…</div>}
+              {profileComposerOpen && postSubmitError && <p className="profile-post-error" role="alert">{postSubmitError}</p>}
+              {(profileComposerOpen || postText.trim() || postAttachments.length > 0) && (
+                <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading || (!postText.trim() && postAttachments.length === 0)}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
+              )}
+            </form>
+  )
+  const renderPosts = (items: Post[]) => (
+    items.map((post) => (
+                <article className="post zalo-post" key={post.id}>
+                  <UserAvatar name={post.author} className="avatar" />
+                  <div className="post-body">
+                    <div className="post-author">
+                      <div><strong>{post.author === name ? (profileMedia?.displayName || session.user.displayName || name) : post.author}</strong>
+                        <small>{new Date(post.createdAt).toLocaleString('vi-VN')} · {post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}</small></div>
+                      <FeedPostActions post={post} mine={post.author === name} request={apiFetch}
+                        onUpdated={syncFeedPost} onDeleted={removeFeedPost}
+                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
+                    </div>
+                    {post.content && (
+                      <div className={post.background ? 'feed-text-background bg-' + post.background : ''}>
+                        <FeedText api={API} token={session.token}
+                          target={translationPreferencesLoaded ? targetLanguage : ''}
+                          text={post.content} maxLines={5} onExpand={() => setActivePostId(post.id)} />
+                      </div>
+                    )}
+                    <div className="feed-media-preview" onClick={() => setActivePostId(post.id)}>
+                      <MediaAttachmentsView items={post.attachments} />
+                    </div>
+                    {(post.likes > 0 || (post.comments?.length || 0) > 0) && (
+                      <div className="post-engagement-summary">
+                        {post.likes > 0 && <span>{post.likes} lượt thích</span>}
+                        {(post.comments?.length || 0) > 0 && <span>{post.comments.length} bình luận</span>}
+                      </div>
+                    )}
+                    <div className="post-toolbar">
+                      <button type="button" className={post.liked ? 'liked' : ''} disabled={likePreviews[post.id] !== undefined}
+                        aria-pressed={post.liked} aria-busy={likePreviews[post.id] !== undefined} onClick={() => void like(post)}>
+                        <UiIcon name="heart" size={21} /><span>Thích</span>
+                      </button>
+                      <button type="button" className="post-stat post-detail-trigger" onClick={() => setActivePostId(post.id)}>
+                        <UiIcon name="comment" size={21} />
+                        <span>Bình luận</span>
+                      </button>
+                      <FeedShareAction postId={post.id}
+                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
+                    </div>
+                  </div>
+                </article>
+              ))
+  )
 
   return (
     <main className={`app-shell modern-shell ${tab === 'chat' && activeConversation ? 'conversation-open' : ''}`}>
@@ -5142,92 +5464,7 @@ export default function App() {
               ))}
             </div>
 
-            <form className="post-box zalo-post-composer" onSubmit={createPost}>
-              <div className="post-prompt compact-post-prompt">
-                <UserAvatar name={name} className="avatar self-avatar" />
-                <textarea
-                  ref={postComposerRef}
-                  className={postBackground ? 'feed-composer-bg bg-' + postBackground : ''}
-                  disabled={!!pendingPost}
-                  aria-label="Nội dung bài viết"
-                  placeholder="Hôm nay bạn thế nào?"
-                  value={postText}
-                  onChange={(event) => setPostText(event.target.value)}
-                  rows={1}
-                  maxLength={5000}
-                />
-              </div>
-              <input
-                ref={feedImageInputRef}
-                className="hidden-media-input"
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files || [])
-                  event.currentTarget.value = ''
-                  void addFeedFiles(files)
-                }}
-              />
-              <input
-                ref={feedVideoInputRef}
-                className="hidden-media-input"
-                type="file"
-                accept="video/*"
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files || [])
-                  event.currentTarget.value = ''
-                  void addFeedFiles(files)
-                }}
-              />
-              <input
-                ref={feedAlbumInputRef}
-                className="hidden-media-input"
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files || [])
-                  event.currentTarget.value = ''
-                  void addFeedFiles(files)
-                }}
-              />
-              {postAttachments.length > 0 && (
-                <div className="feed-pending-media">
-                  <MediaAttachmentsView
-                    items={postAttachments}
-                    pending
-                    onRemove={pendingPost ? undefined : (index) => setPostAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                  />
-                </div>
-              )}
-              <div className="composer-shortcuts">
-                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedImageInputRef.current?.click()}><UiIcon name="photo" size={20} />Ảnh</button>
-                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedVideoInputRef.current?.click()}><UiIcon name="video" size={20} />Video</button>
-                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedAlbumInputRef.current?.click()}><UiIcon name="album" size={20} />Album</button>
-                <button type="button" aria-expanded={showPostBackgrounds} onClick={() => { setShowPostBackgrounds(v => !v); postComposerRef.current?.focus() }}><UiIcon name="text" size={20} />Nền chữ</button>
-              </div>
-              <div className="feed-composer-settings">
-                <label>Ai có thể xem?
-                  <select value={postVisibility} onChange={event => setPostVisibility(event.target.value as typeof postVisibility)}>
-                    <option value="public">🌐 Công khai</option>
-                    <option value="friends">👥 Bạn bè</option>
-                    <option value="private">🔒 Chỉ mình tôi</option>
-                  </select>
-                </label>
-                {showPostBackgrounds && <div className="feed-background-palette" aria-label="Chọn nền bài viết">
-                  {['', 'violet', 'blue', 'sunset', 'mint', 'night'].map(bg => (
-                    <button key={bg || 'none'} type="button" className={'feed-palette-dot bg-' + (bg || 'none')}
-                      aria-pressed={postBackground === bg} aria-label={bg || 'Không nền'} onClick={() => setPostBackground(bg)}>
-                      {postBackground === bg ? '✓' : ''}
-                    </button>
-                  ))}
-                </div>}
-              </div>
-              {mediaUploading === 'feed' && <div className="media-uploading-note">Đang tải media thẳng lên kho lưu trữ…</div>}
-              {(postText.trim() || postAttachments.length > 0) && (
-                <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
-              )}
-            </form>
+            {postComposer}
 
             <div className="soco-feed-section-label soco-feed-posts-label">
               <strong>{feedFilter === 'saved' ? 'Bài viết đã lưu' : 'Bài viết mới'}</strong>
@@ -5247,47 +5484,7 @@ export default function App() {
                   </div>
                 </article>
               )}
-              {searchedPosts.map((post) => (
-                <article className="post zalo-post" key={post.id}>
-                  <UserAvatar name={post.author} className="avatar" />
-                  <div className="post-body">
-                    <div className="post-author">
-                      <div><strong>{post.author}</strong><small>{new Date(post.createdAt).toLocaleString('vi-VN')}</small></div>
-                      <FeedPostActions post={post} mine={post.author === name} request={apiFetch}
-                        onUpdated={syncFeedPost} onDeleted={removeFeedPost}
-                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
-                    </div>
-                    {post.content && (
-                      <div className={post.background ? 'feed-text-background bg-' + post.background : ''}>
-                        <FeedText api={API} token={session.token}
-                          target={translationPreferencesLoaded ? targetLanguage : ''}
-                          text={post.content} maxLines={5} onExpand={() => setActivePostId(post.id)} />
-                      </div>
-                    )}
-                    <div className="feed-media-preview" onClick={() => setActivePostId(post.id)}>
-                      <MediaAttachmentsView items={post.attachments} />
-                    </div>
-                    {(post.likes > 0 || (post.comments?.length || 0) > 0) && (
-                      <div className="post-engagement-summary">
-                        {post.likes > 0 && <span>{post.likes} lượt thích</span>}
-                        {(post.comments?.length || 0) > 0 && <span>{post.comments.length} bình luận</span>}
-                      </div>
-                    )}
-                    <div className="post-toolbar">
-                      <button type="button" className={post.liked ? 'liked' : ''} disabled={likePreviews[post.id] !== undefined}
-                        aria-pressed={post.liked} aria-busy={likePreviews[post.id] !== undefined} onClick={() => void like(post)}>
-                        <UiIcon name="heart" size={21} /><span>Thích</span>
-                      </button>
-                      <button type="button" className="post-stat post-detail-trigger" onClick={() => setActivePostId(post.id)}>
-                        <UiIcon name="comment" size={21} />
-                        <span>Bình luận</span>
-                      </button>
-                      <FeedShareAction postId={post.id}
-                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
-                    </div>
-                  </div>
-                </article>
-              ))}
+              {renderPosts(searchedPosts)}
               {(feedFilter === 'saved' ? hasMoreSavedPosts : hasMorePosts) && (
                 <button type="button" className="soco-load-more soco-feed-load-more"
                   onClick={() => void (feedFilter === 'saved' ? loadSavedPosts(true) : loadMorePosts())}
@@ -5532,7 +5729,7 @@ export default function App() {
         )}
 
         {tab === 'profile' && (
-          <div className="simple-view profile-view">
+          <div className={`simple-view profile-view ${profileTimelineOpen ? 'personal-timeline-view' : ''}`}>
             <input
               ref={avatarFileInputRef}
               className="hidden-media-input"
@@ -5558,6 +5755,13 @@ export default function App() {
               }}
             />
 
+            {profileTimelineOpen && (
+              <header className="personal-timeline-header">
+                <button type="button" onClick={closeProfileTimeline} aria-label="Quay lại hồ sơ"><ArrowLeft size={20} /></button>
+                <h1 ref={profileHeadingRef} tabIndex={-1}>Trang cá nhân</h1>
+                <button type="button" onClick={() => setProfileEditorOpen(true)}><Settings size={18} /><span>Chỉnh sửa</span></button>
+              </header>
+            )}
             <section className="profile-hero">
               <div className={`profile-cover-art ${profileMedia?.coverSet ? 'has-cover' : ''}`}>
                 <div className="profile-cover-placeholder">
@@ -5586,7 +5790,12 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="profile-identity">
+              <div className="profile-identity" onClick={(event) => {
+                if (!profileTimelineOpen && !(event.target as HTMLElement).closest('button')) {
+                  setProfileTimelineOpen(true)
+                  setGlobalSearch('')
+                }
+              }}>
                 <div className="profile-avatar-editor">
                   <UserAvatar name={name} className="profile-avatar" online />
                   <button
@@ -5600,105 +5809,64 @@ export default function App() {
                     <UiIcon name="photo" size={17} />
                   </button>
                 </div>
-                <div className="profile-identity-copy">
+                <button type="button" ref={profileIdentityRef} className="profile-identity-copy profile-identity-link"
+                  aria-label="Mở trang cá nhân" disabled={profileTimelineOpen}
+                  onClick={() => { setProfileTimelineOpen(true); setGlobalSearch('') }}>
                   <strong>{profileMedia?.displayName || session.user.displayName || name}</strong>
                   <span>@{name}</span>
                   <small className="profile-email">{session.user.email}</small>
-                  <small className="profile-media-hint">
-                    {profileBusy === 'avatar' ? t('profile.avatarUpdating') : t('profile.avatarHint')}
-                  </small>
-                </div>
+                  {!profileTimelineOpen && <small className="profile-media-hint">Xem trang cá nhân · Dòng thời gian ›</small>}
+                </button>
               </div>
             </section>
 
-            <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
-              <div className="profile-edit-heading">
-                <div>
-                  <strong>{t('profile.personalInfo')}</strong>
-                  <small>{t('profile.personalInfoHint')}</small>
+            {profileTimelineOpen ? (
+              <section className="personal-timeline-content" aria-label="Dòng thời gian cá nhân">
+                <div className="personal-timeline-intro">
+                  <div><strong>Khoảnh khắc của bạn</strong><p>Lưu giữ và chia sẻ những câu chuyện mỗi ngày.</p></div>
+                  <button type="button" onClick={() => setProfileComposerOpen(true)}><PencilLine size={18} />Đăng bài</button>
                 </div>
-              </div>
-              <label className="profile-edit-field">
-                <span>{t('profile.displayName')}</span>
-                <input
-                  type="text"
-                  value={profileDisplayNameDraft}
-                  onChange={(event) => setProfileDisplayNameDraft(event.target.value)}
-                  maxLength={100}
-                  autoComplete="name"
-                  placeholder={t('profile.displayNamePlaceholder')}
-                  disabled={profileSaving}
-                />
-              </label>
-              <label className="profile-edit-field">
-                <span>{t('profile.username')}</span>
-                <div className="profile-username-input">
-                  <b aria-hidden="true">@</b>
-                  <input
-                    type="text"
-                    value={profileUsernameDraft}
-                    onChange={(event) => setProfileUsernameDraft(event.target.value.toLowerCase())}
-                    minLength={3}
-                    maxLength={32}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    autoComplete="username"
-                    placeholder="username"
-                    disabled={profileSaving}
-                  />
+                <div className="profile-post-launcher">
+                  <UserAvatar name={name} className="avatar self-avatar" />
+                  <button type="button" onClick={() => setProfileComposerOpen(true)}>
+                    {postText.trim() ? 'Tiếp tục bản nháp của bạn...' : 'Bạn đang nghĩ gì?'}
+                  </button>
+                  <button type="button" className="profile-post-photo" aria-label="Tạo bài viết có ảnh hoặc video"
+                    onClick={() => setProfileComposerOpen(true)}><Images size={23} /></button>
                 </div>
-                <small>{t('profile.usernameHint')}</small>
-              </label>
-              <button
-                type="submit"
-                className="profile-save-button"
-                disabled={
-                  profileSaving ||
-                  !profileMedia ||
-                  (
-                    profileDisplayNameDraft.trim() === profileMedia.displayName &&
-                    profileUsernameDraft.trim().toLowerCase() === profileMedia.username
-                  )
-                }
-              >
-                {profileSaving ? t('common.saving') : t('common.save')}
-              </button>
-            </form>
+                <div className="personal-timeline-label">
+                  <h2>Dòng thời gian</h2>
+                  <button type="button" aria-label="Tải lại dòng thời gian" disabled={profilePostsBusy || !!pendingPost}
+                    onClick={() => void loadProfilePosts()}><RefreshCw size={18} /></button>
+                </div>
+                {profilePostsError && <div className="personal-timeline-error" role="alert">
+                  <p>{profilePostsError}</p>
+                  <button type="button" disabled={profilePostsBusy} onClick={() => void loadProfilePosts(profilePosts.length > 0)}>Thử lại</button>
+                </div>}
+                {profilePostsBusy && <p role="status">Đang tải dòng thời gian...</p>}
+                <div className="feed zalo-feed">
+                  {pendingPost && <article className="post zalo-post outgoing-preview" aria-busy="true">
+                    <UserAvatar name={name} className="avatar" />
+                    <div className="post-body"><strong>Đang đăng...</strong><p>{pendingPost.content}</p>
+                      <MediaAttachmentsView items={pendingPost.attachments} /></div>
+                  </article>}
+                  {renderPosts(visibleProfilePosts)}
+                </div>
+                {!profilePostsBusy && !profilePostsError && profilePosts.length === 0 && !pendingPost && (
+                  <SocoEmptyState title="Chưa có bài viết nào" description="Chia sẻ khoảnh khắc đầu tiên lên trang cá nhân của bạn."
+                    action={<SocoTextAction onClick={() => setProfileComposerOpen(true)}>Đăng bài đầu tiên</SocoTextAction>} />
+                )}
+                {profileHasMore && <button type="button" className="soco-load-more soco-feed-load-more"
+                  disabled={profilePostsBusy || !!pendingPost} onClick={() => void loadProfilePosts(true)}>
+                  {profilePostsBusy ? 'Đang tải...' : 'Xem bài viết cũ hơn'}
+                </button>}
+              </section>
+            ) : (<>
+            {profileIdentityForm}
 
             <div className="soco-profile-section-label">TÙY CHỌN & CÀI ĐẶT</div>
             <section className="settings-card">
-              <div className="settings-row">
-                <div>
-                  <strong>Quyền riêng tư tài khoản</strong>
-                  <small>Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. Thiết lập lưu trên máy chủ.</small>
-                </div>
-              </div>
-              {privacyLoading && <div className="settings-row" role="status">Đang tải quyền riêng tư...</div>}
-              {privacyError && <div className="settings-row" role="alert">
-                <span>{privacyError}</span>
-                <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>Thử lại</button>
-              </div>}
-              {privacy && ([
-                ['searchableByUsername', 'Cho phép tìm bằng username', 'Người khác có thể tìm @username của bạn.'],
-                ['searchableByName', 'Cho phép tìm bằng tên', 'Tên hiển thị của bạn có thể xuất hiện trong kết quả.'],
-                ['searchableByEmail', 'Cho phép tìm bằng email', 'Chỉ tìm bằng email khớp chính xác; địa chỉ email không được hiển thị.'],
-                ['allowFriendRequests', 'Cho phép lời mời mới', 'Tắt để ngăn lời mời kết bạn mới từ người khác.'],
-                ['showOnlineStatus', 'Hiển thị trạng thái online', 'Ẩn sự hiện diện trong danh sách và kết quả tìm kiếm.'],
-              ] as const).map(([key, label, hint]) => (
-                <div className="settings-row" key={key}>
-                  <div><strong>{label}</strong><small>{hint}</small></div>
-                  <button
-                    type="button"
-                    className={`switch-button ${privacy[key] ? 'on' : ''}`}
-                    role="switch"
-                    aria-label={label}
-                    aria-checked={privacy[key]}
-                    disabled={privacyBusy}
-                    onClick={() => void changePrivacy(key)}
-                  ><span /></button>
-                </div>
-              ))}
+              {profilePrivacyControls}
               <div className="settings-row">
                 <div>
                   <strong>Thiết bị đã đăng nhập</strong>
@@ -5871,6 +6039,8 @@ export default function App() {
               </button>
             </section>
 
+            </>)}
+
             {translationPickerOpen && (
               <div className="locale-picker-overlay" role="dialog" aria-modal="true" aria-label={t('profile.translationLanguage')}>
                 <button
@@ -6016,6 +6186,21 @@ export default function App() {
           </div>
         )}
       </section>
+
+      {profileComposerOpen && tab === 'profile' && profileTimelineOpen && (
+        <ProfileOverlay title="Tạo bài viết" busy={!!pendingPost || mediaUploading === 'feed'} onClose={() => setProfileComposerOpen(false)}>
+          {postComposer}
+        </ProfileOverlay>
+      )}
+      {profileEditorOpen && tab === 'profile' && profileTimelineOpen && (
+        <ProfileOverlay title="Chỉnh sửa hồ sơ" drawer busy={profileSaving || privacyBusy} onClose={() => setProfileEditorOpen(false)}>
+          {profileIdentityForm}
+          <section className="settings-card profile-field-permissions" aria-label="Quyền trường thông tin">
+            <h3>Quyền trường thông tin</h3>
+            {profilePrivacyControls}
+          </section>
+        </ProfileOverlay>
+      )}
 
       <CallManager
         request={apiFetch}

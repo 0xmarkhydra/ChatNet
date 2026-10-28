@@ -125,7 +125,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 	scope := r.URL.Query().Get("scope")
-	if scope != "" && scope != "saved" {
+	if scope != "" && scope != "saved" && scope != "mine" {
 		httpx.Error(w, http.StatusBadRequest, "invalid scope")
 		return
 	}
@@ -147,7 +147,8 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE ($1::bigint=0 OR p.id<$1) AND `+feedAccessSQL+`
-		  AND ($4='all' OR EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2))
+		  AND ($4='all' OR ($4='mine' AND p.user_id=$2)
+		       OR ($4='saved' AND EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)))
 		ORDER BY p.id DESC LIMIT $3`, before, claims.UserID, limit, scope)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")

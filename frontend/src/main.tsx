@@ -14,6 +14,7 @@ import './soco-theme.css'
 import './soco-screens.css'
 import './soco-layout-v2.css'
 import './design-system/motion.css'
+import './personal-timeline.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)
