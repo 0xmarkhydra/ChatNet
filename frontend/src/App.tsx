@@ -4,12 +4,13 @@ import FeedPostActions, { FeedShareAction } from './FeedPostActions'
 import FeedModeration from './FeedModeration'
 import type { NearbyUser } from './NearbyExplorer'
 import GroupCreator from './GroupCreator'
-import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
+import { Bell, CalendarDays, Check, ChevronDown, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserRound, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from './incomingSound'
 import { createSessionClient, loadSession, parseSession, type Session } from './session'
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from './chatPersistence'
 import { uploadPresignedFile } from './mediaUpload'
 import { canMarkConversationRead } from './conversationRead'
+import { chatMessageSearchQuery, matchesChatMessageSearch } from './chat-message-filter'
 import { mergeById, toggleCount } from './optimistic'
 import CallManager, { CallHeaderActions } from './CallManager'
 import GroupActionsSheet from './GroupActionsSheet'
@@ -17,6 +18,7 @@ import SharedContent from './SharedContent'
 import VoiceRecorder from './VoiceRecorder'
 import { SocoEmptyState, SocoTextAction } from './SocoUI'
 import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
+import './chat-message-search.css'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
 const ProfileQr = lazy(() => import('./ProfileQr'))
@@ -266,6 +268,21 @@ function attachmentLabel(items?: MediaAttachment[]) {
   return '[Tệp]'
 }
 
+function localCalendarDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function searchResultExcerpt(content: string, keyword: string) {
+  const term = keyword.trim()
+  if (!term) return content
+  const position = content.toLocaleLowerCase('vi-VN').indexOf(term.toLocaleLowerCase('vi-VN'))
+  if (position === -1) return content
+  return <>{content.slice(0, position)}<mark>{content.slice(position, position + term.length)}</mark>{content.slice(position + term.length)}</>
+}
+
 function avatarInitials(name: string) {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (words.length === 0) return '?'
@@ -506,6 +523,71 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
+  const [messageSearchOpen, setMessageSearchOpen] = useState(false)
+  const [messageSearchFilterMenu, setMessageSearchFilterMenu] = useState<'sender' | 'date' | null>(null)
+  const [messageSearchMembersBusy, setMessageSearchMembersBusy] = useState(false)
+  const [messageSearchMembersError, setMessageSearchMembersError] = useState(false)
+  const messageSearchInputRef = useRef<HTMLInputElement>(null)
+  const messageSearchDebounceRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!messageSearchOpen) return
+    const focusFrame = requestAnimationFrame(() => messageSearchInputRef.current?.focus())
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMessageSearchOpen(false)
+    }
+    window.addEventListener('keydown', onEscape)
+    return () => {
+      cancelAnimationFrame(focusFrame)
+      window.removeEventListener('keydown', onEscape)
+    }
+  }, [messageSearchOpen])
+  useEffect(() => {
+    setMessageSearchFilterMenu(null)
+    if (!messageSearchOpen || !activeConversationId || !session?.token) return
+    const conversationId = activeConversationId
+    const sessionId = session.sessionId
+    let cancelled = false
+    setMessageSearchMembersBusy(true)
+    setMessageSearchMembersError(false)
+    void apiFetch(`/api/conversations/${conversationId}/members`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error('members unavailable')
+        const members = (await response.json()) as GroupMember[]
+        if (!cancelled && activeConversationIdRef.current === conversationId && sessionRef.current?.sessionId === sessionId) {
+          setGroupMembers(members)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setMessageSearchMembersError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setMessageSearchMembersBusy(false)
+      })
+    return () => { cancelled = true }
+  }, [messageSearchOpen, activeConversationId, session?.sessionId])
+  useEffect(() => {
+    if (!messageSearchOpen || !messageSearchFilterMenu) return
+    const closeFilterOutside = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest('.chat-message-search-filter-button, .chat-message-search-filter-content')) {
+        setMessageSearchFilterMenu(null)
+      }
+    }
+    document.addEventListener('pointerdown', closeFilterOutside)
+    return () => document.removeEventListener('pointerdown', closeFilterOutside)
+  }, [messageSearchOpen, messageSearchFilterMenu])
+  const [messageSearchKeyword, setMessageSearchKeyword] = useState('')
+  const [messageSearchSender, setMessageSearchSender] = useState('')
+  const [messageSearchFrom, setMessageSearchFrom] = useState('')
+  const [messageSearchTo, setMessageSearchTo] = useState('')
+  const [messageSearchResults, setMessageSearchResults] = useState<Message[]>([])
+  const [messageSearchBusy, setMessageSearchBusy] = useState(false)
+  const [messageSearchError, setMessageSearchError] = useState('')
+  const [messageSearchHasMore, setMessageSearchHasMore] = useState(false)
+  const messageSearchGeneration = useRef(0)
+  const messageSearchQuery = useRef('')
+  const messageSearchLastCursor = useRef<number | null>(null)
+  const pendingMessageJump = useRef<number | null>(null)
+  const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null)
   const messagesPagingBusy = useRef(false)
   const pendingMessageScrollRestore = useRef<{ height: number; top: number } | null>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
@@ -714,7 +796,36 @@ export default function App() {
     ? { id: activeConversation.otherUserId, username: '', displayName: activeConversation.name, online: activeConversation.online }
     : null
   const chatFriendRelationship = chatFriend ? friendRelationship(chatFriend.id) : 'none'
+  const liveMessageSearchFilters = {
+    keyword: messageSearchKeyword, sender: messageSearchSender,
+    from: messageSearchFrom, to: messageSearchTo,
+  }
+  const liveMessageSearchQuery = chatMessageSearchQuery(liveMessageSearchFilters)
+  const messageSearchResultsForDisplay = messageSearchQuery.current === liveMessageSearchQuery
+    ? messageSearchResults.filter((item) => matchesChatMessageSearch(item, liveMessageSearchFilters))
+    : []
+  const messageSearchWaiting = Boolean(liveMessageSearchQuery) && messageSearchQuery.current !== liveMessageSearchQuery
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
+  const messageSearchSenderOptions = useMemo(() => {
+    if (groupMembers.length > 0) return groupMembers
+    // If the member request fails, retain sender choices seen in loaded history.
+    const fallback = new Map<string, GroupMember>()
+    if (session?.user.username) {
+      fallback.set(session.user.username.toLowerCase(), {
+        id: session.user.id, username: session.user.username,
+        displayName: session.user.username, role: 'member', online: false,
+      })
+    }
+    for (const message of messages) {
+      if (!message.sender) continue
+      const key = message.sender.toLowerCase()
+      if (!fallback.has(key)) fallback.set(key, {
+        id: message.senderId, username: message.sender,
+        displayName: message.sender, role: 'member', online: false,
+      })
+    }
+    return Array.from(fallback.values())
+  }, [groupMembers, messages, session?.user.id, session?.user.username])
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
   const groupInviteCandidates = useMemo(() => {
     const memberIds = new Set(groupMembers.map((member) => member.id))
@@ -3079,6 +3190,150 @@ export default function App() {
     }
   }, [session?.sessionId, activeConversationId])
 
+  useEffect(() => {
+    messageSearchGeneration.current++
+    setMessageSearchOpen(false)
+    setMessageSearchResults([])
+    messageSearchQuery.current = ''
+    messageSearchLastCursor.current = null
+    setMessageSearchKeyword('')
+    setMessageSearchSender('')
+    setMessageSearchFrom('')
+    setMessageSearchTo('')
+    setMessageSearchBusy(false)
+    setMessageSearchFilterMenu(null)
+    setMessageSearchError('')
+    setMessageSearchHasMore(false)
+    setHighlightMessageId(null)
+    pendingMessageJump.current = null
+  }, [activeConversationId, session?.sessionId])
+
+  async function searchConversationMessages(more = false) {
+    if (!session || !activeConversationId || (more && (!messageSearchHasMore || messageSearchBusy))) return
+    const conversationId = activeConversationId
+    const sessionId = session.sessionId
+    const generation = ++messageSearchGeneration.current
+    const filters = new URLSearchParams({ target: targetLanguage, limit: '40', tzOffset: String(new Date().getTimezoneOffset()) })
+    if (more) {
+      if (messageSearchLastCursor.current === null) return
+      filters.set('before', String(messageSearchLastCursor.current))
+    } else {
+      messageSearchQuery.current = ''
+      messageSearchLastCursor.current = null
+      setMessageSearchResults([])
+      setMessageSearchHasMore(false)
+      if (!messageSearchKeyword.trim() && !messageSearchSender.trim() && !messageSearchFrom && !messageSearchTo) {
+        setMessageSearchError('')
+        return
+      }
+      if (messageSearchFrom && messageSearchTo && messageSearchFrom > messageSearchTo) {
+        setMessageSearchError('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.')
+        return
+      }
+      messageSearchQuery.current = chatMessageSearchQuery({
+        keyword: messageSearchKeyword,
+        sender: messageSearchSender,
+        from: messageSearchFrom,
+        to: messageSearchTo,
+      })
+      setMessageSearchResults([])
+    }
+    const fullQuery = messageSearchQuery.current
+    if (fullQuery) for (const [key, value] of new URLSearchParams(fullQuery)) filters.set(key, value)
+    setMessageSearchBusy(true)
+    setMessageSearchError('')
+    try {
+      const response = await apiFetch(`/api/conversations/${conversationId}/messages?${filters}`)
+      if (!response.ok) throw new Error('Không tìm kiếm được tin nhắn.')
+      const found = (await response.json()) as Message[]
+      if (generation !== messageSearchGeneration.current || sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId) return
+      // The backend applies all filters. Verify results again before display to
+      // avoid showing another sender or irrelevant text if a cached API is stale.
+      const currentFilters = {
+        keyword: messageSearchKeyword, sender: messageSearchSender,
+        from: messageSearchFrom, to: messageSearchTo,
+      }
+      const matching = found.filter((item) => matchesChatMessageSearch(item, currentFilters)).reverse()
+      messageSearchLastCursor.current = found.length > 0 ? found[0].id : null
+      setMessageSearchResults((current) => more
+        ? [...current, ...matching.filter((item) => !current.some((existing) => existing.id === item.id))]
+        : matching)
+      setMessageSearchHasMore(found.length === 40)
+    } catch {
+      if (generation === messageSearchGeneration.current) setMessageSearchError('Không tìm kiếm được tin nhắn. Thử lại.')
+    } finally {
+      if (generation === messageSearchGeneration.current) setMessageSearchBusy(false)
+    }
+  }
+
+  // Search as filters change; invalidate in-flight responses so stale results never flash.
+  useEffect(() => {
+    messageSearchGeneration.current++
+    messageSearchQuery.current = ''
+    messageSearchLastCursor.current = null
+    setMessageSearchResults([])
+    setMessageSearchHasMore(false)
+    setMessageSearchError('')
+    setMessageSearchBusy(false)
+    if (messageSearchDebounceRef.current !== null) {
+      window.clearTimeout(messageSearchDebounceRef.current)
+      messageSearchDebounceRef.current = null
+    }
+    if (!messageSearchOpen || !activeConversationId || !session?.token) return
+    if (!messageSearchKeyword.trim() && !messageSearchSender.trim() && !messageSearchFrom && !messageSearchTo) return
+    messageSearchDebounceRef.current = window.setTimeout(() => {
+      messageSearchDebounceRef.current = null
+      void searchConversationMessages()
+    }, 320)
+    return () => {
+      if (messageSearchDebounceRef.current !== null) {
+        window.clearTimeout(messageSearchDebounceRef.current)
+        messageSearchDebounceRef.current = null
+      }
+    }
+  }, [messageSearchOpen, activeConversationId, session?.sessionId, targetLanguage, messageSearchKeyword, messageSearchSender, messageSearchFrom, messageSearchTo])
+
+  useEffect(() => {
+    if (highlightMessageId === null) return
+    const timeout = window.setTimeout(() => setHighlightMessageId(null), 3500)
+    return () => window.clearTimeout(timeout)
+  }, [highlightMessageId])
+
+  async function jumpToConversationMessage(id: number) {
+    if (!session || !activeConversationId) return
+    const conversationId = activeConversationId
+    const sessionId = session.sessionId
+    if (!messages.some((item) => item.id === id)) {
+      setMessageSearchBusy(true)
+      try {
+        const params = new URLSearchParams({ target: targetLanguage, limit: '40', before: String(id + 1) })
+        const response = await apiFetch(`/api/conversations/${conversationId}/messages?${params}`)
+        if (!response.ok) throw new Error('history failed')
+        const page = (await response.json()) as Message[]
+        if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId) return
+        if (!page.some((item) => item.id === id)) throw new Error('message not found')
+        messageScrollAtBottom.current = false
+        setMessages((current) => {
+          const seen = new Set(current.map((item) => item.id))
+          return [...current, ...page.filter((item) => !seen.has(item.id))].sort((a, b) => a.id - b.id)
+        })
+      } catch {
+        setMessageSearchError('Không thể tải tin nhắn này. Thử lại.')
+        return
+      } finally {
+        setMessageSearchBusy(false)
+      }
+    }
+    pendingMessageScrollRestore.current = null
+    messageScrollAtBottom.current = false
+    pendingMessageJump.current = id
+    setHighlightMessageId(id)
+    setMessageSearchFilterMenu(null)
+    // Zalo-style desktop search stays open for navigating more matches.
+    // Narrow screens give the conversation full space to show the target message.
+    if (window.matchMedia('(max-width: 1000px)').matches) setMessageSearchOpen(false)
+  }
+
   async function loadOlderMessages() {
     if (!session || !activeConversationId || messagesPagingBusy.current ||
         !hasMoreMessages || messages.length === 0) return
@@ -3123,6 +3378,15 @@ export default function App() {
   }
 
   useLayoutEffect(() => {
+    const jumpId = pendingMessageJump.current
+    if (jumpId !== null) {
+      const target = document.getElementById(`chat-message-${jumpId}`)
+      if (target) {
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        pendingMessageJump.current = null
+        return
+      }
+    }
     const restore = pendingMessageScrollRestore.current
     const container = messagesScrollRef.current
     if (restore && container) {
@@ -3133,7 +3397,7 @@ export default function App() {
     // Preserve scroll position when reading history; only follow new messages
     // when the reader was already near the bottom of the conversation.
     if (container && messageScrollAtBottom.current) container.scrollTop = container.scrollHeight
-  }, [messages, outgoingMessage])
+  }, [messages, outgoingMessage, highlightMessageId])
 
   useEffect(() => {
     if (
@@ -4270,8 +4534,8 @@ export default function App() {
             </aside>
 
             <section className={activeConversation?.type === 'group'
-              ? `conversation-panel group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}`
-              : 'conversation-panel'}>
+              ? `conversation-panel group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}${messageSearchOpen ? ' chat-search-active' : ''}`
+              : `conversation-panel${messageSearchOpen ? ' chat-search-active' : ''}`}>
               {!activeConversation ? (
                 <div className="conversation-empty">
                   <SocoEmptyState kind="chat" title="Kết nối không biên giới"
@@ -4313,6 +4577,14 @@ export default function App() {
                     )}
 
                     <div className="translate-controls">
+                      <button type="button" className={`chat-search-trigger${messageSearchOpen ? ' active' : ''}`} aria-label="Tìm tin nhắn trong cuộc trò chuyện" title="Tìm tin nhắn" aria-expanded={messageSearchOpen} aria-controls="chat-message-search-panel" onClick={() => {
+                        setMessageSearchOpen((open) => !open)
+                        setMessageSearchFilterMenu(null)
+                        setGroupSettingsOpen(false)
+                        setTranslationMenuOpen(false)
+                      }}>
+                        <Search size={20} strokeWidth={2.1} aria-hidden="true" />
+                      </button>
                       <CallHeaderActions conversationId={activeConversation.id} />
                       <button
                         type="button"
@@ -4663,6 +4935,139 @@ export default function App() {
                     />
                   )}
 
+                  {messageSearchOpen && (
+                      <section id="chat-message-search-panel" className="chat-message-search" aria-labelledby="chat-message-search-title">
+                        <header className="chat-message-search-heading">
+                          <h2 id="chat-message-search-title"><Search size={17} aria-hidden="true" /> Tìm tin nhắn</h2>
+                          <button type="button" className="chat-message-search-close" onClick={() => setMessageSearchOpen(false)} aria-label="Đóng tìm kiếm">
+                            <X size={26} aria-hidden="true" />
+                          </button>
+                        </header>
+                        <div className="chat-message-search-body chat-message-search-body-inline">
+                          <div className="chat-message-search-form">
+                            <div className="chat-message-search-field">
+                              <Search className="chat-message-search-icon" size={20} strokeWidth={2} aria-hidden="true" />
+                              <input ref={messageSearchInputRef} type="search" maxLength={200} value={messageSearchKeyword}
+                                onChange={(event) => setMessageSearchKeyword(event.target.value)}
+                                placeholder="Nhập từ khóa để tìm kiếm" aria-label="Từ khóa tìm kiếm tin nhắn" />
+                            </div>
+                            <div className="chat-message-search-filters">
+                              <span className="chat-message-search-filters-label">Lọc theo:</span>
+                              <div className={`chat-message-search-filter-chip${messageSearchFilterMenu === 'sender' || messageSearchSender ? ' active' : ''}`}>
+                                <button type="button" className="chat-message-search-filter-button"
+                                  aria-expanded={messageSearchFilterMenu === 'sender'}
+                                  onClick={() => setMessageSearchFilterMenu((current) => current === 'sender' ? null : 'sender')}>
+                                  <UserRound size={17} aria-hidden="true" />
+                                  <span>{messageSearchSender ? `@${messageSearchSender}` : 'Người gửi'}</span>
+                                  {!messageSearchSender && <ChevronDown size={16} aria-hidden="true" />}
+                                </button>
+                                {messageSearchSender && (
+                                  <button type="button" className="chat-message-search-filter-remove"
+                                    aria-label={`Xóa bộ lọc người gửi ${messageSearchSender}`}
+                                    title="Xóa lọc người gửi"
+                                    onClick={() => { setMessageSearchSender(''); setMessageSearchFilterMenu(null) }}>
+                                    <X size={15} aria-hidden="true" />
+                                  </button>
+                                )}
+                              </div>
+                              <div className={`chat-message-search-filter-chip${messageSearchFilterMenu === 'date' || messageSearchFrom || messageSearchTo ? ' active' : ''}`}>
+                                <button type="button" className="chat-message-search-filter-button"
+                                  aria-expanded={messageSearchFilterMenu === 'date'}
+                                  onClick={() => setMessageSearchFilterMenu((current) => current === 'date' ? null : 'date')}>
+                                  <CalendarDays size={17} aria-hidden="true" />
+                                  <span>Ngày gửi</span>
+                                  {!messageSearchFrom && !messageSearchTo && <ChevronDown size={16} aria-hidden="true" />}
+                                </button>
+                                {(messageSearchFrom || messageSearchTo) && (
+                                  <button type="button" className="chat-message-search-filter-remove"
+                                    aria-label="Xóa bộ lọc ngày gửi"
+                                    title="Xóa lọc ngày gửi"
+                                    onClick={() => { setMessageSearchFrom(''); setMessageSearchTo(''); setMessageSearchFilterMenu(null) }}>
+                                    <X size={15} aria-hidden="true" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            {messageSearchFilterMenu === 'sender' && (
+                              <div className="chat-message-search-filter-content" role="group" aria-label="Chọn người gửi">
+                                <button type="button" className={`chat-message-search-person${!messageSearchSender ? ' selected' : ''}`}
+                                  onClick={() => { setMessageSearchSender(''); setMessageSearchFilterMenu(null) }}>
+                                  <span className="chat-message-search-all-avatar"><Users size={18} aria-hidden="true" /></span>
+                                  <span className="chat-message-search-person-label"><strong>Tất cả mọi người</strong><small>Mọi người trong cuộc trò chuyện</small></span>
+                                  {!messageSearchSender && <Check size={17} aria-hidden="true" />}
+                                </button>
+                                {messageSearchMembersBusy && <p role="status">Đang tải danh sách thành viên...</p>}
+                                {messageSearchMembersError && <p role="alert">Không tải được thành viên. Thử đóng và mở lại tìm kiếm.</p>}
+                                {messageSearchSenderOptions.map((member) => (
+                                  <button key={member.id} type="button" className={`chat-message-search-person${messageSearchSender.toLowerCase() === member.username.toLowerCase() ? ' selected' : ''}`}
+                                    onClick={() => { setMessageSearchSender(member.username); setMessageSearchFilterMenu(null) }}>
+                                    <UserAvatar name={member.username} className="chat-message-search-avatar" />
+                                    <span className="chat-message-search-person-label">
+                                      <strong>{member.displayName || member.username}{member.id === session.user.id ? ' (Bạn)' : ''}</strong>
+                                      <small>@{member.username}</small>
+                                    </span>
+                                    {messageSearchSender.toLowerCase() === member.username.toLowerCase() && <Check size={17} aria-hidden="true" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {messageSearchFilterMenu === 'date' && (
+                              <div className="chat-message-search-filter-content chat-message-search-date-content" role="group" aria-label="Chọn khoảng thời gian">
+                                <div className="chat-message-search-date-presets">
+                                  {[7, 30, 90].map((days) => (
+                                    <button type="button" key={days} onClick={() => {
+                                      const today = new Date()
+                                      const start = new Date(today)
+                                      start.setDate(start.getDate() - days + 1)
+                                      setMessageSearchFrom(localCalendarDate(start))
+                                      setMessageSearchTo(localCalendarDate(today))
+                                      setMessageSearchFilterMenu(null)
+                                    }}>{days === 7 ? '7 ngày qua' : days === 30 ? '30 ngày qua' : '3 tháng qua'}</button>
+                                  ))}
+                                </div>
+                                <small className="chat-message-search-date-caption">Hoặc chọn khoảng thời gian</small>
+                                <label htmlFor="chat-message-search-from">Từ ngày
+                                  <input id="chat-message-search-from" type="date" value={messageSearchFrom} onChange={(event) => setMessageSearchFrom(event.target.value)} />
+                                </label>
+                                <label htmlFor="chat-message-search-to">Đến ngày
+                                  <input id="chat-message-search-to" type="date" min={messageSearchFrom || undefined}
+                                    value={messageSearchTo} onChange={(event) => setMessageSearchTo(event.target.value)} />
+                                </label>
+                                <button type="button" className="chat-message-search-date-done" onClick={() => setMessageSearchFilterMenu(null)}>Xong</button>
+                              </div>
+                            )}
+
+                          </div>
+                          {messageSearchError && <p className="chat-message-search-feedback" role="alert">{messageSearchError}</p>}
+                          {(messageSearchBusy || messageSearchWaiting) && <p className="chat-message-search-feedback" role="status">Đang lọc tin nhắn…</p>}
+                          {!messageSearchBusy && !messageSearchError && !liveMessageSearchQuery && (
+                            <div className="chat-message-search-empty">
+                              <Search size={24} strokeWidth={1.8} aria-hidden="true" />
+                              <p>Nhập từ khóa hoặc chọn bộ lọc để tìm trong lịch sử trò chuyện.</p>
+                            </div>
+                          )}
+                          {!messageSearchBusy && !messageSearchWaiting && !messageSearchError && messageSearchResultsForDisplay.length === 0 && Boolean(liveMessageSearchQuery) && (
+                            <div className="chat-message-search-empty"><Search size={54} strokeWidth={1.5} aria-hidden="true" /><p>Không tìm thấy tin nhắn phù hợp.<br />Hãy thử từ khóa hoặc bộ lọc khác.</p></div>
+                          )}
+                          {messageSearchResultsForDisplay.length > 0 && (
+                            <div className="chat-message-search-results" aria-label="Kết quả tìm kiếm">
+                              <div className="chat-message-search-result-count">{messageSearchResultsForDisplay.length} kết quả{messageSearchHasMore ? ' (còn nữa)' : ''}</div>
+                              {messageSearchResultsForDisplay.map((result) => (
+                                <button key={result.id} type="button" onClick={() => void jumpToConversationMessage(result.id)} aria-label={`Nhảy tới tin nhắn của ${result.sender}`}>
+                                  <UserAvatar name={result.sender} className="chat-message-search-avatar" />
+                                  <span className="chat-message-search-result-content">
+                                    <span><strong>@{result.sender}</strong><time>{new Date(result.createdAt).toLocaleString('vi-VN')}</time></span>
+                                    <span className="chat-message-search-snippet">{searchResultExcerpt(result.text || 'Tin nhắn đã thu hồi', messageSearchKeyword)}</span>
+                                  </span>
+                                  <span className="chat-message-search-result-arrow" aria-hidden="true">›</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {messageSearchHasMore && !messageSearchWaiting && <button className="chat-message-search-more" type="button" onClick={() => void searchConversationMessages(true)} disabled={messageSearchBusy}>Xem thêm kết quả</button>}
+                        </div>
+                      </section>
+                  )}
                   <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
                     const element = event.currentTarget
                     messageScrollAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100
@@ -4684,7 +5089,8 @@ export default function App() {
                       return (
                         <article
                           key={message.id}
-                          className={mine ? 'message mine message-press-target' : 'message message-press-target'}
+                          id={`chat-message-${message.id}`}
+                          className={`${mine ? 'message mine message-press-target' : 'message message-press-target'}${highlightMessageId === message.id ? ' message-search-highlight' : ''}`}
                           onPointerDown={(event) => beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)}
                           onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
                           onPointerUp={cancelMessageLongPress}
