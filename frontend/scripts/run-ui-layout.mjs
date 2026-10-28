@@ -554,6 +554,30 @@ try {
       await page.screenshot({ path: 'output/playwright/layout/profile-actions-' + width + '.png' })
   }
 
+  // A former friend can be blocked again from the direct-chat options without re-friending.
+  friends.length = 0
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.reload()
+  await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
+  await page.locator('.conversation-item').filter({ hasText: 'minhanh' }).first().click()
+  await page.locator('.chat-friend-bar').waitFor()
+  await page.getByText('Hai bạn chưa kết bạn', { exact: true }).waitFor()
+  const chatOptions = page.getByRole('button', { name: 'Tùy chọn cuộc trò chuyện' })
+  check(await chatOptions.isVisible() && await chatOptions.isEnabled(),
+    'A non-friend with existing direct chat must have a chat options menu')
+  await chatOptions.click()
+  const blockNonFriend = page.getByRole('menu', { name: 'Tùy chọn cuộc trò chuyện' }).getByRole('menuitem', { name: 'Chặn người dùng' })
+  check(await blockNonFriend.isVisible() && await blockNonFriend.isEnabled(),
+    'A non-friend must be able to block via the three-dot menu')
+  const confirmation = new Promise(resolve => page.once('dialog', async dialog => {
+    check(dialog.type() === 'confirm' && dialog.message().includes('Chặn'),
+      'Block must ask for confirmation')
+    await dialog.dismiss()
+    resolve()
+  }))
+  await blockNonFriend.click()
+  await confirmation
+
   // Regression: frontend must POST only strict AttachmentInput fields.
   // A presigned download URL in POST /api/stories previously triggered "invalid body".
   await page.setViewportSize({ width: 390, height: 844 })

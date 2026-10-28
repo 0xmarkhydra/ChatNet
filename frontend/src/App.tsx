@@ -517,7 +517,20 @@ export default function App() {
   const messageLongPressStart = useRef<{ x: number; y: number; messageId: number } | null>(null)
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
   const [groupActionsOpen, setGroupActionsOpen] = useState(false)
-  useEffect(() => setGroupActionsOpen(false), [activeConversationId, tab])
+  const [chatOptionsOpen, setChatOptionsOpen] = useState(false)
+  const chatOptionsRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    setGroupActionsOpen(false)
+    setChatOptionsOpen(false)
+  }, [activeConversationId, tab])
+  useEffect(() => {
+    if (!chatOptionsOpen) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!chatOptionsRef.current?.contains(event.target as Node)) setChatOptionsOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [chatOptionsOpen])
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [groupNameDraft, setGroupNameDraft] = useState('')
   const [groupInviteDraft, setGroupInviteDraft] = useState('')
@@ -2098,7 +2111,8 @@ export default function App() {
   async function blockContact(friend: FriendSearchResult | FriendConnection) {
     const sid = session?.sessionId
     if (!sid || friendBusyIds.has(friend.id)) return
-    if (!window.confirm(`Chặn @${friend.username}? Hai bạn sẽ không thấy tin nhắn của nhau trong nhóm, bài đăng hoặc liên hệ trực tiếp.`)) return
+    const contactLabel = friend.username ? `@${friend.username}` : friend.displayName || 'người dùng này'
+    if (!window.confirm(`Chặn ${contactLabel}? Hai bạn sẽ không thấy tin nhắn của nhau trong nhóm, bài đăng hoặc liên hệ trực tiếp.`)) return
     setFriendBusyIds((old) => new Set(old).add(friend.id))
     setFriendMenuId(null)
     try {
@@ -2109,6 +2123,7 @@ export default function App() {
         setNotice(result?.error || 'Không thể chặn người dùng.', 'error')
         return
       }
+      setChatOptionsOpen(false)
       setFriends((old) => old.filter((item) => item.id !== friend.id))
       setFriendRequests((old) => old.filter((item) => item.id !== friend.id))
       setFriendResults((old) => old.filter((item) => item.id !== friend.id))
@@ -2123,7 +2138,7 @@ export default function App() {
       setBlockPolicyVersion((version) => version + 1)
       void refreshPosts()
       void refreshStories()
-      setNotice(`Đã chặn @${friend.username}.`)
+      setNotice(`Đã chặn ${contactLabel}.`)
       await refreshFriendConnections()
       void refreshConversations()
     } catch {
@@ -4464,6 +4479,45 @@ export default function App() {
                           </>
                         )}
                       </div>
+                      {chatFriend && (
+                        <div
+                          className="chat-options-anchor"
+                          ref={chatOptionsRef}
+                          onBlur={(event) => {
+                            if (!event.currentTarget.contains(event.relatedTarget)) setChatOptionsOpen(false)
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape') {
+                              setChatOptionsOpen(false)
+                              event.stopPropagation()
+                            }
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="chat-options-trigger"
+                            aria-label="Tùy chọn cuộc trò chuyện"
+                            aria-haspopup="menu"
+                            aria-expanded={chatOptionsOpen}
+                            onClick={() => setChatOptionsOpen((open) => !open)}
+                          >
+                            <MoreHorizontal size={22} aria-hidden="true" />
+                          </button>
+                          {chatOptionsOpen && (
+                            <div className="chat-options-menu" role="menu" aria-label="Tùy chọn cuộc trò chuyện">
+                              <button type="button" role="menuitem" className="chat-options-danger"
+                                disabled={friendBusyIds.has(chatFriend.id)}
+                                onClick={() => { setChatOptionsOpen(false); void blockContact(chatFriend) }}>
+                                Chặn người dùng
+                              </button>
+                              <button type="button" role="menuitem"
+                                onClick={() => { setChatOptionsOpen(false); void reportContact(chatFriend) }}>
+                                Báo cáo người dùng
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </header>
 
