@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-import { canMarkConversationRead } from '../src/conversationRead.ts'
+import { canMarkConversationRead } from '../src/features/chat/conversationRead.ts'
 import {
   clearChatPersistence, clearPendingSend, loadChatDrafts,
   loadPendingSend, saveChatDrafts, savePendingSend,
-} from '../src/chatPersistence.ts'
+} from '../src/features/chat/chatPersistence.ts'
 
 const items = new Map()
 const store = {

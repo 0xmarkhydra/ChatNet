@@ -25,7 +25,7 @@ import {
   mediaKeyBuffer, unwrapMediaKey, wrapMediaKey, type EphemeralCallKeyPair,
 } from './callCrypto'
 import { startCallMediaInterpreter, type InterpreterSession, type InterpreterUpdate } from './callMediaInterpreter'
-import { buildLanguageOptions } from './languages'
+import { buildLanguageOptions } from '../i18n/languages'
 import './call.css'
 
 type ConversationLite = { id: number; name: string; type: 'direct' | 'group' }

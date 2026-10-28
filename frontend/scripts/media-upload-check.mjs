@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { uploadPresignedFile } from '../src/mediaUpload.ts'
+import { uploadPresignedFile } from '../src/features/chat/mediaUpload.ts'
 
 class FakeXHR {
   static latest

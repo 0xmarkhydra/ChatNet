@@ -1,25 +1,25 @@
 import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
-import FeedPostActions, { FeedShareAction } from './FeedPostActions'
-import FeedModeration from './FeedModeration'
-import type { NearbyUser } from './NearbyExplorer'
-import GroupCreator from './GroupCreator'
+import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from '../features/feed/FeedDiscussion'
+import FeedPostActions, { FeedShareAction } from '../features/feed/FeedPostActions'
+import FeedModeration from '../features/feed/FeedModeration'
+import type { NearbyUser } from '../features/discover/NearbyExplorer'
+import GroupCreator from '../features/chat/GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
-import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from './incomingSound'
-import { createSessionClient, loadSession, parseSession, type Session } from './session'
-import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from './chatPersistence'
-import { uploadPresignedFile } from './mediaUpload'
-import { canMarkConversationRead } from './conversationRead'
-import { mergeById, toggleCount } from './optimistic'
-import CallManager, { CallHeaderActions } from './CallManager'
-import GroupActionsSheet from './GroupActionsSheet'
-import SharedContent from './SharedContent'
-import VoiceRecorder from './VoiceRecorder'
-import { SocoEmptyState, SocoTextAction } from './SocoUI'
-import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
+import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../features/notifications/incomingSound'
+import { createSessionClient, loadSession, parseSession, type Session } from '../features/auth/session'
+import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from '../features/chat/chatPersistence'
+import { uploadPresignedFile } from '../features/chat/mediaUpload'
+import { canMarkConversationRead } from '../features/chat/conversationRead'
+import { mergeById, toggleCount } from '../shared/lib/optimistic'
+import CallManager, { CallHeaderActions } from '../features/calls/CallManager'
+import GroupActionsSheet from '../features/chat/GroupActionsSheet'
+import SharedContent from '../features/chat/SharedContent'
+import VoiceRecorder from '../features/chat/VoiceRecorder'
+import { SocoEmptyState, SocoTextAction } from '../shared/ui/SocoUI'
+import { getCurrentPositionSmart, geolocationErrorMessage } from '../features/discover/geolocation'
 
-const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
-const ProfileQr = lazy(() => import('./ProfileQr'))
+const NearbyExplorer = lazy(() => import('../features/discover/NearbyExplorer'))
+const ProfileQr = lazy(() => import('../features/profile/ProfileQr'))
 import {
   defaultBundle,
   loadAppLocalePreference,
@@ -31,8 +31,8 @@ import {
   UI_BUNDLE_VERSION,
   UI_MESSAGES,
   type UIBundle,
-} from './i18n'
-import { buildLanguageOptions, filterLanguageOptions, isSupportedLanguageCode } from './languages'
+} from '../features/i18n/i18n'
+import { buildLanguageOptions, filterLanguageOptions, isSupportedLanguageCode } from '../features/i18n/languages'
 import {
   disableOneSignalPush,
   enableOneSignalPush,
@@ -40,7 +40,7 @@ import {
   isPushDisabled,
   setupOneSignal,
   type PushState,
-} from './onesignal'
+} from '../features/notifications/onesignal'
 
 const API =
   import.meta.env.VITE_API_URL ||
