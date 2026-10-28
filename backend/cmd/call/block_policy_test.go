@@ -44,10 +44,12 @@ func TestCallBlockDirectMembershipIntegration(t *testing.T) {
          VALUES('direct',$1,$2) RETURNING id`, fmt.Sprintf("%d:%d", min(ids[0], ids[1]), max(ids[0], ids[1])), ids[0]).Scan(&directID); err != nil {
 		t.Fatal(err)
 	}
+	defer db.Exec(context.Background(), "DELETE FROM conversations WHERE id=$1", directID)
 	if err := db.QueryRow(ctx, `INSERT INTO conversations(type,name,created_by)
          VALUES('group','everyone',$1) RETURNING id`, ids[2]).Scan(&groupID); err != nil {
 		t.Fatal(err)
 	}
+	defer db.Exec(context.Background(), "DELETE FROM conversations WHERE id=$1", groupID)
 	for _, id := range ids {
 		if _, err := db.Exec(ctx, `INSERT INTO conversation_members(conversation_id,user_id,role) VALUES($1,$2,'member')`, groupID, id); err != nil {
 			t.Fatal(err)

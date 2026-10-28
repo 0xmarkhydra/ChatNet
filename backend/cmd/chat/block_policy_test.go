@@ -56,6 +56,7 @@ func TestBlockedGroupVisibilityThreeAccountsIntegration(t *testing.T) {
         VALUES('group','three people',$1) RETURNING id`, ids[0]).Scan(&groupID); err != nil {
 		t.Fatal(err)
 	}
+	defer db.Exec(context.Background(), "DELETE FROM conversations WHERE id=$1", groupID)
 	for i, id := range ids {
 		role := "member"
 		if i == 0 {
@@ -107,6 +108,11 @@ func TestBlockedGroupVisibilityThreeAccountsIntegration(t *testing.T) {
 			}
 		}
 	}
+	// A and B start as friends: blocking removes the friendship, but unblock must not restore it.
+	if _, err := db.Exec(ctx, `INSERT INTO friend_connections(user_low,user_high,requested_by,status)
+		VALUES($1,$2,$3,'accepted')`, min(ids[0], ids[1]), max(ids[0], ids[1]), ids[0]); err != nil {
+		t.Fatal(err)
+	}
 	read(0, []string{"A says hello", "C says hello", "B-secret"}, nil)
 	request(0, "POST", "/api/users/id/block", s.blockUser, ids[1], "", 200)
 	read(0, []string{"A says hello", "C says hello"}, []string{"B-secret"})
@@ -153,5 +159,17 @@ func TestBlockedGroupVisibilityThreeAccountsIntegration(t *testing.T) {
 		t.Fatalf("incorrect realtime/push recipients: %v, %v", allowed, err)
 	}
 	request(0, "DELETE", "/api/users/id/block", s.unblockUser, ids[1], "", 200)
+	read(0, []string{"A says hello", "C says hello", "B-secret"}, nil)
+	var stillFriends bool
+	if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM friend_connections
+		WHERE user_low=$1 AND user_high=$2)`, min(ids[0], ids[1]), max(ids[0], ids[1])).Scan(&stillFriends); err != nil || stillFriends {
+		t.Fatalf("unblock must not restore friendship: %v, %v", stillFriends, err)
+	}
+	// B can now block A without sending or accepting a new friend request.
+	request(1, "POST", "/api/users/id/block", s.blockUser, ids[0], "", 200)
+	read(0, []string{"A says hello", "C says hello"}, []string{"B-secret"})
+	read(1, []string{"C says hello", "B-secret"}, []string{"A says hello"})
+	read(2, []string{"A says hello", "C says hello", "B-secret"}, nil)
+	request(1, "DELETE", "/api/users/id/block", s.unblockUser, ids[0], "", 200)
 	read(0, []string{"A says hello", "C says hello", "B-secret"}, nil)
 }
