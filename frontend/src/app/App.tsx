@@ -1,13 +1,41 @@
+import { useGroupManagement } from '../features/chat/useGroupManagement'
+import { API } from '../shared/lib/config'
+import type { ProfileMediaState, ProfileUpdateResponse, UserPrivacy } from '../features/profile/types'
+import { attachmentRequestBody, type MediaAttachment, type PresignedUpload } from '../shared/lib/media'
+import { emptyDraft, CHAT_LIST_PAGE_SIZE, MESSAGE_PAGE_SIZE, type Message, type MessageReaction, type MessageDraft, type Conversation, type RealtimeEvent, type GroupMember, type NewChatMode } from '../features/chat/types'
+import { FEED_PAGE_SIZE, type Post, type Story } from '../features/feed/types'
+import type { Tab } from './types'
+import type { FriendSearchResult, FriendConnection } from '../features/contacts/types'
+import type { ManagedAccountSession } from '../features/auth/types'
+import type { InstallPromptEvent } from '../features/pwa/types'
+import { inferToastKind, type ToastKind, type ToastNotice } from '../features/notifications/toast'
+import { formatTime, attachmentLabel } from '../shared/lib/format'
+import UserAvatar, { avatarRefreshVersions, profileAssetUrl } from '../shared/ui/UserAvatar'
+import MediaAttachmentsView from '../shared/ui/MediaAttachmentsView'
+import UiIcon from '../shared/ui/UiIcon'
+import NearbyRadar from '../features/discover/NearbyRadar'
+import AuthScreen from '../features/auth/AuthScreen'
+import { useAuthFlow } from '../features/auth/useAuthFlow'
+import PostComposer from '../features/feed/PostComposer'
+import FeedPostCard from '../features/feed/FeedPostCard'
+import StoryViewer from '../features/feed/StoryViewer'
+import MessageActions from '../features/chat/MessageActions'
+import ProfileIdentityForm from '../features/profile/ProfileIdentityForm'
+import BottomNavigation from './BottomNavigation'
+import GroupSettingsPanel from '../features/chat/GroupSettingsPanel'
+import ContactsView from '../features/contacts/ContactsView'
+import PrivacyControls from '../features/profile/PrivacyControls'
+import AccountSessionsPanel from '../features/auth/AccountSessionsPanel'
+import BlockedUsersPanel from '../features/contacts/BlockedUsersPanel'
 import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from '../features/feed/FeedDiscussion'
-import FeedPostActions, { FeedShareAction } from '../features/feed/FeedPostActions'
 import FeedModeration from '../features/feed/FeedModeration'
 import ProfileOverlay from '../features/profile/ProfileOverlay'
 import type { NearbyUser } from '../features/discover/NearbyExplorer'
 import GroupCreator from '../features/chat/GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../features/notifications/incomingSound'
-import { createSessionClient, loadSession, parseSession, type Session } from '../features/auth/session'
+import { createSessionClient, loadSession, type Session } from '../features/auth/session'
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from '../features/chat/chatPersistence'
 import { uploadPresignedFile } from '../features/chat/mediaUpload'
 import { canMarkConversationRead } from '../features/chat/conversationRead'
@@ -43,424 +71,6 @@ import {
   type PushState,
 } from '../features/notifications/onesignal'
 
-const API =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV ? 'http://localhost:8080' : 'https://api-chat.codelocal.cloud')
-
-type User = {
-  id: number
-  email: string
-  username: string
-  displayName: string
-}
-
-type ProfileMediaState = {
-  username: string
-  displayName: string
-  avatarSet: boolean
-  coverSet: boolean
-  updatedAt: string
-}
-
-type ProfileUpdateResponse = ProfileMediaState & {
-  token: string
-}
-
-type MediaAttachment = {
-  id?: number
-  storageRef: string
-  name: string
-  sizeBytes: number
-  contentType: string
-  kind: 'image' | 'video' | 'audio' | 'file'
-  url?: string
-}
-
-/** Only trusted upload input fields are accepted by strict Go JSON decoders.
- * Public signed URLs and response IDs must never be sent back in API requests. */
-const attachmentRequestBody = ({ storageRef, name, sizeBytes, contentType, kind }: MediaAttachment) =>
-  ({ storageRef, name, sizeBytes, contentType, kind })
-
-type PresignedUpload = {
-  uploadUrl: string
-  storageRef: string
-  key: string
-  expiresAt: string
-  kind: MediaAttachment['kind']
-  downloadUrl: string
-}
-
-type MessageReaction = {
-  emoji: string
-  count: number
-  mine: boolean
-}
-
-type Message = {
-  id: number
-  clientId?: string
-  conversationId: number
-  senderId: number
-  sender: string
-  text: string
-  replyToMessageId?: number
-  replyToSender?: string
-  replyToText?: string
-  editedAt?: string
-  deleted?: boolean
-  reactions?: MessageReaction[]
-  readByUserIds?: number[]
-  translatedText?: string
-  translationLanguage?: string
-  attachments?: MediaAttachment[]
-  createdAt: string
-}
-
-type MessageDraft = { text: string; attachments: MediaAttachment[] }
-const emptyDraft: MessageDraft = { text: '', attachments: [] }
-const FEED_PAGE_SIZE = 15
-const CHAT_LIST_PAGE_SIZE = 25
-const MESSAGE_PAGE_SIZE = 40
-
-type Conversation = {
-  id: number
-  type: 'direct' | 'group'
-  name: string
-  otherUserId?: number
-  memberCount: number
-  unreadCount: number
-  lastMessage: string
-  lastMessageAt?: string
-  online: boolean
-  createdAt: string
-}
-
-type RealtimeEvent = {
-  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
-  conversationId: number
-  message?: Message
-  conversation?: Conversation
-  readerId?: number
-  lastReadMessageId?: number
-}
-
-type Post = {
-  id: number
-  author: string
-  content: string
-  likes: number
-  liked: boolean
-  comments: FeedComment[]
-  attachments?: MediaAttachment[]
-  visibility?: 'public' | 'friends' | 'private'
-  background?: string
-  updatedAt?: string
-  saved?: boolean
-  createdAt: string
-}
-
-type Story = {
-  id: number
-  author: string
-  attachment: MediaAttachment
-  createdAt: string
-  expiresAt: string
-}
-
-type Tab = 'chat' | 'contacts' | 'discover' | 'feed' | 'profile'
-type AuthMode = 'login' | 'register'
-type RegisterStep = 'details' | 'otp'
-type NewChatMode = 'none' | 'friends' | 'direct' | 'group'
-
-type FriendSearchResult = {
-  id: number
-  username: string
-  displayName: string
-  online: boolean
-  distanceKm?: number
-  nearbyActive?: boolean
-  locationUpdatedAt?: string
-  mutualGroups?: number
-  reason?: string
-}
-
-type ManagedAccountSession = {
-  id: string
-  userAgent: string
-  createdAt: string
-  lastSeenAt: string
-  expiresAt: string
-  current: boolean
-}
-
-type UserPrivacy = {
-  searchableByUsername: boolean
-  searchableByName: boolean
-  searchableByEmail: boolean
-  allowFriendRequests: boolean
-  showOnlineStatus: boolean
-}
-
-type FriendConnection = FriendSearchResult & {
-  status: 'accepted' | 'pending'
-  direction?: 'incoming' | 'outgoing'
-  updatedAt: string
-}
-
-type GroupMember = {
-  id: number
-  username: string
-  displayName: string
-  role: 'owner' | 'admin' | 'member'
-  online: boolean
-}
-
-type InstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
-
-type ToastKind = 'success' | 'error' | 'warning' | 'info'
-type ToastNotice = { id: number; message: string; kind: ToastKind }
-
-
-function inferToastKind(message: string): ToastKind {
-  const normalized = message.trim().toLocaleLowerCase('vi-VN')
-  if (
-    normalized.startsWith('đã ') ||
-    normalized.startsWith('bạn đã ') ||
-    normalized.startsWith('chatnet đã ')
-  ) return 'success'
-  if (
-    normalized.includes('không ') ||
-    normalized.includes('thất bại') ||
-    normalized.includes('bị chặn') ||
-    normalized.startsWith('chưa xác nhận') ||
-    normalized.startsWith('mất kết nối')
-  ) return 'error'
-  if (
-    normalized.startsWith('mỗi ') ||
-    normalized.startsWith('hãy ') ||
-    normalized.startsWith('trên iphone') ||
-    normalized.includes('chưa hỗ trợ')
-  ) return 'warning'
-  return 'info'
-}
-
-function formatTime(value?: string) {
-  if (!value) return ''
-  return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return ''
-  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`
-  return `${(value / 1024 / 1024).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`
-}
-
-function attachmentLabel(items?: MediaAttachment[]) {
-  const first = items?.[0]
-  if (!first) return ''
-  if (first.kind === 'image') return '[Ảnh]'
-  if (first.kind === 'video') return '[Video]'
-  if (first.kind === 'audio') return '[Âm thanh]'
-  return '[Tệp]'
-}
-
-function avatarInitials(name: string) {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return '?'
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
-  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
-}
-
-function avatarTone(name: string) {
-  let hash = 0
-  for (let index = 0; index < name.length; index += 1) {
-    hash = (hash * 31 + name.charCodeAt(index)) >>> 0
-  }
-  return hash % 8
-}
-
-const avatarRefreshVersions = new Map<string, string>()
-
-function profileAssetUrl(name: string, kind: 'avatar' | 'cover', version?: string) {
-  const base = `${API}/api/users/${encodeURIComponent(name)}/${kind}`
-  return version ? `${base}?v=${encodeURIComponent(version)}` : base
-}
-
-function UserAvatar({
-  name,
-  className = 'avatar',
-  online = false,
-  group = false,
-}: {
-  name: string
-  className?: string
-  online?: boolean
-  group?: boolean
-}) {
-  const version = avatarRefreshVersions.get(name)
-  const imageUrl = group ? '' : profileAssetUrl(name, 'avatar', version)
-  const [imageFailed, setImageFailed] = useState(false)
-
-  useEffect(() => {
-    setImageFailed(false)
-  }, [imageUrl])
-
-  return (
-    <div
-      className={`${className} smart-avatar avatar-tone-${avatarTone(name)} ${group ? 'group' : ''}`}
-      aria-label={name}
-      title={name}
-    >
-      <span className="avatar-initials">{group ? '👥' : avatarInitials(name)}</span>
-      {!group && !imageFailed && (
-        <img
-          className="avatar-photo"
-          src={imageUrl}
-          alt=""
-          draggable={false}
-          onError={() => setImageFailed(true)}
-        />
-      )}
-      <span className="avatar-shine" aria-hidden="true" />
-      {online && <span className="presence-dot" />}
-    </div>
-  )
-}
-
-function MediaAttachmentsView({
-  items,
-  pending = false,
-  onRemove,
-}: {
-  items?: MediaAttachment[]
-  pending?: boolean
-  onRemove?: (index: number) => void
-}) {
-  if (!items?.length) return null
-
-  return (
-    <div className={`media-attachments ${pending ? 'pending-media' : ''} ${items.length > 1 ? 'media-grid' : ''} media-count-${Math.min(items.length, 4)}`}>
-      {items.map((item, index) => (
-        <div className={`media-item media-${item.kind}`} key={`${item.storageRef}:${index}`}>
-          {item.kind === 'image' && item.url ? (
-            <a href={item.url} target="_blank" rel="noreferrer">
-              <img
-                src={item.url}
-                alt={item.name}
-                loading="lazy"
-                onLoad={(event) => {
-                  const image = event.currentTarget
-                  image.classList.toggle(
-                    'media-extra-tall',
-                    image.naturalWidth > 0 && image.naturalHeight / image.naturalWidth >= 1.8,
-                  )
-                }}
-              />
-            </a>
-          ) : item.kind === 'video' && item.url ? (
-            <video src={item.url} controls playsInline preload="metadata" />
-          ) : item.kind === 'audio' && item.url ? (
-            <div className="media-file-card">
-              <span>🎙️</span>
-              <div><strong>{item.name}</strong><small>{formatBytes(item.sizeBytes)}</small></div>
-              <audio src={item.url} controls preload="none" />
-            </div>
-          ) : (
-            <a className="media-file-card" href={item.url || '#'} target="_blank" rel="noreferrer">
-              <span>📎</span>
-              <div><strong>{item.name}</strong><small>{formatBytes(item.sizeBytes)}</small></div>
-            </a>
-          )}
-          {pending && onRemove && (
-            <button type="button" className="media-remove" onClick={() => onRemove(index)} aria-label={`Bỏ ${item.name}`}>×</button>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function UiIcon({ name, size = 24 }: { name: string; size?: number }) {
-  const common = {
-    width: size,
-    height: size,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.9,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-  }
-
-  switch (name) {
-    case 'search':
-      return <svg {...common}><circle cx="11" cy="11" r="7" /><path d="m20 20-4.2-4.2" /></svg>
-    case 'qr':
-      return <svg {...common}><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /><path d="M8 8h3v3H8zM14 8h2M14 11h3M8 14h2M12 14h4v4M8 17h1M18 12h2" /></svg>
-    case 'plus':
-      return <svg {...common}><path d="M12 5v14M5 12h14" /></svg>
-    case 'compose':
-      return <svg {...common}><path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></svg>
-    case 'bell':
-      return <svg {...common}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>
-    case 'chat':
-      return <svg {...common}><path d="M4 5h16v11H9l-5 4V5Z" /><path d="M8 9h8M8 12h5" /></svg>
-    case 'contacts':
-      return <svg {...common}><rect x="4" y="3" width="16" height="18" rx="2" /><circle cx="12" cy="9" r="2.5" /><path d="M8 17c.7-2.4 2-3.5 4-3.5s3.3 1.1 4 3.5" /></svg>
-    case 'discover':
-      return <svg {...common}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><path d="m12 12 7-7" /><circle cx="12" cy="12" r="1" /></svg>
-    case 'wall':
-      return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 9h6M7 13h10M17 9h.01" /></svg>
-    case 'profile':
-      return <svg {...common}><circle cx="12" cy="8" r="4" /><path d="M4.5 21c.8-4.5 3.3-6.5 7.5-6.5s6.7 2 7.5 6.5" /></svg>
-    case 'attach':
-      return <svg {...common}><path d="m9.5 12.5 5.8-5.8a3.2 3.2 0 0 1 4.5 4.5l-8.4 8.4a5 5 0 0 1-7.1-7.1l8-8" /></svg>
-    case 'send':
-      return <svg {...common}><path d="m4 4 17 8-17 8 3-8-3-8Z" /><path d="M7 12h14" /></svg>
-    case 'photo':
-      return <svg {...common}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m5 18 5-5 3 3 2-2 4 4" /></svg>
-    case 'video':
-      return <svg {...common}><rect x="3" y="6" width="13" height="12" rx="2" /><path d="m16 10 5-3v10l-5-3" /></svg>
-    case 'album':
-      return <svg {...common}><rect x="5" y="4" width="14" height="16" rx="2" /><path d="M9 4V2h8a2 2 0 0 1 2 2M8 15l3-3 4 4 2-2" /></svg>
-    case 'text':
-      return <svg {...common}><path d="M5 6h14M12 6v12M8 18h8" /></svg>
-    case 'heart':
-      return <svg {...common}><path d="M20.8 8.8c0 5-8.8 10-8.8 10s-8.8-5-8.8-10A4.8 4.8 0 0 1 12 6a4.8 4.8 0 0 1 8.8 2.8Z" /></svg>
-    case 'comment':
-      return <svg {...common}><path d="M4 5h16v11H9l-5 4V5Z" /><path d="M8 9h8M8 12h5" /></svg>
-    case 'trash':
-      return <svg {...common}><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>
-    default:
-      return <span aria-hidden="true">•</span>
-  }
-}
-
-function formatEstimatedDistance(distanceKm?: number) {
-  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) return 'Trong phạm vi 5 km'
-  return `Khoảng ${distanceKm.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`
-}
-
-function NearbyRadar({ scanning = false, large = false }: { scanning?: boolean; large?: boolean }) {
-  return (
-    <div className={`nearby-radar ${scanning ? 'is-scanning' : ''} ${large ? 'is-large' : ''}`} aria-hidden="true">
-      <span className="nearby-radar-ring ring-one" />
-      <span className="nearby-radar-ring ring-two" />
-      <span className="nearby-radar-axis axis-x" />
-      <span className="nearby-radar-axis axis-y" />
-      <span className="nearby-radar-sweep" />
-      <span className="nearby-radar-blip blip-one" />
-      <span className="nearby-radar-blip blip-two" />
-      <span className="nearby-radar-blip blip-three" />
-      <span className="nearby-radar-center" />
-    </div>
-  )
-}
-
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession)
   const sessionRef = useRef(session)
@@ -469,16 +79,7 @@ export default function App() {
     save: saveSession,
     expire: () => logout(false),
   }))
-  const [authMode, setAuthMode] = useState<AuthMode>('register')
-  const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
-  const [authEmail, setAuthEmail] = useState('')
-  const [verificationToken, setVerificationToken] = useState('')
-  const [verificationEmail, setVerificationEmail] = useState('')
-  const [otpCode, setOtpCode] = useState('')
-  const [otpExpiresAt, setOtpExpiresAt] = useState(0)
-  const [otpSecondsLeft, setOtpSecondsLeft] = useState(0)
-  const [authError, setAuthError] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
+  const auth = useAuthFlow(saveSession)
 
   const [tab, setTab] = useState<Tab>('chat')
   const tabRef = useRef(tab)
@@ -515,16 +116,9 @@ export default function App() {
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
   const messageLongPressTimer = useRef<number | null>(null)
   const messageLongPressStart = useRef<{ x: number; y: number; messageId: number } | null>(null)
-  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
-  const [groupActionsOpen, setGroupActionsOpen] = useState(false)
-  useEffect(() => setGroupActionsOpen(false), [activeConversationId, tab])
-  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
-  const [groupNameDraft, setGroupNameDraft] = useState('')
-  const [groupInviteDraft, setGroupInviteDraft] = useState('')
-  const [groupInviteSearch, setGroupInviteSearch] = useState('')
-  const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
+
   const [sharedContentOpen, setSharedContentOpen] = useState(false)
-  const [groupBusy, setGroupBusy] = useState(false)
+
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
   const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>(() => {
     const saved = loadChatDrafts(session?.user.id ?? 0)
@@ -732,6 +326,48 @@ export default function App() {
   const avatarFileInputRef = useRef<HTMLInputElement>(null)
   const coverFileInputRef = useRef<HTMLInputElement>(null)
 
+  const {
+    groupSettingsOpen,
+    setGroupSettingsOpen,
+    groupActionsOpen,
+    setGroupActionsOpen,
+    groupMembers,
+    setGroupMembers,
+    groupNameDraft,
+    setGroupNameDraft,
+    groupInviteDraft,
+    setGroupInviteDraft,
+    groupInviteSearch,
+    setGroupInviteSearch,
+    groupInviteSelection,
+    setGroupInviteSelection,
+    groupBusy,
+    setGroupBusy,
+    activeGroupMember,
+    canManageActiveGroup,
+    groupInviteCandidates,
+    openGroupSettings,
+    launchGroupCall,
+    refreshGroupMembers,
+    renameActiveGroup,
+    inviteGroupMembers,
+    changeGroupMemberRole,
+    removeGroupMember,
+  } = useGroupManagement({
+    session,
+    sessionRef,
+    tab,
+    activeConversationId,
+    activeConversationIdRef,
+    friends,
+    apiFetch,
+    refreshFriendConnections,
+    refreshConversations,
+    setActiveConversationId,
+    setNotice,
+    actionLocks,
+  })
+
   const name = session?.user.username || ''
   const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
   const chatFriend = activeConversation?.type === 'direct' && activeConversation.otherUserId
@@ -739,16 +375,7 @@ export default function App() {
     ? { id: activeConversation.otherUserId, username: '', displayName: activeConversation.name, online: activeConversation.online }
     : null
   const chatFriendRelationship = chatFriend ? friendRelationship(chatFriend.id) : 'none'
-  const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
-  const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
-  const groupInviteCandidates = useMemo(() => {
-    const memberIds = new Set(groupMembers.map((member) => member.id))
-    const normalized = groupInviteSearch.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
-    return friends
-      .filter((friend) => friend.status === 'accepted' && !memberIds.has(friend.id))
-      .filter((friend) => !normalized || `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(normalized))
-      .sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username, 'vi'))
-  }, [friends, groupMembers, groupInviteSearch])
+
   const visiblePosts = posts.map((post) => likePreviews[post.id] === undefined ? post : {
     ...post, liked: likePreviews[post.id],
     likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
@@ -2594,128 +2221,6 @@ export default function App() {
     }
   }
 
-  async function submitAuth(event: FormEvent) {
-    event.preventDefault()
-    setAuthLoading(true)
-    setAuthError('')
-
-    try {
-      const response = await fetch(`${API}/api/auth/email/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: authEmail.trim(),
-        }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        setAuthError(result.error || 'Không thể gửi mã xác minh')
-        return
-      }
-
-      const payload = result as {
-        verificationToken: string
-        emailMasked: string
-        expiresInSeconds: number
-      }
-      setVerificationToken(payload.verificationToken)
-      setVerificationEmail(payload.emailMasked)
-      setOtpCode('')
-      const expiresAt = Date.now() + payload.expiresInSeconds * 1000
-      setOtpExpiresAt(expiresAt)
-      setOtpSecondsLeft(payload.expiresInSeconds)
-      setRegisterStep('otp')
-    } catch {
-      setAuthError('Không kết nối được server')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  async function verifyOTP(event: FormEvent) {
-    event.preventDefault()
-    if (!verificationToken || otpCode.length !== 6) return
-
-    setAuthLoading(true)
-    setAuthError('')
-    try {
-      const response = await fetch(`${API}/api/auth/email/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: verificationToken,
-          code: otpCode,
-        }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        setAuthError(result.error || 'Mã xác minh không đúng')
-        return
-      }
-
-      const next = parseSession(result)
-      if (!next) throw new Error('invalid session response')
-      saveSession({ ...next, sessionId: crypto.randomUUID() })
-    } catch {
-      setAuthError('Không kết nối được server')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  async function resendOTP() {
-    if (!verificationToken) return
-
-    setAuthLoading(true)
-    setAuthError('')
-    try {
-      const response = await fetch(`${API}/api/auth/email/resend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: verificationToken }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        setAuthError(result.error || 'Không thể gửi lại mã')
-        return
-      }
-      const payload = result as {
-        verificationToken: string
-        emailMasked: string
-        expiresInSeconds: number
-      }
-      setVerificationEmail(payload.emailMasked)
-      setOtpCode('')
-      const expiresAt = Date.now() + payload.expiresInSeconds * 1000
-      setOtpExpiresAt(expiresAt)
-      setOtpSecondsLeft(payload.expiresInSeconds)
-    } catch {
-      setAuthError('Không kết nối được server')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  function resetRegistration() {
-    setRegisterStep('details')
-    setVerificationToken('')
-    setVerificationEmail('')
-    setOtpCode('')
-    setOtpExpiresAt(0)
-    setOtpSecondsLeft(0)
-    setAuthError('')
-  }
-
-  useEffect(() => {
-    if (registerStep !== 'otp' || otpExpiresAt <= 0) return
-    const update = () => {
-      const left = Math.max(0, Math.ceil((otpExpiresAt - Date.now()) / 1000))
-      setOtpSecondsLeft(left)
-    }
-    update()
-    const timer = window.setInterval(update, 1000)
-    return () => window.clearInterval(timer)
-  }, [registerStep, otpExpiresAt])
 
   function logout(revoke = true, clearStorage = true) {
     const current = sessionRef.current
@@ -2758,8 +2263,8 @@ export default function App() {
     pendingSend.current = null
     if (clearStorage) localStorage.removeItem('chatnet-session')
     sessionRef.current = null
-    resetRegistration()
-    setAuthMode('login')
+    auth.resetRegistration()
+    auth.setAuthMode('login')
     setSession(null)
     setConversations([])
     revokedConversationIds.current.clear()
@@ -3433,178 +2938,6 @@ export default function App() {
     }
   }
 
-  function openGroupSettings(conversation: Conversation) {
-    setGroupActionsOpen(false)
-    setGroupSettingsOpen(true)
-    setGroupNameDraft(conversation.name)
-    setGroupInviteSearch('')
-    setGroupInviteSelection([])
-    void Promise.all([
-      refreshGroupMembers(conversation.id),
-      refreshFriendConnections(),
-    ])
-  }
-
-  function launchGroupCall(conversationId: number, mediaType: 'audio' | 'video') {
-    window.dispatchEvent(new CustomEvent('chatnet:start-call', {
-      detail: { conversationId, mediaType },
-    }))
-  }
-
-  async function refreshGroupMembers(conversationId = activeConversationId || undefined) {
-    if (!conversationId) return
-    try {
-      const response = await apiFetch(`/api/conversations/${conversationId}/members`)
-      if (!response.ok) return
-      const items = (await response.json()) as GroupMember[]
-      if (activeConversationIdRef.current === conversationId) {
-        setGroupMembers(items)
-      }
-    } catch {
-      setNotice('Không tải được danh sách thành viên nhóm.')
-    }
-  }
-
-  async function renameActiveGroup() {
-    if (!activeConversationId || !groupNameDraft.trim() || actionLocks.current.has('group:write')) return
-    const sessionId = session?.sessionId
-    actionLocks.current.add('group:write')
-    setGroupBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: groupNameDraft.trim() }),
-      })
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return
-      if (!response.ok) {
-        setNotice(result?.error || 'Không đổi được tên nhóm')
-        return
-      }
-      setNotice('Đã cập nhật tên nhóm.')
-      await refreshConversations()
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete('group:write')
-        setGroupBusy(false)
-      }
-    }
-  }
-
-  async function inviteGroupMembers() {
-    if (!activeConversationId || actionLocks.current.has('group:write')) return
-    const sessionId = session?.sessionId
-    const selectedUsernames = friends
-      .filter((friend) => friend.status === 'accepted' && groupInviteSelection.includes(friend.id))
-      .map((friend) => friend.username)
-    const usernames = Array.from(new Set([
-      ...selectedUsernames,
-      ...groupInviteDraft.split(/[\s,;]+/),
-    ].map((item) => item.trim().replace(/^@/, '').toLowerCase()).filter(Boolean)))
-    if (usernames.length === 0) return
-    if (usernames.length > 50) {
-      setNotice('Mỗi lần có thể mời tối đa 50 người. Hãy chia thành nhiều lượt.', 'warning')
-      return
-    }
-    actionLocks.current.add('group:write')
-    setGroupBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernames }),
-      })
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return
-      if (!response.ok) {
-        setNotice(result?.error || 'Không thêm được thành viên')
-        return
-      }
-      if (activeConversationIdRef.current === activeConversationId) {
-        setGroupInviteDraft((current) => current === groupInviteDraft ? '' : current)
-        setGroupInviteSelection([])
-        setGroupInviteSearch('')
-      }
-      setNotice('Đã thêm thành viên vào nhóm.')
-      await Promise.all([refreshGroupMembers(activeConversationId), refreshConversations()])
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete('group:write')
-        setGroupBusy(false)
-      }
-    }
-  }
-
-  async function changeGroupMemberRole(member: GroupMember, role: GroupMember['role']) {
-    if (!activeConversationId || actionLocks.current.has('group:write')) return
-    const sessionId = session?.sessionId
-    const message = role === 'owner'
-      ? `Chuyển quyền chủ nhóm cho @${member.username}?`
-      : role === 'admin'
-        ? `Đặt @${member.username} làm quản trị viên?`
-        : `Gỡ quyền quản trị của @${member.username}?`
-    if (!window.confirm(message)) return
-    actionLocks.current.add('group:write')
-    setGroupBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role }),
-      })
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return
-      if (!response.ok) {
-        setNotice(result?.error || 'Không cập nhật được quyền thành viên')
-        return
-      }
-      setNotice(role === 'owner' ? 'Đã chuyển quyền chủ nhóm.' : 'Đã cập nhật quyền thành viên.')
-      await refreshGroupMembers(activeConversationId)
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete('group:write')
-        setGroupBusy(false)
-      }
-    }
-  }
-
-  async function removeGroupMember(member: GroupMember) {
-    if (!activeConversationId || actionLocks.current.has('group:write')) return
-    const sessionId = session?.sessionId
-    const self = member.id === session?.user.id
-    if (!window.confirm(self ? 'Rời khỏi nhóm này?' : `Xóa @${member.username} khỏi nhóm?`)) return
-    actionLocks.current.add('group:write')
-    setGroupBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
-        method: 'DELETE',
-      })
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return
-      if (!response.ok) {
-        setNotice(result?.error || (self ? 'Không rời được nhóm' : 'Không xóa được thành viên'))
-        return
-      }
-      if (self) {
-        if (activeConversationIdRef.current === activeConversationId) {
-          setGroupSettingsOpen(false)
-          setActiveConversationId(null)
-        }
-        setNotice('Bạn đã rời nhóm.')
-        await refreshConversations()
-        return
-      }
-      setNotice(`Đã xóa @${member.username} khỏi nhóm.`)
-      await Promise.all([refreshGroupMembers(activeConversationId), refreshConversations()])
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete('group:write')
-        setGroupBusy(false)
-      }
-    }
-  }
-
   async function editOwnMessage(message: Message) {
     const key = `message:${message.id}`
     if (message.deleted || message.senderId !== session?.user.id || actionLocks.current.has(key)) return
@@ -3855,112 +3188,7 @@ export default function App() {
     }
   }
 
-  if (!session) {
-    return (
-      <main className="auth-screen">
-        <section className="auth-copy">
-          <img src="/soco-mark.svg" width="52" height="52" alt="SOCO" />
-          <h1>SOCO</h1>
-          <p>Understand. Connect. Together.</p>
-        </section>
-
-        {registerStep === 'otp' ? (
-          <form className="auth-card otp-card" onSubmit={verifyOTP}>
-            <div className="otp-icon">✉️</div>
-            <h2>Kiểm tra email của bạn</h2>
-            <p className="auth-hint">
-              SOCO đã gửi mã xác minh 6 số tới <strong>{verificationEmail || 'email của bạn'}</strong>.
-              Mã có hiệu lực trong 10 phút.
-            </p>
-
-            <label>
-              Mã xác minh
-              <input
-                className="otp-input"
-                value={otpCode}
-                onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="000000"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                minLength={6}
-                maxLength={6}
-                autoFocus
-                required
-              />
-            </label>
-
-            <div className="otp-meta">
-              <span>
-                {otpSecondsLeft > 0
-                  ? `Hết hạn sau ${Math.floor(otpSecondsLeft / 60)}:${String(otpSecondsLeft % 60).padStart(2, '0')}`
-                  : 'Mã đã hết hạn'}
-              </span>
-              <button type="button" onClick={() => void resendOTP()} disabled={authLoading}>
-                Gửi lại mã
-              </button>
-            </div>
-
-            {authError && <div className="auth-error">{authError}</div>}
-            <button className="auth-submit" disabled={authLoading || otpCode.length !== 6 || otpSecondsLeft <= 0}>
-              {authLoading ? 'Đang xác minh...' : 'Xác minh & vào SOCO'}
-            </button>
-            <button type="button" className="auth-secondary" onClick={resetRegistration} disabled={authLoading}>
-              Dùng email khác
-            </button>
-          </form>
-        ) : (
-          <form className="auth-card" onSubmit={submitAuth}>
-            <div className="auth-tabs">
-              <button
-                type="button"
-                className={authMode === 'register' ? 'active' : ''}
-                disabled={authLoading}
-                onClick={() => {
-                  setAuthMode('register')
-                  resetRegistration()
-                }}
-              >
-                Đăng ký
-              </button>
-              <button
-                type="button"
-                className={authMode === 'login' ? 'active' : ''}
-                disabled={authLoading}
-                onClick={() => {
-                  setAuthMode('login')
-                  resetRegistration()
-                }}
-              >
-                Đăng nhập
-              </button>
-            </div>
-
-            <h2>{authMode === 'register' ? 'Tạo tài khoản' : 'Chào mừng quay lại'}</h2>
-            <label>
-              Email
-              <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" maxLength={254} required />
-            </label>
-
-            {authMode === 'register' && (
-              <div className="email-verify-note">
-                🔐 Tài khoản chỉ được tạo sau khi bạn nhập đúng OTP gửi qua email.
-              </div>
-            )}
-
-            {authError && <div className="auth-error">{authError}</div>}
-            <button className="auth-submit" disabled={authLoading}>
-              {authLoading
-                ? 'Đang xử lý...'
-                : authMode === 'register'
-                  ? 'Gửi mã OTP'
-                  : 'Đăng nhập'}
-            </button>
-          </form>
-        )}
-      </main>
-    )
-  }
+  if (!session) return <AuthScreen {...auth} />
 
   const unreadTotal = conversations.reduce((sum, conversation) => sum + conversation.unreadCount, 0)
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase('vi-VN')
@@ -3988,236 +3216,71 @@ export default function App() {
   }
 
   const profileIdentityForm = (
-    <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
-              <div className="profile-edit-heading">
-                <div>
-                  <strong>{t('profile.personalInfo')}</strong>
-                  <small>{t('profile.personalInfoHint')}</small>
-                </div>
-              </div>
-              <label className="profile-edit-field">
-                <span>{t('profile.displayName')}</span>
-                <input
-                  type="text"
-                  value={profileDisplayNameDraft}
-                  onChange={(event) => setProfileDisplayNameDraft(event.target.value)}
-                  maxLength={100}
-                  autoComplete="name"
-                  placeholder={t('profile.displayNamePlaceholder')}
-                  disabled={profileSaving}
-                />
-              </label>
-              <label className="profile-edit-field">
-                <span>{t('profile.username')}</span>
-                <div className="profile-username-input">
-                  <b aria-hidden="true">@</b>
-                  <input
-                    type="text"
-                    value={profileUsernameDraft}
-                    onChange={(event) => setProfileUsernameDraft(event.target.value.toLowerCase())}
-                    minLength={3}
-                    maxLength={32}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    autoComplete="username"
-                    placeholder="username"
-                    disabled={profileSaving}
-                  />
-                </div>
-                <small>{t('profile.usernameHint')}</small>
-              </label>
-              <button
-                type="submit"
-                className="profile-save-button"
-                disabled={
-                  profileSaving ||
-                  !profileMedia ||
-                  (
-                    profileDisplayNameDraft.trim() === profileMedia.displayName &&
-                    profileUsernameDraft.trim().toLowerCase() === profileMedia.username
-                  )
-                }
-              >
-                {profileSaving ? t('common.saving') : t('common.save')}
-              </button>
-            </form>
+    <ProfileIdentityForm
+      saveProfileIdentity={saveProfileIdentity}
+      t={t}
+      profileDisplayNameDraft={profileDisplayNameDraft}
+      setProfileDisplayNameDraft={setProfileDisplayNameDraft}
+      profileUsernameDraft={profileUsernameDraft}
+      setProfileUsernameDraft={setProfileUsernameDraft}
+      profileSaving={profileSaving}
+      profileMedia={profileMedia}
+    />
   )
   const profilePrivacyControls = (
-    <>
-      <div className="settings-row">
-                <div>
-                  <strong>Quyền riêng tư tài khoản</strong>
-                  <small>Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. Thiết lập lưu trên máy chủ.</small>
-                </div>
-              </div>
-              {privacyLoading && <div className="settings-row" role="status">Đang tải quyền riêng tư...</div>}
-              {privacyError && <div className="settings-row" role="alert">
-                <span>{privacyError}</span>
-                <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>Thử lại</button>
-              </div>}
-              {privacy && ([
-                ['searchableByUsername', 'Cho phép tìm bằng username', 'Người khác có thể tìm @username của bạn.'],
-                ['searchableByName', 'Cho phép tìm bằng tên', 'Tên hiển thị của bạn có thể xuất hiện trong kết quả.'],
-                ['searchableByEmail', 'Cho phép tìm bằng email', 'Chỉ tìm bằng email khớp chính xác; địa chỉ email không được hiển thị.'],
-                ['allowFriendRequests', 'Cho phép lời mời mới', 'Tắt để ngăn lời mời kết bạn mới từ người khác.'],
-                ['showOnlineStatus', 'Hiển thị trạng thái online', 'Ẩn sự hiện diện trong danh sách và kết quả tìm kiếm.'],
-              ] as const).map(([key, label, hint]) => (
-                <div className="settings-row" key={key}>
-                  <div><strong>{label}</strong><small>{hint}</small></div>
-                  <button
-                    type="button"
-                    className={`switch-button ${privacy[key] ? 'on' : ''}`}
-                    role="switch"
-                    aria-label={label}
-                    aria-checked={privacy[key]}
-                    disabled={privacyBusy}
-                    onClick={() => void changePrivacy(key)}
-                  ><span /></button>
-                </div>
-              ))}
-    </>
-  )
-  const postAudience = (
-    <label>Ai có thể xem?
-      <select disabled={!!pendingPost} value={postVisibility} onChange={event => setPostVisibility(event.target.value as typeof postVisibility)}>
-        <option value="public">🌐 Công khai</option>
-        <option value="friends">👥 Bạn bè</option>
-        <option value="private">🔒 Chỉ mình tôi</option>
-      </select>
-    </label>
+    <PrivacyControls
+      privacyLoading={privacyLoading}
+      privacyError={privacyError}
+      setPrivacyRetry={setPrivacyRetry}
+      privacy={privacy}
+      privacyBusy={privacyBusy}
+      changePrivacy={changePrivacy}
+    />
   )
   const postComposer = (
-    <form className={`post-box zalo-post-composer ${profileComposerOpen ? 'profile-popup-composer' : ''}`} onSubmit={createPost}>
-              <div className="post-prompt compact-post-prompt">
-                <UserAvatar name={name} className="avatar self-avatar" />
-                {profileComposerOpen && <div className="profile-post-author">
-                  <strong>{profileMedia?.displayName || session.user.displayName || name}</strong>
-                  {postAudience}
-                </div>}
-                <textarea
-                  ref={postComposerRef}
-                  className={postBackground ? 'feed-composer-bg bg-' + postBackground : ''}
-                  disabled={!!pendingPost}
-                  aria-label="Nội dung bài viết"
-                  placeholder="Hôm nay bạn thế nào?"
-                  value={postText}
-                  onChange={(event) => setPostText(event.target.value)}
-                  rows={1}
-                  maxLength={5000}
-                />
-              </div>
-              <input
-                ref={feedImageInputRef}
-                className="hidden-media-input"
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files || [])
-                  event.currentTarget.value = ''
-                  void addFeedFiles(files)
-                }}
-              />
-              <input
-                ref={feedVideoInputRef}
-                className="hidden-media-input"
-                type="file"
-                accept="video/*"
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files || [])
-                  event.currentTarget.value = ''
-                  void addFeedFiles(files)
-                }}
-              />
-              <input
-                ref={feedAlbumInputRef}
-                className="hidden-media-input"
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files || [])
-                  event.currentTarget.value = ''
-                  void addFeedFiles(files)
-                }}
-              />
-              {postAttachments.length > 0 && (
-                <div className="feed-pending-media">
-                  <MediaAttachmentsView
-                    items={postAttachments}
-                    pending
-                    onRemove={pendingPost ? undefined : (index) => setPostAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                  />
-                </div>
-              )}
-              <div className="composer-shortcuts">
-                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedImageInputRef.current?.click()}><UiIcon name="photo" size={20} />Ảnh</button>
-                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedVideoInputRef.current?.click()}><UiIcon name="video" size={20} />Video</button>
-                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedAlbumInputRef.current?.click()}><UiIcon name="album" size={20} />Album</button>
-                <button type="button" aria-expanded={showPostBackgrounds} onClick={() => { setShowPostBackgrounds(v => !v); postComposerRef.current?.focus() }}><UiIcon name="text" size={20} />Nền chữ</button>
-              </div>
-              <div className="feed-composer-settings">
-                {!profileComposerOpen && postAudience}
-                {showPostBackgrounds && <div className="feed-background-palette" aria-label="Chọn nền bài viết">
-                  {['', 'violet', 'blue', 'sunset', 'mint', 'night'].map(bg => (
-                    <button key={bg || 'none'} type="button" className={'feed-palette-dot bg-' + (bg || 'none')}
-                      aria-pressed={postBackground === bg} aria-label={bg || 'Không nền'} onClick={() => setPostBackground(bg)}>
-                      {postBackground === bg ? '✓' : ''}
-                    </button>
-                  ))}
-                </div>}
-              </div>
-              {mediaUploading === 'feed' && <div className="media-uploading-note">Đang tải media thẳng lên kho lưu trữ…</div>}
-              {profileComposerOpen && postSubmitError && <p className="profile-post-error" role="alert">{postSubmitError}</p>}
-              {(profileComposerOpen || postText.trim() || postAttachments.length > 0) && (
-                <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading || (!postText.trim() && postAttachments.length === 0)}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
-              )}
-            </form>
+    <PostComposer
+      name={name}
+      createPost={createPost}
+      postComposerRef={postComposerRef}
+      postBackground={postBackground}
+      pendingPost={pendingPost}
+      postText={postText}
+      setPostText={setPostText}
+      feedImageInputRef={feedImageInputRef}
+      feedVideoInputRef={feedVideoInputRef}
+      feedAlbumInputRef={feedAlbumInputRef}
+      addFeedFiles={addFeedFiles}
+      postAttachments={postAttachments}
+      setPostAttachments={setPostAttachments}
+      mediaUploading={mediaUploading}
+      showPostBackgrounds={showPostBackgrounds}
+      setShowPostBackgrounds={setShowPostBackgrounds}
+      postVisibility={postVisibility}
+      setPostVisibility={setPostVisibility}
+      setPostBackground={setPostBackground}
+      popup={profileComposerOpen}
+      displayName={profileMedia?.displayName || session.user.displayName || name}
+      submitError={postSubmitError}
+    />
   )
-  const renderPosts = (items: Post[]) => (
-    items.map((post) => (
-                <article className="post zalo-post" key={post.id}>
-                  <UserAvatar name={post.author} className="avatar" />
-                  <div className="post-body">
-                    <div className="post-author">
-                      <div><strong>{post.author === name ? (profileMedia?.displayName || session.user.displayName || name) : post.author}</strong>
-                        <small>{new Date(post.createdAt).toLocaleString('vi-VN')} · {post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}</small></div>
-                      <FeedPostActions post={post} mine={post.author === name} request={apiFetch}
-                        onUpdated={syncFeedPost} onDeleted={removeFeedPost}
-                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
-                    </div>
-                    {post.content && (
-                      <div className={post.background ? 'feed-text-background bg-' + post.background : ''}>
-                        <FeedText api={API} token={session.token}
-                          target={translationPreferencesLoaded ? targetLanguage : ''}
-                          text={post.content} maxLines={5} onExpand={() => setActivePostId(post.id)} />
-                      </div>
-                    )}
-                    <div className="feed-media-preview" onClick={() => setActivePostId(post.id)}>
-                      <MediaAttachmentsView items={post.attachments} />
-                    </div>
-                    {(post.likes > 0 || (post.comments?.length || 0) > 0) && (
-                      <div className="post-engagement-summary">
-                        {post.likes > 0 && <span>{post.likes} lượt thích</span>}
-                        {(post.comments?.length || 0) > 0 && <span>{post.comments.length} bình luận</span>}
-                      </div>
-                    )}
-                    <div className="post-toolbar">
-                      <button type="button" className={post.liked ? 'liked' : ''} disabled={likePreviews[post.id] !== undefined}
-                        aria-pressed={post.liked} aria-busy={likePreviews[post.id] !== undefined} onClick={() => void like(post)}>
-                        <UiIcon name="heart" size={21} /><span>Thích</span>
-                      </button>
-                      <button type="button" className="post-stat post-detail-trigger" onClick={() => setActivePostId(post.id)}>
-                        <UiIcon name="comment" size={21} />
-                        <span>Bình luận</span>
-                      </button>
-                      <FeedShareAction postId={post.id}
-                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
-                    </div>
-                  </div>
-                </article>
-              ))
-  )
+  const renderPosts = (items: Post[]) => items.map(post => (
+    <FeedPostCard
+      key={post.id}
+      post={post}
+      name={name}
+      ownDisplayName={profileMedia?.displayName || session.user.displayName || name}
+      apiFetch={apiFetch}
+      syncFeedPost={syncFeedPost}
+      removeFeedPost={removeFeedPost}
+      setNotice={setNotice}
+      token={session.token}
+      translationPreferencesLoaded={translationPreferencesLoaded}
+      targetLanguage={targetLanguage}
+      setActivePostId={setActivePostId}
+      likePreviews={likePreviews}
+      like={like}
+    />
+  ))
 
   return (
     <main className={`app-shell modern-shell ${tab === 'chat' && activeConversation ? 'conversation-open' : ''}`}>
@@ -4809,172 +3872,29 @@ export default function App() {
                   )}
 
                   {groupSettingsOpen && activeConversation.type === 'group' && (
-                    <section className="group-settings-panel" role="region" aria-label="Quản lý nhóm">
-                      <div className="group-settings-heading">
-                        <div>
-                          <strong>Quản lý nhóm</strong>
-                          <small>
-                            {activeGroupMember
-                              ? activeGroupMember.role === 'owner'
-                                ? 'Bạn là chủ nhóm'
-                                : activeGroupMember.role === 'admin'
-                                  ? 'Bạn là quản trị viên'
-                                  : 'Bạn là thành viên'
-                              : 'Đang tải quyền...'}
-                          </small>
-                        </div>
-                        <button type="button" onClick={() => setGroupSettingsOpen(false)} aria-label="Quay lại cuộc trò chuyện">
-                          <X size={21} aria-hidden="true" />
-                        </button>
-                      </div>
-
-                      {canManageActiveGroup && (
-                        <div className="group-admin-tools">
-                          <div className="group-tool-row">
-                            <input
-                              value={groupNameDraft}
-                              onChange={(event) => setGroupNameDraft(event.target.value)}
-                              placeholder="Tên nhóm"
-                              maxLength={120}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => void renameActiveGroup()}
-                              disabled={groupBusy || !groupNameDraft.trim() || groupNameDraft.trim() === activeConversation.name}
-                            >
-                              Đổi tên
-                            </button>
-                          </div>
-
-                          <div className="group-invite-friends">
-                            <div className="group-invite-title">
-                              <strong>Mời bạn bè</strong>
-                              <span>{groupInviteSelection.length ? `${groupInviteSelection.length} đã chọn` : 'Chọn trực tiếp từ danh bạ'}</span>
-                            </div>
-                            <input
-                              className="group-invite-search"
-                              type="search"
-                              value={groupInviteSearch}
-                              onChange={(event) => setGroupInviteSearch(event.target.value)}
-                              placeholder="Tìm bạn theo tên hoặc @username"
-                              autoComplete="off"
-                            />
-                            <div className="group-invite-list">
-                              {groupInviteCandidates.length === 0 && (
-                                <div className="group-invite-empty">
-                                  {friends.some((friend) => friend.status === 'accepted')
-                                    ? 'Không còn bạn phù hợp để thêm vào nhóm.'
-                                    : 'Chưa có bạn bè trong danh bạ để mời.'}
-                                </div>
-                              )}
-                              {groupInviteCandidates.map((friend) => {
-                                const selected = groupInviteSelection.includes(friend.id)
-                                return (
-                                  <button
-                                    key={friend.id}
-                                    type="button"
-                                    className={selected ? 'group-invite-friend selected' : 'group-invite-friend'}
-                                    aria-pressed={selected}
-                                    onClick={() => setGroupInviteSelection((current) =>
-                                      current.includes(friend.id)
-                                        ? current.filter((id) => id !== friend.id)
-                                        : [...current, friend.id])}
-                                  >
-                                    <UserAvatar
-                                      name={friend.displayName || friend.username}
-                                      className="group-member-avatar"
-                                      online={friend.online}
-                                    />
-                                    <span>
-                                      <strong>{friend.displayName || friend.username}</strong>
-                                      <small>@{friend.username}</small>
-                                    </span>
-                                    <span className="group-invite-check" aria-hidden="true">✓</span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-
-                          <div className="group-tool-row">
-                            <input
-                              value={groupInviteDraft}
-                              onChange={(event) => setGroupInviteDraft(event.target.value)}
-                              placeholder="Hoặc nhập @username"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => void inviteGroupMembers()}
-                              disabled={groupBusy || (!groupInviteDraft.trim() && groupInviteSelection.length === 0)}
-                            >
-                              {groupInviteSelection.length > 0 ? `Thêm ${groupInviteSelection.length}` : 'Thêm'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="group-members-heading">
-                        <strong>Thành viên nhóm</strong>
-                        <span>{groupMembers.length} thành viên</span>
-                      </div>
-                      <div className="group-member-list">
-                        {groupMembers.map((member) => (
-                          <div className="group-member-row" key={member.id}>
-                            <UserAvatar name={member.username} className="group-member-avatar" online={member.online} />
-                            <div className="group-member-copy">
-                              <strong>@{member.username}{member.id === session.user.id ? ' · Bạn' : ''}</strong>
-                              <span>
-                                {member.role === 'owner' ? 'Chủ nhóm' : member.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
-                                {member.online ? ' · online' : ''}
-                              </span>
-                            </div>
-                            <div className="group-member-actions">
-                              {activeGroupMember?.role === 'owner' && member.id !== session.user.id && member.role !== 'owner' && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => void changeGroupMemberRole(member, member.role === 'admin' ? 'member' : 'admin')}
-                                    disabled={groupBusy}
-                                  >
-                                    {member.role === 'admin' ? 'Gỡ admin' : 'Đặt admin'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => void changeGroupMemberRole(member, 'owner')}
-                                    disabled={groupBusy}
-                                  >
-                                    Chuyển chủ
-                                  </button>
-                                </>
-                              )}
-                              {canManageActiveGroup &&
-                                member.id !== session.user.id &&
-                                member.role !== 'owner' &&
-                                !(activeGroupMember?.role === 'admin' && member.role === 'admin') && (
-                                  <button
-                                    type="button"
-                                    className="danger"
-                                    onClick={() => void removeGroupMember(member)}
-                                    disabled={groupBusy}
-                                  >
-                                    Xóa
-                                  </button>
-                                )}
-                              {member.id === session.user.id && member.role !== 'owner' && (
-                                <button
-                                  type="button"
-                                  className="danger"
-                                  onClick={() => void removeGroupMember(member)}
-                                  disabled={groupBusy}
-                                >
-                                  Rời nhóm
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
+            <GroupSettingsPanel
+              activeGroupMember={activeGroupMember}
+              setGroupSettingsOpen={setGroupSettingsOpen}
+              canManageActiveGroup={canManageActiveGroup}
+              groupNameDraft={groupNameDraft}
+              setGroupNameDraft={setGroupNameDraft}
+              renameActiveGroup={renameActiveGroup}
+              groupBusy={groupBusy}
+              activeConversation={activeConversation}
+              groupInviteSelection={groupInviteSelection}
+              groupInviteSearch={groupInviteSearch}
+              setGroupInviteSearch={setGroupInviteSearch}
+              groupInviteCandidates={groupInviteCandidates}
+              friends={friends}
+              setGroupInviteSelection={setGroupInviteSelection}
+              groupInviteDraft={groupInviteDraft}
+              setGroupInviteDraft={setGroupInviteDraft}
+              inviteGroupMembers={inviteGroupMembers}
+              groupMembers={groupMembers}
+              userId={session.user.id}
+              changeGroupMemberRole={changeGroupMemberRole}
+              removeGroupMember={removeGroupMember}
+            />
                   )}
 
                   {sharedContentOpen && (
@@ -5171,202 +4091,33 @@ export default function App() {
         )}
 
         {tab === 'contacts' && (
-          <div className="simple-view contacts-view">
-            {friendQuery.trim() ? (
-              <section className="contacts-suggestions contacts-search-section" aria-label="Kết quả tìm kiếm bạn bè">
-                <div className="contacts-heading contacts-search-heading">
-                  <span>Kết quả tìm kiếm</span>
-                  <button type="button" onClick={() => setFriendQuery('')}>Xóa tìm kiếm</button>
-                </div>
-                {friendSearching && <div className="friend-search-state" role="status">Đang tìm người dùng...</div>}
-                {friendSearchError && !friendSearching && (
-                  <div className="friend-search-state" role="alert">
-                    Không thể tìm kiếm lúc này. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button>
-                  </div>
-                )}
-                {!friendSearching && !friendSearchError && contactSearchResults.length === 0 && (
-                  <div className="friend-search-state">Không tìm thấy kết quả. Thử tên, @username hoặc email chính xác.</div>
-                )}
-                {contactSearchResults.map((friend) => {
-                  const relationship = friendRelationship(friend.id)
-                  const actionLabel = relationship === 'accepted' ? 'Nhắn tin'
-                    : relationship === 'incoming' ? 'Chấp nhận'
-                      : relationship === 'outgoing' ? 'Hủy lời mời' : 'Kết bạn'
-                  return (
-                    <div className="friend-result contact-result contact-search-row" key={friend.id}>
-                      <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
-                      <div className="friend-result-copy">
-                        <strong>{friend.displayName || friend.username}</strong>
-                        <span>@{friend.username}{relationship === 'accepted' ? ' · Bạn bè' : relationship === 'incoming' ? ' · Đã nhận lời mời' : relationship === 'outgoing' ? ' · Đã gửi lời mời' : ''}</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="contact-search-action"
-                        disabled={friendBusyIds.has(friend.id)}
-                        onClick={() => void actOnFriend(friend)}
-                      >{actionLabel}</button>
-                      <div className="friend-contact-controls" onBlur={(event) => {
-                        if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
-                      }}>
-                        <button type="button" className="friend-contact-more"
-                          aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
-                          aria-expanded={friendMenuId === friend.id} aria-haspopup="menu"
-                          onClick={() => setFriendMenuId((old) => old === friend.id ? null : friend.id)}>
-                          <MoreHorizontal size={19} aria-hidden="true" />
-                        </button>
-                        {friendMenuId === friend.id && (
-                          <div className="friend-contact-popover" role="menu">
-                            <button type="button" role="menuitem" className="friend-contact-danger"
-                              disabled={friendBusyIds.has(friend.id)}
-                              onClick={() => void blockContact(friend)}>Chặn người dùng</button>
-                            <button type="button" role="menuitem"
-                              onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </section>
-            ) : (
-              <>
-            <div className="contact-shortcuts">
-              <button type="button" onClick={() => { setTab('chat'); setNewChatMode('friends') }}>
-                <span className="shortcut-icon">＋</span><div><strong>Lời mời kết bạn</strong><small>Tìm và kết nối người mới</small></div><b>›</b>
-              </button>
-              <button type="button" onClick={() => { setFriendQuery(''); setChatCreateError(''); setTab('chat'); setNewChatMode('group') }}>
-                <span className="shortcut-icon">👥</span><div><strong>Nhóm và cộng đồng</strong><small>Tạo cuộc trò chuyện nhóm</small></div><b>›</b>
-              </button>
-            </div>
-
-            {friendRequests.some((item) => item.direction === 'incoming') && (
-              <section className="contacts-suggestions">
-                <div className="contacts-heading">
-                  Lời mời kết bạn ({friendRequests.filter((item) => item.direction === 'incoming').length})
-                </div>
-                {friendRequests.filter((item) => item.direction === 'incoming').map((friend) => (
-                  <div className="friend-result contact-result friend-request-row" key={friend.id}>
-                    <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                    <div className="friend-result-copy">
-                      <strong>@{friend.username}</strong>
-                      <span>Muốn kết bạn với bạn</span>
-                    </div>
-                    <div className="friend-request-actions">
-                      <button type="button" onClick={() => void actOnFriend(friend)} disabled={friendBusyIds.has(friend.id)}>Chấp nhận</button>
-                      <button type="button" className="secondary" onClick={() => void declineFriendRequest(friend)} disabled={friendBusyIds.has(friend.id)}>Từ chối</button>
-                    </div>
-                  </div>
-                ))}
-              </section>
-            )}
-
-            <section className="contacts-suggestions">
-              <div className="contacts-heading">Bạn bè ({friends.length})</div>
-              {friends.length === 0 && (
-                <SocoEmptyState kind="friends" title="Chưa có bạn bè"
-                  description="Gửi lời mời để bắt đầu những cuộc trò chuyện mới."
-                  action={<SocoTextAction onClick={() => { setTab('chat'); setNewChatMode('friends') }}>Tìm bạn bè</SocoTextAction>}
-                />
-              )}
-              {[...friends].sort((a, b) => Number(Boolean(contactMetadata[b.id]?.favorite)) - Number(Boolean(contactMetadata[a.id]?.favorite))).map((friend) => (
-                <div
-                  className="friend-result contact-result friend-contact-row"
-                  key={friend.id}
-                  onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') setFriendMenuId(null)
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="friend-contact-primary"
-                    onClick={() => void openDirectByUsername(friend.username)}
-                  >
-                    <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
-                    <span className="friend-result-copy">
-                      <strong>{contactMetadata[friend.id]?.favorite ? '⭐ ' : ''}{contactMetadata[friend.id]?.nickname || friend.displayName || friend.username}</strong>
-                      <span>@{friend.username} · {friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
-                      {contactMetadata[friend.id]?.note && <small className="friend-private-note">{contactMetadata[friend.id].note}</small>}
-                    </span>
-                  </button>
-                  <div className="friend-contact-controls">
-                    <button
-                      type="button"
-                      className="friend-contact-more"
-                      aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
-                      aria-expanded={friendMenuId === friend.id}
-                      aria-haspopup="menu"
-                      onClick={() => setFriendMenuId((current) => current === friend.id ? null : friend.id)}
-                    >
-                      <MoreHorizontal size={20} aria-hidden="true" />
-                    </button>
-                    {friendMenuId === friend.id && (
-                      <div className="friend-contact-popover" role="menu">
-                        <button type="button" role="menuitem" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem hồ sơ</button>
-                        <button type="button" role="menuitem" onClick={() => { setFriendMenuId(null); void openDirectByUsername(friend.username) }}>Nhắn tin</button>
-                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'nickname')}>Đặt biệt danh</button>
-                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'note')}>Ghi chú riêng</button>
-                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'favorite')}>{contactMetadata[friend.id]?.favorite ? 'Bỏ bạn thân' : 'Đánh dấu bạn thân'}</button>
-                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
-                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void blockContact(friend)}>Chặn người dùng</button>
-                        <button type="button" role="menuitem" onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </section>
-
-            {friendRequests.some((item) => item.direction === 'outgoing') && (
-              <section className="contacts-suggestions">
-                <div className="contacts-heading">Lời mời đã gửi</div>
-                {friendRequests.filter((item) => item.direction === 'outgoing').map((friend) => (
-                  <button
-                    type="button"
-                    className="friend-result contact-result"
-                    key={friend.id}
-                    onClick={() => void actOnFriend(friend)}
-                    disabled={friendBusyIds.has(friend.id)}
-                  >
-                    <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                    <div className="friend-result-copy">
-                      <strong>@{friend.username}</strong>
-                      <span>Đang chờ phản hồi</span>
-                    </div>
-                    <div className="friend-result-action"><small>Hủy lời mời</small><span>×</span></div>
-                  </button>
-                ))}
-              </section>
-            )}
-
-            <section className="contacts-suggestions">
-              <div className="contacts-heading">Người bạn có thể biết</div>
-              {friendSearching && <div className="friend-search-state">Đang tải gợi ý...</div>}
-              {!friendSearching && friendResults.filter((friend) => friendRelationship(friend.id) === 'none').length === 0 && (
-                <div className="friend-search-state">Chưa có gợi ý mới phù hợp.</div>
-              )}
-              {friendResults.filter((friend) => friendRelationship(friend.id) === 'none').map((friend) => (
-                <button
-                  type="button"
-                  className="friend-result contact-result"
-                  key={friend.id}
-                  onClick={() => void actOnFriend(friend)}
-                  disabled={friendBusyIds.has(friend.id)}
-                >
-                  <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                  <div className="friend-result-copy">
-                    <strong>@{friend.username}</strong>
-                    <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
-                  </div>
-                  <div className="friend-result-action"><small>Kết bạn</small><span>＋</span></div>
-                </button>
-              ))}
-            </section>
-              </>
-            )}
-          </div>
+            <ContactsView
+              friendQuery={friendQuery}
+              setFriendQuery={setFriendQuery}
+              friendSearching={friendSearching}
+              friendSearchError={friendSearchError}
+              setFriendSearchRetry={setFriendSearchRetry}
+              contactSearchResults={contactSearchResults}
+              friendRelationship={friendRelationship}
+              friendBusyIds={friendBusyIds}
+              actOnFriend={actOnFriend}
+              setFriendMenuId={setFriendMenuId}
+              friendMenuId={friendMenuId}
+              blockContact={blockContact}
+              reportContact={reportContact}
+              setTab={setTab}
+              setNewChatMode={setNewChatMode}
+              setChatCreateError={setChatCreateError}
+              friendRequests={friendRequests}
+              declineFriendRequest={declineFriendRequest}
+              friends={friends}
+              contactMetadata={contactMetadata}
+              openDirectByUsername={openDirectByUsername}
+              setFriendPreview={setFriendPreview}
+              changePersonalContact={changePersonalContact}
+              removeAcceptedFriend={removeAcceptedFriend}
+              friendResults={friendResults}
+            />
         )}
 
         {tab === 'discover' && (
@@ -5505,114 +4256,7 @@ export default function App() {
           </div>
         )}
 
-        {activeMessageAction && (() => {
-          const mine = activeMessageAction.senderId === session.user.id
-          const preview = activeMessageAction.text.trim() || attachmentLabel(activeMessageAction.attachments)
-          return (
-            <div
-              className="message-context-backdrop"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Tùy chọn tin nhắn"
-              onMouseDown={(event) => {
-                if (event.currentTarget === event.target) setMessageActionId(null)
-              }}
-            >
-              <section className="message-context-sheet">
-                <div className={mine ? 'message-context-preview mine' : 'message-context-preview'}>
-                  <small>{mine ? 'Bạn' : `@${activeMessageAction.sender}`}</small>
-                  <div className="message-context-preview-bubble">{preview || 'Tin nhắn'}</div>
-                  <time>{formatTime(activeMessageAction.createdAt)}</time>
-                </div>
-
-                <div className="message-context-reactions" aria-label="Thả cảm xúc">
-                  {['❤️', '👍', '😂', '😮', '😢', '🙏'].map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      className={(activeMessageAction.reactions || []).some((reaction) => reaction.emoji === emoji && reaction.mine) ? 'active' : ''}
-                      aria-label={`Thả cảm xúc ${emoji}`}
-                      onClick={() => {
-                        setMessageActionId(null)
-                        void toggleReaction(activeMessageAction, emoji)
-                      }}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="message-context-actions">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReplyingTo(activeMessageAction)
-                      setMessageActionId(null)
-                    }}
-                  >
-                    <span aria-hidden="true">↩</span>
-                    <b>Trả lời</b>
-                  </button>
-
-                  {Boolean(activeMessageAction.text.trim()) && (
-                    <button type="button" onClick={() => void copyMessage(activeMessageAction)}>
-                      <span aria-hidden="true">▣</span>
-                      <b>Sao chép</b>
-                    </button>
-                  )}
-
-                  {!mine && Boolean(activeMessageAction.text.trim()) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMessageActionId(null)
-                        void translateMessage(activeMessageAction)
-                      }}
-                    >
-                      <span aria-hidden="true">文</span>
-                      <b>Dịch</b>
-                    </button>
-                  )}
-
-                  {mine && Boolean(activeMessageAction.text.trim()) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMessageActionId(null)
-                        void editOwnMessage(activeMessageAction)
-                      }}
-                    >
-                      <span aria-hidden="true">✎</span>
-                      <b>Sửa</b>
-                    </button>
-                  )}
-
-                  {mine && (
-                    <button
-                      type="button"
-                      className="danger"
-                      onClick={() => {
-                        setMessageActionId(null)
-                        void recallOwnMessage(activeMessageAction)
-                      }}
-                    >
-                      <span aria-hidden="true">⌫</span>
-                      <b>Thu hồi</b>
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className="message-context-cancel"
-                  onClick={() => setMessageActionId(null)}
-                >
-                  Đóng
-                </button>
-              </section>
-            </div>
-          )
-        })()}
+        {activeMessageAction && <MessageActions activeMessageAction={activeMessageAction} userId={session.user.id} setMessageActionId={setMessageActionId} toggleReaction={toggleReaction} setReplyingTo={setReplyingTo} copyMessage={copyMessage} translateMessage={translateMessage} editOwnMessage={editOwnMessage} recallOwnMessage={recallOwnMessage} />}
 
         {activePost && (
           <div
@@ -5684,49 +4328,7 @@ export default function App() {
           </div>
         )}
 
-        {activeStory && (
-          <div
-            className="story-viewer-backdrop"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Story của @${activeStory.author}`}
-            onMouseDown={(event) => {
-              if (event.currentTarget === event.target) setActiveStoryId(null)
-            }}
-          >
-            <section className="story-viewer">
-              <div className="story-progress" aria-hidden="true">
-                <span key={activeStory.id} className={activeStory.attachment.kind === 'image' ? 'running' : ''} />
-              </div>
-              <header>
-                <UserAvatar name={activeStory.author} className="story-viewer-avatar" />
-                <div className="story-viewer-owner">
-                  <strong>@{activeStory.author}</strong>
-                  <time dateTime={activeStory.createdAt}>
-                    {new Date(activeStory.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric' })}
-                  </time>
-                </div>
-                {activeStory.author === name && (
-                  <button type="button" className="story-delete" aria-label="Xóa Story" title="Xóa Story" disabled={storyBusy} onClick={() => void deleteStory(activeStory)}>
-                    <UiIcon name="trash" size={20} />
-                  </button>
-                )}
-                <button type="button" className="story-close" aria-label="Đóng Story" title="Đóng" onClick={() => setActiveStoryId(null)}>×</button>
-              </header>
-              <div className="story-viewer-media">
-                {activeStory.attachment.kind === 'video' ? (
-                  <video src={activeStory.attachment.url} autoPlay controls playsInline onEnded={nextStory} />
-                ) : (
-                  <img src={activeStory.attachment.url} alt={activeStory.attachment.name} />
-                )}
-              </div>
-              <button type="button" className="story-nav story-previous" aria-label="Story trước" title="Story trước"
-                disabled={activeStoryIndex === 0} onClick={previousStory}>‹</button>
-              <button type="button" className="story-nav story-next" aria-label="Story tiếp theo" title="Story tiếp theo"
-                onClick={nextStory}>›</button>
-            </section>
-          </div>
-        )}
+        {activeStory && <StoryViewer activeStory={activeStory} name={name} storyBusy={storyBusy} deleteStory={deleteStory} setActiveStoryId={setActiveStoryId} nextStory={nextStory} previousStory={previousStory} activeStoryIndex={activeStoryIndex} />}
 
         {tab === 'profile' && (
           <div className={`simple-view profile-view ${profileTimelineOpen ? 'personal-timeline-view' : ''}`}>
@@ -5867,78 +4469,25 @@ export default function App() {
             <div className="soco-profile-section-label">TÙY CHỌN & CÀI ĐẶT</div>
             <section className="settings-card">
               {profilePrivacyControls}
-              <div className="settings-row">
-                <div>
-                  <strong>Thiết bị đã đăng nhập</strong>
-                  <small>Kiểm tra và thu hồi những phiên đăng nhập không còn sử dụng.</small>
-                </div>
-                <button type="button" className="settings-action"
-                  disabled={sessionsBusy || !session.refreshToken}
-                  onClick={() => {
-                    if (sessionsOpen) setSessionsOpen(false)
-                    else void fetchAccountSessions()
-                  }}>
-                  {sessionsBusy ? 'Đang xử lý...' : sessionsOpen ? 'Thu gọn' : 'Xem thiết bị'}
-                </button>
-              </div>
-              {sessionsError && <div className="settings-row" role="alert">
-                <small>{sessionsError}</small>
-                <button type="button" className="settings-action" disabled={sessionsBusy}
-                  onClick={() => void fetchAccountSessions()}>Thử lại</button>
-              </div>}
-              {sessionsOpen && (
-                <div className="account-sessions-panel">
-                  <p>Thu hồi phiên sẽ ngăn gia hạn đăng nhập bằng refresh token. Access token đã phát hành có thể tiếp tục hoạt động đến khi hết hạn (tối đa 24 giờ).</p>
-                  {managedSessions.length === 0 && <small>Không có phiên đang hoạt động.</small>}
-                  {managedSessions.map((device) => (
-                    <div className="account-session-item" key={device.id}>
-                      <div className="account-session-details">
-                        <strong>{device.current ? 'Thiết bị này' : device.userAgent || 'Trình duyệt khác'}</strong>
-                        {device.current && <small>{device.userAgent || 'Trình duyệt hiện tại'}</small>}
-                        <small>Hoạt động: {new Date(device.lastSeenAt).toLocaleString('vi-VN')}</small>
-                      </div>
-                      <button type="button" className="settings-action"
-                        disabled={sessionsBusy}
-                        onClick={() => void revokeAccountSessions(device.id)}>
-                        {device.current ? 'Đăng xuất' : 'Thu hồi'}
-                      </button>
-                    </div>
-                  ))}
-                  {managedSessions.some((device) => !device.current) && (
-                    <button type="button" className="settings-action account-revoke-others"
-                      disabled={sessionsBusy} onClick={() => void revokeAccountSessions()}>
-                      Đăng xuất tất cả thiết bị khác
-                    </button>
-                  )}
-                </div>
-              )}
-              <div className="settings-row">
-                <div><strong>Người dùng đã chặn</strong><small>Quản lý những tài khoản không thể nhắn tin hoặc kết bạn với bạn.</small></div>
-                <button type="button" className="settings-action" disabled={blockedBusy}
-                  onClick={() => blockedOpen ? setBlockedOpen(false) : void loadBlockedUsers()}>
-                  {blockedBusy ? 'Đang tải...' : blockedOpen ? 'Thu gọn' : 'Xem danh sách'}
-                </button>
-              </div>
-              {blockedError && <div className="settings-row" role="alert">
-                <small>{blockedError}</small>
-                <button type="button" className="settings-action" disabled={blockedBusy}
-                  onClick={() => void loadBlockedUsers()}>Thử lại</button>
-              </div>}
-              {blockedOpen && (
-                <div className="account-sessions-panel">
-                  {blockedUsers.length === 0 && <p>Chưa chặn tài khoản nào.</p>}
-                  {blockedUsers.map((item) => (
-                    <div className="account-session-item" key={item.id}>
-                      <div className="account-session-details">
-                        <strong>{item.displayName || item.username}</strong>
-                        <small>@{item.username}</small>
-                      </div>
-                      <button type="button" className="settings-action" disabled={blockedBusy}
-                        onClick={() => void unblockContact(item.id)}>Bỏ chặn</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <AccountSessionsPanel
+              sessionsBusy={sessionsBusy}
+              refreshToken={session.refreshToken}
+              sessionsOpen={sessionsOpen}
+              setSessionsOpen={setSessionsOpen}
+              fetchAccountSessions={fetchAccountSessions}
+              sessionsError={sessionsError}
+              managedSessions={managedSessions}
+              revokeAccountSessions={revokeAccountSessions}
+            />
+            <BlockedUsersPanel
+              blockedBusy={blockedBusy}
+              blockedOpen={blockedOpen}
+              setBlockedOpen={setBlockedOpen}
+              loadBlockedUsers={loadBlockedUsers}
+              blockedError={blockedError}
+              blockedUsers={blockedUsers}
+              unblockContact={unblockContact}
+            />
               <button
                 type="button"
                 className="settings-row settings-row-button app-locale-row"
@@ -6212,53 +4761,13 @@ export default function App() {
         conversations={conversations.map(({ id, name, type }) => ({ id, name, type }))}
       />
 
-      <nav className="bottom-navigation" aria-label="Điều hướng chính">
-        <button
-          type="button"
-          aria-label={t('nav.chat')}
-          title={t('nav.chat')}
-          className={tab === 'chat' ? 'active' : ''}
-          onClick={() => switchTab('chat')}
-        >
-          <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b>{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
-        </button>
-        <button
-          type="button"
-          aria-label={t('nav.contacts')}
-          title={t('nav.contacts')}
-          className={tab === 'contacts' ? 'active' : ''}
-          onClick={() => switchTab('contacts')}
-        >
-          <span className="nav-icon"><UiIcon name="contacts" size={25} /></span>
-        </button>
-        <button
-          type="button"
-          aria-label={t('nav.discover')}
-          title={t('nav.discover')}
-          className={tab === 'discover' ? 'active' : ''}
-          onClick={() => switchTab('discover')}
-        >
-          <span className="nav-icon"><UiIcon name="discover" size={25} /></span>
-        </button>
-        <button
-          type="button"
-          aria-label={t('nav.feed')}
-          title={t('nav.feed')}
-          className={tab === 'feed' ? 'active' : ''}
-          onClick={() => switchTab('feed')}
-        >
-          <span className="nav-icon"><UiIcon name="wall" size={25} /></span>
-        </button>
-        <button
-          type="button"
-          aria-label={t('nav.profile')}
-          title={t('nav.profile')}
-          className={tab === 'profile' ? 'active' : ''}
-          onClick={() => switchTab('profile')}
-        >
-          <span className="nav-icon"><UiIcon name="profile" size={25} />{!pushEnabled && <b>!</b>}</span>
-        </button>
-      </nav>
+      <BottomNavigation
+        tab={tab}
+        t={t}
+        switchTab={switchTab}
+        unreadTotal={unreadTotal}
+        pushEnabled={pushEnabled}
+      />
     </main>
   )
 }
