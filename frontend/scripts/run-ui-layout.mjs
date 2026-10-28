@@ -206,6 +206,32 @@ try {
     await blockFriend.scrollIntoViewIfNeeded()
     await blockFriend.click() // Native confirmation is dismissed by Playwright; do not block the test account.
     await page.keyboard.press('Escape')
+    if (width === 390) {
+      // Search rows must never shrink while the mouse is held, even with animations enabled.
+      const contactSearch = page.locator('.appbar-search input')
+      await contactSearch.fill('minhanh')
+      const searchRow = page.locator('.contact-search-row').first()
+      await searchRow.waitFor()
+      await page.emulateMedia({ reducedMotion: 'no-preference' })
+      const beforePress = await searchRow.boundingBox()
+      check(beforePress, 'Search result missing before pointer-down test')
+      await page.mouse.move(beforePress.x + beforePress.width / 2, beforePress.y + beforePress.height / 2)
+      await page.mouse.down()
+      await page.waitForTimeout(180)
+      const pressedRow = await searchRow.evaluate(node => ({
+        transform: getComputedStyle(node).transform,
+        transitionDuration: getComputedStyle(node).transitionDuration,
+      }))
+      const afterPress = await searchRow.boundingBox()
+      await page.mouse.up()
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      check(pressedRow.transform === 'none' && pressedRow.transitionDuration.split(',').every(t => parseFloat(t) === 0),
+        'Search result must not scale or animate on pointer-down: ' + JSON.stringify(pressedRow))
+      check(afterPress && Math.abs(afterPress.width - beforePress.width) < 1 &&
+        Math.abs(afterPress.height - beforePress.height) < 1,
+        'Search row shrank while mouse was held: ' + JSON.stringify({ beforePress, afterPress }))
+      await contactSearch.fill('')
+    }
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
     // Only social engagement actions belong in the footer. Manage post from •••.
