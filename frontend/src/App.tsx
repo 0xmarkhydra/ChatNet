@@ -663,6 +663,22 @@ export default function App() {
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
+  const translationHubRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!translationMenuOpen) return
+    const closeOutside = (event: PointerEvent) => {
+      if (!translationHubRef.current?.contains(event.target as Node)) setTranslationMenuOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTranslationMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [translationMenuOpen])
   const [languageSearch, setLanguageSearch] = useState('')
   const [appLocale, setAppLocale] = useState(loadAppLocalePreference)
   const [uiBundle, setUiBundle] = useState<UIBundle>(defaultBundle)
@@ -4383,7 +4399,7 @@ export default function App() {
                           👥 Nhóm
                         </button>
                       )}
-                      <div className="translation-hub">
+                      <div className="translation-hub" ref={translationHubRef}>
                         <button
                           type="button"
                           className={autoTranslate ? 'translation-hub-trigger active' : 'translation-hub-trigger'}
@@ -4407,12 +4423,6 @@ export default function App() {
 
                         {translationMenuOpen && (
                           <>
-                            <button
-                              type="button"
-                              className="translation-hub-scrim"
-                              aria-label="Đóng cài đặt dịch"
-                              onClick={() => setTranslationMenuOpen(false)}
-                            />
                             <div className="translation-hub-popover" role="dialog" aria-label="Cài đặt dịch AI">
                               <div className="translation-hub-heading">
                                 <div>

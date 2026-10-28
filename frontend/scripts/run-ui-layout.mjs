@@ -303,6 +303,20 @@ try {
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
     await page.locator('.conversation-item').first().click()
     await geometry('chat-room', width, ['.modern-frame', '.conversation-panel', '.chat-head'])
+    if ([390, 1440].includes(width)) {
+      const translationTrigger = page.locator('.chat-head .translation-hub-trigger')
+      const translationMenu = page.getByRole('dialog', { name: 'Cài đặt dịch AI' })
+      await translationTrigger.click()
+      await translationMenu.waitFor()
+      await translationMenu.locator('.translation-language-search input').fill('en')
+      check(await translationMenu.isVisible(), 'Translation menu closed while interacting inside: ' + width)
+      await page.locator('.chat-head .room-info').click()
+      await translationMenu.waitFor({ state: 'hidden' })
+      await translationTrigger.click()
+      await translationMenu.waitFor()
+      await page.keyboard.press('Escape')
+      await translationMenu.waitFor({ state: 'hidden' })
+    }
     if (width <= 760) await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
   }
   // Regression: connection sheet stays a fixed 50% of the viewport while results change.
