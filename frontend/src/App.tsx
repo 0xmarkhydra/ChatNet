@@ -569,6 +569,7 @@ export default function App() {
   const friendActionRef = useRef(new Set<number>())
   const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(() => new Set())
   const [friendMenuId, setFriendMenuId] = useState<number | null>(null)
+  const [friendMenuLayout, setFriendMenuLayout] = useState({ openUp: false, maxHeight: 352 })
   const [friendPreview, setFriendPreview] = useState<FriendSearchResult | null>(null)
   const [blockedUsers, setBlockedUsers] = useState<Array<{ id: number; username: string; displayName: string }>>([])
   const [blockedOpen, setBlockedOpen] = useState(false)
@@ -2080,6 +2081,18 @@ export default function App() {
         return nextIDs
       })
     }
+  }
+
+  function toggleFriendMenu(id: number, anchor: HTMLButtonElement, menuHeight: number) {
+    const trigger = anchor.getBoundingClientRect()
+    const viewport = anchor.closest('.contacts-view')?.getBoundingClientRect()
+    const topEdge = Math.max(8, viewport?.top ?? 8)
+    const bottomEdge = Math.min(window.innerHeight - 8, viewport?.bottom ?? window.innerHeight - 8)
+    const spaceAbove = Math.max(0, trigger.top - topEdge - 4)
+    const spaceBelow = Math.max(0, bottomEdge - trigger.bottom - 4)
+    const openUp = spaceBelow < menuHeight && spaceAbove > spaceBelow
+    setFriendMenuLayout({ openUp, maxHeight: Math.max(64, Math.floor(Math.min(menuHeight, openUp ? spaceAbove : spaceBelow))) })
+    setFriendMenuId((current) => current === id ? null : id)
   }
 
   async function blockContact(friend: FriendSearchResult | FriendConnection) {
@@ -4908,11 +4921,11 @@ export default function App() {
                         <button type="button" className="friend-contact-more"
                           aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
                           aria-expanded={friendMenuId === friend.id} aria-haspopup="menu"
-                          onClick={() => setFriendMenuId((old) => old === friend.id ? null : friend.id)}>
+                          onClick={(event) => toggleFriendMenu(friend.id, event.currentTarget, 100)}>
                           <MoreHorizontal size={19} aria-hidden="true" />
                         </button>
                         {friendMenuId === friend.id && (
-                          <div className="friend-contact-popover" role="menu">
+                          <div className={`friend-contact-popover${friendMenuLayout.openUp ? ' friend-contact-popover--up' : ''}`} role="menu" style={{ maxHeight: friendMenuLayout.maxHeight }}>
                             <button type="button" role="menuitem" className="friend-contact-danger"
                               disabled={friendBusyIds.has(friend.id)}
                               onClick={() => void blockContact(friend)}>Chặn người dùng</button>
@@ -4995,12 +5008,12 @@ export default function App() {
                       aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
                       aria-expanded={friendMenuId === friend.id}
                       aria-haspopup="menu"
-                      onClick={() => setFriendMenuId((current) => current === friend.id ? null : friend.id)}
+                      onClick={(event) => toggleFriendMenu(friend.id, event.currentTarget, 352)}
                     >
                       <MoreHorizontal size={20} aria-hidden="true" />
                     </button>
                     {friendMenuId === friend.id && (
-                      <div className="friend-contact-popover" role="menu">
+                      <div className={`friend-contact-popover${friendMenuLayout.openUp ? ' friend-contact-popover--up' : ''}`} role="menu" style={{ maxHeight: friendMenuLayout.maxHeight }}>
                         <button type="button" role="menuitem" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem hồ sơ</button>
                         <button type="button" role="menuitem" onClick={() => { setFriendMenuId(null); void openDirectByUsername(friend.username) }}>Nhắn tin</button>
                         <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'nickname')}>Đặt biệt danh</button>

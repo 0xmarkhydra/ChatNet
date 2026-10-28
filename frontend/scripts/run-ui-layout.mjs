@@ -192,6 +192,20 @@ try {
     await page.getByRole('button', { name: 'Danh bạ', exact: true }).click()
     await geometry('contacts', width, ['.modern-frame', '.contacts-view', '.contact-shortcuts'])
     check(await page.locator('.contacts-view > .soco-section-heading').count() === 0, 'Removed Contacts banner reappeared: ' + width)
+    // Regression: the friend menu must escape the rounded card and its Block action must be clickable.
+    const friendOptions = page.locator('.friend-contact-row .friend-contact-more').first()
+    await friendOptions.click()
+    const friendMenu = page.locator('.friend-contact-row .friend-contact-popover')
+    await friendMenu.waitFor()
+    const menuBounds = await friendMenu.boundingBox()
+    check(menuBounds && menuBounds.y >= -1 && menuBounds.y + menuBounds.height <= (width <= 375 ? 667 : width <= 430 ? 844 : 900) + 1,
+      'Friend options are outside the viewport at ' + width + ': ' + JSON.stringify(menuBounds))
+    check(await friendMenu.evaluate(node => getComputedStyle(node.closest('.contacts-suggestions')).overflowY === 'visible'),
+      'Friend options are clipped by the contacts card at ' + width)
+    const blockFriend = friendMenu.getByRole('menuitem', { name: 'Chặn người dùng' })
+    await blockFriend.scrollIntoViewIfNeeded()
+    await blockFriend.click() // Native confirmation is dismissed by Playwright; do not block the test account.
+    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
     // Only social engagement actions belong in the footer. Manage post from •••.
