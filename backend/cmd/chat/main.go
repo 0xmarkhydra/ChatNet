@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,6 +22,7 @@ import (
 	"chatnet/internal/objectstore"
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -120,15 +124,24 @@ func main() {
 	mux.Handle("POST /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.findNearby)))
 	mux.Handle("DELETE /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.stopNearby)))
 	mux.Handle("GET /api/friends", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriends)))
+	mux.Handle("GET /api/contacts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listContactMetadata)))
+	mux.Handle("PUT /api/contacts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateContactMetadata)))
 	mux.Handle("GET /api/friends/requests", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriendRequests)))
 	mux.Handle("POST /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.sendFriendRequest)))
 	mux.Handle("POST /api/friends/{id}/accept", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.acceptFriendRequest)))
 	mux.Handle("DELETE /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeFriendConnection)))
+	mux.Handle("GET /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPrivacy)))
+	mux.Handle("PUT /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePrivacy)))
+	mux.Handle("GET /api/users/blocked", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listBlockedUsers)))
+	mux.Handle("POST /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.blockUser)))
+	mux.Handle("DELETE /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.unblockUser)))
+	mux.Handle("POST /api/users/{id}/report", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reportUser)))
 	mux.Handle("GET /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPreferences)))
 	mux.Handle("PUT /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePreferences)))
 	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
 	mux.Handle("PUT /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateTranslationPreferences)))
 	mux.Handle("GET /api/conversations", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversations)))
+	mux.Handle("GET /api/conversations/memberships", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversationMemberships)))
 	mux.Handle("POST /api/conversations/direct", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createDirect)))
 	mux.Handle("POST /api/conversations/groups", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createGroup)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listMessages)))
@@ -298,10 +311,16 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 				ON other.conversation_id=c.id AND other.user_id<>$1
 			WHERE c.type='direct'
 		)
-		SELECT u.id,u.username,u.display_name,COALESCE(sg.mutual_groups,0)
+		SELECT u.id,u.username,u.display_name,u.show_online_status,COALESCE(sg.mutual_groups,0)
 		FROM users u
 		LEFT JOIN shared_groups sg ON sg.user_id=u.id
 		WHERE u.id<>$1
+		  AND (u.searchable_by_username OR u.searchable_by_name)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=u.id)
+		       OR (b.blocker_id=u.id AND b.blocked_id=$1)
+		  )
 		  AND NOT EXISTS (
 			SELECT 1 FROM direct_contacts dc WHERE dc.user_id=u.id
 		  )
@@ -317,8 +336,9 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int64
 		var username, displayName string
+		var showOnline bool
 		var mutualGroups int
-		if rows.Scan(&id, &username, &displayName, &mutualGroups) != nil {
+		if rows.Scan(&id, &username, &displayName, &showOnline, &mutualGroups) != nil {
 			continue
 		}
 
@@ -333,7 +353,7 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 			"id":           id,
 			"username":     username,
 			"displayName":  displayName,
-			"online":       s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
+			"online":       showOnline && s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
 			"mutualGroups": mutualGroups,
 			"reason":       reason,
 		})
@@ -355,9 +375,14 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT id,username,display_name
+		SELECT id,username,display_name,show_online_status
 		FROM users
 		WHERE id<>$1
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=users.id)
+		       OR (b.blocker_id=users.id AND b.blocked_id=$1)
+		  )
 		  AND (
 			(searchable_by_username AND strpos(lower(username), $2)>0)
 			OR (searchable_by_email AND lower(email)=$2)
@@ -384,10 +409,11 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int64
 		var username, displayName string
-		if rows.Scan(&id, &username, &displayName) == nil {
+		var showOnline bool
+		if rows.Scan(&id, &username, &displayName, &showOnline) == nil {
 			items = append(items, map[string]any{
 				"id": id, "username": username, "displayName": displayName,
-				"online": s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
+				"online": showOnline && s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
 			})
 		}
 	}
@@ -508,6 +534,13 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		WHERE cm.user_id=$1
+		  AND (c.type <> 'direct' OR NOT EXISTS (
+		    SELECT 1 FROM conversation_members other
+		    JOIN user_blocks b ON
+		      (b.blocker_id=$1 AND b.blocked_id=other.user_id)
+		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
+		    WHERE other.conversation_id=c.id AND other.user_id<>$1
+		  ))
 		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
 		claims.UserID, limit, offset)
@@ -532,16 +565,17 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		if c.Type == "direct" {
 			var otherID int64
 			var displayName string
+			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username
+				SELECT u.id,u.username,u.show_online_status
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
-				c.ID, claims.UserID).Scan(&otherID, &displayName)
+				c.ID, claims.UserID).Scan(&otherID, &displayName, &showOnline)
 			if err == nil {
 				c.Name = displayName
 				c.OtherUserID = &otherID
-				c.Online = s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
+				c.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
 			}
 		}
 		items = append(items, c)
@@ -566,10 +600,20 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 
 	var otherID int64
 	var otherName string
+	var showOnline bool
 	if err := s.db.QueryRow(r.Context(),
-		`SELECT id,username FROM users WHERE username=$1`, username,
-	).Scan(&otherID, &otherName); err != nil {
+		`SELECT id,username,show_online_status FROM users WHERE username=$1`, username,
+	).Scan(&otherID, &otherName, &showOnline); err != nil {
 		httpx.Error(w, http.StatusNotFound, "user not found")
+		return
+	}
+	blocked, err := s.blockedPair(r.Context(), claims.UserID, otherID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify contact policy")
+		return
+	}
+	if blocked {
+		httpx.Error(w, http.StatusForbidden, "direct contact is blocked")
 		return
 	}
 
@@ -612,7 +656,7 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	c := conversation{
 		ID: id, Type: "direct", Name: otherName, OtherUserID: &otherID,
 		MemberCount: 2, CreatedAt: createdAt,
-		Online: s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0,
+		Online: showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0,
 	}
 	s.publishConversationEvent(r.Context(), ids, realtimeEvent{Type: "conversation.created", ConversationID: id, Conversation: &c})
 	httpx.JSON(w, http.StatusCreated, c)
@@ -697,6 +741,24 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, c)
 }
 
+func searchDateBounds(fromDate, toDate *time.Time, offsetMinutes int) (from, to time.Time) {
+	offset := time.Duration(offsetMinutes) * time.Minute
+	if fromDate != nil {
+		from = fromDate.Add(offset)
+	}
+	if toDate != nil {
+		to = toDate.AddDate(0, 0, 1).Add(offset)
+	}
+	return
+}
+
+func nullableSearchTime(source *time.Time, value time.Time) *time.Time {
+	if source == nil {
+		return nil
+	}
+	return &value
+}
+
 func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -704,6 +766,9 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		if ok {
 			httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		}
+		return
+	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
 		return
 	}
 
@@ -731,8 +796,49 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		before = n
 	}
 
+	keyword := strings.TrimSpace(r.URL.Query().Get("search"))
+	sender := strings.TrimSpace(r.URL.Query().Get("sender"))
+	if len([]rune(keyword)) > 200 || len([]rune(sender)) > 100 {
+		httpx.Error(w, http.StatusBadRequest, "search filter too long")
+		return
+	}
+	var fromDate, toDate *time.Time
+	for _, filter := range []struct {
+		raw    string
+		output **time.Time
+	}{
+		{r.URL.Query().Get("from"), &fromDate},
+		{r.URL.Query().Get("to"), &toDate},
+	} {
+		if filter.raw == "" {
+			continue
+		}
+		parsed, err := time.Parse("2006-01-02", filter.raw)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid date filter (YYYY-MM-DD)")
+			return
+		}
+		*filter.output = &parsed
+	}
+	if fromDate != nil && toDate != nil && fromDate.After(*toDate) {
+		httpx.Error(w, http.StatusBadRequest, "invalid date range")
+		return
+	}
+	// Browser date inputs represent days in the viewer's local timezone.
+	// JavaScript getTimezoneOffset() is UTC minus local time in minutes.
+	var tzOffset int
+	if raw := r.URL.Query().Get("tzOffset"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < -840 || value > 840 {
+			httpx.Error(w, http.StatusBadRequest, "invalid timezone offset")
+			return
+		}
+		tzOffset = value
+	}
+	from, to := searchDateBounds(fromDate, toDate, tzOffset)
+
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
+		SELECT m.id,m.conversation_id,m.user_id,u.username,COALESCE(m.client_id,''),m.text,
 		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
@@ -751,7 +857,11 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
 		WHERE m.conversation_id=$1 AND ($3::bigint=0 OR m.id<$3)
-		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit)
+		  AND ($5::text='' OR (m.deleted_at IS NULL AND strpos(lower(m.text), lower($5))>0))
+		  AND ($6::text='' OR lower(u.username)=lower($6))
+		  AND ($7::timestamptz IS NULL OR m.created_at >= $7)
+		  AND ($8::timestamptz IS NULL OR m.created_at < $8)
+		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to))
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return
@@ -762,7 +872,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m message
 		if rows.Scan(
-			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
+			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.ClientID, &m.Text,
 			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
 			&m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
 			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
@@ -794,6 +904,74 @@ func validClientID(id string) bool {
 	}) < 0
 }
 
+// messageRequestFingerprint is computed from the *original* validated request,
+// not the mutable message row. An edit/recall cannot turn a valid retry into 409.
+func messageRequestFingerprint(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) string {
+	refs := make([]string, 0, len(attachments))
+	for _, attachment := range attachments {
+		refs = append(refs, strings.TrimSpace(attachment.StorageRef))
+	}
+	payload, _ := json.Marshal(struct {
+		ConversationID int64    `json:"conversationId"`
+		Text           string   `json:"text"`
+		ReplyTo        *int64   `json:"replyTo"`
+		StorageRefs    []string `json:"storageRefs"`
+	}{conversationID, text, replyTo, refs})
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:])
+}
+
+func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+	if m.ConversationID != conversationID || m.Text != text || len(m.Attachments) != len(attachments) {
+		return false
+	}
+	if (m.ReplyToMessageID == nil) != (replyTo == nil) {
+		return false
+	}
+	if replyTo != nil && *m.ReplyToMessageID != *replyTo {
+		return false
+	}
+	for i, item := range attachments {
+		if m.Attachments[i].StorageRef != strings.TrimSpace(item.StorageRef) {
+			return false
+		}
+	}
+	return true
+}
+
+// replyExistingMessage returns true once it wrote a response for an existing client ID.
+func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+	var messageID int64
+	var fingerprint *string
+	err := s.db.QueryRow(r.Context(), `
+		SELECT id,request_fingerprint FROM messages WHERE user_id=$1 AND client_id=$2
+	`, senderID, clientID).Scan(&messageID, &fingerprint)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false
+	}
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot look up message retry")
+		return true
+	}
+	m, err := s.loadMessage(r.Context(), messageID, senderID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load message retry")
+		return true
+	}
+	if fingerprint != nil {
+		if *fingerprint != messageRequestFingerprint(conversationID, text, replyTo, attachments) {
+			httpx.Error(w, http.StatusConflict, "client id was already used for another message")
+			return true
+		}
+	} else if !sameMessageRequest(m, conversationID, text, replyTo, attachments) {
+		// Compatibility for rows created before the additive fingerprint migration.
+		httpx.Error(w, http.StatusConflict, "client id was already used for another message")
+		return true
+	}
+	httpx.JSON(w, http.StatusOK, m)
+	return true
+}
+
 func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -801,6 +979,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		if ok {
 			httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		}
+		return
+	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
 		return
 	}
 
@@ -815,13 +996,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Text = strings.TrimSpace(body.Text)
-	// ponytail: correlation only, not durable idempotency; do not auto-retry message creation.
 	if !validClientID(body.ClientID) {
 		httpx.Error(w, http.StatusBadRequest, "invalid client id")
 		return
 	}
 	if len(body.Text) > 4000 {
 		httpx.Error(w, http.StatusBadRequest, "text must be <= 4000 characters")
+		return
+	}
+	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
 		return
 	}
 
@@ -858,6 +1041,21 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
+	// Lock active membership until the message commits. A group removal cannot
+	// race a slow S3 validation and leave a message sent after removal.
+	var membership int64
+	if err := tx.QueryRow(r.Context(), `
+		SELECT conversation_id FROM conversation_members
+		WHERE conversation_id=$1 AND user_id=$2 FOR SHARE
+	`, conversationID, claims.UserID).Scan(&membership); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.Error(w, http.StatusForbidden, "not a conversation member")
+		} else {
+			httpx.Error(w, http.StatusInternalServerError, "cannot verify conversation membership")
+		}
+		return
+	}
+
 	m := message{
 		ClientID:         body.ClientID,
 		ConversationID:   conversationID,
@@ -867,11 +1065,25 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		Attachments:      attachments,
 		Reactions:        []messageReaction{},
 	}
-	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id)
-		VALUES($1,$2,$3,$4) RETURNING id,text,created_at`,
-		conversationID, claims.UserID, body.Text, body.ReplyToMessageID,
-	).Scan(&m.ID, &m.Text, &m.CreatedAt); err != nil {
+	fingerprint := ""
+	if body.ClientID != "" {
+		fingerprint = messageRequestFingerprint(conversationID, body.Text, body.ReplyToMessageID, body.Attachments)
+	}
+	err = tx.QueryRow(r.Context(), `
+		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint)
+		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''))
+		ON CONFLICT (user_id,client_id) WHERE client_id IS NOT NULL DO NOTHING
+		RETURNING id,text,created_at`,
+		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint,
+	).Scan(&m.ID, &m.Text, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		_ = tx.Rollback(r.Context())
+		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
+			httpx.Error(w, http.StatusConflict, "message retry could not be resolved")
+		}
+		return
+	}
+	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create message")
 		return
 	}
@@ -933,7 +1145,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (message, error) {
 	var m message
 	err := s.db.QueryRow(ctx, `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
+		SELECT m.id,m.conversation_id,m.user_id,u.username,COALESCE(m.client_id,''),m.text,
 		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
@@ -950,7 +1162,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		WHERE m.id=$1`, messageID).Scan(
-		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
+		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.ClientID, &m.Text,
 		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
 		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
 	)
@@ -992,10 +1204,15 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		UPDATE messages
+		UPDATE messages m
 		SET text=$1,edited_at=NOW()
-		WHERE id=$2 AND user_id=$3 AND deleted_at IS NULL
-		RETURNING conversation_id`, body.Text, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		WHERE m.id=$2 AND m.user_id=$3 AND m.deleted_at IS NULL
+		  AND EXISTS (
+			SELECT 1 FROM conversation_members cm
+			WHERE cm.conversation_id=m.conversation_id AND cm.user_id=$3
+			FOR SHARE
+		  )
+		RETURNING m.conversation_id`, body.Text, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be edited")
 		return
 	}
@@ -1021,10 +1238,15 @@ func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		UPDATE messages
+		UPDATE messages m
 		SET text='',deleted_at=NOW(),edited_at=NULL
-		WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-		RETURNING conversation_id`, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		WHERE m.id=$1 AND m.user_id=$2 AND m.deleted_at IS NULL
+		  AND EXISTS (
+			SELECT 1 FROM conversation_members cm
+			WHERE cm.conversation_id=m.conversation_id AND cm.user_id=$2
+			FOR SHARE
+		  )
+		RETURNING m.conversation_id`, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be recalled")
 		return
 	}
@@ -1218,12 +1440,14 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 		WHERE conversation_id=$1
 	`, conversationID).Scan(&maxID)
 
+	lastReadID := previousReadID
 	if maxID > previousReadID {
-		if _, err := s.db.Exec(r.Context(), `
+		if err := s.db.QueryRow(r.Context(), `
 			UPDATE conversation_members
-			SET last_read_message_id=$1
+			SET last_read_message_id=GREATEST(last_read_message_id,$1)
 			WHERE conversation_id=$2 AND user_id=$3
-		`, maxID, conversationID, claims.UserID); err != nil {
+			RETURNING last_read_message_id
+		`, maxID, conversationID, claims.UserID).Scan(&lastReadID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot update read state")
 			return
 		}
@@ -1231,13 +1455,13 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 			Type:              "conversation.read",
 			ConversationID:    conversationID,
 			ReaderID:          claims.UserID,
-			LastReadMessageID: maxID,
+			LastReadMessageID: lastReadID,
 		})
 	}
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"conversationId":    conversationID,
-		"lastReadMessageId": maxID,
+		"lastReadMessageId": lastReadID,
 	})
 }
 
