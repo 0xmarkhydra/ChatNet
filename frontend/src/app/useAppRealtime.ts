@@ -23,6 +23,8 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     onCategoriesChanged: () => void
     refreshCategoryConversations: () => void
     responseCache: RefObject<SessionResponseCache>
+    expireSession: () => void
+    checkSession: () => Promise<boolean>
     purgeConversation: (id: number) => void
     groupSettingsOpen: boolean
     activeConversationIdRef: RefObject<number | null>
@@ -46,6 +48,8 @@ export function useAppRealtime({
   onCategoriesChanged,
   refreshCategoryConversations,
   responseCache,
+  expireSession,
+  checkSession,
   session,
   sessionRef,
   apiFetch,
@@ -82,15 +86,27 @@ export function useAppRealtime({
     void refreshPosts()
     void refreshStories()
 
+    let lastSSECheckAt = 0
     const events = new EventSource(
       `${API}/api/events?token=${encodeURIComponent(session.token)}`,
     )
     events.onopen = () => {
+      lastSSECheckAt = Date.now()
       setStatus('Đang online')
       void refreshFriendConnections()
       void reconcileConversationMemberships()
     }
-    events.onerror = () => setStatus('Đang kết nối lại...')
+    events.onerror = () => {
+      setStatus('Đang kết nối lại...')
+      if (Date.now() - lastSSECheckAt < 30_000) return
+      lastSSECheckAt = Date.now()
+      if (document.visibilityState === 'visible' && sessionRef.current?.sessionId === session.sessionId) {
+        void checkSession().catch(() => undefined)
+      }
+    }
+    events.addEventListener('session-revoked', () => {
+      if (sessionRef.current?.sessionId === session.sessionId) expireSession()
+    })
     events.addEventListener('update', (event) => {
       if (sessionRef.current?.sessionId !== session.sessionId) return
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent

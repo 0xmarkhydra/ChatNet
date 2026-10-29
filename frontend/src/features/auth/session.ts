@@ -42,6 +42,7 @@ export function createSessionClient(baseURL: string, state: {
   expire: () => void
 }) {
   let pending: { sessionId: string; promise: Promise<Session | null> } | undefined
+  let checking: { sessionId: string; promise: Promise<boolean> } | undefined
   const unchanged = (previous: Session) => {
     const current = state.get()
     return current?.sessionId === previous.sessionId && current.token === previous.token
@@ -93,6 +94,40 @@ export function createSessionClient(baseURL: string, state: {
     return operation.promise
   }
 
+  // Verify the session-bound access JWT through the lightweight Redis-backed
+  // Auth endpoint. No refresh rotation or extra PostgreSQL write per mutation.
+  function check(): Promise<boolean> {
+    const current = state.get()
+    if (!current) return Promise.resolve(false)
+    if (checking?.sessionId === current.sessionId) return checking.promise
+    const operation = { sessionId: current.sessionId, promise: verify(current) }
+    checking = operation
+    void operation.promise.finally(() => {
+      if (checking === operation) checking = undefined
+    }).catch(() => undefined)
+    return operation.promise
+  }
+
+  async function verify(previous: Session): Promise<boolean> {
+    if (!previous.refreshToken) {
+      if (state.get()?.sessionId === previous.sessionId) state.expire()
+      return false
+    }
+    const response = await fetch(`${baseURL}/api/auth/session/status`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${previous.token}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!unchanged(previous)) return false
+    if (response.status === 401) {
+      state.expire()
+      return false
+    }
+    if (!response.ok) throw new Error('Không xác minh được phiên đăng nhập.')
+    return true
+  }
+
   async function request(path: string, init: RequestInit = {}, sessionId?: string) {
     const original = state.get()
     if (!original || original.sessionId !== sessionId) throw new Error('Phiên đăng nhập đã thay đổi.')
@@ -104,7 +139,11 @@ export function createSessionClient(baseURL: string, state: {
     }
     const ready = await refresh()
     if (!ready || ready.sessionId !== sessionId) throw new Error('Phiên đăng nhập đã hết hạn.')
-    let response = await send(ready)
+    const method = (init.method || 'GET').toUpperCase()
+    if (method !== 'GET' && method !== 'HEAD' && !await check()) {
+      throw new Error('Phiên đăng nhập đã hết hạn.')
+    }
+    let response = await send(state.get() || ready)
     if (response.status === 401) {
       const current = state.get()
       if (!current || current.sessionId !== sessionId) return response
@@ -114,5 +153,5 @@ export function createSessionClient(baseURL: string, state: {
     return response
   }
 
-  return { refresh, request }
+  return { refresh, check, request }
 }

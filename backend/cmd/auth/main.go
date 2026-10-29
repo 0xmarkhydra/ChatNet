@@ -116,7 +116,14 @@ func main() {
 	mux.HandleFunc("POST /api/auth/sessions/list", s.listSessions)
 	mux.HandleFunc("POST /api/auth/sessions/revoke", s.revokeSession)
 	mux.HandleFunc("POST /api/auth/sessions/revoke-others", s.revokeOtherSessions)
-	mux.Handle("GET /api/auth/me", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.me)))
+	mux.Handle("GET /api/auth/me", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.me)))
+	// Lightweight auth check: the middleware validates sid via Redis without
+	// reloading the user profile or rotating a refresh token.
+	mux.Handle("GET /api/auth/session/status", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis,
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			w.WriteHeader(http.StatusNoContent)
+		})))
 
 	port := config.Env("PORT", "8081")
 	log.Printf("auth service listening on :%s", port)
@@ -440,7 +447,8 @@ func (s *server) me(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, u)
 }
 
-func (s *server) allow(w http.ResponseWriter, r *http.Request, scope, subject string, limit int64, window time.Duration) bool {
+func (s *server) allow(w http.ResponseWriter, r *http.Request, scope,
+	subject string, limit int64, window time.Duration) bool {
 	ok, _, err := s.limiter.Allow(r.Context(), scope, subject, limit, window)
 	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "rate limiter unavailable")

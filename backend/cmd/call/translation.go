@@ -53,6 +53,7 @@ var supportedGeminiLiveLanguages = map[string]string{
 type translationTicket struct {
 	CallID    string `json:"callId"`
 	UserID    int64  `json:"userId"`
+	SessionID string `json:"sessionId"`
 	SpeakerID int64  `json:"speakerId"`
 	Target    string `json:"target"`
 }
@@ -246,7 +247,7 @@ func (s *server) createCallTranslationSession(w http.ResponseWriter, r *http.Req
 		httpx.Error(w, 500, "cannot create translation session")
 		return
 	}
-	raw, _ := json.Marshal(translationTicket{CallID: callID, UserID: claims.UserID, SpeakerID: speakerID, Target: target})
+	raw, _ := json.Marshal(translationTicket{CallID: callID, UserID: claims.UserID, SessionID: claims.SessionID, SpeakerID: speakerID, Target: target})
 	if err := s.redis.Set(r.Context(), translationTicketKey(ticket), raw, translationTicketTTL).Err(); err != nil {
 		httpx.Error(w, 503, "translation sessions unavailable")
 		return
@@ -322,6 +323,11 @@ func (s *server) streamCallTranslation(w http.ResponseWriter, r *http.Request) {
 		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Phiên dịch không hợp lệ."})
 		return
 	}
+	activeSession, err := authx.SessionActiveCached(r.Context(), s.db, s.redis, &authx.Claims{UserID: ticket.UserID, SessionID: ticket.SessionID})
+	if err != nil || !activeSession {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Phiên đăng nhập đã hết hạn hoặc bị thu hồi."})
+		return
+	}
 	if err := s.verifyLiveCallParticipant(r, ticket.CallID, ticket.UserID); err != nil {
 		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Bạn không còn quyền tham gia cuộc gọi."})
 		return
@@ -379,8 +385,10 @@ func (s *server) streamCallTranslation(w http.ResponseWriter, r *http.Request) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				active, sessionErr := authx.SessionActiveCached(ctx, s.db, s.redis, &authx.Claims{UserID: ticket.UserID, SessionID: ticket.SessionID})
 				consented, consentErr := s.callTranslationConsentAllowed(ctx, ticket.CallID, ticket.SpeakerID)
-				if s.verifyLiveCallParticipant(r, ticket.CallID, ticket.UserID) != nil ||
+				if sessionErr != nil || !active ||
+					s.verifyLiveCallParticipant(r, ticket.CallID, ticket.UserID) != nil ||
 					s.verifyLiveCallParticipant(r, ticket.CallID, ticket.SpeakerID) != nil || consentErr != nil || !consented {
 					_ = send(map[string]string{"type": "error", "message": "Quyền dịch cuộc gọi đã thay đổi."})
 					cancel()

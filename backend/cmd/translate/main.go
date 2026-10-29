@@ -128,8 +128,8 @@ func main() {
 		})
 	})
 	mux.HandleFunc("GET /health/provider", s.providerHealth)
-	mux.Handle("POST /api/translate", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.translate)))
-	mux.Handle("POST /api/i18n/bundle", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.translateUIBundle)))
+	mux.Handle("POST /api/translate", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.translate)))
+	mux.Handle("POST /api/i18n/bundle", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.translateUIBundle)))
 
 	port := config.Env("PORT", "8084")
 	log.Printf("translate service listening on :%s provider=%s model=%s style=%s", port, s.provider, s.model, s.apiStyle)

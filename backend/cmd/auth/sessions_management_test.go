@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"chatnet/internal/authx"
 	"chatnet/internal/database"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -77,6 +78,14 @@ func TestSessionManagementIntegration(t *testing.T) {
 	a := newSession(0, "ChatNet Web A")
 	a2 := newSession(0, "ChatNet Web A2")
 	b := newSession(1, "ChatNet Web B")
+	aClaims, err := authx.Parse(s.jwtSecret, a.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a2Claims, err := authx.Parse(s.jwtSecret, a2.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
 	identityBody := func(token string) string {
 		body, _ := json.Marshal(map[string]string{"refreshToken": token})
 		return string(body)
@@ -137,6 +146,14 @@ func TestSessionManagementIntegration(t *testing.T) {
 	}
 	request(s.revokeSession, revokeBody(a.RefreshToken, "invalid"), http.StatusBadRequest)
 	request(s.revokeSession, revokeBody(a.RefreshToken, a2ID), http.StatusNoContent)
+	active, err := authx.SessionActive(ctx, db, a2Claims)
+	if err != nil || active {
+		t.Fatal("revoke must block previously issued access token")
+	}
+	active, err = authx.SessionActive(ctx, db, aClaims)
+	if err != nil || !active {
+		t.Fatal("other current access token must remain valid")
+	}
 	list(a2.RefreshToken, http.StatusUnauthorized)
 	if len(list(a.RefreshToken, http.StatusOK)) != 1 {
 		t.Fatal("other session was not revoked")
@@ -148,6 +165,10 @@ func TestSessionManagementIntegration(t *testing.T) {
 		t.Fatal("revoke others should keep only current session")
 	}
 	request(s.revokeSession, revokeBody(a.RefreshToken, aID), http.StatusNoContent)
+	active, err = authx.SessionActive(ctx, db, aClaims)
+	if err != nil || active {
+		t.Fatal("revoking current session must block current access token")
+	}
 	list(a.RefreshToken, http.StatusUnauthorized)
 	// A revoked access token cannot re-open a fresh refresh credential.
 	request(s.refresh, `{"refreshToken":""}`, http.StatusUnauthorized)

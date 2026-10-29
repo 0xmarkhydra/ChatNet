@@ -2245,6 +2245,8 @@ export default function App() {
     onCategoriesChanged: () => { void conversationCategories.refreshCategories(); conversationCategories.refreshFiltered() },
     refreshCategoryConversations: conversationCategories.refreshFiltered,
     responseCache,
+    expireSession: () => { logout(false); setNotice('Phiên đăng nhập đã bị thu hồi. Vui lòng đăng nhập lại.', 'warning') },
+    checkSession: sessionClient.check,
     session,
     sessionRef,
     apiFetch,
