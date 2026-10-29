@@ -1,26 +1,60 @@
+import { useMessageData } from '../features/chat/useMessageData'
+import { useApiRequest } from './useApiRequest'
+import { useAppRealtime } from './useAppRealtime'
+import { useConversationData } from '../features/chat/useConversationData'
+import { useContactData } from '../features/contacts/useContactData'
+import { useFeedData } from '../features/feed/useFeedData'
+import { useGroupManagement } from '../features/chat/useGroupManagement'
+import { API } from '../shared/lib/config'
+import type { ProfileMediaState, ProfileUpdateResponse, UserPrivacy } from '../features/profile/types'
+import { attachmentRequestBody, type MediaAttachment, type PresignedUpload } from '../shared/lib/media'
+import { emptyDraft, CHAT_LIST_PAGE_SIZE, MESSAGE_PAGE_SIZE, type Message, type MessageReaction, type MessageDraft, type Conversation, type RealtimeEvent, type GroupMember, type NewChatMode } from '../features/chat/types'
+import { FEED_PAGE_SIZE, type Post, type Story } from '../features/feed/types'
+import type { Tab } from './types'
+import type { FriendSearchResult, FriendConnection } from '../features/contacts/types'
+import type { ManagedAccountSession } from '../features/auth/types'
+import type { InstallPromptEvent } from '../features/pwa/types'
+import { inferToastKind, type ToastKind, type ToastNotice } from '../features/notifications/toast'
+import { formatTime, attachmentLabel } from '../shared/lib/format'
+import UserAvatar, { avatarRefreshVersions, profileAssetUrl } from '../shared/ui/UserAvatar'
+import MediaAttachmentsView from '../shared/ui/MediaAttachmentsView'
+import UiIcon from '../shared/ui/UiIcon'
+import NearbyRadar from '../features/discover/NearbyRadar'
+import AuthScreen from '../features/auth/AuthScreen'
+import { useAuthFlow } from '../features/auth/useAuthFlow'
+import PostComposer from '../features/feed/PostComposer'
+import FeedPostCard from '../features/feed/FeedPostCard'
+import StoryViewer from '../features/feed/StoryViewer'
+import MessageActions from '../features/chat/MessageActions'
+import ProfileIdentityForm from '../features/profile/ProfileIdentityForm'
+import BottomNavigation from './BottomNavigation'
+import GroupSettingsPanel from '../features/chat/GroupSettingsPanel'
+import ContactsView from '../features/contacts/ContactsView'
+import PrivacyControls from '../features/profile/PrivacyControls'
+import AccountSessionsPanel from '../features/auth/AccountSessionsPanel'
+import BlockedUsersPanel from '../features/contacts/BlockedUsersPanel'
 import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from './FeedDiscussion'
-import FeedPostActions, { FeedShareAction } from './FeedPostActions'
-import FeedModeration from './FeedModeration'
-import type { NearbyUser } from './NearbyExplorer'
-import GroupCreator from './GroupCreator'
+import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from '../features/feed/FeedDiscussion'
+import FeedModeration from '../features/feed/FeedModeration'
+import type { NearbyUser } from '../features/discover/NearbyExplorer'
+import GroupCreator from '../features/chat/GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
-import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from './incomingSound'
-import { createSessionClient, loadSession, parseSession, type Session } from './session'
-import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from './chatPersistence'
-import { uploadPresignedFile } from './mediaUpload'
-import { canMarkConversationRead } from './conversationRead'
-import { mergeById, toggleCount } from './optimistic'
-import CallManager, { CallHeaderActions } from './CallManager'
-import GroupActionsSheet from './GroupActionsSheet'
-import SharedContent from './SharedContent'
-import VoiceRecorder from './VoiceRecorder'
-import { SocoEmptyState, SocoTextAction } from './SocoUI'
-import { getCurrentPositionSmart, geolocationErrorMessage } from './geolocation'
+import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../features/notifications/incomingSound'
+import { createSessionClient, loadSession, type Session } from '../features/auth/session'
+import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from '../features/chat/chatPersistence'
+import { uploadPresignedFile } from '../features/chat/mediaUpload'
+import { canMarkConversationRead } from '../features/chat/conversationRead'
+import { mergeById, toggleCount } from '../shared/lib/optimistic'
+import CallManager, { CallHeaderActions } from '../features/calls/CallManager'
+import GroupActionsSheet from '../features/chat/GroupActionsSheet'
+import SharedContent from '../features/chat/SharedContent'
+import VoiceRecorder from '../features/chat/VoiceRecorder'
+import { SocoEmptyState, SocoTextAction } from '../shared/ui/SocoUI'
+import { getCurrentPositionSmart, geolocationErrorMessage } from '../features/discover/geolocation'
 
-const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
-const Marketplace = lazy(() => import('./Marketplace'))
-const ProfileQr = lazy(() => import('./ProfileQr'))
+const NearbyExplorer = lazy(() => import('../features/discover/NearbyExplorer'))
+const Marketplace = lazy(() => import('../Marketplace'))
+const ProfileQr = lazy(() => import('../features/profile/ProfileQr'))
 import {
   defaultBundle,
   loadAppLocalePreference,
@@ -32,8 +66,8 @@ import {
   UI_BUNDLE_VERSION,
   UI_MESSAGES,
   type UIBundle,
-} from './i18n'
-import { buildLanguageOptions, filterLanguageOptions, isSupportedLanguageCode } from './languages'
+} from '../features/i18n/i18n'
+import { buildLanguageOptions, filterLanguageOptions, isSupportedLanguageCode } from '../features/i18n/languages'
 import {
   disableOneSignalPush,
   enableOneSignalPush,
@@ -41,425 +75,7 @@ import {
   isPushDisabled,
   setupOneSignal,
   type PushState,
-} from './onesignal'
-
-const API =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV ? 'http://localhost:8080' : 'https://api-chat.codelocal.cloud')
-
-type User = {
-  id: number
-  email: string
-  username: string
-  displayName: string
-}
-
-type ProfileMediaState = {
-  username: string
-  displayName: string
-  avatarSet: boolean
-  coverSet: boolean
-  updatedAt: string
-}
-
-type ProfileUpdateResponse = ProfileMediaState & {
-  token: string
-}
-
-type MediaAttachment = {
-  id?: number
-  storageRef: string
-  name: string
-  sizeBytes: number
-  contentType: string
-  kind: 'image' | 'video' | 'audio' | 'file'
-  url?: string
-}
-
-/** Only trusted upload input fields are accepted by strict Go JSON decoders.
- * Public signed URLs and response IDs must never be sent back in API requests. */
-const attachmentRequestBody = ({ storageRef, name, sizeBytes, contentType, kind }: MediaAttachment) =>
-  ({ storageRef, name, sizeBytes, contentType, kind })
-
-type PresignedUpload = {
-  uploadUrl: string
-  storageRef: string
-  key: string
-  expiresAt: string
-  kind: MediaAttachment['kind']
-  downloadUrl: string
-}
-
-type MessageReaction = {
-  emoji: string
-  count: number
-  mine: boolean
-}
-
-type Message = {
-  id: number
-  clientId?: string
-  conversationId: number
-  senderId: number
-  sender: string
-  text: string
-  replyToMessageId?: number
-  replyToSender?: string
-  replyToText?: string
-  editedAt?: string
-  deleted?: boolean
-  reactions?: MessageReaction[]
-  readByUserIds?: number[]
-  translatedText?: string
-  translationLanguage?: string
-  attachments?: MediaAttachment[]
-  createdAt: string
-}
-
-type MessageDraft = { text: string; attachments: MediaAttachment[] }
-const emptyDraft: MessageDraft = { text: '', attachments: [] }
-const FEED_PAGE_SIZE = 15
-const CHAT_LIST_PAGE_SIZE = 25
-const MESSAGE_PAGE_SIZE = 40
-
-type Conversation = {
-  id: number
-  type: 'direct' | 'group'
-  name: string
-  otherUserId?: number
-  memberCount: number
-  unreadCount: number
-  lastMessage: string
-  lastMessageAt?: string
-  online: boolean
-  createdAt: string
-}
-
-type RealtimeEvent = {
-  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
-  conversationId: number
-  message?: Message
-  conversation?: Conversation
-  readerId?: number
-  lastReadMessageId?: number
-}
-
-type Post = {
-  id: number
-  author: string
-  content: string
-  likes: number
-  liked: boolean
-  comments: FeedComment[]
-  attachments?: MediaAttachment[]
-  visibility?: 'public' | 'friends' | 'private'
-  background?: string
-  updatedAt?: string
-  saved?: boolean
-  createdAt: string
-}
-
-type Story = {
-  id: number
-  author: string
-  attachment: MediaAttachment
-  createdAt: string
-  expiresAt: string
-}
-
-type Tab = 'chat' | 'contacts' | 'discover' | 'market' | 'feed' | 'profile'
-type AuthMode = 'login' | 'register'
-type RegisterStep = 'details' | 'otp'
-type NewChatMode = 'none' | 'friends' | 'direct' | 'group'
-
-type FriendSearchResult = {
-  id: number
-  username: string
-  displayName: string
-  online: boolean
-  distanceKm?: number
-  nearbyActive?: boolean
-  locationUpdatedAt?: string
-  mutualGroups?: number
-  reason?: string
-}
-
-type ManagedAccountSession = {
-  id: string
-  userAgent: string
-  createdAt: string
-  lastSeenAt: string
-  expiresAt: string
-  current: boolean
-}
-
-type UserPrivacy = {
-  searchableByUsername: boolean
-  searchableByName: boolean
-  searchableByEmail: boolean
-  allowFriendRequests: boolean
-  showOnlineStatus: boolean
-}
-
-type FriendConnection = FriendSearchResult & {
-  status: 'accepted' | 'pending'
-  direction?: 'incoming' | 'outgoing'
-  updatedAt: string
-}
-
-type GroupMember = {
-  id: number
-  username: string
-  displayName: string
-  role: 'owner' | 'admin' | 'member'
-  online: boolean
-}
-
-type InstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
-
-type ToastKind = 'success' | 'error' | 'warning' | 'info'
-type ToastNotice = { id: number; message: string; kind: ToastKind }
-
-
-function inferToastKind(message: string): ToastKind {
-  const normalized = message.trim().toLocaleLowerCase('vi-VN')
-  if (
-    normalized.startsWith('đã ') ||
-    normalized.startsWith('bạn đã ') ||
-    normalized.startsWith('chatnet đã ')
-  ) return 'success'
-  if (
-    normalized.includes('không ') ||
-    normalized.includes('thất bại') ||
-    normalized.includes('bị chặn') ||
-    normalized.startsWith('chưa xác nhận') ||
-    normalized.startsWith('mất kết nối')
-  ) return 'error'
-  if (
-    normalized.startsWith('mỗi ') ||
-    normalized.startsWith('hãy ') ||
-    normalized.startsWith('trên iphone') ||
-    normalized.includes('chưa hỗ trợ')
-  ) return 'warning'
-  return 'info'
-}
-
-function formatTime(value?: string) {
-  if (!value) return ''
-  return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return ''
-  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`
-  return `${(value / 1024 / 1024).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`
-}
-
-function attachmentLabel(items?: MediaAttachment[]) {
-  const first = items?.[0]
-  if (!first) return ''
-  if (first.kind === 'image') return '[Ảnh]'
-  if (first.kind === 'video') return '[Video]'
-  if (first.kind === 'audio') return '[Âm thanh]'
-  return '[Tệp]'
-}
-
-function avatarInitials(name: string) {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return '?'
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
-  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
-}
-
-function avatarTone(name: string) {
-  let hash = 0
-  for (let index = 0; index < name.length; index += 1) {
-    hash = (hash * 31 + name.charCodeAt(index)) >>> 0
-  }
-  return hash % 8
-}
-
-const avatarRefreshVersions = new Map<string, string>()
-
-function profileAssetUrl(name: string, kind: 'avatar' | 'cover', version?: string) {
-  const base = `${API}/api/users/${encodeURIComponent(name)}/${kind}`
-  return version ? `${base}?v=${encodeURIComponent(version)}` : base
-}
-
-function UserAvatar({
-  name,
-  className = 'avatar',
-  online = false,
-  group = false,
-}: {
-  name: string
-  className?: string
-  online?: boolean
-  group?: boolean
-}) {
-  const version = avatarRefreshVersions.get(name)
-  const imageUrl = group ? '' : profileAssetUrl(name, 'avatar', version)
-  const [imageFailed, setImageFailed] = useState(false)
-
-  useEffect(() => {
-    setImageFailed(false)
-  }, [imageUrl])
-
-  return (
-    <div
-      className={`${className} smart-avatar avatar-tone-${avatarTone(name)} ${group ? 'group' : ''}`}
-      aria-label={name}
-      title={name}
-    >
-      <span className="avatar-initials">{group ? '👥' : avatarInitials(name)}</span>
-      {!group && !imageFailed && (
-        <img
-          className="avatar-photo"
-          src={imageUrl}
-          alt=""
-          draggable={false}
-          onError={() => setImageFailed(true)}
-        />
-      )}
-      <span className="avatar-shine" aria-hidden="true" />
-      {online && <span className="presence-dot" />}
-    </div>
-  )
-}
-
-function MediaAttachmentsView({
-  items,
-  pending = false,
-  onRemove,
-}: {
-  items?: MediaAttachment[]
-  pending?: boolean
-  onRemove?: (index: number) => void
-}) {
-  if (!items?.length) return null
-
-  return (
-    <div className={`media-attachments ${pending ? 'pending-media' : ''} ${items.length > 1 ? 'media-grid' : ''} media-count-${Math.min(items.length, 4)}`}>
-      {items.map((item, index) => (
-        <div className={`media-item media-${item.kind}`} key={`${item.storageRef}:${index}`}>
-          {item.kind === 'image' && item.url ? (
-            <a href={item.url} target="_blank" rel="noreferrer">
-              <img
-                src={item.url}
-                alt={item.name}
-                loading="lazy"
-                onLoad={(event) => {
-                  const image = event.currentTarget
-                  image.classList.toggle(
-                    'media-extra-tall',
-                    image.naturalWidth > 0 && image.naturalHeight / image.naturalWidth >= 1.8,
-                  )
-                }}
-              />
-            </a>
-          ) : item.kind === 'video' && item.url ? (
-            <video src={item.url} controls playsInline preload="metadata" />
-          ) : item.kind === 'audio' && item.url ? (
-            <div className="media-file-card">
-              <span>🎙️</span>
-              <div><strong>{item.name}</strong><small>{formatBytes(item.sizeBytes)}</small></div>
-              <audio src={item.url} controls preload="none" />
-            </div>
-          ) : (
-            <a className="media-file-card" href={item.url || '#'} target="_blank" rel="noreferrer">
-              <span>📎</span>
-              <div><strong>{item.name}</strong><small>{formatBytes(item.sizeBytes)}</small></div>
-            </a>
-          )}
-          {pending && onRemove && (
-            <button type="button" className="media-remove" onClick={() => onRemove(index)} aria-label={`Bỏ ${item.name}`}>×</button>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function UiIcon({ name, size = 24 }: { name: string; size?: number }) {
-  const common = {
-    width: size,
-    height: size,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.9,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-  }
-
-  switch (name) {
-    case 'search':
-      return <svg {...common}><circle cx="11" cy="11" r="7" /><path d="m20 20-4.2-4.2" /></svg>
-    case 'qr':
-      return <svg {...common}><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /><path d="M8 8h3v3H8zM14 8h2M14 11h3M8 14h2M12 14h4v4M8 17h1M18 12h2" /></svg>
-    case 'plus':
-      return <svg {...common}><path d="M12 5v14M5 12h14" /></svg>
-    case 'compose':
-      return <svg {...common}><path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></svg>
-    case 'bell':
-      return <svg {...common}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>
-    case 'chat':
-      return <svg {...common}><path d="M4 5h16v11H9l-5 4V5Z" /><path d="M8 9h8M8 12h5" /></svg>
-    case 'contacts':
-      return <svg {...common}><rect x="4" y="3" width="16" height="18" rx="2" /><circle cx="12" cy="9" r="2.5" /><path d="M8 17c.7-2.4 2-3.5 4-3.5s3.3 1.1 4 3.5" /></svg>
-    case 'discover':
-      return <svg {...common}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><path d="m12 12 7-7" /><circle cx="12" cy="12" r="1" /></svg>
-    case 'wall':
-      return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 9h6M7 13h10M17 9h.01" /></svg>
-    case 'profile':
-      return <svg {...common}><circle cx="12" cy="8" r="4" /><path d="M4.5 21c.8-4.5 3.3-6.5 7.5-6.5s6.7 2 7.5 6.5" /></svg>
-    case 'attach':
-      return <svg {...common}><path d="m9.5 12.5 5.8-5.8a3.2 3.2 0 0 1 4.5 4.5l-8.4 8.4a5 5 0 0 1-7.1-7.1l8-8" /></svg>
-    case 'send':
-      return <svg {...common}><path d="m4 4 17 8-17 8 3-8-3-8Z" /><path d="M7 12h14" /></svg>
-    case 'photo':
-      return <svg {...common}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m5 18 5-5 3 3 2-2 4 4" /></svg>
-    case 'video':
-      return <svg {...common}><rect x="3" y="6" width="13" height="12" rx="2" /><path d="m16 10 5-3v10l-5-3" /></svg>
-    case 'album':
-      return <svg {...common}><rect x="5" y="4" width="14" height="16" rx="2" /><path d="M9 4V2h8a2 2 0 0 1 2 2M8 15l3-3 4 4 2-2" /></svg>
-    case 'text':
-      return <svg {...common}><path d="M5 6h14M12 6v12M8 18h8" /></svg>
-    case 'heart':
-      return <svg {...common}><path d="M20.8 8.8c0 5-8.8 10-8.8 10s-8.8-5-8.8-10A4.8 4.8 0 0 1 12 6a4.8 4.8 0 0 1 8.8 2.8Z" /></svg>
-    case 'comment':
-      return <svg {...common}><path d="M4 5h16v11H9l-5 4V5Z" /><path d="M8 9h8M8 12h5" /></svg>
-    case 'trash':
-      return <svg {...common}><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>
-    default:
-      return <span aria-hidden="true">•</span>
-  }
-}
-
-function formatEstimatedDistance(distanceKm?: number) {
-  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) return 'Trong phạm vi 5 km'
-  return `Khoảng ${distanceKm.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`
-}
-
-function NearbyRadar({ scanning = false, large = false }: { scanning?: boolean; large?: boolean }) {
-  return (
-    <div className={`nearby-radar ${scanning ? 'is-scanning' : ''} ${large ? 'is-large' : ''}`} aria-hidden="true">
-      <span className="nearby-radar-ring ring-one" />
-      <span className="nearby-radar-ring ring-two" />
-      <span className="nearby-radar-axis axis-x" />
-      <span className="nearby-radar-axis axis-y" />
-      <span className="nearby-radar-sweep" />
-      <span className="nearby-radar-blip blip-one" />
-      <span className="nearby-radar-blip blip-two" />
-      <span className="nearby-radar-blip blip-three" />
-      <span className="nearby-radar-center" />
-    </div>
-  )
-}
+} from '../features/notifications/onesignal'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession)
@@ -469,16 +85,7 @@ export default function App() {
     save: saveSession,
     expire: () => logout(false),
   }))
-  const [authMode, setAuthMode] = useState<AuthMode>('register')
-  const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
-  const [authEmail, setAuthEmail] = useState('')
-  const [verificationToken, setVerificationToken] = useState('')
-  const [verificationEmail, setVerificationEmail] = useState('')
-  const [otpCode, setOtpCode] = useState('')
-  const [otpExpiresAt, setOtpExpiresAt] = useState(0)
-  const [otpSecondsLeft, setOtpSecondsLeft] = useState(0)
-  const [authError, setAuthError] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
+  const auth = useAuthFlow(saveSession)
 
   const [tab, setTab] = useState<Tab>('chat')
   const tabRef = useRef(tab)
@@ -493,38 +100,17 @@ export default function App() {
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [quickCreateOpen])
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const revokedConversationIds = useRef(new Set<number>())
-  const membershipSnapshot = useRef<Set<number> | null>(null)
-  const membershipSyncSequence = useRef(0)
-  const membershipEventSequence = useRef(0)
-  const [hasMoreConversations, setHasMoreConversations] = useState(false)
-  const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
-  const conversationPagingBusy = useRef(false)
-  const conversationOffset = useRef(0)
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
   const activeConversationIdRef = useRef<number | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [hasMoreMessages, setHasMoreMessages] = useState(false)
-  const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
-  const messagesPagingBusy = useRef(false)
-  const pendingMessageScrollRestore = useRef<{ height: number; top: number } | null>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
   const messageScrollAtBottom = useRef(true)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
   const messageLongPressTimer = useRef<number | null>(null)
   const messageLongPressStart = useRef<{ x: number; y: number; messageId: number } | null>(null)
-  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
-  const [groupActionsOpen, setGroupActionsOpen] = useState(false)
-  useEffect(() => setGroupActionsOpen(false), [activeConversationId, tab])
-  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
-  const [groupNameDraft, setGroupNameDraft] = useState('')
-  const [groupInviteDraft, setGroupInviteDraft] = useState('')
-  const [groupInviteSearch, setGroupInviteSearch] = useState('')
-  const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
+
   const [sharedContentOpen, setSharedContentOpen] = useState(false)
-  const [groupBusy, setGroupBusy] = useState(false)
+
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
   const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>(() => {
     const saved = loadChatDrafts(session?.user.id ?? 0)
@@ -547,11 +133,6 @@ export default function App() {
   const [reactionPreviews, setReactionPreviews] = useState<Record<number, MessageReaction[]>>({})
   const messageChanges = useRef(new Set<number>())
   const actionLocks = useRef(new Set<string>())
-  const feedRevision = useRef(0)
-  const feedLoads = useRef(0)
-  const [pendingActions, setPendingActions] = useState(0)
-  const pendingRequests = useRef(new Set<symbol>())
-  const mutationRequests = useRef(new Map<string, Promise<Response>>())
   const messageReceipts = useRef(new Map<string, Message | null>())
   // Preserve the request ID for an ambiguous send so a retry cannot create another row.
   const pendingSend = useRef<{ sessionId: string; conversationId: number; signature: string; clientId: string; draft: MessageDraft } | null>(null)
@@ -563,8 +144,6 @@ export default function App() {
   const [friendSearching, setFriendSearching] = useState(false)
   const [friendSearchError, setFriendSearchError] = useState(false)
   const [friendSearchRetry, setFriendSearchRetry] = useState(0)
-  const [friends, setFriends] = useState<FriendConnection[]>([])
-  const [friendRequests, setFriendRequests] = useState<FriendConnection[]>([])
   const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null)
   const friendActionRef = useRef(new Set<number>())
   const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(() => new Set())
@@ -574,11 +153,6 @@ export default function App() {
   const [blockedOpen, setBlockedOpen] = useState(false)
   const [blockedBusy, setBlockedBusy] = useState(false)
   const [blockedError, setBlockedError] = useState('')
-  const [contactMetadata, setContactMetadata] = useState<Record<number, { nickname: string; note: string; favorite: boolean }>>({})
-  const friendSyncRequest = useRef(0)
-  const [friendSyncSessionId, setFriendSyncSessionId] = useState('')
-  const [friendSyncError, setFriendSyncError] = useState('')
-  const [friendSyncBusy, setFriendSyncBusy] = useState(false)
   const [directUsername, setDirectUsername] = useState('')
   const [qrOpen, setQrOpen] = useState<'mine' | 'scan' | null>(null)
   const [chatCreateError, setChatCreateError] = useState('')
@@ -590,15 +164,7 @@ export default function App() {
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5)
   const nearbyRequest = useRef(0)
 
-  const [posts, setPosts] = useState<Post[]>([])
-  const [savedPosts, setSavedPosts] = useState<Post[]>([])
   const [feedFilter, setFeedFilter] = useState<'all' | 'saved'>('all')
-  const [hasMoreSavedPosts, setHasMoreSavedPosts] = useState(false)
-  const [savedPostsBusy, setSavedPostsBusy] = useState(false)
-  const savedPagingBusy = useRef(false)
-  const [hasMorePosts, setHasMorePosts] = useState(false)
-  const [postsLoadingMore, setPostsLoadingMore] = useState(false)
-  const postsPagingBusy = useRef(false)
   const [activePostId, setActivePostId] = useState<number | null>(null)
   useEffect(() => {
     if (!session?.token) return
@@ -620,7 +186,6 @@ export default function App() {
     })
     return () => { cancelled = true }
   }, [session?.token])
-  const [stories, setStories] = useState<Story[]>([])
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null)
   const [storyBusy, setStoryBusy] = useState(false)
   const [commentEditors, setCommentEditors] = useState<Record<number, DiscussionDraft>>({})
@@ -708,6 +273,170 @@ export default function App() {
   const avatarFileInputRef = useRef<HTMLInputElement>(null)
   const coverFileInputRef = useRef<HTMLInputElement>(null)
 
+  const {
+    apiFetch,
+    pendingActions,
+    setPendingActions,
+    pendingRequests,
+    mutationRequests,
+  } = useApiRequest({ session, sessionRef, sessionClient })
+
+  const {
+    conversations,
+    setConversations,
+    revokedConversationIds,
+    membershipSnapshot,
+    membershipSyncSequence,
+    membershipEventSequence,
+    hasMoreConversations,
+    setHasMoreConversations,
+    conversationLoadingMore,
+    setConversationLoadingMore,
+    conversationPagingBusy,
+    conversationOffset,
+    reconcileConversationMemberships,
+    refreshConversations,
+    loadMoreConversations,
+  } = useConversationData({
+    session,
+    sessionRef,
+    apiFetch,
+    setStatus,
+    setNotice,
+    activeConversationIdRef,
+    setMessageDrafts,
+    purgeConversation,
+  })
+
+  const {
+    friends,
+    setFriends,
+    friendRequests,
+    setFriendRequests,
+    contactMetadata,
+    setContactMetadata,
+    friendSyncRequest,
+    friendSyncSessionId,
+    setFriendSyncSessionId,
+    friendSyncError,
+    setFriendSyncError,
+    friendSyncBusy,
+    setFriendSyncBusy,
+    refreshFriendConnections,
+  } = useContactData({
+    session,
+    sessionRef,
+    apiFetch,
+    setStatus,
+    setNotice,
+  })
+
+  const {
+    feedRevision,
+    feedLoads,
+    posts,
+    setPosts,
+    savedPosts,
+    setSavedPosts,
+    hasMoreSavedPosts,
+    setHasMoreSavedPosts,
+    savedPostsBusy,
+    setSavedPostsBusy,
+    savedPagingBusy,
+    hasMorePosts,
+    setHasMorePosts,
+    postsLoadingMore,
+    setPostsLoadingMore,
+    postsPagingBusy,
+    stories,
+    setStories,
+    refreshPosts,
+    loadMorePosts,
+    loadSavedPosts,
+    syncFeedPost,
+    removeFeedPost,
+    refreshStories,
+  } = useFeedData({
+    session,
+    sessionRef,
+    apiFetch,
+    setStatus,
+    setNotice,
+    actionLocks,
+    setActivePostId,
+  })
+
+  const {
+    messages,
+    setMessages,
+    hasMoreMessages,
+    setHasMoreMessages,
+    messagesLoadingMore,
+    setMessagesLoadingMore,
+    messagesPagingBusy,
+    pendingMessageScrollRestore,
+    loadOlderMessages,
+  } = useMessageData({
+    session,
+    sessionRef,
+    apiFetch,
+    setNotice,
+    activeConversationId,
+    activeConversationIdRef,
+    translationPreferencesLoaded,
+    targetLanguage,
+    setTranslations,
+    messageChanges,
+    pendingSend,
+    setMessageDrafts,
+    setConversations,
+    tabRef,
+    messagesScrollRef,
+    purgeConversation,
+  })
+
+  const {
+    groupSettingsOpen,
+    setGroupSettingsOpen,
+    groupActionsOpen,
+    setGroupActionsOpen,
+    groupMembers,
+    setGroupMembers,
+    groupNameDraft,
+    setGroupNameDraft,
+    groupInviteDraft,
+    setGroupInviteDraft,
+    groupInviteSearch,
+    setGroupInviteSearch,
+    groupInviteSelection,
+    setGroupInviteSelection,
+    groupBusy,
+    setGroupBusy,
+    activeGroupMember,
+    canManageActiveGroup,
+    groupInviteCandidates,
+    openGroupSettings,
+    launchGroupCall,
+    refreshGroupMembers,
+    renameActiveGroup,
+    inviteGroupMembers,
+    changeGroupMemberRole,
+    removeGroupMember,
+  } = useGroupManagement({
+    session,
+    sessionRef,
+    tab,
+    activeConversationId,
+    activeConversationIdRef,
+    friends,
+    apiFetch,
+    refreshFriendConnections,
+    refreshConversations,
+    setActiveConversationId,
+    setNotice,
+    actionLocks,
+  })
+
   const name = session?.user.username || ''
   const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
   const chatFriend = activeConversation?.type === 'direct' && activeConversation.otherUserId
@@ -715,16 +444,7 @@ export default function App() {
     ? { id: activeConversation.otherUserId, username: '', displayName: activeConversation.name, online: activeConversation.online }
     : null
   const chatFriendRelationship = chatFriend ? friendRelationship(chatFriend.id) : 'none'
-  const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
-  const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
-  const groupInviteCandidates = useMemo(() => {
-    const memberIds = new Set(groupMembers.map((member) => member.id))
-    const normalized = groupInviteSearch.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
-    return friends
-      .filter((friend) => friend.status === 'accepted' && !memberIds.has(friend.id))
-      .filter((friend) => !normalized || `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(normalized))
-      .sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username, 'vi'))
-  }, [friends, groupMembers, groupInviteSearch])
+
   const visiblePosts = posts.map((post) => likePreviews[post.id] === undefined ? post : {
     ...post, liked: likePreviews[post.id],
     likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
@@ -977,45 +697,6 @@ export default function App() {
     localStorage.setItem('chatnet-session', JSON.stringify(next))
     sessionRef.current = next
     setSession(next)
-  }
-
-  async function apiFetch(path: string, init: RequestInit = {}) {
-    const sessionId = session?.sessionId
-    const write = !!init.method && !['GET', 'HEAD'].includes(init.method)
-    const key = JSON.stringify([sessionId, path, init.method, init.body])
-    const existing = write && mutationRequests.current.get(key)
-    if (existing) return (await existing).clone()
-    const operation = performRequest()
-    if (write) mutationRequests.current.set(key, operation)
-    try { return (await operation).clone() }
-    finally { if (mutationRequests.current.get(key) === operation) mutationRequests.current.delete(key) }
-
-    async function performRequest() {
-      const mutation = write && !/\/(read|translate|presign|subscription|bundle)$/.test(path)
-      const request = Symbol(path)
-      if (mutation) {
-        pendingRequests.current.add(request)
-        setPendingActions(pendingRequests.current.size)
-      }
-      try {
-        const response = await sessionClient.request(path, {
-          ...init, signal: init.signal || AbortSignal.timeout(30_000),
-        }, sessionId)
-        // Consume the body before releasing pending state or accepting a stale session.
-        await response.clone().text()
-        if (sessionRef.current?.sessionId !== sessionId) throw new Error('Phiên đăng nhập đã thay đổi.')
-        return response
-      } catch (error) {
-        if (!write) throw error
-        const message = error instanceof Error && error.message === 'Phiên đăng nhập đã thay đổi.'
-          ? error.message
-          : 'Chưa xác nhận được kết quả. Kiểm tra dữ liệu trước khi thử lại.'
-        return Response.json({ error: message }, { status: 503 })
-      } finally {
-        pendingRequests.current.delete(request)
-        if (sessionRef.current?.sessionId === sessionId) setPendingActions(pendingRequests.current.size)
-      }
-    }
   }
 
   async function loadProfileMedia() {
@@ -1918,43 +1599,6 @@ export default function App() {
     }
   }
 
-  async function refreshFriendConnections() {
-    const sessionId = session?.sessionId
-    if (!sessionId) return
-    const request = ++friendSyncRequest.current
-    setFriendSyncBusy(true)
-    try {
-      const [friendsResponse, requestsResponse, metadataResponse] = await Promise.all([
-        apiFetch('/api/friends'),
-        apiFetch('/api/friends/requests'),
-        apiFetch('/api/contacts'),
-      ])
-      if (!friendsResponse.ok || !requestsResponse.ok) throw new Error('Friend sync failed')
-      const [nextFriends, nextRequests] = await Promise.all([
-        friendsResponse.json() as Promise<FriendConnection[]>,
-        requestsResponse.json() as Promise<FriendConnection[]>,
-      ])
-      if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
-      setFriends(nextFriends)
-      setFriendRequests(nextRequests)
-      if (metadataResponse.ok) {
-        const records = await metadataResponse.json() as Array<{ id: number; nickname: string; note: string; favorite: boolean }>
-        if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
-        setContactMetadata(Object.fromEntries(records.map((item) => [item.id, {
-          nickname: item.nickname, note: item.note, favorite: item.favorite,
-        }])))
-      }
-      setFriendSyncSessionId(sessionId)
-      setFriendSyncError('')
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) {
-        setFriendSyncError('Chưa tải được trạng thái kết bạn.')
-      }
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) setFriendSyncBusy(false)
-    }
-  }
-
   const contactQuery = friendQuery.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
   const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
     `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(contactQuery),
@@ -2338,315 +1982,6 @@ export default function App() {
     }
   }
 
-  async function reconcileConversationMemberships() {
-    const sessionId = session?.sessionId
-    if (!sessionId) return
-    const sequence = ++membershipSyncSequence.current
-    const membershipEventAtStart = membershipEventSequence.current
-    const authorized = new Set<number>()
-    let after = 0
-    try {
-      // Fetch only IDs, not full message metadata. Never prune on partial
-      // snapshots: a failed page is not proof of lost group membership.
-      for (let page = 0; page < 200; page += 1) {
-        const response = await apiFetch(`/api/conversations/memberships?limit=500&after=${after}`)
-        if (!response.ok) return
-        const data = (await response.json()) as { ids: number[]; nextAfter: number | null }
-        if (!Array.isArray(data.ids) || data.ids.length > 500 ||
-          data.ids.some((id) => !Number.isSafeInteger(id) || id <= after)) return
-        for (const id of data.ids) authorized.add(id)
-        if (data.nextAfter === null) {
-          if (sessionRef.current?.sessionId !== sessionId ||
-              sequence !== membershipSyncSequence.current ||
-              membershipEventAtStart !== membershipEventSequence.current) return
-          membershipSnapshot.current = authorized
-          for (const id of authorized) revokedConversationIds.current.delete(id)
-          setConversations((current) => current.filter((item) => authorized.has(item.id)))
-          setMessageDrafts((current) => Object.fromEntries(
-            Object.entries(current).filter(([id]) => authorized.has(Number(id))),
-          ))
-          if (activeConversationIdRef.current && !authorized.has(activeConversationIdRef.current)) {
-            purgeConversation(activeConversationIdRef.current)
-          }
-          void refreshConversations()
-          return
-        }
-        if (!Number.isSafeInteger(data.nextAfter) || data.nextAfter <= after ||
-            data.nextAfter !== data.ids[data.ids.length - 1]) return
-        after = data.nextAfter
-      }
-    } catch {
-      // Connectivity failures must never be interpreted as revoked rights.
-    }
-  }
-
-  async function refreshConversations() {
-    const sessionId = session?.sessionId
-    try {
-      const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}`)
-      if (!response.ok) return
-      const data = ((await response.json()) as Conversation[])
-        .filter((item) => !revokedConversationIds.current.has(item.id) &&
-          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
-      if (sessionRef.current?.sessionId !== sessionId) return
-      setConversations((current) => {
-        const freshIds = new Set(data.map((item) => item.id))
-        return [...data, ...current.filter((item) => !freshIds.has(item.id))]
-      })
-      conversationOffset.current = Math.max(conversationOffset.current, data.length)
-      if (conversationOffset.current === data.length) setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
-    } catch {
-      setStatus('Đang kết nối lại...')
-    }
-  }
-
-  async function loadMoreConversations() {
-    if (!session || conversationPagingBusy.current || !hasMoreConversations) return
-    const sessionId = session.sessionId
-    conversationPagingBusy.current = true
-    setConversationLoadingMore(true)
-    try {
-      const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}&offset=${conversationOffset.current}`)
-      if (!response.ok) throw new Error('Không tải thêm được hội thoại')
-      const data = (await response.json()) as Conversation[]
-      if (sessionRef.current?.sessionId !== sessionId) return
-      conversationOffset.current += data.length
-      setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
-      setConversations((current) => {
-        const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id) && !revokedConversationIds.current.has(item.id) &&
-          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))]
-      })
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
-    } finally {
-      conversationPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId) setConversationLoadingMore(false)
-    }
-  }
-
-  async function refreshPosts() {
-    const revision = feedRevision.current
-    const request = ++feedLoads.current
-    const sessionId = session?.sessionId
-    try {
-      const response = await apiFetch(`/api/posts?limit=${FEED_PAGE_SIZE}`)
-      if (!response.ok) return
-      const data = (await response.json()) as Post[]
-      if (sessionRef.current?.sessionId !== sessionId ||
-        revision !== feedRevision.current || request !== feedLoads.current ||
-        [...actionLocks.current].some((key) => key.startsWith('feed:'))) return
-      setPosts((current) => {
-        const ids = new Set(data.map((item) => item.id))
-        return [...data, ...current.filter((item) => !ids.has(item.id))]
-      })
-      if (data.length < FEED_PAGE_SIZE) setHasMorePosts(false)
-      else if (posts.length === 0) setHasMorePosts(true)
-    } catch {
-      setStatus('Đang kết nối lại...')
-    }
-  }
-
-  async function loadMorePosts() {
-    if (!session || postsPagingBusy.current || !hasMorePosts || posts.length === 0) return
-    const sessionId = session.sessionId
-    const before = Math.min(...posts.map((item) => item.id))
-    postsPagingBusy.current = true
-    setPostsLoadingMore(true)
-    try {
-      const response = await apiFetch(`/api/posts?limit=${FEED_PAGE_SIZE}&before=${before}`)
-      if (!response.ok) throw new Error('Không tải thêm được bài viết')
-      const data = (await response.json()) as Post[]
-      if (sessionRef.current?.sessionId !== sessionId) return
-      setHasMorePosts(data.length === FEED_PAGE_SIZE)
-      setPosts((current) => {
-        const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id))]
-      })
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được bài viết. Hãy thử lại.', 'error')
-    } finally {
-      postsPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId) setPostsLoadingMore(false)
-    }
-  }
-
-  async function loadSavedPosts(more = false) {
-    if (!session || savedPagingBusy.current) return
-    const sessionId = session.sessionId
-    savedPagingBusy.current = true
-    setSavedPostsBusy(true)
-    try {
-      const before = more && savedPosts.length ? '&before=' + Math.min(...savedPosts.map(p => p.id)) : ''
-      const response = await apiFetch('/api/posts?scope=saved&limit=' + FEED_PAGE_SIZE + before)
-      if (!response.ok) throw new Error('Không tải được các bài đã lưu.')
-      const data = await response.json() as Post[]
-      if (sessionRef.current?.sessionId !== sessionId) return
-      setSavedPosts(current => {
-        if (!more) return data
-        const ids = new Set(current.map(p => p.id))
-        return [...current, ...data.filter(p => !ids.has(p.id))]
-      })
-      setHasMoreSavedPosts(data.length === FEED_PAGE_SIZE)
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không tải được bài đã lưu.', 'error')
-    } finally {
-      savedPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId) setSavedPostsBusy(false)
-    }
-  }
-
-  function syncFeedPost(updated: Post) {
-    setPosts(current => current.map(p => p.id === updated.id ? updated : p))
-    setSavedPosts(current => {
-      if (!updated.saved) return current.filter(p => p.id !== updated.id)
-      const exists = current.some(p => p.id === updated.id)
-      return exists ? current.map(p => p.id === updated.id ? updated : p) : [updated, ...current]
-    })
-  }
-
-  function removeFeedPost(id: number) {
-    setPosts(current => current.filter(p => p.id !== id))
-    setSavedPosts(current => current.filter(p => p.id !== id))
-    setActivePostId(current => current === id ? null : current)
-  }
-
-  async function refreshStories() {
-    try {
-      const response = await apiFetch('/api/stories')
-      if (!response.ok) return
-      const data = (await response.json()) as Story[]
-      if (sessionRef.current?.sessionId === session?.sessionId) {
-        setStories(data.filter((item) => Date.parse(item.expiresAt) > Date.now()))
-      }
-    } catch {
-      setStatus('Đang kết nối lại...')
-    }
-  }
-
-  async function submitAuth(event: FormEvent) {
-    event.preventDefault()
-    setAuthLoading(true)
-    setAuthError('')
-
-    try {
-      const response = await fetch(`${API}/api/auth/email/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: authEmail.trim(),
-        }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        setAuthError(result.error || 'Không thể gửi mã xác minh')
-        return
-      }
-
-      const payload = result as {
-        verificationToken: string
-        emailMasked: string
-        expiresInSeconds: number
-      }
-      setVerificationToken(payload.verificationToken)
-      setVerificationEmail(payload.emailMasked)
-      setOtpCode('')
-      const expiresAt = Date.now() + payload.expiresInSeconds * 1000
-      setOtpExpiresAt(expiresAt)
-      setOtpSecondsLeft(payload.expiresInSeconds)
-      setRegisterStep('otp')
-    } catch {
-      setAuthError('Không kết nối được server')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  async function verifyOTP(event: FormEvent) {
-    event.preventDefault()
-    if (!verificationToken || otpCode.length !== 6) return
-
-    setAuthLoading(true)
-    setAuthError('')
-    try {
-      const response = await fetch(`${API}/api/auth/email/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: verificationToken,
-          code: otpCode,
-        }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        setAuthError(result.error || 'Mã xác minh không đúng')
-        return
-      }
-
-      const next = parseSession(result)
-      if (!next) throw new Error('invalid session response')
-      saveSession({ ...next, sessionId: crypto.randomUUID() })
-    } catch {
-      setAuthError('Không kết nối được server')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  async function resendOTP() {
-    if (!verificationToken) return
-
-    setAuthLoading(true)
-    setAuthError('')
-    try {
-      const response = await fetch(`${API}/api/auth/email/resend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: verificationToken }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        setAuthError(result.error || 'Không thể gửi lại mã')
-        return
-      }
-      const payload = result as {
-        verificationToken: string
-        emailMasked: string
-        expiresInSeconds: number
-      }
-      setVerificationEmail(payload.emailMasked)
-      setOtpCode('')
-      const expiresAt = Date.now() + payload.expiresInSeconds * 1000
-      setOtpExpiresAt(expiresAt)
-      setOtpSecondsLeft(payload.expiresInSeconds)
-    } catch {
-      setAuthError('Không kết nối được server')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  function resetRegistration() {
-    setRegisterStep('details')
-    setVerificationToken('')
-    setVerificationEmail('')
-    setOtpCode('')
-    setOtpExpiresAt(0)
-    setOtpSecondsLeft(0)
-    setAuthError('')
-  }
-
-  useEffect(() => {
-    if (registerStep !== 'otp' || otpExpiresAt <= 0) return
-    const update = () => {
-      const left = Math.max(0, Math.ceil((otpExpiresAt - Date.now()) / 1000))
-      setOtpSecondsLeft(left)
-    }
-    update()
-    const timer = window.setInterval(update, 1000)
-    return () => window.clearInterval(timer)
-  }, [registerStep, otpExpiresAt])
-
   function logout(revoke = true, clearStorage = true) {
     const current = sessionRef.current
     const currentToken = current?.token
@@ -2688,8 +2023,8 @@ export default function App() {
     pendingSend.current = null
     if (clearStorage) localStorage.removeItem('chatnet-session')
     sessionRef.current = null
-    resetRegistration()
-    setAuthMode('login')
+    auth.resetRegistration()
+    auth.setAuthMode('login')
     setSession(null)
     setConversations([])
     revokedConversationIds.current.clear()
@@ -2779,192 +2114,36 @@ export default function App() {
     }
   }, [session?.sessionId, sessionClient])
 
-  useEffect(() => {
-    if (!session?.token) return
-
-    void refreshConversations()
-    void refreshPosts()
-    void refreshStories()
-
-    const events = new EventSource(
-      `${API}/api/events?token=${encodeURIComponent(session.token)}`,
-    )
-    events.onopen = () => {
-      setStatus('Đang online')
-      void refreshFriendConnections()
-      void reconcileConversationMemberships()
-    }
-    events.onerror = () => setStatus('Đang kết nối lại...')
-    events.addEventListener('update', (event) => {
-      if (sessionRef.current?.sessionId !== session.sessionId) return
-      const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
-      if (update.type === 'friend.updated') {
-        void refreshFriendConnections()
-        return
-      }
-
-      if (update.type === 'conversation.removed') {
-        purgeConversation(update.conversationId)
-        return
-      }
-
-      if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
-        revokedConversationIds.current.delete(update.conversationId)
-        membershipSnapshot.current?.add(update.conversationId)
-        membershipEventSequence.current += 1
-        void refreshConversations()
-        if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
-          void refreshGroupMembers(update.conversationId)
-        }
-        return
-      }
-
-      if (
-        update.type === 'conversation.read' &&
-        update.readerId &&
-        update.lastReadMessageId &&
-        update.readerId !== session.user.id
-      ) {
-        if (activeConversationIdRef.current === update.conversationId) {
-          setMessages((current) =>
-            current.map((message) => {
-              if (
-                message.senderId !== session.user.id ||
-                message.id > (update.lastReadMessageId || 0)
-              ) return message
-              const readers = message.readByUserIds || []
-              if (readers.includes(update.readerId as number)) return message
-              messageChanges.current.add(message.id)
-              return { ...message, readByUserIds: [...readers, update.readerId as number] }
-            }),
-          )
-        }
-        return
-      }
-
-      if (update.type === 'message.updated' && update.message) {
-        const changed = update.message
-        messageChanges.current.add(changed.id)
-        if (activeConversationIdRef.current === update.conversationId) {
-          setMessages((current) => {
-            const item = current.find((message) => message.id === changed.id)
-            const mineByEmoji = new Map(
-              (item?.reactions || []).map((reaction) => [reaction.emoji, reaction.mine]),
-            )
-            return mergeById(current, {
-              ...changed,
-              readByUserIds: [...new Set([...(item?.readByUserIds || []), ...(changed.readByUserIds || [])])],
-              reactions: (changed.reactions || []).map((reaction) => ({
-                ...reaction,
-                mine: mineByEmoji.get(reaction.emoji) ?? false,
-              })),
-            }).sort((a, b) => a.id - b.id)
-          })
-          setTranslations((current) => {
-            const next = { ...current }
-            delete next[changed.id]
-            return next
-          })
-        }
-        void refreshConversations()
-        return
-      }
-
-      if (update.type === 'message' && update.message) {
-        const incoming = update.message
-        // Only genuine, recent messages from other users make a sound. Loading
-        // history, updating reactions and our own sends never trigger one.
-        messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
-        messageChanges.current.add(incoming.id)
-        if (incoming.senderId === session.user.id && incoming.clientId) {
-          const recovered = loadPendingSend(session.user.id, session.sessionId)
-          if (recovered?.clientId === incoming.clientId && recovered.conversationId === incoming.conversationId) {
-            clearPendingSend(session.user.id, incoming.clientId)
-            setMessageDrafts((current) => {
-              const existing = current[incoming.conversationId]
-              if (!existing || existing.text.trim() !== incoming.text || existing.attachments.length > 0) return current
-              const next = { ...current }
-              delete next[incoming.conversationId]
-              return next
-            })
-          }
-          if (pendingSend.current?.clientId === incoming.clientId) {
-            const confirmed = pendingSend.current
-            pendingSend.current = null
-            // A late SSE receipt also resolves an ambiguous HTTP send. Keep any newer draft.
-            setMessageDrafts((current) => {
-              if (current[confirmed.conversationId] !== confirmed.draft) return current
-              const next = { ...current }
-              delete next[confirmed.conversationId]
-              return next
-            })
-          }
-          if (messageReceipts.current.has(incoming.clientId)) messageReceipts.current.set(incoming.clientId, incoming)
-          setOutgoingMessage((current) => current?.clientId === incoming.clientId ? null : current)
-        }
-        const currentId = activeConversationIdRef.current
-
-        setConversations((current) => {
-          const existing = current.find((item) => item.id === update.conversationId)
-          if (!existing) return current
-          const next = current.map((item) =>
-            item.id === update.conversationId
-              ? {
-                  ...item,
-                  lastMessage: incoming.text || attachmentLabel(incoming.attachments),
-                  lastMessageAt: incoming.createdAt,
-                  unreadCount:
-                    incoming.senderId !== session.user.id &&
-                      !canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState)
-                      ? item.unreadCount + 1
-                      : item.unreadCount,
-                }
-              : item,
-          )
-          return next.sort((a, b) =>
-            (b.lastMessageAt || b.createdAt).localeCompare(a.lastMessageAt || a.createdAt),
-          )
-        })
-
-        void refreshConversations()
-
-        if (currentId === update.conversationId) {
-          setMessages((current) =>
-            current.some((item) => item.id === incoming.id)
-              ? current
-              : [...current, incoming],
-          )
-          if (incoming.senderId !== session.user.id &&
-              canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState)) {
-            void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
-              .catch(() => setStatus('Đang kết nối lại...'))
-          }
-        }
-      }
-    })
-
-    const refreshTimer = window.setInterval(() => {
-      void refreshConversations()
-      void refreshFriendConnections()
-    }, 20000)
-    const membershipTimer = window.setInterval(() => {
-      void reconcileConversationMemberships()
-    }, 90000)
-    const checkMembership = () => { void reconcileConversationMemberships() }
-    const checkVisibleMembership = () => {
-      if (document.visibilityState === 'visible') checkMembership()
-    }
-    window.addEventListener('online', checkMembership)
-    document.addEventListener('visibilitychange', checkVisibleMembership)
-    return () => {
-      events.close()
-      window.clearInterval(refreshTimer)
-      window.clearInterval(membershipTimer)
-      window.removeEventListener('online', checkMembership)
-      document.removeEventListener('visibilitychange', checkVisibleMembership)
-      membershipSyncSequence.current += 1
-    }
-  }, [session?.token, groupSettingsOpen])
+  useAppRealtime({
+    session,
+    sessionRef,
+    apiFetch,
+    setStatus,
+    refreshConversations,
+    refreshPosts,
+    refreshStories,
+    refreshFriendConnections,
+    reconcileConversationMemberships,
+    purgeConversation,
+    revokedConversationIds,
+    membershipSnapshot,
+    membershipEventSequence,
+    membershipSyncSequence,
+    groupSettingsOpen,
+    activeConversationIdRef,
+    refreshGroupMembers,
+    setMessages,
+    messageChanges,
+    setTranslations,
+    messageSound,
+    messageSoundEnabledRef,
+    tabRef,
+    pendingSend,
+    setMessageDrafts,
+    messageReceipts,
+    setOutgoingMessage,
+    setConversations,
+  })
 
   useEffect(() => {
     if (!session?.token || tab !== 'feed') return
@@ -2976,152 +2155,6 @@ export default function App() {
     }, 12000)
     return () => window.clearInterval(timer)
   }, [tab, session?.token])
-
-  useEffect(() => {
-    if (!session?.token || !activeConversationId || !translationPreferencesLoaded) {
-      if (!activeConversationId) setMessages([])
-      return
-    }
-
-    let cancelled = false
-    const changes = new Set<number>()
-    messageChanges.current = changes
-    setTranslations({})
-    apiFetch(
-      `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}`,
-    )
-      .then(async (response) => {
-        if (response.status === 403) {
-          if (!cancelled) purgeConversation(activeConversationId)
-          return
-        }
-        if (!response.ok) throw new Error('Không tải được tin nhắn')
-        const data = (await response.json()) as Message[]
-        if (cancelled) return
-
-        // Reconcile a POST whose ACK vanished before refresh. A persisted
-        // clientId in history is proof of delivery; no second POST is needed.
-        const recovered = loadPendingSend(session.user.id, session.sessionId)
-        const confirmed = recovered && data.find((item) => item.clientId === recovered.clientId && item.conversationId === recovered.conversationId)
-        if (confirmed && recovered) {
-          clearPendingSend(session.user.id, recovered.clientId)
-          if (pendingSend.current?.clientId === recovered.clientId) pendingSend.current = null
-          setMessageDrafts((current) => {
-            const existing = current[confirmed.conversationId]
-            if (!existing || existing.text.trim() !== confirmed.text || existing.attachments.length > 0) return current
-            const next = { ...current }
-            delete next[confirmed.conversationId]
-            return next
-          })
-        }
-
-        setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
-        setMessages((current) => {
-          const live = current.filter((item) => item.conversationId === activeConversationId && changes.has(item.id))
-          const liveIds = new Set(live.map((item) => item.id))
-          return [...data.filter((item) => !liveIds.has(item.id)), ...live].sort((a, b) => a.id - b.id)
-        })
-        const restored: Record<number, string> = {}
-        for (const message of data) {
-          if (
-            message.translatedText &&
-            !changes.has(message.id) &&
-            message.translationLanguage === targetLanguage
-          ) {
-            restored[message.id] = message.translatedText
-          }
-        }
-        setTranslations(restored)
-        if (!canMarkConversationRead(activeConversationIdRef.current, activeConversationId, tabRef.current, document.visibilityState)) return
-        const read = await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
-        if (!read.ok) return
-        if (!cancelled) {
-          setConversations((current) =>
-            current.map((item) =>
-              item.id === activeConversationId ? { ...item, unreadCount: 0 } : item,
-            ),
-          )
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setNotice('Không tải được tin nhắn. Kiểm tra kết nối rồi mở lại cuộc trò chuyện.')
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [
-    activeConversationId,
-    session?.token,
-    targetLanguage,
-    translationPreferencesLoaded,
-  ])
-
-  useEffect(() => {
-    if (!session?.token || !activeConversationId) return
-    const id = activeConversationId
-    const sessionId = session.sessionId
-    const markWhenVisible = () => {
-      if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState)) return
-      void apiFetch(`/api/conversations/${id}/read`, { method: 'POST' })
-        .then((response) => {
-          if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId) return
-          setConversations((current) =>
-            current.map((item) => item.id === id ? { ...item, unreadCount: 0 } : item),
-          )
-        })
-        .catch(() => undefined)
-    }
-    window.addEventListener('focus', markWhenVisible)
-    document.addEventListener('visibilitychange', markWhenVisible)
-    return () => {
-      window.removeEventListener('focus', markWhenVisible)
-      document.removeEventListener('visibilitychange', markWhenVisible)
-    }
-  }, [session?.sessionId, activeConversationId])
-
-  async function loadOlderMessages() {
-    if (!session || !activeConversationId || messagesPagingBusy.current ||
-        !hasMoreMessages || messages.length === 0) return
-    const conversationId = activeConversationId
-    const sessionId = session.sessionId
-    const before = Math.min(...messages.map((message) => message.id))
-    messagesPagingBusy.current = true
-    setMessagesLoadingMore(true)
-    try {
-      const response = await apiFetch(
-        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}&before=${before}`,
-      )
-      if (!response.ok) throw new Error('Không tải thêm được lịch sử tin nhắn')
-      const data = (await response.json()) as Message[]
-      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId) return
-      setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
-      if (data.length > 0) {
-        const container = messagesScrollRef.current
-        if (container) pendingMessageScrollRestore.current = { height: container.scrollHeight, top: container.scrollTop }
-        setMessages((current) => {
-          const ids = new Set(current.map((message) => message.id))
-          return [...data.filter((message) => !ids.has(message.id)), ...current].sort((a, b) => a.id - b.id)
-        })
-        setTranslations((current) => {
-          const restored = { ...current }
-          for (const message of data) {
-            if (message.translatedText && message.translationLanguage === targetLanguage) {
-              restored[message.id] = message.translatedText
-            }
-          }
-          return restored
-        })
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
-        setNotice('Không tải được tin nhắn cũ. Hãy thử lại.', 'error')
-    } finally {
-      messagesPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
-        setMessagesLoadingMore(false)
-    }
-  }
 
   useLayoutEffect(() => {
     const restore = pendingMessageScrollRestore.current
@@ -3349,178 +2382,6 @@ export default function App() {
         if (activeConversationIdRef.current === conversationId) {
           window.requestAnimationFrame(() => messageInputRef.current?.focus({ preventScroll: true }))
         }
-      }
-    }
-  }
-
-  function openGroupSettings(conversation: Conversation) {
-    setGroupActionsOpen(false)
-    setGroupSettingsOpen(true)
-    setGroupNameDraft(conversation.name)
-    setGroupInviteSearch('')
-    setGroupInviteSelection([])
-    void Promise.all([
-      refreshGroupMembers(conversation.id),
-      refreshFriendConnections(),
-    ])
-  }
-
-  function launchGroupCall(conversationId: number, mediaType: 'audio' | 'video') {
-    window.dispatchEvent(new CustomEvent('chatnet:start-call', {
-      detail: { conversationId, mediaType },
-    }))
-  }
-
-  async function refreshGroupMembers(conversationId = activeConversationId || undefined) {
-    if (!conversationId) return
-    try {
-      const response = await apiFetch(`/api/conversations/${conversationId}/members`)
-      if (!response.ok) return
-      const items = (await response.json()) as GroupMember[]
-      if (activeConversationIdRef.current === conversationId) {
-        setGroupMembers(items)
-      }
-    } catch {
-      setNotice('Không tải được danh sách thành viên nhóm.')
-    }
-  }
-
-  async function renameActiveGroup() {
-    if (!activeConversationId || !groupNameDraft.trim() || actionLocks.current.has('group:write')) return
-    const sessionId = session?.sessionId
-    actionLocks.current.add('group:write')
-    setGroupBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: groupNameDraft.trim() }),
-      })
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return
-      if (!response.ok) {
-        setNotice(result?.error || 'Không đổi được tên nhóm')
-        return
-      }
-      setNotice('Đã cập nhật tên nhóm.')
-      await refreshConversations()
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete('group:write')
-        setGroupBusy(false)
-      }
-    }
-  }
-
-  async function inviteGroupMembers() {
-    if (!activeConversationId || actionLocks.current.has('group:write')) return
-    const sessionId = session?.sessionId
-    const selectedUsernames = friends
-      .filter((friend) => friend.status === 'accepted' && groupInviteSelection.includes(friend.id))
-      .map((friend) => friend.username)
-    const usernames = Array.from(new Set([
-      ...selectedUsernames,
-      ...groupInviteDraft.split(/[\s,;]+/),
-    ].map((item) => item.trim().replace(/^@/, '').toLowerCase()).filter(Boolean)))
-    if (usernames.length === 0) return
-    if (usernames.length > 50) {
-      setNotice('Mỗi lần có thể mời tối đa 50 người. Hãy chia thành nhiều lượt.', 'warning')
-      return
-    }
-    actionLocks.current.add('group:write')
-    setGroupBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernames }),
-      })
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return
-      if (!response.ok) {
-        setNotice(result?.error || 'Không thêm được thành viên')
-        return
-      }
-      if (activeConversationIdRef.current === activeConversationId) {
-        setGroupInviteDraft((current) => current === groupInviteDraft ? '' : current)
-        setGroupInviteSelection([])
-        setGroupInviteSearch('')
-      }
-      setNotice('Đã thêm thành viên vào nhóm.')
-      await Promise.all([refreshGroupMembers(activeConversationId), refreshConversations()])
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete('group:write')
-        setGroupBusy(false)
-      }
-    }
-  }
-
-  async function changeGroupMemberRole(member: GroupMember, role: GroupMember['role']) {
-    if (!activeConversationId || actionLocks.current.has('group:write')) return
-    const sessionId = session?.sessionId
-    const message = role === 'owner'
-      ? `Chuyển quyền chủ nhóm cho @${member.username}?`
-      : role === 'admin'
-        ? `Đặt @${member.username} làm quản trị viên?`
-        : `Gỡ quyền quản trị của @${member.username}?`
-    if (!window.confirm(message)) return
-    actionLocks.current.add('group:write')
-    setGroupBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role }),
-      })
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return
-      if (!response.ok) {
-        setNotice(result?.error || 'Không cập nhật được quyền thành viên')
-        return
-      }
-      setNotice(role === 'owner' ? 'Đã chuyển quyền chủ nhóm.' : 'Đã cập nhật quyền thành viên.')
-      await refreshGroupMembers(activeConversationId)
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete('group:write')
-        setGroupBusy(false)
-      }
-    }
-  }
-
-  async function removeGroupMember(member: GroupMember) {
-    if (!activeConversationId || actionLocks.current.has('group:write')) return
-    const sessionId = session?.sessionId
-    const self = member.id === session?.user.id
-    if (!window.confirm(self ? 'Rời khỏi nhóm này?' : `Xóa @${member.username} khỏi nhóm?`)) return
-    actionLocks.current.add('group:write')
-    setGroupBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
-        method: 'DELETE',
-      })
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return
-      if (!response.ok) {
-        setNotice(result?.error || (self ? 'Không rời được nhóm' : 'Không xóa được thành viên'))
-        return
-      }
-      if (self) {
-        if (activeConversationIdRef.current === activeConversationId) {
-          setGroupSettingsOpen(false)
-          setActiveConversationId(null)
-        }
-        setNotice('Bạn đã rời nhóm.')
-        await refreshConversations()
-        return
-      }
-      setNotice(`Đã xóa @${member.username} khỏi nhóm.`)
-      await Promise.all([refreshGroupMembers(activeConversationId), refreshConversations()])
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete('group:write')
-        setGroupBusy(false)
       }
     }
   }
@@ -3766,112 +2627,7 @@ export default function App() {
     }
   }
 
-  if (!session) {
-    return (
-      <main className="auth-screen">
-        <section className="auth-copy">
-          <img src="/soco-mark.svg" width="52" height="52" alt="SOCO" />
-          <h1>SOCO</h1>
-          <p>Understand. Connect. Together.</p>
-        </section>
-
-        {registerStep === 'otp' ? (
-          <form className="auth-card otp-card" onSubmit={verifyOTP}>
-            <div className="otp-icon">✉️</div>
-            <h2>Kiểm tra email của bạn</h2>
-            <p className="auth-hint">
-              SOCO đã gửi mã xác minh 6 số tới <strong>{verificationEmail || 'email của bạn'}</strong>.
-              Mã có hiệu lực trong 10 phút.
-            </p>
-
-            <label>
-              Mã xác minh
-              <input
-                className="otp-input"
-                value={otpCode}
-                onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="000000"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                minLength={6}
-                maxLength={6}
-                autoFocus
-                required
-              />
-            </label>
-
-            <div className="otp-meta">
-              <span>
-                {otpSecondsLeft > 0
-                  ? `Hết hạn sau ${Math.floor(otpSecondsLeft / 60)}:${String(otpSecondsLeft % 60).padStart(2, '0')}`
-                  : 'Mã đã hết hạn'}
-              </span>
-              <button type="button" onClick={() => void resendOTP()} disabled={authLoading}>
-                Gửi lại mã
-              </button>
-            </div>
-
-            {authError && <div className="auth-error">{authError}</div>}
-            <button className="auth-submit" disabled={authLoading || otpCode.length !== 6 || otpSecondsLeft <= 0}>
-              {authLoading ? 'Đang xác minh...' : 'Xác minh & vào SOCO'}
-            </button>
-            <button type="button" className="auth-secondary" onClick={resetRegistration} disabled={authLoading}>
-              Dùng email khác
-            </button>
-          </form>
-        ) : (
-          <form className="auth-card" onSubmit={submitAuth}>
-            <div className="auth-tabs">
-              <button
-                type="button"
-                className={authMode === 'register' ? 'active' : ''}
-                disabled={authLoading}
-                onClick={() => {
-                  setAuthMode('register')
-                  resetRegistration()
-                }}
-              >
-                Đăng ký
-              </button>
-              <button
-                type="button"
-                className={authMode === 'login' ? 'active' : ''}
-                disabled={authLoading}
-                onClick={() => {
-                  setAuthMode('login')
-                  resetRegistration()
-                }}
-              >
-                Đăng nhập
-              </button>
-            </div>
-
-            <h2>{authMode === 'register' ? 'Tạo tài khoản' : 'Chào mừng quay lại'}</h2>
-            <label>
-              Email
-              <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" maxLength={254} required />
-            </label>
-
-            {authMode === 'register' && (
-              <div className="email-verify-note">
-                🔐 Tài khoản chỉ được tạo sau khi bạn nhập đúng OTP gửi qua email.
-              </div>
-            )}
-
-            {authError && <div className="auth-error">{authError}</div>}
-            <button className="auth-submit" disabled={authLoading}>
-              {authLoading
-                ? 'Đang xử lý...'
-                : authMode === 'register'
-                  ? 'Gửi mã OTP'
-                  : 'Đăng nhập'}
-            </button>
-          </form>
-        )}
-      </main>
-    )
-  }
+  if (!session) return <AuthScreen {...auth} />
 
   const unreadTotal = conversations.reduce((sum, conversation) => sum + conversation.unreadCount, 0)
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase('vi-VN')
@@ -4488,172 +3244,29 @@ export default function App() {
                   )}
 
                   {groupSettingsOpen && activeConversation.type === 'group' && (
-                    <section className="group-settings-panel" role="region" aria-label="Quản lý nhóm">
-                      <div className="group-settings-heading">
-                        <div>
-                          <strong>Quản lý nhóm</strong>
-                          <small>
-                            {activeGroupMember
-                              ? activeGroupMember.role === 'owner'
-                                ? 'Bạn là chủ nhóm'
-                                : activeGroupMember.role === 'admin'
-                                  ? 'Bạn là quản trị viên'
-                                  : 'Bạn là thành viên'
-                              : 'Đang tải quyền...'}
-                          </small>
-                        </div>
-                        <button type="button" onClick={() => setGroupSettingsOpen(false)} aria-label="Quay lại cuộc trò chuyện">
-                          <X size={21} aria-hidden="true" />
-                        </button>
-                      </div>
-
-                      {canManageActiveGroup && (
-                        <div className="group-admin-tools">
-                          <div className="group-tool-row">
-                            <input
-                              value={groupNameDraft}
-                              onChange={(event) => setGroupNameDraft(event.target.value)}
-                              placeholder="Tên nhóm"
-                              maxLength={120}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => void renameActiveGroup()}
-                              disabled={groupBusy || !groupNameDraft.trim() || groupNameDraft.trim() === activeConversation.name}
-                            >
-                              Đổi tên
-                            </button>
-                          </div>
-
-                          <div className="group-invite-friends">
-                            <div className="group-invite-title">
-                              <strong>Mời bạn bè</strong>
-                              <span>{groupInviteSelection.length ? `${groupInviteSelection.length} đã chọn` : 'Chọn trực tiếp từ danh bạ'}</span>
-                            </div>
-                            <input
-                              className="group-invite-search"
-                              type="search"
-                              value={groupInviteSearch}
-                              onChange={(event) => setGroupInviteSearch(event.target.value)}
-                              placeholder="Tìm bạn theo tên hoặc @username"
-                              autoComplete="off"
-                            />
-                            <div className="group-invite-list">
-                              {groupInviteCandidates.length === 0 && (
-                                <div className="group-invite-empty">
-                                  {friends.some((friend) => friend.status === 'accepted')
-                                    ? 'Không còn bạn phù hợp để thêm vào nhóm.'
-                                    : 'Chưa có bạn bè trong danh bạ để mời.'}
-                                </div>
-                              )}
-                              {groupInviteCandidates.map((friend) => {
-                                const selected = groupInviteSelection.includes(friend.id)
-                                return (
-                                  <button
-                                    key={friend.id}
-                                    type="button"
-                                    className={selected ? 'group-invite-friend selected' : 'group-invite-friend'}
-                                    aria-pressed={selected}
-                                    onClick={() => setGroupInviteSelection((current) =>
-                                      current.includes(friend.id)
-                                        ? current.filter((id) => id !== friend.id)
-                                        : [...current, friend.id])}
-                                  >
-                                    <UserAvatar
-                                      name={friend.displayName || friend.username}
-                                      className="group-member-avatar"
-                                      online={friend.online}
-                                    />
-                                    <span>
-                                      <strong>{friend.displayName || friend.username}</strong>
-                                      <small>@{friend.username}</small>
-                                    </span>
-                                    <span className="group-invite-check" aria-hidden="true">✓</span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-
-                          <div className="group-tool-row">
-                            <input
-                              value={groupInviteDraft}
-                              onChange={(event) => setGroupInviteDraft(event.target.value)}
-                              placeholder="Hoặc nhập @username"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => void inviteGroupMembers()}
-                              disabled={groupBusy || (!groupInviteDraft.trim() && groupInviteSelection.length === 0)}
-                            >
-                              {groupInviteSelection.length > 0 ? `Thêm ${groupInviteSelection.length}` : 'Thêm'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="group-members-heading">
-                        <strong>Thành viên nhóm</strong>
-                        <span>{groupMembers.length} thành viên</span>
-                      </div>
-                      <div className="group-member-list">
-                        {groupMembers.map((member) => (
-                          <div className="group-member-row" key={member.id}>
-                            <UserAvatar name={member.username} className="group-member-avatar" online={member.online} />
-                            <div className="group-member-copy">
-                              <strong>@{member.username}{member.id === session.user.id ? ' · Bạn' : ''}</strong>
-                              <span>
-                                {member.role === 'owner' ? 'Chủ nhóm' : member.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
-                                {member.online ? ' · online' : ''}
-                              </span>
-                            </div>
-                            <div className="group-member-actions">
-                              {activeGroupMember?.role === 'owner' && member.id !== session.user.id && member.role !== 'owner' && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => void changeGroupMemberRole(member, member.role === 'admin' ? 'member' : 'admin')}
-                                    disabled={groupBusy}
-                                  >
-                                    {member.role === 'admin' ? 'Gỡ admin' : 'Đặt admin'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => void changeGroupMemberRole(member, 'owner')}
-                                    disabled={groupBusy}
-                                  >
-                                    Chuyển chủ
-                                  </button>
-                                </>
-                              )}
-                              {canManageActiveGroup &&
-                                member.id !== session.user.id &&
-                                member.role !== 'owner' &&
-                                !(activeGroupMember?.role === 'admin' && member.role === 'admin') && (
-                                  <button
-                                    type="button"
-                                    className="danger"
-                                    onClick={() => void removeGroupMember(member)}
-                                    disabled={groupBusy}
-                                  >
-                                    Xóa
-                                  </button>
-                                )}
-                              {member.id === session.user.id && member.role !== 'owner' && (
-                                <button
-                                  type="button"
-                                  className="danger"
-                                  onClick={() => void removeGroupMember(member)}
-                                  disabled={groupBusy}
-                                >
-                                  Rời nhóm
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
+            <GroupSettingsPanel
+              activeGroupMember={activeGroupMember}
+              setGroupSettingsOpen={setGroupSettingsOpen}
+              canManageActiveGroup={canManageActiveGroup}
+              groupNameDraft={groupNameDraft}
+              setGroupNameDraft={setGroupNameDraft}
+              renameActiveGroup={renameActiveGroup}
+              groupBusy={groupBusy}
+              activeConversation={activeConversation}
+              groupInviteSelection={groupInviteSelection}
+              groupInviteSearch={groupInviteSearch}
+              setGroupInviteSearch={setGroupInviteSearch}
+              groupInviteCandidates={groupInviteCandidates}
+              friends={friends}
+              setGroupInviteSelection={setGroupInviteSelection}
+              groupInviteDraft={groupInviteDraft}
+              setGroupInviteDraft={setGroupInviteDraft}
+              inviteGroupMembers={inviteGroupMembers}
+              groupMembers={groupMembers}
+              userId={session.user.id}
+              changeGroupMemberRole={changeGroupMemberRole}
+              removeGroupMember={removeGroupMember}
+            />
                   )}
 
                   {sharedContentOpen && (
@@ -4850,202 +3463,33 @@ export default function App() {
         )}
 
         {tab === 'contacts' && (
-          <div className="simple-view contacts-view">
-            {friendQuery.trim() ? (
-              <section className="contacts-suggestions contacts-search-section" aria-label="Kết quả tìm kiếm bạn bè">
-                <div className="contacts-heading contacts-search-heading">
-                  <span>Kết quả tìm kiếm</span>
-                  <button type="button" onClick={() => setFriendQuery('')}>Xóa tìm kiếm</button>
-                </div>
-                {friendSearching && <div className="friend-search-state" role="status">Đang tìm người dùng...</div>}
-                {friendSearchError && !friendSearching && (
-                  <div className="friend-search-state" role="alert">
-                    Không thể tìm kiếm lúc này. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button>
-                  </div>
-                )}
-                {!friendSearching && !friendSearchError && contactSearchResults.length === 0 && (
-                  <div className="friend-search-state">Không tìm thấy kết quả. Thử tên, @username hoặc email chính xác.</div>
-                )}
-                {contactSearchResults.map((friend) => {
-                  const relationship = friendRelationship(friend.id)
-                  const actionLabel = relationship === 'accepted' ? 'Nhắn tin'
-                    : relationship === 'incoming' ? 'Chấp nhận'
-                      : relationship === 'outgoing' ? 'Hủy lời mời' : 'Kết bạn'
-                  return (
-                    <div className="friend-result contact-result contact-search-row" key={friend.id}>
-                      <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
-                      <div className="friend-result-copy">
-                        <strong>{friend.displayName || friend.username}</strong>
-                        <span>@{friend.username}{relationship === 'accepted' ? ' · Bạn bè' : relationship === 'incoming' ? ' · Đã nhận lời mời' : relationship === 'outgoing' ? ' · Đã gửi lời mời' : ''}</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="contact-search-action"
-                        disabled={friendBusyIds.has(friend.id)}
-                        onClick={() => void actOnFriend(friend)}
-                      >{actionLabel}</button>
-                      <div className="friend-contact-controls" onBlur={(event) => {
-                        if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
-                      }}>
-                        <button type="button" className="friend-contact-more"
-                          aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
-                          aria-expanded={friendMenuId === friend.id} aria-haspopup="menu"
-                          onClick={() => setFriendMenuId((old) => old === friend.id ? null : friend.id)}>
-                          <MoreHorizontal size={19} aria-hidden="true" />
-                        </button>
-                        {friendMenuId === friend.id && (
-                          <div className="friend-contact-popover" role="menu">
-                            <button type="button" role="menuitem" className="friend-contact-danger"
-                              disabled={friendBusyIds.has(friend.id)}
-                              onClick={() => void blockContact(friend)}>Chặn người dùng</button>
-                            <button type="button" role="menuitem"
-                              onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </section>
-            ) : (
-              <>
-            <div className="contact-shortcuts">
-              <button type="button" onClick={() => { setTab('chat'); setNewChatMode('friends') }}>
-                <span className="shortcut-icon">＋</span><div><strong>Lời mời kết bạn</strong><small>Tìm và kết nối người mới</small></div><b>›</b>
-              </button>
-              <button type="button" onClick={() => { setFriendQuery(''); setChatCreateError(''); setTab('chat'); setNewChatMode('group') }}>
-                <span className="shortcut-icon">👥</span><div><strong>Nhóm và cộng đồng</strong><small>Tạo cuộc trò chuyện nhóm</small></div><b>›</b>
-              </button>
-            </div>
-
-            {friendRequests.some((item) => item.direction === 'incoming') && (
-              <section className="contacts-suggestions">
-                <div className="contacts-heading">
-                  Lời mời kết bạn ({friendRequests.filter((item) => item.direction === 'incoming').length})
-                </div>
-                {friendRequests.filter((item) => item.direction === 'incoming').map((friend) => (
-                  <div className="friend-result contact-result friend-request-row" key={friend.id}>
-                    <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                    <div className="friend-result-copy">
-                      <strong>@{friend.username}</strong>
-                      <span>Muốn kết bạn với bạn</span>
-                    </div>
-                    <div className="friend-request-actions">
-                      <button type="button" onClick={() => void actOnFriend(friend)} disabled={friendBusyIds.has(friend.id)}>Chấp nhận</button>
-                      <button type="button" className="secondary" onClick={() => void declineFriendRequest(friend)} disabled={friendBusyIds.has(friend.id)}>Từ chối</button>
-                    </div>
-                  </div>
-                ))}
-              </section>
-            )}
-
-            <section className="contacts-suggestions">
-              <div className="contacts-heading">Bạn bè ({friends.length})</div>
-              {friends.length === 0 && (
-                <SocoEmptyState kind="friends" title="Chưa có bạn bè"
-                  description="Gửi lời mời để bắt đầu những cuộc trò chuyện mới."
-                  action={<SocoTextAction onClick={() => { setTab('chat'); setNewChatMode('friends') }}>Tìm bạn bè</SocoTextAction>}
-                />
-              )}
-              {[...friends].sort((a, b) => Number(Boolean(contactMetadata[b.id]?.favorite)) - Number(Boolean(contactMetadata[a.id]?.favorite))).map((friend) => (
-                <div
-                  className="friend-result contact-result friend-contact-row"
-                  key={friend.id}
-                  onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null)
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') setFriendMenuId(null)
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="friend-contact-primary"
-                    onClick={() => void openDirectByUsername(friend.username)}
-                  >
-                    <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
-                    <span className="friend-result-copy">
-                      <strong>{contactMetadata[friend.id]?.favorite ? '⭐ ' : ''}{contactMetadata[friend.id]?.nickname || friend.displayName || friend.username}</strong>
-                      <span>@{friend.username} · {friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
-                      {contactMetadata[friend.id]?.note && <small className="friend-private-note">{contactMetadata[friend.id].note}</small>}
-                    </span>
-                  </button>
-                  <div className="friend-contact-controls">
-                    <button
-                      type="button"
-                      className="friend-contact-more"
-                      aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
-                      aria-expanded={friendMenuId === friend.id}
-                      aria-haspopup="menu"
-                      onClick={() => setFriendMenuId((current) => current === friend.id ? null : friend.id)}
-                    >
-                      <MoreHorizontal size={20} aria-hidden="true" />
-                    </button>
-                    {friendMenuId === friend.id && (
-                      <div className="friend-contact-popover" role="menu">
-                        <button type="button" role="menuitem" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem hồ sơ</button>
-                        <button type="button" role="menuitem" onClick={() => { setFriendMenuId(null); void openDirectByUsername(friend.username) }}>Nhắn tin</button>
-                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'nickname')}>Đặt biệt danh</button>
-                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'note')}>Ghi chú riêng</button>
-                        <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'favorite')}>{contactMetadata[friend.id]?.favorite ? 'Bỏ bạn thân' : 'Đánh dấu bạn thân'}</button>
-                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
-                        <button type="button" role="menuitem" className="friend-contact-danger" disabled={friendBusyIds.has(friend.id)} onClick={() => void blockContact(friend)}>Chặn người dùng</button>
-                        <button type="button" role="menuitem" onClick={() => void reportContact(friend)}>Báo cáo người dùng</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </section>
-
-            {friendRequests.some((item) => item.direction === 'outgoing') && (
-              <section className="contacts-suggestions">
-                <div className="contacts-heading">Lời mời đã gửi</div>
-                {friendRequests.filter((item) => item.direction === 'outgoing').map((friend) => (
-                  <button
-                    type="button"
-                    className="friend-result contact-result"
-                    key={friend.id}
-                    onClick={() => void actOnFriend(friend)}
-                    disabled={friendBusyIds.has(friend.id)}
-                  >
-                    <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                    <div className="friend-result-copy">
-                      <strong>@{friend.username}</strong>
-                      <span>Đang chờ phản hồi</span>
-                    </div>
-                    <div className="friend-result-action"><small>Hủy lời mời</small><span>×</span></div>
-                  </button>
-                ))}
-              </section>
-            )}
-
-            <section className="contacts-suggestions">
-              <div className="contacts-heading">Người bạn có thể biết</div>
-              {friendSearching && <div className="friend-search-state">Đang tải gợi ý...</div>}
-              {!friendSearching && friendResults.filter((friend) => friendRelationship(friend.id) === 'none').length === 0 && (
-                <div className="friend-search-state">Chưa có gợi ý mới phù hợp.</div>
-              )}
-              {friendResults.filter((friend) => friendRelationship(friend.id) === 'none').map((friend) => (
-                <button
-                  type="button"
-                  className="friend-result contact-result"
-                  key={friend.id}
-                  onClick={() => void actOnFriend(friend)}
-                  disabled={friendBusyIds.has(friend.id)}
-                >
-                  <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
-                  <div className="friend-result-copy">
-                    <strong>@{friend.username}</strong>
-                    <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
-                  </div>
-                  <div className="friend-result-action"><small>Kết bạn</small><span>＋</span></div>
-                </button>
-              ))}
-            </section>
-              </>
-            )}
-          </div>
+            <ContactsView
+              friendQuery={friendQuery}
+              setFriendQuery={setFriendQuery}
+              friendSearching={friendSearching}
+              friendSearchError={friendSearchError}
+              setFriendSearchRetry={setFriendSearchRetry}
+              contactSearchResults={contactSearchResults}
+              friendRelationship={friendRelationship}
+              friendBusyIds={friendBusyIds}
+              actOnFriend={actOnFriend}
+              setFriendMenuId={setFriendMenuId}
+              friendMenuId={friendMenuId}
+              blockContact={blockContact}
+              reportContact={reportContact}
+              setTab={setTab}
+              setNewChatMode={setNewChatMode}
+              setChatCreateError={setChatCreateError}
+              friendRequests={friendRequests}
+              declineFriendRequest={declineFriendRequest}
+              friends={friends}
+              contactMetadata={contactMetadata}
+              openDirectByUsername={openDirectByUsername}
+              setFriendPreview={setFriendPreview}
+              changePersonalContact={changePersonalContact}
+              removeAcceptedFriend={removeAcceptedFriend}
+              friendResults={friendResults}
+            />
         )}
 
         {tab === 'discover' && (
@@ -5156,92 +3600,27 @@ export default function App() {
               ))}
             </div>
 
-            <form className="post-box zalo-post-composer" onSubmit={createPost}>
-              <div className="post-prompt compact-post-prompt">
-                <UserAvatar name={name} className="avatar self-avatar" />
-                <textarea
-                  ref={postComposerRef}
-                  className={postBackground ? 'feed-composer-bg bg-' + postBackground : ''}
-                  disabled={!!pendingPost}
-                  aria-label="Nội dung bài viết"
-                  placeholder="Hôm nay bạn thế nào?"
-                  value={postText}
-                  onChange={(event) => setPostText(event.target.value)}
-                  rows={1}
-                  maxLength={5000}
-                />
-              </div>
-              <input
-                ref={feedImageInputRef}
-                className="hidden-media-input"
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files || [])
-                  event.currentTarget.value = ''
-                  void addFeedFiles(files)
-                }}
-              />
-              <input
-                ref={feedVideoInputRef}
-                className="hidden-media-input"
-                type="file"
-                accept="video/*"
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files || [])
-                  event.currentTarget.value = ''
-                  void addFeedFiles(files)
-                }}
-              />
-              <input
-                ref={feedAlbumInputRef}
-                className="hidden-media-input"
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files || [])
-                  event.currentTarget.value = ''
-                  void addFeedFiles(files)
-                }}
-              />
-              {postAttachments.length > 0 && (
-                <div className="feed-pending-media">
-                  <MediaAttachmentsView
-                    items={postAttachments}
-                    pending
-                    onRemove={pendingPost ? undefined : (index) => setPostAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                  />
-                </div>
-              )}
-              <div className="composer-shortcuts">
-                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedImageInputRef.current?.click()}><UiIcon name="photo" size={20} />Ảnh</button>
-                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedVideoInputRef.current?.click()}><UiIcon name="video" size={20} />Video</button>
-                <button type="button" disabled={!!pendingPost || mediaUploading === 'feed'} onClick={() => feedAlbumInputRef.current?.click()}><UiIcon name="album" size={20} />Album</button>
-                <button type="button" aria-expanded={showPostBackgrounds} onClick={() => { setShowPostBackgrounds(v => !v); postComposerRef.current?.focus() }}><UiIcon name="text" size={20} />Nền chữ</button>
-              </div>
-              <div className="feed-composer-settings">
-                <label>Ai có thể xem?
-                  <select value={postVisibility} onChange={event => setPostVisibility(event.target.value as typeof postVisibility)}>
-                    <option value="public">🌐 Công khai</option>
-                    <option value="friends">👥 Bạn bè</option>
-                    <option value="private">🔒 Chỉ mình tôi</option>
-                  </select>
-                </label>
-                {showPostBackgrounds && <div className="feed-background-palette" aria-label="Chọn nền bài viết">
-                  {['', 'violet', 'blue', 'sunset', 'mint', 'night'].map(bg => (
-                    <button key={bg || 'none'} type="button" className={'feed-palette-dot bg-' + (bg || 'none')}
-                      aria-pressed={postBackground === bg} aria-label={bg || 'Không nền'} onClick={() => setPostBackground(bg)}>
-                      {postBackground === bg ? '✓' : ''}
-                    </button>
-                  ))}
-                </div>}
-              </div>
-              {mediaUploading === 'feed' && <div className="media-uploading-note">Đang tải media thẳng lên kho lưu trữ…</div>}
-              {(postText.trim() || postAttachments.length > 0) && (
-                <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
-              )}
-            </form>
+            <PostComposer
+              name={name}
+              createPost={createPost}
+              postComposerRef={postComposerRef}
+              postBackground={postBackground}
+              pendingPost={pendingPost}
+              postText={postText}
+              setPostText={setPostText}
+              feedImageInputRef={feedImageInputRef}
+              feedVideoInputRef={feedVideoInputRef}
+              feedAlbumInputRef={feedAlbumInputRef}
+              addFeedFiles={addFeedFiles}
+              postAttachments={postAttachments}
+              setPostAttachments={setPostAttachments}
+              mediaUploading={mediaUploading}
+              showPostBackgrounds={showPostBackgrounds}
+              setShowPostBackgrounds={setShowPostBackgrounds}
+              postVisibility={postVisibility}
+              setPostVisibility={setPostVisibility}
+              setPostBackground={setPostBackground}
+            />
 
             <div className="soco-feed-section-label soco-feed-posts-label">
               <strong>{feedFilter === 'saved' ? 'Bài viết đã lưu' : 'Bài viết mới'}</strong>
@@ -5261,47 +3640,7 @@ export default function App() {
                   </div>
                 </article>
               )}
-              {searchedPosts.map((post) => (
-                <article className="post zalo-post" key={post.id}>
-                  <UserAvatar name={post.author} className="avatar" />
-                  <div className="post-body">
-                    <div className="post-author">
-                      <div><strong>{post.author}</strong><small>{new Date(post.createdAt).toLocaleString('vi-VN')}</small></div>
-                      <FeedPostActions post={post} mine={post.author === name} request={apiFetch}
-                        onUpdated={syncFeedPost} onDeleted={removeFeedPost}
-                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
-                    </div>
-                    {post.content && (
-                      <div className={post.background ? 'feed-text-background bg-' + post.background : ''}>
-                        <FeedText api={API} token={session.token}
-                          target={translationPreferencesLoaded ? targetLanguage : ''}
-                          text={post.content} maxLines={5} onExpand={() => setActivePostId(post.id)} />
-                      </div>
-                    )}
-                    <div className="feed-media-preview" onClick={() => setActivePostId(post.id)}>
-                      <MediaAttachmentsView items={post.attachments} />
-                    </div>
-                    {(post.likes > 0 || (post.comments?.length || 0) > 0) && (
-                      <div className="post-engagement-summary">
-                        {post.likes > 0 && <span>{post.likes} lượt thích</span>}
-                        {(post.comments?.length || 0) > 0 && <span>{post.comments.length} bình luận</span>}
-                      </div>
-                    )}
-                    <div className="post-toolbar">
-                      <button type="button" className={post.liked ? 'liked' : ''} disabled={likePreviews[post.id] !== undefined}
-                        aria-pressed={post.liked} aria-busy={likePreviews[post.id] !== undefined} onClick={() => void like(post)}>
-                        <UiIcon name="heart" size={21} /><span>Thích</span>
-                      </button>
-                      <button type="button" className="post-stat post-detail-trigger" onClick={() => setActivePostId(post.id)}>
-                        <UiIcon name="comment" size={21} />
-                        <span>Bình luận</span>
-                      </button>
-                      <FeedShareAction postId={post.id}
-                        onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
-                    </div>
-                  </div>
-                </article>
-              ))}
+              {searchedPosts.map(post => <FeedPostCard key={post.id} post={post} name={name} apiFetch={apiFetch} syncFeedPost={syncFeedPost} removeFeedPost={removeFeedPost} setNotice={setNotice} token={session.token} translationPreferencesLoaded={translationPreferencesLoaded} targetLanguage={targetLanguage} setActivePostId={setActivePostId} likePreviews={likePreviews} like={like} />)}
               {(feedFilter === 'saved' ? hasMoreSavedPosts : hasMorePosts) && (
                 <button type="button" className="soco-load-more soco-feed-load-more"
                   onClick={() => void (feedFilter === 'saved' ? loadSavedPosts(true) : loadMorePosts())}
@@ -5322,114 +3661,7 @@ export default function App() {
           </div>
         )}
 
-        {activeMessageAction && (() => {
-          const mine = activeMessageAction.senderId === session.user.id
-          const preview = activeMessageAction.text.trim() || attachmentLabel(activeMessageAction.attachments)
-          return (
-            <div
-              className="message-context-backdrop"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Tùy chọn tin nhắn"
-              onMouseDown={(event) => {
-                if (event.currentTarget === event.target) setMessageActionId(null)
-              }}
-            >
-              <section className="message-context-sheet">
-                <div className={mine ? 'message-context-preview mine' : 'message-context-preview'}>
-                  <small>{mine ? 'Bạn' : `@${activeMessageAction.sender}`}</small>
-                  <div className="message-context-preview-bubble">{preview || 'Tin nhắn'}</div>
-                  <time>{formatTime(activeMessageAction.createdAt)}</time>
-                </div>
-
-                <div className="message-context-reactions" aria-label="Thả cảm xúc">
-                  {['❤️', '👍', '😂', '😮', '😢', '🙏'].map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      className={(activeMessageAction.reactions || []).some((reaction) => reaction.emoji === emoji && reaction.mine) ? 'active' : ''}
-                      aria-label={`Thả cảm xúc ${emoji}`}
-                      onClick={() => {
-                        setMessageActionId(null)
-                        void toggleReaction(activeMessageAction, emoji)
-                      }}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="message-context-actions">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReplyingTo(activeMessageAction)
-                      setMessageActionId(null)
-                    }}
-                  >
-                    <span aria-hidden="true">↩</span>
-                    <b>Trả lời</b>
-                  </button>
-
-                  {Boolean(activeMessageAction.text.trim()) && (
-                    <button type="button" onClick={() => void copyMessage(activeMessageAction)}>
-                      <span aria-hidden="true">▣</span>
-                      <b>Sao chép</b>
-                    </button>
-                  )}
-
-                  {!mine && Boolean(activeMessageAction.text.trim()) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMessageActionId(null)
-                        void translateMessage(activeMessageAction)
-                      }}
-                    >
-                      <span aria-hidden="true">文</span>
-                      <b>Dịch</b>
-                    </button>
-                  )}
-
-                  {mine && Boolean(activeMessageAction.text.trim()) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMessageActionId(null)
-                        void editOwnMessage(activeMessageAction)
-                      }}
-                    >
-                      <span aria-hidden="true">✎</span>
-                      <b>Sửa</b>
-                    </button>
-                  )}
-
-                  {mine && (
-                    <button
-                      type="button"
-                      className="danger"
-                      onClick={() => {
-                        setMessageActionId(null)
-                        void recallOwnMessage(activeMessageAction)
-                      }}
-                    >
-                      <span aria-hidden="true">⌫</span>
-                      <b>Thu hồi</b>
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className="message-context-cancel"
-                  onClick={() => setMessageActionId(null)}
-                >
-                  Đóng
-                </button>
-              </section>
-            </div>
-          )
-        })()}
+        {activeMessageAction && <MessageActions activeMessageAction={activeMessageAction} userId={session.user.id} setMessageActionId={setMessageActionId} toggleReaction={toggleReaction} setReplyingTo={setReplyingTo} copyMessage={copyMessage} translateMessage={translateMessage} editOwnMessage={editOwnMessage} recallOwnMessage={recallOwnMessage} />}
 
         {activePost && (
           <div
@@ -5501,49 +3733,7 @@ export default function App() {
           </div>
         )}
 
-        {activeStory && (
-          <div
-            className="story-viewer-backdrop"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Story của @${activeStory.author}`}
-            onMouseDown={(event) => {
-              if (event.currentTarget === event.target) setActiveStoryId(null)
-            }}
-          >
-            <section className="story-viewer">
-              <div className="story-progress" aria-hidden="true">
-                <span key={activeStory.id} className={activeStory.attachment.kind === 'image' ? 'running' : ''} />
-              </div>
-              <header>
-                <UserAvatar name={activeStory.author} className="story-viewer-avatar" />
-                <div className="story-viewer-owner">
-                  <strong>@{activeStory.author}</strong>
-                  <time dateTime={activeStory.createdAt}>
-                    {new Date(activeStory.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric' })}
-                  </time>
-                </div>
-                {activeStory.author === name && (
-                  <button type="button" className="story-delete" aria-label="Xóa Story" title="Xóa Story" disabled={storyBusy} onClick={() => void deleteStory(activeStory)}>
-                    <UiIcon name="trash" size={20} />
-                  </button>
-                )}
-                <button type="button" className="story-close" aria-label="Đóng Story" title="Đóng" onClick={() => setActiveStoryId(null)}>×</button>
-              </header>
-              <div className="story-viewer-media">
-                {activeStory.attachment.kind === 'video' ? (
-                  <video src={activeStory.attachment.url} autoPlay controls playsInline onEnded={nextStory} />
-                ) : (
-                  <img src={activeStory.attachment.url} alt={activeStory.attachment.name} />
-                )}
-              </div>
-              <button type="button" className="story-nav story-previous" aria-label="Story trước" title="Story trước"
-                disabled={activeStoryIndex === 0} onClick={previousStory}>‹</button>
-              <button type="button" className="story-nav story-next" aria-label="Story tiếp theo" title="Story tiếp theo"
-                onClick={nextStory}>›</button>
-            </section>
-          </div>
-        )}
+        {activeStory && <StoryViewer activeStory={activeStory} name={name} storyBusy={storyBusy} deleteStory={deleteStory} setActiveStoryId={setActiveStoryId} nextStory={nextStory} previousStory={previousStory} activeStoryIndex={activeStoryIndex} />}
 
         {tab === 'profile' && (
           <div className="simple-view profile-view">
@@ -5625,166 +3815,46 @@ export default function App() {
               </div>
             </section>
 
-            <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
-              <div className="profile-edit-heading">
-                <div>
-                  <strong>{t('profile.personalInfo')}</strong>
-                  <small>{t('profile.personalInfoHint')}</small>
-                </div>
-              </div>
-              <label className="profile-edit-field">
-                <span>{t('profile.displayName')}</span>
-                <input
-                  type="text"
-                  value={profileDisplayNameDraft}
-                  onChange={(event) => setProfileDisplayNameDraft(event.target.value)}
-                  maxLength={100}
-                  autoComplete="name"
-                  placeholder={t('profile.displayNamePlaceholder')}
-                  disabled={profileSaving}
-                />
-              </label>
-              <label className="profile-edit-field">
-                <span>{t('profile.username')}</span>
-                <div className="profile-username-input">
-                  <b aria-hidden="true">@</b>
-                  <input
-                    type="text"
-                    value={profileUsernameDraft}
-                    onChange={(event) => setProfileUsernameDraft(event.target.value.toLowerCase())}
-                    minLength={3}
-                    maxLength={32}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    autoComplete="username"
-                    placeholder="username"
-                    disabled={profileSaving}
-                  />
-                </div>
-                <small>{t('profile.usernameHint')}</small>
-              </label>
-              <button
-                type="submit"
-                className="profile-save-button"
-                disabled={
-                  profileSaving ||
-                  !profileMedia ||
-                  (
-                    profileDisplayNameDraft.trim() === profileMedia.displayName &&
-                    profileUsernameDraft.trim().toLowerCase() === profileMedia.username
-                  )
-                }
-              >
-                {profileSaving ? t('common.saving') : t('common.save')}
-              </button>
-            </form>
+            <ProfileIdentityForm
+              saveProfileIdentity={saveProfileIdentity}
+              t={t}
+              profileDisplayNameDraft={profileDisplayNameDraft}
+              setProfileDisplayNameDraft={setProfileDisplayNameDraft}
+              profileUsernameDraft={profileUsernameDraft}
+              setProfileUsernameDraft={setProfileUsernameDraft}
+              profileSaving={profileSaving}
+              profileMedia={profileMedia}
+            />
 
             <div className="soco-profile-section-label">TÙY CHỌN & CÀI ĐẶT</div>
             <section className="settings-card">
-              <div className="settings-row">
-                <div>
-                  <strong>Quyền riêng tư tài khoản</strong>
-                  <small>Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. Thiết lập lưu trên máy chủ.</small>
-                </div>
-              </div>
-              {privacyLoading && <div className="settings-row" role="status">Đang tải quyền riêng tư...</div>}
-              {privacyError && <div className="settings-row" role="alert">
-                <span>{privacyError}</span>
-                <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>Thử lại</button>
-              </div>}
-              {privacy && ([
-                ['searchableByUsername', 'Cho phép tìm bằng username', 'Người khác có thể tìm @username của bạn.'],
-                ['searchableByName', 'Cho phép tìm bằng tên', 'Tên hiển thị của bạn có thể xuất hiện trong kết quả.'],
-                ['searchableByEmail', 'Cho phép tìm bằng email', 'Chỉ tìm bằng email khớp chính xác; địa chỉ email không được hiển thị.'],
-                ['allowFriendRequests', 'Cho phép lời mời mới', 'Tắt để ngăn lời mời kết bạn mới từ người khác.'],
-                ['showOnlineStatus', 'Hiển thị trạng thái online', 'Ẩn sự hiện diện trong danh sách và kết quả tìm kiếm.'],
-              ] as const).map(([key, label, hint]) => (
-                <div className="settings-row" key={key}>
-                  <div><strong>{label}</strong><small>{hint}</small></div>
-                  <button
-                    type="button"
-                    className={`switch-button ${privacy[key] ? 'on' : ''}`}
-                    role="switch"
-                    aria-label={label}
-                    aria-checked={privacy[key]}
-                    disabled={privacyBusy}
-                    onClick={() => void changePrivacy(key)}
-                  ><span /></button>
-                </div>
-              ))}
-              <div className="settings-row">
-                <div>
-                  <strong>Thiết bị đã đăng nhập</strong>
-                  <small>Kiểm tra và thu hồi những phiên đăng nhập không còn sử dụng.</small>
-                </div>
-                <button type="button" className="settings-action"
-                  disabled={sessionsBusy || !session.refreshToken}
-                  onClick={() => {
-                    if (sessionsOpen) setSessionsOpen(false)
-                    else void fetchAccountSessions()
-                  }}>
-                  {sessionsBusy ? 'Đang xử lý...' : sessionsOpen ? 'Thu gọn' : 'Xem thiết bị'}
-                </button>
-              </div>
-              {sessionsError && <div className="settings-row" role="alert">
-                <small>{sessionsError}</small>
-                <button type="button" className="settings-action" disabled={sessionsBusy}
-                  onClick={() => void fetchAccountSessions()}>Thử lại</button>
-              </div>}
-              {sessionsOpen && (
-                <div className="account-sessions-panel">
-                  <p>Thu hồi phiên sẽ ngăn gia hạn đăng nhập bằng refresh token. Access token đã phát hành có thể tiếp tục hoạt động đến khi hết hạn (tối đa 24 giờ).</p>
-                  {managedSessions.length === 0 && <small>Không có phiên đang hoạt động.</small>}
-                  {managedSessions.map((device) => (
-                    <div className="account-session-item" key={device.id}>
-                      <div className="account-session-details">
-                        <strong>{device.current ? 'Thiết bị này' : device.userAgent || 'Trình duyệt khác'}</strong>
-                        {device.current && <small>{device.userAgent || 'Trình duyệt hiện tại'}</small>}
-                        <small>Hoạt động: {new Date(device.lastSeenAt).toLocaleString('vi-VN')}</small>
-                      </div>
-                      <button type="button" className="settings-action"
-                        disabled={sessionsBusy}
-                        onClick={() => void revokeAccountSessions(device.id)}>
-                        {device.current ? 'Đăng xuất' : 'Thu hồi'}
-                      </button>
-                    </div>
-                  ))}
-                  {managedSessions.some((device) => !device.current) && (
-                    <button type="button" className="settings-action account-revoke-others"
-                      disabled={sessionsBusy} onClick={() => void revokeAccountSessions()}>
-                      Đăng xuất tất cả thiết bị khác
-                    </button>
-                  )}
-                </div>
-              )}
-              <div className="settings-row">
-                <div><strong>Người dùng đã chặn</strong><small>Quản lý những tài khoản không thể nhắn tin hoặc kết bạn với bạn.</small></div>
-                <button type="button" className="settings-action" disabled={blockedBusy}
-                  onClick={() => blockedOpen ? setBlockedOpen(false) : void loadBlockedUsers()}>
-                  {blockedBusy ? 'Đang tải...' : blockedOpen ? 'Thu gọn' : 'Xem danh sách'}
-                </button>
-              </div>
-              {blockedError && <div className="settings-row" role="alert">
-                <small>{blockedError}</small>
-                <button type="button" className="settings-action" disabled={blockedBusy}
-                  onClick={() => void loadBlockedUsers()}>Thử lại</button>
-              </div>}
-              {blockedOpen && (
-                <div className="account-sessions-panel">
-                  {blockedUsers.length === 0 && <p>Chưa chặn tài khoản nào.</p>}
-                  {blockedUsers.map((item) => (
-                    <div className="account-session-item" key={item.id}>
-                      <div className="account-session-details">
-                        <strong>{item.displayName || item.username}</strong>
-                        <small>@{item.username}</small>
-                      </div>
-                      <button type="button" className="settings-action" disabled={blockedBusy}
-                        onClick={() => void unblockContact(item.id)}>Bỏ chặn</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <PrivacyControls
+              privacyLoading={privacyLoading}
+              privacyError={privacyError}
+              setPrivacyRetry={setPrivacyRetry}
+              privacy={privacy}
+              privacyBusy={privacyBusy}
+              changePrivacy={changePrivacy}
+            />
+            <AccountSessionsPanel
+              sessionsBusy={sessionsBusy}
+              refreshToken={session.refreshToken}
+              sessionsOpen={sessionsOpen}
+              setSessionsOpen={setSessionsOpen}
+              fetchAccountSessions={fetchAccountSessions}
+              sessionsError={sessionsError}
+              managedSessions={managedSessions}
+              revokeAccountSessions={revokeAccountSessions}
+            />
+            <BlockedUsersPanel
+              blockedBusy={blockedBusy}
+              blockedOpen={blockedOpen}
+              setBlockedOpen={setBlockedOpen}
+              loadBlockedUsers={loadBlockedUsers}
+              blockedError={blockedError}
+              blockedUsers={blockedUsers}
+              unblockContact={unblockContact}
+            />
               <button
                 type="button"
                 className="settings-row settings-row-button app-locale-row"
@@ -6041,53 +4111,13 @@ export default function App() {
         conversations={conversations.map(({ id, name, type }) => ({ id, name, type }))}
       />
 
-      <nav className="bottom-navigation" aria-label="Điều hướng chính">
-        <button
-          type="button"
-          aria-label={t('nav.chat')}
-          title={t('nav.chat')}
-          className={tab === 'chat' ? 'active' : ''}
-          onClick={() => switchTab('chat')}
-        >
-          <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b>{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
-        </button>
-        <button
-          type="button"
-          aria-label={t('nav.contacts')}
-          title={t('nav.contacts')}
-          className={tab === 'contacts' ? 'active' : ''}
-          onClick={() => switchTab('contacts')}
-        >
-          <span className="nav-icon"><UiIcon name="contacts" size={25} /></span>
-        </button>
-        <button
-          type="button"
-          aria-label={t('nav.discover')}
-          title={t('nav.discover')}
-          className={tab === 'discover' ? 'active' : ''}
-          onClick={() => switchTab('discover')}
-        >
-          <span className="nav-icon"><UiIcon name="discover" size={25} /></span>
-        </button>
-        <button
-          type="button"
-          aria-label={t('nav.feed')}
-          title={t('nav.feed')}
-          className={tab === 'feed' ? 'active' : ''}
-          onClick={() => switchTab('feed')}
-        >
-          <span className="nav-icon"><UiIcon name="wall" size={25} /></span>
-        </button>
-        <button
-          type="button"
-          aria-label={t('nav.profile')}
-          title={t('nav.profile')}
-          className={tab === 'profile' ? 'active' : ''}
-          onClick={() => switchTab('profile')}
-        >
-          <span className="nav-icon"><UiIcon name="profile" size={25} />{!pushEnabled && <b>!</b>}</span>
-        </button>
-      </nav>
+      <BottomNavigation
+        tab={tab}
+        t={t}
+        switchTab={switchTab}
+        unreadTotal={unreadTotal}
+        pushEnabled={pushEnabled}
+      />
     </main>
   )
 }

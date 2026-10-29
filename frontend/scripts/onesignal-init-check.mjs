@@ -77,7 +77,7 @@ globalThis.document = {
   },
 }
 
-const { disableOneSignalPush, enableOneSignalPush, isPushDisabled, setupOneSignal } = await import('../src/onesignal.ts')
+const { disableOneSignalPush, enableOneSignalPush, isPushDisabled, setupOneSignal } = await import('../src/features/notifications/onesignal.ts')
 const first = setupOneSignal('test-app')
 const second = setupOneSignal('test-app')
 
@@ -146,7 +146,7 @@ OneSignal.init = async () => {
   initCalls += 1
   throw new Error('first init failed')
 }
-const failedModule = await import('../src/onesignal.ts?failed-init')
+const failedModule = await import('../src/features/notifications/onesignal.ts?failed-init')
 await assert.rejects(failedModule.setupOneSignal('test-app'), /first init failed/)
 OneSignal.init = async () => { initCalls += 1 }
 const retried = await failedModule.setupOneSignal('test-app')
