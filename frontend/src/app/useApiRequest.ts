@@ -42,6 +42,7 @@ export function useApiRequest({
 
     async function performRequest() {
       const mutation = write && !/\/(read|translate|presign|subscription|bundle)$/.test(path)
+        && !/^\/api\/conversations\/\d+\/category$/.test(path)
       const request = Symbol(path)
       if (mutation) {
         pendingRequests.current.add(request)

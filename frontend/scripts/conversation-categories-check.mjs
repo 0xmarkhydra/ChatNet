@@ -34,7 +34,7 @@ try{
    let categories=[{id:1,name:'Gia đình',color:'indigo'}], nextId=2, fail=false
    const conversations=Array.from({length:28},(_,i)=>({id:100+i,type:'group',name:'Hội thoại '+i,memberCount:3,unreadCount:0,lastMessage:'Tin nhắn',createdAt:'2026-01-01',categoryId:1}))
    conversations.push({id:200,type:'group',name:'Hội thoại chưa phân loại',memberCount:2,unreadCount:0,lastMessage:'Xin chào',createdAt:'2026-01-01'})
-   await page.route('http://localhost:8080/**',route=>{
+   await page.route('http://localhost:8080/**',async route=>{
     const req=route.request(),u=new URL(req.url()),p=u.pathname,method=req.method()
     if(method==='GET') counts.set(p,(counts.get(p)||0)+1)
     const json=(data,status=200)=>route.fulfill({status,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},contentType:'application/json',body:JSON.stringify(data)})
@@ -51,6 +51,7 @@ try{
      const item={id,...req.postDataJSON()};categories=categories.map(c=>c.id===id?item:c);return json(item)
     }
     if(p.endsWith('/category')){
+     await delay(150)
      const id=Number(p.split('/')[3]),data=req.postDataJSON()
      const item=conversations.find(c=>c.id===id);item.categoryId=data.categoryId||undefined
      return json({conversationId:id,categoryId:data.categoryId})
@@ -102,7 +103,7 @@ try{
    await page.locator('.conversation-list .conversation-item').first().click()
    const assignment=page.getByLabel('Phân loại hội thoại',{exact:true})
    await assignment.waitFor()
-   const assignCategory=async value=>{await assignment.click();await page.locator('.category-assignment-popover input[value="'+(value||'0')+'"]').locator('..').click()}
+   const assignCategory=async value=>{await assignment.click();await page.locator('.category-assignment-popover input[value="'+(value||'0')+'"]').locator('..').click();await delay(40);assert.equal(await page.locator('.request-progress').count(),0,'Assigning a category must not show global progress')}
    const friendReads=counts.get('/api/friends'),feedReads=counts.get('/api/posts')
    await assignCategory('2')
    await page.waitForFunction(()=>document.querySelector('[aria-label="Phân loại hội thoại"]').dataset.categoryId==='2')
