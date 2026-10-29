@@ -1,0 +1,49 @@
+{
+  "name": "soco-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SOCO Desktop shell for ChatNet",
+  "main": "src/main.cjs",
+  "scripts": {
+    "dev:web": "npm --prefix ../frontend run dev -- --host 127.0.0.1 --mode desktop",
+    "dev": "electron . --dev",
+    "build:web": "npm --prefix ../frontend run build:desktop",
+    "build": "npm run build:web && electron-builder --dir --publish never",
+    "dist:mac": "npm run build:web && electron-builder --mac --publish never",
+    "dist:win": "npm run build:web && electron-builder --win --publish never",
+    "test": "node --test test/*.test.cjs",
+    "check": "npm run test && npm run build:web"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "asia.soco.desktop",
+    "productName": "SOCO",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "dist/renderer/**/*",
+      "package.json",
+      "!**/*.test.*",
+      "!**/*.map"
+    ],
+    "mac": {
+      "category": "public.app-category.social-networking",
+      "target": ["dmg", "zip"],
+      "hardenedRuntime": true
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": null
+  }
+}

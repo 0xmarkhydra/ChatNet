@@ -1,0 +1,64 @@
+name: SOCO Desktop foundation checks
+
+on:
+  push:
+    branches:
+      - feat/chatnet-desktop-electron
+  pull_request:
+    branches:
+      - feat/chatnet-desktop-electron
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: Desktop shell - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+      - name: Install shared React dependencies
+        run: npm ci --prefix frontend --no-audit --no-fund
+      - name: Install Electron shell dependencies
+        run: npm ci --prefix desktop --no-audit --no-fund
+      - name: Electron IPC and path security tests
+        run: npm test --prefix desktop
+      - name: Web regression build
+        run: npm run build --prefix frontend
+      - name: Desktop React bundle and native unsigned internal package
+        run: npm run build --prefix desktop
+      # Intentionally no artifact upload, signing, publishing, auto-update or release.
+      # Public beta requires the separate QA/release approval gates.
+
+  backend:
+    name: Translation origin regression
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go test ./...

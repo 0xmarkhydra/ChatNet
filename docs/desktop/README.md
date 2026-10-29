@@ -1,6 +1,6 @@
 # ChatNet / SOCO Desktop — Tài liệu tổng (Source of Truth)
 
-> **Trạng thái tại 30/10/2026: DOCUMENTATION ONLY — CHƯA TRIỂN KHAI DESKTOP.**
+> **Trạng thái tại 30/10/2026: ĐÃ CÓ ELECTRON FOUNDATION TRÊN NHÁNH RIÊNG — CHƯA ĐỦ BETA.**
 > Những mục [CHỐT] là quyết định kỹ thuật/sản phẩm; [ĐỀ XUẤT] cần xác nhận hoặc spike; [CHƯA CHỐT] không được tự áp đặt thành chính sách phát hành.
 
 ## 1. Bối cảnh và nguyên tắc
@@ -21,6 +21,7 @@
 | [03_IMPLEMENTATION_BACKLOG.md](03_IMPLEMENTATION_BACKLOG.md) | Task ID, phụ thuộc, ưu tiên, người làm, acceptance criteria | Thắng/Bắc + Integration Owner |
 | [04_QA_RELEASE_GATES.md](04_QA_RELEASE_GATES.md) | Ma trận kiểm thử, release blockers, signing/update/rollback | QA / Agent 5 |
 | [05_AGENT_HANDOFF.md](05_AGENT_HANDOFF.md) | Hợp đồng giao việc, quy tắc merge & báo cáo tiến độ | Integration Owner |
+| [06_BATCH_01_STATUS.md](06_BATCH_01_STATUS.md) | Báo cáo B01, kiểm thử thực chạy và các blocker Beta | Integration Owner |
 | [adr/0001-electron-vs-tauri.md](adr/0001-electron-vs-tauri.md) | Vì sao chọn Electron và điều kiện xem xét lại | Tech Lead |
 
 Nguồn nghiệp vụ đang có:
@@ -66,4 +67,4 @@ Nguồn nghiệp vụ đang có:
 
 Dùng trạng thái: `NOT_STARTED`, `IN_PROGRESS`, `IN_REVIEW`, `BLOCKED`, `DONE`. `DONE` cần link bằng chứng: commit + kết quả test + người review. Docs cập nhật qua commit riêng; thay đổi kiến trúc phải viết ADR và xin duyệt trước khi đổi runtime/backend/auth.
 
-**Hiện tại:** chỉ hoàn thành bước D0 khi các tài liệu được commit và rà soát; tuyệt đối không báo Desktop P0 là đã phát triển.
+**Hiện tại:** D0 đã commit; B01 đã dựng Electron nền tảng. Xem `06_BATCH_01_STATUS.md` để phân biệt PASS/NOT RUN/BLOCKED. Không báo toàn bộ Desktop P0 là đã hoàn thành.

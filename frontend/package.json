@@ -24,7 +24,8 @@
     "preview": "vite preview",
     "check:categories": "node scripts/conversation-categories-check.mjs",
     "check:profile-note": "node scripts/profile-note-check.mjs",
-    "check:cache": "node --experimental-strip-types scripts/session-cache-check.mjs"
+    "check:cache": "node --experimental-strip-types scripts/session-cache-check.mjs",
+    "build:desktop": "tsc --noEmit && vite build --mode desktop --base ./ --outDir ../desktop/dist/renderer --emptyOutDir"
   },
   "dependencies": {
     "livekit-client": "^2.22.3",

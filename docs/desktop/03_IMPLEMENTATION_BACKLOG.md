@@ -1,7 +1,7 @@
 # SOCO Desktop — Implementation Backlog v1
 
 **Cơ sở:** `dev@c04a044` · **Nhánh triển khai:** `feat/chatnet-desktop-electron`
-**Trạng thái:** Tất cả task phát triển phía dưới = `NOT_STARTED`; **chỉ tài liệu D0** đang chuẩn bị bàn giao.
+**Trạng thái 30/10/2026:** DSK-000 = DONE; DSK-001/002/003 = IN_REVIEW; DSK-004 = BLOCKED (chưa UAT LiveKit thật); DSK-005 = IN_PROGRESS. Các task còn lại = NOT_STARTED. Xem `06_BATCH_01_STATUS.md` để biết bằng chứng kiểm thử.
 **Nhân sự đề xuất:** Thắng = Desktop Platform / Native; Bắc = React / API integration; Agent 5 = review, CI, security, UAT, integration. Phân công có thể đổi khi có quyết định team.
 
 ## Quy ước task và Definition of Done
