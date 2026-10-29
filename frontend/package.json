@@ -18,8 +18,7 @@
     "check:call-ux": "node scripts/call-ux-check.mjs",
     "check:call-translation": "node --experimental-strip-types scripts/call-translation-check.mjs",
     "check:call-live": "node scripts/call-live-check.mjs",
-    "preview": "vite preview",
-    "check:app-data": "node scripts/app-data-check.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "livekit-client": "^2.22.3",
