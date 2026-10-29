@@ -1,5 +1,6 @@
 import { userLabel } from '../../shared/lib/userLabel'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Ellipsis } from 'lucide-react'
 
 export type FeedComment = {
@@ -128,17 +129,37 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
   const [editingComment, setEditingComment] = useState<number | null>(null)
   const [commentOptionsId, setCommentOptionsId] = useState<number | null>(null)
+  const optionsTrigger = useRef<HTMLButtonElement | null>(null)
+  const optionsPanel = useRef<HTMLDivElement>(null)
+  const [optionsPosition, setOptionsPosition] = useState({ top: 0, left: 0 })
+  useLayoutEffect(() => {
+    if (commentOptionsId === null) return
+    const anchor = optionsTrigger.current?.getBoundingClientRect()
+    const panel = optionsPanel.current?.getBoundingClientRect()
+    if (!anchor || !panel) return
+    const below = anchor.bottom + 4
+    const top = below + panel.height <= window.innerHeight - 8 ? below : anchor.top - panel.height - 4
+    setOptionsPosition({
+      top: Math.max(8, Math.min(top, window.innerHeight - panel.height - 8)),
+      left: Math.max(8, Math.min(anchor.left, document.documentElement.clientWidth - panel.width - 8)),
+    })
+  }, [commentOptionsId])
   useEffect(() => {
     if (commentOptionsId === null) return
     function onDismiss(event: PointerEvent) {
-      if (!(event.target as HTMLElement).closest('.feed-comment-menu')) setCommentOptionsId(null)
+      if (!optionsPanel.current?.contains(event.target as Node) && !optionsTrigger.current?.contains(event.target as Node)) setCommentOptionsId(null)
     }
     function onEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') setCommentOptionsId(null)
     }
+    const onMove = () => setCommentOptionsId(null)
+    window.addEventListener('resize', onMove)
+    document.addEventListener('scroll', onMove, true)
     document.addEventListener('pointerdown', onDismiss)
     document.addEventListener('keydown', onEscape)
     return () => {
+      window.removeEventListener('resize', onMove)
+      document.removeEventListener('scroll', onMove, true)
       document.removeEventListener('pointerdown', onDismiss)
       document.removeEventListener('keydown', onEscape)
     }
@@ -221,11 +242,11 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
             <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời ${userLabel(comment.authorDisplayName, comment.author)}`}>Trả lời</button>
             <div className="feed-comment-menu">
               <button type="button" aria-label="Tùy chọn bình luận" aria-expanded={commentOptionsId === comment.id}
-                onClick={() => setCommentOptionsId(current => current === comment.id ? null : comment.id)}>
+                onClick={event => { optionsTrigger.current = event.currentTarget; setCommentOptionsId(current => current === comment.id ? null : comment.id) }}>
                 <Ellipsis size={16} />
               </button>
-              {commentOptionsId === comment.id && (
-                <div className="feed-comment-options" role="group" aria-label="Thao tác bình luận">
+              {commentOptionsId === comment.id && createPortal(
+                <div ref={optionsPanel} style={optionsPosition} className="feed-comment-options" role="group" aria-label="Thao tác bình luận">
                   {comment.author === currentUser ? (
                     <>
                       <button type="button" disabled={commentActionBusy} onClick={() => {
@@ -239,7 +260,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
                   ) : <button type="button" onClick={() => {
                     setReportingComment(comment.id); setEditingComment(null); setCommentOptionsId(null)
                   }}>Báo cáo bình luận</button>}
-                </div>
+                </div>, document.body
               )}
             </div>
           </div>
