@@ -1,3 +1,4 @@
+import type { SessionResponseCache } from '../shared/lib/sessionCache'
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { API } from '../shared/lib/config'
 import { attachmentLabel } from '../shared/lib/format'
@@ -18,6 +19,7 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     'membershipSnapshot' | 'membershipEventSequence' | 'membershipSyncSequence' | 'setConversations'> &
   Pick<ReturnType<typeof useFeedData>, 'refreshPosts' | 'refreshStories'> &
   Pick<ReturnType<typeof useContactData>, 'refreshFriendConnections'> & {
+    responseCache: RefObject<SessionResponseCache>
     purgeConversation: (id: number) => void
     groupSettingsOpen: boolean
     activeConversationIdRef: RefObject<number | null>
@@ -37,6 +39,7 @@ type Options = Omit<AppDataContext, 'setNotice'> &
   }
 
 export function useAppRealtime({
+  responseCache,
   session,
   sessionRef,
   apiFetch,
@@ -86,16 +89,19 @@ export function useAppRealtime({
       if (sessionRef.current?.sessionId !== session.sessionId) return
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
       if (update.type === 'friend.updated') {
+        responseCache.current.invalidate(['friends','feed','stories','profiles'])
         void refreshFriendConnections()
         return
       }
 
       if (update.type === 'conversation.removed') {
+        responseCache.current.invalidate(['conversations','messages'])
         purgeConversation(update.conversationId)
         return
       }
 
       if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
+        responseCache.current.invalidate(['conversations','messages'])
         revokedConversationIds.current.delete(update.conversationId)
         membershipSnapshot.current?.add(update.conversationId)
         membershipEventSequence.current += 1
@@ -130,6 +136,7 @@ export function useAppRealtime({
       }
 
       if (update.type === 'message.updated' && update.message) {
+        responseCache.current.invalidate(['messages','conversations'])
         const changed = update.message
         messageChanges.current.add(changed.id)
         if (activeConversationIdRef.current === update.conversationId) {
@@ -158,6 +165,7 @@ export function useAppRealtime({
       }
 
       if (update.type === 'message' && update.message) {
+        responseCache.current.invalidate(['messages','conversations'])
         const incoming = update.message
         // Only genuine, recent messages from other users make a sound. Loading
         // history, updating reactions and our own sends never trigger one.
@@ -231,6 +239,7 @@ export function useAppRealtime({
     })
 
     const refreshTimer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
       void refreshConversations()
       void refreshFriendConnections()
     }, 20000)
@@ -239,7 +248,11 @@ export function useAppRealtime({
     }, 90000)
     const checkMembership = () => { void reconcileConversationMemberships() }
     const checkVisibleMembership = () => {
-      if (document.visibilityState === 'visible') checkMembership()
+      if (document.visibilityState === 'visible') {
+        checkMembership()
+        void refreshConversations()
+        void refreshFriendConnections()
+      }
     }
     window.addEventListener('online', checkMembership)
     document.addEventListener('visibilitychange', checkVisibleMembership)
@@ -252,6 +265,5 @@ export function useAppRealtime({
       membershipSyncSequence.current += 1
     }
   }, [session?.token, groupSettingsOpen])
-
 
 }

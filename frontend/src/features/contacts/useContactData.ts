@@ -17,7 +17,19 @@ export function useContactData({
   const [friendSyncError, setFriendSyncError] = useState('')
   const [friendSyncBusy, setFriendSyncBusy] = useState(false)
 
+  const friendSyncFlight = useRef<{ sessionId: string; revision: number; promise: Promise<void> } | null>(null)
   async function refreshFriendConnections() {
+    const sessionId = sessionRef.current?.sessionId
+    if (!sessionId) return
+    const active = friendSyncFlight.current
+    if (active?.sessionId === sessionId && active.revision === friendSyncRequest.current) return active.promise
+    const promise = fetchFriendConnections()
+    const flight = { sessionId, revision: friendSyncRequest.current, promise }
+    friendSyncFlight.current = flight
+    try { await promise }
+    finally { if (friendSyncFlight.current === flight) friendSyncFlight.current = null }
+  }
+  async function fetchFriendConnections() {
     const sessionId = session?.sessionId
     if (!sessionId) return
     const request = ++friendSyncRequest.current
@@ -51,7 +63,6 @@ export function useContactData({
       }
     } finally {
       if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) setFriendSyncBusy(false)
-
     }
   }
 

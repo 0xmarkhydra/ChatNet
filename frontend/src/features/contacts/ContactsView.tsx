@@ -87,7 +87,7 @@ export default function ContactsView({
               <div className="friend-result contact-result contact-search-row" key={friend.id}>
                 <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
                 <div className="friend-result-copy">
-                  <strong>{friend.displayName || friend.username}</strong>
+                  <button type="button" className="visitor-name-link" onClick={() => setFriendPreview(friend)}>{friend.displayName || friend.username}</button>
                   <span>@{friend.username}{relationship === 'accepted' ? ' · Bạn bè' : relationship === 'incoming' ? ' · Đã nhận lời mời' : relationship === 'outgoing' ? ' · Đã gửi lời mời' : ''}</span>
                 </div>
                 <button

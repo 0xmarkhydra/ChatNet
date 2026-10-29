@@ -1,13 +1,16 @@
+import { SessionResponseCache, mutationTags } from '../shared/lib/sessionCache'
 import { useRef, useState, type RefObject } from 'react'
 import type { Session, createSessionClient } from '../features/auth/session'
 
 type Options = {
+  responseCache: RefObject<SessionResponseCache>
   session: Session | null
   sessionRef: RefObject<Session | null>
   sessionClient: ReturnType<typeof createSessionClient>
 }
 
 export function useApiRequest({
+  responseCache,
   session,
   sessionRef,
   sessionClient,
@@ -18,13 +21,23 @@ export function useApiRequest({
 
   async function apiFetch(path: string, init: RequestInit = {}) {
     const sessionId = session?.sessionId
-    const write = !!init.method && !['GET', 'HEAD'].includes(init.method)
+    const write = !['GET', 'HEAD'].includes((init.method || 'GET').toUpperCase())
     const key = JSON.stringify([sessionId, path, init.method, init.body])
     const existing = write && mutationRequests.current.get(key)
     if (existing) return (await existing).clone()
-    const operation = performRequest()
+    const cacheScope = sessionId ? `${session?.user.id}:${sessionId}` : ''
+    responseCache.current.setScope(cacheScope)
+    if (write) responseCache.current.invalidate(mutationTags(path))
+    const method = (init.method || 'GET').toUpperCase()
+    const operation = method === 'GET' && !init.signal && !init.headers && init.cache !== 'no-store'
+      ? responseCache.current.read(cacheScope, path, performRequest, init.cache === 'reload' || init.cache === 'no-cache')
+      : performRequest()
     if (write) mutationRequests.current.set(key, operation)
-    try { return (await operation).clone() }
+    try {
+      const response = await operation
+      if (sessionRef.current?.sessionId !== sessionId) throw new Error('Phiên đăng nhập đã thay đổi.')
+      return response.clone()
+    }
     finally { if (mutationRequests.current.get(key) === operation) mutationRequests.current.delete(key) }
 
     async function performRequest() {
@@ -41,6 +54,7 @@ export function useApiRequest({
         // Consume the body before releasing pending state or accepting a stale session.
         await response.clone().text()
         if (sessionRef.current?.sessionId !== sessionId) throw new Error('Phiên đăng nhập đã thay đổi.')
+        if (write && response.ok) responseCache.current.invalidate(mutationTags(path))
         return response
       } catch (error) {
         if (!write) throw error
@@ -49,6 +63,7 @@ export function useApiRequest({
           : 'Chưa xác nhận được kết quả. Kiểm tra dữ liệu trước khi thử lại.'
         return Response.json({ error: message }, { status: 503 })
       } finally {
+        if (write && sessionRef.current?.sessionId === sessionId) responseCache.current.invalidate(mutationTags(path))
         pendingRequests.current.delete(request)
         if (sessionRef.current?.sessionId === sessionId) setPendingActions(pendingRequests.current.size)
       }

@@ -1,3 +1,5 @@
+import { SessionResponseCache } from '../shared/lib/sessionCache'
+import VisitorProfile from '../features/profile/VisitorProfile'
 import { userLabel } from '../shared/lib/userLabel'
 import { useMessageData } from '../features/chat/useMessageData'
 import { useApiRequest } from './useApiRequest'
@@ -82,6 +84,7 @@ import {
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession)
   const sessionRef = useRef(session)
+  const responseCache = useRef(new SessionResponseCache())
   const [sessionClient] = useState(() => createSessionClient(API, {
     get: () => sessionRef.current,
     save: saveSession,
@@ -150,7 +153,12 @@ export default function App() {
   const friendActionRef = useRef(new Set<number>())
   const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(() => new Set())
   const [friendMenuId, setFriendMenuId] = useState<number | null>(null)
-  const [friendPreview, setFriendPreview] = useState<FriendSearchResult | null>(null)
+  const [visitorUsername,setVisitorUsername]=useState<string|null>(null)
+  function openVisitor(username:string) {
+    if(username===sessionRef.current?.user.username){setTab('profile');setProfileTimelineOpen(true);return}
+    setVisitorUsername(username)
+  }
+  function setFriendPreview(friend:FriendSearchResult|null){if(friend)openVisitor(friend.username);else setVisitorUsername(null)}
   const [blockedUsers, setBlockedUsers] = useState<Array<{ id: number; username: string; displayName: string }>>([])
   const [blockedOpen, setBlockedOpen] = useState(false)
   const [blockedBusy, setBlockedBusy] = useState(false)
@@ -306,7 +314,7 @@ export default function App() {
     setPendingActions,
     pendingRequests,
     mutationRequests,
-  } = useApiRequest({ session, sessionRef, sessionClient })
+  } = useApiRequest({ session, sessionRef, sessionClient, responseCache })
 
   const {
     conversations,
@@ -636,7 +644,7 @@ export default function App() {
     if (!requestedUser) return
 
     if (requestedUser.toLocaleLowerCase('vi-VN') !== session.user.username.toLocaleLowerCase('vi-VN')) {
-      openConnectSurface(requestedUser)
+      openVisitor(requestedUser)
     }
 
     params.delete('connect')
@@ -735,6 +743,7 @@ export default function App() {
     sessionRef.current = next
     setSession(next)
   }
+
 
   async function loadProfileMedia() {
     if (!session?.token) return
@@ -1637,6 +1646,7 @@ export default function App() {
     }
   }
 
+
   const contactQuery = friendQuery.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
   const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
     `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(contactQuery),
@@ -1701,8 +1711,8 @@ export default function App() {
           : `Đã gửi lời mời kết bạn tới ${label}`)
       } else {
         setNotice('Đang kiểm tra trạng thái kết bạn')
+        await refreshFriendConnections()
       }
-      await refreshFriendConnections()
     } catch {
       if (sessionRef.current?.sessionId === sessionId) {
         setNotice('Không cập nhật được lời mời kết bạn. Kiểm tra kết nối rồi thử lại.')
@@ -1995,6 +2005,7 @@ export default function App() {
   }, [friendQuery, friendSearchRetry, newChatMode, session?.token, tab])
 
   function purgeConversation(id: number) {
+    responseCache.current.invalidate(['conversations','messages'])
     revokedConversationIds.current.add(id)
     membershipSnapshot.current?.delete(id)
     membershipEventSequence.current += 1
@@ -2032,7 +2043,7 @@ export default function App() {
     removeFeedDataPost(id)
   }
 
-  async function loadProfilePosts(more = false) {
+  async function loadProfilePosts(more = false, force = false) {
     if (!session || profilePagingBusy.current) return
     const sessionId = session.sessionId
     const sequence = ++profileLoadSequence.current
@@ -2042,7 +2053,7 @@ export default function App() {
     setProfilePostsBusy(true)
     setProfilePostsError('')
     try {
-      const response = await apiFetch(`/api/posts?scope=mine&limit=${FEED_PAGE_SIZE}${before ? '&before=' + before : ''}`)
+      const response = await apiFetch(`/api/posts?scope=mine&limit=${FEED_PAGE_SIZE}${before ? '&before=' + before : ''}`, force ? { cache: 'reload' } : {})
       if (!response.ok) throw new Error('Không tải được dòng thời gian. Hãy thử lại.')
       const data = await response.json() as Post[]
       if (sessionRef.current?.sessionId !== sessionId || sequence !== profileLoadSequence.current) return
@@ -2071,6 +2082,8 @@ export default function App() {
 
 
   function logout(revoke = true, clearStorage = true) {
+    responseCache.current.clear()
+    setVisitorUsername(null)
     const current = sessionRef.current
     const currentToken = current?.token
     if (revoke && current?.refreshToken) {
@@ -2213,6 +2226,7 @@ export default function App() {
   }, [session?.sessionId, sessionClient])
 
   useAppRealtime({
+    responseCache,
     session,
     sessionRef,
     apiFetch,
@@ -2243,11 +2257,13 @@ export default function App() {
     setConversations,
   })
 
+
   useEffect(() => {
     if (!session?.token || tab !== 'feed') return
     void refreshPosts()
     void refreshStories()
     const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
       void refreshPosts()
       void refreshStories()
     }, 12000)
@@ -2670,13 +2686,13 @@ export default function App() {
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
       setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
     } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId) void refreshPosts()
       if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được lượt thích.', 'error')
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         ++feedRevision.current
         actionLocks.current.delete(key)
         setLikePreviews((current) => { const next = { ...current }; delete next[post.id]; return next })
-        void refreshPosts()
       }
     }
   }
@@ -2816,6 +2832,7 @@ export default function App() {
       key={post.id}
       post={post}
       name={name}
+      onAuthorOpen={openVisitor}
       ownDisplayName={profileMedia?.displayName || session.user.displayName || name}
       apiFetch={apiFetch}
       syncFeedPost={syncFeedPost}
@@ -2835,7 +2852,7 @@ export default function App() {
       {qrOpen && <Suspense fallback={<div role="status">Đang mở QR...</div>}>
         <ProfileQr username={session.user.username} displayName={session.user.displayName || session.user.username}
           url={connectUrl()} initialMode={qrOpen} onClose={() => setQrOpen(null)}
-          onConnect={(username) => { setQrOpen(null); openConnectSurface(username) }} />
+          onConnect={(username) => { setQrOpen(null); openVisitor(username) }} />
       </Suspense>}
       {mediaUploading && mediaUploadProgress && (
         <div className="media-upload-progress" role="status" aria-live="polite">
@@ -2844,22 +2861,12 @@ export default function App() {
           <button type="button" onClick={() => mediaUploadAbort.current?.abort()}>Hủy tải</button>
         </div>
       )}
-      {friendPreview && (
-        <div className="connect-modal-layer">
-          <button type="button" className="connect-modal-scrim" aria-label="Đóng hồ sơ" onClick={() => setFriendPreview(null)} />
-          <section className="friend-profile-preview" role="dialog" aria-modal="true" aria-label={`Hồ sơ ${friendPreview.displayName || friendPreview.username}`}>
-            <button type="button" className="friend-profile-close" aria-label="Đóng" onClick={() => setFriendPreview(null)}><X size={20} /></button>
-            <UserAvatar username={friendPreview.username} name={friendPreview.displayName || friendPreview.username} className="friend-profile-avatar" online={friendPreview.online} />
-            <h2>{friendPreview.displayName || friendPreview.username}</h2>
-            <p>@{friendPreview.username}</p>
-            <p>{friendPreview.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</p>
-            <div className="friend-profile-actions">
-              <button type="button" onClick={() => { setFriendPreview(null); void openDirectByUsername(friendPreview.username) }}>Nhắn tin</button>
-              <button type="button" onClick={() => setFriendPreview(null)}>Đóng</button>
-            </div>
-          </section>
-        </div>
-      )}
+      {visitorUsername && <VisitorProfile key={session.sessionId+':'+visitorUsername}
+        username={visitorUsername} request={apiFetch} currentUser={name} token={session.token}
+        targetLanguage={translationPreferencesLoaded?targetLanguage:''} relationship={friendRelationship}
+        friendBusy={friendActionBusy} onFriend={actOnFriend} onMessage={async username=>{await openDirectByUsername(username);setVisitorUsername(null)}}
+        onClose={()=>setVisitorUsername(null)} onPostOpen={post=>{setPosts(current=>[post,...current.filter(item=>item.id!==post.id)]);setActivePostId(post.id)}}
+        onUpdated={syncFeedPost} updates={posts} onDeleted={removeFeedPost} feedback={setNotice} />}
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
@@ -3224,7 +3231,9 @@ export default function App() {
                         online={activeConversation.type === 'direct' && activeConversation.online}
                       />
                       <div>
-                        <strong>{activeConversation.name}</strong>
+                        <strong>{activeConversation.type === 'direct' && activeConversation.otherUsername
+                          ? <button type="button" className="visitor-name-link" onClick={() => openVisitor(activeConversation.otherUsername!)} aria-label="Xem trang cá nhân">{activeConversation.name}</button>
+                          : activeConversation.name}</strong>
                         <small>
                           {activeConversation.type === 'group'
                             ? `${activeConversation.memberCount} thành viên`
@@ -3987,11 +3996,11 @@ export default function App() {
                 <div className="personal-timeline-label">
                   <h2>Dòng thời gian</h2>
                   <button type="button" aria-label="Tải lại dòng thời gian" disabled={profilePostsBusy || !!pendingPost}
-                    onClick={() => void loadProfilePosts()}><RefreshCw size={18} /></button>
+                    onClick={() => void loadProfilePosts(false, true)}><RefreshCw size={18} /></button>
                 </div>
                 {profilePostsError && <div className="personal-timeline-error" role="alert">
                   <p>{profilePostsError}</p>
-                  <button type="button" disabled={profilePostsBusy} onClick={() => void loadProfilePosts(profilePosts.length > 0)}>Thử lại</button>
+                  <button type="button" disabled={profilePostsBusy} onClick={() => void loadProfilePosts(profilePosts.length > 0, true)}>Thử lại</button>
                 </div>}
                 {profilePostsBusy && <p role="status">Đang tải dòng thời gian...</p>}
                 <div className="feed zalo-feed">
