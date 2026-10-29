@@ -1,4 +1,11 @@
 import { userLabel } from '../shared/lib/userLabel'
+import { useMessageData } from '../features/chat/useMessageData'
+import { useApiRequest } from './useApiRequest'
+import { useAppRealtime } from './useAppRealtime'
+import { useConversationData } from '../features/chat/useConversationData'
+import { useContactData } from '../features/contacts/useContactData'
+import { useFeedData } from '../features/feed/useFeedData'
+
 import { useGroupManagement } from '../features/chat/useGroupManagement'
 import { API } from '../shared/lib/config'
 import type { ProfileMediaState, ProfileUpdateResponse, UserPrivacy } from '../features/profile/types'
@@ -95,22 +102,8 @@ export default function App() {
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [quickCreateOpen])
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const revokedConversationIds = useRef(new Set<number>())
-  const membershipSnapshot = useRef<Set<number> | null>(null)
-  const membershipSyncSequence = useRef(0)
-  const membershipEventSequence = useRef(0)
-  const [hasMoreConversations, setHasMoreConversations] = useState(false)
-  const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
-  const conversationPagingBusy = useRef(false)
-  const conversationOffset = useRef(0)
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
   const activeConversationIdRef = useRef<number | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [hasMoreMessages, setHasMoreMessages] = useState(false)
-  const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
-  const messagesPagingBusy = useRef(false)
-  const pendingMessageScrollRestore = useRef<{ height: number; top: number } | null>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
   const messageScrollAtBottom = useRef(true)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
@@ -142,11 +135,6 @@ export default function App() {
   const [reactionPreviews, setReactionPreviews] = useState<Record<number, MessageReaction[]>>({})
   const messageChanges = useRef(new Set<number>())
   const actionLocks = useRef(new Set<string>())
-  const feedRevision = useRef(0)
-  const feedLoads = useRef(0)
-  const [pendingActions, setPendingActions] = useState(0)
-  const pendingRequests = useRef(new Set<symbol>())
-  const mutationRequests = useRef(new Map<string, Promise<Response>>())
   const messageReceipts = useRef(new Map<string, Message | null>())
   // Preserve the request ID for an ambiguous send so a retry cannot create another row.
   const pendingSend = useRef<{ sessionId: string; conversationId: number; signature: string; clientId: string; draft: MessageDraft } | null>(null)
@@ -158,8 +146,6 @@ export default function App() {
   const [friendSearching, setFriendSearching] = useState(false)
   const [friendSearchError, setFriendSearchError] = useState(false)
   const [friendSearchRetry, setFriendSearchRetry] = useState(0)
-  const [friends, setFriends] = useState<FriendConnection[]>([])
-  const [friendRequests, setFriendRequests] = useState<FriendConnection[]>([])
   const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null)
   const friendActionRef = useRef(new Set<number>())
   const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(() => new Set())
@@ -169,11 +155,6 @@ export default function App() {
   const [blockedOpen, setBlockedOpen] = useState(false)
   const [blockedBusy, setBlockedBusy] = useState(false)
   const [blockedError, setBlockedError] = useState('')
-  const [contactMetadata, setContactMetadata] = useState<Record<number, { nickname: string; note: string; favorite: boolean }>>({})
-  const friendSyncRequest = useRef(0)
-  const [friendSyncSessionId, setFriendSyncSessionId] = useState('')
-  const [friendSyncError, setFriendSyncError] = useState('')
-  const [friendSyncBusy, setFriendSyncBusy] = useState(false)
   const [directUsername, setDirectUsername] = useState('')
   const [qrOpen, setQrOpen] = useState<'mine' | 'scan' | null>(null)
   const [chatCreateError, setChatCreateError] = useState('')
@@ -185,7 +166,6 @@ export default function App() {
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5)
   const nearbyRequest = useRef(0)
 
-  const [posts, setPosts] = useState<Post[]>([])
   const [profileTimelineOpen, setProfileTimelineOpen] = useState(false)
   const [profileComposerOpen, setProfileComposerOpen] = useState(false)
   const [profileEditorOpen, setProfileEditorOpen] = useState(false)
@@ -210,14 +190,8 @@ export default function App() {
     profileHeadingRef.current?.focus()
     return () => { ++profileLoadSequence.current; profilePagingBusy.current = false }
   }, [profileTimelineOpen, tab, session?.sessionId, session?.user.username])
-  const [savedPosts, setSavedPosts] = useState<Post[]>([])
+
   const [feedFilter, setFeedFilter] = useState<'all' | 'saved'>('all')
-  const [hasMoreSavedPosts, setHasMoreSavedPosts] = useState(false)
-  const [savedPostsBusy, setSavedPostsBusy] = useState(false)
-  const savedPagingBusy = useRef(false)
-  const [hasMorePosts, setHasMorePosts] = useState(false)
-  const [postsLoadingMore, setPostsLoadingMore] = useState(false)
-  const postsPagingBusy = useRef(false)
   const [activePostId, setActivePostId] = useState<number | null>(null)
   useEffect(() => {
     if (!session?.token) return
@@ -239,7 +213,6 @@ export default function App() {
     })
     return () => { cancelled = true }
   }, [session?.token])
-  const [stories, setStories] = useState<Story[]>([])
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null)
   const [storyBusy, setStoryBusy] = useState(false)
   const [commentEditors, setCommentEditors] = useState<Record<number, DiscussionDraft>>({})
@@ -326,6 +299,128 @@ export default function App() {
   const storyFileInputRef = useRef<HTMLInputElement>(null)
   const avatarFileInputRef = useRef<HTMLInputElement>(null)
   const coverFileInputRef = useRef<HTMLInputElement>(null)
+
+  const {
+    apiFetch,
+    pendingActions,
+    setPendingActions,
+    pendingRequests,
+    mutationRequests,
+  } = useApiRequest({ session, sessionRef, sessionClient })
+
+  const {
+    conversations,
+    setConversations,
+    revokedConversationIds,
+    membershipSnapshot,
+    membershipSyncSequence,
+    membershipEventSequence,
+    hasMoreConversations,
+    setHasMoreConversations,
+    conversationLoadingMore,
+    setConversationLoadingMore,
+    conversationPagingBusy,
+    conversationOffset,
+    reconcileConversationMemberships,
+    refreshConversations,
+    loadMoreConversations,
+  } = useConversationData({
+    session,
+    sessionRef,
+    apiFetch,
+    setStatus,
+    setNotice,
+    activeConversationIdRef,
+    setMessageDrafts,
+    purgeConversation,
+  })
+
+  const {
+    friends,
+    setFriends,
+    friendRequests,
+    setFriendRequests,
+    contactMetadata,
+    setContactMetadata,
+    friendSyncRequest,
+    friendSyncSessionId,
+    setFriendSyncSessionId,
+    friendSyncError,
+    setFriendSyncError,
+    friendSyncBusy,
+    setFriendSyncBusy,
+    refreshFriendConnections,
+  } = useContactData({
+    session,
+    sessionRef,
+    apiFetch,
+    setStatus,
+    setNotice,
+  })
+
+  const {
+    feedRevision,
+    feedLoads,
+    posts,
+    setPosts,
+    savedPosts,
+    setSavedPosts,
+    hasMoreSavedPosts,
+    setHasMoreSavedPosts,
+    savedPostsBusy,
+    setSavedPostsBusy,
+    savedPagingBusy,
+    hasMorePosts,
+    setHasMorePosts,
+    postsLoadingMore,
+    setPostsLoadingMore,
+    postsPagingBusy,
+    stories,
+    setStories,
+    refreshPosts,
+    loadMorePosts,
+    loadSavedPosts,
+    syncFeedPost: syncFeedDataPost,
+    removeFeedPost: removeFeedDataPost,
+    refreshStories,
+  } = useFeedData({
+    session,
+    sessionRef,
+    apiFetch,
+    setStatus,
+    setNotice,
+    actionLocks,
+    setActivePostId,
+  })
+
+  const {
+    messages,
+    setMessages,
+    hasMoreMessages,
+    setHasMoreMessages,
+    messagesLoadingMore,
+    setMessagesLoadingMore,
+    messagesPagingBusy,
+    pendingMessageScrollRestore,
+    loadOlderMessages,
+  } = useMessageData({
+    session,
+    sessionRef,
+    apiFetch,
+    setNotice,
+    activeConversationId,
+    activeConversationIdRef,
+    translationPreferencesLoaded,
+    targetLanguage,
+    setTranslations,
+    messageChanges,
+    pendingSend,
+    setMessageDrafts,
+    setConversations,
+    tabRef,
+    messagesScrollRef,
+    purgeConversation,
+  })
 
   const {
     groupSettingsOpen,
@@ -639,45 +734,6 @@ export default function App() {
     localStorage.setItem('chatnet-session', JSON.stringify(next))
     sessionRef.current = next
     setSession(next)
-  }
-
-  async function apiFetch(path: string, init: RequestInit = {}) {
-    const sessionId = session?.sessionId
-    const write = !!init.method && !['GET', 'HEAD'].includes(init.method)
-    const key = JSON.stringify([sessionId, path, init.method, init.body])
-    const existing = write && mutationRequests.current.get(key)
-    if (existing) return (await existing).clone()
-    const operation = performRequest()
-    if (write) mutationRequests.current.set(key, operation)
-    try { return (await operation).clone() }
-    finally { if (mutationRequests.current.get(key) === operation) mutationRequests.current.delete(key) }
-
-    async function performRequest() {
-      const mutation = write && !/\/(read|translate|presign|subscription|bundle)$/.test(path)
-      const request = Symbol(path)
-      if (mutation) {
-        pendingRequests.current.add(request)
-        setPendingActions(pendingRequests.current.size)
-      }
-      try {
-        const response = await sessionClient.request(path, {
-          ...init, signal: init.signal || AbortSignal.timeout(30_000),
-        }, sessionId)
-        // Consume the body before releasing pending state or accepting a stale session.
-        await response.clone().text()
-        if (sessionRef.current?.sessionId !== sessionId) throw new Error('Phiên đăng nhập đã thay đổi.')
-        return response
-      } catch (error) {
-        if (!write) throw error
-        const message = error instanceof Error && error.message === 'Phiên đăng nhập đã thay đổi.'
-          ? error.message
-          : 'Chưa xác nhận được kết quả. Kiểm tra dữ liệu trước khi thử lại.'
-        return Response.json({ error: message }, { status: 503 })
-      } finally {
-        pendingRequests.current.delete(request)
-        if (sessionRef.current?.sessionId === sessionId) setPendingActions(pendingRequests.current.size)
-      }
-    }
   }
 
   async function loadProfileMedia() {
@@ -1581,43 +1637,6 @@ export default function App() {
     }
   }
 
-  async function refreshFriendConnections() {
-    const sessionId = session?.sessionId
-    if (!sessionId) return
-    const request = ++friendSyncRequest.current
-    setFriendSyncBusy(true)
-    try {
-      const [friendsResponse, requestsResponse, metadataResponse] = await Promise.all([
-        apiFetch('/api/friends'),
-        apiFetch('/api/friends/requests'),
-        apiFetch('/api/contacts'),
-      ])
-      if (!friendsResponse.ok || !requestsResponse.ok) throw new Error('Friend sync failed')
-      const [nextFriends, nextRequests] = await Promise.all([
-        friendsResponse.json() as Promise<FriendConnection[]>,
-        requestsResponse.json() as Promise<FriendConnection[]>,
-      ])
-      if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
-      setFriends(nextFriends)
-      setFriendRequests(nextRequests)
-      if (metadataResponse.ok) {
-        const records = await metadataResponse.json() as Array<{ id: number; nickname: string; note: string; favorite: boolean }>
-        if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
-        setContactMetadata(Object.fromEntries(records.map((item) => [item.id, {
-          nickname: item.nickname, note: item.note, favorite: item.favorite,
-        }])))
-      }
-      setFriendSyncSessionId(sessionId)
-      setFriendSyncError('')
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) {
-        setFriendSyncError('Chưa tải được trạng thái kết bạn.')
-      }
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) setFriendSyncBusy(false)
-    }
-  }
-
   const contactQuery = friendQuery.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
   const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
     `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(contactQuery),
@@ -2001,91 +2020,16 @@ export default function App() {
     }
   }
 
-  async function reconcileConversationMemberships() {
-    const sessionId = session?.sessionId
-    if (!sessionId) return
-    const sequence = ++membershipSyncSequence.current
-    const membershipEventAtStart = membershipEventSequence.current
-    const authorized = new Set<number>()
-    let after = 0
-    try {
-      // Fetch only IDs, not full message metadata. Never prune on partial
-      // snapshots: a failed page is not proof of lost group membership.
-      for (let page = 0; page < 200; page += 1) {
-        const response = await apiFetch(`/api/conversations/memberships?limit=500&after=${after}`)
-        if (!response.ok) return
-        const data = (await response.json()) as { ids: number[]; nextAfter: number | null }
-        if (!Array.isArray(data.ids) || data.ids.length > 500 ||
-          data.ids.some((id) => !Number.isSafeInteger(id) || id <= after)) return
-        for (const id of data.ids) authorized.add(id)
-        if (data.nextAfter === null) {
-          if (sessionRef.current?.sessionId !== sessionId ||
-              sequence !== membershipSyncSequence.current ||
-              membershipEventAtStart !== membershipEventSequence.current) return
-          membershipSnapshot.current = authorized
-          for (const id of authorized) revokedConversationIds.current.delete(id)
-          setConversations((current) => current.filter((item) => authorized.has(item.id)))
-          setMessageDrafts((current) => Object.fromEntries(
-            Object.entries(current).filter(([id]) => authorized.has(Number(id))),
-          ))
-          if (activeConversationIdRef.current && !authorized.has(activeConversationIdRef.current)) {
-            purgeConversation(activeConversationIdRef.current)
-          }
-          void refreshConversations()
-          return
-        }
-        if (!Number.isSafeInteger(data.nextAfter) || data.nextAfter <= after ||
-            data.nextAfter !== data.ids[data.ids.length - 1]) return
-        after = data.nextAfter
-      }
-    } catch {
-      // Connectivity failures must never be interpreted as revoked rights.
-    }
+  function syncFeedPost(updated: Post) {
+    ++feedRevision.current
+    setProfilePosts(current => current.map(p => p.id === updated.id ? updated : p))
+    syncFeedDataPost(updated)
   }
 
-  async function refreshConversations() {
-    const sessionId = session?.sessionId
-    try {
-      const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}`)
-      if (!response.ok) return
-      const data = ((await response.json()) as Conversation[])
-        .filter((item) => !revokedConversationIds.current.has(item.id) &&
-          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
-      if (sessionRef.current?.sessionId !== sessionId) return
-      setConversations((current) => {
-        const freshIds = new Set(data.map((item) => item.id))
-        return [...data, ...current.filter((item) => !freshIds.has(item.id))]
-      })
-      conversationOffset.current = Math.max(conversationOffset.current, data.length)
-      if (conversationOffset.current === data.length) setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
-    } catch {
-      setStatus('Đang kết nối lại...')
-    }
-  }
-
-  async function loadMoreConversations() {
-    if (!session || conversationPagingBusy.current || !hasMoreConversations) return
-    const sessionId = session.sessionId
-    conversationPagingBusy.current = true
-    setConversationLoadingMore(true)
-    try {
-      const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}&offset=${conversationOffset.current}`)
-      if (!response.ok) throw new Error('Không tải thêm được hội thoại')
-      const data = (await response.json()) as Conversation[]
-      if (sessionRef.current?.sessionId !== sessionId) return
-      conversationOffset.current += data.length
-      setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
-      setConversations((current) => {
-        const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id) && !revokedConversationIds.current.has(item.id) &&
-          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))]
-      })
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
-    } finally {
-      conversationPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId) setConversationLoadingMore(false)
-    }
+  function removeFeedPost(id: number) {
+    ++feedRevision.current
+    setProfilePosts(current => current.filter(p => p.id !== id))
+    removeFeedDataPost(id)
   }
 
   async function loadProfilePosts(more = false) {
@@ -2123,109 +2067,6 @@ export default function App() {
   function closeProfileTimeline() {
     setProfileTimelineOpen(false)
     requestAnimationFrame(() => profileIdentityRef.current?.focus())
-  }
-
-  async function refreshPosts() {
-    const revision = feedRevision.current
-    const request = ++feedLoads.current
-    const sessionId = session?.sessionId
-    try {
-      const response = await apiFetch(`/api/posts?limit=${FEED_PAGE_SIZE}`)
-      if (!response.ok) return
-      const data = (await response.json()) as Post[]
-      if (sessionRef.current?.sessionId !== sessionId ||
-        revision !== feedRevision.current || request !== feedLoads.current ||
-        [...actionLocks.current].some((key) => key.startsWith('feed:'))) return
-      setPosts((current) => {
-        const ids = new Set(data.map((item) => item.id))
-        return [...data, ...current.filter((item) => !ids.has(item.id))]
-      })
-      if (data.length < FEED_PAGE_SIZE) setHasMorePosts(false)
-      else if (posts.length === 0) setHasMorePosts(true)
-    } catch {
-      setStatus('Đang kết nối lại...')
-    }
-  }
-
-  async function loadMorePosts() {
-    if (!session || postsPagingBusy.current || !hasMorePosts || posts.length === 0) return
-    const sessionId = session.sessionId
-    const before = Math.min(...posts.map((item) => item.id))
-    postsPagingBusy.current = true
-    setPostsLoadingMore(true)
-    try {
-      const response = await apiFetch(`/api/posts?limit=${FEED_PAGE_SIZE}&before=${before}`)
-      if (!response.ok) throw new Error('Không tải thêm được bài viết')
-      const data = (await response.json()) as Post[]
-      if (sessionRef.current?.sessionId !== sessionId) return
-      setHasMorePosts(data.length === FEED_PAGE_SIZE)
-      setPosts((current) => {
-        const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id))]
-      })
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được bài viết. Hãy thử lại.', 'error')
-    } finally {
-      postsPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId) setPostsLoadingMore(false)
-    }
-  }
-
-  async function loadSavedPosts(more = false) {
-    if (!session || savedPagingBusy.current) return
-    const sessionId = session.sessionId
-    savedPagingBusy.current = true
-    setSavedPostsBusy(true)
-    try {
-      const before = more && savedPosts.length ? '&before=' + Math.min(...savedPosts.map(p => p.id)) : ''
-      const response = await apiFetch('/api/posts?scope=saved&limit=' + FEED_PAGE_SIZE + before)
-      if (!response.ok) throw new Error('Không tải được các bài đã lưu.')
-      const data = await response.json() as Post[]
-      if (sessionRef.current?.sessionId !== sessionId) return
-      setSavedPosts(current => {
-        if (!more) return data
-        const ids = new Set(current.map(p => p.id))
-        return [...current, ...data.filter(p => !ids.has(p.id))]
-      })
-      setHasMoreSavedPosts(data.length === FEED_PAGE_SIZE)
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không tải được bài đã lưu.', 'error')
-    } finally {
-      savedPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId) setSavedPostsBusy(false)
-    }
-  }
-
-  function syncFeedPost(updated: Post) {
-    ++feedRevision.current
-    setProfilePosts(current => current.map(p => p.id === updated.id ? updated : p))
-    setPosts(current => current.map(p => p.id === updated.id ? updated : p))
-    setSavedPosts(current => {
-      if (!updated.saved) return current.filter(p => p.id !== updated.id)
-      const exists = current.some(p => p.id === updated.id)
-      return exists ? current.map(p => p.id === updated.id ? updated : p) : [updated, ...current]
-    })
-  }
-
-  function removeFeedPost(id: number) {
-    ++feedRevision.current
-    setProfilePosts(current => current.filter(p => p.id !== id))
-    setPosts(current => current.filter(p => p.id !== id))
-    setSavedPosts(current => current.filter(p => p.id !== id))
-    setActivePostId(current => current === id ? null : current)
-  }
-
-  async function refreshStories() {
-    try {
-      const response = await apiFetch('/api/stories')
-      if (!response.ok) return
-      const data = (await response.json()) as Story[]
-      if (sessionRef.current?.sessionId === session?.sessionId) {
-        setStories(data.filter((item) => Date.parse(item.expiresAt) > Date.now()))
-      }
-    } catch {
-      setStatus('Đang kết nối lại...')
-    }
   }
 
 
@@ -2371,192 +2212,36 @@ export default function App() {
     }
   }, [session?.sessionId, sessionClient])
 
-  useEffect(() => {
-    if (!session?.token) return
-
-    void refreshConversations()
-    void refreshPosts()
-    void refreshStories()
-
-    const events = new EventSource(
-      `${API}/api/events?token=${encodeURIComponent(session.token)}`,
-    )
-    events.onopen = () => {
-      setStatus('Đang online')
-      void refreshFriendConnections()
-      void reconcileConversationMemberships()
-    }
-    events.onerror = () => setStatus('Đang kết nối lại...')
-    events.addEventListener('update', (event) => {
-      if (sessionRef.current?.sessionId !== session.sessionId) return
-      const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
-      if (update.type === 'friend.updated') {
-        void refreshFriendConnections()
-        return
-      }
-
-      if (update.type === 'conversation.removed') {
-        purgeConversation(update.conversationId)
-        return
-      }
-
-      if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
-        revokedConversationIds.current.delete(update.conversationId)
-        membershipSnapshot.current?.add(update.conversationId)
-        membershipEventSequence.current += 1
-        void refreshConversations()
-        if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
-          void refreshGroupMembers(update.conversationId)
-        }
-        return
-      }
-
-      if (
-        update.type === 'conversation.read' &&
-        update.readerId &&
-        update.lastReadMessageId &&
-        update.readerId !== session.user.id
-      ) {
-        if (activeConversationIdRef.current === update.conversationId) {
-          setMessages((current) =>
-            current.map((message) => {
-              if (
-                message.senderId !== session.user.id ||
-                message.id > (update.lastReadMessageId || 0)
-              ) return message
-              const readers = message.readByUserIds || []
-              if (readers.includes(update.readerId as number)) return message
-              messageChanges.current.add(message.id)
-              return { ...message, readByUserIds: [...readers, update.readerId as number] }
-            }),
-          )
-        }
-        return
-      }
-
-      if (update.type === 'message.updated' && update.message) {
-        const changed = update.message
-        messageChanges.current.add(changed.id)
-        if (activeConversationIdRef.current === update.conversationId) {
-          setMessages((current) => {
-            const item = current.find((message) => message.id === changed.id)
-            const mineByEmoji = new Map(
-              (item?.reactions || []).map((reaction) => [reaction.emoji, reaction.mine]),
-            )
-            return mergeById(current, {
-              ...changed,
-              readByUserIds: [...new Set([...(item?.readByUserIds || []), ...(changed.readByUserIds || [])])],
-              reactions: (changed.reactions || []).map((reaction) => ({
-                ...reaction,
-                mine: mineByEmoji.get(reaction.emoji) ?? false,
-              })),
-            }).sort((a, b) => a.id - b.id)
-          })
-          setTranslations((current) => {
-            const next = { ...current }
-            delete next[changed.id]
-            return next
-          })
-        }
-        void refreshConversations()
-        return
-      }
-
-      if (update.type === 'message' && update.message) {
-        const incoming = update.message
-        // Only genuine, recent messages from other users make a sound. Loading
-        // history, updating reactions and our own sends never trigger one.
-        messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
-        messageChanges.current.add(incoming.id)
-        if (incoming.senderId === session.user.id && incoming.clientId) {
-          const recovered = loadPendingSend(session.user.id, session.sessionId)
-          if (recovered?.clientId === incoming.clientId && recovered.conversationId === incoming.conversationId) {
-            clearPendingSend(session.user.id, incoming.clientId)
-            setMessageDrafts((current) => {
-              const existing = current[incoming.conversationId]
-              if (!existing || existing.text.trim() !== incoming.text || existing.attachments.length > 0) return current
-              const next = { ...current }
-              delete next[incoming.conversationId]
-              return next
-            })
-          }
-          if (pendingSend.current?.clientId === incoming.clientId) {
-            const confirmed = pendingSend.current
-            pendingSend.current = null
-            // A late SSE receipt also resolves an ambiguous HTTP send. Keep any newer draft.
-            setMessageDrafts((current) => {
-              if (current[confirmed.conversationId] !== confirmed.draft) return current
-              const next = { ...current }
-              delete next[confirmed.conversationId]
-              return next
-            })
-          }
-          if (messageReceipts.current.has(incoming.clientId)) messageReceipts.current.set(incoming.clientId, incoming)
-          setOutgoingMessage((current) => current?.clientId === incoming.clientId ? null : current)
-        }
-        const currentId = activeConversationIdRef.current
-
-        setConversations((current) => {
-          const existing = current.find((item) => item.id === update.conversationId)
-          if (!existing) return current
-          const next = current.map((item) =>
-            item.id === update.conversationId
-              ? {
-                  ...item,
-                  lastMessage: incoming.text || attachmentLabel(incoming.attachments),
-                  lastMessageAt: incoming.createdAt,
-                  unreadCount:
-                    incoming.senderId !== session.user.id &&
-                      !canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState)
-                      ? item.unreadCount + 1
-                      : item.unreadCount,
-                }
-              : item,
-          )
-          return next.sort((a, b) =>
-            (b.lastMessageAt || b.createdAt).localeCompare(a.lastMessageAt || a.createdAt),
-          )
-        })
-
-        void refreshConversations()
-
-        if (currentId === update.conversationId) {
-          setMessages((current) =>
-            current.some((item) => item.id === incoming.id)
-              ? current
-              : [...current, incoming],
-          )
-          if (incoming.senderId !== session.user.id &&
-              canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState)) {
-            void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
-              .catch(() => setStatus('Đang kết nối lại...'))
-          }
-        }
-      }
-    })
-
-    const refreshTimer = window.setInterval(() => {
-      void refreshConversations()
-      void refreshFriendConnections()
-    }, 20000)
-    const membershipTimer = window.setInterval(() => {
-      void reconcileConversationMemberships()
-    }, 90000)
-    const checkMembership = () => { void reconcileConversationMemberships() }
-    const checkVisibleMembership = () => {
-      if (document.visibilityState === 'visible') checkMembership()
-    }
-    window.addEventListener('online', checkMembership)
-    document.addEventListener('visibilitychange', checkVisibleMembership)
-    return () => {
-      events.close()
-      window.clearInterval(refreshTimer)
-      window.clearInterval(membershipTimer)
-      window.removeEventListener('online', checkMembership)
-      document.removeEventListener('visibilitychange', checkVisibleMembership)
-      membershipSyncSequence.current += 1
-    }
-  }, [session?.token, groupSettingsOpen])
+  useAppRealtime({
+    session,
+    sessionRef,
+    apiFetch,
+    setStatus,
+    refreshConversations,
+    refreshPosts,
+    refreshStories,
+    refreshFriendConnections,
+    reconcileConversationMemberships,
+    purgeConversation,
+    revokedConversationIds,
+    membershipSnapshot,
+    membershipEventSequence,
+    membershipSyncSequence,
+    groupSettingsOpen,
+    activeConversationIdRef,
+    refreshGroupMembers,
+    setMessages,
+    messageChanges,
+    setTranslations,
+    messageSound,
+    messageSoundEnabledRef,
+    tabRef,
+    pendingSend,
+    setMessageDrafts,
+    messageReceipts,
+    setOutgoingMessage,
+    setConversations,
+  })
 
   useEffect(() => {
     if (!session?.token || tab !== 'feed') return
@@ -2568,152 +2253,6 @@ export default function App() {
     }, 12000)
     return () => window.clearInterval(timer)
   }, [tab, session?.token])
-
-  useEffect(() => {
-    if (!session?.token || !activeConversationId || !translationPreferencesLoaded) {
-      if (!activeConversationId) setMessages([])
-      return
-    }
-
-    let cancelled = false
-    const changes = new Set<number>()
-    messageChanges.current = changes
-    setTranslations({})
-    apiFetch(
-      `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}`,
-    )
-      .then(async (response) => {
-        if (response.status === 403) {
-          if (!cancelled) purgeConversation(activeConversationId)
-          return
-        }
-        if (!response.ok) throw new Error('Không tải được tin nhắn')
-        const data = (await response.json()) as Message[]
-        if (cancelled) return
-
-        // Reconcile a POST whose ACK vanished before refresh. A persisted
-        // clientId in history is proof of delivery; no second POST is needed.
-        const recovered = loadPendingSend(session.user.id, session.sessionId)
-        const confirmed = recovered && data.find((item) => item.clientId === recovered.clientId && item.conversationId === recovered.conversationId)
-        if (confirmed && recovered) {
-          clearPendingSend(session.user.id, recovered.clientId)
-          if (pendingSend.current?.clientId === recovered.clientId) pendingSend.current = null
-          setMessageDrafts((current) => {
-            const existing = current[confirmed.conversationId]
-            if (!existing || existing.text.trim() !== confirmed.text || existing.attachments.length > 0) return current
-            const next = { ...current }
-            delete next[confirmed.conversationId]
-            return next
-          })
-        }
-
-        setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
-        setMessages((current) => {
-          const live = current.filter((item) => item.conversationId === activeConversationId && changes.has(item.id))
-          const liveIds = new Set(live.map((item) => item.id))
-          return [...data.filter((item) => !liveIds.has(item.id)), ...live].sort((a, b) => a.id - b.id)
-        })
-        const restored: Record<number, string> = {}
-        for (const message of data) {
-          if (
-            message.translatedText &&
-            !changes.has(message.id) &&
-            message.translationLanguage === targetLanguage
-          ) {
-            restored[message.id] = message.translatedText
-          }
-        }
-        setTranslations(restored)
-        if (!canMarkConversationRead(activeConversationIdRef.current, activeConversationId, tabRef.current, document.visibilityState)) return
-        const read = await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
-        if (!read.ok) return
-        if (!cancelled) {
-          setConversations((current) =>
-            current.map((item) =>
-              item.id === activeConversationId ? { ...item, unreadCount: 0 } : item,
-            ),
-          )
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setNotice('Không tải được tin nhắn. Kiểm tra kết nối rồi mở lại cuộc trò chuyện.')
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [
-    activeConversationId,
-    session?.token,
-    targetLanguage,
-    translationPreferencesLoaded,
-  ])
-
-  useEffect(() => {
-    if (!session?.token || !activeConversationId) return
-    const id = activeConversationId
-    const sessionId = session.sessionId
-    const markWhenVisible = () => {
-      if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState)) return
-      void apiFetch(`/api/conversations/${id}/read`, { method: 'POST' })
-        .then((response) => {
-          if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId) return
-          setConversations((current) =>
-            current.map((item) => item.id === id ? { ...item, unreadCount: 0 } : item),
-          )
-        })
-        .catch(() => undefined)
-    }
-    window.addEventListener('focus', markWhenVisible)
-    document.addEventListener('visibilitychange', markWhenVisible)
-    return () => {
-      window.removeEventListener('focus', markWhenVisible)
-      document.removeEventListener('visibilitychange', markWhenVisible)
-    }
-  }, [session?.sessionId, activeConversationId])
-
-  async function loadOlderMessages() {
-    if (!session || !activeConversationId || messagesPagingBusy.current ||
-        !hasMoreMessages || messages.length === 0) return
-    const conversationId = activeConversationId
-    const sessionId = session.sessionId
-    const before = Math.min(...messages.map((message) => message.id))
-    messagesPagingBusy.current = true
-    setMessagesLoadingMore(true)
-    try {
-      const response = await apiFetch(
-        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}&before=${before}`,
-      )
-      if (!response.ok) throw new Error('Không tải thêm được lịch sử tin nhắn')
-      const data = (await response.json()) as Message[]
-      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId) return
-      setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
-      if (data.length > 0) {
-        const container = messagesScrollRef.current
-        if (container) pendingMessageScrollRestore.current = { height: container.scrollHeight, top: container.scrollTop }
-        setMessages((current) => {
-          const ids = new Set(current.map((message) => message.id))
-          return [...data.filter((message) => !ids.has(message.id)), ...current].sort((a, b) => a.id - b.id)
-        })
-        setTranslations((current) => {
-          const restored = { ...current }
-          for (const message of data) {
-            if (message.translatedText && message.translationLanguage === targetLanguage) {
-              restored[message.id] = message.translatedText
-            }
-          }
-          return restored
-        })
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
-        setNotice('Không tải được tin nhắn cũ. Hãy thử lại.', 'error')
-    } finally {
-      messagesPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
-        setMessagesLoadingMore(false)
-    }
-  }
 
   useLayoutEffect(() => {
     const restore = pendingMessageScrollRestore.current
