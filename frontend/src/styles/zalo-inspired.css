@@ -3725,10 +3725,17 @@ select:focus-visible {
   -webkit-touch-callout: none;
 }
 
-.message-press-target .bubble,
 .message-press-target .message-reply-quote {
   -webkit-user-select: none;
   user-select: none;
+}
+
+.message-selectable-text {
+  display: block;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+  cursor: text;
 }
 
 .message-reactions {
