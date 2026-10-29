@@ -10,17 +10,17 @@ export function CategoryBadge({ category }: { category?: ConversationCategory })
  return category ? <small className={'conversation-category-badge category-' + category.color}><Tag size={11} aria-hidden="true" />{category.name}</small> : null
 }
 export function CategoryAssignment({ model, conversationId, categoryId }: { model: Model; conversationId: number; categoryId?: number }) {
- return <div className="conversation-category-assignment">
-  <Tag size={15} aria-hidden="true" />
-  <label>Phân loại
-   <select aria-label="Phân loại hội thoại" value={categoryId || ''} disabled={model.busy}
-    onChange={e => void model.assign(conversationId, Number(e.target.value) || null)}>
-    <option value="">Chưa phân loại</option>
-    {model.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-   </select>
-  </label>
-  {model.error && <span role="alert">{model.error}</span>}
- </div>
+ const category = model.categories.find(c => c.id === categoryId)
+ const label = category ? 'Phân loại: '+category.name : 'Phân loại hội thoại'
+ return <span className={'conversation-category-assignment'+(category ? ' category-'+category.color : '')}>
+  <Tag size={17} aria-hidden="true" fill={category ? 'currentColor' : 'none'} />
+  <select aria-label="Phân loại hội thoại" title={label} value={categoryId || ''} disabled={model.busy}
+   onChange={e => void model.assign(conversationId, Number(e.target.value) || null)}>
+   <option value="">Chưa phân loại</option>
+   {model.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+  </select>
+  {model.error && <span className="category-assignment-error" role="alert">{model.error}</span>}
+ </span>
 }
 export default function ConversationCategories({ model }: { model: Model }) {
  const [edit, setEdit] = useState<number | undefined>()

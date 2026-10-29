@@ -3261,10 +3261,11 @@ export default function App() {
                         <strong>{activeConversation.type === 'direct' && activeConversation.otherUsername
                           ? <button type="button" className="visitor-name-link" onClick={() => openVisitor(activeConversation.otherUsername!)} aria-label="Xem trang cá nhân">{activeConversation.name}</button>
                           : activeConversation.name}</strong>
-                        <small>
+                        <small className="room-subtitle">
                           {activeConversation.type === 'group'
                             ? `${activeConversation.memberCount} thành viên`
                             : activeConversation.online ? '● Đang online' : 'Chat riêng'}
+                          <CategoryAssignment model={conversationCategories} conversationId={activeConversation.id} categoryId={activeConversation.categoryId} />
                         </small>
                       </div>
                     </div>
@@ -3403,7 +3404,6 @@ export default function App() {
                       </div>
                     </div>
                   </header>
-                  <CategoryAssignment model={conversationCategories} conversationId={activeConversation.id} categoryId={activeConversation.categoryId} />
 
 
                   {groupActionsOpen && activeConversation.type === 'group' && !groupSettingsOpen && (
