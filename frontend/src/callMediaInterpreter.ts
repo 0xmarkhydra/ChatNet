@@ -44,7 +44,7 @@ export async function startCallMediaInterpreter(options: InterpreterOptions): Pr
   if (!response.ok) {
     const reason = response.status === 503 ? 'Máy chủ phiên dịch chưa sẵn sàng.'
       : response.status === 429 ? 'Quá nhiều phiên dịch đang hoạt động.'
-      : response.status === 403 ? 'Bạn hoặc người nói đã rời cuộc gọi.'
+      : response.status === 403 ? 'Người nói chưa cho phép dịch giọng nói hoặc đã rời cuộc gọi.'
       : 'Không thể bắt đầu dịch trực tiếp (' + response.status + ').'
     throw new Error(reason)
   }
@@ -56,7 +56,6 @@ export async function startCallMediaInterpreter(options: InterpreterOptions): Pr
   endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:'
   endpoint.pathname = '/api/calls/' + encodeURIComponent(options.callId) + '/translation-stream'
   endpoint.search = ''
-  endpoint.searchParams.set('ticket', ticket)
   const socket = new WebSocket(endpoint.toString())
   let disposed = false
   let ready = false
@@ -91,6 +90,7 @@ export async function startCallMediaInterpreter(options: InterpreterOptions): Pr
         else if (!disposed) { options.onError(message); stop() }
       }
       timeoutID = window.setTimeout(() => fail('Hết thời gian kết nối phiên dịch.'), 20000)
+      socket.onopen = () => socket.send(JSON.stringify({ ticket }))
       socket.onerror = () => fail('Không thể kết nối tới máy chủ phiên dịch.')
       socket.onclose = () => { if (!disposed) fail('Phiên dịch bị ngắt kết nối.') }
       socket.onmessage = async (event) => {

@@ -1,0 +1,89 @@
+name: Web/PWA quality gates
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feat/chatnet-*'
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-pwa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Typecheck, build and browser-logic tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm run check:pwa
+      - run: npm run check:incoming-sound
+      - run: npm run check:onesignal
+      - run: npm run check:session
+      - run: npm run check:optimistic
+      - run: npm run check:chat
+      - run: npm run check:outbox
+      - run: npm run check:offline-browser
+      - run: npm run check:call-translation
+      - run: npm run check:call-live
+
+  backend:
+    name: Go API unit and integration packages
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: chatnet
+          POSTGRES_USER: chatnet
+          POSTGRES_PASSWORD: chatnet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chatnet -d chatnet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go test ./...
+      - name: Verify message idempotency with PostgreSQL and Redis
+        run: go test ./cmd/chat -run '^TestMessageIdempotencyIntegration$' -count=1 -v
+        env:
+          CHATNET_TEST_DATABASE_URL: postgres://chatnet:chatnet@127.0.0.1:5432/chatnet?sslmode=disable
+          CHATNET_TEST_REDIS_ADDR: 127.0.0.1:6379

@@ -2076,6 +2076,65 @@
   color: #2859d8;
 }
 
+.voice-record-trigger {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  color: #5556b5;
+  touch-action: manipulation;
+}
+
+.voice-recorder.busy {
+  font-size: 12px;
+  color: #5a58a9;
+}
+
+.voice-recorder.recording {
+  position: fixed;
+  z-index: 1250;
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  left: max(12px, calc((100vw - 460px) / 2));
+  width: min(436px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #d9dafe;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 34px rgb(31 29 87 / 17%);
+}
+
+.voice-recording-time {
+  flex: 1;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+  color: #d13b62;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.voice-recorder.recording button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  border: 1px solid #dedff4;
+  border-radius: 10px;
+  padding: 8px 11px;
+  background: #f8f9fd;
+  color: #415077;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.voice-recorder.recording button.voice-save {
+  border-color: #5754c9;
+  background: linear-gradient(135deg, #2563eb, #8b5cf6);
+  color: #fff;
+}
+
 .feed-pending-media {
   margin: 8px 0 3px 50px;
 }
@@ -2089,6 +2148,50 @@
   padding: 7px 4px 0 50px;
   color: #6d7781;
   font-size: 11px;
+}
+
+.media-upload-progress {
+  position: fixed;
+  z-index: 1200;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  width: min(410px, calc(100vw - 24px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid #dbe3ff;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 30px rgb(15 23 42 / 18%);
+  color: #243450;
+  font-size: 13px;
+}
+
+.media-upload-progress progress {
+  grid-column: 1 / 2;
+  width: 100%;
+  height: 8px;
+  accent-color: #6356e9;
+}
+
+.media-upload-progress button {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  border: 1px solid #dbe3ff;
+  border-radius: 10px;
+  background: #f4f2ff;
+  color: #4137a9;
+  padding: 9px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.media-upload-progress button:focus-visible {
+  outline: 3px solid #8b5cf6;
+  outline-offset: 2px;
 }
 
 .zalo-post .media-attachments {

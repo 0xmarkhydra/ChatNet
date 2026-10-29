@@ -171,30 +171,59 @@ func classify(scope, fileName, contentType string) (string, int64, error) {
 
 	ext := strings.ToLower(path.Ext(strings.TrimSpace(fileName)))
 	mime := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
-	imageExt := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true, ".gif": true, ".heic": true, ".heif": true}
-	videoExt := map[string]bool{".mp4": true, ".mov": true, ".m4v": true, ".webm": true}
-	audioExt := map[string]bool{".mp3": true, ".m4a": true, ".aac": true, ".wav": true, ".ogg": true}
-	fileExt := map[string]bool{
-		".pdf": true, ".doc": true, ".docx": true, ".xls": true, ".xlsx": true,
-		".ppt": true, ".pptx": true, ".txt": true, ".csv": true, ".zip": true,
+	// Browser-provided MIME and extensions must agree. Generic prefixes such
+	// as image/* accepted image/svg+xml disguised as a JPEG, and arbitrary
+	// document MIME types could serve executable content through S3 links.
+	allowed := func(accepted []string) bool {
+		if mime == "" || mime == "application/octet-stream" {
+			return true // Some browsers/clients do not determine MIME locally.
+		}
+		for _, value := range accepted {
+			if mime == value {
+				return true
+			}
+		}
+		return false
+	}
+	imageExt := map[string][]string{
+		".jpg": {"image/jpeg"}, ".jpeg": {"image/jpeg"}, ".png": {"image/png"},
+		".webp": {"image/webp"}, ".gif": {"image/gif"},
+		".heic": {"image/heic"}, ".heif": {"image/heif"},
+	}
+	videoExt := map[string][]string{
+		".mp4": {"video/mp4"}, ".mov": {"video/quicktime"},
+		".m4v": {"video/x-m4v", "video/mp4"}, ".webm": {"video/webm"},
+	}
+	audioExt := map[string][]string{
+		".mp3": {"audio/mpeg", "audio/mp3"}, ".m4a": {"audio/mp4", "audio/x-m4a"},
+		".aac": {"audio/aac", "audio/x-aac"},
+		".wav": {"audio/wav", "audio/x-wav", "audio/wave"}, ".ogg": {"audio/ogg"},
+		".webm": {"audio/webm"},
+	}
+	fileExt := map[string][]string{
+		".pdf": {"application/pdf"}, ".doc": {"application/msword"},
+		".docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+		".xls":  {"application/vnd.ms-excel"},
+		".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+		".ppt":  {"application/vnd.ms-powerpoint"},
+		".pptx": {"application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+		".txt":  {"text/plain"}, ".csv": {"text/csv", "application/csv", "application/vnd.ms-excel"},
+		".zip": {"application/zip", "application/x-zip-compressed"},
 	}
 
-	if imageExt[ext] && (strings.HasPrefix(mime, "image/") || mime == "" || mime == "application/octet-stream") {
+	if types, ok := imageExt[ext]; ok && allowed(types) {
 		if scope == "profile" {
 			return "image", 12 * 1024 * 1024, nil
 		}
 		return "image", MaxImageBytes, nil
 	}
-	if scope != "profile" && videoExt[ext] && (strings.HasPrefix(mime, "video/") || mime == "" || mime == "application/octet-stream") {
+	if types, ok := videoExt[ext]; ok && scope != "profile" && allowed(types) {
 		return "video", MaxVideoBytes, nil
 	}
-	if scope == "chat" && audioExt[ext] && (strings.HasPrefix(mime, "audio/") || mime == "" || mime == "application/octet-stream") {
+	if types, ok := audioExt[ext]; ok && scope == "chat" && allowed(types) {
 		return "audio", MaxAudioBytes, nil
 	}
-	if scope == "chat" && fileExt[ext] {
-		if mime == "text/html" || mime == "image/svg+xml" {
-			return "", 0, errors.New("loại file không được phép")
-		}
+	if types, ok := fileExt[ext]; ok && scope == "chat" && allowed(types) {
 		return "file", MaxFileBytes, nil
 	}
 	if scope == "profile" {

@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,14 +21,21 @@ import (
 	"chatnet/internal/config"
 	"chatnet/internal/httpx"
 	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
 	geminiTranslationModel  = "gemini-3.5-live-translate-preview"
 	geminiLiveURL           = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
 	translationTicketTTL    = 40 * time.Second
+	translationConsentTTL   = 2 * time.Hour
 	translationSessionLimit = 5
 	translationMaxPCM       = 8192 // 250 ms max @ 16 kHz mono PCM16
+)
+
+var (
+	errGeminiQuota  = errors.New("Gemini quota exceeded")
+	errGeminiAccess = errors.New("Gemini access denied")
 )
 
 var supportedGeminiLiveLanguages = map[string]string{
@@ -52,6 +60,105 @@ type translationTicket struct {
 func translationTicketKey(ticket string) string {
 	hash := sha256.Sum256([]byte(ticket))
 	return "chatnet:call:translation:ticket:" + hex.EncodeToString(hash[:])
+}
+
+func translationConsentKey(callID string, speakerID int64) string {
+	return fmt.Sprintf("chatnet:call:translation:consent:%s:%d", callID, speakerID)
+}
+
+func (s *server) revokeCallTranslationConsent(ctx context.Context, callID string, userID int64) {
+	if err := s.redis.Del(ctx, translationConsentKey(callID, userID)).Err(); err != nil {
+		log.Printf("call consent revoke failed call=%s: %T", callID, err)
+	}
+}
+
+func (s *server) cleanupCallTranslationConsents(ctx context.Context, callID string, userIDs []int64) {
+	if len(userIDs) == 0 {
+		return
+	}
+	keys := make([]string, 0, len(userIDs))
+	for _, id := range userIDs {
+		keys = append(keys, translationConsentKey(callID, id))
+	}
+	if err := s.redis.Del(ctx, keys...).Err(); err != nil {
+		log.Printf("call consent cleanup failed call=%s: %T", callID, err)
+	}
+}
+
+func (s *server) callTranslationConsentAllowed(ctx context.Context, callID string, speakerID int64) (bool, error) {
+	value, err := s.redis.Get(ctx, translationConsentKey(callID, speakerID)).Result()
+	if errors.Is(err, redis.Nil) {
+		return false, nil
+	}
+	return value == "granted" && err == nil, err
+}
+
+// Consent may only be granted or withdrawn by the authenticated speaker.
+func (s *server) setCallTranslationConsent(w http.ResponseWriter, r *http.Request) {
+	claims, ok := authx.ClaimsFromContext(r.Context())
+	if !ok {
+		httpx.Error(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	callID := strings.TrimSpace(r.PathValue("id"))
+	if err := s.verifyLiveCallParticipant(r, callID, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusForbidden, "not a joined call participant")
+		return
+	}
+	var body struct {
+		Allowed *bool `json:"allowed"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || body.Allowed == nil || decoder.Decode(&struct{}{}) != io.EOF {
+		httpx.Error(w, http.StatusBadRequest, "invalid consent decision")
+		return
+	}
+	// Never rate-limit withdrawal of permission. Throttle new grants only.
+	if *body.Allowed && !s.allow(w, r, "call-translation-consent-grant", claims.UserID, 20, time.Minute) {
+		return
+	}
+	key := translationConsentKey(callID, claims.UserID)
+	var err error
+	if *body.Allowed {
+		err = s.redis.Set(r.Context(), key, "granted", translationConsentTTL).Err()
+	} else {
+		err = s.redis.Del(r.Context(), key).Err()
+	}
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "consent service unavailable")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, http.StatusOK, map[string]bool{"allowed": *body.Allowed})
+}
+
+func (s *server) getCallTranslationConsent(w http.ResponseWriter, r *http.Request) {
+	claims, ok := authx.ClaimsFromContext(r.Context())
+	if !ok {
+		httpx.Error(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	callID := strings.TrimSpace(r.PathValue("id"))
+	if err := s.verifyLiveCallParticipant(r, callID, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusForbidden, "not a joined call participant")
+		return
+	}
+	allowed, err := s.callTranslationConsentAllowed(r.Context(), callID, claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "consent service unavailable")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, http.StatusOK, map[string]bool{"allowed": allowed})
+}
+
+func parseRemoteSpeakerID(identity string) (int64, bool) {
+	if !strings.HasPrefix(identity, "u_") {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(identity, "u_"), 10, 64)
+	return id, err == nil && id > 0
 }
 
 func (s *server) callTranslationLanguages(w http.ResponseWriter, r *http.Request) {
@@ -116,13 +223,22 @@ func (s *server) createCallTranslationSession(w http.ResponseWriter, r *http.Req
 		httpx.Error(w, 400, "unsupported language")
 		return
 	}
-	var speakerID int64
-	if _, err := fmt.Sscanf(body.SpeakerID, "u_%d", &speakerID); err != nil || speakerID <= 0 || speakerID == claims.UserID {
+	speakerID, validSpeaker := parseRemoteSpeakerID(body.SpeakerID)
+	if !validSpeaker || speakerID == claims.UserID {
 		httpx.Error(w, 400, "invalid remote speaker")
 		return
 	}
 	if err := s.verifyLiveCallParticipant(r, callID, speakerID); err != nil {
 		httpx.Error(w, 403, "speaker is not a joined call member")
+		return
+	}
+	consented, err := s.callTranslationConsentAllowed(r.Context(), callID, speakerID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "consent service unavailable")
+		return
+	}
+	if !consented {
+		httpx.Error(w, http.StatusForbidden, "speaker has not consented to AI translation")
 		return
 	}
 	ticket, err := secureID("cnlt_", 24)
@@ -165,60 +281,80 @@ var translationUpgrader = websocket.Upgrader{
 }
 
 func (s *server) streamCallTranslation(w http.ResponseWriter, r *http.Request) {
-	rawTicket := strings.TrimSpace(r.URL.Query().Get("ticket"))
-	if len(rawTicket) < 20 || len(rawTicket) > 120 {
-		http.Error(w, "invalid ticket", 401)
-		return
-	}
-	stored, err := s.redis.GetDel(r.Context(), translationTicketKey(rawTicket)).Bytes()
-	if err != nil {
-		http.Error(w, "expired or used ticket", 401)
-		return
-	}
-	var ticket translationTicket
-	if json.Unmarshal(stored, &ticket) != nil || ticket.CallID != r.PathValue("id") || ticket.UserID <= 0 ||
-		ticket.SpeakerID <= 0 || supportedGeminiLiveLanguages[strings.ToLower(ticket.Target)] != ticket.Target {
-		http.Error(w, "invalid ticket scope", 401)
-		return
-	}
-	if err := s.verifyLiveCallParticipant(r, ticket.CallID, ticket.UserID); err != nil {
-		http.Error(w, "not an active call member", 403)
-		return
-	}
-	if err := s.verifyLiveCallParticipant(r, ticket.CallID, ticket.SpeakerID); err != nil {
-		http.Error(w, "speaker unavailable", 403)
-		return
-	}
 	if !translationAllowedOrigin(r) {
-		http.Error(w, "invalid origin", 403)
+		http.Error(w, "invalid origin", http.StatusForbidden)
 		return
 	}
-
-	quotaKey := fmt.Sprintf("chatnet:call:translation:active:%s:%d", ticket.CallID, ticket.UserID)
-	active, err := s.redis.Incr(r.Context(), quotaKey).Result()
-	if err != nil {
-		http.Error(w, "translation capacity unavailable", 503)
+	// Never put the bearer ticket in a URL: reverse proxies and request logs may retain it.
+	if r.URL.RawQuery != "" {
+		http.Error(w, "credentials must not be sent in query parameters", http.StatusBadRequest)
 		return
 	}
-	s.redis.Expire(r.Context(), quotaKey, 45*time.Minute)
-	defer s.redis.Decr(context.Background(), quotaKey)
-	if active > translationSessionLimit {
-		http.Error(w, "too many translation streams", 429)
-		return
-	}
-
 	client, err := translationUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 	defer client.Close()
 
+	client.SetReadLimit(2048)
+	_ = client.SetReadDeadline(time.Now().Add(8 * time.Second))
+	var handshake struct {
+		Ticket string `json:"ticket"`
+	}
+	if err := client.ReadJSON(&handshake); err != nil {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Không nhận được vé phiên dịch."})
+		return
+	}
+	_ = client.SetReadDeadline(time.Time{})
+	rawTicket := strings.TrimSpace(handshake.Ticket)
+	if len(rawTicket) < 20 || len(rawTicket) > 120 {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Vé phiên dịch không hợp lệ."})
+		return
+	}
+	stored, err := s.redis.GetDel(r.Context(), translationTicketKey(rawTicket)).Bytes()
+	if err != nil {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Vé phiên dịch đã hết hạn hoặc đã sử dụng."})
+		return
+	}
+	var ticket translationTicket
+	if json.Unmarshal(stored, &ticket) != nil || ticket.CallID != r.PathValue("id") || ticket.UserID <= 0 ||
+		ticket.SpeakerID <= 0 || supportedGeminiLiveLanguages[strings.ToLower(ticket.Target)] != ticket.Target {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Phiên dịch không hợp lệ."})
+		return
+	}
+	if err := s.verifyLiveCallParticipant(r, ticket.CallID, ticket.UserID); err != nil {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Bạn không còn quyền tham gia cuộc gọi."})
+		return
+	}
+	if err := s.verifyLiveCallParticipant(r, ticket.CallID, ticket.SpeakerID); err != nil {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Người nói không còn trong cuộc gọi."})
+		return
+	}
+	consented, consentErr := s.callTranslationConsentAllowed(r.Context(), ticket.CallID, ticket.SpeakerID)
+	if consentErr != nil || !consented {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Người nói chưa đồng ý hoặc đã thu hồi quyền dịch."})
+		return
+	}
+
+	quotaKey := fmt.Sprintf("chatnet:call:translation:active:%s:%d", ticket.CallID, ticket.UserID)
+	active, err := s.redis.Incr(r.Context(), quotaKey).Result()
+	if err != nil {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Máy chủ phiên dịch đang quá tải."})
+		return
+	}
+	_ = s.redis.Expire(r.Context(), quotaKey, 45*time.Minute).Err()
+	defer s.redis.Decr(context.Background(), quotaKey)
+	if active > translationSessionLimit {
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Quá nhiều phiên dịch đang hoạt động."})
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
 	defer cancel()
 	google, err := connectGeminiLive(ctx, ticket.Target)
 	if err != nil {
 		log.Printf("live translation connect failed: %s", safeTranslationError(err))
-		_ = client.WriteJSON(map[string]string{"type": "error", "message": "Không kết nối được dịch trực tiếp. Kiểm tra quyền truy cập Gemini và thử lại."})
+		_ = client.WriteJSON(map[string]string{"type": "error", "message": publicGeminiLiveError(err)})
 		return
 	}
 	defer google.Close()
@@ -232,6 +368,29 @@ func (s *server) streamCallTranslation(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = send(map[string]string{"type": "ready"})
 	log.Printf("live translation session ready call=%s listener=%d speaker=%d", ticket.CallID, ticket.UserID, ticket.SpeakerID)
+
+	// A participant can be removed while the stream is running. Revoke AI access
+	// independently of LiveKit so the existing call is unaffected.
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				consented, consentErr := s.callTranslationConsentAllowed(ctx, ticket.CallID, ticket.SpeakerID)
+				if s.verifyLiveCallParticipant(r, ticket.CallID, ticket.UserID) != nil ||
+					s.verifyLiveCallParticipant(r, ticket.CallID, ticket.SpeakerID) != nil || consentErr != nil || !consented {
+					_ = send(map[string]string{"type": "error", "message": "Quyền dịch cuộc gọi đã thay đổi."})
+					cancel()
+					_ = client.Close()
+					_ = google.Close()
+					return
+				}
+			}
+		}
+	}()
 
 	done := make(chan struct{})
 	go func() {
@@ -320,15 +479,28 @@ func geminiLiveSetup(target string) map[string]any {
 		"setup": map[string]any{
 			"model": "models/" + geminiTranslationModel,
 			"generationConfig": map[string]any{
-				"responseModalities": []string{"AUDIO"},
+				"responseModalities":       []string{"AUDIO"},
+				"inputAudioTranscription":  map[string]any{},
+				"outputAudioTranscription": map[string]any{},
 				"translationConfig": map[string]any{
 					"targetLanguageCode": target,
 					"echoTargetLanguage": false,
 				},
 			},
-			"inputAudioTranscription":  map[string]any{},
-			"outputAudioTranscription": map[string]any{},
 		},
+	}
+}
+
+func publicGeminiLiveError(err error) string {
+	switch {
+	case errors.Is(err, errGeminiQuota):
+		return "Gemini đã hết quota hoặc vượt giới hạn tốc độ. Cuộc gọi vẫn tiếp tục bình thường."
+	case errors.Is(err, errGeminiAccess):
+		return "Gemini chưa cấp quyền sử dụng tính năng dịch cho API key này."
+	case errors.Is(err, context.DeadlineExceeded):
+		return "Gemini phản hồi quá chậm. Cuộc gọi vẫn tiếp tục, bạn có thể thử lại."
+	default:
+		return "Không kết nối được dịch trực tiếp. Kiểm tra quyền truy cập Gemini và thử lại."
 	}
 }
 
@@ -358,6 +530,12 @@ func connectGeminiLive(ctx context.Context, target string) (*websocket.Conn, err
 			resp.Body.Close()
 			status, reason := parseGeminiLiveError(body)
 			log.Printf("Gemini Live handshake http_status=%d provider_status=%s provider_reason=%q", resp.StatusCode, status, reason)
+			if resp.StatusCode == http.StatusTooManyRequests {
+				return nil, errGeminiQuota
+			}
+			if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+				return nil, errGeminiAccess
+			}
 		}
 		return nil, errors.New("Gemini Live websocket rejected connection")
 	}
@@ -381,11 +559,13 @@ func connectGeminiLive(ctx context.Context, target string) (*websocket.Conn, err
 	}
 	if json.Unmarshal(response, &ready) != nil || len(ready.SetupComplete) == 0 {
 		google.Close()
-		reason := strings.Join(strings.Fields(ready.Error.Message), " ")
-		if len(reason) > 200 {
-			reason = reason[:200]
+		log.Printf("Gemini Live setup refused code=%d reason=%q", ready.Error.Code, sanitizeGeminiDiagnostic(ready.Error.Message))
+		if ready.Error.Code == http.StatusTooManyRequests {
+			return nil, errGeminiQuota
 		}
-		log.Printf("Gemini Live setup refused code=%d reason=%q", ready.Error.Code, reason)
+		if ready.Error.Code == http.StatusForbidden || ready.Error.Code == http.StatusUnauthorized {
+			return nil, errGeminiAccess
+		}
 		return nil, errors.New("Gemini Live setup not accepted")
 	}
 	_ = google.SetReadDeadline(time.Time{})
