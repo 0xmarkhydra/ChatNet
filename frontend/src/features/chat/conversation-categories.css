@@ -59,10 +59,10 @@
 .category-no-tags{font-size:12px;line-height:1.6;color:var(--soco-muted);padding:4px 10px}
 .chat-head .room-info .room-subtitle{display:flex;align-items:center;gap:8px;min-width:0}
 .conversation-category-assignment{position:relative;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:32px;height:28px;box-sizing:border-box;border-left:1px solid var(--soco-line);padding-left:8px;color:var(--category-text,var(--soco-muted))}
-.conversation-category-assignment>select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
-.conversation-category-assignment:has(select:focus-visible){outline:2px solid var(--soco-blue);outline-offset:2px;border-radius:5px}
+.conversation-category-assignment>button{display:inline-flex;align-items:center;justify-content:center;border:0;padding:0;width:100%;height:100%;background:transparent;color:inherit;cursor:pointer}
+.conversation-category-assignment:has(button:focus-visible){outline:2px solid var(--soco-blue);outline-offset:2px;border-radius:5px}
 .conversation-category-assignment:hover{color:var(--soco-blue)}
-.conversation-category-assignment:has(select:disabled){opacity:.5}
+.conversation-category-assignment:has(button:disabled){opacity:.5}
 .category-assignment-error{position:absolute;z-index:10;top:100%;left:0;width:220px;max-width:60vw;white-space:normal;padding:9px 12px;background:#fff1f2;color:#b91c1c;border:1px solid #fecdd3;border-radius:8px;font-size:12px;line-height:1.5}
 .category-error{font-size:12px;line-height:1.5;color:#b91c1c;padding-top:8px}
 .category-error button{display:inline-flex;padding:5px 8px;border:0;border-radius:6px;color:var(--soco-blue);background:var(--soco-soft-blue);margin-left:6px}
@@ -72,3 +72,5 @@
 .zalo-conversation-list .conversation-copy .conversation-title{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
 .zalo-conversation-list .conversation-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .zalo-conversation-list .conversation-title .category-icon-only{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:transparent;padding:0;border-radius:0;width:16px;height:18px}
+.category-assignment-popover{font-size:14px;font-weight:400;white-space:normal;line-height:1.5}
+.category-assignment-popover .category-options{display:block}

@@ -15,16 +15,49 @@ export function CategoryBadge({ category, iconOnly = false }: { category?: Conve
 export function CategoryAssignment({ model, conversationId, categoryId }: { model: Model; conversationId: number; categoryId?: number }) {
  const category = model.categories.find(c => c.id === categoryId)
  const label = category ? 'Phân loại: '+category.name : 'Phân loại hội thoại'
+ const menuId = useId()
+ const menu = useRef<HTMLDivElement>(null)
+ const trigger = useRef<HTMLButtonElement>(null)
+ const [expanded,setExpanded] = useState(false)
+ useEffect(() => { menu.current?.hidePopover() },[conversationId])
+ useEffect(() => {
+  if (!expanded) return
+  const close = () => menu.current?.hidePopover()
+  const scroll = (event: Event) => { if (!menu.current?.contains(event.target as Node)) close() }
+  window.addEventListener('resize',close)
+  document.addEventListener('scroll',scroll,true)
+  return () => {window.removeEventListener('resize',close);document.removeEventListener('scroll',scroll,true)}
+ },[expanded])
  return <span className={'conversation-category-assignment'+(category ? ' category-'+category.color : '')}>
-  <Tag size={17} aria-hidden="true" fill={category ? 'currentColor' : 'none'} />
-  <select aria-label="Phân loại hội thoại" title={label} value={categoryId || ''} disabled={model.busy}
-   onChange={e => void model.assign(conversationId, Number(e.target.value) || null)}>
-   <option value="">Chưa phân loại</option>
-   {model.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-  </select>
+  <button ref={trigger} type="button" aria-label="Phân loại hội thoại" title={label} data-category-id={categoryId || ''}
+   disabled={model.busy} aria-expanded={expanded} popoverTarget={menuId}
+   onClick={() => {
+    const rect=trigger.current!.getBoundingClientRect()
+    const node=menu.current!
+    node.style.left=Math.max(12,Math.min(rect.left,window.innerWidth-300))+'px'
+    node.style.top=Math.min(rect.bottom+8,window.innerHeight-180)+'px'
+    node.style.maxHeight=Math.max(140,window.innerHeight-rect.bottom-20)+'px'
+   }}>
+   <Tag size={17} aria-hidden="true" fill={category ? 'currentColor' : 'none'} />
+  </button>
+  <div ref={menu} id={menuId} popover="auto" className="category-popover category-assignment-popover"
+   onToggle={event => setExpanded(event.newState === 'open')}>
+   <div className="category-popover-heading"><strong>Phân loại hội thoại</strong></div>
+   <fieldset className="category-options">
+    <legend className="sr-only">Chọn thẻ cho hội thoại</legend>
+    {[{id:0,name:'Chưa phân loại',color:'slate'},...model.categories].map(c =>
+     <label className={'category-option category-'+c.color+((categoryId || 0)===c.id ? ' is-selected' : '')} key={c.id}>
+      <input type="radio" name={menuId} value={c.id} checked={(categoryId || 0)===c.id} disabled={model.busy}
+       onChange={() => {menu.current?.hidePopover();trigger.current?.focus();void model.assign(conversationId,c.id || null)}} />
+      <span className="category-option-icon"><Tag size={18} fill={c.id ? 'currentColor' : 'none'} /></span>
+      <span>{c.name}</span><Check className="category-option-check" size={17} aria-hidden="true" />
+     </label>)}
+   </fieldset>
+  </div>
   {model.error && <span className="category-assignment-error" role="alert">{model.error}</span>}
  </span>
 }
+
 export default function ConversationCategories({ model }: { model: Model }) {
  const [edit, setEdit] = useState<number | undefined>()
  const [name, setName] = useState('')
