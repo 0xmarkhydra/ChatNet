@@ -772,6 +772,24 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, c)
 }
 
+func searchDateBounds(fromDate, toDate *time.Time, offsetMinutes int) (from, to time.Time) {
+	offset := time.Duration(offsetMinutes) * time.Minute
+	if fromDate != nil {
+		from = fromDate.Add(offset)
+	}
+	if toDate != nil {
+		to = toDate.AddDate(0, 0, 1).Add(offset)
+	}
+	return
+}
+
+func nullableSearchTime(source *time.Time, value time.Time) *time.Time {
+	if source == nil {
+		return nil
+	}
+	return &value
+}
+
 func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -809,6 +827,47 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		before = n
 	}
 
+	keyword := strings.TrimSpace(r.URL.Query().Get("search"))
+	sender := strings.TrimSpace(r.URL.Query().Get("sender"))
+	if len([]rune(keyword)) > 200 || len([]rune(sender)) > 100 {
+		httpx.Error(w, http.StatusBadRequest, "search filter too long")
+		return
+	}
+	var fromDate, toDate *time.Time
+	for _, filter := range []struct {
+		raw    string
+		output **time.Time
+	}{
+		{r.URL.Query().Get("from"), &fromDate},
+		{r.URL.Query().Get("to"), &toDate},
+	} {
+		if filter.raw == "" {
+			continue
+		}
+		parsed, err := time.Parse("2006-01-02", filter.raw)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid date filter (YYYY-MM-DD)")
+			return
+		}
+		*filter.output = &parsed
+	}
+	if fromDate != nil && toDate != nil && fromDate.After(*toDate) {
+		httpx.Error(w, http.StatusBadRequest, "invalid date range")
+		return
+	}
+	// Browser date inputs represent days in the viewer's local timezone.
+	// JavaScript getTimezoneOffset() is UTC minus local time in minutes.
+	var tzOffset int
+	if raw := r.URL.Query().Get("tzOffset"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < -840 || value > 840 {
+			httpx.Error(w, http.StatusBadRequest, "invalid timezone offset")
+			return
+		}
+		tzOffset = value
+	}
+	from, to := searchDateBounds(fromDate, toDate, tzOffset)
+
 	rows, err := s.db.Query(r.Context(), `
 		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
 		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
@@ -834,7 +893,11 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		WHERE m.conversation_id=$1 AND ($3::bigint=0 OR m.id<$3)
 		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
-		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID)
+		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(lower(m.text), lower($6))>0))
+		  AND ($7::text='' OR lower(u.username)=lower($7))
+		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)
+		  AND ($9::timestamptz IS NULL OR m.created_at < $9)
+		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to))
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return

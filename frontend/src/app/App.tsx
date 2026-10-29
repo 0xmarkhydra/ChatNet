@@ -33,6 +33,7 @@ import PostComposer from '../features/feed/PostComposer'
 import FeedPostCard from '../features/feed/FeedPostCard'
 import StoryViewer from '../features/feed/StoryViewer'
 import MessageActions from '../features/chat/MessageActions'
+import MessageSearchPanel from '../features/chat/MessageSearchPanel'
 import ProfileIdentityForm from '../features/profile/ProfileIdentityForm'
 import BottomNavigation from './BottomNavigation'
 import GroupSettingsPanel from '../features/chat/GroupSettingsPanel'
@@ -119,6 +120,8 @@ export default function App() {
   const messageLongPressStart = useRef<{ x: number; y: number; messageId: number } | null>(null)
 
   const [sharedContentOpen, setSharedContentOpen] = useState(false)
+  const [messageSearchOpen, setMessageSearchOpen] = useState(false)
+  useEffect(() => { setMessageSearchOpen(false) }, [activeConversationId])
 
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
   const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>(() => {
@@ -3289,6 +3292,7 @@ export default function App() {
 
                     <div className="translate-controls">
                       <CallHeaderActions conversationId={activeConversation.id} />
+                      <button type="button" className="group-settings-toggle" onClick={() => setMessageSearchOpen(true)} title="Tìm trong cuộc trò chuyện" aria-label="Tìm tin nhắn trong cuộc trò chuyện"><Search size={19} /></button>
                       <button
                         type="button"
                         className="group-settings-toggle shared-content-trigger"
@@ -3496,6 +3500,20 @@ export default function App() {
                     />
                   )}
 
+                  {messageSearchOpen && (
+                    <MessageSearchPanel conversationId={activeConversation.id} request={apiFetch}
+                      onClose={() => setMessageSearchOpen(false)}
+                      onJump={async (result) => {
+                        const response = await apiFetch(`/api/conversations/${activeConversation.id}/messages?before=${result.id + 1}&limit=80&target=${encodeURIComponent(targetLanguage)}`)
+                        if (!response.ok) throw new Error('Không tải được tin nhắn')
+                        const history = (await response.json()) as Message[]
+                        if (activeConversationIdRef.current !== activeConversation.id) return
+                        setMessages(history.sort((a, b) => a.id - b.id))
+                        setHasMoreMessages(history.length === 80)
+                        window.setTimeout(() => document.querySelector(`[data-message-id="${result.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 90)
+                      }}
+                    />
+                  )}
                   <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
                     const element = event.currentTarget
                     messageScrollAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100
@@ -3517,6 +3535,7 @@ export default function App() {
                       return (
                         <article
                           key={message.id}
+                          data-message-id={message.id}
                           className={mine ? 'message mine message-press-target' : 'message message-press-target'}
                           onPointerDown={(event) => beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)}
                           onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}

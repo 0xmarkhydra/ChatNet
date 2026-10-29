@@ -12,6 +12,7 @@
     "check:session": "node --experimental-strip-types scripts/session-check.mjs",
     "check:optimistic": "node --experimental-strip-types scripts/optimistic-check.mjs",
     "check:chat": "node --experimental-strip-types scripts/chat-persistence-check.mjs",
+    "check:message-search": "node --experimental-strip-types scripts/message-search-check.mjs",
     "check:media": "node --experimental-strip-types scripts/media-upload-check.mjs",
     "check:voice": "node --experimental-strip-types scripts/voice-media-check.mjs",
     "check:ui": "node scripts/run-ui-layout.mjs",

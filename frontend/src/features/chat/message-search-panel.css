@@ -1,0 +1,19 @@
+.conversation-panel{position:relative}
+.message-search-panel{position:absolute;inset:0 0 0 auto;z-index:45;width:min(410px,100%);height:100%;display:flex;flex-direction:column;background:var(--surface,#fff);color:var(--text,#172033);border-left:1px solid rgba(120,135,160,.2);box-shadow:-12px 0 36px rgba(15,23,42,.13);overflow:hidden}
+.message-search-panel-head{display:flex;justify-content:space-between;align-items:center;padding:15px 18px;border-bottom:1px solid rgba(120,135,160,.15);flex:none}
+.message-search-panel-head strong{font-size:15px;font-weight:700}
+.message-search-panel-head button{border:0;background:transparent;padding:7px 10px;cursor:pointer;color:inherit;border-radius:10px}
+.message-search-panel-fields{padding:13px 15px;display:grid;gap:10px;flex:none}
+.message-search-panel-fields>input,.message-search-panel-dates input{box-sizing:border-box;min-width:0;width:100%;font-size:14px;padding:11px 12px;border:1px solid rgba(120,135,160,.28);background:var(--input-bg,#f7f8fb);color:inherit;border-radius:12px;outline-offset:2px}
+.message-search-panel-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.message-search-panel-dates label{display:grid;gap:5px;color:inherit;font-size:12px}
+.message-search-panel-results{flex:1;min-height:0;overflow-y:auto;padding:4px 10px 20px;overscroll-behavior:contain}
+.message-search-result{display:grid;text-align:left;gap:7px;padding:12px 10px;width:100%;background:transparent;color:inherit;border:0;border-bottom:1px solid rgba(120,135,160,.15);cursor:pointer;border-radius:8px}
+.message-search-result:hover,.message-search-result:focus-visible{background:rgba(37,99,235,.08)}
+.message-search-result-top{display:flex;justify-content:space-between;align-items:center;gap:7px;font-size:13px}
+.message-search-result-top small{font-size:11px;opacity:.65}
+.message-search-result-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;opacity:.84}
+.message-search-empty,.message-search-error{font-size:13px;padding:18px 12px;text-align:center;opacity:.7}
+.message-search-error{color:#ef4444}
+.message-search-load-more{display:block;margin:14px auto;border:1px solid rgba(37,99,235,.35);padding:9px 18px;color:#2563eb;background:transparent;border-radius:12px;cursor:pointer}
+@media(max-width:720px){.message-search-panel{position:fixed;inset:0;width:100%;height:100dvh;z-index:1000;border-left:0}}
