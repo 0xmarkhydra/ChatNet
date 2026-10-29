@@ -1,0 +1,9 @@
+.bubble-textarea{position:relative;display:inline-grid;grid-template-columns:minmax(0,1fr);max-width:100%;border:1px solid var(--soco-line,#e2e8f0);border-radius:28px;background:var(--soco-surface,#fff);color:var(--soco-text,#17233d);box-shadow:0 8px 28px #17233d14}
+.bubble-textarea::after{content:'';position:absolute;bottom:-8px;right:36px;width:18px;height:18px;border-radius:6px;background:var(--soco-surface,#fff);transform:rotate(45deg);pointer-events:none}
+.bubble-textarea::before{content:'';position:absolute;bottom:-21px;right:25px;width:9px;height:9px;border-radius:50%;background:var(--soco-surface,#fff);box-shadow:0 1px 5px #17233d0d;pointer-events:none}
+.bubble-textarea-sizer,.bubble-textarea .bubble-textarea-input{grid-area:1/1;box-sizing:border-box;font:inherit;font-size:18px;line-height:1.5;padding:20px 16px;letter-spacing:normal;white-space:pre-wrap;overflow-wrap:anywhere}
+.bubble-textarea-sizer{visibility:hidden;min-width:min(178px,100%);width:max-content;max-width:min(var(--bubble-max-width,252px),100%);max-height:280px;overflow:hidden}
+.bubble-textarea .bubble-textarea-input{width:100%;height:100%;min-height:0;margin:0;border:0;border-radius:28px;resize:none;overflow:auto;background:transparent;color:inherit;text-align:center}
+.bubble-textarea:focus-within{border-color:var(--soco-blue,#2563eb);box-shadow:0 0 0 3px var(--soco-soft-blue,#eff4ff),0 8px 28px #17233d14}
+.bubble-textarea .bubble-textarea-input:focus-visible{outline:0}
+.bubble-textarea .bubble-textarea-input::placeholder{color:var(--soco-muted,#697894)}

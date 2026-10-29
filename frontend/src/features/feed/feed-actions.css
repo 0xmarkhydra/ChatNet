@@ -56,7 +56,7 @@
 .feed-comment-menu {position:relative;display:flex;align-items:center;z-index:4}
 .feed-comment-menu > button {display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;padding:5px;border:0;border-radius:999px;background:transparent;color:#67748c;cursor:pointer}
 .feed-comment-menu > button:hover,.feed-comment-menu > button[aria-expanded=true] {background:#eff2fc}
-.feed-comment-options {position:absolute;top:calc(100% + 3px);left:0;z-index:20;display:grid;min-width:188px;overflow:hidden;padding:5px;border:1px solid #e4e8f4;border-radius:13px;background:white;box-shadow:0 12px 38px rgba(27,40,83,.2)}
+.feed-comment-options {position:fixed;z-index:99999;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow-y:auto;box-sizing:border-box;display:grid;min-width:min(188px,calc(100vw - 16px));padding:5px;border:1px solid #e4e8f4;border-radius:13px;background:white;box-shadow:0 12px 38px rgba(27,40,83,.2)}
 .feed-comment-options button {border:0;background:transparent;border-radius:9px;color:#263450;text-align:left;font-size:12px;padding:10px 12px;cursor:pointer}
 .feed-comment-options button:hover {background:#edf2ff}
 .feed-comment-options .danger {color:#c93d54}

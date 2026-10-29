@@ -58,7 +58,7 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,m.created_at
+		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,m.text,m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
 		WHERE m.conversation_id=$1
@@ -94,6 +94,7 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 			&item.ConversationID,
 			&item.SenderID,
 			&item.Sender,
+			&item.SenderDisplayName,
 			&item.Text,
 			&item.CreatedAt,
 		); err != nil {

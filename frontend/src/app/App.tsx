@@ -1,9 +1,16 @@
+import ProfileNote from '../features/profile/ProfileNote'
+import ConversationCategories, { CategoryAssignment, CategoryBadge } from '../features/chat/ConversationCategories'
+import { useConversationCategories } from '../features/chat/useConversationCategories'
+import { SessionResponseCache } from '../shared/lib/sessionCache'
+import VisitorProfile from '../features/profile/VisitorProfile'
+import { userLabel } from '../shared/lib/userLabel'
 import { useMessageData } from '../features/chat/useMessageData'
 import { useApiRequest } from './useApiRequest'
 import { useAppRealtime } from './useAppRealtime'
 import { useConversationData } from '../features/chat/useConversationData'
 import { useContactData } from '../features/contacts/useContactData'
 import { useFeedData } from '../features/feed/useFeedData'
+
 import { useGroupManagement } from '../features/chat/useGroupManagement'
 import { API } from '../shared/lib/config'
 import type { ProfileMediaState, ProfileUpdateResponse, UserPrivacy } from '../features/profile/types'
@@ -36,9 +43,10 @@ import BlockedUsersPanel from '../features/contacts/BlockedUsersPanel'
 import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from '../features/feed/FeedDiscussion'
 import FeedModeration from '../features/feed/FeedModeration'
+import ProfileOverlay from '../features/profile/ProfileOverlay'
 import type { NearbyUser } from '../features/discover/NearbyExplorer'
 import GroupCreator from '../features/chat/GroupCreator'
-import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
+import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../features/notifications/incomingSound'
 import { createSessionClient, loadSession, type Session } from '../features/auth/session'
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from '../features/chat/chatPersistence'
@@ -80,6 +88,7 @@ import {
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession)
   const sessionRef = useRef(session)
+  const responseCache = useRef(new SessionResponseCache())
   const [sessionClient] = useState(() => createSessionClient(API, {
     get: () => sessionRef.current,
     save: saveSession,
@@ -148,7 +157,12 @@ export default function App() {
   const friendActionRef = useRef(new Set<number>())
   const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(() => new Set())
   const [friendMenuId, setFriendMenuId] = useState<number | null>(null)
-  const [friendPreview, setFriendPreview] = useState<FriendSearchResult | null>(null)
+  const [visitorUsername,setVisitorUsername]=useState<string|null>(null)
+  function openVisitor(username:string) {
+    if(username===sessionRef.current?.user.username){setTab('profile');setProfileTimelineOpen(true);return}
+    setVisitorUsername(username)
+  }
+  function setFriendPreview(friend:FriendSearchResult|null){if(friend)openVisitor(friend.username);else setVisitorUsername(null)}
   const [blockedUsers, setBlockedUsers] = useState<Array<{ id: number; username: string; displayName: string }>>([])
   const [blockedOpen, setBlockedOpen] = useState(false)
   const [blockedBusy, setBlockedBusy] = useState(false)
@@ -163,6 +177,31 @@ export default function App() {
   const [nearbyResultRadiusKm, setNearbyResultRadiusKm] = useState(5)
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5)
   const nearbyRequest = useRef(0)
+
+  const [profileTimelineOpen, setProfileTimelineOpen] = useState(false)
+  const [profileComposerOpen, setProfileComposerOpen] = useState(false)
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false)
+  const [postSubmitError, setPostSubmitError] = useState('')
+  useEffect(() => {
+    if (tab !== 'profile' || !profileTimelineOpen) {
+      setProfileComposerOpen(false)
+      setProfileEditorOpen(false)
+    }
+  }, [tab, profileTimelineOpen])
+  const [profilePosts, setProfilePosts] = useState<Post[]>([])
+  const [profilePostsBusy, setProfilePostsBusy] = useState(false)
+  const [profilePostsError, setProfilePostsError] = useState('')
+  const [profileHasMore, setProfileHasMore] = useState(false)
+  const profileLoadSequence = useRef(0)
+  const profilePagingBusy = useRef(false)
+  const profileIdentityRef = useRef<HTMLButtonElement>(null)
+  const profileHeadingRef = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (!profileTimelineOpen || tab !== 'profile' || !session?.sessionId) return
+    void loadProfilePosts()
+    profileHeadingRef.current?.focus()
+    return () => { ++profileLoadSequence.current; profilePagingBusy.current = false }
+  }, [profileTimelineOpen, tab, session?.sessionId, session?.user.username])
 
   const [feedFilter, setFeedFilter] = useState<'all' | 'saved'>('all')
   const [activePostId, setActivePostId] = useState<number | null>(null)
@@ -279,7 +318,7 @@ export default function App() {
     setPendingActions,
     pendingRequests,
     mutationRequests,
-  } = useApiRequest({ session, sessionRef, sessionClient })
+  } = useApiRequest({ session, sessionRef, sessionClient, responseCache })
 
   const {
     conversations,
@@ -306,6 +345,17 @@ export default function App() {
     activeConversationIdRef,
     setMessageDrafts,
     purgeConversation,
+  })
+
+  const conversationCategories = useConversationCategories({
+    session, sessionRef, apiFetch, setStatus, setNotice,
+    mergeConversations: items => setConversations(current => {
+      const fresh = new Map(items.filter(c => !revokedConversationIds.current.has(c.id)).map(c => [c.id,c]))
+      return [...current.map(c => fresh.get(c.id) || c), ...[...fresh.values()].filter(c => !current.some(p => p.id === c.id))]
+    }),
+    setCategory: (id, categoryId) => setConversations(current => current.map(c =>
+      c.id === id ? { ...c, categoryId: categoryId || undefined } : c)),
+    clearCategory: id => setConversations(current => current.map(c => c.categoryId === id ? { ...c, categoryId: undefined } : c)),
   })
 
   const {
@@ -353,8 +403,8 @@ export default function App() {
     refreshPosts,
     loadMorePosts,
     loadSavedPosts,
-    syncFeedPost,
-    removeFeedPost,
+    syncFeedPost: syncFeedDataPost,
+    removeFeedPost: removeFeedDataPost,
     refreshStories,
   } = useFeedData({
     session,
@@ -438,10 +488,16 @@ export default function App() {
   })
 
   const name = session?.user.username || ''
-  const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
+  const displayConversations = useMemo(() => conversations.map(conversation => ({
+    ...conversation,
+    name: conversation.type === 'direct' && conversation.otherUserId
+      ? contactMetadata[conversation.otherUserId]?.nickname || conversation.name
+      : conversation.name,
+  })), [conversations, contactMetadata])
+  const activeConversation = displayConversations.find((item) => item.id === activeConversationId) || null
   const chatFriend = activeConversation?.type === 'direct' && activeConversation.otherUserId
     && activeConversation.otherUserId !== session?.user.id
-    ? { id: activeConversation.otherUserId, username: '', displayName: activeConversation.name, online: activeConversation.online }
+    ? { id: activeConversation.otherUserId, username: activeConversation.otherUsername || '', displayName: activeConversation.name, online: activeConversation.online }
     : null
   const chatFriendRelationship = chatFriend ? friendRelationship(chatFriend.id) : 'none'
 
@@ -452,7 +508,11 @@ export default function App() {
   const visibleMessages = messages.map((message) => reactionPreviews[message.id] ? {
     ...message, reactions: message.deleted ? [] : reactionPreviews[message.id],
   } : message)
-  const activePost = activePostId ? [...visiblePosts, ...savedPosts].find((item) => item.id === activePostId) || null : null
+  const visibleProfilePosts = profilePosts.map(post => likePreviews[post.id] === undefined ? post : {
+    ...post, liked: likePreviews[post.id],
+    likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
+  })
+  const activePost = activePostId ? [...visibleProfilePosts, ...visiblePosts, ...savedPosts].find((item) => item.id === activePostId) || null : null
   const activeMessageAction = messageActionId
     ? messages.find((item) => item.id === messageActionId) || null
     : null
@@ -599,7 +659,7 @@ export default function App() {
     if (!requestedUser) return
 
     if (requestedUser.toLocaleLowerCase('vi-VN') !== session.user.username.toLocaleLowerCase('vi-VN')) {
-      openConnectSurface(requestedUser)
+      openVisitor(requestedUser)
     }
 
     params.delete('connect')
@@ -698,6 +758,7 @@ export default function App() {
     sessionRef.current = next
     setSession(next)
   }
+
 
   async function loadProfileMedia() {
     if (!session?.token) return
@@ -1513,6 +1574,7 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok || !result) throw new Error('Không lưu được quyền riêng tư.')
       setPrivacy(result)
+      setPrivacyError('')
       setNotice('Đã lưu cài đặt riêng tư')
     } catch {
       if (sessionRef.current?.sessionId === sessionId) {
@@ -1599,6 +1661,7 @@ export default function App() {
     }
   }
 
+
   const contactQuery = friendQuery.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
   const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
     `${friend.displayName} ${friend.username}`.toLocaleLowerCase('vi-VN').includes(contactQuery),
@@ -1663,8 +1726,8 @@ export default function App() {
           : `Đã gửi lời mời kết bạn tới ${label}`)
       } else {
         setNotice('Đang kiểm tra trạng thái kết bạn')
+        await refreshFriendConnections()
       }
-      await refreshFriendConnections()
     } catch {
       if (sessionRef.current?.sessionId === sessionId) {
         setNotice('Không cập nhật được lời mời kết bạn. Kiểm tra kết nối rồi thử lại.')
@@ -1957,6 +2020,7 @@ export default function App() {
   }, [friendQuery, friendSearchRetry, newChatMode, session?.token, tab])
 
   function purgeConversation(id: number) {
+    responseCache.current.invalidate(['conversations','messages'])
     revokedConversationIds.current.add(id)
     membershipSnapshot.current?.delete(id)
     membershipEventSequence.current += 1
@@ -1982,7 +2046,59 @@ export default function App() {
     }
   }
 
+  function syncFeedPost(updated: Post) {
+    ++feedRevision.current
+    setProfilePosts(current => current.map(p => p.id === updated.id ? updated : p))
+    syncFeedDataPost(updated)
+  }
+
+  function removeFeedPost(id: number) {
+    ++feedRevision.current
+    setProfilePosts(current => current.filter(p => p.id !== id))
+    removeFeedDataPost(id)
+  }
+
+  async function loadProfilePosts(more = false, force = false) {
+    if (!session || profilePagingBusy.current) return
+    const sessionId = session.sessionId
+    const sequence = ++profileLoadSequence.current
+    const revision = feedRevision.current
+    const before = more && profilePosts.length ? Math.min(...profilePosts.map(post => post.id)) : 0
+    profilePagingBusy.current = true
+    setProfilePostsBusy(true)
+    setProfilePostsError('')
+    try {
+      const response = await apiFetch(`/api/posts?scope=mine&limit=${FEED_PAGE_SIZE}${before ? '&before=' + before : ''}`, force ? { cache: 'reload' } : {})
+      if (!response.ok) throw new Error('Không tải được dòng thời gian. Hãy thử lại.')
+      const data = await response.json() as Post[]
+      if (sessionRef.current?.sessionId !== sessionId || sequence !== profileLoadSequence.current) return
+      if (revision !== feedRevision.current) throw new Error('Dòng thời gian vừa thay đổi. Hãy tải lại để cập nhật.')
+      if (!Array.isArray(data) || data.some(post => !Number.isSafeInteger(post.id) || post.id <= 0 || post.author !== sessionRef.current?.user.username)) {
+        throw new Error('Dữ liệu dòng thời gian không hợp lệ. Hãy tải lại.')
+      }
+      setProfilePosts(current => more ? data.reduce((items, post) => mergeById(items, post), current) : data)
+      setProfileHasMore(data.length === FEED_PAGE_SIZE)
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId && sequence === profileLoadSequence.current) {
+        setProfilePostsError(error instanceof Error ? error.message : 'Không tải được dòng thời gian. Hãy thử lại.')
+      }
+    } finally {
+      if (sequence === profileLoadSequence.current) {
+        profilePagingBusy.current = false
+        if (sessionRef.current?.sessionId === sessionId) setProfilePostsBusy(false)
+      }
+    }
+  }
+
+  function closeProfileTimeline() {
+    setProfileTimelineOpen(false)
+    requestAnimationFrame(() => profileIdentityRef.current?.focus())
+  }
+
+
   function logout(revoke = true, clearStorage = true) {
+    responseCache.current.clear()
+    setVisitorUsername(null)
     const current = sessionRef.current
     const currentToken = current?.token
     if (revoke && current?.refreshToken) {
@@ -2073,6 +2189,16 @@ export default function App() {
     setFriendPreview(null)
     setPostText('')
     setPosts([])
+    ++profileLoadSequence.current
+    profilePagingBusy.current = false
+    setProfileTimelineOpen(false)
+    setProfileComposerOpen(false)
+    setProfileEditorOpen(false)
+    setPostSubmitError('')
+    setProfilePosts([])
+    setProfileHasMore(false)
+    setProfilePostsBusy(false)
+    setProfilePostsError('')
     setHasMorePosts(false)
     setPostsLoadingMore(false)
     postsPagingBusy.current = false
@@ -2115,6 +2241,10 @@ export default function App() {
   }, [session?.sessionId, sessionClient])
 
   useAppRealtime({
+    onCategoryAssignmentChanged: conversationCategories.applyAssignment,
+    onCategoriesChanged: () => { void conversationCategories.refreshCategories(); conversationCategories.refreshFiltered() },
+    refreshCategoryConversations: conversationCategories.refreshFiltered,
+    responseCache,
     session,
     sessionRef,
     apiFetch,
@@ -2145,11 +2275,13 @@ export default function App() {
     setConversations,
   })
 
+
   useEffect(() => {
     if (!session?.token || tab !== 'feed') return
     void refreshPosts()
     void refreshStories()
     const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
       void refreshPosts()
       void refreshStories()
     }, 12000)
@@ -2325,9 +2457,9 @@ export default function App() {
     sendingRef.current = true
     setMessageSending(true)
     setOutgoingMessage({
-      id: -1, clientId, conversationId, senderId: session.user.id, sender: session.user.username,
+      id: -1, clientId, conversationId, senderId: session.user.id, sender: session.user.username, senderDisplayName: session.user.displayName,
       text, attachments, createdAt: new Date().toISOString(),
-      replyToMessageId: reply?.id, replyToSender: reply?.sender, replyToText: reply?.text,
+      replyToMessageId: reply?.id, replyToSender: reply?.sender, replyToDisplayName: reply?.senderDisplayName, replyToText: reply?.text,
     })
     try {
       const response = await apiFetch(`/api/conversations/${conversationId}/messages`, {
@@ -2514,6 +2646,7 @@ export default function App() {
     event.preventDefault()
     if (!session || actionLocks.current.has('feed:create') || mediaUploading || (!postText.trim() && postAttachments.length === 0)) return
 
+    setPostSubmitError('')
     const content = postText.trim()
     const attachments = postAttachments
     const visibility = postVisibility
@@ -2521,7 +2654,7 @@ export default function App() {
     const sessionId = session.sessionId
     actionLocks.current.add('feed:create')
     ++feedRevision.current
-    setPendingPost({ id: -1, author: name, content, visibility, background, attachments, likes: 0, liked: false, comments: [], createdAt: new Date().toISOString() })
+    setPendingPost({ id: -1, author: name, authorDisplayName: session?.user.displayName, content, visibility, background, attachments, likes: 0, liked: false, comments: [], createdAt: new Date().toISOString() })
     try {
       const response = await apiFetch('/api/posts', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2531,13 +2664,19 @@ export default function App() {
       if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok || !Number.isSafeInteger(post.id) || post.id <= 0) throw new Error(post.error || 'Không đăng được bài viết')
       setPosts((current) => [post, ...current.filter((item) => item.id !== post.id)])
+      setProfilePosts(current => [post, ...current.filter(item => item.id !== post.id)])
       setPostText('')
       setPostAttachments([])
       setPostBackground('')
       setShowPostBackgrounds(false)
+      setProfileComposerOpen(false)
       setNotice('Đã đăng bài viết.', 'success')
     } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không đăng được bài viết. Bản nháp được giữ lại.', 'error')
+      if (sessionRef.current?.sessionId === sessionId) {
+        const message = error instanceof Error ? error.message : 'Không đăng được bài viết. Bản nháp được giữ lại.'
+        setPostSubmitError(message)
+        setNotice(message, 'error')
+      }
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         ++feedRevision.current
@@ -2563,14 +2702,15 @@ export default function App() {
       }
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
+      setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
     } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId) void refreshPosts()
       if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được lượt thích.', 'error')
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         ++feedRevision.current
         actionLocks.current.delete(key)
         setLikePreviews((current) => { const next = { ...current }; delete next[post.id]; return next })
-        void refreshPosts()
       }
     }
   }
@@ -2604,7 +2744,7 @@ export default function App() {
     actionLocks.current.add(key)
     ++feedRevision.current
     setPendingComments((current) => ({ ...current, [post.id]: {
-      id: -1, parentId, author: name, content, createdAt: new Date().toISOString(),
+      id: -1, parentId, author: name, authorDisplayName: session?.user.displayName, content, createdAt: new Date().toISOString(),
     } }))
     try {
       const response = await apiFetch(`/api/posts/${post.id}/comments`, {
@@ -2618,6 +2758,7 @@ export default function App() {
       if (updated.id !== post.id || !Array.isArray(updated.comments)) throw new Error('Phản hồi không hợp lệ. Bản nháp được giữ lại.')
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
+      setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, comments: updated.comments } : item))
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         ++feedRevision.current
@@ -2631,18 +2772,24 @@ export default function App() {
 
   const unreadTotal = conversations.reduce((sum, conversation) => sum + conversation.unreadCount, 0)
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase('vi-VN')
-  const searchedConversations = conversations.filter((conversation) => {
+  const searchedConversations = displayConversations.filter((conversation) => {
     if (!normalizedSearch) return true
     return (
       conversation.name.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
+      (conversation.otherUsername || '').toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
       conversation.lastMessage.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
     )
   })
-  const visibleConversations = searchedConversations
+  const visibleConversations = conversationCategories.selected === null ? searchedConversations :
+    conversationCategories.items.map(item => displayConversations.find(c => c.id === item.id) || item)
+      .filter(item => !revokedConversationIds.current.has(item.id) &&
+        (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)) &&
+        (!normalizedSearch || (item.name + ' ' + (item.otherUsername || '') + ' ' + item.lastMessage).toLocaleLowerCase('vi-VN').includes(normalizedSearch)))
   const searchedPosts = (feedFilter === 'saved' ? savedPosts : visiblePosts).filter((post) => {
     if (!normalizedSearch || tab !== 'feed') return true
     return (
       post.author.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
+      userLabel(post.authorDisplayName, post.author).toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
       post.content.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
     )
   })
@@ -2654,12 +2801,80 @@ export default function App() {
     if (nextTab !== 'contacts') setFriendQuery('')
   }
 
+  const profileIdentityForm = (
+    <ProfileIdentityForm
+      saveProfileIdentity={saveProfileIdentity}
+      t={t}
+      profileDisplayNameDraft={profileDisplayNameDraft}
+      setProfileDisplayNameDraft={setProfileDisplayNameDraft}
+      profileUsernameDraft={profileUsernameDraft}
+      setProfileUsernameDraft={setProfileUsernameDraft}
+      profileSaving={profileSaving}
+      profileMedia={profileMedia}
+    />
+  )
+  const profilePrivacyControls = (
+    <PrivacyControls
+      privacyLoading={privacyLoading}
+      privacyError={privacyError}
+      setPrivacyRetry={setPrivacyRetry}
+      privacy={privacy}
+      privacyBusy={privacyBusy}
+      changePrivacy={changePrivacy}
+    />
+  )
+  const postComposer = (
+    <PostComposer
+      name={name}
+      createPost={createPost}
+      postComposerRef={postComposerRef}
+      postBackground={postBackground}
+      pendingPost={pendingPost}
+      postText={postText}
+      setPostText={setPostText}
+      feedImageInputRef={feedImageInputRef}
+      feedVideoInputRef={feedVideoInputRef}
+      feedAlbumInputRef={feedAlbumInputRef}
+      addFeedFiles={addFeedFiles}
+      postAttachments={postAttachments}
+      setPostAttachments={setPostAttachments}
+      mediaUploading={mediaUploading}
+      showPostBackgrounds={showPostBackgrounds}
+      setShowPostBackgrounds={setShowPostBackgrounds}
+      postVisibility={postVisibility}
+      setPostVisibility={setPostVisibility}
+      setPostBackground={setPostBackground}
+      popup={profileComposerOpen}
+      displayName={profileMedia?.displayName || session.user.displayName || name}
+      submitError={postSubmitError}
+    />
+  )
+  const renderPosts = (items: Post[]) => items.map(post => (
+    <FeedPostCard
+      key={post.id}
+      post={post}
+      name={name}
+      onAuthorOpen={openVisitor}
+      ownDisplayName={profileMedia?.displayName || session.user.displayName || name}
+      apiFetch={apiFetch}
+      syncFeedPost={syncFeedPost}
+      removeFeedPost={removeFeedPost}
+      setNotice={setNotice}
+      token={session.token}
+      translationPreferencesLoaded={translationPreferencesLoaded}
+      targetLanguage={targetLanguage}
+      setActivePostId={setActivePostId}
+      likePreviews={likePreviews}
+      like={like}
+    />
+  ))
+
   return (
     <main className={`app-shell modern-shell ${tab === 'chat' && activeConversation ? 'conversation-open' : ''}`}>
       {qrOpen && <Suspense fallback={<div role="status">Đang mở QR...</div>}>
         <ProfileQr username={session.user.username} displayName={session.user.displayName || session.user.username}
           url={connectUrl()} initialMode={qrOpen} onClose={() => setQrOpen(null)}
-          onConnect={(username) => { setQrOpen(null); openConnectSurface(username) }} />
+          onConnect={(username) => { setQrOpen(null); openVisitor(username) }} />
       </Suspense>}
       {mediaUploading && mediaUploadProgress && (
         <div className="media-upload-progress" role="status" aria-live="polite">
@@ -2668,22 +2883,12 @@ export default function App() {
           <button type="button" onClick={() => mediaUploadAbort.current?.abort()}>Hủy tải</button>
         </div>
       )}
-      {friendPreview && (
-        <div className="connect-modal-layer">
-          <button type="button" className="connect-modal-scrim" aria-label="Đóng hồ sơ" onClick={() => setFriendPreview(null)} />
-          <section className="friend-profile-preview" role="dialog" aria-modal="true" aria-label={`Hồ sơ ${friendPreview.displayName || friendPreview.username}`}>
-            <button type="button" className="friend-profile-close" aria-label="Đóng" onClick={() => setFriendPreview(null)}><X size={20} /></button>
-            <UserAvatar name={friendPreview.displayName || friendPreview.username} className="friend-profile-avatar" online={friendPreview.online} />
-            <h2>{friendPreview.displayName || friendPreview.username}</h2>
-            <p>@{friendPreview.username}</p>
-            <p>{friendPreview.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</p>
-            <div className="friend-profile-actions">
-              <button type="button" onClick={() => { setFriendPreview(null); void openDirectByUsername(friendPreview.username) }}>Nhắn tin</button>
-              <button type="button" onClick={() => setFriendPreview(null)}>Đóng</button>
-            </div>
-          </section>
-        </div>
-      )}
+      {visitorUsername && <VisitorProfile key={session.sessionId+':'+visitorUsername}
+        username={visitorUsername} request={apiFetch} currentUser={name} token={session.token}
+        targetLanguage={translationPreferencesLoaded?targetLanguage:''} relationship={friendRelationship}
+        friendBusy={friendActionBusy} onFriend={actOnFriend} onMessage={async username=>{await openDirectByUsername(username);setVisitorUsername(null)}}
+        onClose={()=>setVisitorUsername(null)} onPostOpen={post=>{setPosts(current=>[post,...current.filter(item=>item.id!==post.id)]);setActivePostId(post.id)}}
+        onUpdated={syncFeedPost} updates={posts} onDeleted={removeFeedPost} feedback={setNotice} />}
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
@@ -2897,7 +3102,7 @@ export default function App() {
                     </label>
 
                     <div className="connect-identity-card">
-                      <UserAvatar name={session.user.username} className="connect-identity-avatar" online />
+                      <UserAvatar username={session.user.username} name={userLabel(session.user.displayName, session.user.username)} className="connect-identity-avatar" online />
                       <div className="connect-identity-copy">
                         <strong>{session.user.displayName || session.user.username}</strong>
                         <span>@{session.user.username}</span>
@@ -2945,7 +3150,7 @@ export default function App() {
                             onClick={() => void actOnFriend(friend)}
                             disabled={friendBusyIds.has(friend.id)}
                           >
-                            <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+                            <UserAvatar username={friend.username} name={userLabel(friend.displayName, friend.username)} className="friend-avatar" online={friend.online} />
                             <div className="friend-result-copy">
                               <strong>{friend.displayName || friend.username}</strong>
                               <span>
@@ -2974,8 +3179,13 @@ export default function App() {
 
               {chatCreateError && newChatMode !== 'group' && <div className="inline-error">{chatCreateError}</div>}
 
+              <ConversationCategories key={session.sessionId} model={conversationCategories} />
               <div className="conversation-list zalo-conversation-list">
-                {visibleConversations.length === 0 && (
+                {conversationCategories.selected !== null && conversationCategories.loading && <p role="status">Đang tải phân loại…</p>}
+                {conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
+                  {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>Thử lại</button>
+                </div>}
+                {visibleConversations.length === 0 && !conversationCategories.loading && !conversationCategories.listError && (
                   <div className="conversation-list-empty">
                     <SocoEmptyState
                       kind={normalizedSearch ? 'search' : 'chat'}
@@ -2998,14 +3208,16 @@ export default function App() {
                     }}
                   >
                     <UserAvatar
-                      name={conversation.name}
+                      username={conversation.otherUsername} name={conversation.name}
                       className="conversation-avatar"
                       group={conversation.type === 'group'}
                       online={conversation.type === 'direct' && conversation.online}
                     />
                     <div className="conversation-copy">
                       <div>
-                        <strong>{conversation.name}</strong>
+                        <span className="conversation-title"><strong>{conversation.name}</strong>
+                          <CategoryBadge iconOnly category={conversationCategories.categories.find(c => c.id === conversation.categoryId)} />
+                        </span>
                         <time>{formatTime(conversation.lastMessageAt) || (conversation.online ? 'online' : '')}</time>
                       </div>
                       <div>
@@ -3015,12 +3227,13 @@ export default function App() {
                     </div>
                   </button>
                 ))}
-                {hasMoreConversations && (
+                {(conversationCategories.selected === null ? hasMoreConversations : conversationCategories.hasMore) && (
                   <button type="button" className="soco-load-more soco-conversation-load-more"
-                    onClick={() => void loadMoreConversations()} disabled={conversationLoadingMore}
-                    aria-busy={conversationLoadingMore}>
+                    onClick={() => void (conversationCategories.selected === null ? loadMoreConversations() : conversationCategories.load(true))}
+                    disabled={conversationLoadingMore || conversationCategories.loading}
+                    aria-busy={conversationLoadingMore || conversationCategories.loading}>
                     <RefreshCw size={15} aria-hidden="true" />
-                    {conversationLoadingMore ? 'Đang tải...' : 'Tải thêm hội thoại'}
+                    {conversationLoadingMore || conversationCategories.loading ? 'Đang tải...' : 'Tải thêm hội thoại'}
                   </button>
                 )}
               </div>
@@ -3042,17 +3255,20 @@ export default function App() {
                     <div className="room-info">
                       <button className="mobile-back" type="button" aria-label="Quay lại danh sách" onClick={() => setActiveConversationId(null)}>‹</button>
                       <UserAvatar
-                        name={activeConversation.name}
+                        username={activeConversation.otherUsername} name={activeConversation.name}
                         className="room-avatar"
                         group={activeConversation.type === 'group'}
                         online={activeConversation.type === 'direct' && activeConversation.online}
                       />
                       <div>
-                        <strong>{activeConversation.name}</strong>
-                        <small>
+                        <strong>{activeConversation.type === 'direct' && activeConversation.otherUsername
+                          ? <button type="button" className="visitor-name-link" onClick={() => openVisitor(activeConversation.otherUsername!)} aria-label="Xem trang cá nhân">{activeConversation.name}</button>
+                          : activeConversation.name}</strong>
+                        <small className="room-subtitle">
                           {activeConversation.type === 'group'
                             ? `${activeConversation.memberCount} thành viên`
                             : activeConversation.online ? '● Đang online' : 'Chat riêng'}
+                          <CategoryAssignment model={conversationCategories} conversationId={activeConversation.id} categoryId={activeConversation.categoryId} />
                         </small>
                       </div>
                     </div>
@@ -3192,6 +3408,7 @@ export default function App() {
                     </div>
                   </header>
 
+
                   {groupActionsOpen && activeConversation.type === 'group' && !groupSettingsOpen && (
                     <GroupActionsSheet
                       groupName={activeConversation.name}
@@ -3311,10 +3528,10 @@ export default function App() {
                             openMessageActions(message)
                           }}
                         >
-                          {!mine && <div className="message-meta">{message.sender}</div>}
+                          {!mine && <div className="message-meta">{userLabel(message.senderDisplayName, message.sender)}</div>}
                           {message.replyToMessageId && (
                             <div className="message-reply-quote">
-                              <strong>@{message.replyToSender || 'user'}</strong>
+                              <strong>{userLabel(message.replyToDisplayName, message.replyToSender)}</strong>
                               <span>{message.replyToText || 'Tin nhắn đã thu hồi'}</span>
                             </div>
                           )}
@@ -3388,7 +3605,7 @@ export default function App() {
                       <article className="message mine outgoing-preview" aria-busy="true">
                         {outgoingMessage.replyToMessageId && (
                           <div className="message-reply-quote">
-                            <strong>@{outgoingMessage.replyToSender}</strong><span>{outgoingMessage.replyToText}</span>
+                            <strong>{userLabel(outgoingMessage.replyToDisplayName, outgoingMessage.replyToSender)}</strong><span>{outgoingMessage.replyToText}</span>
                           </div>
                         )}
                         {outgoingMessage.text && (
@@ -3419,7 +3636,7 @@ export default function App() {
                     {replyingTo && (
                       <div className="composer-reply-preview">
                         <div>
-                          <strong>Đang trả lời @{replyingTo.sender}</strong>
+                          <strong>Đang trả lời {userLabel(replyingTo.senderDisplayName, replyingTo.sender)}</strong>
                           <span>{replyingTo.deleted ? 'Tin nhắn đã thu hồi' : (replyingTo.text || attachmentLabel(replyingTo.attachments))}</span>
                         </div>
                         <button type="button" onClick={() => setReplyingTo(null)} aria-label="Hủy trả lời">×</button>
@@ -3590,7 +3807,7 @@ export default function App() {
                   className="story-card"
                   key={story.id}
                   onClick={() => setActiveStoryId(story.id)}
-                  aria-label={`Xem Story của @${story.author}`}
+                  aria-label={`Xem Story của ${userLabel(story.authorDisplayName, story.author)}`}
                 >
                   <div className="story-visual">
                     {story.attachment.kind === 'video' ? (
@@ -3598,34 +3815,14 @@ export default function App() {
                     ) : (
                       <img src={story.attachment.url} alt="" loading="lazy" />
                     )}
-                    <span className="story-avatar-mini">{story.author.slice(0, 1).toUpperCase()}</span>
+                    <UserAvatar className="story-avatar-mini" username={story.author} name={userLabel(story.authorDisplayName, story.author)} />
                   </div>
-                  <span>{story.author === name ? 'Story của bạn' : story.author}</span>
+                  <span>{story.author === name ? 'Story của bạn' : userLabel(story.authorDisplayName, story.author)}</span>
                 </button>
               ))}
             </div>
 
-            <PostComposer
-              name={name}
-              createPost={createPost}
-              postComposerRef={postComposerRef}
-              postBackground={postBackground}
-              pendingPost={pendingPost}
-              postText={postText}
-              setPostText={setPostText}
-              feedImageInputRef={feedImageInputRef}
-              feedVideoInputRef={feedVideoInputRef}
-              feedAlbumInputRef={feedAlbumInputRef}
-              addFeedFiles={addFeedFiles}
-              postAttachments={postAttachments}
-              setPostAttachments={setPostAttachments}
-              mediaUploading={mediaUploading}
-              showPostBackgrounds={showPostBackgrounds}
-              setShowPostBackgrounds={setShowPostBackgrounds}
-              postVisibility={postVisibility}
-              setPostVisibility={setPostVisibility}
-              setPostBackground={setPostBackground}
-            />
+            {postComposer}
 
             <div className="soco-feed-section-label soco-feed-posts-label">
               <strong>{feedFilter === 'saved' ? 'Bài viết đã lưu' : 'Bài viết mới'}</strong>
@@ -3637,15 +3834,15 @@ export default function App() {
             <div className="feed zalo-feed">
               {pendingPost && (
                 <article className="post zalo-post outgoing-preview" aria-busy="true">
-                  <UserAvatar name={pendingPost.author} className="avatar" />
+                  <UserAvatar username={pendingPost.author} name={userLabel(pendingPost.authorDisplayName, pendingPost.author)} className="avatar" />
                   <div className="post-body">
-                    <div className="post-author"><strong>{pendingPost.author}</strong><small role="status">Đang đăng...</small></div>
+                    <div className="post-author"><strong>{userLabel(pendingPost.authorDisplayName, pendingPost.author)}</strong><small role="status">Đang đăng...</small></div>
                     <p className="pending-content">{pendingPost.content}</p>
                     <MediaAttachmentsView items={pendingPost.attachments} />
                   </div>
                 </article>
               )}
-              {searchedPosts.map(post => <FeedPostCard key={post.id} post={post} name={name} apiFetch={apiFetch} syncFeedPost={syncFeedPost} removeFeedPost={removeFeedPost} setNotice={setNotice} token={session.token} translationPreferencesLoaded={translationPreferencesLoaded} targetLanguage={targetLanguage} setActivePostId={setActivePostId} likePreviews={likePreviews} like={like} />)}
+              {renderPosts(searchedPosts)}
               {(feedFilter === 'saved' ? hasMoreSavedPosts : hasMorePosts) && (
                 <button type="button" className="soco-load-more soco-feed-load-more"
                   onClick={() => void (feedFilter === 'saved' ? loadSavedPosts(true) : loadMorePosts())}
@@ -3673,7 +3870,7 @@ export default function App() {
             className="post-detail-backdrop"
             role="dialog"
             aria-modal="true"
-            aria-label={`Chi tiết bài viết của @${activePost.author}`}
+            aria-label={`Chi tiết bài viết của ${userLabel(activePost.authorDisplayName, activePost.author)}`}
             onMouseDown={(event) => {
               if (event.currentTarget === event.target) setActivePostId(null)
             }}
@@ -3688,11 +3885,11 @@ export default function App() {
               </header>
               <div className="post-detail-scroll">
                 <article className="post zalo-post post-detail-post">
-                  <UserAvatar name={activePost.author} className="avatar" />
+                  <UserAvatar username={activePost.author} name={userLabel(activePost.authorDisplayName, activePost.author)} className="avatar" />
                   <div className="post-body">
                     <div className="post-author">
                       <div>
-                        <strong>{activePost.author}</strong>
+                        <strong>{userLabel(activePost.authorDisplayName, activePost.author)}</strong>
                         <small>{new Date(activePost.createdAt).toLocaleString('vi-VN')}</small>
                       </div>
                     </div>
@@ -3741,7 +3938,7 @@ export default function App() {
         {activeStory && <StoryViewer activeStory={activeStory} name={name} storyBusy={storyBusy} deleteStory={deleteStory} setActiveStoryId={setActiveStoryId} nextStory={nextStory} previousStory={previousStory} activeStoryIndex={activeStoryIndex} />}
 
         {tab === 'profile' && (
-          <div className="simple-view profile-view">
+          <div className={`simple-view profile-view ${profileTimelineOpen ? 'personal-timeline-view' : ''}`}>
             <input
               ref={avatarFileInputRef}
               className="hidden-media-input"
@@ -3767,6 +3964,13 @@ export default function App() {
               }}
             />
 
+            {profileTimelineOpen && (
+              <header className="personal-timeline-header">
+                <button type="button" onClick={closeProfileTimeline} aria-label="Quay lại hồ sơ"><ArrowLeft size={20} /></button>
+                <h1 ref={profileHeadingRef} tabIndex={-1}>Trang cá nhân</h1>
+                <button type="button" onClick={() => setProfileEditorOpen(true)}><Settings size={18} /><span>Chỉnh sửa</span></button>
+              </header>
+            )}
             <section className="profile-hero">
               <div className={`profile-cover-art ${profileMedia?.coverSet ? 'has-cover' : ''}`}>
                 <div className="profile-cover-placeholder">
@@ -3795,9 +3999,15 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="profile-identity">
+              <div className="profile-identity" onClick={(event) => {
+                if (!profileTimelineOpen && !(event.target as HTMLElement).closest('button')) {
+                  setProfileTimelineOpen(true)
+                  setGlobalSearch('')
+                }
+              }}>
                 <div className="profile-avatar-editor">
-                  <UserAvatar name={name} className="profile-avatar" online />
+                  <ProfileNote key={session.sessionId+':note'} username={name} owner request={apiFetch} />
+                  <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="profile-avatar" online />
                   <button
                     type="button"
                     className="profile-avatar-edit"
@@ -3809,38 +4019,64 @@ export default function App() {
                     <UiIcon name="photo" size={17} />
                   </button>
                 </div>
-                <div className="profile-identity-copy">
+                <button type="button" ref={profileIdentityRef} className="profile-identity-copy profile-identity-link"
+                  aria-label="Mở trang cá nhân" disabled={profileTimelineOpen}
+                  onClick={() => { setProfileTimelineOpen(true); setGlobalSearch('') }}>
                   <strong>{profileMedia?.displayName || session.user.displayName || name}</strong>
                   <span>@{name}</span>
                   <small className="profile-email">{session.user.email}</small>
-                  <small className="profile-media-hint">
-                    {profileBusy === 'avatar' ? t('profile.avatarUpdating') : t('profile.avatarHint')}
-                  </small>
-                </div>
+                  {!profileTimelineOpen && <small className="profile-media-hint">Xem trang cá nhân · Dòng thời gian ›</small>}
+                </button>
               </div>
             </section>
 
-            <ProfileIdentityForm
-              saveProfileIdentity={saveProfileIdentity}
-              t={t}
-              profileDisplayNameDraft={profileDisplayNameDraft}
-              setProfileDisplayNameDraft={setProfileDisplayNameDraft}
-              profileUsernameDraft={profileUsernameDraft}
-              setProfileUsernameDraft={setProfileUsernameDraft}
-              profileSaving={profileSaving}
-              profileMedia={profileMedia}
-            />
+            {profileTimelineOpen ? (
+              <section className="personal-timeline-content" aria-label="Dòng thời gian cá nhân">
+                <div className="personal-timeline-intro">
+                  <div><strong>Khoảnh khắc của bạn</strong><p>Lưu giữ và chia sẻ những câu chuyện mỗi ngày.</p></div>
+                  <button type="button" onClick={() => setProfileComposerOpen(true)}><PencilLine size={18} />Đăng bài</button>
+                </div>
+                <div className="profile-post-launcher">
+                  <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="avatar self-avatar" />
+                  <button type="button" onClick={() => setProfileComposerOpen(true)}>
+                    {postText.trim() ? 'Tiếp tục bản nháp của bạn...' : 'Bạn đang nghĩ gì?'}
+                  </button>
+                  <button type="button" className="profile-post-photo" aria-label="Tạo bài viết có ảnh hoặc video"
+                    onClick={() => setProfileComposerOpen(true)}><Images size={23} /></button>
+                </div>
+                <div className="personal-timeline-label">
+                  <h2>Dòng thời gian</h2>
+                  <button type="button" aria-label="Tải lại dòng thời gian" disabled={profilePostsBusy || !!pendingPost}
+                    onClick={() => void loadProfilePosts(false, true)}><RefreshCw size={18} /></button>
+                </div>
+                {profilePostsError && <div className="personal-timeline-error" role="alert">
+                  <p>{profilePostsError}</p>
+                  <button type="button" disabled={profilePostsBusy} onClick={() => void loadProfilePosts(profilePosts.length > 0, true)}>Thử lại</button>
+                </div>}
+                {profilePostsBusy && <p role="status">Đang tải dòng thời gian...</p>}
+                <div className="feed zalo-feed">
+                  {pendingPost && <article className="post zalo-post outgoing-preview" aria-busy="true">
+                    <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="avatar" />
+                    <div className="post-body"><strong>Đang đăng...</strong><p>{pendingPost.content}</p>
+                      <MediaAttachmentsView items={pendingPost.attachments} /></div>
+                  </article>}
+                  {renderPosts(visibleProfilePosts)}
+                </div>
+                {!profilePostsBusy && !profilePostsError && profilePosts.length === 0 && !pendingPost && (
+                  <SocoEmptyState title="Chưa có bài viết nào" description="Chia sẻ khoảnh khắc đầu tiên lên trang cá nhân của bạn."
+                    action={<SocoTextAction onClick={() => setProfileComposerOpen(true)}>Đăng bài đầu tiên</SocoTextAction>} />
+                )}
+                {profileHasMore && <button type="button" className="soco-load-more soco-feed-load-more"
+                  disabled={profilePostsBusy || !!pendingPost} onClick={() => void loadProfilePosts(true)}>
+                  {profilePostsBusy ? 'Đang tải...' : 'Xem bài viết cũ hơn'}
+                </button>}
+              </section>
+            ) : (<>
+            {profileIdentityForm}
 
             <div className="soco-profile-section-label">TÙY CHỌN & CÀI ĐẶT</div>
             <section className="settings-card">
-            <PrivacyControls
-              privacyLoading={privacyLoading}
-              privacyError={privacyError}
-              setPrivacyRetry={setPrivacyRetry}
-              privacy={privacy}
-              privacyBusy={privacyBusy}
-              changePrivacy={changePrivacy}
-            />
+              {profilePrivacyControls}
             <AccountSessionsPanel
               sessionsBusy={sessionsBusy}
               refreshToken={session.refreshToken}
@@ -3959,6 +4195,8 @@ export default function App() {
                 <span className="settings-account-chevron" aria-hidden="true">›</span>
               </button>
             </section>
+
+            </>)}
 
             {translationPickerOpen && (
               <div className="locale-picker-overlay" role="dialog" aria-modal="true" aria-label={t('profile.translationLanguage')}>
@@ -4106,6 +4344,21 @@ export default function App() {
         )}
       </section>
 
+      {profileComposerOpen && tab === 'profile' && profileTimelineOpen && (
+        <ProfileOverlay title="Tạo bài viết" busy={!!pendingPost || mediaUploading === 'feed'} onClose={() => setProfileComposerOpen(false)}>
+          {postComposer}
+        </ProfileOverlay>
+      )}
+      {profileEditorOpen && tab === 'profile' && profileTimelineOpen && (
+        <ProfileOverlay title="Chỉnh sửa hồ sơ" drawer busy={profileSaving || privacyBusy} onClose={() => setProfileEditorOpen(false)}>
+          {profileIdentityForm}
+          <section className="settings-card profile-field-permissions" aria-label="Quyền trường thông tin">
+            <h3>Quyền trường thông tin</h3>
+            {profilePrivacyControls}
+          </section>
+        </ProfileOverlay>
+      )}
+
       <CallManager
         request={apiFetch}
         apiBase={API}
@@ -4113,7 +4366,7 @@ export default function App() {
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}
-        conversations={conversations.map(({ id, name, type }) => ({ id, name, type }))}
+        conversations={displayConversations.map(({ id, name, type }) => ({ id, name, type }))}
       />
 
       <BottomNavigation

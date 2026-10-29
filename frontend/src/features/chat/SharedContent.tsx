@@ -1,3 +1,4 @@
+import { userLabel } from '../../shared/lib/userLabel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, Images, Link2, LoaderCircle, X } from 'lucide-react'
 
@@ -14,6 +15,7 @@ type MediaAttachment = {
 type SharedMessage = {
   id: number
   sender: string
+  senderDisplayName?: string
   text: string
   attachments?: MediaAttachment[]
   createdAt: string
@@ -152,7 +154,7 @@ export default function SharedContent({
                   {attachment.kind === 'video'
                     ? <video src={attachment.url} muted playsInline preload="metadata" />
                     : <img src={attachment.url} alt={attachment.name || 'Ảnh đã chia sẻ'} loading="lazy" />}
-                  <span>@{message.sender}</span>
+                  <span>{userLabel(message.senderDisplayName, message.sender)}</span>
                 </a>
               ))}
             </div>
@@ -171,7 +173,7 @@ export default function SharedContent({
                   <span className="shared-file-icon"><FileText size={20} /></span>
                   <span className="shared-file-copy">
                     <strong>{attachment.name || 'Tệp đính kèm'}</strong>
-                    <small>@{message.sender} · {formatBytes(attachment.sizeBytes)}</small>
+                    <small>{userLabel(message.senderDisplayName, message.sender)} · {formatBytes(attachment.sizeBytes)}</small>
                   </span>
                   <b>↗</b>
                 </a>
@@ -186,7 +188,7 @@ export default function SharedContent({
                   <span className="shared-link-icon"><Link2 size={19} /></span>
                   <span>
                     <strong>{url}</strong>
-                    <small>@{message.sender} · {new Date(message.createdAt).toLocaleDateString('vi-VN')}</small>
+                    <small>{userLabel(message.senderDisplayName, message.sender)} · {new Date(message.createdAt).toLocaleDateString('vi-VN')}</small>
                   </span>
                   <b>↗</b>
                 </a>

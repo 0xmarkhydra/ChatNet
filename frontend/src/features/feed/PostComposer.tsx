@@ -1,3 +1,4 @@
+import { userLabel } from '../../shared/lib/userLabel'
 import type { Dispatch, SetStateAction, RefObject, FormEvent } from 'react'
 import type { Post } from './types'
 import type { MediaAttachment } from '../../shared/lib/media'
@@ -7,6 +8,9 @@ import UiIcon from '../../shared/ui/UiIcon'
 
 type Props = {
   name: string
+  popup?: boolean
+  displayName?: string
+  submitError?: string
   createPost: (event: FormEvent) => void
   postComposerRef: RefObject<HTMLTextAreaElement | null>
   postBackground: string
@@ -29,6 +33,9 @@ type Props = {
 
 export default function PostComposer({
   name,
+  popup = false,
+  displayName,
+  submitError,
   createPost,
   postComposerRef,
   postBackground,
@@ -48,10 +55,23 @@ export default function PostComposer({
   setPostVisibility,
   setPostBackground,
 }: Props) {
+  const postAudience = (
+    <label>Ai có thể xem?
+      <select disabled={!!pendingPost} value={postVisibility} onChange={event => setPostVisibility(event.target.value as typeof postVisibility)}>
+        <option value="public">🌐 Công khai</option>
+        <option value="friends">👥 Bạn bè</option>
+        <option value="private">🔒 Chỉ mình tôi</option>
+      </select>
+    </label>
+  )
   return (
-    <form className="post-box zalo-post-composer" onSubmit={createPost}>
+    <form className={`post-box zalo-post-composer ${popup ? 'profile-popup-composer' : ''}`} onSubmit={createPost}>
       <div className="post-prompt compact-post-prompt">
-        <UserAvatar name={name} className="avatar self-avatar" />
+        <UserAvatar username={name} name={userLabel(displayName, name)} className="avatar self-avatar" />
+        {popup && <div className="profile-post-author">
+          <strong>{displayName || name}</strong>
+          {postAudience}
+        </div>}
         <textarea
           ref={postComposerRef}
           className={postBackground ? 'feed-composer-bg bg-' + postBackground : ''}
@@ -114,13 +134,7 @@ export default function PostComposer({
         <button type="button" aria-expanded={showPostBackgrounds} onClick={() => { setShowPostBackgrounds(v => !v); postComposerRef.current?.focus() }}><UiIcon name="text" size={20} />Nền chữ</button>
       </div>
       <div className="feed-composer-settings">
-        <label>Ai có thể xem?
-          <select value={postVisibility} onChange={event => setPostVisibility(event.target.value as typeof postVisibility)}>
-            <option value="public">🌐 Công khai</option>
-            <option value="friends">👥 Bạn bè</option>
-            <option value="private">🔒 Chỉ mình tôi</option>
-          </select>
-        </label>
+        {!popup && postAudience}
         {showPostBackgrounds && <div className="feed-background-palette" aria-label="Chọn nền bài viết">
           {['', 'violet', 'blue', 'sunset', 'mint', 'night'].map(bg => (
             <button key={bg || 'none'} type="button" className={'feed-palette-dot bg-' + (bg || 'none')}
@@ -131,8 +145,9 @@ export default function PostComposer({
         </div>}
       </div>
       {mediaUploading === 'feed' && <div className="media-uploading-note">Đang tải media thẳng lên kho lưu trữ…</div>}
-      {(postText.trim() || postAttachments.length > 0) && (
-        <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
+      {popup && submitError && <p className="profile-post-error" role="alert">{submitError}</p>}
+      {(popup || postText.trim() || postAttachments.length > 0) && (
+        <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading || (!postText.trim() && postAttachments.length === 0)}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
       )}
     </form>
   )

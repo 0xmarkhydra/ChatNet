@@ -13,7 +13,8 @@ import (
 	"unicode/utf8"
 )
 
-const feedAccessSQL = `(p.user_id=$2 OR p.visibility='public' OR
+const feedAccessSQL = `NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+ (b.blocker_id=$2 AND b.blocked_id=p.user_id) OR (b.blocker_id=p.user_id AND b.blocked_id=$2)) AND (p.user_id=$2 OR p.visibility='public' OR
  (p.visibility='friends' AND EXISTS(SELECT 1 FROM friend_connections fc
  WHERE fc.user_low=LEAST(p.user_id,$2) AND fc.user_high=GREATEST(p.user_id,$2)
  AND fc.status='accepted')))`
@@ -41,13 +42,13 @@ func (s *server) canReadPost(ctx context.Context, id, uid int64) bool {
 }
 func (s *server) respondPost(w http.ResponseWriter, r *http.Request, id, uid int64, status int) {
 	var p post
-	err := s.db.QueryRow(r.Context(), `SELECT p.id,u.username,p.content,p.likes_count,p.created_at,
+	err := s.db.QueryRow(r.Context(), `SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
  p.visibility,p.background,p.updated_at,
  EXISTS(SELECT 1 FROM post_likes WHERE post_id=p.id AND user_id=$2),
  EXISTS(SELECT 1 FROM saved_posts WHERE post_id=p.id AND user_id=$2)
  FROM posts p JOIN users u ON u.id=p.user_id
  WHERE p.id=$1 AND `+feedAccessSQL, id, uid).Scan(
-		&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt,
+		&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt,
 		&p.Visibility, &p.Background, &p.UpdatedAt, &p.Liked, &p.Saved)
 	if err != nil {
 		httpx.Error(w, 404, "post not found")

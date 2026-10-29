@@ -1,0 +1,112 @@
+.modern-shell .profile-identity-link {
+  display: flex; flex: 1; flex-direction: column; align-items: flex-start;
+  padding: 50px 0 0; border: 0; background: transparent; color: inherit; text-align: left;
+  font: inherit; cursor: pointer; white-space: normal;
+}
+.modern-shell .profile-identity-link:disabled { opacity: 1; cursor: default; }
+.modern-shell .profile-identity-link:focus-visible { outline: 2px solid var(--soco-blue); outline-offset: 6px; }
+.modern-shell .profile-identity-link .profile-media-hint { color: var(--soco-blue); }
+.modern-shell .simple-view.personal-timeline-view {
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 0; padding-bottom: max(28px, env(safe-area-inset-bottom));
+}
+.modern-shell .personal-timeline-view > .personal-timeline-header,
+.modern-shell .personal-timeline-view > .personal-timeline-content {
+  width: calc(100% - 24px); max-width: 860px; margin-inline: auto; box-sizing: border-box; flex-shrink: 0;
+}
+.personal-timeline-header { display: flex; align-items: center; gap: 10px; padding-block: 12px; }
+.personal-timeline-header h1 { flex: 1; margin: 0; font-size: 20px; color: var(--soco-navy); outline: none; }
+.personal-timeline-header button,
+.personal-timeline-intro button,
+.personal-timeline-label button,
+.personal-timeline-error button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 44px; padding: 10px 13px; border: 1px solid var(--soco-line);
+  background: var(--soco-surface); color: var(--soco-blue); font: inherit; cursor: pointer;
+}
+.modern-shell .personal-timeline-view > .profile-hero { margin-top: 0; flex-shrink: 0; }
+.modern-shell .personal-timeline-view .profile-cover-art { height: clamp(180px, 26vw, 280px); }
+.personal-timeline-content { padding-top: 18px; min-width: 0; }
+.personal-timeline-intro, .personal-timeline-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.personal-timeline-intro { margin-bottom: 16px; }
+.personal-timeline-intro strong { color: var(--soco-navy); font-size: 17px; }
+.personal-timeline-intro p { margin: 5px 0 0; font-size: 13px; color: var(--soco-muted); }
+.personal-timeline-intro button { flex-shrink: 0; background: var(--soco-gradient); color: white; border: 0; }
+.personal-timeline-label { padding-block: 16px 4px; }
+.personal-timeline-label h2 { margin: 0; color: var(--soco-navy); font-size: 18px; }
+.personal-timeline-content > .post-box { margin: 0; }
+.personal-timeline-content .feed { padding-top: 10px; }
+.personal-timeline-content .post { min-width: 0; }
+.personal-timeline-content .post-body { min-width: 0; overflow-wrap: anywhere; }
+.personal-timeline-content > .soco-load-more { width: 100%; }
+.personal-timeline-error { padding: 12px; border: 1px solid var(--soco-line); border-radius: 14px; background: var(--soco-surface); }
+.personal-timeline-error p { margin-top: 0; }
+@media (max-width: 760px) {
+  .modern-shell .simple-view.personal-timeline-view { padding-bottom: max(90px, env(safe-area-inset-bottom)); }
+}
+@media (max-width: 480px) {
+  .personal-timeline-header h1 { font-size: 18px; }
+  .personal-timeline-header button { padding-inline: 10px; }
+  .personal-timeline-intro { align-items: flex-start; }
+  .personal-timeline-intro p { line-height: 1.5; }
+  .modern-shell .personal-timeline-content .composer-shortcuts { flex-wrap: wrap; }
+}
+/* Personal publishing and editing use native modal focus/inert behavior. */
+.profile-post-launcher { display: flex; align-items: center; gap: 12px; padding: 16px; border: 1px solid var(--soco-line); border-radius: 18px; background: var(--soco-surface); }
+.profile-post-launcher > button { min-height: 46px; border: 0; border-radius: 24px; background: var(--soco-canvas); color: var(--soco-muted); padding: 12px 16px; font: inherit; text-align: left; cursor: pointer; flex: 1; min-width: 0; }
+.profile-post-launcher > .profile-post-photo { flex: 0 0 44px; padding: 10px; color: var(--soco-teal); background: transparent; }
+.profile-overlay { box-sizing: border-box; width: min(600px, calc(100vw - 28px)); max-height: calc(100dvh - 40px); padding: 0; border: 1px solid var(--soco-line); border-radius: 20px; background: var(--soco-surface); color: var(--soco-text); box-shadow: var(--soco-shadow); overflow: hidden; }
+.profile-overlay[open] { display: flex; flex-direction: column; }
+.profile-overlay::backdrop { background: rgb(242 244 247 / 78%); }
+.profile-overlay-heading { flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; min-height: 74px; padding: 14px 66px; border-bottom: 1px solid var(--soco-line); }
+.profile-overlay-heading h2 { margin: 0; color: var(--soco-navy); font-size: 23px; font-weight: 750; text-align: center; }
+.profile-overlay-heading > button { position: absolute; right: 16px; top: 15px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; color: var(--soco-muted); background: var(--soco-line); cursor: pointer; }
+.profile-overlay-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.profile-overlay button:disabled { cursor: not-allowed; }
+.profile-overlay :is(button, input, select, textarea):focus-visible { outline: 2px solid var(--soco-blue); outline-offset: 3px; }
+.modern-shell .profile-post-dialog .profile-popup-composer { display: flex; flex-direction: column; gap: 16px; margin: 0; padding: 20px; border: 0; border-radius: 0; background: var(--soco-surface); box-shadow: none; }
+.profile-popup-composer .post-prompt { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 14px; align-items: center; }
+.profile-popup-composer .self-avatar { width: 48px; height: 48px; }
+.profile-post-author { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.profile-post-author strong { overflow-wrap: anywhere; font-size: 16px; color: var(--soco-navy); }
+.profile-post-author label { font-size: 0; }
+.profile-post-author select { max-width: 100%; min-height: 32px; padding: 4px 10px; border: 0; border-radius: 7px; background: var(--soco-line); color: var(--soco-text); font-size: 13px; font-weight: 600; }
+.modern-shell .profile-popup-composer .post-prompt textarea { grid-column: 1 / -1; box-sizing: border-box; width: 100%; min-height: 185px; max-height: 40dvh; padding: 6px 0; border: 0; border-radius: 0; background: transparent; font-size: 24px; line-height: 1.5; resize: vertical; }
+.modern-shell .profile-popup-composer .post-prompt textarea.feed-composer-bg { padding: 20px; border-radius: 12px; }
+.profile-popup-composer .feed-pending-media { order: 2; }
+.profile-popup-composer .feed-composer-settings { order: 3; min-height: 0; padding: 0; border: 0; }
+.profile-popup-composer .feed-composer-settings:empty { display: none; }
+.modern-shell .profile-popup-composer .composer-shortcuts { order: 4; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; padding: 10px; border: 1px solid var(--soco-line); border-radius: 12px; }
+.profile-popup-composer .composer-shortcuts::before { content: 'Thêm vào bài viết'; margin-right: auto; padding: 6px; color: var(--soco-text); font-size: 14px; font-weight: 600; }
+.profile-popup-composer .composer-shortcuts button { min-height: 44px; padding: 8px; border-radius: 8px; }
+.profile-popup-composer .composer-shortcuts button:first-of-type { color: var(--soco-teal); }
+.profile-popup-composer .media-uploading-note, .profile-popup-composer .profile-post-error { order: 5; }
+.profile-post-error { margin: 0; color: #b42318; font-size: 14px; }
+.modern-shell .profile-popup-composer .feed-submit { order: 6; width: 100%; min-height: 46px; margin: 0; border: 0; border-radius: 10px; background: var(--soco-blue); color: white; font-size: 16px; font-weight: 650; }
+.modern-shell .profile-popup-composer .feed-submit:disabled { opacity: 1; color: var(--soco-muted); background: var(--soco-line); }
+.profile-edit-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(440px, 100vw); height: 100dvh; max-height: 100dvh; border-radius: 20px 0 0 20px; }
+.profile-edit-drawer::backdrop { background: rgb(15 23 42 / 35%); }
+.profile-edit-drawer .profile-overlay-heading { justify-content: flex-start; padding-left: 22px; }
+.profile-edit-drawer .profile-overlay-heading h2 { font-size: 21px; text-align: left; }
+.profile-edit-drawer .profile-overlay-body { padding: 20px 18px max(24px, env(safe-area-inset-bottom)); }
+.modern-shell .profile-edit-drawer .profile-edit-card { margin: 0 0 20px; width: 100%; box-sizing: border-box; padding: 18px; border: 1px solid var(--soco-line); border-radius: 16px; background: var(--soco-surface); }
+.modern-shell .profile-edit-drawer .profile-edit-card { display: flex; flex-direction: column; gap: 16px; }
+.profile-edit-drawer .profile-edit-field { min-width: 0; }
+.profile-edit-drawer .profile-edit-field input { box-sizing: border-box; width: 100%; min-width: 0; font-size: 16px; }
+.profile-edit-drawer .settings-card { margin: 0; border: 1px solid var(--soco-line); border-radius: 16px; }
+.profile-edit-drawer h3 { margin: 0; padding: 18px 16px 0; font-size: 17px; }
+.profile-edit-drawer .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; }
+.profile-edit-drawer .settings-row > div { min-width: 0; }
+.profile-edit-drawer .settings-row strong, .profile-edit-drawer .settings-row small { display: block; overflow-wrap: anywhere; }
+.profile-edit-drawer .settings-row small { margin-top: 5px; color: var(--soco-muted); line-height: 1.5; }
+.profile-edit-drawer .switch-button { flex-shrink: 0; }
+@media (max-width: 480px) {
+  .profile-overlay { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 16px; }
+  .profile-overlay-heading { min-height: 66px; padding-block: 10px; }
+  .profile-overlay-heading h2 { font-size: 20px; }
+  .profile-overlay-heading > button { top: 11px; right: 12px; }
+  .modern-shell .profile-post-dialog .profile-popup-composer { padding: 16px; gap: 12px; }
+  .modern-shell .profile-popup-composer .post-prompt textarea { font-size: 20px; min-height: 150px; }
+  .profile-popup-composer .composer-shortcuts::before { flex-basis: 100%; }
+  .profile-edit-drawer { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+}

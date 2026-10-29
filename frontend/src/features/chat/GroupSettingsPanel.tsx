@@ -124,7 +124,7 @@ export default function GroupSettingsPanel({
                         : [...current, friend.id])}
                   >
                     <UserAvatar
-                      name={friend.displayName || friend.username}
+                      username={friend.username} name={friend.displayName || friend.username}
                       className="group-member-avatar"
                       online={friend.online}
                     />
@@ -163,9 +163,9 @@ export default function GroupSettingsPanel({
       <div className="group-member-list">
         {groupMembers.map((member) => (
           <div className="group-member-row" key={member.id}>
-            <UserAvatar name={member.username} className="group-member-avatar" online={member.online} />
+            <UserAvatar username={member.username} name={member.displayName || member.username} className="group-member-avatar" online={member.online} />
             <div className="group-member-copy">
-              <strong>@{member.username}{member.id === userId ? ' · Bạn' : ''}</strong>
+              <strong>{member.displayName || member.username}{member.id === userId ? ' · Bạn' : ''}</strong>
               <span>
                 {member.role === 'owner' ? 'Chủ nhóm' : member.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
                 {member.online ? ' · online' : ''}

@@ -1,3 +1,4 @@
+import type { SessionResponseCache } from '../shared/lib/sessionCache'
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { API } from '../shared/lib/config'
 import { attachmentLabel } from '../shared/lib/format'
@@ -18,6 +19,10 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     'membershipSnapshot' | 'membershipEventSequence' | 'membershipSyncSequence' | 'setConversations'> &
   Pick<ReturnType<typeof useFeedData>, 'refreshPosts' | 'refreshStories'> &
   Pick<ReturnType<typeof useContactData>, 'refreshFriendConnections'> & {
+    onCategoryAssignmentChanged: (id: number, categoryId: number | null) => void
+    onCategoriesChanged: () => void
+    refreshCategoryConversations: () => void
+    responseCache: RefObject<SessionResponseCache>
     purgeConversation: (id: number) => void
     groupSettingsOpen: boolean
     activeConversationIdRef: RefObject<number | null>
@@ -37,6 +42,10 @@ type Options = Omit<AppDataContext, 'setNotice'> &
   }
 
 export function useAppRealtime({
+  onCategoryAssignmentChanged,
+  onCategoriesChanged,
+  refreshCategoryConversations,
+  responseCache,
   session,
   sessionRef,
   apiFetch,
@@ -85,21 +94,37 @@ export function useAppRealtime({
     events.addEventListener('update', (event) => {
       if (sessionRef.current?.sessionId !== session.sessionId) return
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
+      if (update.type === 'category.updated') {
+        if (update.conversationId > 0) {
+          responseCache.current.invalidate(['conversations'])
+          onCategoryAssignmentChanged(update.conversationId, update.categoryId || null)
+          return
+        }
+        responseCache.current.invalidate(['categories','conversations'])
+        onCategoriesChanged()
+        void refreshConversations()
+        return
+      }
       if (update.type === 'friend.updated') {
+        responseCache.current.invalidate(['friends','feed','stories','profiles','notes'])
         void refreshFriendConnections()
         return
       }
 
       if (update.type === 'conversation.removed') {
+        responseCache.current.invalidate(['conversations','messages'])
         purgeConversation(update.conversationId)
+        refreshCategoryConversations()
         return
       }
 
       if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
+        responseCache.current.invalidate(['conversations','messages'])
         revokedConversationIds.current.delete(update.conversationId)
         membershipSnapshot.current?.add(update.conversationId)
         membershipEventSequence.current += 1
         void refreshConversations()
+        refreshCategoryConversations()
         if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
           void refreshGroupMembers(update.conversationId)
         }
@@ -130,6 +155,7 @@ export function useAppRealtime({
       }
 
       if (update.type === 'message.updated' && update.message) {
+        responseCache.current.invalidate(['messages','conversations'])
         const changed = update.message
         messageChanges.current.add(changed.id)
         if (activeConversationIdRef.current === update.conversationId) {
@@ -154,10 +180,12 @@ export function useAppRealtime({
           })
         }
         void refreshConversations()
+        refreshCategoryConversations()
         return
       }
 
       if (update.type === 'message' && update.message) {
+        responseCache.current.invalidate(['messages','conversations'])
         const incoming = update.message
         // Only genuine, recent messages from other users make a sound. Loading
         // history, updating reactions and our own sends never trigger one.
@@ -214,6 +242,7 @@ export function useAppRealtime({
         })
 
         void refreshConversations()
+        refreshCategoryConversations()
 
         if (currentId === update.conversationId) {
           setMessages((current) =>
@@ -231,15 +260,22 @@ export function useAppRealtime({
     })
 
     const refreshTimer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
       void refreshConversations()
       void refreshFriendConnections()
+      refreshCategoryConversations()
     }, 20000)
     const membershipTimer = window.setInterval(() => {
       void reconcileConversationMemberships()
     }, 90000)
     const checkMembership = () => { void reconcileConversationMemberships() }
     const checkVisibleMembership = () => {
-      if (document.visibilityState === 'visible') checkMembership()
+      if (document.visibilityState === 'visible') {
+        checkMembership()
+        void refreshConversations()
+        refreshCategoryConversations()
+        void refreshFriendConnections()
+      }
     }
     window.addEventListener('online', checkMembership)
     document.addEventListener('visibilitychange', checkVisibleMembership)
@@ -252,6 +288,5 @@ export function useAppRealtime({
       membershipSyncSequence.current += 1
     }
   }, [session?.token, groupSettingsOpen])
-
 
 }

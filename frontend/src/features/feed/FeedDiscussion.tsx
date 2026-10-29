@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { userLabel } from '../../shared/lib/userLabel'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Ellipsis } from 'lucide-react'
 
 export type FeedComment = {
   id: number
   parentId?: number | null
   author: string
+  authorDisplayName?: string
   content: string
   createdAt: string
   updatedAt?: string | null
@@ -126,17 +129,37 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
   const [editingComment, setEditingComment] = useState<number | null>(null)
   const [commentOptionsId, setCommentOptionsId] = useState<number | null>(null)
+  const optionsTrigger = useRef<HTMLButtonElement | null>(null)
+  const optionsPanel = useRef<HTMLDivElement>(null)
+  const [optionsPosition, setOptionsPosition] = useState({ top: 0, left: 0 })
+  useLayoutEffect(() => {
+    if (commentOptionsId === null) return
+    const anchor = optionsTrigger.current?.getBoundingClientRect()
+    const panel = optionsPanel.current?.getBoundingClientRect()
+    if (!anchor || !panel) return
+    const below = anchor.bottom + 4
+    const top = below + panel.height <= window.innerHeight - 8 ? below : anchor.top - panel.height - 4
+    setOptionsPosition({
+      top: Math.max(8, Math.min(top, window.innerHeight - panel.height - 8)),
+      left: Math.max(8, Math.min(anchor.left, document.documentElement.clientWidth - panel.width - 8)),
+    })
+  }, [commentOptionsId])
   useEffect(() => {
     if (commentOptionsId === null) return
     function onDismiss(event: PointerEvent) {
-      if (!(event.target as HTMLElement).closest('.feed-comment-menu')) setCommentOptionsId(null)
+      if (!optionsPanel.current?.contains(event.target as Node) && !optionsTrigger.current?.contains(event.target as Node)) setCommentOptionsId(null)
     }
     function onEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') setCommentOptionsId(null)
     }
+    const onMove = () => setCommentOptionsId(null)
+    window.addEventListener('resize', onMove)
+    document.addEventListener('scroll', onMove, true)
     document.addEventListener('pointerdown', onDismiss)
     document.addEventListener('keydown', onEscape)
     return () => {
+      window.removeEventListener('resize', onMove)
+      document.removeEventListener('scroll', onMove, true)
       document.removeEventListener('pointerdown', onDismiss)
       document.removeEventListener('keydown', onEscape)
     }
@@ -197,11 +220,11 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
     const parent = comment.parentId ? byID.get(comment.parentId) : undefined
     return (
       <div className="feed-comment-row">
-        <span className="feed-comment-avatar" aria-hidden="true">{comment.author.slice(0, 2).toUpperCase()}</span>
+        <span className="feed-comment-avatar" aria-hidden="true">{userLabel(comment.authorDisplayName, comment.author).slice(0, 2).toUpperCase()}</span>
         <div className="feed-comment-body">
           <div className="feed-comment-bubble">
-            <strong>@{comment.author}</strong>
-            {parent && <small className="feed-reply-to">Trả lời @{parent.author}</small>}
+            <strong>{userLabel(comment.authorDisplayName, comment.author)}</strong>
+            {parent && <small className="feed-reply-to">Trả lời {userLabel(parent.authorDisplayName, parent.author)}</small>}
             {editingComment === comment.id ? (
               <div className="feed-comment-edit">
                 <textarea maxLength={1000} rows={3} value={editingText} onChange={event => setEditingText(event.target.value)} aria-label="Chỉnh sửa bình luận" />
@@ -216,14 +239,14 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
           </div>
           <div className="feed-comment-actions">
             <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
-            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời @${comment.author}`}>Trả lời</button>
+            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời ${userLabel(comment.authorDisplayName, comment.author)}`}>Trả lời</button>
             <div className="feed-comment-menu">
               <button type="button" aria-label="Tùy chọn bình luận" aria-expanded={commentOptionsId === comment.id}
-                onClick={() => setCommentOptionsId(current => current === comment.id ? null : comment.id)}>
+                onClick={event => { optionsTrigger.current = event.currentTarget; setCommentOptionsId(current => current === comment.id ? null : comment.id) }}>
                 <Ellipsis size={16} />
               </button>
-              {commentOptionsId === comment.id && (
-                <div className="feed-comment-options" role="group" aria-label="Thao tác bình luận">
+              {commentOptionsId === comment.id && createPortal(
+                <div ref={optionsPanel} style={optionsPosition} className="feed-comment-options" role="group" aria-label="Thao tác bình luận">
                   {comment.author === currentUser ? (
                     <>
                       <button type="button" disabled={commentActionBusy} onClick={() => {
@@ -237,7 +260,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
                   ) : <button type="button" onClick={() => {
                     setReportingComment(comment.id); setEditingComment(null); setCommentOptionsId(null)
                   }}>Báo cáo bình luận</button>}
-                </div>
+                </div>, document.body
               )}
             </div>
           </div>
@@ -285,11 +308,11 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
       {commentActionError && <p role="alert" className="feed-comment-error">{commentActionError}</p>}
       {pending && (
         <div className="feed-comment-row outgoing-preview" aria-busy="true">
-          <span className="feed-comment-avatar" aria-hidden="true">{pending.author.slice(0, 2).toUpperCase()}</span>
+          <span className="feed-comment-avatar" aria-hidden="true">{userLabel(pending.authorDisplayName, pending.author).slice(0, 2).toUpperCase()}</span>
           <div className="feed-comment-body">
             <div className="feed-comment-bubble">
-              <strong>@{pending.author}</strong>
-              {pending.parentId && <small className="feed-reply-to">Trả lời @{byID.get(pending.parentId)?.author}</small>}
+              <strong>{userLabel(pending.authorDisplayName, pending.author)}</strong>
+              {pending.parentId && <small className="feed-reply-to">Trả lời {userLabel(byID.get(pending.parentId)?.authorDisplayName, byID.get(pending.parentId)?.author)}</small>}
               <p className="pending-content">{pending.content}</p>
             </div>
             <small role="status">Đang gửi bình luận...</small>
@@ -299,14 +322,14 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
       <form className="feed-comment-form" onSubmit={(event) => { event.preventDefault(); void send() }}>
         {replyTo && (
           <div className="feed-reply-target">
-            <span>Đang trả lời @{replyTo.author}</span>
+            <span>Đang trả lời {userLabel(replyTo.authorDisplayName, replyTo.author)}</span>
             <button type="button" disabled={sending} onClick={() => updateEditor({ drafts, replyTo: null })}>Hủy</button>
           </div>
         )}
         <div className="feed-comment-compose">
           <textarea ref={input} rows={2} maxLength={1000} disabled={sending}
-            aria-label={replyTo ? `Phản hồi @${replyTo.author}` : 'Viết bình luận'}
-            placeholder={replyTo ? `Trả lời @${replyTo.author}...` : 'Viết bình luận...'}
+            aria-label={replyTo ? `Phản hồi ${userLabel(replyTo.authorDisplayName, replyTo.author)}` : 'Viết bình luận'}
+            placeholder={replyTo ? `Trả lời ${userLabel(replyTo.authorDisplayName, replyTo.author)}...` : 'Viết bình luận...'}
             value={draft} onChange={(event) => updateEditor({ replyTo, drafts: { ...drafts, [draftKey]: event.target.value } })}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {

@@ -1,3 +1,4 @@
+import { userLabel } from '../../shared/lib/userLabel'
 import type { Post } from './types'
 import type { ToastKind } from '../notifications/toast'
 import { API } from '../../shared/lib/config'
@@ -10,6 +11,8 @@ import UiIcon from '../../shared/ui/UiIcon'
 type Props = {
   post: Post
   name: string
+  ownDisplayName?: string
+  onAuthorOpen?: (username: string) => void
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   syncFeedPost: (post: Post) => void
   removeFeedPost: (id: number) => void
@@ -25,6 +28,8 @@ type Props = {
 export default function FeedPostCard({
   post,
   name,
+  ownDisplayName,
+  onAuthorOpen,
   apiFetch,
   syncFeedPost,
   removeFeedPost,
@@ -36,12 +41,16 @@ export default function FeedPostCard({
   likePreviews,
   like,
 }: Props) {
+  const authorLabel = userLabel(post.author === name ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
   return (
     <article className="post zalo-post" key={post.id}>
-      <UserAvatar name={post.author} className="avatar" />
+      <UserAvatar username={post.author} name={authorLabel} className="avatar" />
       <div className="post-body">
         <div className="post-author">
-          <div><strong>{post.author}</strong><small>{new Date(post.createdAt).toLocaleString('vi-VN')}</small></div>
+          <div>
+            <strong>{onAuthorOpen ? <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(post.author)}>{authorLabel}</button> : authorLabel}</strong>
+            <small>{new Date(post.createdAt).toLocaleString('vi-VN')} · {post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}</small>
+          </div>
           <FeedPostActions post={post} mine={post.author === name} request={apiFetch}
             onUpdated={syncFeedPost} onDeleted={removeFeedPost}
             onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
