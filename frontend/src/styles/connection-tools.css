@@ -57,5 +57,33 @@
   background: white; color: #354d40; font: inherit; font-weight: 600; cursor: pointer;
 }
 .chat-friend-bar button.primary { background: #08764b; border-color: #08764b; color: white; }
+
+
 .chat-friend-bar button:disabled { opacity: .5; cursor: wait; }
 .chat-friend-bar button:focus-visible { outline: 2px solid #08764b; outline-offset: 2px; }
+.chat-options-anchor { position: relative; flex: 0 0 auto; }
+.chat-options-trigger {
+  display: grid; place-items: center; width: 42px; height: 42px; padding: 0;
+  border: 1px solid #e2e8f0; border-radius: 12px;
+  background: #f1f5ff; color: #475569; cursor: pointer;
+}
+.chat-options-trigger:hover, .chat-options-trigger[aria-expanded="true"] {
+  background: #e5eaff; color: #4338ca;
+}
+.chat-options-trigger:focus-visible, .chat-options-menu button:focus-visible {
+  outline: 2px solid #4f46e5; outline-offset: 2px;
+}
+.chat-options-menu {
+  position: absolute; z-index: 30; top: calc(100% + 6px); right: 0;
+  width: 206px; max-width: calc(100vw - 20px); padding: 6px;
+  border: 1px solid #e2e8f0; border-radius: 14px;
+  background: #fff; box-shadow: 0 14px 34px rgba(15, 23, 42, .16);
+}
+.chat-options-menu button {
+  display: block; width: 100%; min-height: 44px; padding: 10px 12px;
+  border: 0; border-radius: 9px; background: transparent;
+  color: #334155; font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.chat-options-menu button:hover { background: #f1f5ff; }
+.chat-options-menu button.chat-options-danger { color: #be123c; }
+.chat-options-menu button:disabled { opacity: .5; cursor: wait; }

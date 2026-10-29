@@ -4262,16 +4262,6 @@ select:focus-visible {
   font-size: 10px;
 }
 
-.translation-hub-scrim {
-  position: fixed;
-  z-index: 198;
-  inset: 0;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: default;
-}
-
 .translation-hub-popover {
   position: absolute;
   z-index: 199;

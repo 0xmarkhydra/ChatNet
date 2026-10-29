@@ -110,6 +110,17 @@ export function useAppRealtime({
     events.addEventListener('update', (event) => {
       if (sessionRef.current?.sessionId !== session.sessionId) return
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
+      if (update.type === 'privacy.updated') {
+        // Remove potentially forbidden content immediately; refetch using current access rules.
+        responseCache.current.invalidate(['messages', 'conversations', 'friends', 'feed', 'stories', 'profiles', 'notes'])
+        setMessages([])
+        void refreshConversations()
+        void refreshFriendConnections()
+        void refreshPosts()
+        void refreshStories()
+        void reconcileConversationMemberships()
+        return
+      }
       if (update.type === 'category.updated') {
         if (update.conversationId > 0) {
           responseCache.current.invalidate(['conversations'])

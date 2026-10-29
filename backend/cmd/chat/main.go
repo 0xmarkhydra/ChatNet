@@ -549,12 +549,15 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		               ), '')
 		           END
 		           FROM messages m
-		           WHERE m.conversation_id=c.id
+		           WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		             (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))
 		           ORDER BY m.id DESC
 		           LIMIT 1
 		       ),''),
-		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id ORDER BY m.id DESC LIMIT 1),c.created_at),
-		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1),0)
+		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)) ORDER BY m.id DESC LIMIT 1),c.created_at),
+		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0)
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
@@ -567,7 +570,8 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
 		    WHERE other.conversation_id=c.id AND other.user_id<>$1
 		  ))
-		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id), c.created_at) DESC, c.id DESC
+		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
 		claims.UserID, limit, offset, categoryID)
 	if err != nil {
@@ -807,7 +811,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := s.db.Query(r.Context(), `
 		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
-		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
+		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
@@ -815,17 +819,22 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		           WHERE cmr.conversation_id=m.conversation_id
 		             AND cmr.user_id<>m.user_id
 		             AND cmr.last_read_message_id>=m.id
+		             AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		               (b.blocker_id=$5 AND b.blocked_id=cmr.user_id) OR (b.blocked_id=$5 AND b.blocker_id=cmr.user_id))
 		           ORDER BY cmr.user_id
 		       ),
 		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id))
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
 		WHERE m.conversation_id=$1 AND ($3::bigint=0 OR m.id<$3)
-		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit)
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
+		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return
@@ -991,8 +1000,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	if body.ReplyToMessageID != nil {
 		var replyConversationID int64
 		if err := s.db.QueryRow(r.Context(), `
-			SELECT conversation_id FROM messages WHERE id=$1
-		`, *body.ReplyToMessageID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
+			SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+			  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+		`, *body.ReplyToMessageID, claims.UserID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
 			httpx.Error(w, http.StatusBadRequest, "invalid reply message")
 			return
 		}
@@ -1089,10 +1099,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	memberIDs := s.memberIDs(r.Context(), conversationID)
-	s.publishConversationEvent(r.Context(), memberIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
+	visibleIDs, visibilityErr := s.visibleRecipients(r.Context(), claims.UserID, memberIDs)
+	if visibilityErr != nil {
+		log.Printf("cannot filter message recipients: %v", visibilityErr)
+		visibleIDs = []int64{claims.UserID} // Message persisted; never notify blocked peers on failure.
+	}
+	s.publishConversationEvent(r.Context(), visibleIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
 
-	recipients := make([]int64, 0, len(memberIDs))
-	for _, uid := range memberIDs {
+	recipients := make([]int64, 0, len(visibleIDs))
+	for _, uid := range visibleIDs {
 		if uid != claims.UserID {
 			recipients = append(recipients, uid)
 		}
@@ -1115,7 +1130,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 	var m message
 	err := s.db.QueryRow(ctx, `
 		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
-		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
+		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
@@ -1123,14 +1138,18 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		           WHERE cmr.conversation_id=m.conversation_id
 		             AND cmr.user_id<>m.user_id
 		             AND cmr.last_read_message_id>=m.id
+		             AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		               (b.blocker_id=$2 AND b.blocked_id=cmr.user_id) OR (b.blocked_id=$2 AND b.blocker_id=cmr.user_id))
 		           ORDER BY cmr.user_id
 		       ),
 		       m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$2 AND b.blocker_id=rm.user_id))
 		LEFT JOIN users ru ON ru.id=rm.user_id
-		WHERE m.id=$1`, messageID).Scan(
+		WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))`, messageID, viewerID).Scan(
 		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
@@ -1257,8 +1276,10 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		SELECT conversation_id FROM messages WHERE id=$1 AND deleted_at IS NULL
-	`, messageID).Scan(&conversationID); err != nil {
+		SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND m.deleted_at IS NULL
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+	`, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found")
 		return
 	}
@@ -1364,6 +1385,9 @@ func (s *server) attachMessageReactions(ctx context.Context, viewerID int64, ite
 		SELECT message_id,emoji,COUNT(*)::int,BOOL_OR(user_id=$2)
 		FROM message_reactions
 		WHERE message_id = ANY($1::bigint[])
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$2 AND b.blocked_id=message_reactions.user_id) OR
+		    (b.blocked_id=$2 AND b.blocker_id=message_reactions.user_id))
 		GROUP BY message_id,emoji
 		ORDER BY message_id,MIN(created_at)
 	`, ids, viewerID)
@@ -1402,12 +1426,21 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
+		return
+	}
+
 	var maxID int64
-	_ = s.db.QueryRow(r.Context(), `
-		SELECT COALESCE(MAX(id),0)
-		FROM messages
-		WHERE conversation_id=$1
-	`, conversationID).Scan(&maxID)
+	if err := s.db.QueryRow(r.Context(), `
+		SELECT COALESCE(MAX(m.id),0)
+		FROM messages m
+		WHERE m.conversation_id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR
+		  (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+	`, conversationID, claims.UserID).Scan(&maxID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify read policy")
+		return
+	}
 
 	lastReadID := previousReadID
 	if maxID > previousReadID {
@@ -1479,7 +1512,42 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 				}
 				continue
 			}
-			fmt.Fprintf(w, "event: update\ndata: %s\n\n", item.Payload)
+			var event realtimeEvent
+			if json.Unmarshal([]byte(item.Payload), &event) != nil {
+				continue
+			}
+			actorID := int64(0)
+			if event.Message != nil {
+				actorID = event.Message.SenderID
+			}
+			if event.Type == "conversation.read" {
+				actorID = event.ReaderID
+			}
+			if actorID > 0 && actorID != claims.UserID {
+				blocked, err := s.blockedPair(r.Context(), claims.UserID, actorID)
+				if err != nil || blocked {
+					continue
+				} // Also cover in-flight messages after a block.
+			}
+			// Reload in the recipient's privacy scope. C replying to B
+			// must not expose B's quoted text or reaction identities to A.
+			payload := item.Payload
+			if event.Message != nil {
+				if !s.isMember(r.Context(), event.ConversationID, claims.UserID) {
+					continue
+				}
+				personalized, err := s.loadMessage(r.Context(), event.Message.ID, claims.UserID)
+				if err != nil {
+					continue
+				}
+				event.Message = &personalized
+				filtered, err := json.Marshal(event)
+				if err != nil {
+					continue
+				}
+				payload = string(filtered)
+			}
+			fmt.Fprintf(w, "event: update\ndata: %s\n\n", payload)
 			flusher.Flush()
 		case <-ticker.C:
 			active, err := authx.SessionActiveCached(r.Context(), s.db, s.redis, claims)
@@ -1594,6 +1662,21 @@ func (s *server) memberIDs(ctx context.Context, conversationID int64) []int64 {
 }
 
 func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, event realtimeEvent) {
+	actorID := int64(0)
+	if event.Message != nil {
+		actorID = event.Message.SenderID
+	}
+	if event.Type == "conversation.read" {
+		actorID = event.ReaderID
+	}
+	if actorID > 0 {
+		visible, err := s.visibleRecipients(ctx, actorID, userIDs)
+		if err != nil {
+			log.Printf("cannot filter chat event recipients: %v", err)
+			return // Fail closed: never broadcast blocked message payloads.
+		}
+		userIDs = visible
+	}
 	data, _ := json.Marshal(event)
 	for _, userID := range userIDs {
 		_ = s.redis.Publish(ctx, userChannel(userID), data).Err()

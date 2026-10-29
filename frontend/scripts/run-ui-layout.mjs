@@ -192,6 +192,46 @@ try {
     await page.getByRole('button', { name: 'Danh bạ', exact: true }).click()
     await geometry('contacts', width, ['.modern-frame', '.contacts-view', '.contact-shortcuts'])
     check(await page.locator('.contacts-view > .soco-section-heading').count() === 0, 'Removed Contacts banner reappeared: ' + width)
+    // Regression: the friend menu must escape the rounded card and its Block action must be clickable.
+    const friendOptions = page.locator('.friend-contact-row .friend-contact-more').first()
+    await friendOptions.click()
+    const friendMenu = page.locator('.friend-contact-row .friend-contact-popover')
+    await friendMenu.waitFor()
+    const menuBounds = await friendMenu.boundingBox()
+    check(menuBounds && menuBounds.y >= -1 && menuBounds.y + menuBounds.height <= (width <= 375 ? 667 : width <= 430 ? 844 : 900) + 1,
+      'Friend options are outside the viewport at ' + width + ': ' + JSON.stringify(menuBounds))
+    check(await friendMenu.evaluate(node => getComputedStyle(node.closest('.contacts-suggestions')).overflowY === 'visible'),
+      'Friend options are clipped by the contacts card at ' + width)
+    const blockFriend = friendMenu.getByRole('menuitem', { name: 'Chặn người dùng' })
+    await blockFriend.scrollIntoViewIfNeeded()
+    await blockFriend.click() // Native confirmation is dismissed by Playwright; do not block the test account.
+    await page.keyboard.press('Escape')
+    if (width === 390) {
+      // Search rows must never shrink while the mouse is held, even with animations enabled.
+      const contactSearch = page.locator('.appbar-search input')
+      await contactSearch.fill('minhanh')
+      const searchRow = page.locator('.contact-search-row').first()
+      await searchRow.waitFor()
+      await page.emulateMedia({ reducedMotion: 'no-preference' })
+      const beforePress = await searchRow.boundingBox()
+      check(beforePress, 'Search result missing before pointer-down test')
+      await page.mouse.move(beforePress.x + beforePress.width / 2, beforePress.y + beforePress.height / 2)
+      await page.mouse.down()
+      await page.waitForTimeout(180)
+      const pressedRow = await searchRow.evaluate(node => ({
+        transform: getComputedStyle(node).transform,
+        transitionDuration: getComputedStyle(node).transitionDuration,
+      }))
+      const afterPress = await searchRow.boundingBox()
+      await page.mouse.up()
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      check(pressedRow.transform === 'none' && pressedRow.transitionDuration.split(',').every(t => parseFloat(t) === 0),
+        'Search result must not scale or animate on pointer-down: ' + JSON.stringify(pressedRow))
+      check(afterPress && Math.abs(afterPress.width - beforePress.width) < 1 &&
+        Math.abs(afterPress.height - beforePress.height) < 1,
+        'Search row shrank while mouse was held: ' + JSON.stringify({ beforePress, afterPress }))
+      await contactSearch.fill('')
+    }
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
     // Only social engagement actions belong in the footer. Manage post from •••.
@@ -263,6 +303,20 @@ try {
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
     await page.locator('.conversation-item').first().click()
     await geometry('chat-room', width, ['.modern-frame', '.conversation-panel', '.chat-head'])
+    if ([390, 1440].includes(width)) {
+      const translationTrigger = page.locator('.chat-head .translation-hub-trigger')
+      const translationMenu = page.getByRole('dialog', { name: 'Cài đặt dịch AI' })
+      await translationTrigger.click()
+      await translationMenu.waitFor()
+      await translationMenu.locator('.translation-language-search input').fill('en')
+      check(await translationMenu.isVisible(), 'Translation menu closed while interacting inside: ' + width)
+      await page.locator('.chat-head .room-info').click()
+      await translationMenu.waitFor({ state: 'hidden' })
+      await translationTrigger.click()
+      await translationMenu.waitFor()
+      await page.keyboard.press('Escape')
+      await translationMenu.waitFor({ state: 'hidden' })
+    }
     if (width <= 760) await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
   }
   // Regression: connection sheet stays a fixed 50% of the viewport while results change.
@@ -560,6 +614,30 @@ try {
     if (width === 390 || width === 1440)
       await page.screenshot({ path: 'output/playwright/layout/profile-actions-' + width + '.png' })
   }
+
+  // A former friend can be blocked again from the direct-chat options without re-friending.
+  friends.length = 0
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.reload()
+  await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
+  await page.locator('.conversation-item').filter({ hasText: 'minhanh' }).first().click()
+  await page.locator('.chat-friend-bar').waitFor()
+  await page.getByText('Hai bạn chưa kết bạn', { exact: true }).waitFor()
+  const chatOptions = page.getByRole('button', { name: 'Tùy chọn cuộc trò chuyện' })
+  check(await chatOptions.isVisible() && await chatOptions.isEnabled(),
+    'A non-friend with existing direct chat must have a chat options menu')
+  await chatOptions.click()
+  const blockNonFriend = page.getByRole('menu', { name: 'Tùy chọn cuộc trò chuyện' }).getByRole('menuitem', { name: 'Chặn người dùng' })
+  check(await blockNonFriend.isVisible() && await blockNonFriend.isEnabled(),
+    'A non-friend must be able to block via the three-dot menu')
+  const confirmation = new Promise(resolve => page.once('dialog', async dialog => {
+    check(dialog.type() === 'confirm' && dialog.message().includes('Chặn'),
+      'Block must ask for confirmation')
+    await dialog.dismiss()
+    resolve()
+  }))
+  await blockNonFriend.click()
+  await confirmation
 
   // Regression: frontend must POST only strict AttachmentInput fields.
   // A presigned download URL in POST /api/stories previously triggered "invalid body".
