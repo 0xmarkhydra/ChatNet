@@ -13,7 +13,8 @@ import (
 	"unicode/utf8"
 )
 
-const feedAccessSQL = `(p.user_id=$2 OR p.visibility='public' OR
+const feedAccessSQL = `NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+ (b.blocker_id=$2 AND b.blocked_id=p.user_id) OR (b.blocker_id=p.user_id AND b.blocked_id=$2)) AND (p.user_id=$2 OR p.visibility='public' OR
  (p.visibility='friends' AND EXISTS(SELECT 1 FROM friend_connections fc
  WHERE fc.user_low=LEAST(p.user_id,$2) AND fc.user_high=GREATEST(p.user_id,$2)
  AND fc.status='accepted')))`

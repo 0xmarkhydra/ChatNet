@@ -127,6 +127,11 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
+	author := strings.TrimSpace(r.URL.Query().Get("author"))
+	if len(author) > 64 {
+		httpx.Error(w, 400, "invalid author")
+		return
+	}
 	scope := r.URL.Query().Get("scope")
 	if scope != "" && scope != "saved" && scope != "mine" {
 		httpx.Error(w, http.StatusBadRequest, "invalid scope")
@@ -149,10 +154,10 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		       p.visibility,p.background,p.updated_at,
 		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
 		FROM posts p JOIN users u ON u.id=p.user_id
-		WHERE ($1::bigint=0 OR p.id<$1) AND `+feedAccessSQL+`
+		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND `+feedAccessSQL+`
 		  AND ($4='all' OR ($4='mine' AND p.user_id=$2)
 		       OR ($4='saved' AND EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)))
-		ORDER BY p.id DESC LIMIT $3`, before, claims.UserID, limit, scope)
+		ORDER BY p.id DESC LIMIT $3`, before, claims.UserID, limit, scope, author)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")
 		return

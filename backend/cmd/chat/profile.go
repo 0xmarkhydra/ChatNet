@@ -244,3 +244,30 @@ func (s *server) profileAsset(w http.ResponseWriter, r *http.Request, kind strin
 	}
 	http.Redirect(w, r, signed, http.StatusTemporaryRedirect)
 }
+
+// Visitor profiles expose only public identity fields, never email or privacy settings.
+func (s *server) getUserProfile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	username, err := normalizeProfileUsername(r.PathValue("username"))
+	if err != nil {
+		httpx.Error(w, 404, "profile not found")
+		return
+	}
+	var result struct {
+		profileState
+		ID                  int64 `json:"id"`
+		AllowFriendRequests bool  `json:"allowFriendRequests"`
+	}
+	err = s.db.QueryRow(r.Context(), `
+ SELECT u.id,u.username,u.display_name,COALESCE(u.avatar_ref,'')<>'',COALESCE(u.cover_ref,'')<>'',
+ u.profile_updated_at,u.allow_friend_requests FROM users u WHERE u.username=$1
+ AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+ (b.blocker_id=$2 AND b.blocked_id=u.id) OR (b.blocker_id=u.id AND b.blocked_id=$2))
+ `, username, claims.UserID).Scan(&result.ID, &result.Username, &result.DisplayName, &result.AvatarSet, &result.CoverSet, &result.UpdatedAt, &result.AllowFriendRequests)
+	if err != nil {
+		httpx.Error(w, 404, "profile not found")
+		return
+	}
+	httpx.JSON(w, 200, result)
+}
