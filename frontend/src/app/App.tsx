@@ -3213,10 +3213,11 @@ export default function App() {
                     />
                     <div className="conversation-copy">
                       <div>
-                        <strong>{conversation.name}</strong>
+                        <span className="conversation-title"><strong>{conversation.name}</strong>
+                          <CategoryBadge iconOnly category={conversationCategories.categories.find(c => c.id === conversation.categoryId)} />
+                        </span>
                         <time>{formatTime(conversation.lastMessageAt) || (conversation.online ? 'online' : '')}</time>
                       </div>
-                      <CategoryBadge category={conversationCategories.categories.find(c => c.id === conversation.categoryId)} />
                       <div>
                         <span>{conversation.lastMessage || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
                         {conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</b>}

@@ -69,3 +69,6 @@
 .conversation-categories :focus-visible,.conversation-category-assignment :focus-visible{outline:2px solid var(--soco-blue);outline-offset:2px}
 .category-options .sr-only{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}
 @media(max-width:600px){.category-toolbar button{min-height:40px}.category-manager{max-width:calc(100vw - 24px);border-radius:20px;max-height:calc(100dvh - 24px)}.category-dialog-header{padding:18px}.category-manager-content{padding:16px 18px 18px}.category-manager button{min-height:40px}.category-manager input:not([type]),.conversation-category-assignment select{font-size:16px}.category-color-choice{width:36px;height:36px}.category-color-picker{gap:6px}.category-manager form{padding:14px}.category-managed-list{max-height:180px}}
+.zalo-conversation-list .conversation-copy .conversation-title{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+.zalo-conversation-list .conversation-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zalo-conversation-list .conversation-title .category-icon-only{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:transparent;padding:0;border-radius:0;width:16px;height:18px}

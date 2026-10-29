@@ -6,8 +6,11 @@ import './conversation-categories.css'
 type Model = ReturnType<typeof useConversationCategories>
 export const categoryColors = [{value:'indigo',name:'Chàm'}, {value:'blue',name:'Xanh dương'}, {value:'green',name:'Xanh lá'}, {value:'orange',name:'Cam'}, {value:'pink',name:'Hồng'}, {value:'slate',name:'Xám'}]
 
-export function CategoryBadge({ category }: { category?: ConversationCategory }) {
- return category ? <small className={'conversation-category-badge category-' + category.color}><Tag size={11} aria-hidden="true" />{category.name}</small> : null
+export function CategoryBadge({ category, iconOnly = false }: { category?: ConversationCategory; iconOnly?: boolean }) {
+ return category ? <small className={'conversation-category-badge category-' + category.color + (iconOnly ? ' category-icon-only' : '')}
+  title={category.name} aria-label={iconOnly ? 'Phân loại: '+category.name : undefined}>
+  <Tag size={iconOnly ? 14 : 11} fill={iconOnly ? 'currentColor' : 'none'} aria-hidden="true" />{!iconOnly && category.name}
+ </small> : null
 }
 export function CategoryAssignment({ model, conversationId, categoryId }: { model: Model; conversationId: number; categoryId?: number }) {
  const category = model.categories.find(c => c.id === categoryId)
