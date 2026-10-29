@@ -41,6 +41,7 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     setMessageDrafts: Dispatch<SetStateAction<Record<number, MessageDraft>>>
     messageReceipts: RefObject<Map<string, Message | null>>
     setOutgoingMessage: Dispatch<SetStateAction<Message | null>>
+    onMessageConfirmed: (message: Message) => void
   }
 
 export function useAppRealtime({
@@ -78,6 +79,7 @@ export function useAppRealtime({
   messageReceipts,
   setOutgoingMessage,
   setConversations,
+  onMessageConfirmed,
 }: Options) {
   useEffect(() => {
     if (!session?.token) return
@@ -219,6 +221,7 @@ export function useAppRealtime({
         messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
+          onMessageConfirmed(incoming)
           const recovered = loadPendingSend(session.user.id, session.sessionId)
           if (recovered?.clientId === incoming.clientId && recovered.conversationId === incoming.conversationId) {
             clearPendingSend(session.user.id, incoming.clientId)

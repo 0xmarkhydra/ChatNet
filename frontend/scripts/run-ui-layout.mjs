@@ -109,6 +109,7 @@ try {
     const json = (data, status = 200) => route.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify(data) })
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
     if (path === '/api/events') return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: ': connected\n\n' })
+    if (path === '/api/conversation-categories') return json([])
     if (path === '/api/conversations') return json(pagedConversations.slice(offset, offset + limit))
     if (/^\/api\/conversations\/\d+\/members$/.test(path)) return json([
       { id: 1, username: 'soco_user', displayName: 'SOCO Test User', role: 'owner', online: true },

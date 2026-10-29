@@ -50,7 +50,9 @@ import GroupCreator from '../features/chat/GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../features/notifications/incomingSound'
 import { createSessionClient, loadSession, type Session } from '../features/auth/session'
-import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from '../features/chat/chatPersistence'
+import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts } from '../features/chat/chatPersistence'
+import { restoreChatOutbox } from '../features/chat/outboxRecovery'
+import { clearChatOutbox, confirmChatMessage, enqueueChatMessage, persistChatOutboxChange, retryableChatMessages, type QueuedChatMessage } from '../chatOutbox'
 import { uploadPresignedFile } from '../features/chat/mediaUpload'
 import { canMarkConversationRead } from '../features/chat/conversationRead'
 import { mergeById, toggleCount } from '../shared/lib/optimistic'
@@ -148,6 +150,38 @@ export default function App() {
   const messageReceipts = useRef(new Map<string, Message | null>())
   // Preserve the request ID for an ambiguous send so a retry cannot create another row.
   const pendingSend = useRef<{ sessionId: string; conversationId: number; signature: string; clientId: string; draft: MessageDraft } | null>(null)
+  const [chatOutbox, setChatOutbox] = useState<QueuedChatMessage[]>(() =>
+    restoreChatOutbox(session?.user.id ?? 0, session?.sessionId ?? ''))
+  const chatOutboxRef = useRef(chatOutbox)
+  const chatOutboxSession = useRef(session?.sessionId ?? '')
+  const sendingClientIDs = useRef(new Set<string>())
+  const retryOutboxBusy = useRef(false)
+  const [chatOnline, setChatOnline] = useState(() => navigator.onLine)
+
+  function updateChatOutbox(transform: (items: QueuedChatMessage[]) => QueuedChatMessage[]) {
+    const current = sessionRef.current
+    if (!current || current.sessionId !== chatOutboxSession.current) return chatOutboxRef.current
+    const previous = chatOutboxRef.current
+    const next = transform(previous)
+    if (previous === next) return next
+    if (!persistChatOutboxChange(current.user.id, current.sessionId, previous, next)) {
+      setNotice('Không lưu được hàng đợi tin nhắn trên thiết bị này.', 'warning')
+      return previous
+    }
+    chatOutboxRef.current = next
+    setChatOutbox(next)
+    return next
+  }
+  useEffect(() => {
+    const nextSessionId = session?.sessionId ?? ''
+    if (nextSessionId === chatOutboxSession.current) return
+    chatOutboxSession.current = nextSessionId
+    const restored = restoreChatOutbox(session?.user.id ?? 0, nextSessionId)
+    chatOutboxRef.current = restored
+    setChatOutbox(restored)
+    sendingClientIDs.current.clear()
+    retryOutboxBusy.current = false
+  }, [session?.sessionId])
   const preferenceQueue = useRef(Promise.resolve())
   const preferenceRevision = useRef(0)
   const [newChatMode, setNewChatMode] = useState<NewChatMode>('none')
@@ -256,6 +290,23 @@ export default function App() {
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
+  useEffect(() => {
+    if (!translationMenuOpen) return
+    const onOutsidePointer = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest('.translation-hub')) {
+        setTranslationMenuOpen(false)
+      }
+    }
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTranslationMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onOutsidePointer, true)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('pointerdown', onOutsidePointer, true)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [translationMenuOpen])
   const [languageSearch, setLanguageSearch] = useState('')
   const [appLocale, setAppLocale] = useState(loadAppLocalePreference)
   const [uiBundle, setUiBundle] = useState<UIBundle>(defaultBundle)
@@ -2138,7 +2189,11 @@ export default function App() {
       })
       .catch(() => undefined)
 
-    if (current?.user.id) clearChatPersistence(current.user.id)
+    if (current?.user.id) { clearChatPersistence(current.user.id); clearChatOutbox(current.user.id) }
+    chatOutboxRef.current = []
+    setChatOutbox([])
+    chatOutboxSession.current = ''
+    sendingClientIDs.current.clear()
     pendingSend.current = null
     if (clearStorage) localStorage.removeItem('chatnet-session')
     sessionRef.current = null
@@ -2278,6 +2333,13 @@ export default function App() {
     messageReceipts,
     setOutgoingMessage,
     setConversations,
+    onMessageConfirmed: (message) => {
+      if (!message.clientId || message.senderId !== sessionRef.current?.user.id) return
+      updateChatOutbox((items) => {
+        if (!items.some((item) => item.clientId === message.clientId && item.conversationId === message.conversationId)) return items
+        return confirmChatMessage(items, message.clientId!, message.conversationId)
+      })
+    },
   })
 
 
@@ -2429,98 +2491,151 @@ export default function App() {
     }
   }
 
-  async function sendMessage(event: FormEvent) {
-    event.preventDefault()
-    if (!canSend || !activeConversationId || sendingRef.current) return
 
-    const conversationId = activeConversationId
-    const submittedDraft = draft
-    const text = messageText.trim()
-    const attachments = messageAttachments
-    if (!session) return
-    const sessionId = session.sessionId
-    const reply = replyingTo
-    const signature = JSON.stringify({ text, attachments: attachments.map((file) => file.storageRef), replyToMessageId: reply?.id ?? null })
-    const previous = pendingSend.current ?? loadPendingSend(session.user.id, sessionId)
-    // A refresh cannot restore unsigned media URLs. Never silently resend a
-    // text-only copy of an ambiguous attachment message as a new message.
-    if (previous?.conversationId === conversationId && messageAttachments.length === 0) {
-      try {
-        const earlier = JSON.parse(previous.signature) as { text?: string; attachments?: string[] }
-        if (earlier.text === text && Array.isArray(earlier.attachments) && earlier.attachments.length > 0) {
-          setNotice('Tin kèm tệp trước đó chưa được xác nhận. Hãy kiểm tra lịch sử hoặc thay đổi nội dung trước khi gửi lại.', 'warning')
-          return
-        }
-      } catch { /* Invalid old receipt is ignored. */ }
-    }
-    const clientId = previous && previous.sessionId === sessionId && previous.conversationId === conversationId && previous.signature === signature
-      ? previous.clientId : crypto.randomUUID()
-    pendingSend.current = { sessionId, conversationId, signature, clientId, draft: submittedDraft }
-    savePendingSend(session.user.id, { sessionId, conversationId, signature, clientId })
-    // A matching realtime receipt can confirm delivery even if the HTTP response is lost.
-    messageReceipts.current.set(clientId, null)
-    sendingRef.current = true
-    setMessageSending(true)
-    setOutgoingMessage({
-      id: -1, clientId, conversationId, senderId: session.user.id, sender: session.user.username, senderDisplayName: session.user.displayName,
-      text, attachments, createdAt: new Date().toISOString(),
-      replyToMessageId: reply?.id, replyToSender: reply?.sender, replyToDisplayName: reply?.senderDisplayName, replyToText: reply?.text,
-    })
+  async function deliverQueuedChatMessage(item: QueuedChatMessage) {
+    const identity = sessionRef.current
+    if (!identity || chatOutboxSession.current !== identity.sessionId ||
+      !navigator.onLine || sendingClientIDs.current.has(item.clientId) ||
+      !chatOutboxRef.current.some((pending) => pending.clientId === item.clientId &&
+        pending.conversationId === item.conversationId && pending.status !== 'failed')) return
+    sendingClientIDs.current.add(item.clientId)
     try {
-      const response = await apiFetch(`/api/conversations/${conversationId}/messages`, {
+      const response = await apiFetch(`/api/conversations/${item.conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text,
-          attachments: attachments.map(attachmentRequestBody),
-          clientId,
-          ...(reply ? { replyToMessageId: reply.id } : {}),
+          text: item.text,
+          attachments: item.attachments,
+          clientId: item.clientId,
+          ...(item.replyToMessageId ? { replyToMessageId: item.replyToMessageId } : {}),
         }),
       })
-      if (sessionRef.current?.sessionId !== sessionId) return
-      const receipt = messageReceipts.current.get(clientId)
-      if (!response.ok && !receipt?.id) {
-        if (response.status >= 400 && response.status < 500 && pendingSend.current?.clientId === clientId) {
-          pendingSend.current = null
-          clearPendingSend(session.user.id, clientId)
-        }
-        const result = await response.json().catch(() => null) as { error?: string } | null
-        setNotice(result?.error || 'Gửi tin nhắn thất bại')
+      if (sessionRef.current?.sessionId !== identity.sessionId) return
+      if (!response.ok) {
+        const permanent = response.status >= 400 && response.status < 500 &&
+          response.status !== 408 && response.status !== 429
+        const error = permanent
+          ? (await response.json().catch(() => null) as { error?: string } | null)?.error
+          : undefined
+        updateChatOutbox((items) => items.map((pending) =>
+          pending.clientId === item.clientId && pending.conversationId === item.conversationId
+            ? { ...pending, status: permanent ? 'failed' : 'unconfirmed',
+                error: permanent ? (error || 'Không gửi được. Kiểm tra quyền hoặc nội dung.') : undefined }
+            : pending))
         return
       }
-      const sent = receipt?.id ? receipt : await response.json() as Message
-      if (!Number.isSafeInteger(sent.id) || sent.id <= 0 || sent.conversationId !== conversationId) {
-        throw new Error('Invalid message response')
-      }
-      if (pendingSend.current?.clientId === clientId) pendingSend.current = null
-      clearPendingSend(session.user.id, clientId)
-      if (activeConversationIdRef.current === conversationId) {
-        messageChanges.current.add(sent.id)
-        setMessages((current) => mergeById(current, sent).sort((a, b) => a.id - b.id))
+      const confirmed = await response.json() as Message
+      if (!Number.isSafeInteger(confirmed.id) || confirmed.id <= 0 ||
+        confirmed.clientId !== item.clientId || confirmed.conversationId !== item.conversationId ||
+        confirmed.senderId !== identity.user.id) throw new Error('Unexpected send receipt')
+      updateChatOutbox((items) => confirmChatMessage(items, item.clientId, item.conversationId))
+      if (activeConversationIdRef.current === item.conversationId) {
+        messageChanges.current.add(confirmed.id)
+        setMessages((current) => mergeById(current, confirmed).sort((a, b) => a.id - b.id))
       }
       void refreshConversations()
-      setMessageDrafts((current) => {
-        if (current[conversationId] !== submittedDraft) return current
-        const next = { ...current }
-        delete next[conversationId]
-        return next
-      })
-      if (activeConversationIdRef.current === conversationId) setReplyingTo((current) => current === reply ? null : current)
     } catch {
-      if (sessionRef.current?.sessionId === sessionId) {
-        setNotice('Chưa xác nhận được tin đã gửi. Bản nháp được giữ lại; kiểm tra hội thoại trước khi gửi lại.')
+      if (sessionRef.current?.sessionId === identity.sessionId) {
+        // The HTTP ACK might be lost after the database commit. Reuse the same clientId.
+        updateChatOutbox((items) => items.map((pending) =>
+          pending.clientId === item.clientId && pending.conversationId === item.conversationId
+            ? { ...pending, status: 'unconfirmed', error: undefined }
+            : pending))
       }
     } finally {
-      messageReceipts.current.delete(clientId)
-      if (sessionRef.current?.sessionId === sessionId) {
-        setOutgoingMessage(null)
-        sendingRef.current = false
-        setMessageSending(false)
-        if (activeConversationIdRef.current === conversationId) {
-          window.requestAnimationFrame(() => messageInputRef.current?.focus({ preventScroll: true }))
-        }
-      }
+      sendingClientIDs.current.delete(item.clientId)
     }
+  }
+
+  async function retryQueuedChatMessages() {
+    if (!navigator.onLine || retryOutboxBusy.current || !sessionRef.current) return
+    retryOutboxBusy.current = true
+    try {
+      while (navigator.onLine) {
+        const item = retryableChatMessages(chatOutboxRef.current)[0]
+        if (!item) break
+        await deliverQueuedChatMessage(item)
+        const remaining = chatOutboxRef.current.find((pending) =>
+          pending.clientId === item.clientId && pending.conversationId === item.conversationId)
+        if (remaining && remaining.status !== 'failed') break
+      }
+    } finally {
+      retryOutboxBusy.current = false
+    }
+  }
+
+  useEffect(() => {
+    if (!session?.sessionId) return
+    const onOnline = () => {
+      setChatOnline(true)
+      void retryQueuedChatMessages()
+    }
+    const onOffline = () => setChatOnline(false)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') onOnline()
+    }
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = window.setInterval(() => void retryQueuedChatMessages(), 15_000)
+    const initial = window.setTimeout(() => void retryQueuedChatMessages(), 250)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.clearInterval(timer)
+      window.clearTimeout(initial)
+    }
+  }, [session?.sessionId])
+
+  useEffect(() => {
+    if (!session || !messages.length || !chatOutboxRef.current.length) return
+    const delivered = new Set(messages.filter((message) =>
+      message.senderId === session.user.id && Boolean(message.clientId)).map((message) =>
+      `${message.conversationId}:${message.clientId}`))
+    if (!delivered.size) return
+    updateChatOutbox((items) => {
+      if (!items.some((item) => delivered.has(`${item.conversationId}:${item.clientId}`))) return items
+      return items.filter((item) => !delivered.has(`${item.conversationId}:${item.clientId}`))
+    })
+  }, [messages, session?.sessionId])
+
+  function sendMessage(event: FormEvent) {
+    event.preventDefault()
+    if (!canSend || !activeConversationId || sendingRef.current || !session) return
+    sendingRef.current = true
+    window.setTimeout(() => { sendingRef.current = false }, 0)
+
+    const conversationId = activeConversationId
+    const submittedDraft = draft
+    const reply = replyingTo
+    const item: QueuedChatMessage = {
+      clientId: crypto.randomUUID(),
+      conversationId,
+      text: messageText.trim(),
+      attachments: messageAttachments.map(attachmentRequestBody),
+      ...(reply ? {
+        replyToMessageId: reply.id,
+        replyToSender: reply.sender,
+        replyToText: reply.text,
+      } : {}),
+      createdAt: new Date().toISOString(),
+      status: 'queued',
+    }
+    const next = updateChatOutbox((items) => enqueueChatMessage(items, item))
+    if (!next.some((pending) => pending.clientId === item.clientId)) {
+      setNotice('Hàng đợi tin nhắn đã đầy. Nội dung vẫn ở ô nhập; hãy thử lại sau.', 'warning')
+      return
+    }
+    setMessageDrafts((current) => {
+      if (current[conversationId] !== submittedDraft) return current
+      const updated = { ...current }
+      delete updated[conversationId]
+      return updated
+    })
+    setReplyingTo((current) => current === reply ? null : current)
+    if (navigator.onLine) void retryQueuedChatMessages()
+    else setChatOnline(false)
   }
 
   async function editOwnMessage(message: Message) {
@@ -3622,22 +3737,32 @@ export default function App() {
                         </article>
                       )
                     })}
-                    {outgoingMessage?.conversationId === activeConversationId && (
-                      <article className="message mine outgoing-preview" aria-busy="true">
-                        {outgoingMessage.replyToMessageId && (
+                    {chatOutbox.filter((item) => item.conversationId === activeConversationId).map((item) => (
+                      <article className="message mine outgoing-preview chat-outbox-message" key={item.clientId} aria-busy={item.status !== 'failed'}>
+                        {item.replyToMessageId && (
                           <div className="message-reply-quote">
-                            <strong>{userLabel(outgoingMessage.replyToDisplayName, outgoingMessage.replyToSender)}</strong><span>{outgoingMessage.replyToText}</span>
+                            <strong>{item.replyToSender || 'Trả lời'}</strong><span>{item.replyToText}</span>
                           </div>
                         )}
-                        {outgoingMessage.text && (
-                          <div className="bubble">
-                            <span className="message-selectable-text">{outgoingMessage.text}</span>
-                          </div>
-                        )}
-                        <MediaAttachmentsView items={outgoingMessage.attachments} />
-                        <div className="message-stamp" role="status">Đang gửi...</div>
+                        {item.text && <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>}
+                        <MediaAttachmentsView items={item.attachments} />
+                        <div className="chat-outbox-footer">
+                          <span className={item.status === 'failed' ? 'message-stamp chat-outbox-error' : 'message-stamp'} role="status">
+                            {item.status === 'failed' ? item.error || 'Không gửi được' :
+                              !chatOnline ? 'Chờ có mạng' : item.status === 'unconfirmed' ? 'Đang xác nhận...' : 'Đang gửi...'}
+                          </span>
+                          {(item.status === 'failed' || (item.status === 'unconfirmed' && chatOnline)) && (
+                            <button type="button" className="chat-outbox-retry"
+                              aria-label={item.status === 'failed' ? 'Gửi lại tin nhắn bị lỗi' : 'Gửi lại tin nhắn đang chờ'}
+                              onClick={() => {
+                              updateChatOutbox((items) => items.map((old) =>
+                                old.clientId === item.clientId ? { ...old, status: 'queued', error: undefined } : old))
+                              void retryQueuedChatMessages()
+                            }}><RefreshCw size={14} /> Gửi lại</button>
+                          )}
+                        </div>
                       </article>
-                    )}
+                    ))}
                     <div ref={bottomRef} />
                   </div>
 
