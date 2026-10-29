@@ -4217,7 +4217,7 @@ export default function App() {
                     ) : (
                       <img src={story.attachment.url} alt="" loading="lazy" />
                     )}
-                    <span className="story-avatar-mini">{userLabel(story.authorDisplayName, story.author).slice(0, 1).toUpperCase()}</span>
+                    <UserAvatar className="story-avatar-mini" username={story.author} name={userLabel(story.authorDisplayName, story.author)} />
                   </div>
                   <span>{story.author === name ? 'Story của bạn' : userLabel(story.authorDisplayName, story.author)}</span>
                 </button>

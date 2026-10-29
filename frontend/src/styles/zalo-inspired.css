@@ -1083,6 +1083,10 @@
   font-size: 11px;
 }
 
+.story-avatar-mini.smart-avatar {
+  position: absolute;
+}
+
 .story-viewer-backdrop {
   position: fixed;
   z-index: 100;
