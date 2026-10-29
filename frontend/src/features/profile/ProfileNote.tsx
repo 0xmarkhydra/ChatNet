@@ -1,3 +1,5 @@
+import BubbleTextarea from '../../shared/ui/BubbleTextarea'
+import UserAvatar from '../../shared/ui/UserAvatar'
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, Plus, Trash2, X, LockKeyhole, Users, Globe, RefreshCw } from 'lucide-react'
 import './profile-note.css'
@@ -76,8 +78,11 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
     </div>}
    </div>:owner&&<form className="profile-note-body" onSubmit={e=>{e.preventDefault();void publishOrDelete()}}>
     <p className="profile-note-hint">Một suy nghĩ nhỏ, một ngày mới. Ghi chú hiển thị trong 24 giờ.</p>
-    <textarea aria-label="Nội dung ghi chú" placeholder="Bạn đang nghĩ gì?" value={draft} disabled={busy} onChange={e=>setDraft(e.target.value)} rows={3} autoFocus />
-    <span className={'profile-note-count'+(count>60?' over-limit':'')}>{count}/60</span>
+    <div className="profile-note-compose">
+     <BubbleTextarea className="profile-note-input-bubble" aria-label="Nội dung ghi chú" placeholder="Chia sẻ suy nghĩ…" value={draft} disabled={busy} onChange={e=>setDraft(e.target.value)} autoFocus />
+     <UserAvatar username={username} name={username} className="profile-note-compose-avatar" />
+     <span className={'profile-note-count'+(count>60?' over-limit':'')}>{count}/60</span>
+    </div>
     <label className="profile-note-audience"><Users size={16}/><span>Ai có thể xem?</span>
      <select aria-label="Ai có thể xem ghi chú" value={visibility} disabled={busy} onChange={e=>setVisibility(e.target.value as Note['visibility'])}>
       <option value="friends">Bạn bè</option><option value="public">Công khai</option><option value="private">Chỉ mình tôi</option>
