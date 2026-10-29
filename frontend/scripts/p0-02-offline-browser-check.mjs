@@ -39,6 +39,9 @@ const records = new Map()
 const requests = []
 let loseNextAck = false
 let blockPost = false
+let heldPostText = ''
+let heldPostStarted
+let releaseHeldPost
 let nextId = 900
 const answer = (route, body, status = 200) => route.fulfill({
   status, headers: cors, contentType: 'application/json', body: JSON.stringify(body),
@@ -56,10 +59,11 @@ try {
   assert.ok(ready, 'Vite did not start: ' + output)
   browser = await chromium.launch({ headless: true, channel: 'chrome' })
   const context = await browser.newContext({ viewport: { width: 1100, height: 800 } })
-  const page = await context.newPage()
+  let page = await context.newPage()
   const pageErrors = []
-  page.on('pageerror', error => pageErrors.push(error.message))
-  await page.addInitScript(s => {
+  const watchPage = candidate => candidate.on('pageerror', error => pageErrors.push(error.message))
+  watchPage(page)
+  await context.addInitScript(s => {
     localStorage.setItem('chatnet-session', JSON.stringify(s))
     window.EventSource = class TestEventSource {
       readyState = 1
@@ -68,7 +72,7 @@ try {
       close() {}
     }
   }, session)
-  await page.route('http://localhost:8080/**', async route => {
+  await context.route('http://localhost:8080/**', async route => {
     const req = route.request()
     const path = new URL(req.url()).pathname
     const method = req.method()
@@ -81,6 +85,10 @@ try {
       const body = req.postDataJSON()
       requests.push(body)
       if (blockPost) return route.abort('failed')
+      if (body.text === heldPostText) {
+        heldPostStarted?.()
+        await new Promise(resolveHeld => { releaseHeldPost = resolveHeld })
+      }
       let saved = records.get(body.clientId)
       if (!saved) {
         saved = {
@@ -112,8 +120,8 @@ try {
   await page.goto(origin)
   await page.locator('.conversation-item').first().waitFor({ timeout: 10000 })
   await page.locator('.conversation-item').first().click()
-  const field = page.getByRole('textbox', { name: 'Tin nhắn' })
-  const sendButton = page.getByRole('button', { name: 'Gửi tin nhắn' })
+  let field = page.getByRole('textbox', { name: 'Tin nhắn' })
+  let sendButton = page.getByRole('button', { name: 'Gửi tin nhắn' })
   await field.waitFor({ timeout: 10000 })
 
   // P0: Offline A -> B must show a durable, visible pending bubble.
@@ -121,21 +129,68 @@ try {
   await page.evaluate(() => window.dispatchEvent(new Event('offline')))
   await field.fill('P0-02 offline message from A to B')
   await sendButton.click()
-  const pending = page.locator('.chat-outbox-message').filter({ hasText: 'P0-02 offline message from A to B' })
+  let pending = page.locator('.chat-outbox-message').filter({ hasText: 'P0-02 offline message from A to B' })
   await pending.waitFor({ timeout: 5000 })
   assert.match(await pending.textContent(), /Đang gửi/)
   assert.equal(records.size, 0, 'nothing should be POSTed while offline')
-  const savedOutbox = await page.evaluate(() => sessionStorage.getItem('chatnet:outbox:v1:1'))
-  assert.ok(savedOutbox?.includes('P0-02 offline message'), 'pending message must survive a reload')
+  const savedOutbox = await page.evaluate(() =>
+    Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .filter(key => key?.startsWith('chatnet:outbox:v2:1:'))
+      .map(key => localStorage.getItem(key)))
+  assert.ok(savedOutbox.some(raw => raw?.includes('P0-02 offline message')),
+    'pending message must be stored durably')
+
+  // Closing the tab/PWA must not erase the queue. Reopen while the message API is unavailable.
+  blockPost = true
+  await page.close()
+  await context.setOffline(false)
+  page = await context.newPage()
+  watchPage(page)
+  await page.goto(origin)
+  await page.locator('.conversation-item').first().waitFor({ timeout: 10000 })
+  await page.locator('.conversation-item').first().click()
+  field = page.getByRole('textbox', { name: 'Tin nhắn' })
+  sendButton = page.getByRole('button', { name: 'Gửi tin nhắn' })
+  await field.waitFor({ timeout: 10000 })
+  pending = page.locator('.chat-outbox-message').filter({ hasText: 'P0-02 offline message from A to B' })
+  await pending.waitFor({ timeout: 10000 })
+  assert.match(await pending.textContent(), /Đang gửi/)
 
   // Reconnect must automatically flush with the same clientId and one DB row.
-  await context.setOffline(false)
+  blockPost = false
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await page.waitForFunction(() => document.querySelectorAll('.chat-outbox-message').length === 0, { timeout: 10000 })
   assert.equal(records.size, 1)
   const firstClientId = [...records.keys()][0]
-  assert.equal(requests.filter(x => x.clientId === firstClientId).length, 1)
+  assert.equal(requests.filter(x => x.clientId === firstClientId).length, 2,
+    'reopen outage and successful retry must reuse the same clientId')
   assert.equal(await page.locator('.message .bubble').filter({ hasText: 'P0-02 offline message from A to B' }).count(), 1)
+
+  // All online sends use one pump: a second message cannot overtake a slow first request.
+  const orderedFirst = 'P0-03 ordered first'
+  const orderedSecond = 'P0-03 ordered second'
+  heldPostText = orderedFirst
+  const firstReachedServer = new Promise(resolveStarted => { heldPostStarted = resolveStarted })
+  await field.fill(orderedFirst)
+  await sendButton.click()
+  await Promise.race([
+    firstReachedServer,
+    delay(5000).then(() => { throw new Error('first ordered send did not reach the server') }),
+  ])
+  await field.fill(orderedSecond)
+  await sendButton.click()
+  await delay(250)
+  assert.deepEqual(requests.filter(x => x.text === orderedFirst || x.text === orderedSecond).map(x => x.text),
+    [orderedFirst], 'second POST must wait for the first receipt')
+  assert.ok(releaseHeldPost, 'first POST gate was not installed')
+  releaseHeldPost()
+  await page.waitForFunction(() => document.querySelectorAll('.chat-outbox-message').length === 0,
+    { timeout: 10000 })
+  assert.deepEqual(requests.filter(x => x.text === orderedFirst || x.text === orderedSecond).map(x => x.text),
+    [orderedFirst, orderedSecond])
+  heldPostText = ''
+  heldPostStarted = undefined
+  releaseHeldPost = undefined
 
   // Server commits but HTTP ACK disappears. The retry must reuse clientId.
   loseNextAck = true
@@ -148,9 +203,9 @@ try {
   const ids = requests.filter(x => x.text === 'P0-02 lost ACK').map(x => x.clientId)
   assert.equal(ids.length, 2, 'lost ACK must be replayed')
   assert.equal(new Set(ids).size, 1, 'resend must reuse the original clientId')
-  assert.equal(records.size, 2, 'database cannot create a duplicate')
+  assert.equal(records.size, 4, 'database cannot create a duplicate')
 
-  // Pending is reloaded from sessionStorage rather than lost on a page refresh.
+  // Pending is reloaded from durable local storage rather than lost on a page refresh.
   blockPost = true
   await field.fill('P0-02 reload during outage')
   await sendButton.click()
@@ -162,9 +217,9 @@ try {
   blockPost = false
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await recovering.waitFor({ state: 'detached', timeout: 25000 })
-  assert.equal(records.size, 3)
+  assert.equal(records.size, 5)
   assert.deepEqual(pageErrors, [], 'page must not throw while offline/recovering')
-  console.log('PASS: browser offline bubble, automatic resend, lost-ACK idempotency, reload recovery, no duplicate messages')
+  console.log('PASS: durable close/reopen queue, serialized sends, automatic resend, lost-ACK idempotency, reload recovery')
 } finally {
   await browser?.close()
   vite.kill('SIGTERM')

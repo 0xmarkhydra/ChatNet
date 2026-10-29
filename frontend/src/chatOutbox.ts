@@ -1,5 +1,5 @@
-// A per-tab outbox for unacknowledged chat sends. Only the original request
-// fields are saved: never persist bearer tokens or signed media URLs.
+// A durable per-account outbox for unacknowledged chat sends. Only the
+// original request fields are saved: never persist bearer tokens or signed media URLs.
 export type QueuedChatAttachment = {
   storageRef: string
   name: string
@@ -21,16 +21,28 @@ export type QueuedChatMessage = {
   error?: string
 }
 
-type ChatStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+type ChatStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'>
 const MAX_OUTBOX = 60
 const MAX_BYTES = 600_000
-const key = (userId: number) => `chatnet:outbox:v1:${userId}`
-const validID = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) > 0
+const prefix = (userId: number) => `chatnet:outbox:v2:${userId}:`
+const itemKey = (userId: number, clientId: string) => prefix(userId) + clientId
+const validID = (value: unknown): value is number =>
+  Number.isSafeInteger(value) && (value as number) > 0
 const validClientID = (value: unknown): value is string =>
   typeof value === 'string' && /^[a-zA-Z0-9-]{1,64}$/.test(value)
 
 function usableStore(store?: ChatStore): ChatStore | null {
-  try { return store ?? window.sessionStorage } catch { return null }
+  try { return store ?? window.localStorage } catch { return null }
+}
+
+function storedKeys(target: ChatStore, userId: number): string[] {
+  const start = prefix(userId)
+  const keys: string[] = []
+  for (let index = 0; index < target.length; index++) {
+    const candidate = target.key(index)
+    if (candidate?.startsWith(start)) keys.push(candidate)
+  }
+  return keys
 }
 
 function validItem(value: unknown): value is QueuedChatMessage {
@@ -71,33 +83,65 @@ function safeItem(item: QueuedChatMessage): QueuedChatMessage {
 export function loadChatOutbox(userId: number, sessionId: string, store?: ChatStore): QueuedChatMessage[] {
   if (!validID(userId) || !sessionId) return []
   try {
-    const raw = usableStore(store)?.getItem(key(userId))
-    if (!raw || raw.length > MAX_BYTES) return []
-    const value: unknown = JSON.parse(raw)
-    if (!value || typeof value !== 'object') return []
-    const saved = value as { sessionId?: string; items?: unknown }
-    if (saved.sessionId !== sessionId || !Array.isArray(saved.items) || saved.items.length > MAX_OUTBOX) return []
+    const target = usableStore(store)
+    if (!target) return []
+    const keys = storedKeys(target, userId)
+    if (keys.length > MAX_OUTBOX) return []
+
+    let bytes = 0
     const seen = new Set<string>()
-    return saved.items.filter((item): item is QueuedChatMessage => {
-      if (!validItem(item) || seen.has(item.clientId)) return false
-      seen.add(item.clientId)
-      return true
-    }).map(safeItem)
+    const items: QueuedChatMessage[] = []
+    for (const storageKey of keys) {
+      const raw = target.getItem(storageKey)
+      if (!raw) continue
+      bytes += raw.length
+      if (bytes > MAX_BYTES) return []
+      const value: unknown = JSON.parse(raw)
+      if (!value || typeof value !== 'object') continue
+      const saved = value as { sessionId?: string; item?: unknown }
+      if (saved.sessionId !== sessionId || !validItem(saved.item) ||
+        seen.has(saved.item.clientId)) continue
+      seen.add(saved.item.clientId)
+      items.push(safeItem(saved.item))
+    }
+    return items.sort((a, b) =>
+      a.createdAt.localeCompare(b.createdAt) || a.clientId.localeCompare(b.clientId))
   } catch { return [] }
 }
 
-export function saveChatOutbox(
-  userId: number, sessionId: string, items: QueuedChatMessage[], store?: ChatStore,
+export function persistChatOutboxChange(
+  userId: number,
+  sessionId: string,
+  previous: QueuedChatMessage[],
+  next: QueuedChatMessage[],
+  store?: ChatStore,
 ): boolean {
-  if (!validID(userId) || !sessionId || items.length > MAX_OUTBOX || !items.every(validItem)) return false
+  if (!validID(userId) || !sessionId || next.length > MAX_OUTBOX ||
+    !next.every(validItem) || new Set(next.map((item) => item.clientId)).size !== next.length) return false
   try {
     const target = usableStore(store)
     if (!target) return false
-    if (!items.length) target.removeItem(key(userId))
-    else {
-      const raw = JSON.stringify({ sessionId, items: items.map(safeItem) })
-      if (raw.length > MAX_BYTES) return false
-      target.setItem(key(userId), raw)
+
+    const nextByID = new Map(next.map((item) => [item.clientId, safeItem(item)]))
+    const projected = new Map<string, string>()
+    for (const storageKey of storedKeys(target, userId)) {
+      const raw = target.getItem(storageKey)
+      if (raw) projected.set(storageKey, raw)
+    }
+    for (const item of nextByID.values()) {
+      projected.set(itemKey(userId, item.clientId), JSON.stringify({ sessionId, item }))
+    }
+    for (const old of previous) {
+      if (!nextByID.has(old.clientId)) projected.delete(itemKey(userId, old.clientId))
+    }
+    if (projected.size > MAX_OUTBOX ||
+      [...projected.values()].reduce((total, raw) => total + raw.length, 0) > MAX_BYTES) return false
+
+    for (const item of nextByID.values()) {
+      target.setItem(itemKey(userId, item.clientId), JSON.stringify({ sessionId, item }))
+    }
+    for (const old of previous) {
+      if (!nextByID.has(old.clientId)) target.removeItem(itemKey(userId, old.clientId))
     }
     return true
   } catch { return false }
@@ -105,16 +149,28 @@ export function saveChatOutbox(
 
 export function clearChatOutbox(userId: number, store?: ChatStore): void {
   if (!validID(userId)) return
-  try { usableStore(store)?.removeItem(key(userId)) } catch { /* Restricted storage */ }
+  try {
+    const target = usableStore(store)
+    if (!target) return
+    for (const storageKey of storedKeys(target, userId)) target.removeItem(storageKey)
+  } catch { /* Restricted storage */ }
 }
 
-export function enqueueChatMessage(items: QueuedChatMessage[], message: QueuedChatMessage): QueuedChatMessage[] {
+export function enqueueChatMessage(
+  items: QueuedChatMessage[],
+  message: QueuedChatMessage,
+): QueuedChatMessage[] {
   if (items.length >= MAX_OUTBOX || items.some((item) => item.clientId === message.clientId)) return items
   return [...items, message]
 }
 
-export function confirmChatMessage(items: QueuedChatMessage[], clientId: string, conversationId: number): QueuedChatMessage[] {
-  return items.filter((item) => item.clientId !== clientId || item.conversationId !== conversationId)
+export function confirmChatMessage(
+  items: QueuedChatMessage[],
+  clientId: string,
+  conversationId: number,
+): QueuedChatMessage[] {
+  return items.filter((item) =>
+    item.clientId !== clientId || item.conversationId !== conversationId)
 }
 
 export function retryableChatMessages(items: QueuedChatMessage[]): QueuedChatMessage[] {

@@ -10,7 +10,7 @@ import { createSessionClient, loadSession, parseSession, type Session } from './
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts } from './chatPersistence'
 import {
   clearChatOutbox, confirmChatMessage, enqueueChatMessage, loadChatOutbox,
-  retryableChatMessages, saveChatOutbox, type QueuedChatMessage,
+  persistChatOutboxChange, retryableChatMessages, type QueuedChatMessage,
 } from './chatOutbox'
 import { uploadPresignedFile } from './mediaUpload'
 import { canMarkConversationRead } from './conversationRead'
@@ -142,7 +142,7 @@ function restoreChatOutbox(userId: number, sessionId: string): QueuedChatMessage
       ...(reply ? { replyToMessageId: Number(reply) } : {}),
       status: 'unconfirmed',
     })
-    if (next !== current && saveChatOutbox(userId, sessionId, next)) {
+    if (next !== current && persistChatOutboxChange(userId, sessionId, current, next)) {
       clearPendingSend(userId, previous.clientId)
       return next
     }
@@ -582,13 +582,15 @@ export default function App() {
   function updateChatOutbox(update: (items: QueuedChatMessage[]) => QueuedChatMessage[]): QueuedChatMessage[] {
     const current = sessionRef.current
     if (!current || chatOutboxSession.current !== current.sessionId) return chatOutboxRef.current
-    const next = update(chatOutboxRef.current)
-    if (next === chatOutboxRef.current) return next
+    const previous = chatOutboxRef.current
+    const next = update(previous)
+    if (next === previous) return next
+    if (!persistChatOutboxChange(current.user.id, current.sessionId, previous, next)) {
+      setNotice('Trình duyệt không lưu được hàng đợi trên thiết bị.', 'warning')
+      return previous
+    }
     chatOutboxRef.current = next
     setChatOutbox(next)
-    if (!saveChatOutbox(current.user.id, current.sessionId, next)) {
-      setNotice('Trình duyệt không lưu được hàng đợi. Hãy giữ tab mở cho đến khi tin được xác nhận.', 'warning')
-    }
     return next
   }
 
@@ -3317,12 +3319,12 @@ export default function App() {
     }
   }
 
-  async function deliverQueuedChatMessage(item: QueuedChatMessage, allowFailed = false) {
+  async function deliverQueuedChatMessage(item: QueuedChatMessage) {
     const identity = sessionRef.current
     if (!identity || chatOutboxSession.current !== identity.sessionId || !navigator.onLine ||
       sendingClientIDs.current.has(item.clientId) ||
       !chatOutboxRef.current.some((pending) => pending.clientId === item.clientId &&
-        pending.conversationId === item.conversationId && (pending.status !== 'failed' || allowFailed))) return
+        pending.conversationId === item.conversationId && pending.status !== 'failed')) return
 
     sendingClientIDs.current.add(item.clientId)
     setSendingClientIDList([...sendingClientIDs.current])
@@ -3382,10 +3384,14 @@ export default function App() {
     if (!navigator.onLine || retryOutboxBusy.current || !sessionRef.current) return
     retryOutboxBusy.current = true
     try {
-      // Replay requests in order; the backend unique index makes lost-ACK safe.
-      for (const item of retryableChatMessages(chatOutboxRef.current)) {
-        if (!navigator.onLine) break
+      // One pump owns all sends so later messages cannot overtake a slow request.
+      while (navigator.onLine) {
+        const item = retryableChatMessages(chatOutboxRef.current)[0]
+        if (!item) break
         await deliverQueuedChatMessage(item)
+        const remaining = chatOutboxRef.current.find((pending) =>
+          pending.clientId === item.clientId && pending.conversationId === item.conversationId)
+        if (remaining && remaining.status !== 'failed') break
       }
     } finally {
       retryOutboxBusy.current = false
@@ -3451,7 +3457,7 @@ export default function App() {
     })
     setReplyingTo((current) => current === reply ? null : current)
     // Keep the pending bubble visible until a real delivery receipt arrives.
-    if (navigator.onLine) void deliverQueuedChatMessage(item)
+    if (navigator.onLine) void retryQueuedChatMessages()
     else setChatOnline(false)
   }
 
@@ -4895,7 +4901,7 @@ export default function App() {
                                 onClick={() => {
                                   updateChatOutbox((items) => items.map((old) =>
                                     old.clientId === item.clientId ? { ...old, status: 'queued', error: undefined } : old))
-                                  void deliverQueuedChatMessage(item, true)
+                                  void retryQueuedChatMessages()
                                 }}>
                                 <RefreshCw size={14} aria-hidden="true" /> Gửi lại
                               </button>
