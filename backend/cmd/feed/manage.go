@@ -41,13 +41,13 @@ func (s *server) canReadPost(ctx context.Context, id, uid int64) bool {
 }
 func (s *server) respondPost(w http.ResponseWriter, r *http.Request, id, uid int64, status int) {
 	var p post
-	err := s.db.QueryRow(r.Context(), `SELECT p.id,u.username,p.content,p.likes_count,p.created_at,
+	err := s.db.QueryRow(r.Context(), `SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
  p.visibility,p.background,p.updated_at,
  EXISTS(SELECT 1 FROM post_likes WHERE post_id=p.id AND user_id=$2),
  EXISTS(SELECT 1 FROM saved_posts WHERE post_id=p.id AND user_id=$2)
  FROM posts p JOIN users u ON u.id=p.user_id
  WHERE p.id=$1 AND `+feedAccessSQL, id, uid).Scan(
-		&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt,
+		&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt,
 		&p.Visibility, &p.Background, &p.UpdatedAt, &p.Liked, &p.Saved)
 	if err != nil {
 		httpx.Error(w, 404, "post not found")

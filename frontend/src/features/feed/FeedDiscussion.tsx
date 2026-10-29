@@ -1,3 +1,4 @@
+import { userLabel } from '../../shared/lib/userLabel'
 import { useEffect, useRef, useState } from 'react'
 import { Ellipsis } from 'lucide-react'
 
@@ -5,6 +6,7 @@ export type FeedComment = {
   id: number
   parentId?: number | null
   author: string
+  authorDisplayName?: string
   content: string
   createdAt: string
   updatedAt?: string | null
@@ -197,11 +199,11 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
     const parent = comment.parentId ? byID.get(comment.parentId) : undefined
     return (
       <div className="feed-comment-row">
-        <span className="feed-comment-avatar" aria-hidden="true">{comment.author.slice(0, 2).toUpperCase()}</span>
+        <span className="feed-comment-avatar" aria-hidden="true">{userLabel(comment.authorDisplayName, comment.author).slice(0, 2).toUpperCase()}</span>
         <div className="feed-comment-body">
           <div className="feed-comment-bubble">
-            <strong>@{comment.author}</strong>
-            {parent && <small className="feed-reply-to">Trả lời @{parent.author}</small>}
+            <strong>{userLabel(comment.authorDisplayName, comment.author)}</strong>
+            {parent && <small className="feed-reply-to">Trả lời {userLabel(parent.authorDisplayName, parent.author)}</small>}
             {editingComment === comment.id ? (
               <div className="feed-comment-edit">
                 <textarea maxLength={1000} rows={3} value={editingText} onChange={event => setEditingText(event.target.value)} aria-label="Chỉnh sửa bình luận" />
@@ -216,7 +218,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
           </div>
           <div className="feed-comment-actions">
             <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
-            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời @${comment.author}`}>Trả lời</button>
+            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời ${userLabel(comment.authorDisplayName, comment.author)}`}>Trả lời</button>
             <div className="feed-comment-menu">
               <button type="button" aria-label="Tùy chọn bình luận" aria-expanded={commentOptionsId === comment.id}
                 onClick={() => setCommentOptionsId(current => current === comment.id ? null : comment.id)}>
@@ -285,11 +287,11 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
       {commentActionError && <p role="alert" className="feed-comment-error">{commentActionError}</p>}
       {pending && (
         <div className="feed-comment-row outgoing-preview" aria-busy="true">
-          <span className="feed-comment-avatar" aria-hidden="true">{pending.author.slice(0, 2).toUpperCase()}</span>
+          <span className="feed-comment-avatar" aria-hidden="true">{userLabel(pending.authorDisplayName, pending.author).slice(0, 2).toUpperCase()}</span>
           <div className="feed-comment-body">
             <div className="feed-comment-bubble">
-              <strong>@{pending.author}</strong>
-              {pending.parentId && <small className="feed-reply-to">Trả lời @{byID.get(pending.parentId)?.author}</small>}
+              <strong>{userLabel(pending.authorDisplayName, pending.author)}</strong>
+              {pending.parentId && <small className="feed-reply-to">Trả lời {userLabel(byID.get(pending.parentId)?.authorDisplayName, byID.get(pending.parentId)?.author)}</small>}
               <p className="pending-content">{pending.content}</p>
             </div>
             <small role="status">Đang gửi bình luận...</small>
@@ -299,14 +301,14 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
       <form className="feed-comment-form" onSubmit={(event) => { event.preventDefault(); void send() }}>
         {replyTo && (
           <div className="feed-reply-target">
-            <span>Đang trả lời @{replyTo.author}</span>
+            <span>Đang trả lời {userLabel(replyTo.authorDisplayName, replyTo.author)}</span>
             <button type="button" disabled={sending} onClick={() => updateEditor({ drafts, replyTo: null })}>Hủy</button>
           </div>
         )}
         <div className="feed-comment-compose">
           <textarea ref={input} rows={2} maxLength={1000} disabled={sending}
-            aria-label={replyTo ? `Phản hồi @${replyTo.author}` : 'Viết bình luận'}
-            placeholder={replyTo ? `Trả lời @${replyTo.author}...` : 'Viết bình luận...'}
+            aria-label={replyTo ? `Phản hồi ${userLabel(replyTo.authorDisplayName, replyTo.author)}` : 'Viết bình luận'}
+            placeholder={replyTo ? `Trả lời ${userLabel(replyTo.authorDisplayName, replyTo.author)}...` : 'Viết bình luận...'}
             value={draft} onChange={(event) => updateEditor({ replyTo, drafts: { ...drafts, [draftKey]: event.target.value } })}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {

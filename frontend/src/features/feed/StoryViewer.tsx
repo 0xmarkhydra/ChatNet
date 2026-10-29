@@ -1,3 +1,4 @@
+import { userLabel } from '../../shared/lib/userLabel'
 import type { Story } from './types'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import UiIcon from '../../shared/ui/UiIcon'
@@ -23,12 +24,13 @@ export default function StoryViewer({
   previousStory,
   activeStoryIndex,
 }: Props) {
+  const authorLabel = userLabel(activeStory.authorDisplayName, activeStory.author)
   return (
     <div
       className="story-viewer-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label={`Story của @${activeStory.author}`}
+      aria-label={`Story của ${authorLabel}`}
       onMouseDown={(event) => {
         if (event.currentTarget === event.target) setActiveStoryId(null)
       }}
@@ -38,9 +40,9 @@ export default function StoryViewer({
           <span key={activeStory.id} className={activeStory.attachment.kind === 'image' ? 'running' : ''} />
         </div>
         <header>
-          <UserAvatar name={activeStory.author} className="story-viewer-avatar" />
+          <UserAvatar username={activeStory.author} name={authorLabel} className="story-viewer-avatar" />
           <div className="story-viewer-owner">
-            <strong>@{activeStory.author}</strong>
+            <strong>{authorLabel}</strong>
             <time dateTime={activeStory.createdAt}>
               {new Date(activeStory.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric' })}
             </time>

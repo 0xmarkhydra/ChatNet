@@ -25,17 +25,19 @@ export function profileAssetUrl(name: string, kind: 'avatar' | 'cover', version?
 
 export default function UserAvatar({
   name,
+  username = name,
   className = 'avatar',
   online = false,
   group = false,
 }: {
   name: string
+  username?: string
   className?: string
   online?: boolean
   group?: boolean
 }) {
-  const version = avatarRefreshVersions.get(name)
-  const imageUrl = group ? '' : profileAssetUrl(name, 'avatar', version)
+  const version = avatarRefreshVersions.get(username)
+  const imageUrl = group ? '' : profileAssetUrl(username, 'avatar', version)
   const [imageFailed, setImageFailed] = useState(false)
 
   useEffect(() => {

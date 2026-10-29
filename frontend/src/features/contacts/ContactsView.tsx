@@ -85,7 +85,7 @@ export default function ContactsView({
                 : relationship === 'outgoing' ? 'Hủy lời mời' : 'Kết bạn'
             return (
               <div className="friend-result contact-result contact-search-row" key={friend.id}>
-                <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
+                <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
                 <div className="friend-result-copy">
                   <strong>{friend.displayName || friend.username}</strong>
                   <span>@{friend.username}{relationship === 'accepted' ? ' · Bạn bè' : relationship === 'incoming' ? ' · Đã nhận lời mời' : relationship === 'outgoing' ? ' · Đã gửi lời mời' : ''}</span>
@@ -137,9 +137,9 @@ export default function ContactsView({
           </div>
           {friendRequests.filter((item) => item.direction === 'incoming').map((friend) => (
             <div className="friend-result contact-result friend-request-row" key={friend.id}>
-              <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+              <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
               <div className="friend-result-copy">
-                <strong>@{friend.username}</strong>
+                <strong>{friend.displayName || friend.username}</strong>
                 <span>Muốn kết bạn với bạn</span>
               </div>
               <div className="friend-request-actions">
@@ -175,7 +175,7 @@ export default function ContactsView({
               className="friend-contact-primary"
               onClick={() => void openDirectByUsername(friend.username)}
             >
-              <UserAvatar name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
+              <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
               <span className="friend-result-copy">
                 <strong>{contactMetadata[friend.id]?.favorite ? '⭐ ' : ''}{contactMetadata[friend.id]?.nickname || friend.displayName || friend.username}</strong>
                 <span>@{friend.username} · {friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</span>
@@ -221,9 +221,9 @@ export default function ContactsView({
               onClick={() => void actOnFriend(friend)}
               disabled={friendBusyIds.has(friend.id)}
             >
-              <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+              <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
               <div className="friend-result-copy">
-                <strong>@{friend.username}</strong>
+                <strong>{friend.displayName || friend.username}</strong>
                 <span>Đang chờ phản hồi</span>
               </div>
               <div className="friend-result-action"><small>Hủy lời mời</small><span>×</span></div>
@@ -246,9 +246,9 @@ export default function ContactsView({
             onClick={() => void actOnFriend(friend)}
             disabled={friendBusyIds.has(friend.id)}
           >
-            <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+            <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="friend-avatar" online={friend.online} />
             <div className="friend-result-copy">
-              <strong>@{friend.username}</strong>
+              <strong>{friend.displayName || friend.username}</strong>
               <span>{friend.reason || (friend.online ? 'Đang hoạt động' : 'Ngoại tuyến')}</span>
             </div>
             <div className="friend-result-action"><small>Kết bạn</small><span>＋</span></div>

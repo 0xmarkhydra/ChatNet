@@ -12,9 +12,11 @@ export type Message = {
   conversationId: number
   senderId: number
   sender: string
+  senderDisplayName?: string
   text: string
   replyToMessageId?: number
   replyToSender?: string
+  replyToDisplayName?: string
   replyToText?: string
   editedAt?: string
   deleted?: boolean
@@ -36,6 +38,7 @@ export type Conversation = {
   type: 'direct' | 'group'
   name: string
   otherUserId?: number
+  otherUsername?: string
   memberCount: number
   unreadCount: number
   lastMessage: string

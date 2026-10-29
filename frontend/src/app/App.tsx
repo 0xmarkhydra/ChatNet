@@ -1,3 +1,4 @@
+import { userLabel } from '../shared/lib/userLabel'
 import { useGroupManagement } from '../features/chat/useGroupManagement'
 import { API } from '../shared/lib/config'
 import type { ProfileMediaState, ProfileUpdateResponse, UserPrivacy } from '../features/profile/types'
@@ -369,10 +370,16 @@ export default function App() {
   })
 
   const name = session?.user.username || ''
-  const activeConversation = conversations.find((item) => item.id === activeConversationId) || null
+  const displayConversations = useMemo(() => conversations.map(conversation => ({
+    ...conversation,
+    name: conversation.type === 'direct' && conversation.otherUserId
+      ? contactMetadata[conversation.otherUserId]?.nickname || conversation.name
+      : conversation.name,
+  })), [conversations, contactMetadata])
+  const activeConversation = displayConversations.find((item) => item.id === activeConversationId) || null
   const chatFriend = activeConversation?.type === 'direct' && activeConversation.otherUserId
     && activeConversation.otherUserId !== session?.user.id
-    ? { id: activeConversation.otherUserId, username: '', displayName: activeConversation.name, online: activeConversation.online }
+    ? { id: activeConversation.otherUserId, username: activeConversation.otherUsername || '', displayName: activeConversation.name, online: activeConversation.online }
     : null
   const chatFriendRelationship = chatFriend ? friendRelationship(chatFriend.id) : 'none'
 
@@ -2877,9 +2884,9 @@ export default function App() {
     sendingRef.current = true
     setMessageSending(true)
     setOutgoingMessage({
-      id: -1, clientId, conversationId, senderId: session.user.id, sender: session.user.username,
+      id: -1, clientId, conversationId, senderId: session.user.id, sender: session.user.username, senderDisplayName: session.user.displayName,
       text, attachments, createdAt: new Date().toISOString(),
-      replyToMessageId: reply?.id, replyToSender: reply?.sender, replyToText: reply?.text,
+      replyToMessageId: reply?.id, replyToSender: reply?.sender, replyToDisplayName: reply?.senderDisplayName, replyToText: reply?.text,
     })
     try {
       const response = await apiFetch(`/api/conversations/${conversationId}/messages`, {
@@ -3074,7 +3081,7 @@ export default function App() {
     const sessionId = session.sessionId
     actionLocks.current.add('feed:create')
     ++feedRevision.current
-    setPendingPost({ id: -1, author: name, content, visibility, background, attachments, likes: 0, liked: false, comments: [], createdAt: new Date().toISOString() })
+    setPendingPost({ id: -1, author: name, authorDisplayName: session?.user.displayName, content, visibility, background, attachments, likes: 0, liked: false, comments: [], createdAt: new Date().toISOString() })
     try {
       const response = await apiFetch('/api/posts', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3164,7 +3171,7 @@ export default function App() {
     actionLocks.current.add(key)
     ++feedRevision.current
     setPendingComments((current) => ({ ...current, [post.id]: {
-      id: -1, parentId, author: name, content, createdAt: new Date().toISOString(),
+      id: -1, parentId, author: name, authorDisplayName: session?.user.displayName, content, createdAt: new Date().toISOString(),
     } }))
     try {
       const response = await apiFetch(`/api/posts/${post.id}/comments`, {
@@ -3192,10 +3199,11 @@ export default function App() {
 
   const unreadTotal = conversations.reduce((sum, conversation) => sum + conversation.unreadCount, 0)
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase('vi-VN')
-  const searchedConversations = conversations.filter((conversation) => {
+  const searchedConversations = displayConversations.filter((conversation) => {
     if (!normalizedSearch) return true
     return (
       conversation.name.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
+      (conversation.otherUsername || '').toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
       conversation.lastMessage.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
     )
   })
@@ -3204,6 +3212,7 @@ export default function App() {
     if (!normalizedSearch || tab !== 'feed') return true
     return (
       post.author.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
+      userLabel(post.authorDisplayName, post.author).toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
       post.content.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
     )
   })
@@ -3301,7 +3310,7 @@ export default function App() {
           <button type="button" className="connect-modal-scrim" aria-label="Đóng hồ sơ" onClick={() => setFriendPreview(null)} />
           <section className="friend-profile-preview" role="dialog" aria-modal="true" aria-label={`Hồ sơ ${friendPreview.displayName || friendPreview.username}`}>
             <button type="button" className="friend-profile-close" aria-label="Đóng" onClick={() => setFriendPreview(null)}><X size={20} /></button>
-            <UserAvatar name={friendPreview.displayName || friendPreview.username} className="friend-profile-avatar" online={friendPreview.online} />
+            <UserAvatar username={friendPreview.username} name={friendPreview.displayName || friendPreview.username} className="friend-profile-avatar" online={friendPreview.online} />
             <h2>{friendPreview.displayName || friendPreview.username}</h2>
             <p>@{friendPreview.username}</p>
             <p>{friendPreview.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</p>
@@ -3525,7 +3534,7 @@ export default function App() {
                     </label>
 
                     <div className="connect-identity-card">
-                      <UserAvatar name={session.user.username} className="connect-identity-avatar" online />
+                      <UserAvatar username={session.user.username} name={userLabel(session.user.displayName, session.user.username)} className="connect-identity-avatar" online />
                       <div className="connect-identity-copy">
                         <strong>{session.user.displayName || session.user.username}</strong>
                         <span>@{session.user.username}</span>
@@ -3573,7 +3582,7 @@ export default function App() {
                             onClick={() => void actOnFriend(friend)}
                             disabled={friendBusyIds.has(friend.id)}
                           >
-                            <UserAvatar name={friend.username} className="friend-avatar" online={friend.online} />
+                            <UserAvatar username={friend.username} name={userLabel(friend.displayName, friend.username)} className="friend-avatar" online={friend.online} />
                             <div className="friend-result-copy">
                               <strong>{friend.displayName || friend.username}</strong>
                               <span>
@@ -3626,7 +3635,7 @@ export default function App() {
                     }}
                   >
                     <UserAvatar
-                      name={conversation.name}
+                      username={conversation.otherUsername} name={conversation.name}
                       className="conversation-avatar"
                       group={conversation.type === 'group'}
                       online={conversation.type === 'direct' && conversation.online}
@@ -3670,7 +3679,7 @@ export default function App() {
                     <div className="room-info">
                       <button className="mobile-back" type="button" aria-label="Quay lại danh sách" onClick={() => setActiveConversationId(null)}>‹</button>
                       <UserAvatar
-                        name={activeConversation.name}
+                        username={activeConversation.otherUsername} name={activeConversation.name}
                         className="room-avatar"
                         group={activeConversation.type === 'group'}
                         online={activeConversation.type === 'direct' && activeConversation.online}
@@ -3938,10 +3947,10 @@ export default function App() {
                             openMessageActions(message)
                           }}
                         >
-                          {!mine && <div className="message-meta">{message.sender}</div>}
+                          {!mine && <div className="message-meta">{userLabel(message.senderDisplayName, message.sender)}</div>}
                           {message.replyToMessageId && (
                             <div className="message-reply-quote">
-                              <strong>@{message.replyToSender || 'user'}</strong>
+                              <strong>{userLabel(message.replyToDisplayName, message.replyToSender)}</strong>
                               <span>{message.replyToText || 'Tin nhắn đã thu hồi'}</span>
                             </div>
                           )}
@@ -4015,7 +4024,7 @@ export default function App() {
                       <article className="message mine outgoing-preview" aria-busy="true">
                         {outgoingMessage.replyToMessageId && (
                           <div className="message-reply-quote">
-                            <strong>@{outgoingMessage.replyToSender}</strong><span>{outgoingMessage.replyToText}</span>
+                            <strong>{userLabel(outgoingMessage.replyToDisplayName, outgoingMessage.replyToSender)}</strong><span>{outgoingMessage.replyToText}</span>
                           </div>
                         )}
                         {outgoingMessage.text && <div className="bubble">{outgoingMessage.text}</div>}
@@ -4042,7 +4051,7 @@ export default function App() {
                     {replyingTo && (
                       <div className="composer-reply-preview">
                         <div>
-                          <strong>Đang trả lời @{replyingTo.sender}</strong>
+                          <strong>Đang trả lời {userLabel(replyingTo.senderDisplayName, replyingTo.sender)}</strong>
                           <span>{replyingTo.deleted ? 'Tin nhắn đã thu hồi' : (replyingTo.text || attachmentLabel(replyingTo.attachments))}</span>
                         </div>
                         <button type="button" onClick={() => setReplyingTo(null)} aria-label="Hủy trả lời">×</button>
@@ -4200,7 +4209,7 @@ export default function App() {
                   className="story-card"
                   key={story.id}
                   onClick={() => setActiveStoryId(story.id)}
-                  aria-label={`Xem Story của @${story.author}`}
+                  aria-label={`Xem Story của ${userLabel(story.authorDisplayName, story.author)}`}
                 >
                   <div className="story-visual">
                     {story.attachment.kind === 'video' ? (
@@ -4208,9 +4217,9 @@ export default function App() {
                     ) : (
                       <img src={story.attachment.url} alt="" loading="lazy" />
                     )}
-                    <span className="story-avatar-mini">{story.author.slice(0, 1).toUpperCase()}</span>
+                    <span className="story-avatar-mini">{userLabel(story.authorDisplayName, story.author).slice(0, 1).toUpperCase()}</span>
                   </div>
-                  <span>{story.author === name ? 'Story của bạn' : story.author}</span>
+                  <span>{story.author === name ? 'Story của bạn' : userLabel(story.authorDisplayName, story.author)}</span>
                 </button>
               ))}
             </div>
@@ -4227,9 +4236,9 @@ export default function App() {
             <div className="feed zalo-feed">
               {pendingPost && (
                 <article className="post zalo-post outgoing-preview" aria-busy="true">
-                  <UserAvatar name={pendingPost.author} className="avatar" />
+                  <UserAvatar username={pendingPost.author} name={userLabel(pendingPost.authorDisplayName, pendingPost.author)} className="avatar" />
                   <div className="post-body">
-                    <div className="post-author"><strong>{pendingPost.author}</strong><small role="status">Đang đăng...</small></div>
+                    <div className="post-author"><strong>{userLabel(pendingPost.authorDisplayName, pendingPost.author)}</strong><small role="status">Đang đăng...</small></div>
                     <p className="pending-content">{pendingPost.content}</p>
                     <MediaAttachmentsView items={pendingPost.attachments} />
                   </div>
@@ -4263,7 +4272,7 @@ export default function App() {
             className="post-detail-backdrop"
             role="dialog"
             aria-modal="true"
-            aria-label={`Chi tiết bài viết của @${activePost.author}`}
+            aria-label={`Chi tiết bài viết của ${userLabel(activePost.authorDisplayName, activePost.author)}`}
             onMouseDown={(event) => {
               if (event.currentTarget === event.target) setActivePostId(null)
             }}
@@ -4278,11 +4287,11 @@ export default function App() {
               </header>
               <div className="post-detail-scroll">
                 <article className="post zalo-post post-detail-post">
-                  <UserAvatar name={activePost.author} className="avatar" />
+                  <UserAvatar username={activePost.author} name={userLabel(activePost.authorDisplayName, activePost.author)} className="avatar" />
                   <div className="post-body">
                     <div className="post-author">
                       <div>
-                        <strong>{activePost.author}</strong>
+                        <strong>{userLabel(activePost.authorDisplayName, activePost.author)}</strong>
                         <small>{new Date(activePost.createdAt).toLocaleString('vi-VN')}</small>
                       </div>
                     </div>
@@ -4399,7 +4408,7 @@ export default function App() {
                 }
               }}>
                 <div className="profile-avatar-editor">
-                  <UserAvatar name={name} className="profile-avatar" online />
+                  <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="profile-avatar" online />
                   <button
                     type="button"
                     className="profile-avatar-edit"
@@ -4429,7 +4438,7 @@ export default function App() {
                   <button type="button" onClick={() => setProfileComposerOpen(true)}><PencilLine size={18} />Đăng bài</button>
                 </div>
                 <div className="profile-post-launcher">
-                  <UserAvatar name={name} className="avatar self-avatar" />
+                  <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="avatar self-avatar" />
                   <button type="button" onClick={() => setProfileComposerOpen(true)}>
                     {postText.trim() ? 'Tiếp tục bản nháp của bạn...' : 'Bạn đang nghĩ gì?'}
                   </button>
@@ -4448,7 +4457,7 @@ export default function App() {
                 {profilePostsBusy && <p role="status">Đang tải dòng thời gian...</p>}
                 <div className="feed zalo-feed">
                   {pendingPost && <article className="post zalo-post outgoing-preview" aria-busy="true">
-                    <UserAvatar name={name} className="avatar" />
+                    <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="avatar" />
                     <div className="post-body"><strong>Đang đăng...</strong><p>{pendingPost.content}</p>
                       <MediaAttachmentsView items={pendingPost.attachments} /></div>
                   </article>}
@@ -4758,7 +4767,7 @@ export default function App() {
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}
-        conversations={conversations.map(({ id, name, type }) => ({ id, name, type }))}
+        conversations={displayConversations.map(({ id, name, type }) => ({ id, name, type }))}
       />
 
       <BottomNavigation

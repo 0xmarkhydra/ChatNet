@@ -24,35 +24,38 @@ import (
 )
 
 type comment struct {
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	ID        int64      `json:"id"`
-	ParentID  *int64     `json:"parentId"`
-	Author    string     `json:"author"`
-	Content   string     `json:"content"`
-	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt         *time.Time `json:"updatedAt,omitempty"`
+	ID                int64      `json:"id"`
+	ParentID          *int64     `json:"parentId"`
+	Author            string     `json:"author"`
+	AuthorDisplayName string     `json:"authorDisplayName,omitempty"`
+	Content           string     `json:"content"`
+	CreatedAt         time.Time  `json:"createdAt"`
 }
 
 type post struct {
-	Visibility  string              `json:"visibility"`
-	Background  string              `json:"background"`
-	Saved       bool                `json:"saved"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
-	ID          int64               `json:"id"`
-	Author      string              `json:"author"`
-	Content     string              `json:"content"`
-	Likes       int                 `json:"likes"`
-	Liked       bool                `json:"liked"`
-	Comments    []comment           `json:"comments"`
-	Attachments []mediax.Attachment `json:"attachments,omitempty"`
-	CreatedAt   time.Time           `json:"createdAt"`
+	Visibility        string              `json:"visibility"`
+	Background        string              `json:"background"`
+	Saved             bool                `json:"saved"`
+	UpdatedAt         time.Time           `json:"updatedAt"`
+	ID                int64               `json:"id"`
+	Author            string              `json:"author"`
+	AuthorDisplayName string              `json:"authorDisplayName,omitempty"`
+	Content           string              `json:"content"`
+	Likes             int                 `json:"likes"`
+	Liked             bool                `json:"liked"`
+	Comments          []comment           `json:"comments"`
+	Attachments       []mediax.Attachment `json:"attachments,omitempty"`
+	CreatedAt         time.Time           `json:"createdAt"`
 }
 
 type story struct {
-	ID         int64             `json:"id"`
-	Author     string            `json:"author"`
-	Attachment mediax.Attachment `json:"attachment"`
-	CreatedAt  time.Time         `json:"createdAt"`
-	ExpiresAt  time.Time         `json:"expiresAt"`
+	ID                int64             `json:"id"`
+	Author            string            `json:"author"`
+	AuthorDisplayName string            `json:"authorDisplayName,omitempty"`
+	Attachment        mediax.Attachment `json:"attachment"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	ExpiresAt         time.Time         `json:"expiresAt"`
 }
 
 type server struct {
@@ -142,7 +145,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		before = n
 	}
 	rows, err := s.db.Query(r.Context(), `
-		SELECT p.id,u.username,p.content,p.likes_count,p.created_at,
+		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
 		       p.visibility,p.background,p.updated_at,
 		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
 		FROM posts p JOIN users u ON u.id=p.user_id
@@ -159,7 +162,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	posts := []post{}
 	for rows.Next() {
 		var p post
-		if rows.Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.Saved) != nil {
+		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.Saved) != nil {
 			continue
 		}
 		_ = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id=$1 AND user_id=$2)`, p.ID, claims.UserID).Scan(&p.Liked)
@@ -172,7 +175,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) comments(r *http.Request, postID int64) []comment {
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id,c.parent_id,u.username,c.content,c.created_at,c.updated_at
+		SELECT c.id,c.parent_id,u.username,u.display_name,c.content,c.created_at,c.updated_at
 		FROM comments c JOIN users u ON u.id=c.user_id
 		WHERE c.post_id=$1 ORDER BY c.id ASC`, postID)
 	if err != nil {
@@ -183,7 +186,7 @@ func (s *server) comments(r *http.Request, postID int64) []comment {
 	items := []comment{}
 	for rows.Next() {
 		var c comment
-		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.Content, &c.CreatedAt, &c.UpdatedAt) == nil {
+		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.AuthorDisplayName, &c.Content, &c.CreatedAt, &c.UpdatedAt) == nil {
 			items = append(items, c)
 		}
 	}
@@ -272,7 +275,10 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 
 	var p post
-	p.Author = claims.Username
+	if err := tx.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&p.Author, &p.AuthorDisplayName); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load post author")
+		return
+	}
 	p.Visibility = body.Visibility
 	p.Background = body.Background
 	p.Attachments = attachments
@@ -318,7 +324,7 @@ func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 	// ponytail: rows expire eagerly on reads; add object-store lifecycle cleanup when orphan cleanup ships.
 	_, _ = s.db.Exec(r.Context(), `DELETE FROM stories WHERE expires_at <= NOW()`)
 	rows, err := s.db.Query(r.Context(), `
-		SELECT s.id,u.username,s.storage_ref,s.original_name,s.content_type,s.size_bytes,s.kind,s.created_at,s.expires_at
+		SELECT s.id,u.username,u.display_name,s.storage_ref,s.original_name,s.content_type,s.size_bytes,s.kind,s.created_at,s.expires_at
 		FROM stories s JOIN users u ON u.id=s.user_id
 		WHERE s.expires_at > NOW()
 		ORDER BY (s.user_id=$1) DESC,s.created_at DESC
@@ -335,6 +341,7 @@ func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 		if rows.Scan(
 			&item.ID,
 			&item.Author,
+			&item.AuthorDisplayName,
 			&item.Attachment.StorageRef,
 			&item.Attachment.Name,
 			&item.Attachment.ContentType,
@@ -385,7 +392,11 @@ func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item := story{Author: claims.Username, Attachment: attachments[0]}
+	item := story{Attachment: attachments[0]}
+	if err := s.db.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&item.Author, &item.AuthorDisplayName); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load story author")
+		return
+	}
 	err = s.db.QueryRow(r.Context(), `
 		INSERT INTO stories(user_id,storage_ref,original_name,content_type,size_bytes,kind)
 		VALUES($1,$2,$3,$4,$5,$6)
@@ -472,10 +483,10 @@ func (s *server) like(w http.ResponseWriter, r *http.Request) {
 
 	var p post
 	err = tx.QueryRow(r.Context(), `
-		SELECT p.id,u.username,p.content,p.likes_count,p.created_at
+		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE p.id=$1`, id,
-	).Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt)
+	).Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt)
 	if err != nil {
 		httpx.Error(w, http.StatusNotFound, "post not found")
 		return
@@ -578,9 +589,9 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 
 	var p post
 	err = s.db.QueryRow(r.Context(), `
-		SELECT p.id,u.username,p.content,p.likes_count,p.created_at
+		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at
 		FROM posts p JOIN users u ON u.id=p.user_id WHERE p.id=$1`, postID,
-	).Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt)
+	).Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt)
 	if err != nil {
 		httpx.Error(w, http.StatusNotFound, "post not found")
 		return

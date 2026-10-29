@@ -849,7 +849,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                     UserAvatar(
                                       name: room['name']?.toString() ?? '',
                                       username: room['type'] == 'direct'
-                                          ? room['name']?.toString()
+                                          ? (room['otherUsername'] ?? room['name'])?.toString()
                                           : null,
                                       size: 52,
                                       group: room['type'] == 'group',
@@ -1021,7 +1021,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       UserAvatar(
                         name: room['name']?.toString() ?? '',
                         username: room['type'] == 'direct'
-                            ? room['name']?.toString()
+                            ? (room['otherUsername'] ?? room['name'])?.toString()
                             : null,
                         size: compact ? 36 : 42,
                         group: room['type'] == 'group',

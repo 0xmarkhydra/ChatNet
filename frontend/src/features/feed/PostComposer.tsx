@@ -1,3 +1,4 @@
+import { userLabel } from '../../shared/lib/userLabel'
 import type { Dispatch, SetStateAction, RefObject, FormEvent } from 'react'
 import type { Post } from './types'
 import type { MediaAttachment } from '../../shared/lib/media'
@@ -66,7 +67,7 @@ export default function PostComposer({
   return (
     <form className={`post-box zalo-post-composer ${popup ? 'profile-popup-composer' : ''}`} onSubmit={createPost}>
       <div className="post-prompt compact-post-prompt">
-        <UserAvatar name={name} className="avatar self-avatar" />
+        <UserAvatar username={name} name={userLabel(displayName, name)} className="avatar self-avatar" />
         {popup && <div className="profile-post-author">
           <strong>{displayName || name}</strong>
           {postAudience}

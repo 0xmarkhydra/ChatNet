@@ -1,3 +1,4 @@
+import { userLabel } from '../../shared/lib/userLabel'
 import type { Message } from './types'
 import { attachmentLabel, formatTime } from '../../shared/lib/format'
 
@@ -38,7 +39,7 @@ export default function MessageActions({
     >
       <section className="message-context-sheet">
         <div className={mine ? 'message-context-preview mine' : 'message-context-preview'}>
-          <small>{mine ? 'Bạn' : `@${activeMessageAction.sender}`}</small>
+          <small>{mine ? 'Bạn' : userLabel(activeMessageAction.senderDisplayName, activeMessageAction.sender)}</small>
           <div className="message-context-preview-bubble">{preview || 'Tin nhắn'}</div>
           <time>{formatTime(activeMessageAction.createdAt)}</time>
         </div>

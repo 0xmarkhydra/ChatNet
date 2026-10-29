@@ -6,6 +6,7 @@ export const FEED_PAGE_SIZE = 15
 export type Post = {
   id: number
   author: string
+  authorDisplayName?: string
   content: string
   likes: number
   liked: boolean
@@ -21,6 +22,7 @@ export type Post = {
 export type Story = {
   id: number
   author: string
+  authorDisplayName?: string
   attachment: MediaAttachment
   createdAt: string
   expiresAt: string

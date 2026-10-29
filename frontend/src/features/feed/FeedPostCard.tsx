@@ -1,3 +1,4 @@
+import { userLabel } from '../../shared/lib/userLabel'
 import type { Post } from './types'
 import type { ToastKind } from '../notifications/toast'
 import { API } from '../../shared/lib/config'
@@ -38,13 +39,14 @@ export default function FeedPostCard({
   likePreviews,
   like,
 }: Props) {
+  const authorLabel = userLabel(post.author === name ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
   return (
     <article className="post zalo-post" key={post.id}>
-      <UserAvatar name={post.author} className="avatar" />
+      <UserAvatar username={post.author} name={authorLabel} className="avatar" />
       <div className="post-body">
         <div className="post-author">
           <div>
-            <strong>{post.author === name ? (ownDisplayName || name) : post.author}</strong>
+            <strong>{authorLabel}</strong>
             <small>{new Date(post.createdAt).toLocaleString('vi-VN')} · {post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}</small>
           </div>
           <FeedPostActions post={post} mine={post.author === name} request={apiFetch}

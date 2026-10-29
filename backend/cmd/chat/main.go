@@ -33,9 +33,11 @@ type message struct {
 	ConversationID      int64               `json:"conversationId"`
 	SenderID            int64               `json:"senderId"`
 	Sender              string              `json:"sender"`
+	SenderDisplayName   string              `json:"senderDisplayName,omitempty"`
 	Text                string              `json:"text"`
 	ReplyToMessageID    *int64              `json:"replyToMessageId,omitempty"`
 	ReplyToSender       string              `json:"replyToSender,omitempty"`
+	ReplyToDisplayName  string              `json:"replyToDisplayName,omitempty"`
 	ReplyToText         string              `json:"replyToText,omitempty"`
 	EditedAt            *time.Time          `json:"editedAt,omitempty"`
 	Deleted             bool                `json:"deleted,omitempty"`
@@ -58,6 +60,7 @@ type conversation struct {
 	Type          string     `json:"type"`
 	Name          string     `json:"name"`
 	OtherUserID   *int64     `json:"otherUserId,omitempty"`
+	OtherUsername string     `json:"otherUsername,omitempty"`
 	MemberCount   int        `json:"memberCount"`
 	UnreadCount   int        `json:"unreadCount"`
 	LastMessage   string     `json:"lastMessage"`
@@ -564,16 +567,17 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 
 		if c.Type == "direct" {
 			var otherID int64
-			var displayName string
+			var username, displayName string
 			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username,u.show_online_status
+				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
-				c.ID, claims.UserID).Scan(&otherID, &displayName, &showOnline)
+				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline)
 			if err == nil {
 				c.Name = displayName
+				c.OtherUsername = username
 				c.OtherUserID = &otherID
 				c.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
 			}
@@ -599,11 +603,11 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var otherID int64
-	var otherName string
+	var otherName, otherUsername string
 	var showOnline bool
 	if err := s.db.QueryRow(r.Context(),
-		`SELECT id,username,show_online_status FROM users WHERE username=$1`, username,
-	).Scan(&otherID, &otherName, &showOnline); err != nil {
+		`SELECT id,username,COALESCE(NULLIF(BTRIM(display_name),''),username),show_online_status FROM users WHERE username=$1`, username,
+	).Scan(&otherID, &otherUsername, &otherName, &showOnline); err != nil {
 		httpx.Error(w, http.StatusNotFound, "user not found")
 		return
 	}
@@ -654,7 +658,7 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := conversation{
-		ID: id, Type: "direct", Name: otherName, OtherUserID: &otherID,
+		ID: id, Type: "direct", Name: otherName, OtherUserID: &otherID, OtherUsername: otherUsername,
 		MemberCount: 2, CreatedAt: createdAt,
 		Online: showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0,
 	}
@@ -779,8 +783,8 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,COALESCE(m.client_id,''),m.text,
-		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
+		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
+		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
@@ -809,8 +813,8 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m message
 		if rows.Scan(
-			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.ClientID, &m.Text,
-			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
+			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
+			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 			&m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
 			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
 		) == nil {
@@ -1006,6 +1010,11 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	if body.ClientID != "" {
 		fingerprint = messageRequestFingerprint(conversationID, body.Text, body.ReplyToMessageID, body.Attachments)
 	}
+	if err := tx.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&m.Sender, &m.SenderDisplayName); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load message sender")
+		return
+	}
+
 	err = tx.QueryRow(r.Context(), `
 		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint)
 		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''))
@@ -1049,11 +1058,11 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if m.ReplyToMessageID != nil {
 		_ = s.db.QueryRow(r.Context(), `
-			SELECT u.username, CASE WHEN rm.deleted_at IS NULL THEN rm.text ELSE '' END
+			SELECT u.username,u.display_name, CASE WHEN rm.deleted_at IS NULL THEN rm.text ELSE '' END
 			FROM messages rm
 			JOIN users u ON u.id=rm.user_id
 			WHERE rm.id=$1
-		`, *m.ReplyToMessageID).Scan(&m.ReplyToSender, &m.ReplyToText)
+		`, *m.ReplyToMessageID).Scan(&m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText)
 	}
 
 	memberIDs := s.memberIDs(r.Context(), conversationID)
@@ -1082,8 +1091,8 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (message, error) {
 	var m message
 	err := s.db.QueryRow(ctx, `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,COALESCE(m.client_id,''),m.text,
-		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
+		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
+		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
@@ -1099,8 +1108,8 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		WHERE m.id=$1`, messageID).Scan(
-		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.ClientID, &m.Text,
-		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
+		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
+		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
 	)
 	if err != nil {
