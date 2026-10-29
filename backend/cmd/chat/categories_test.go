@@ -51,6 +51,10 @@ func TestConversationCategoriesIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer db.Exec(ctx, "DELETE FROM users WHERE id=$1", users[i])
+		// This CRUD fixture starts empty; default initialization has separate coverage.
+		if _, err = db.Exec(ctx, "DELETE FROM conversation_categories WHERE user_id=$1", users[i]); err != nil {
+			t.Fatal(err)
+		}
 		tokens[i], _ = authx.Sign("test", users[i], name, "Category Test")
 	}
 	s := &server{db: db}
