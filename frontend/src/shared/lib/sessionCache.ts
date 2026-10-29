@@ -1,6 +1,7 @@
 type Entry = { valid: boolean; response?: Response; expires: number; pending?: Promise<Response> }
 function policy(path: string): { tag: string; ttl: number } | undefined {
  const p = new URL(path, 'http://cache.local').pathname
+ if (p === '/api/profile/note' || /^\/api\/users\/[^/]+\/note$/.test(p)) return { tag: 'notes', ttl: 10000 }
  if (p === '/api/posts' || /^\/api\/posts\/\d+$/.test(p)) return { tag: 'feed', ttl: 15000 }
  if (p === '/api/stories') return { tag: 'stories', ttl: 10000 }
  if (['/api/friends','/api/friends/requests','/api/contacts'].includes(p)) return { tag: 'friends', ttl: 20000 }
@@ -12,7 +13,8 @@ function policy(path: string): { tag: string; ttl: number } | undefined {
 }
 export function mutationTags(path: string): string[] {
  const p = new URL(path, 'http://cache.local').pathname
- if (/^\/api\/(friends|contacts|privacy|users)(\/|$)/.test(p)) return ['friends','feed','profiles','stories','conversations','messages']
+ if (p === '/api/profile/note') return ['notes']
+ if (/^\/api\/(friends|contacts|privacy|users)(\/|$)/.test(p)) return ['friends','feed','profiles','stories','conversations','messages','notes']
  if (p.startsWith('/api/profile')) return ['profiles','friends','feed','stories','conversations','messages']
  if (p.startsWith('/api/posts')) return ['feed']
  if (p.startsWith('/api/stories')) return ['stories']

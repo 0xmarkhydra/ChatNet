@@ -1,3 +1,4 @@
+import ProfileNote from './ProfileNote'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, MessageCircle, UserPlus, UserMinus, UserCheck, RefreshCw } from 'lucide-react'
 import UserAvatar, { profileAssetUrl } from '../../shared/ui/UserAvatar'
@@ -43,7 +44,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   alive.current=true
   const previous=document.activeElement instanceof HTMLElement?document.activeElement:null
   back.current?.focus()
-  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape' && !document.querySelector('.post-detail-backdrop'))onClose()}
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape' && !document.querySelector('.post-detail-backdrop') && !document.querySelector('.profile-note-dialog[open]'))onClose()}
   document.addEventListener('keydown',escape)
   return ()=>{alive.current=false;sequence.current++;document.removeEventListener('keydown',escape);previous?.focus()}
  },[])
@@ -119,7 +120,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
  },[relation,profile?.username])
  const action=relation==='accepted'?'Bạn bè':relation==='incoming'?'Chấp nhận kết bạn':relation==='outgoing'?'Hủy lời mời':'Kết bạn'
  return <section ref={surface} onKeyDown={event=>{
-  if(event.key!=='Tab'||document.querySelector('.post-detail-backdrop'))return
+  if(event.key!=='Tab'||document.querySelector('.post-detail-backdrop')||document.querySelector('.profile-note-dialog[open]'))return
   const controls=Array.from(surface.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')||[])
   const first=controls[0],last=controls[controls.length-1]
   if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
@@ -130,7 +131,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
    {profile&&<>
     <section className="visitor-hero">
      <div className="visitor-cover">{profile.coverSet&&<img src={profileAssetUrl(profile.username,'cover',profile.updatedAt)} alt="Ảnh bìa" onError={event=>{event.currentTarget.hidden=true}}/>}<span>Khoảnh khắc và những câu chuyện</span></div>
-     <div className="visitor-identity"><UserAvatar username={profile.username} name={userLabel(profile.displayName,profile.username)} className="profile-avatar"/><h1>{userLabel(profile.displayName,profile.username)}</h1><p>@{profile.username}</p>
+     <div className="visitor-identity"><div className="profile-note-avatar"><UserAvatar username={profile.username} name={userLabel(profile.displayName,profile.username)} className="profile-avatar"/><ProfileNote username={profile.username} request={request} refreshKey={relation}/></div><h1>{userLabel(profile.displayName,profile.username)}</h1><p>@{profile.username}</p>
       <div className="visitor-actions"><button type="button" onClick={()=>void onMessage(profile.username)}><MessageCircle size={18}/>Nhắn tin</button>
        <button type="button" disabled={relation==='accepted'||friendBusy===profile.id||(!profile.allowFriendRequests&&relation==='none')} onClick={()=>void onFriend(profile).catch(cause=>{if(alive.current)feedback(cause instanceof Error?cause.message:'Không cập nhật được kết bạn.','error')})}>{relation==='outgoing'?<UserMinus size={18}/>:relation==='accepted'||relation==='incoming'?<UserCheck size={18}/>:<UserPlus size={18}/>} {action}</button></div>
       {!profile.allowFriendRequests&&relation==='none'&&<small>Tài khoản này đang tắt nhận lời mời kết bạn.</small>}

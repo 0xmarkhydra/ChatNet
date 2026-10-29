@@ -20,6 +20,7 @@
     "check:call-live": "node scripts/call-live-check.mjs",
     "preview": "vite preview",
     "check:categories": "node scripts/conversation-categories-check.mjs",
+    "check:profile-note": "node scripts/profile-note-check.mjs",
     "check:cache": "node --experimental-strip-types scripts/session-cache-check.mjs"
   },
   "dependencies": {

@@ -17,6 +17,9 @@ var conversationCategoriesSQL string
 //go:embed migrations/002_default_conversation_categories.sql
 var defaultConversationCategoriesSQL string
 
+//go:embed migrations/003_profile_notes.sql
+var profileNotesSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -29,6 +32,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err := pool.Exec(ctx, defaultConversationCategoriesSQL); err != nil {
 		return fmt.Errorf("apply default conversation categories migration: %w", err)
+	}
+	if _, err := pool.Exec(ctx, profileNotesSQL); err != nil {
+		return fmt.Errorf("apply profile notes migration: %w", err)
 	}
 	return nil
 }

@@ -1,3 +1,4 @@
+import ProfileNote from '../features/profile/ProfileNote'
 import ConversationCategories, { CategoryAssignment, CategoryBadge } from '../features/chat/ConversationCategories'
 import { useConversationCategories } from '../features/chat/useConversationCategories'
 import { SessionResponseCache } from '../shared/lib/sessionCache'
@@ -3986,6 +3987,7 @@ export default function App() {
                 }
               }}>
                 <div className="profile-avatar-editor">
+                  <ProfileNote key={session.sessionId+':note'} username={name} owner request={apiFetch} />
                   <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="profile-avatar" online />
                   <button
                     type="button"

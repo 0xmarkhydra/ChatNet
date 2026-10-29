@@ -41,7 +41,7 @@ export function useApiRequest({
     finally { if (mutationRequests.current.get(key) === operation) mutationRequests.current.delete(key) }
 
     async function performRequest() {
-      const mutation = write && !/\/(read|translate|presign|subscription|bundle)$/.test(path)
+      const mutation = write && path !== '/api/profile/note' && !/\/(read|translate|presign|subscription|bundle)$/.test(path)
         && !/^\/api\/conversations\/\d+\/category$/.test(path)
       const request = Symbol(path)
       if (mutation) {

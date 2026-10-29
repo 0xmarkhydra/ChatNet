@@ -106,7 +106,7 @@ export function useAppRealtime({
         return
       }
       if (update.type === 'friend.updated') {
-        responseCache.current.invalidate(['friends','feed','stories','profiles'])
+        responseCache.current.invalidate(['friends','feed','stories','profiles','notes'])
         void refreshFriendConnections()
         return
       }
