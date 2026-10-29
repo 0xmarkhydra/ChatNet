@@ -56,6 +56,7 @@ type messageReaction struct {
 }
 
 type conversation struct {
+	CategoryID    *int64     `json:"categoryId,omitempty"`
 	ID            int64      `json:"id"`
 	Type          string     `json:"type"`
 	Name          string     `json:"name"`
@@ -70,6 +71,7 @@ type conversation struct {
 }
 
 type realtimeEvent struct {
+	CategoryID        *int64        `json:"categoryId,omitempty"`
 	Type              string        `json:"type"`
 	ConversationID    int64         `json:"conversationId"`
 	Message           *message      `json:"message,omitempty"`
@@ -144,6 +146,11 @@ func main() {
 	mux.Handle("PUT /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePreferences)))
 	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
 	mux.Handle("PUT /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateTranslationPreferences)))
+	mux.Handle("GET /api/conversation-categories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listCategories)))
+	mux.Handle("POST /api/conversation-categories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.saveCategory)))
+	mux.Handle("PUT /api/conversation-categories/{categoryId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.saveCategory)))
+	mux.Handle("DELETE /api/conversation-categories/{categoryId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteCategory)))
+	mux.Handle("PUT /api/conversations/{id}/category", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.assignCategory)))
 	mux.Handle("GET /api/conversations", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversations)))
 	mux.Handle("GET /api/conversations/memberships", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversationMemberships)))
 	mux.Handle("POST /api/conversations/direct", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createDirect)))
@@ -509,8 +516,17 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		}
 		offset = n
 	}
+	categoryID := int64(-1)
+	if raw := r.URL.Query().Get("category"); raw != "" {
+		var err error
+		categoryID, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || categoryID < 0 {
+			httpx.Error(w, 400, "invalid category")
+			return
+		}
+	}
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,
+		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,
 		       COALESCE((SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id=c.id),0),
 		       COALESCE((
 		           SELECT CASE
@@ -537,7 +553,9 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1),0)
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
-		WHERE cm.user_id=$1
+		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
+        WHERE cm.user_id=$1
+          AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
 		  AND (c.type <> 'direct' OR NOT EXISTS (
 		    SELECT 1 FROM conversation_members other
 		    JOIN user_blocks b ON
@@ -547,7 +565,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		  ))
 		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
-		claims.UserID, limit, offset)
+		claims.UserID, limit, offset, categoryID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
@@ -559,7 +577,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		var c conversation
 		var lastRead, memberCount, unreadCount int64
 		var lastMessageAt time.Time
-		if err := rows.Scan(&c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount); err != nil {
+		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount); err != nil {
 			continue
 		}
 		c.MemberCount = int(memberCount)

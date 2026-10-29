@@ -34,6 +34,7 @@ export const CHAT_LIST_PAGE_SIZE = 25
 export const MESSAGE_PAGE_SIZE = 40
 
 export type Conversation = {
+  categoryId?: number
   id: number
   type: 'direct' | 'group'
   name: string
@@ -48,7 +49,8 @@ export type Conversation = {
 }
 
 export type RealtimeEvent = {
-  type: 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
+  categoryId?: number | null
+  type: 'category.updated' | 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
   conversationId: number
   message?: Message
   conversation?: Conversation

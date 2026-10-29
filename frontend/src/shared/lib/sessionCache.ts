@@ -5,6 +5,7 @@ function policy(path: string): { tag: string; ttl: number } | undefined {
  if (p === '/api/stories') return { tag: 'stories', ttl: 10000 }
  if (['/api/friends','/api/friends/requests','/api/contacts'].includes(p)) return { tag: 'friends', ttl: 20000 }
  if (p === '/api/profile' || /^\/api\/users\/[^/]+\/profile$/.test(p)) return { tag: 'profiles', ttl: 30000 }
+ if (p === '/api/conversation-categories') return { tag: 'categories', ttl: 30000 }
  if (p === '/api/conversations') return { tag: 'conversations', ttl: 8000 }
  if (/^\/api\/conversations\/\d+\/messages$/.test(p)) return { tag: 'messages', ttl: 0 }
  return undefined
@@ -15,6 +16,8 @@ export function mutationTags(path: string): string[] {
  if (p.startsWith('/api/profile')) return ['profiles','friends','feed','stories','conversations','messages']
  if (p.startsWith('/api/posts')) return ['feed']
  if (p.startsWith('/api/stories')) return ['stories']
+ if (p.startsWith('/api/conversation-categories')) return ['categories','conversations']
+ if (/^\/api\/conversations\/\d+\/category$/.test(p)) return ['conversations']
  if (p.startsWith('/api/conversations') || p.startsWith('/api/messages')) return ['messages','conversations']
  return []
 }

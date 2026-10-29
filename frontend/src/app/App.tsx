@@ -1,3 +1,5 @@
+import ConversationCategories, { CategoryAssignment, CategoryBadge } from '../features/chat/ConversationCategories'
+import { useConversationCategories } from '../features/chat/useConversationCategories'
 import { SessionResponseCache } from '../shared/lib/sessionCache'
 import VisitorProfile from '../features/profile/VisitorProfile'
 import { userLabel } from '../shared/lib/userLabel'
@@ -341,6 +343,17 @@ export default function App() {
     activeConversationIdRef,
     setMessageDrafts,
     purgeConversation,
+  })
+
+  const conversationCategories = useConversationCategories({
+    session, sessionRef, apiFetch, setStatus, setNotice,
+    mergeConversations: items => setConversations(current => {
+      const fresh = new Map(items.filter(c => !revokedConversationIds.current.has(c.id)).map(c => [c.id,c]))
+      return [...current.map(c => fresh.get(c.id) || c), ...[...fresh.values()].filter(c => !current.some(p => p.id === c.id))]
+    }),
+    setCategory: (id, categoryId) => setConversations(current => current.map(c =>
+      c.id === id ? { ...c, categoryId: categoryId || undefined } : c)),
+    clearCategory: id => setConversations(current => current.map(c => c.categoryId === id ? { ...c, categoryId: undefined } : c)),
   })
 
   const {
@@ -2226,6 +2239,9 @@ export default function App() {
   }, [session?.sessionId, sessionClient])
 
   useAppRealtime({
+    onCategoryAssignmentChanged: conversationCategories.applyAssignment,
+    onCategoriesChanged: () => { void conversationCategories.refreshCategories(); conversationCategories.refreshFiltered() },
+    refreshCategoryConversations: conversationCategories.refreshFiltered,
     responseCache,
     session,
     sessionRef,
@@ -2762,7 +2778,11 @@ export default function App() {
       conversation.lastMessage.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
     )
   })
-  const visibleConversations = searchedConversations
+  const visibleConversations = conversationCategories.selected === null ? searchedConversations :
+    conversationCategories.items.map(item => displayConversations.find(c => c.id === item.id) || item)
+      .filter(item => !revokedConversationIds.current.has(item.id) &&
+        (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)) &&
+        (!normalizedSearch || (item.name + ' ' + (item.otherUsername || '') + ' ' + item.lastMessage).toLocaleLowerCase('vi-VN').includes(normalizedSearch)))
   const searchedPosts = (feedFilter === 'saved' ? savedPosts : visiblePosts).filter((post) => {
     if (!normalizedSearch || tab !== 'feed') return true
     return (
@@ -3157,8 +3177,13 @@ export default function App() {
 
               {chatCreateError && newChatMode !== 'group' && <div className="inline-error">{chatCreateError}</div>}
 
+              <ConversationCategories key={session.sessionId} model={conversationCategories} />
               <div className="conversation-list zalo-conversation-list">
-                {visibleConversations.length === 0 && (
+                {conversationCategories.selected !== null && conversationCategories.loading && <p role="status">Đang tải phân loại…</p>}
+                {conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
+                  {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>Thử lại</button>
+                </div>}
+                {visibleConversations.length === 0 && !conversationCategories.loading && !conversationCategories.listError && (
                   <div className="conversation-list-empty">
                     <SocoEmptyState
                       kind={normalizedSearch ? 'search' : 'chat'}
@@ -3191,6 +3216,7 @@ export default function App() {
                         <strong>{conversation.name}</strong>
                         <time>{formatTime(conversation.lastMessageAt) || (conversation.online ? 'online' : '')}</time>
                       </div>
+                      <CategoryBadge category={conversationCategories.categories.find(c => c.id === conversation.categoryId)} />
                       <div>
                         <span>{conversation.lastMessage || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
                         {conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</b>}
@@ -3198,12 +3224,13 @@ export default function App() {
                     </div>
                   </button>
                 ))}
-                {hasMoreConversations && (
+                {(conversationCategories.selected === null ? hasMoreConversations : conversationCategories.hasMore) && (
                   <button type="button" className="soco-load-more soco-conversation-load-more"
-                    onClick={() => void loadMoreConversations()} disabled={conversationLoadingMore}
-                    aria-busy={conversationLoadingMore}>
+                    onClick={() => void (conversationCategories.selected === null ? loadMoreConversations() : conversationCategories.load(true))}
+                    disabled={conversationLoadingMore || conversationCategories.loading}
+                    aria-busy={conversationLoadingMore || conversationCategories.loading}>
                     <RefreshCw size={15} aria-hidden="true" />
-                    {conversationLoadingMore ? 'Đang tải...' : 'Tải thêm hội thoại'}
+                    {conversationLoadingMore || conversationCategories.loading ? 'Đang tải...' : 'Tải thêm hội thoại'}
                   </button>
                 )}
               </div>
@@ -3376,6 +3403,8 @@ export default function App() {
                       </div>
                     </div>
                   </header>
+                  <CategoryAssignment model={conversationCategories} conversationId={activeConversation.id} categoryId={activeConversation.categoryId} />
+
 
                   {groupActionsOpen && activeConversation.type === 'group' && !groupSettingsOpen && (
                     <GroupActionsSheet

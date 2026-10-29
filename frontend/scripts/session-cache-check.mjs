@@ -66,4 +66,24 @@ const oldSession=cache.read('a','/api/profile',()=>new Promise(resolve=>{release
 cache.clear()
 releaseOld(Response.json({private:true}))
 await assert.rejects(oldSession,/thay đổi/)
+
+const categoriesCache=new SessionResponseCache()
+let categoryReads=0,conversationReads=0,feedReads=0
+const categoryLoader=async()=>{categoryReads++;return Response.json([])}
+const conversationLoader=async()=>{conversationReads++;return Response.json([])}
+const feedLoader=async()=>{feedReads++;return Response.json([])}
+await categoriesCache.read('owner','/api/conversation-categories',categoryLoader)
+await categoriesCache.read('owner','/api/conversations?category=1&limit=25',conversationLoader)
+await categoriesCache.read('owner','/api/posts',feedLoader)
+categoriesCache.invalidate(mutationTags('/api/conversations/1/category'))
+await categoriesCache.read('owner','/api/conversation-categories',categoryLoader)
+await categoriesCache.read('owner','/api/conversations?category=1&limit=25',conversationLoader)
+await categoriesCache.read('owner','/api/posts',feedLoader)
+assert.equal(categoryReads,1,'Assignment does not reload category definitions')
+assert.equal(conversationReads,2,'Assignment invalidates filtered conversation cache')
+assert.equal(feedReads,1,'Assignment leaves feed cache intact')
+categoriesCache.invalidate(mutationTags('/api/conversation-categories/1'))
+await categoriesCache.read('owner','/api/conversation-categories',categoryLoader)
+assert.equal(categoryReads,2,'Category CRUD invalidates category definitions')
+
 console.log('PASS: session isolation, deduplication, independent bodies, TTL, forced refresh, selective invalidation, stale-request protection and error recovery')

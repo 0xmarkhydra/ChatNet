@@ -19,6 +19,9 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     'membershipSnapshot' | 'membershipEventSequence' | 'membershipSyncSequence' | 'setConversations'> &
   Pick<ReturnType<typeof useFeedData>, 'refreshPosts' | 'refreshStories'> &
   Pick<ReturnType<typeof useContactData>, 'refreshFriendConnections'> & {
+    onCategoryAssignmentChanged: (id: number, categoryId: number | null) => void
+    onCategoriesChanged: () => void
+    refreshCategoryConversations: () => void
     responseCache: RefObject<SessionResponseCache>
     purgeConversation: (id: number) => void
     groupSettingsOpen: boolean
@@ -39,6 +42,9 @@ type Options = Omit<AppDataContext, 'setNotice'> &
   }
 
 export function useAppRealtime({
+  onCategoryAssignmentChanged,
+  onCategoriesChanged,
+  refreshCategoryConversations,
   responseCache,
   session,
   sessionRef,
@@ -88,6 +94,17 @@ export function useAppRealtime({
     events.addEventListener('update', (event) => {
       if (sessionRef.current?.sessionId !== session.sessionId) return
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
+      if (update.type === 'category.updated') {
+        if (update.conversationId > 0) {
+          responseCache.current.invalidate(['conversations'])
+          onCategoryAssignmentChanged(update.conversationId, update.categoryId || null)
+          return
+        }
+        responseCache.current.invalidate(['categories','conversations'])
+        onCategoriesChanged()
+        void refreshConversations()
+        return
+      }
       if (update.type === 'friend.updated') {
         responseCache.current.invalidate(['friends','feed','stories','profiles'])
         void refreshFriendConnections()
@@ -97,6 +114,7 @@ export function useAppRealtime({
       if (update.type === 'conversation.removed') {
         responseCache.current.invalidate(['conversations','messages'])
         purgeConversation(update.conversationId)
+        refreshCategoryConversations()
         return
       }
 
@@ -106,6 +124,7 @@ export function useAppRealtime({
         membershipSnapshot.current?.add(update.conversationId)
         membershipEventSequence.current += 1
         void refreshConversations()
+        refreshCategoryConversations()
         if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
           void refreshGroupMembers(update.conversationId)
         }
@@ -161,6 +180,7 @@ export function useAppRealtime({
           })
         }
         void refreshConversations()
+        refreshCategoryConversations()
         return
       }
 
@@ -222,6 +242,7 @@ export function useAppRealtime({
         })
 
         void refreshConversations()
+        refreshCategoryConversations()
 
         if (currentId === update.conversationId) {
           setMessages((current) =>
@@ -242,6 +263,7 @@ export function useAppRealtime({
       if (document.visibilityState !== 'visible') return
       void refreshConversations()
       void refreshFriendConnections()
+      refreshCategoryConversations()
     }, 20000)
     const membershipTimer = window.setInterval(() => {
       void reconcileConversationMemberships()
@@ -251,6 +273,7 @@ export function useAppRealtime({
       if (document.visibilityState === 'visible') {
         checkMembership()
         void refreshConversations()
+        refreshCategoryConversations()
         void refreshFriendConnections()
       }
     }
