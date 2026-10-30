@@ -39,7 +39,11 @@
         "dmg",
         "zip"
       ],
-      "hardenedRuntime": true
+      "hardenedRuntime": true,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "SOCO sử dụng microphone khi bạn gọi thoại/video hoặc ghi tin nhắn thoại.",
+        "NSCameraUsageDescription": "SOCO sử dụng camera khi bạn gọi video hoặc quét mã QR."
+      }
     },
     "win": {
       "target": [

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import App from '../app/App'
+import DesktopScreenPicker from './DesktopScreenPicker'
 import { parseSession, type Session } from '../features/auth/session'
 import { clearChatPersistence, configureChatPersistenceStore } from '../features/chat/chatPersistence'
 import { clearChatOutbox } from '../chatOutbox'
@@ -49,7 +50,7 @@ export default function DesktopBootstrap() {
     return () => { active = false; unsubscribe?.() }
   }, [attempt])
 
-  if (startup.phase === 'ready') return <App initialSession={startup.session} />
+  if (startup.phase === 'ready') return <><App initialSession={startup.session} /><DesktopScreenPicker /></>
   return (
     <main className="desktop-startup" aria-live="polite">
       <h1>SOCO</h1>

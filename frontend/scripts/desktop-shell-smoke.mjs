@@ -69,6 +69,34 @@ try {
   assert.match(state.title, /SOCO/)
   evidence.checks.push('packaged UI, sandbox, native auth bridge, no plaintext session, blocked renderer auth HTTP, unsafe URL and popup denial')
 
+  const mediaBoundary = await page.evaluate(async () => {
+    const denied = async (operation) => { try { await operation(); return false } catch { return true } }
+    return {
+      microphone: await denied(() => window.socoDesktop.media.request('microphone')),
+      camera: await denied(() => window.socoDesktop.media.request('camera')),
+      invalidKind: await denied(() => window.socoDesktop.media.request('filesystem')),
+      screen: await denied(() => window.socoDesktop.screen.select('expired-qa-request', 0)),
+    }
+  })
+  assert.deepEqual(mediaBoundary, { microphone: true, camera: true, invalidKind: true, screen: true })
+  evidence.checks.push('actual packaged media IPC denies unauthenticated mic/camera and invalid/expired requests; no devices activated')
+  if (process.platform === 'darwin') {
+    const plist = await readFile(resolve(dirname(executablePath), '../Info.plist'), 'utf8')
+    assert.match(plist, /NSMicrophoneUsageDescription/)
+    assert.match(plist, /NSCameraUsageDescription/)
+    evidence.checks.push('packaged macOS microphone/camera privacy descriptions present')
+  }
+  // UI fixture only: no OS source capture. An expired selection must remain dismissible.
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('soco:screen:picker', {
+    requestId: 'expired-qa-request', sources: [{ index: 0, name: 'QA fixture — not an actual screen', thumbnail: '' }],
+  }))
+  await page.getByRole('dialog', { name: 'Chọn nguồn chia sẻ' }).waitFor()
+  await page.getByRole('button', { name: 'QA fixture — not an actual screen' }).click()
+  await page.getByRole('alert').filter({ hasText: 'Yêu cầu chia sẻ đã hết hạn' }).waitFor()
+  await page.getByRole('button', { name: 'Hủy chia sẻ' }).click()
+  await page.getByRole('dialog', { name: 'Chọn nguồn chia sẻ' }).waitFor({ state: 'detached' })
+  evidence.checks.push('screen-picker UI fixture: expired selection shows error and cancel closes modal; real capture NOT RUN')
+
   const vault = await application.evaluate(({ app, safeStorage }, profile) => {
     const require = process.getBuiltinModule('module').createRequire(app.getAppPath() + '/package.json')
     const fs = require('node:fs'), path = require('node:path')

@@ -1,5 +1,7 @@
 # SOCO Desktop — Agent Handoff / Execution Contract
 
+**Bàn giao tiếp B03 — 31/10/2026:** Đọc `08_BATCH_03_STATUS.md` trước khi sửa tiếp. Đã tích hợp media permission Main-only, picker screen video-only, UI chọn mic/camera, guard cleanup E2EE và Mac privacy plist. 49 unit tests và packaged smoke PASS; live call/translation/screen và Windows vẫn NOT RUN/BLOCKED. Không áp dụng gói WIP cũ. Tiếp tục DSK-016/017 và packaging/CI độc lập; không gọi B03 là đủ UAT hoặc release.
+
 **Áp dụng cho toàn bộ agent và dev trong** `feat/chatnet-desktop-electron`.
 **Status 30/10/2026:** B01 foundation và B02 native-auth/window integration đã có code trên nhánh riêng. Đọc `07_BATCH_02_STATUS.md` trước khi tiếp tục: ghi bằng chứng build/unit/backend integration/native macOS và các gate còn NOT RUN/BLOCKED. Không phải giấy chứng nhận đủ điều kiện phát hành.
 

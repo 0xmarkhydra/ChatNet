@@ -50,6 +50,12 @@ function createAuthBroker({ vault, baseURL, fetchImpl = fetch, userAgent = 'SOCO
   let generation = 0
   let pendingRefresh
   let loggingIn = false
+  let verified = false
+
+  // Main-only authorization context for native integrations; never expose credentials over IPC.
+  function currentScope() {
+    return verified && credential ? { sessionId: credential.sessionId, userId: credential.userId } : null
+  }
 
   function load() {
     if (!loaded) { credential = vault.read(); loaded = true }
@@ -59,6 +65,7 @@ function createAuthBroker({ vault, baseURL, fetchImpl = fetch, userAgent = 'SOCO
     const previous = credential
     ++generation
     credential = null
+    verified = false
     loaded = true
     try { vault.clear() } finally {
       if (previous) onExpired(previous.sessionId, previous.userId)
@@ -115,6 +122,7 @@ function createAuthBroker({ vault, baseURL, fetchImpl = fetch, userAgent = 'SOCO
         throw error
       }
       credential = next
+      verified = true
       return session
     } finally { loggingIn = false }
   }
@@ -134,6 +142,7 @@ function createAuthBroker({ vault, baseURL, fetchImpl = fetch, userAgent = 'SOCO
       const next = { ...previous, refreshToken: data.refreshToken }
       vault.write(next)
       credential = next
+      verified = true
       return session
     })() }
     pendingRefresh = operation
@@ -186,7 +195,7 @@ function createAuthBroker({ vault, baseURL, fetchImpl = fetch, userAgent = 'SOCO
       return { id, userAgent, createdAt, lastSeenAt, expiresAt, current }
     })
   }
-  return { verifyEmail, refresh, restore, logout, manage }
+  return { verifyEmail, refresh, restore, logout, manage, currentScope }
 }
 
 module.exports = { createAuthBroker, publicSession, exactObject }

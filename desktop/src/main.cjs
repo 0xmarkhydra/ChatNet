@@ -1,21 +1,22 @@
 'use strict'
 
-const { app, BrowserWindow, ipcMain, protocol, net, session, shell, safeStorage } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, session, shell, safeStorage, systemPreferences, dialog, desktopCapturer } = require('electron')
 const { createCredentialVault } = require('./auth-vault.cjs')
 const { createAuthBroker } = require('./auth-broker.cjs')
 const { registerAuthIPC } = require('./auth-ipc.cjs')
+const { createMediaPermissions, registerMediaIPC, kindForMediaType } = require('./media-permissions.cjs')
+const { registerScreenCapture } = require('./screen-capture.cjs')
 const { createWindowLifecycle } = require('./window-lifecycle.cjs')
 const { join, isAbsolute } = require('node:path')
+const { pathToFileURL } = require('node:url')
+const { trustedRendererURL, safeExternalURL, isSafeAssetPath } = require('./ipc-policy.cjs')
 
-// Explicit launcher-only profile selection lets QA run without touching the user's account or queue.
+// Explicit launcher-only profile selection keeps QA separate from the user's session and queue.
 const profile = app.commandLine.getSwitchValue('user-data-dir')
 if (profile) {
   if (!isAbsolute(profile)) throw new Error('SOCO profile path must be absolute')
   app.setPath('userData', profile)
 }
-const { pathToFileURL } = require('node:url')
-const { trustedRendererURL, safeExternalURL, isSafeAssetPath } = require('./ipc-policy.cjs')
-
 const dev = !app.isPackaged && process.argv.includes('--dev')
 const DEV_URL = 'http://127.0.0.1:5173/'
 const APP_URL = 'app://soco/index.html'
@@ -26,15 +27,15 @@ const CSP = [
   "img-src 'self' data: blob: https:", "font-src 'self' data:",
   "media-src 'self' blob: https:", "connect-src 'self' https: wss:", "worker-src 'self' blob:"
 ].join('; ')
-
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
 ])
 
-let mainWindow
-let windowLifecycle
+let mainWindow, windowLifecycle, authBroker, mediaPermissions, screenCapture
 const hasLock = app.requestSingleInstanceLock()
 if (!hasLock) app.quit()
+const trustedURL = (url) => trustedRendererURL(url, dev)
+const getScope = () => authBroker?.currentScope() ?? null
 
 function showMainWindow() {
   if (!mainWindow) createMainWindow()
@@ -42,22 +43,27 @@ function showMainWindow() {
   mainWindow.show()
   mainWindow.focus()
 }
-
 function isTrustedFrame(event) {
-  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents ||
-      !event.senderFrame || event.senderFrame !== mainWindow.webContents.mainFrame) return false
-  return trustedRendererURL(event.senderFrame.url, dev)
+  return Boolean(mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents &&
+    event.senderFrame && event.senderFrame === mainWindow.webContents.mainFrame && trustedURL(event.senderFrame.url))
 }
+function resetNativeGrants() { mediaPermissions?.reset(); screenCapture?.reset() }
 
 function attachHandlers() {
   const vault = createCredentialVault(join(app.getPath('userData'), 'credentials'), safeStorage)
-  const broker = createAuthBroker({
+  authBroker = createAuthBroker({
     vault, baseURL: API_ORIGIN, userAgent: `SOCO Desktop/${app.getVersion()} (${process.platform})`,
     onExpired: (sessionId, userId) => {
+      resetNativeGrants()
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('soco:auth:expired', sessionId, userId)
     },
   })
-  registerAuthIPC(ipcMain, broker, isTrustedFrame)
+  registerAuthIPC(ipcMain, authBroker, isTrustedFrame)
+  mediaPermissions = createMediaPermissions({ preferences: systemPreferences, dialog, platform: process.platform,
+    getScope, getWindow: () => mainWindow })
+  registerMediaIPC(ipcMain, mediaPermissions, isTrustedFrame)
+  screenCapture = registerScreenCapture({ ses: session.defaultSession, ipcMain, desktopCapturer,
+    getScope, getWindow: () => mainWindow, trusted: isTrustedFrame, trustedURL })
   ipcMain.handle('soco:platform-info', (event) => {
     if (!isTrustedFrame(event)) throw new Error('Forbidden IPC origin')
     return { platform: process.platform, version: app.getVersion(), packaged: app.isPackaged, apiOrigin: API_ORIGIN }
@@ -91,16 +97,27 @@ async function registerAppProtocol() {
 }
 
 function configureSecurity() {
-  const trusted = (contents) => Boolean(contents && mainWindow && contents === mainWindow.webContents &&
-    trustedRendererURL(contents.getURL(), dev))
+  const trustedContents = (contents) => Boolean(contents && mainWindow && !mainWindow.isDestroyed() &&
+    contents === mainWindow.webContents && trustedURL(contents.getURL()) && getScope())
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+    if (!trustedContents(contents) || !details.isMainFrame || !trustedURL(details.requestingUrl)) { callback(false); return }
+    if (permission === 'display-capture') {
+      callback(mainWindow.isVisible() && mainWindow.isFocused()); return
+    }
     const kinds = details.mediaTypes || []
-    callback(Boolean(trusted(contents) && details.isMainFrame && permission === 'media' &&
-      kinds.length > 0 && kinds.every((kind) => kind === 'audio' || kind === 'video')))
+    if (permission !== 'media' || !kinds.length || kinds.some((kind) => !kindForMediaType(kind))) { callback(false); return }
+    void (async () => {
+      for (const type of kinds) if (!(await mediaPermissions.request(kindForMediaType(type))).granted) return false
+      return trustedContents(contents)
+    })().then(callback, () => callback(false))
   })
-  session.defaultSession.setPermissionCheckHandler((contents, permission, requestingOrigin) =>
-    Boolean(trusted(contents) && trustedRendererURL(requestingOrigin, dev) && permission === 'media'))
-  // Main uses Node fetch, outside Chromium. Renderer must never receive a refresh credential via HTTP.
+  session.defaultSession.setPermissionCheckHandler((contents, permission, requestingOrigin, details) => {
+    if (!trustedContents(contents) || !details.isMainFrame || !trustedURL(requestingOrigin)) return false
+    if (permission === 'display-capture') return mainWindow.isVisible() && mainWindow.isFocused()
+    const kind = kindForMediaType(details.mediaType)
+    return permission === 'media' && Boolean(kind && mediaPermissions.hasGrant(kind))
+  })
+  // Node fetch in Main is outside Chromium. Never let renderer receive refresh credentials over HTTP.
   const publicAuthPaths = new Set(['/api/auth/email/start', '/api/auth/email/resend', '/api/auth/session/status'])
   session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (details, callback) => {
     let blocked = false
@@ -110,9 +127,7 @@ function configureSecurity() {
     } catch { blocked = true }
     callback({ cancel: blocked })
   })
-  app.on('web-contents-created', (_event, contents) => {
-    contents.on('will-attach-webview', (event) => event.preventDefault())
-  })
+  app.on('web-contents-created', (_event, contents) => contents.on('will-attach-webview', (event) => event.preventDefault()))
 }
 
 function createMainWindow() {
@@ -127,12 +142,12 @@ function createMainWindow() {
     },
   })
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (url !== (dev ? DEV_URL : APP_URL)) event.preventDefault()
-  })
+  mainWindow.webContents.on('will-navigate', (event, url) => { if (url !== (dev ? DEV_URL : APP_URL)) event.preventDefault() })
   mainWindow.webContents.on('will-redirect', (event) => event.preventDefault())
+  mainWindow.webContents.on('render-process-gone', resetNativeGrants)
+  mainWindow.webContents.on('did-start-navigation', resetNativeGrants)
   windowLifecycle.attach(mainWindow)
-  mainWindow.on('closed', () => { mainWindow = undefined })
+  mainWindow.on('closed', () => { resetNativeGrants(); mainWindow = undefined })
   void mainWindow.loadURL(dev ? DEV_URL : APP_URL)
 }
 
@@ -140,14 +155,11 @@ if (hasLock) {
   app.on('second-instance', () => { if (mainWindow) showMainWindow() })
   app.whenReady().then(async () => {
     await registerAppProtocol()
-    configureSecurity()
     attachHandlers()
+    configureSecurity()
     windowLifecycle = createWindowLifecycle(() => mainWindow, showMainWindow)
     createMainWindow()
     app.on('activate', showMainWindow)
-  }).catch(() => {
-    console.error('SOCO desktop startup failed')
-    app.quit()
-  })
+  }).catch(() => { console.error('SOCO desktop startup failed'); app.quit() })
 }
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

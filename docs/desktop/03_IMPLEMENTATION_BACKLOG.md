@@ -1,5 +1,7 @@
 # SOCO Desktop — Implementation Backlog v1
 
+**Cập nhật 31/10/2026 — B03:** DSK-014 = IN_PROGRESS; DSK-018/019 = IN_REVIEW; DSK-004/015/020 = BLOCKED ở nghiệm thu media thật. B03 đã có permission broker, chọn nguồn screen video-only, chuyển mic/camera và guards lifecycle. 49/49 Desktop tests, Web regression, backend DB integration và packaged macOS smoke PASS; không thay thế UAT hai thiết bị. Xem `08_BATCH_03_STATUS.md`. Không task nào mới DONE.
+
 **Cơ sở:** `dev@c04a044` · **Nhánh triển khai:** `feat/chatnet-desktop-electron`
 **Trạng thái 30/10/2026 sau B02:** DSK-000 = DONE; DSK-001/002/003/006/007/008/011 = IN_REVIEW; DSK-004 = BLOCKED (chưa UAT LiveKit hai thiết bị); DSK-005/009/010/012/013 = IN_PROGRESS. Các task còn lại = NOT_STARTED cho đến báo cáo batch tương ứng. Bằng chứng B01: `06_BATCH_01_STATUS.md`; B02: `07_BATCH_02_STATUS.md`. Chưa có task Desktop mới nào được đánh dấu DONE; chưa đủ điều kiện merge/release.
 

@@ -8,9 +8,20 @@ export type DesktopPlatformInfo = {
   apiOrigin: string
 }
 
+export type DesktopScreenRequest = { requestId: string; sources: { index: number; name: string; thumbnail: string }[] }
+export type MediaPermissionStatus = 'not-determined' | 'granted' | 'denied' | 'restricted' | 'unknown'
+
 export type DesktopBridge = {
   getPlatformInfo: () => Promise<DesktopPlatformInfo>
   openExternal: (url: string) => Promise<boolean>
+  media: {
+    status: (kind: 'microphone' | 'camera' | 'screen') => Promise<MediaPermissionStatus>
+    request: (kind: 'microphone' | 'camera') => Promise<{ granted: boolean; status: MediaPermissionStatus }>
+  }
+  screen: {
+    select: (requestId: string, index: number | null) => Promise<boolean>
+    onPicker: (callback: (request: DesktopScreenRequest | null) => void) => () => void
+  }
   auth: {
     restore: () => Promise<Session | null>
     verifyEmail: (input: { token: string; code: string }) => Promise<Session>
