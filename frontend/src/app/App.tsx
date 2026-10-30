@@ -37,6 +37,7 @@ import MessageSearchPanel from '../features/chat/MessageSearchPanel'
 import ProfileIdentityForm from '../features/profile/ProfileIdentityForm'
 import BottomNavigation from './BottomNavigation'
 import GroupSettingsPanel from '../features/chat/GroupSettingsPanel'
+import GroupInviteJoinDialog from '../features/chat/GroupInviteJoinDialog'
 import ContactsView from '../features/contacts/ContactsView'
 import PrivacyControls from '../features/profile/PrivacyControls'
 import AccountSessionsPanel from '../features/auth/AccountSessionsPanel'
@@ -518,6 +519,8 @@ export default function App() {
     setGroupBusy,
     activeGroupMember,
     canManageActiveGroup,
+    canInviteActiveGroup,
+    canEditActiveGroup,
     groupInviteCandidates,
     openGroupSettings,
     launchGroupCall,
@@ -3586,6 +3589,8 @@ export default function App() {
               activeGroupMember={activeGroupMember}
               setGroupSettingsOpen={setGroupSettingsOpen}
               canManageActiveGroup={canManageActiveGroup}
+              canInviteActiveGroup={canInviteActiveGroup}
+              canEditActiveGroup={canEditActiveGroup}
               groupNameDraft={groupNameDraft}
               setGroupNameDraft={setGroupNameDraft}
               renameActiveGroup={renameActiveGroup}
@@ -3604,6 +3609,9 @@ export default function App() {
               userId={session.user.id}
               changeGroupMemberRole={changeGroupMemberRole}
               removeGroupMember={removeGroupMember}
+              request={apiFetch}
+              notify={(message) => setNotice(message)}
+              onMembersChanged={() => refreshGroupMembers(activeConversation.id)}
             />
                   )}
 
@@ -4504,6 +4512,16 @@ export default function App() {
           </section>
         </ProfileOverlay>
       )}
+
+      <GroupInviteJoinDialog
+        request={apiFetch}
+        notify={(message) => setNotice(message)}
+        onJoined={async (id) => {
+          await refreshConversations()
+          setActiveConversationId(id)
+          setTab('chat')
+        }}
+      />
 
       <CallManager
         request={apiFetch}

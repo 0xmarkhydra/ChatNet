@@ -43,9 +43,12 @@ export function useGroupManagement({
   const [groupInviteSearch, setGroupInviteSearch] = useState('')
   const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
   const [groupBusy, setGroupBusy] = useState(false)
+  const [groupPolicy, setGroupPolicy] = useState<{ adminCanInvite: boolean; adminCanEditInfo: boolean } | null>(null)
 
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
+  const canInviteActiveGroup = activeGroupMember?.role === 'owner' || (activeGroupMember?.role === 'admin' && groupPolicy?.adminCanInvite === true)
+  const canEditActiveGroup = activeGroupMember?.role === 'owner' || (activeGroupMember?.role === 'admin' && groupPolicy?.adminCanEditInfo === true)
   const groupInviteCandidates = useMemo(() => {
     const memberIds = new Set(groupMembers.map((member) => member.id))
     const normalized = groupInviteSearch.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
@@ -61,6 +64,13 @@ export function useGroupManagement({
     setGroupNameDraft(conversation.name)
     setGroupInviteSearch('')
     setGroupInviteSelection([])
+    setGroupPolicy(null)
+    void apiFetch(`/api/conversations/${conversation.id}/group-settings`)
+      .then(async response => {
+        if (!response.ok) throw new Error()
+        const result = await response.json() as { adminCanInvite: boolean; adminCanEditInfo: boolean }
+        if (activeConversationIdRef.current === conversation.id) setGroupPolicy(result)
+      }).catch(() => setNotice('Không tải được quyền quản trị nhóm.'))
     void Promise.all([
       refreshGroupMembers(conversation.id),
       refreshFriendConnections(),
@@ -246,6 +256,8 @@ export function useGroupManagement({
     setGroupBusy,
     activeGroupMember,
     canManageActiveGroup,
+    canInviteActiveGroup,
+    canEditActiveGroup,
     groupInviteCandidates,
     openGroupSettings,
     launchGroupCall,

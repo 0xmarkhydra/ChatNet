@@ -3,11 +3,14 @@ import { X } from 'lucide-react'
 import type { GroupMember, Conversation } from './types'
 import type { FriendConnection } from '../contacts/types'
 import UserAvatar from '../../shared/ui/UserAvatar'
+import GroupGovernancePanel from './GroupGovernancePanel'
 
 type Props = {
   activeGroupMember: GroupMember | null
   setGroupSettingsOpen: (open: boolean) => void
   canManageActiveGroup: boolean
+  canInviteActiveGroup: boolean
+  canEditActiveGroup: boolean
   groupNameDraft: string
   setGroupNameDraft: (value: string) => void
   renameActiveGroup: () => Promise<void>
@@ -26,12 +29,17 @@ type Props = {
   userId: number
   changeGroupMemberRole: (member: GroupMember, role: GroupMember['role']) => Promise<void>
   removeGroupMember: (member: GroupMember) => Promise<void>
+  request: (path: string, init?: RequestInit) => Promise<Response>
+  notify: (message: string) => void
+  onMembersChanged: () => Promise<void>
 }
 
 export default function GroupSettingsPanel({
   activeGroupMember,
   setGroupSettingsOpen,
   canManageActiveGroup,
+  canInviteActiveGroup,
+  canEditActiveGroup,
   groupNameDraft,
   setGroupNameDraft,
   renameActiveGroup,
@@ -50,6 +58,9 @@ export default function GroupSettingsPanel({
   userId,
   changeGroupMemberRole,
   removeGroupMember,
+  request,
+  notify,
+  onMembersChanged,
 }: Props) {
   return (
     <section className="group-settings-panel" role="region" aria-label="Quản lý nhóm">
@@ -73,7 +84,7 @@ export default function GroupSettingsPanel({
 
       {canManageActiveGroup && (
         <div className="group-admin-tools">
-          <div className="group-tool-row">
+          {canEditActiveGroup && <div className="group-tool-row">
             <input
               value={groupNameDraft}
               onChange={(event) => setGroupNameDraft(event.target.value)}
@@ -87,9 +98,9 @@ export default function GroupSettingsPanel({
             >
               Đổi tên
             </button>
-          </div>
+          </div>}
 
-          <div className="group-invite-friends">
+          {canInviteActiveGroup && <div className="group-invite-friends">
             <div className="group-invite-title">
               <strong>Mời bạn bè</strong>
               <span>{groupInviteSelection.length ? `${groupInviteSelection.length} đã chọn` : 'Chọn trực tiếp từ danh bạ'}</span>
@@ -137,9 +148,9 @@ export default function GroupSettingsPanel({
                 )
               })}
             </div>
-          </div>
+          </div>}
 
-          <div className="group-tool-row">
+          {canInviteActiveGroup && <div className="group-tool-row">
             <input
               value={groupInviteDraft}
               onChange={(event) => setGroupInviteDraft(event.target.value)}
@@ -152,7 +163,7 @@ export default function GroupSettingsPanel({
             >
               {groupInviteSelection.length > 0 ? `Thêm ${groupInviteSelection.length}` : 'Thêm'}
             </button>
-          </div>
+          </div>}
         </div>
       )}
 
@@ -217,6 +228,13 @@ export default function GroupSettingsPanel({
           </div>
         ))}
       </div>
+      {activeGroupMember && <GroupGovernancePanel
+        conversationId={activeConversation.id}
+        role={activeGroupMember.role}
+        request={request}
+        notify={notify}
+        onMembersChanged={onMembersChanged}
+      />}
     </section>
   )
 }
