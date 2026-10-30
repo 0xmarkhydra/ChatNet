@@ -6,6 +6,18 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('socoDesktop', Object.freeze({
   getPlatformInfo: () => ipcRenderer.invoke('soco:platform-info'),
   openExternal: (url) => ipcRenderer.invoke('soco:open-external', url),
+  notifications: Object.freeze({
+    sync: (input) => ipcRenderer.invoke('soco:notification:sync', input),
+    show: (input) => ipcRenderer.invoke('soco:notification:show', input),
+    clear: (sessionId) => ipcRenderer.invoke('soco:notification:clear', sessionId),
+    dismiss: (input) => ipcRenderer.invoke('soco:notification:dismiss', input),
+    onClicked: (callback) => {
+      if (typeof callback !== 'function') throw new TypeError('Callback required')
+      const listener = (_event, value) => callback(value)
+      ipcRenderer.on('soco:notification:clicked', listener)
+      return () => ipcRenderer.removeListener('soco:notification:clicked', listener)
+    },
+  }),
   media: Object.freeze({
     status: (kind) => ipcRenderer.invoke('soco:media:status', kind),
     request: (kind) => ipcRenderer.invoke('soco:media:request', kind),

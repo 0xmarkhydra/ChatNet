@@ -1,5 +1,7 @@
 # SOCO Desktop — Agent Handoff / Execution Contract
 
+**Bàn giao B04 — 31/10/2026:** Xem `09_BATCH_04_STATUS.md`. Đã có notification/call notice native, badge theo tổng server, click reauthorize, focus-aware read receipt. Backend bổ sung unread summary và exact conversation lookup, chưa deploy. 59 native tests, React contract tests, real PG/Redis suite và packaged negative IPC smoke PASS; positive OS notification/UAT chưa chứng minh. B03 đã push `2330cc3`. Tiếp tục B05 trên nhánh Desktop, giữ nguyên blockers và không public release.
+
 **Bàn giao tiếp B03 — 31/10/2026:** Đọc `08_BATCH_03_STATUS.md` trước khi sửa tiếp. Đã tích hợp media permission Main-only, picker screen video-only, UI chọn mic/camera, guard cleanup E2EE và Mac privacy plist. 49 unit tests và packaged smoke PASS; live call/translation/screen và Windows vẫn NOT RUN/BLOCKED. Không áp dụng gói WIP cũ. Tiếp tục DSK-016/017 và packaging/CI độc lập; không gọi B03 là đủ UAT hoặc release.
 
 **Áp dụng cho toàn bộ agent và dev trong** `feat/chatnet-desktop-electron`.

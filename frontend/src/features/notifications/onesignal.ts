@@ -31,7 +31,7 @@ declare global {
 }
 
 // Desktop must never inject OneSignal's remote browser SDK into an Electron renderer.
-const desktopMode = import.meta.env.MODE === 'desktop'
+const desktopMode = import.meta.env?.MODE === 'desktop'
 const desktopUnsupported = (): PushState => ({ permission: 'unsupported', supported: false, optedIn: false })
 
 let sdkPromise: Promise<OneSignalAPI> | null = null

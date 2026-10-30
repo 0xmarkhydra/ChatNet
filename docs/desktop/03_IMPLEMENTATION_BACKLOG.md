@@ -1,5 +1,7 @@
 # SOCO Desktop — Implementation Backlog v1
 
+**Cập nhật B04 — 31/10/2026:** DSK-016/017 = IN_REVIEW: notification native giữ riêng tư, badge theo tổng server, click xác minh lại auth/membership, focus/read receipt, notification call lifecycle. 59/59 native policy tests + React contract fixtures + backend PG/Redis integration + packaged negative IPC smoke PASS. DSK-021/022 parity UI thực tế vẫn IN_PROGRESS. Xem `09_BATCH_04_STATUS.md`, gồm contract backend bổ sung chưa deploy và các gate NOT RUN/BLOCKED. Không task mới DONE.
+
 **Cập nhật 31/10/2026 — B03:** DSK-014 = IN_PROGRESS; DSK-018/019 = IN_REVIEW; DSK-004/015/020 = BLOCKED ở nghiệm thu media thật. B03 đã có permission broker, chọn nguồn screen video-only, chuyển mic/camera và guards lifecycle. 49/49 Desktop tests, Web regression, backend DB integration và packaged macOS smoke PASS; không thay thế UAT hai thiết bị. Xem `08_BATCH_03_STATUS.md`. Không task nào mới DONE.
 
 **Cơ sở:** `dev@c04a044` · **Nhánh triển khai:** `feat/chatnet-desktop-electron`

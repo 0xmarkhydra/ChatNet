@@ -29,6 +29,7 @@ import { buildLanguageOptions } from '../i18n/languages'
 import { isDesktopBuild } from '../../platform/desktop'
 import { requireDesktopMedia } from '../../platform/desktopMedia'
 import CallDeviceSettings from './CallDeviceSettings'
+import { notifyDesktopCall, dismissDesktopCall } from '../../platform/useDesktopNotifications'
 import './call.css'
 
 type ConversationLite = { id: number; name: string; type: 'direct' | 'group' }
@@ -38,6 +39,7 @@ type CallManagerProps = {
   request: CallRequest
   apiBase: string
   token: string
+  sessionId?: string
   userId: number
   sourceLanguage: string
   targetLanguage: string
@@ -71,7 +73,7 @@ export function CallHeaderActions({ conversationId }: { conversationId: number }
 }
 
 export default function CallManager({
-  request, apiBase, token, userId, sourceLanguage, targetLanguage, conversations,
+  request, apiBase, token, sessionId, userId, sourceLanguage, targetLanguage, conversations,
 }: CallManagerProps) {
   const [incoming, setIncoming] = useState<CallView | null>(null)
   const [active, setActive] = useState<CallView | CallSession | null>(null)
@@ -81,6 +83,13 @@ export default function CallManager({
   const requestRef = useRef(request)
   requestRef.current = request
   const callRequest = useCallback<CallRequest>((path, init) => requestRef.current(path, init), [])
+
+  useEffect(() => {
+    if (!isDesktopBuild || !sessionId || !incoming) return
+    // Defer one tick so StrictMode setup/cleanup cannot consume dedupe before the live effect.
+    const timer = window.setTimeout(() => notifyDesktopCall(sessionId, incoming), 0)
+    return () => { window.clearTimeout(timer); dismissDesktopCall(sessionId, incoming.id) }
+  }, [incoming?.id, sessionId])
 
   const conversationMap = useMemo(
     () => new Map(conversations.map((item) => [item.id, item])),

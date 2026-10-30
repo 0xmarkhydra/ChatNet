@@ -14,6 +14,13 @@ export type MediaPermissionStatus = 'not-determined' | 'granted' | 'denied' | 'r
 export type DesktopBridge = {
   getPlatformInfo: () => Promise<DesktopPlatformInfo>
   openExternal: (url: string) => Promise<boolean>
+  notifications: {
+    sync: (input: { sessionId: string; conversationId: number | null; unreadCount: number | null; enabled: boolean; sound: boolean }) => Promise<boolean>
+    show: (input: { sessionId: string; conversationId: number; eventId: string; kind: 'message' | 'call'; senderId: number; createdAt: string }) => Promise<{ shown: boolean; reason?: string }>
+    clear: (sessionId: string) => Promise<boolean>
+    dismiss: (input: { sessionId: string; kind: 'message' | 'call'; eventId: string }) => Promise<boolean>
+    onClicked: (callback: (input: { sessionId: string; conversationId: number; kind: 'message' | 'call' }) => void) => () => void
+  }
   media: {
     status: (kind: 'microphone' | 'camera' | 'screen') => Promise<MediaPermissionStatus>
     request: (kind: 'microphone' | 'camera') => Promise<{ granted: boolean; status: MediaPermissionStatus }>

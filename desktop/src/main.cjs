@@ -6,6 +6,8 @@ const { createAuthBroker } = require('./auth-broker.cjs')
 const { registerAuthIPC } = require('./auth-ipc.cjs')
 const { createMediaPermissions, registerMediaIPC, kindForMediaType } = require('./media-permissions.cjs')
 const { registerScreenCapture } = require('./screen-capture.cjs')
+const { Notification } = require('electron')
+const { createNativeNotifications, registerNotificationIPC } = require('./notifications.cjs')
 const { createWindowLifecycle } = require('./window-lifecycle.cjs')
 const { join, isAbsolute } = require('node:path')
 const { pathToFileURL } = require('node:url')
@@ -31,7 +33,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
 ])
 
-let mainWindow, windowLifecycle, authBroker, mediaPermissions, screenCapture
+let mainWindow, windowLifecycle, authBroker, mediaPermissions, screenCapture, nativeNotifications
 const hasLock = app.requestSingleInstanceLock()
 if (!hasLock) app.quit()
 const trustedURL = (url) => trustedRendererURL(url, dev)
@@ -47,7 +49,7 @@ function isTrustedFrame(event) {
   return Boolean(mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents &&
     event.senderFrame && event.senderFrame === mainWindow.webContents.mainFrame && trustedURL(event.senderFrame.url))
 }
-function resetNativeGrants() { mediaPermissions?.reset(); screenCapture?.reset() }
+function resetNativeGrants() { mediaPermissions?.reset(); screenCapture?.reset(); nativeNotifications?.reset() }
 
 function attachHandlers() {
   const vault = createCredentialVault(join(app.getPath('userData'), 'credentials'), safeStorage)
@@ -64,6 +66,10 @@ function attachHandlers() {
   registerMediaIPC(ipcMain, mediaPermissions, isTrustedFrame)
   screenCapture = registerScreenCapture({ ses: session.defaultSession, ipcMain, desktopCapturer,
     getScope, getWindow: () => mainWindow, trusted: isTrustedFrame, trustedURL })
+  if (process.platform === 'win32') app.setAppUserModelId('asia.soco.desktop')
+  nativeNotifications = createNativeNotifications({ Notification, getScope, getWindow: () => mainWindow,
+    showWindow: showMainWindow, setBadge: (count) => windowLifecycle?.setUnread(count) })
+  registerNotificationIPC(ipcMain, nativeNotifications, isTrustedFrame)
   ipcMain.handle('soco:platform-info', (event) => {
     if (!isTrustedFrame(event)) throw new Error('Forbidden IPC origin')
     return { platform: process.platform, version: app.getVersion(), packaged: app.isPackaged, apiOrigin: API_ORIGIN }

@@ -7,6 +7,7 @@ import { userLabel } from '../shared/lib/userLabel'
 import { useMessageData } from '../features/chat/useMessageData'
 import { useApiRequest } from './useApiRequest'
 import { useAppRealtime } from './useAppRealtime'
+import { useDesktopNotifications } from '../platform/useDesktopNotifications'
 import { useConversationData } from '../features/chat/useConversationData'
 import { useContactData } from '../features/contacts/useContactData'
 import { useFeedData } from '../features/feed/useFeedData'
@@ -2356,6 +2357,20 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     }
   }, [session?.sessionId, sessionClient])
 
+  const nativeNotifications = useDesktopNotifications({
+    session, sessionRef, apiFetch, checkSession: sessionClient.check,
+    activeConversationId, tab, sound: messageSoundEnabled,
+    onError: (message) => setNotice(message, 'warning'),
+    onOpen: (conversation) => {
+      revokedConversationIds.current.delete(conversation.id)
+      membershipSnapshot.current?.add(conversation.id)
+      setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)])
+      if (activeConversationIdRef.current !== conversation.id) setMessages([])
+      switchTab('chat')
+      setActiveConversationId(conversation.id)
+    },
+  })
+
   useAppRealtime({
     onCategoryAssignmentChanged: conversationCategories.applyAssignment,
     onCategoriesChanged: () => { void conversationCategories.refreshCategories(); conversationCategories.refreshFiltered() },
@@ -4337,17 +4352,21 @@ export default function App({ initialSession }: { initialSession?: Session | nul
               </button>
 
               <div className="settings-row">
-                <div><strong>{t('profile.notifications')}</strong><small>{t('profile.notificationsHint')}</small></div>
+                <div>
+                  <strong>{isDesktopBuild ? 'Thông báo Desktop' : t('profile.notifications')}</strong>
+                  <small>{isDesktopBuild ? 'Ẩn nội dung và tên người gửi. Nhận khi SOCO còn chạy; thoát hẳn sẽ dừng thông báo.' : t('profile.notificationsHint')}</small>
+                </div>
                 <button
                   type="button"
-                  className={`switch-button ${pushEnabled ? 'on' : ''}`}
-                  onClick={() => void togglePush()}
-                  disabled={pushBusy}
-                  aria-label={pushEnabled ? 'Tắt thông báo' : 'Bật thông báo'}
+                  className={`switch-button ${(isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? 'on' : ''}`}
+                  onClick={() => isDesktopBuild ? nativeNotifications.toggle() : void togglePush()}
+                  disabled={!isDesktopBuild && pushBusy}
+                  aria-label={(isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? 'Tắt thông báo' : 'Bật thông báo'}
                   role="switch"
-                  aria-checked={pushEnabled}
+                  aria-checked={isDesktopBuild ? nativeNotifications.enabled : pushEnabled}
                 ><span /></button>
               </div>
+              {isDesktopBuild && nativeNotifications.warning && <div className="settings-row" role="status"><small>{nativeNotifications.warning}</small></div>}
               <div className="settings-row message-sound-row">
                 <div><strong>{t('profile.messageSound')}</strong><small>{t('profile.messageSoundHint')}</small></div>
                 <button
@@ -4369,10 +4388,10 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                   </button>
                 </div>
               )}
-              <div className="settings-row">
+              {!isDesktopBuild && <div className="settings-row">
                 <div><strong>{t('profile.testNotification')}</strong><small>{t('profile.testNotificationHint')}</small></div>
                 <button type="button" className="settings-action" onClick={() => void sendTestPush()} disabled={pushBusy || !pushEnabled}>{t('common.test')}</button>
-              </div>
+              </div>}
               <div className="settings-row">
                 <div><strong>{t('profile.autoTranslate')}</strong></div>
                 <button
@@ -4581,6 +4600,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         request={apiFetch}
         apiBase={API}
         token={session.token}
+        sessionId={session.sessionId}
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}

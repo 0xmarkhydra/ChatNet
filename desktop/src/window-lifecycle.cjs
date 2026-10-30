@@ -12,6 +12,20 @@ function createWindowLifecycle(getWindow, showWindow) {
   let tray
   let timer
   let quitting = false
+  let unreadCount = 0
+
+  function setUnread(count) {
+    unreadCount = count
+    const label = count === null ? '' : count > 99 ? '99+' : count > 0 ? String(count) : ''
+    app.dock?.setBadge(label)
+    const window = getWindow()
+    if (process.platform === 'win32' && window && !window.isDestroyed()) {
+      window.setOverlayIcon(label ? nativeImage.createFromDataURL(trayIcon).resize({ width: 32, height: 32 }) : null,
+        label ? `${label} tin nhắn chưa đọc` : '')
+    }
+    tray?.setToolTip(count === null ? 'SOCO — chưa đồng bộ số tin chưa đọc' : label ? `SOCO — ${label} tin chưa đọc` : 'SOCO')
+    if (process.platform === 'darwin') tray?.setTitle(label)
+  }
 
   function save() {
     clearTimeout(timer)
@@ -54,6 +68,7 @@ function createWindowLifecycle(getWindow, showWindow) {
     return state.bounds
   }
   function attach(window) {
+    setUnread(unreadCount)
     if (state.maximized) window.maximize()
     const scheduleSave = () => { clearTimeout(timer); timer = setTimeout(save, 300) }
     for (const event of ['resize', 'move', 'maximize', 'unmaximize']) window.on(event, scheduleSave)
@@ -93,7 +108,7 @@ function createWindowLifecycle(getWindow, showWindow) {
     screen.removeListener('display-metrics-changed', restoreVisibleBounds)
     tray?.destroy()
   })
-  return { visibleBounds, attach, quit, hasTray: () => Boolean(tray) }
+  return { visibleBounds, attach, quit, setUnread, hasTray: () => Boolean(tray) }
 }
 
 module.exports = { createWindowLifecycle }

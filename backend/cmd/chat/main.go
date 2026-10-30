@@ -156,6 +156,7 @@ func main() {
 	mux.Handle("DELETE /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteCategory)))
 	mux.Handle("PUT /api/conversations/{id}/category", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.assignCategory)))
 	mux.Handle("GET /api/conversations", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversations)))
+	mux.Handle("GET /api/conversations/unread", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.unreadSummary)))
 	mux.Handle("GET /api/conversations/memberships", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversationMemberships)))
 	mux.Handle("POST /api/conversations/direct", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createDirect)))
 	mux.Handle("POST /api/conversations/groups", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroup)))
@@ -502,6 +503,16 @@ func validTranslationTarget(value string) bool {
 
 func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	// Optional exact lookup reuses the same membership/privacy projection as the list.
+	conversationID := int64(0)
+	if raw := r.URL.Query().Get("id"); raw != "" {
+		var err error
+		conversationID, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || conversationID <= 0 {
+			httpx.Error(w, http.StatusBadRequest, "invalid conversation id")
+			return
+		}
+	}
 	limit := 2147483647 // Preserve the original unpaginated response for older app versions.
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
@@ -562,6 +573,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
         WHERE cm.user_id=$1
+          AND ($5::bigint=0 OR c.id=$5)
           AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
 		  AND (c.type <> 'direct' OR NOT EXISTS (
 		    SELECT 1 FROM conversation_members other
@@ -573,7 +585,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
-		claims.UserID, limit, offset, categoryID)
+		claims.UserID, limit, offset, categoryID, conversationID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return

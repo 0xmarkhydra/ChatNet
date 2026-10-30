@@ -80,6 +80,20 @@ try {
   })
   assert.deepEqual(mediaBoundary, { microphone: true, camera: true, invalidKind: true, screen: true })
   evidence.checks.push('actual packaged media IPC denies unauthenticated mic/camera and invalid/expired requests; no devices activated')
+  const notificationBoundary = await page.evaluate(async () => {
+    const bridge = window.socoDesktop.notifications
+    const sessionId = 'a7ce5309-8fb5-4f57-861c-ef54c75db291'
+    const denied = async operation => { try { await operation(); return false } catch { return true } }
+    return {
+      sync: await denied(() => bridge.sync({ sessionId, conversationId: 1, unreadCount: 5, enabled: true, sound: false })),
+      clear: await denied(() => bridge.clear(sessionId)),
+      show: await bridge.show({ sessionId, conversationId: 1, senderId: 8, eventId: 'qa-no-notification', kind: 'message', createdAt: new Date().toISOString() }),
+    }
+  })
+  assert.equal(notificationBoundary.sync, true)
+  assert.equal(notificationBoundary.clear, true)
+  assert.deepEqual(notificationBoundary.show, { shown: false, reason: 'session' })
+  evidence.checks.push('actual packaged notification IPC rejects unauthenticated badge changes and does not display a fabricated message; real signed notification UAT NOT RUN')
   if (process.platform === 'darwin') {
     const plist = await readFile(resolve(dirname(executablePath), '../Info.plist'), 'utf8')
     assert.match(plist, /NSMicrophoneUsageDescription/)
