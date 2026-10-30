@@ -1,5 +1,7 @@
 # SOCO Desktop — Implementation Backlog v1
 
+**Cập nhật B05 — 31/10/2026:** DSK-023 = IN_REVIEW: EXE Windows x64 và DMG/ZIP macOS arm64/x64 đã build thật; DMG arm64 copy-install smoke PASS. DSK-024/025/027/028 = BLOCKED (chứng chỉ/notarization, updater chưa triển khai với feed ký được duyệt, GitHub billing lock, UAT máy thật). DSK-026 = IN_PROGRESS, 62/62 native tests và audit 0 reported vulnerabilities chưa thay full security review. Xem `10_BATCH_05_STATUS.md` cho artifact SHA-256, bằng chứng và phần còn thiếu. Không task mới DONE, không merge/release.
+
 **Cập nhật B04 — 31/10/2026:** DSK-016/017 = IN_REVIEW: notification native giữ riêng tư, badge theo tổng server, click xác minh lại auth/membership, focus/read receipt, notification call lifecycle. 59/59 native policy tests + React contract fixtures + backend PG/Redis integration + packaged negative IPC smoke PASS. DSK-021/022 parity UI thực tế vẫn IN_PROGRESS. Xem `09_BATCH_04_STATUS.md`, gồm contract backend bổ sung chưa deploy và các gate NOT RUN/BLOCKED. Không task mới DONE.
 
 **Cập nhật 31/10/2026 — B03:** DSK-014 = IN_PROGRESS; DSK-018/019 = IN_REVIEW; DSK-004/015/020 = BLOCKED ở nghiệm thu media thật. B03 đã có permission broker, chọn nguồn screen video-only, chuyển mic/camera và guards lifecycle. 49/49 Desktop tests, Web regression, backend DB integration và packaged macOS smoke PASS; không thay thế UAT hai thiết bị. Xem `08_BATCH_03_STATUS.md`. Không task nào mới DONE.

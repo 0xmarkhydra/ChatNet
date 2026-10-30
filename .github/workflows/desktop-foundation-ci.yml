@@ -16,12 +16,19 @@ concurrency:
 
 jobs:
   desktop:
-    name: Desktop core - ${{ matrix.os }}
+    name: Desktop ${{ matrix.target }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - { os: macos-15, target: mac, arch: arm64 }
+          - { os: macos-15-intel, target: mac, arch: x64 }
+          - { os: windows-2025, target: win, arch: x64 }
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
     steps:
@@ -33,36 +40,56 @@ jobs:
           cache-dependency-path: |
             frontend/package-lock.json
             desktop/package-lock.json
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('Wrong runner architecture')"
       - name: Install shared frontend
         run: npm ci --prefix frontend
       - name: Install Desktop dependencies
         run: npm ci --prefix desktop
+      - name: Install isolated test browser
+        working-directory: frontend
+        run: npx playwright install chromium
       - name: Dependency security gates
         run: |
           npm audit --prefix frontend --audit-level=high
           npm audit --prefix desktop --audit-level=high
-      - name: Native vault, broker, IPC and window unit tests
+      - name: Native vault, IPC, media, notifications and packaging policy
         run: npm test --prefix desktop
-      - name: Shared Web auth regression
-        run: npm run check:session --prefix frontend
-      - name: Native session adapter and persistent queue contracts
-        run: npm run check:desktop-session --prefix frontend
-      - name: Shared chat and outbox regression
+      - name: Session and chat contracts
         run: |
+          npm run check:session --prefix frontend
+          npm run check:desktop-session --prefix frontend
           npm run check:chat --prefix frontend
           npm run check:outbox --prefix frontend
+          npm run check:desktop-notifications --prefix frontend
+      - name: Calls, notification sound and Web/PWA regression
+        run: |
+          npm run check:call-live --prefix frontend
+          npm run check:call-translation --prefix frontend
+          npm run check:incoming-sound --prefix frontend
+          npm run check:onesignal --prefix frontend
+          npm run check:pwa --prefix frontend
       - name: Web regression build
         run: npm run build --prefix frontend
       - name: Build unsigned internal native package
         run: npm run build --prefix desktop
       - name: Actual packaged shell and OS storage smoke with isolated profile
         run: node frontend/scripts/desktop-shell-smoke.mjs
-      # No unsigned installer upload, signing, publishing or release deployment.
-      # This automated smoke does not replace real-account/two-device UAT.
+      - name: Internal installer build, not distribution approval
+        working-directory: desktop
+        run: npx electron-builder --${{ matrix.target }} --${{ matrix.arch }} --publish never
+      - name: Isolated copy-install smoke from internal arm64 DMG
+        if: runner.os == 'macOS' && matrix.arch == 'arm64'
+        run: node frontend/scripts/desktop-dmg-smoke.mjs
+      - name: Inventory internal artifacts and SHA-256 (not signing verification)
+        run: npm run manifest:internal --prefix desktop
+      # No installer upload, production secrets, signing, publishing or deployment.
+      # These steps do not replace real-account/two-device or signed installer UAT.
 
   backend:
     name: Backend contract and disposable DB integration
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16-alpine

@@ -3,14 +3,18 @@
   "private": true,
   "version": "0.1.0",
   "description": "SOCO Desktop shell for ChatNet",
+  "author": "SOCO",
   "main": "src/main.cjs",
   "scripts": {
     "dev:web": "npm --prefix ../frontend run dev -- --host 127.0.0.1 --mode desktop",
     "dev": "electron . --dev",
     "build:web": "npm --prefix ../frontend run build:desktop",
     "build": "npm run build:web && electron-builder --dir --publish never",
-    "dist:mac": "npm run build:web && electron-builder --mac --publish never",
-    "dist:win": "npm run build:web && electron-builder --win --publish never",
+    "dist:mac": "npm run build:web && electron-builder --mac --arm64 --x64 --config.forceCodeSigning=true --publish never",
+    "dist:win": "npm run build:web && electron-builder --win --x64 --config.forceCodeSigning=true --publish never",
+    "dist:internal:mac": "npm run build:web && electron-builder --mac --arm64 --x64 --publish never",
+    "dist:internal:win": "npm run build:web && electron-builder --win --x64 --publish never",
+    "manifest:internal": "node scripts/artifact-manifest.cjs",
     "test": "node --test test/*.test.cjs",
     "check": "npm run test && npm run build:web"
   },
@@ -21,38 +25,26 @@
   "build": {
     "appId": "asia.soco.desktop",
     "productName": "SOCO",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "icon": "assets/icon.png",
     "asar": true,
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "src/**/*",
-      "dist/renderer/**/*",
-      "package.json",
-      "!**/*.test.*",
-      "!**/*.map"
-    ],
+    "directories": { "output": "release" },
+    "files": ["src/**/*", "dist/renderer/**/*", "package.json", "!**/*.test.*", "!**/*.map"],
     "mac": {
       "category": "public.app-category.social-networking",
       "minimumSystemVersion": "13.0.0",
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": ["dmg", "zip"],
       "hardenedRuntime": true,
       "extendInfo": {
         "NSMicrophoneUsageDescription": "SOCO sử dụng microphone khi bạn gọi thoại/video hoặc ghi tin nhắn thoại.",
         "NSCameraUsageDescription": "SOCO sử dụng camera khi bạn gọi video hoặc quét mã QR."
       }
     },
-    "win": {
-      "target": [
-        "nsis"
-      ]
-    },
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
     },
     "publish": null
   }
