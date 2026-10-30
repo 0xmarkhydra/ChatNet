@@ -1,6 +1,6 @@
 # SOCO Desktop — QA / Security / Release Gates
 
-**QA status tại 30/10/2026: TẤT CẢ TEST DESKTOP = NOT RUN.** Tài liệu lập kế hoạch không thay thế bằng chứng kiểm thử.
+**QA status tại 30/10/2026:** B02 có 32 unit tests và packaged macOS native/vault/lifecycle smoke PASS; backend PostgreSQL/Redis integration PASS. Xem `07_BATCH_02_STATUS.md` để biết phạm vi chính xác. Login/chat/call hai thiết bị, Windows physical UAT, signed install/update/rollback vẫn NOT RUN/BLOCKED. Không suy rộng các kết quả này thành PASS toàn bộ QA-ID hoặc quyền phát hành.
 **Release owner:** Integration Owner / Agent 5.
 
 ## 1. Môi trường bắt buộc

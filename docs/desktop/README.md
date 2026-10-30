@@ -67,4 +67,4 @@ Nguồn nghiệp vụ đang có:
 
 Dùng trạng thái: `NOT_STARTED`, `IN_PROGRESS`, `IN_REVIEW`, `BLOCKED`, `DONE`. `DONE` cần link bằng chứng: commit + kết quả test + người review. Docs cập nhật qua commit riêng; thay đổi kiến trúc phải viết ADR và xin duyệt trước khi đổi runtime/backend/auth.
 
-**Hiện tại:** D0 đã commit; B01 đã dựng Electron nền tảng. Xem `06_BATCH_01_STATUS.md` để phân biệt PASS/NOT RUN/BLOCKED. Không báo toàn bộ Desktop P0 là đã hoàn thành.
+**Hiện tại:** B01 có Electron nền tảng; B02 đã tích hợp Main-only credential vault/auth, native tray/window lifecycle và adapter dùng chung React. Xem [07_BATCH_02_STATUS.md](07_BATCH_02_STATUS.md) để phân biệt unit/fixture, backend PostgreSQL/Redis thật, packaged macOS smoke và các gate NOT RUN/BLOCKED. Electron hiện pin 45.1.0 (macOS 13+), Vite 7.3.7 sau xử lý audit dependency. Chưa đủ beta; không báo toàn bộ Desktop P0 là đã hoàn thành.

@@ -88,15 +88,17 @@ import {
   type PushState,
 } from '../features/notifications/onesignal'
 
-export default function App() {
-  const [session, setSession] = useState<Session | null>(loadSession)
+import { desktopBridge, isDesktopBuild } from '../platform/desktop'
+
+export default function App({ initialSession }: { initialSession?: Session | null }) {
+  const [session, setSession] = useState<Session | null>(() => isDesktopBuild ? initialSession ?? null : loadSession())
   const sessionRef = useRef(session)
   const responseCache = useRef(new SessionResponseCache())
   const [sessionClient] = useState(() => createSessionClient(API, {
     get: () => sessionRef.current,
     save: saveSession,
     expire: () => logout(false),
-  }))
+  }, isDesktopBuild ? desktopBridge().auth : undefined))
   const auth = useAuthFlow(saveSession)
 
   const [tab, setTab] = useState<Tab>('chat')
@@ -358,6 +360,33 @@ export default function App() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const postComposerRef = useRef<HTMLTextAreaElement>(null)
   const messageInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!isDesktopBuild) return
+    const preventFileNavigation = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
+    }
+    const keyboard = (event: KeyboardEvent) => {
+      if (!sessionRef.current || event.isComposing || event.altKey || !(event.ctrlKey || event.metaKey) ||
+          document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      if (event.key.toLowerCase() === 'k' && !event.shiftKey) {
+        event.preventDefault()
+        setTab('chat')
+        requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.appbar-search input')?.focus())
+      } else if (event.key.toLowerCase() === 'l' && event.shiftKey) {
+        event.preventDefault()
+        messageInputRef.current?.focus()
+      }
+    }
+    document.addEventListener('dragover', preventFileNavigation)
+    document.addEventListener('drop', preventFileNavigation)
+    window.addEventListener('keydown', keyboard)
+    return () => {
+      document.removeEventListener('dragover', preventFileNavigation)
+      document.removeEventListener('drop', preventFileNavigation)
+      window.removeEventListener('keydown', keyboard)
+    }
+  }, [])
   const chatFileInputRef = useRef<HTMLInputElement>(null)
   const feedImageInputRef = useRef<HTMLInputElement>(null)
   const feedVideoInputRef = useRef<HTMLInputElement>(null)
@@ -808,7 +837,12 @@ export default function App() {
   }
 
   function saveSession(next: Session) {
-    localStorage.setItem('chatnet-session', JSON.stringify(next))
+    if (isDesktopBuild) {
+      if (next.refreshToken !== undefined) throw new Error('Desktop credential boundary violation')
+      localStorage.removeItem('chatnet-session')
+    } else {
+      localStorage.setItem('chatnet-session', JSON.stringify(next))
+    }
     sessionRef.current = next
     setSession(next)
   }
@@ -1649,19 +1683,24 @@ export default function App() {
 
   async function fetchAccountSessions() {
     const current = sessionRef.current
-    if (!current?.refreshToken || sessionsBusy) return
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy) return
     const identity = current.sessionId
     setSessionsBusy(true)
     setSessionsError('')
     try {
-      const response = await fetch(`${API}/api/auth/sessions/list`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ refreshToken: current.refreshToken }),
-      })
-      if (!response.ok) throw new Error('Không tải được phiên đăng nhập.')
-      const data = await response.json() as ManagedAccountSession[]
+      let data: ManagedAccountSession[]
+      if (isDesktopBuild) {
+        data = await desktopBridge().auth.listSessions(identity)
+      } else {
+        const response = await fetch(`${API}/api/auth/sessions/list`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({ refreshToken: current.refreshToken }),
+        })
+        if (!response.ok) throw new Error('Không tải được phiên đăng nhập.')
+        data = await response.json() as ManagedAccountSession[]
+      }
       if (sessionRef.current?.sessionId === identity) {
         setManagedSessions(data)
         setSessionsOpen(true)
@@ -1677,7 +1716,7 @@ export default function App() {
 
   async function revokeAccountSessions(sessionID?: string) {
     const current = sessionRef.current
-    if (!current?.refreshToken || sessionsBusy) return
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy) return
     const identity = current.sessionId
     const selected = managedSessions.find((item) => item.id === sessionID)
     if (sessionID && !selected) return
@@ -1690,13 +1729,21 @@ export default function App() {
     setSessionsBusy(true)
     setSessionsError('')
     try {
-      const response = await fetch(`${API}/api/auth/sessions/${sessionID ? 'revoke' : 'revoke-others'}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ refreshToken: current.refreshToken, ...(sessionID ? { sessionId: sessionID } : {}) }),
-      })
-      if (!response.ok) throw new Error('Không thu hồi được phiên đăng nhập.')
+      if (isDesktopBuild) {
+        const nativeAuth = desktopBridge().auth
+        const revoked = sessionID
+          ? await nativeAuth.revokeSession(identity, sessionID)
+          : await nativeAuth.revokeOthers(identity)
+        if (!revoked) throw new Error('Không thu hồi được phiên đăng nhập.')
+      } else {
+        const response = await fetch(`${API}/api/auth/sessions/${sessionID ? 'revoke' : 'revoke-others'}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({ refreshToken: current.refreshToken, ...(sessionID ? { sessionId: sessionID } : {}) }),
+        })
+        if (!response.ok) throw new Error('Không thu hồi được phiên đăng nhập.')
+      }
       if (sessionRef.current?.sessionId !== identity) return
       if (selected?.current) {
         logout(false)
@@ -2155,7 +2202,11 @@ export default function App() {
     setVisitorUsername(null)
     const current = sessionRef.current
     const currentToken = current?.token
-    if (revoke && current?.refreshToken) {
+    if (isDesktopBuild) {
+      void desktopBridge().auth.logout({ sessionId: current?.sessionId ?? null, revoke }).then((result) => {
+        if (!result.revoked) setNotice('Đã đăng xuất trên máy này. Chưa thu hồi được phiên trên server.', 'warning')
+      }).catch(() => setNotice('Không xóa hoặc thu hồi được phiên an toàn. Hãy thu hồi thiết bị này từ một phiên khác.', 'error'))
+    } else if (revoke && current?.refreshToken) {
       void fetch(`${API}/api/auth/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2268,6 +2319,11 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (isDesktopBuild) {
+      return desktopBridge().auth.onExpired((sessionId) => {
+        if (sessionRef.current?.sessionId === sessionId) logout(false)
+      })
+    }
     const sync = (event: StorageEvent) => {
       if (event.key !== 'chatnet-session' && event.key !== null) return
       const next = loadSession()
@@ -2282,8 +2338,10 @@ export default function App() {
   useEffect(() => {
     if (!session) return
     const refresh = () => {
-      if (document.visibilityState === 'hidden') return
-      void sessionClient.refresh().catch(() => setStatus('Đang kết nối lại...'))
+      if (!isDesktopBuild && document.visibilityState === 'hidden') return
+      void sessionClient.refresh().then((current) => {
+        if (isDesktopBuild && current) return sessionClient.check()
+      }).catch(() => setStatus('Đang kết nối lại...'))
     }
     refresh()
     const timer = window.setInterval(refresh, 60_000)
@@ -3359,9 +3417,20 @@ export default function App() {
               </div>
             </aside>
 
-            <section className={activeConversation?.type === 'group'
-              ? `conversation-panel group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}`
-              : 'conversation-panel'}>
+            <section
+              onDragOver={(event) => {
+                if (isDesktopBuild && event.dataTransfer.types.includes('Files')) event.preventDefault()
+              }}
+              onDrop={(event) => {
+                if (!isDesktopBuild || !event.dataTransfer.types.includes('Files')) return
+                event.preventDefault()
+                if (!activeConversationId) { setNotice('Chọn hội thoại trước khi thả tệp.', 'warning'); return }
+                if (mediaUploading || messageSending) { setNotice('Hãy hoàn tất hoặc hủy tác vụ hiện tại trước khi thả thêm tệp.', 'warning'); return }
+                void addChatFiles(Array.from(event.dataTransfer.files))
+              }}
+              className={activeConversation?.type === 'group'
+                ? `conversation-panel group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}`
+                : 'conversation-panel'}>
               {!activeConversation ? (
                 <div className="conversation-empty">
                   <SocoEmptyState kind="chat" title="Kết nối không biên giới"
@@ -3766,7 +3835,10 @@ export default function App() {
                     <div ref={bottomRef} />
                   </div>
 
-                  <form className="composer media-composer" onSubmit={sendMessage}>
+                  <form className="composer media-composer" onSubmit={(event) => {
+                    void sendMessage(event)
+                    if (isDesktopBuild) messageInputRef.current?.focus()
+                  }}>
                     <input
                       ref={chatFileInputRef}
                       className="hidden-media-input"
@@ -4225,7 +4297,7 @@ export default function App() {
               {profilePrivacyControls}
             <AccountSessionsPanel
               sessionsBusy={sessionsBusy}
-              refreshToken={session.refreshToken}
+              canManageSessions={isDesktopBuild || Boolean(session.refreshToken)}
               sessionsOpen={sessionsOpen}
               setSessionsOpen={setSessionsOpen}
               fetchAccountSessions={fetchAccountSessions}

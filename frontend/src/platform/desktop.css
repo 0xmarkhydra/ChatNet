@@ -1,0 +1,21 @@
+.desktop-startup {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+  background: var(--soco-canvas, #f5f7fd);
+  color: var(--soco-text, #17233d);
+}
+.desktop-startup h1 { margin: 0; color: #2563eb; font-size: 32px; }
+.desktop-startup p { max-width: 540px; line-height: 1.6; }
+.desktop-startup button {
+  background: #2563eb; color: white; border: 0; border-radius: 10px;
+  padding: 10px 24px; font-size: 14px; cursor: pointer;
+}
+html[data-app-platform="desktop"] { height: 100%; overflow: hidden; }
+html[data-app-platform="desktop"] body,
+html[data-app-platform="desktop"] #root { height: 100%; overflow: hidden; }

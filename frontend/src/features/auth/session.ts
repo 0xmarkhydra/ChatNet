@@ -40,7 +40,7 @@ export function createSessionClient(baseURL: string, state: {
   get: () => Session | null
   save: (session: Session) => void
   expire: () => void
-}) {
+}, nativeAuth?: { refresh: (sessionId: string) => Promise<Session | null> }) {
   let pending: { sessionId: string; promise: Promise<Session | null> } | undefined
   let checking: { sessionId: string; promise: Promise<boolean> } | undefined
   const unchanged = (previous: Session) => {
@@ -49,6 +49,17 @@ export function createSessionClient(baseURL: string, state: {
   }
 
   async function renew(previous: Session): Promise<Session | null> {
+    if (nativeAuth) {
+      const result = await nativeAuth.refresh(previous.sessionId)
+      if (!unchanged(previous)) return state.get()
+      if (!result) { state.expire(); return null }
+      const next = parseSession(result)
+      if (!next || next.refreshToken !== undefined || next.sessionId !== previous.sessionId || next.user.id !== previous.user.id) {
+        throw new Error('Phản hồi gia hạn phiên không hợp lệ.')
+      }
+      state.save(next)
+      return next
+    }
     // Legacy access-only credentials cannot safely recreate a refresh token.
     // Otherwise logging out could be reversed while a JWT remains valid.
     if (!previous.refreshToken) {
@@ -85,7 +96,7 @@ export function createSessionClient(baseURL: string, state: {
     const current = state.get()
     if (!current) return Promise.resolve(null)
     if (pending?.sessionId === current.sessionId) return pending.promise
-    if (!force && current.refreshToken && !expiresSoon(current.token)) return Promise.resolve(current)
+    if (!force && (nativeAuth || current.refreshToken) && !expiresSoon(current.token)) return Promise.resolve(current)
     const operation = { sessionId: current.sessionId, promise: renew(current) }
     pending = operation
     void operation.promise.finally(() => {
@@ -109,7 +120,7 @@ export function createSessionClient(baseURL: string, state: {
   }
 
   async function verify(previous: Session): Promise<boolean> {
-    if (!previous.refreshToken) {
+    if (!nativeAuth && !previous.refreshToken) {
       if (state.get()?.sessionId === previous.sessionId) state.expire()
       return false
     }

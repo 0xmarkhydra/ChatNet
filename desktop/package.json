@@ -15,7 +15,7 @@
     "check": "npm run test && npm run build:web"
   },
   "devDependencies": {
-    "electron": "^39.0.0",
+    "electron": "45.1.0",
     "electron-builder": "^26.0.0"
   },
   "build": {
@@ -34,11 +34,17 @@
     ],
     "mac": {
       "category": "public.app-category.social-networking",
-      "target": ["dmg", "zip"],
+      "minimumSystemVersion": "13.0.0",
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "hardenedRuntime": true
     },
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "nsis": {
       "oneClick": false,

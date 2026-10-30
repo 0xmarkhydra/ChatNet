@@ -1,7 +1,9 @@
 # SOCO Desktop — Implementation Backlog v1
 
 **Cơ sở:** `dev@c04a044` · **Nhánh triển khai:** `feat/chatnet-desktop-electron`
-**Trạng thái 30/10/2026:** DSK-000 = DONE; DSK-001/002/003 = IN_REVIEW; DSK-004 = BLOCKED (chưa UAT LiveKit thật); DSK-005 = IN_PROGRESS. Các task còn lại = NOT_STARTED. Xem `06_BATCH_01_STATUS.md` để biết bằng chứng kiểm thử.
+**Trạng thái 30/10/2026 sau B02:** DSK-000 = DONE; DSK-001/002/003/006/007/008/011 = IN_REVIEW; DSK-004 = BLOCKED (chưa UAT LiveKit hai thiết bị); DSK-005/009/010/012/013 = IN_PROGRESS. Các task còn lại = NOT_STARTED cho đến báo cáo batch tương ứng. Bằng chứng B01: `06_BATCH_01_STATUS.md`; B02: `07_BATCH_02_STATUS.md`. Chưa có task Desktop mới nào được đánh dấu DONE; chưa đủ điều kiện merge/release.
+
+B02 đã tích hợp vault/Main-only auth, bridge React, tray/window lifecycle, text-draft persistence và kiểm thử bảo vệ Web. Native macOS smoke + 32 unit tests PASS; backend integration với PostgreSQL/Redis dùng một lần PASS. Login/chat/call hai thiết bị, Windows, signing và update/rollback chưa được UAT. Xem báo cáo B02 để phân biệt test fixture, test backend thật và smoke hệ điều hành.
 **Nhân sự đề xuất:** Thắng = Desktop Platform / Native; Bắc = React / API integration; Agent 5 = review, CI, security, UAT, integration. Phân công có thể đổi khi có quyết định team.
 
 ## Quy ước task và Definition of Done

@@ -96,7 +96,8 @@ export function loadChatOutbox(userId: number, sessionId: string, store?: ChatSt
       if (!raw) continue
       bytes += raw.length
       if (bytes > MAX_BYTES) return []
-      const value: unknown = JSON.parse(raw)
+      let value: unknown
+      try { value = JSON.parse(raw) } catch { continue } // Isolate one corrupt item; keep other queued sends recoverable.
       if (!value || typeof value !== 'object') continue
       const saved = value as { sessionId?: string; item?: unknown }
       if (saved.sessionId !== sessionId || !validItem(saved.item) ||

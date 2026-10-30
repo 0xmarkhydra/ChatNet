@@ -1,25 +1,22 @@
-name: SOCO Desktop foundation checks
+name: SOCO Desktop core checks
 
 on:
   push:
-    branches:
-      - feat/chatnet-desktop-electron
+    branches: [feat/chatnet-desktop-electron]
   pull_request:
-    branches:
-      - feat/chatnet-desktop-electron
-      - dev
+    branches: [feat/chatnet-desktop-electron, dev]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-foundation-${{ github.ref }}
+  group: desktop-core-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   desktop:
-    name: Desktop shell - ${{ matrix.os }}
+    name: Desktop core - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -36,22 +33,56 @@ jobs:
           cache-dependency-path: |
             frontend/package-lock.json
             desktop/package-lock.json
-      - name: Install shared React dependencies
-        run: npm ci --prefix frontend --no-audit --no-fund
-      - name: Install Electron shell dependencies
-        run: npm ci --prefix desktop --no-audit --no-fund
-      - name: Electron IPC and path security tests
+      - name: Install shared frontend
+        run: npm ci --prefix frontend
+      - name: Install Desktop dependencies
+        run: npm ci --prefix desktop
+      - name: Dependency security gates
+        run: |
+          npm audit --prefix frontend --audit-level=high
+          npm audit --prefix desktop --audit-level=high
+      - name: Native vault, broker, IPC and window unit tests
         run: npm test --prefix desktop
+      - name: Shared Web auth regression
+        run: npm run check:session --prefix frontend
+      - name: Native session adapter and persistent queue contracts
+        run: npm run check:desktop-session --prefix frontend
+      - name: Shared chat and outbox regression
+        run: |
+          npm run check:chat --prefix frontend
+          npm run check:outbox --prefix frontend
       - name: Web regression build
         run: npm run build --prefix frontend
-      - name: Desktop React bundle and native unsigned internal package
+      - name: Build unsigned internal native package
         run: npm run build --prefix desktop
-      # Intentionally no artifact upload, signing, publishing, auto-update or release.
-      # Public beta requires the separate QA/release approval gates.
+      - name: Actual packaged shell and OS storage smoke with isolated profile
+        run: node frontend/scripts/desktop-shell-smoke.mjs
+      # No unsigned installer upload, signing, publishing or release deployment.
+      # This automated smoke does not replace real-account/two-device UAT.
 
   backend:
-    name: Translation origin regression
+    name: Backend contract and disposable DB integration
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: socoqa
+          POSTGRES_USER: socoqa
+          POSTGRES_PASSWORD: local-qa-only
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U socoqa -d socoqa"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      CHATNET_TEST_DATABASE_URL: postgres://socoqa:local-qa-only@127.0.0.1:5432/socoqa?sslmode=disable
+      CHATNET_TEST_REDIS_ADDR: 127.0.0.1:6379
     defaults:
       run:
         working-directory: backend
@@ -61,4 +92,4 @@ jobs:
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
-      - run: go test ./...
+      - run: go test -p 1 -count=1 -v ./...

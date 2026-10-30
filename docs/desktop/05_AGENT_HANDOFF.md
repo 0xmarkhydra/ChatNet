@@ -1,7 +1,11 @@
 # SOCO Desktop — Agent Handoff / Execution Contract
 
 **Áp dụng cho toàn bộ agent và dev trong** `feat/chatnet-desktop-electron`.
-**Status 30/10/2026:** Docs only. Không phải giấy chứng nhận đã code Desktop.
+**Status 30/10/2026:** B01 foundation và B02 native-auth/window integration đã có code trên nhánh riêng. Đọc `07_BATCH_02_STATUS.md` trước khi tiếp tục: ghi bằng chứng build/unit/backend integration/native macOS và các gate còn NOT RUN/BLOCKED. Không phải giấy chứng nhận đủ điều kiện phát hành.
+
+**Bàn giao B02:** vault + broker Main-only đã nối IPC/preload/React; renderer không lưu refresh/access credential trong localStorage. Tray, bounds, close-choice, text draft và outbox scope đã tích hợp. Đã sửa validation ép kiểu của vault và đảm bảo vẫn thử revoke server khi xóa vault lỗi. Giữ nguyên API/backend/Marketplace. Cần UAT login/revoke/chat/call thật, Windows, signed installers và updater trước signoff. Không áp dụng gói WIP cũ đè lên worktree mới.
+
+**Lệnh kiểm thử bổ sung:** `npm --prefix frontend run check:desktop-session`; `node frontend/scripts/desktop-shell-smoke.mjs` (tạo profile QA mới, không dùng profile thật); `node desktop/scripts/backend-integration.cjs` (Docker dùng một lần, loopback, tự dọn). Không diễn giải các fixture tests thành bằng chứng nghiệp vụ thật.
 
 ## 1. Prompt chuẩn cho mọi dev/agent
 
