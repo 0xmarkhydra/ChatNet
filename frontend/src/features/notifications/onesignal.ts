@@ -30,6 +30,10 @@ declare global {
   }
 }
 
+// Desktop must never inject OneSignal's remote browser SDK into an Electron renderer.
+const desktopMode = import.meta.env?.MODE === 'desktop'
+const desktopUnsupported = (): PushState => ({ permission: 'unsupported', supported: false, optedIn: false })
+
 let sdkPromise: Promise<OneSignalAPI> | null = null
 let initializedAppId = ''
 let initialization: { appId: string; promise: Promise<void> } | null = null
@@ -38,6 +42,7 @@ let stateHandler: ((state: PushState) => void | Promise<void>) | null = null
 let pushDisabled = false
 
 export function isPushDisabled(): boolean {
+  if (desktopMode) return true
   try {
     return window.localStorage.getItem('chatnet-push-disabled') === 'true' || pushDisabled
   } catch {
@@ -186,6 +191,7 @@ export async function setupOneSignal(
   appId: string,
   onStateChange?: (state: PushState) => void | Promise<void>,
 ): Promise<PushState> {
+  if (desktopMode) return desktopUnsupported()
   if (!appId) {
     return {
       permission: nativePermission(),
@@ -225,6 +231,7 @@ export async function setupOneSignal(
 }
 
 export async function enableOneSignalPush(): Promise<PushState> {
+  if (desktopMode) return desktopUnsupported()
   const OneSignal = await getSDK()
   if (!OneSignal.Notifications.isPushSupported?.()) {
     return snapshot(OneSignal)
@@ -251,6 +258,7 @@ export async function enableOneSignalPush(): Promise<PushState> {
 }
 
 export async function disableOneSignalPush(): Promise<PushState> {
+  if (desktopMode) return desktopUnsupported()
   const OneSignal = await getSDK()
   const before = snapshot(OneSignal)
 
@@ -268,6 +276,7 @@ export async function disableOneSignalPush(): Promise<PushState> {
 }
 
 export async function getOneSignalPushState(): Promise<PushState> {
+  if (desktopMode) return desktopUnsupported()
   const OneSignal = await getSDK()
   return snapshot(OneSignal)
 }

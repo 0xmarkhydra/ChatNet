@@ -262,7 +262,15 @@ func translationAllowedOrigin(r *http.Request) bool {
 		return false
 	}
 	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "https" && parsed.Scheme != "http") {
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	// SOCO Desktop's packaged renderer uses an isolated, secure app:// origin.
+	// Translation still requires an authenticated, call-scoped, one-time ticket.
+	if parsed.Scheme == "app" {
+		return parsed.Host == "soco" && parsed.User == nil && parsed.Path == "" && parsed.RawQuery == "" && parsed.Fragment == ""
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
 		return false
 	}
 	allowed := strings.TrimSpace(config.Env("CHATNET_WEB_URL", "https://chat.codelocal.cloud"))

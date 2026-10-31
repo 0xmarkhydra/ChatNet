@@ -2,6 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './app/App'
 import { PWAUpdate } from './features/pwa/PWAUpdate'
+import DesktopBootstrap from './platform/DesktopBootstrap'
+import { isDesktopBuild } from './platform/desktop'
 import './styles/styles.css'
 import './styles/mobile.css'
 import './styles/mobile-nav.css'
@@ -15,6 +17,7 @@ import './styles/soco-screens.css'
 import './styles/soco-layout-v2.css'
 import './design-system/motion.css'
 import './features/profile/personal-timeline.css'
+import './platform/desktop.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)
@@ -22,7 +25,7 @@ if (window.location.search.includes('pwa=')) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
-    {import.meta.env.PROD && <PWAUpdate />}
+    {isDesktopBuild ? <DesktopBootstrap /> : <App />}
+    {import.meta.env.PROD && !isDesktopBuild && <PWAUpdate />}
   </React.StrictMode>,
 )

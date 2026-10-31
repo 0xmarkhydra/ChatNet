@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { API } from '../../shared/lib/config'
 import { parseSession, type Session } from './session'
+import { desktopBridge, isDesktopBuild } from '../../platform/desktop'
 
 type AuthMode = 'login' | 'register'
 type RegisterStep = 'details' | 'otp'
@@ -56,11 +57,18 @@ export function useAuthFlow(saveSession: (next: Session) => void) {
 
   async function verifyOTP(event: FormEvent) {
     event.preventDefault()
-    if (!verificationToken || otpCode.length !== 6) return
+    if (!verificationToken || otpCode.length !== 6 || authLoading) return
 
     setAuthLoading(true)
     setAuthError('')
     try {
+      // Main calls the existing Auth service and stores its refresh credential in the OS vault.
+      // Only the short-lived access session is returned; never fall back to Web login on Desktop.
+      if (isDesktopBuild) {
+        const next = await desktopBridge().auth.verifyEmail({ token: verificationToken, code: otpCode })
+        saveSession(next)
+        return
+      }
       const response = await fetch(`${API}/api/auth/email/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

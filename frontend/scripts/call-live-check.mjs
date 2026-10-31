@@ -26,4 +26,13 @@ assert.ok(ui.includes("phase !== 'connected'") &&
   ui.includes('[room, phase, translationOn,'), 'AI media streaming must stop on LiveKit reconnect/disconnect')
 assert.ok(backend.includes('callTranslationConsentAllowed(') && backend.includes('speaker has not consented to AI translation'), 'Gemini tickets require server-verified speaker consent')
 assert.ok(backend.includes('consentErr != nil || !consented'), 'AI streams must terminate after consent is revoked')
-console.log('PASS: provider secrets stay on backend; one-click UI; server-verified per-call consent')
+// Static lifetime/permission regression guards; these do not prove actual media delivery.
+assert.ok(ui.includes('let disposed = false') && !ui.includes('disposed.current = false'), 'StrictMode setup cancellation must be effect-local')
+assert.ok(ui.includes('disposed || syncingHost') && ui.includes('disposed || syncingParticipant'), 'key sync must be bounded and stop after cleanup')
+for (const [start, end] of [['async function toggleMic()', 'async function toggleCamera()'], ['async function toggleCamera()', 'async function toggleScreen()']]) {
+  const handler = ui.slice(ui.indexOf(start), ui.indexOf(end))
+  assert.ok(handler.includes("if (next && room.state !== 'connected') return"), 'mute/camera off must still work while reconnecting')
+  assert.ok(handler.includes('if (next) await requireDesktopMedia('), 'capture enable requires explicit native permission')
+}
+assert.ok(ui.includes('isDesktopBuild ? { audio: false } : undefined'), 'Desktop screen capture must not implicitly include system audio')
+console.log('PASS: backend provider/consent boundaries, one-click UI, bounded media lifecycle and permission source guards (static, not live media)')
