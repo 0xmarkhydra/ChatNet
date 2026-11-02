@@ -22,6 +22,7 @@ import (
 	"chatnet/internal/objectstore"
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
+	"chatnet/internal/searchx"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -156,6 +157,7 @@ func main() {
 	mux.Handle("DELETE /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteCategory)))
 	mux.Handle("PUT /api/conversations/{id}/category", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.assignCategory)))
 	mux.Handle("GET /api/conversations", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversations)))
+	mux.Handle("GET /api/chat/search", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.quickChatSearch)))
 	mux.Handle("GET /api/conversations/memberships", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversationMemberships)))
 	mux.Handle("POST /api/conversations/direct", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createDirect)))
 	mux.Handle("POST /api/conversations/groups", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroup)))
@@ -399,17 +401,17 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 		       OR (b.blocker_id=users.id AND b.blocked_id=$1)
 		  )
 		  AND (
-			(searchable_by_username AND strpos(lower(username), $2)>0)
+			(searchable_by_username AND strpos(`+searchx.FoldSQL("username")+`, `+searchx.FoldSQL("$2")+`)>0)
 			OR (searchable_by_email AND lower(email)=$2)
-			OR (searchable_by_name AND strpos(lower(display_name), $2)>0)
+			OR (searchable_by_name AND strpos(`+searchx.FoldSQL("display_name")+`, `+searchx.FoldSQL("$2")+`)>0)
 		  )
 		ORDER BY
 		  CASE
 			WHEN searchable_by_username AND lower(username)=$2 THEN 0
 			WHEN searchable_by_email AND lower(email)=$2 THEN 1
-			WHEN searchable_by_username AND strpos(lower(username), $2)=1 THEN 2
-			WHEN searchable_by_username AND strpos(lower(username), $2)>0 THEN 3
-			WHEN searchable_by_name AND strpos(lower(display_name), $2)=1 THEN 4
+			WHEN searchable_by_username AND strpos(`+searchx.FoldSQL("username")+`, `+searchx.FoldSQL("$2")+`)=1 THEN 2
+			WHEN searchable_by_username AND strpos(`+searchx.FoldSQL("username")+`, `+searchx.FoldSQL("$2")+`)>0 THEN 3
+			WHEN searchable_by_name AND strpos(`+searchx.FoldSQL("display_name")+`, `+searchx.FoldSQL("$2")+`)=1 THEN 4
 			ELSE 5
 		  END,
 		  username ASC
@@ -520,6 +522,11 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		}
 		offset = n
 	}
+	keyword := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len([]rune(keyword)) > 120 {
+		httpx.Error(w, http.StatusBadRequest, "search query too long")
+		return
+	}
 	categoryID := int64(-1)
 	if raw := r.URL.Query().Get("category"); raw != "" {
 		var err error
@@ -563,6 +570,15 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
         WHERE cm.user_id=$1
           AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
+		  AND ($5::text='' OR strpos(`+searchx.FoldSQL("COALESCE(c.name,'')")+`, `+searchx.FoldSQL("$5")+`)>0
+		    OR EXISTS (SELECT 1 FROM conversation_members other
+		       JOIN users u ON u.id=other.user_id
+		       WHERE other.conversation_id=c.id AND other.user_id<>$1
+		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$5")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$5")+`)>0))
+		    OR EXISTS (SELECT 1 FROM messages msg WHERE msg.conversation_id=c.id
+		       AND msg.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$5")+`)>0
+		       AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id))))
 		  AND (c.type <> 'direct' OR NOT EXISTS (
 		    SELECT 1 FROM conversation_members other
 		    JOIN user_blocks b ON
@@ -573,7 +589,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
-		claims.UserID, limit, offset, categoryID)
+		claims.UserID, limit, offset, categoryID, keyword)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
@@ -893,7 +909,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		WHERE m.conversation_id=$1 AND ($3::bigint=0 OR m.id<$3)
 		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
-		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(lower(m.text), lower($6))>0))
+		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("m.text")+`, `+searchx.FoldSQL("$6")+`)>0))
 		  AND ($7::text='' OR lower(u.username)=lower($7))
 		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)
 		  AND ($9::timestamptz IS NULL OR m.created_at < $9)
