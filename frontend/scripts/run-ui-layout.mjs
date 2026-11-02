@@ -36,7 +36,10 @@ const pagedConversations = [...conversations, ...Array.from({ length: 27 }, (_, 
 }))]
 // Keep the newest 40 messages in the first response and add older messages on demand.
 const pagedMessages = Array.from({ length: 45 }, (_, index) => ({
-  id: index + 1, conversationId: 1, senderId: 1, sender: 'soco_user',
+  id: index + 1, conversationId: 1,
+  senderId: [4, 44].includes(index + 1) ? 2 : 1,
+  sender: [4, 44].includes(index + 1) ? 'minhanh' : 'soco_user',
+  senderDisplayName: [4, 44].includes(index + 1) ? 'Minh Anh' : 'SOCO Test User',
   text: 'Lịch sử tin nhắn ' + (index + 1),
   createdAt: new Date(Date.UTC(2026, 9, 2, 7, index)).toISOString(),
 }))
@@ -96,6 +99,8 @@ try {
   })
   const errors = []
   let submittedStory = null
+  let searchRequestCount = 0
+  let releasePendingChatSend = null
   page.on('pageerror', e => errors.push(e.message))
   await page.route(origin + '/mock-story-upload', route =>
     route.fulfill({ status: 200, body: '' }))
@@ -111,6 +116,13 @@ try {
     if (path === '/api/events') return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: ': connected\n\n' })
     if (path === '/api/conversation-categories') return json([])
     if (path === '/api/conversations') return json(pagedConversations.slice(offset, offset + limit))
+    if (path === '/api/chat/search') return json({
+      contacts: [{ id: 2, username: 'minhanh', name: 'Minh Anh' }],
+      messages: [{ id: 3, conversation: conversations[0], sender: 'Minh Anh', text: 'Tìm kiếm lịch sử',
+        createdAt: '2026-10-02T07:00:00Z' }],
+      files: [{ id: 2, attachmentId: 10, conversation: conversations[0], sender: 'Minh Anh',
+        text: '', fileName: 'Báo cáo.pdf', fileKind: 'file', createdAt: '2026-10-02T07:00:00Z' }],
+    })
     if (/^\/api\/conversations\/\d+\/members$/.test(path)) return json([
       { id: 1, username: 'soco_user', displayName: 'SOCO Test User', role: 'owner', online: true },
       ...Array.from({ length: 8 }, (_, index) => ({
@@ -118,9 +130,24 @@ try {
         displayName: 'Thành viên ' + (index + 2), role: index === 0 ? 'admin' : 'member', online: index % 2 === 0,
       })),
     ])
-    if (path.endsWith('/messages')) return json(
-      pagedMessages.filter(message => !before || message.id < before).slice(-limit),
-    )
+    if (req.method() === 'POST' && /^\/api\/conversations\/\d+\/messages$/.test(path)
+      && req.postDataJSON()?.text === 'Kiểm tra trạng thái gửi') {
+      return new Promise(resolve => {
+        releasePendingChatSend = () => {
+          const sent = req.postDataJSON()
+          resolve(json({
+            id: 9001, conversationId: 1, senderId: 1, sender: 'soco_user',
+            clientId: sent.clientId, text: sent.text, attachments: [],
+            createdAt: new Date().toISOString(),
+          }))
+        }
+      })
+    }
+    if (path.endsWith('/messages')) {
+      const search = (currentURL.searchParams.get('search') || '').toLocaleLowerCase('vi-VN')
+      return json(pagedMessages.filter(message => (!before || message.id < before) &&
+        (!search || message.text.toLocaleLowerCase('vi-VN').includes(search))).slice(-limit))
+    }
     if (path === '/api/friends') return json(friends)
     if (path === '/api/friends/requests') return json([])
     if (path === '/api/users/suggestions' || path === '/api/users/search') return json(friends)
@@ -130,7 +157,13 @@ try {
       const text = req.postDataJSON()?.text || ''
       return json({ translatedText: text, translation: text, sourceLanguage: 'vi', targetLanguage: 'en' })
     }
-    if (path === '/api/posts') return json(pagedPosts.filter(post => !before || post.id < before).slice(0, limit))
+    if (path === '/api/posts') {
+      const q = (currentURL.searchParams.get('q') || '').toLocaleLowerCase('vi-VN')
+      if (q) searchRequestCount++
+      return json(pagedPosts.filter(post =>
+        (!before || post.id < before) && (!q || [post.content, post.author].some(value => value.toLocaleLowerCase('vi-VN').includes(q)))
+      ).slice(0, limit))
+    }
     if (path === '/api/media/presign' && req.method() === 'POST') return json({
       uploadUrl: origin + '/mock-story-upload',
       storageRef: 'story/1/upload.png', kind: 'image', downloadUrl: origin + '/mock-story-image.png',
@@ -155,6 +188,137 @@ try {
   })
   await page.goto(origin)
   await page.locator('.conversation-item').first().waitFor({ timeout: 12000 })
+  // The global search is a grouped, keyboard-dismissible dropdown. File results jump to their message.
+  const chatSearchBox = page.locator('.appbar-search input')
+  const chatList = page.locator('.conversation-list.zalo-conversation-list')
+  await chatList.evaluate(node => { node.scrollTop = Math.min(130, node.scrollHeight - node.clientHeight) })
+  const beforeDropdownSearch = await chatList.evaluate(node => ({
+    top: node.scrollTop,
+    rows: [...node.querySelectorAll('.conversation-item .conversation-title strong')].map(row => row.textContent),
+  }))
+  check(beforeDropdownSearch.top > 0, 'Search regression fixture must provide a scrollable conversation list')
+  await chatSearchBox.fill('tim kiem')
+  const searchFocus = await chatSearchBox.evaluate(input => {
+    const label = input.closest('.appbar-search')
+    return {
+      inputOutline: getComputedStyle(input).outlineStyle,
+      labelBorder: label ? getComputedStyle(label).borderColor : '',
+    }
+  })
+  check(searchFocus.inputOutline === 'none' && searchFocus.labelBorder === 'rgb(174, 198, 255)',
+    'Search focus should highlight only its rounded wrapper, not draw a rectangular input outline: ' +
+      JSON.stringify(searchFocus))
+  const groupedResults = page.locator('#chat-quick-search-results')
+  await groupedResults.waitFor({ timeout: 7000 })
+  await groupedResults.locator('.chat-quick-search-section', { hasText: 'Liên hệ' }).waitFor()
+  await groupedResults.locator('.chat-quick-search-section', { hasText: 'Tin nhắn' }).waitFor()
+  await groupedResults.locator('.chat-quick-search-section', { hasText: 'File' }).waitFor()
+  await groupedResults.getByRole('button', { name: /Báo cáo.pdf/ }).waitFor()
+  const afterDropdownSearch = await chatList.evaluate(node => ({
+    top: node.scrollTop,
+    rows: [...node.querySelectorAll('.conversation-item .conversation-title strong')].map(row => row.textContent),
+  }))
+  check(JSON.stringify(afterDropdownSearch) === JSON.stringify(beforeDropdownSearch),
+    'Typing a chat keyword must not filter, reorder or scroll the conversation list')
+  await page.keyboard.press('Escape')
+  await groupedResults.waitFor({ state: 'hidden' })
+  check(await chatList.evaluate(node => node.scrollTop) === beforeDropdownSearch.top,
+    'Closing search dropdown must preserve conversation list scroll position')
+  await chatSearchBox.click()
+  await groupedResults.waitFor()
+  await groupedResults.getByRole('button', { name: /Báo cáo.pdf/ }).click()
+  await page.locator('[data-message-id="2"]').waitFor({ timeout: 7000 })
+  // Jumping to an older hit must not replace the chat with only older messages.
+  await page.locator('[data-message-id="4"]').waitFor({ timeout: 7000 })
+  await page.locator('[data-message-id="44"]').waitFor({ timeout: 7000 })
+  await page.locator('[data-message-id="45"]').waitFor({ timeout: 7000 })
+  check(await page.locator('.message-press-target').count() === 45,
+    'Jumping to an older hit must retain both participants and the latest messages')
+  check(await page.locator('[data-message-id="44"] .message-meta').getByText('Minh Anh').isVisible(),
+    'The other participant\'s newer message must remain visible')
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  const afterQuickResult = await chatList.evaluate(node => ({
+    top: node.scrollTop,
+    rows: [...node.querySelectorAll('.conversation-item .conversation-title strong')].map(row => row.textContent),
+  }))
+  check(JSON.stringify(afterQuickResult.rows) === JSON.stringify(beforeDropdownSearch.rows),
+    'Opening an existing search result must not reorder conversations')
+  // Long conversations need a way to backfill the gap between an old search hit and the latest page.
+  pagedMessages.push(...Array.from({ length: 220 }, (_, index) => ({
+    id: index + 46, conversationId: 1,
+    senderId: index === 100 ? 2 : 1, sender: index === 100 ? 'minhanh' : 'soco_user',
+    senderDisplayName: index === 100 ? 'Minh Anh' : 'SOCO Test User',
+    text: 'Tin nhắn sau tìm kiếm ' + (index + 46),
+    createdAt: new Date(Date.UTC(2026, 9, 2, 8, index)).toISOString(),
+  })))
+  await chatSearchBox.fill('tim kiem')
+  await groupedResults.getByRole('button', { name: /Báo cáo.pdf/ }).click()
+  const missingMiddle = page.getByRole('button', { name: 'Tải tin nhắn ở giữa' })
+  await missingMiddle.waitFor({ timeout: 7000 })
+  await missingMiddle.click()
+  await missingMiddle.waitFor({ state: 'hidden', timeout: 7000 })
+  check(await page.locator('.message-press-target').count() === 265,
+    'Long conversation search must allow loading the missing middle pages')
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  pagedMessages.splice(45)
+  // The per-conversation search panel must reuse the same non-destructive jump handler.
+  await page.locator('.conversation-item').first().click()
+  await page.locator('.message-press-target').last().waitFor()
+  await page.getByRole('button', { name: 'Tìm tin nhắn trong cuộc trò chuyện' }).click()
+  const localSearch = page.getByRole('dialog', { name: 'Tìm trong hội thoại' })
+  await localSearch.locator('input[aria-label="Từ khóa tin nhắn"]').fill('Lịch sử tin nhắn 2')
+  await localSearch.getByText('Lịch sử tin nhắn 2', { exact: true }).click()
+  await localSearch.waitFor({ state: 'hidden' })
+  await page.locator('[data-message-id="2"]').waitFor()
+  check(await page.locator('.message-press-target').count() === 45,
+    'Search inside a conversation must preserve newer messages from both senders')
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  // Restore the original fixture so unrelated layout/translation tests remain unchanged.
+  for (const id of [4, 44]) {
+    const item = pagedMessages.find(message => message.id === id)
+    if (item) Object.assign(item, { senderId: 1, sender: 'soco_user', senderDisplayName: 'SOCO Test User' })
+  }
+  console.log('PASS: grouped and local chat search, both participants, full history and middle-page backfill')
+  // Sending retains its outbox status, but must not show the generic "Đang xử lý" banner.
+  await page.locator('.conversation-item').first().click()
+  const chatTimeline = page.locator('.messages')
+  await page.locator('.message-press-target').last().waitFor()
+  await chatTimeline.evaluate(element => {
+    element.scrollTop = Math.min(120, element.scrollHeight - element.clientHeight)
+    element.dispatchEvent(new Event('scroll', { bubbles: true }))
+  })
+  const scrolledOldTop = await chatTimeline.evaluate(element => element.scrollTop)
+  check(scrolledOldTop > 0, 'Chat history fixture must allow scrolling away from latest')
+  await page.evaluate(() => window.__socoEmitRealtime({
+    type: 'message', conversationId: 1,
+    message: { id: 8999, conversationId: 1, senderId: 2, sender: 'minhanh',
+      senderDisplayName: 'Minh Anh', text: 'Tin mới từ đối phương', createdAt: new Date().toISOString() },
+  }))
+  await page.locator('[data-message-id="8999"]').waitFor()
+  await page.waitForTimeout(50)
+  const incomingScrollTop = await chatTimeline.evaluate(element => element.scrollTop)
+  check(Math.abs(incomingScrollTop - scrolledOldTop) < 5,
+    'Incoming message must preserve the old reading position: ' + JSON.stringify({ scrolledOldTop, incomingScrollTop }))
+  await page.getByRole('textbox', { name: 'Tin nhắn', exact: true }).fill('Kiểm tra trạng thái gửi')
+  const pendingSendRequest = page.waitForRequest(req => req.method() === 'POST' &&
+    /\/api\/conversations\/\d+\/messages$/.test(new URL(req.url()).pathname))
+  await page.getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click()
+  await pendingSendRequest
+  await page.waitForFunction(() => {
+    const timeline = document.querySelector('.messages')
+    return timeline && timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 5
+  }, null, { timeout: 4000 })
+  check(await page.locator('.chat-outbox-message').count() === 1, 'Message must remain visible in the outbox while sending')
+  check(await page.locator('.request-progress').count() === 0,
+    'Sending messages must not show the generic processing banner')
+  check(typeof releasePendingChatSend === 'function', 'Chat send request was not held for status check')
+  releasePendingChatSend()
+  await page.locator('.chat-outbox-message').waitFor({ state: 'hidden' })
+  const confirmedScrollGap = await chatTimeline.evaluate(element =>
+    element.scrollHeight - element.scrollTop - element.clientHeight)
+  check(confirmedScrollGap < 5, 'Server acknowledgement must not undo the scroll to the latest own message')
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  console.log('PASS: incoming preserves old scroll, self-send follows latest, ACK remains at bottom, no processing banner')
   const widths = [320, 375, 390, 430, 768, 1024, 1440]
   let checks = 0
   const geometry = async (label, width, selectors) => {
@@ -235,8 +399,42 @@ try {
     }
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
+    if (width === 390) {
+      const scroller = page.locator('.feed-view.zalo-feed-view')
+      await scroller.evaluate(element => { element.scrollTop = element.scrollHeight })
+      const keyword = page.locator('.appbar-search input')
+      const firstPage = page.waitForResponse(response => {
+        const url = new URL(response.url())
+        return url.pathname === '/api/posts' && url.searchParams.get('q') === 'minhanh' && url.searchParams.get('limit') === '5'
+      })
+      await keyword.fill('minhanh')
+      await page.waitForTimeout(300)
+      check(searchRequestCount === 0, 'Feed search must debounce until user stops typing')
+      await firstPage
+      await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 5)
+      check(await scroller.evaluate(element => element.scrollTop) === 0, 'New search should reset feed scroll to top')
+      await page.waitForTimeout(200)
+      check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 5,
+        'Search must not auto-fetch a second page before scrolling')
+      await scroller.evaluate(element => { element.scrollTop = element.scrollHeight })
+      await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length >= 10, null, { timeout: 7000 })
+      check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() >= 10,
+        'Scrolling did not load the next five matching posts')
+      const contentPage = page.waitForResponse(response => {
+        const url = new URL(response.url())
+        return url.pathname === '/api/posts' && url.searchParams.get('q') === 'bài viết' && url.searchParams.get('limit') === '5'
+      })
+      await keyword.fill('Bài viết')
+      await contentPage
+      await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 5)
+      check(await scroller.evaluate(element => element.scrollTop) === 0,
+        'Changing from author to content search should reset scroll to top')
+      await keyword.fill('')
+      check(await scroller.evaluate(element => element.scrollTop) === 0, 'Clearing search should reset feed scroll')
+      console.log('PASS: feed search debounce, 5-post first page, scroll reset and infinite pagination')
+    }
     // Only social engagement actions belong in the footer. Manage post from •••.
-    const ownPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 18' })
+    const ownPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 18' }).first()
     check(await ownPost.locator('.feed-share-action').isVisible(),
       'Sharing must appear alongside Like and Comment: ' + width)
     check(await page.locator('.feed-owner-shortcuts').count() === 0,
@@ -263,7 +461,7 @@ try {
         'Delete action must show confirmation: ' + width)
       await options.getByRole('button', { name: 'Hủy' }).click()
       await options.getByRole('button', { name: 'Đóng', exact: true }).click()
-      const otherPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 17' })
+      const otherPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 17' }).first()
       await otherPost.getByRole('button', { name: 'Tùy chọn bài viết' }).click()
       check(await page.getByRole('dialog').getByRole('button', { name: 'Báo cáo bài viết' }).isVisible(),
         'Other posts must show reporting: ' + width)
@@ -417,9 +615,10 @@ try {
   }))
   check(activeNavStyle.bg === 'rgba(0, 0, 0, 0)' && (activeNavStyle.indicator === 'none' || activeNavStyle.indicator === 'normal'),
     'Bulky active navigation highlight was not removed')
-  check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 15, 'Feed first page must have 15 posts')
-  await page.getByRole('button', { name: 'Tải thêm bài viết' }).click()
-  await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 18, null, { timeout: 6000 })
+  check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() >= 15,
+    'Feed should have its first 15 posts')
+  await page.locator('.feed-view.zalo-feed-view').evaluate(element => { element.scrollTop = element.scrollHeight })
+  await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 18, null, { timeout: 7000 })
   check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 18,
     'Feed load more did not append the remaining 3 posts')
   check(await page.getByRole('button', { name: 'Tải thêm bài viết' }).count() === 0,

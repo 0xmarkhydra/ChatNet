@@ -9,8 +9,12 @@ import { useApiRequest } from './useApiRequest'
 import { useAppRealtime } from './useAppRealtime'
 import { useDesktopNotifications } from '../platform/useDesktopNotifications'
 import { useConversationData } from '../features/chat/useConversationData'
+import { useChatQuickSearch, type ChatQuickContact, type ChatQuickHit } from '../features/chat/useChatQuickSearch'
+import ChatQuickSearch from '../features/chat/ChatQuickSearch'
 import { useContactData } from '../features/contacts/useContactData'
 import { useFeedData } from '../features/feed/useFeedData'
+import { usePostSearch } from '../features/feed/usePostSearch'
+import { useFeedInfiniteScroll } from '../features/feed/useFeedInfiniteScroll'
 
 import { useGroupManagement } from '../features/chat/useGroupManagement'
 import { API } from '../shared/lib/config'
@@ -42,7 +46,7 @@ import ContactsView from '../features/contacts/ContactsView'
 import PrivacyControls from '../features/profile/PrivacyControls'
 import AccountSessionsPanel from '../features/auth/AccountSessionsPanel'
 import BlockedUsersPanel from '../features/contacts/BlockedUsersPanel'
-import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, Fragment, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from '../features/feed/FeedDiscussion'
 import FeedModeration from '../features/feed/FeedModeration'
 import ProfileOverlay from '../features/profile/ProfileOverlay'
@@ -106,6 +110,23 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const tabRef = useRef(tab)
   tabRef.current = tab
   const [globalSearch, setGlobalSearch] = useState('')
+  const [quickSearchOpen, setQuickSearchOpen] = useState(false)
+  const quickSearchAnchorRef = useRef<HTMLDivElement>(null)
+  const [chatSearchJump, setChatSearchJump] = useState<{ conversationId: number; messageId: number; revision: number } | null>(null)
+  const chatSearchJumpRevision = useRef(0)
+  const lastScrolledSearchJump = useRef(0)
+  useEffect(() => {
+    if (!quickSearchOpen) return
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !quickSearchAnchorRef.current?.contains(event.target)) setQuickSearchOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setQuickSearchOpen(false)
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
+  }, [quickSearchOpen])
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   useEffect(() => {
     if (!quickCreateOpen) return
@@ -119,6 +140,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const activeConversationIdRef = useRef<number | null>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
   const messageScrollAtBottom = useRef(true)
+  const ownSendScrollConversation = useRef<number | null>(null)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
   const messageLongPressTimer = useRef<number | null>(null)
@@ -244,6 +266,13 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   }, [profileTimelineOpen, tab, session?.sessionId, session?.user.username])
 
   const [feedFilter, setFeedFilter] = useState<'all' | 'saved'>('all')
+  const feedViewRef = useRef<HTMLDivElement>(null)
+  const [searchHasScrolled, setSearchHasScrolled] = useState(false)
+  useLayoutEffect(() => {
+    if (tab !== 'feed') return
+    if (feedViewRef.current) feedViewRef.current.scrollTop = 0
+    setSearchHasScrolled(false)
+  }, [tab, globalSearch.trim().toLocaleLowerCase('vi-VN'), feedFilter])
   const [activePostId, setActivePostId] = useState<number | null>(null)
   useEffect(() => {
     if (!session?.token) return
@@ -481,6 +510,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setHasMorePosts,
     postsLoadingMore,
     setPostsLoadingMore,
+    postsPagingError,
+    savedPagingError,
     postsPagingBusy,
     stories,
     setStories,
@@ -500,6 +531,28 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setActivePostId,
   })
 
+  const feedSearchActive = tab === 'feed' && globalSearch.trim().length > 0
+  const postSearch = usePostSearch({
+    query: globalSearch,
+    scope: feedFilter,
+    enabled: tab === 'feed',
+    sessionId: session?.sessionId,
+    request: apiFetch,
+  })
+  const feedLoadingMore = feedSearchActive ? postSearch.loadingMore : feedFilter === 'saved' ? savedPostsBusy : postsLoadingMore
+  const feedPagingError = feedSearchActive ? Boolean(postSearch.error) : feedFilter === 'saved' ? savedPagingError : postsPagingError
+  const feedInfiniteScrollRef = useFeedInfiniteScroll({
+    enabled: tab === 'feed' && (!feedSearchActive || searchHasScrolled),
+    hasMore: feedSearchActive ? postSearch.hasMore : feedFilter === 'saved' ? hasMoreSavedPosts : hasMorePosts,
+    loading: (feedSearchActive && postSearch.loading) || feedLoadingMore,
+    error: feedPagingError,
+    onLoadMore: () => {
+      if (feedSearchActive) void postSearch.loadMore()
+      else if (feedFilter === 'saved') void loadSavedPosts(true)
+      else void loadMorePosts()
+    },
+  })
+
   const {
     messages,
     setMessages,
@@ -507,6 +560,9 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setHasMoreMessages,
     messagesLoadingMore,
     setMessagesLoadingMore,
+    messageGapBefore,
+    messageGapLoading,
+    loadMissingMessages,
     messagesPagingBusy,
     pendingMessageScrollRestore,
     loadOlderMessages,
@@ -527,6 +583,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     tabRef,
     messagesScrollRef,
     purgeConversation,
+    jumpToMessage: chatSearchJump,
   })
 
   const {
@@ -571,6 +628,25 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     actionLocks,
   })
 
+  const conversationSearching = tab === 'chat' && globalSearch.trim().length > 0
+  const chatQuickSearch = useChatQuickSearch({
+    keyword: globalSearch,
+    sessionId: session?.sessionId,
+    enabled: tab === 'chat',
+    request: apiFetch,
+  })
+  useEffect(() => {
+    const jump = chatSearchJump
+    if (!jump || jump.conversationId !== activeConversationId || lastScrolledSearchJump.current === jump.revision ||
+      !messages.some(item => item.id === jump.messageId)) return
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.querySelector(`[data-message-id="${jump.messageId}"]`)
+      if (!target) return
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      lastScrolledSearchJump.current = jump.revision
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [messages, activeConversationId, chatSearchJump])
   const name = session?.user.username || ''
   const displayConversations = useMemo(() => conversations.map(conversation => ({
     ...conversation,
@@ -596,7 +672,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     ...post, liked: likePreviews[post.id],
     likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
   })
-  const activePost = activePostId ? [...visibleProfilePosts, ...visiblePosts, ...savedPosts].find((item) => item.id === activePostId) || null : null
+  const activePost = activePostId ? [...visibleProfilePosts, ...visiblePosts, ...savedPosts, ...postSearch.posts].find((item) => item.id === activePostId) || null : null
   const activeMessageAction = messageActionId
     ? messages.find((item) => item.id === messageActionId) || null
     : null
@@ -2152,12 +2228,14 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     ++feedRevision.current
     setProfilePosts(current => current.map(p => p.id === updated.id ? updated : p))
     syncFeedDataPost(updated)
+    postSearch.syncPost(updated)
   }
 
   function removeFeedPost(id: number) {
     ++feedRevision.current
     setProfilePosts(current => current.filter(p => p.id !== id))
     removeFeedDataPost(id)
+    postSearch.removePost(id)
   }
 
   async function loadProfilePosts(more = false, force = false) {
@@ -2299,6 +2377,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setFriendPreview(null)
     setPostText('')
     setPosts([])
+    setSavedPosts([])
+    setHasMoreSavedPosts(false)
     ++profileLoadSequence.current
     profilePagingBusy.current = false
     setProfileTimelineOpen(false)
@@ -2429,8 +2509,19 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   }, [tab, session?.token])
 
   useLayoutEffect(() => {
-    const restore = pendingMessageScrollRestore.current
     const container = messagesScrollRef.current
+    if (ownSendScrollConversation.current !== null) {
+      const sentInCurrentConversation = ownSendScrollConversation.current === activeConversationId
+      ownSendScrollConversation.current = null
+      if (sentInCurrentConversation && container) {
+        // Only a local send overrides the reader's position; incoming messages never do.
+        pendingMessageScrollRestore.current = null
+        container.scrollTop = container.scrollHeight
+        messageScrollAtBottom.current = true
+        return
+      }
+    }
+    const restore = pendingMessageScrollRestore.current
     if (restore && container) {
       container.scrollTop = restore.top + container.scrollHeight - restore.height
       pendingMessageScrollRestore.current = null
@@ -2439,7 +2530,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     // Preserve scroll position when reading history; only follow new messages
     // when the reader was already near the bottom of the conversation.
     if (container && messageScrollAtBottom.current) container.scrollTop = container.scrollHeight
-  }, [messages, outgoingMessage])
+  }, [messages, outgoingMessage, chatOutbox])
 
   useEffect(() => {
     if (
@@ -2700,6 +2791,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       setNotice('Hàng đợi tin nhắn đã đầy. Nội dung vẫn ở ô nhập; hãy thử lại sau.', 'warning')
       return
     }
+    ownSendScrollConversation.current = conversationId
     setMessageDrafts((current) => {
       if (current[conversationId] !== submittedDraft) return current
       const updated = { ...current }
@@ -2896,6 +2988,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
       setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
+      postSearch.syncPost({ ...post, liked: updated.liked, likes: updated.likes })
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) void refreshPosts()
       if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được lượt thích.', 'error')
@@ -2952,6 +3045,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
       setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, comments: updated.comments } : item))
+      postSearch.syncPost({ ...post, comments: updated.comments })
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         ++feedRevision.current
@@ -2965,28 +3059,42 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
   const unreadTotal = conversations.reduce((sum, conversation) => sum + conversation.unreadCount, 0)
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase('vi-VN')
-  const searchedConversations = displayConversations.filter((conversation) => {
-    if (!normalizedSearch) return true
-    return (
-      conversation.name.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
-      (conversation.otherUsername || '').toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
-      conversation.lastMessage.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
-    )
-  })
-  const visibleConversations = conversationCategories.selected === null ? searchedConversations :
+  // The conversation sidebar is independent of the keyword. Only the dropdown searches.
+  const visibleConversations = conversationCategories.selected === null ? displayConversations :
     conversationCategories.items.map(item => displayConversations.find(c => c.id === item.id) || item)
       .filter(item => !revokedConversationIds.current.has(item.id) &&
-        (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)) &&
-        (!normalizedSearch || (item.name + ' ' + (item.otherUsername || '') + ' ' + item.lastMessage).toLocaleLowerCase('vi-VN').includes(normalizedSearch)))
-  const searchedPosts = (feedFilter === 'saved' ? savedPosts : visiblePosts).filter((post) => {
-    if (!normalizedSearch || tab !== 'feed') return true
-    return (
-      post.author.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
-      userLabel(post.authorDisplayName, post.author).toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
-      post.content.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
-    )
-  })
+        (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
+  const searchedPosts = feedSearchActive ? postSearch.posts.map(post => likePreviews[post.id] === undefined ? post : {
+    ...post,
+    liked: likePreviews[post.id],
+    likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
+  }) : feedFilter === 'saved' ? savedPosts : visiblePosts
+  const openChatQuickContact = (contact: ChatQuickContact) => {
+    setQuickSearchOpen(false)
+    setGlobalSearch('')
+    setChatSearchJump(null)
+    if (contact.conversation) {
+      const selected = contact.conversation
+      setConversations(current => current.some(item => item.id === selected.id) ? current : [...current, selected])
+      setActiveConversationId(selected.id)
+    } else if (contact.username) {
+      void openDirectByUsername(contact.username)
+    }
+  }
+  const openChatQuickHit = (hit: ChatQuickHit) => {
+    setQuickSearchOpen(false)
+    setGlobalSearch('')
+    setConversations(current => current.some(item => item.id === hit.conversation.id) ? current : [...current, hit.conversation])
+    setChatSearchJump({
+      conversationId: hit.conversation.id, messageId: hit.id,
+      revision: ++chatSearchJumpRevision.current,
+    })
+    setActiveConversationId(hit.conversation.id)
+    setTranslations({})
+    setTranslationOriginals({})
+  }
   const switchTab = (nextTab: Tab) => {
+    setQuickSearchOpen(false)
     setTab(nextTab)
     setQuickCreateOpen(false)
     setGlobalSearch('')
@@ -3089,18 +3197,35 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       {tab !== 'profile' && tab !== 'discover' && tab !== 'market' && (
       <header className="chatnet-appbar">
         <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SOCO</strong></div>
+          <div className="appbar-search-anchor" ref={quickSearchAnchorRef}>
           <label className="appbar-search">
             <UiIcon name="search" size={27} />
             <input
               value={tab === 'contacts' ? friendQuery : globalSearch}
+              maxLength={tab === 'feed' || tab === 'chat' ? 120 : undefined}
+              type="search"
+              onKeyDown={(event) => {
+                if (tab === 'chat' && event.key === 'Escape') {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setQuickSearchOpen(false)
+                }
+              }}
+              aria-expanded={tab === 'chat' && conversationSearching && quickSearchOpen}
+              aria-controls={tab === 'chat' ? 'chat-quick-search-results' : undefined}
+              onFocus={() => { if (tab === 'chat' && globalSearch.trim()) setQuickSearchOpen(true) }}
+              onClick={() => { if (tab === 'chat' && globalSearch.trim()) setQuickSearchOpen(true) }}
               onChange={(event) => {
                 if (tab === 'contacts') setFriendQuery(event.target.value)
-                else setGlobalSearch(event.target.value)
+                else {
+                  setGlobalSearch(event.target.value)
+                  if (tab === 'chat') setQuickSearchOpen(Boolean(event.target.value.trim()))
+                }
               }}
               placeholder={
                 tab === 'contacts' ? 'Tên, @username hoặc email'
                   : tab === 'feed' ? 'Tìm tác giả hoặc nội dung bài viết'
-                    : 'Tìm cuộc trò chuyện'
+                    : 'Tìm liên hệ, tin nhắn, file'
               }
               aria-label={
                 tab === 'contacts' ? 'Tìm bạn bằng tên, username hoặc email'
@@ -3109,6 +3234,18 @@ export default function App({ initialSession }: { initialSession?: Session | nul
               }
             />
           </label>
+          {tab === 'chat' && conversationSearching && quickSearchOpen && (
+            <ChatQuickSearch
+              results={chatQuickSearch.results}
+              loading={chatQuickSearch.loading}
+              error={chatQuickSearch.error}
+              onRetry={chatQuickSearch.retry}
+              onClose={() => setQuickSearchOpen(false)}
+              onContact={openChatQuickContact}
+              onHit={openChatQuickHit}
+            />
+          )}
+          </div>
         <div className="appbar-actions">
           {tab === 'chat' && (
             <>
@@ -3381,10 +3518,10 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 {visibleConversations.length === 0 && !conversationCategories.loading && !conversationCategories.listError && (
                   <div className="conversation-list-empty">
                     <SocoEmptyState
-                      kind={normalizedSearch ? 'search' : 'chat'}
-                      title={normalizedSearch ? 'Không tìm thấy cuộc trò chuyện' : 'Chưa có cuộc trò chuyện'}
-                      description={normalizedSearch ? 'Thử tìm bằng tên hoặc nội dung khác.' : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
-                      action={!normalizedSearch && <SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
+                      kind="chat"
+                      title="Chưa có cuộc trò chuyện"
+                      description="Tìm bạn bè để bắt đầu kết nối và trò chuyện."
+                      action={<SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
                     />
                   </div>
                 )}
@@ -3394,6 +3531,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                     key={conversation.id}
                     className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''}`}
                     onClick={() => {
+                      setChatSearchJump(null)
+                      setQuickSearchOpen(false)
                       setActiveConversationId(conversation.id)
                       setTranslations({})
                       setTranslationOriginals({})
@@ -3703,13 +3842,13 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                     <MessageSearchPanel conversationId={activeConversation.id} request={apiFetch}
                       onClose={() => setMessageSearchOpen(false)}
                       onJump={async (result) => {
-                        const response = await apiFetch(`/api/conversations/${activeConversation.id}/messages?before=${result.id + 1}&limit=80&target=${encodeURIComponent(targetLanguage)}`)
-                        if (!response.ok) throw new Error('Không tải được tin nhắn')
-                        const history = (await response.json()) as Message[]
                         if (activeConversationIdRef.current !== activeConversation.id) return
-                        setMessages(history.sort((a, b) => a.id - b.id))
-                        setHasMoreMessages(history.length === 80)
-                        window.setTimeout(() => document.querySelector(`[data-message-id="${result.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 90)
+                        // Both search entry points use the same history loader; never replace the current timeline.
+                        setChatSearchJump({
+                          conversationId: activeConversation.id,
+                          messageId: result.id,
+                          revision: ++chatSearchJumpRevision.current,
+                        })
                       }}
                     />
                   )}
@@ -3732,8 +3871,16 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                       const originalVisible = Boolean(translationOriginals[message.id])
                       const translatedLanguage = selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()
                       return (
+                        <Fragment key={message.id}>
+                          {messageGapBefore === message.id && (
+                            <button type="button" className="soco-load-more soco-middle-messages"
+                              onClick={() => void loadMissingMessages()} disabled={messageGapLoading}
+                              aria-busy={messageGapLoading}>
+                              <RefreshCw size={15} aria-hidden="true" />
+                              {messageGapLoading ? 'Đang tải...' : 'Tải tin nhắn ở giữa'}
+                            </button>
+                          )}
                         <article
-                          key={message.id}
                           data-message-id={message.id}
                           className={mine ? 'message mine message-press-target' : 'message message-press-target'}
                           onPointerDown={(event) => beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)}
@@ -3819,6 +3966,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                             </>
                           )}
                         </article>
+                        </Fragment>
                       )
                     })}
                     {chatOutbox.filter((item) => item.conversationId === activeConversationId).map((item) => (
@@ -3995,11 +4143,15 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         )}
 
         {tab === 'feed' && (
-          <div className="feed-view zalo-feed-view">
+          <div className="feed-view zalo-feed-view" ref={feedViewRef}
+            onScroll={(event) => {
+              if (feedSearchActive && event.currentTarget.scrollTop > 0) setSearchHasScrolled(true)
+            }}>
             <FeedModeration request={apiFetch} onRemoved={(type, id) => {
               if (type === 'post') {
                 setPosts((current) => current.filter((post) => post.id !== id))
                 setSavedPosts((current) => current.filter((post) => post.id !== id))
+                postSearch.removePost(id)
                 if (activePostId === id) setActivePostId(null)
               } else if (type === 'comment') {
                 void refreshPosts()
@@ -4075,16 +4227,22 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                   </div>
                 </article>
               )}
+              {feedSearchActive && postSearch.loading && <p role="status" className="soco-feed-load-more">Đang tìm bài viết...</p>}
               {renderPosts(searchedPosts)}
-              {(feedFilter === 'saved' ? hasMoreSavedPosts : hasMorePosts) && (
-                <button type="button" className="soco-load-more soco-feed-load-more"
-                  onClick={() => void (feedFilter === 'saved' ? loadSavedPosts(true) : loadMorePosts())}
-                  disabled={feedFilter === 'saved' ? savedPostsBusy : postsLoadingMore}>
-                  <RefreshCw size={17} aria-hidden="true" />
-                  {(feedFilter === 'saved' ? savedPostsBusy : postsLoadingMore) ? 'Đang tải...' : 'Tải thêm bài viết'}
-                </button>
+              {feedLoadingMore && <p role="status" className="soco-feed-load-more">Đang tải thêm bài viết...</p>}
+              {feedPagingError && (
+                <div role="alert" className="soco-feed-load-more">
+                  <span>{feedSearchActive ? postSearch.error : 'Không thể tải bài viết.'}</span>
+                  <button type="button" onClick={() => {
+                    if (feedSearchActive) postSearch.retry()
+                    else if (feedFilter === 'saved') void loadSavedPosts(savedPosts.length > 0)
+                    else if (posts.length === 0) void refreshPosts()
+                    else void loadMorePosts()
+                  }}>Thử lại</button>
+                </div>
               )}
-              {searchedPosts.length === 0 && (
+              <div ref={feedInfiniteScrollRef} aria-hidden="true" style={{ height: 1 }} />
+              {searchedPosts.length === 0 && !feedLoadingMore && !(feedSearchActive && postSearch.loading) && !feedPagingError && (
                 <div className="feed-empty">
                   <SocoEmptyState title={normalizedSearch ? 'Không tìm thấy bài viết' : 'Chưa có bài viết'}
                     description={normalizedSearch ? 'Thử một từ khóa khác nhé.' : 'Hãy chia sẻ khoảnh khắc đầu tiên của bạn.'}

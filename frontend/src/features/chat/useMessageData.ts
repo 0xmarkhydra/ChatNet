@@ -23,6 +23,7 @@ type Options = Omit<AppDataContext, 'setStatus'> &
     tabRef: RefObject<Tab>
     messagesScrollRef: RefObject<HTMLDivElement | null>
     purgeConversation: (id: number) => void
+    jumpToMessage?: { conversationId: number; messageId: number; revision: number } | null
   }
 
 export function useMessageData({
@@ -42,10 +43,14 @@ export function useMessageData({
   tabRef,
   messagesScrollRef,
   purgeConversation,
+  jumpToMessage,
 }: Options) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
+  const [messageGapBefore, setMessageGapBefore] = useState<number | null>(null)
+  const [messageGapLoading, setMessageGapLoading] = useState(false)
+  const gapPagingBusy = useRef(false)
   const messagesPagingBusy = useRef(false)
   const pendingMessageScrollRestore = useRef<{ height: number; top: number } | null>(null)
 
@@ -59,17 +64,27 @@ export function useMessageData({
     const changes = new Set<number>()
     messageChanges.current = changes
     setTranslations({})
-    apiFetch(
-      `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}`,
-    )
-      .then(async (response) => {
-        if (response.status === 403) {
+    const jump = jumpToMessage?.conversationId === activeConversationId ? jumpToMessage : null
+    setMessageGapBefore(null)
+    const pageSize = jump ? 80 : MESSAGE_PAGE_SIZE
+    const before = jump ? `&before=${jump.messageId + 1}` : ''
+    const basePath = `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}`
+    const requestedPages = [
+      apiFetch(`${basePath}&limit=${pageSize}${before}`),
+      ...(jump ? [apiFetch(`${basePath}&limit=200`)] : []),
+    ]
+    Promise.all(requestedPages)
+      .then(async (responses) => {
+        if (responses.some((response) => response.status === 403)) {
           if (!cancelled) purgeConversation(activeConversationId)
           return
         }
-        if (!response.ok) throw new Error('Không tải được tin nhắn')
-        const data = (await response.json()) as Message[]
+        if (responses.some((response) => !response.ok)) throw new Error('Không tải được tin nhắn')
+        const pages = await Promise.all(responses.map(async (response) => (await response.json()) as Message[]))
         if (cancelled) return
+        // Include the targeted history and newer messages from BOTH participants.
+        const byId = new Map(pages.flat().map((item) => [item.id, item]))
+        const data = [...byId.values()].sort((a, b) => a.id - b.id)
 
         // Reconcile a POST whose ACK vanished before refresh. A persisted
         // clientId in history is proof of delivery; no second POST is needed.
@@ -87,11 +102,21 @@ export function useMessageData({
           })
         }
 
-        setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
+        // If the latest page does not overlap the jump window, offer paged backfill.
+        const anchorMax = pages[0].reduce((max, item) => Math.max(max, item.id), 0)
+        const recent = pages[1] || []
+        const recentMin = recent.reduce((min, item) => Math.min(min, item.id), Infinity)
+        setMessageGapBefore(jump && recent.length === 200 && anchorMax > 0 && anchorMax < recentMin
+          ? recentMin : null)
+        // The older-page cursor applies to the anchor page, not the combined result.
+        setHasMoreMessages(pages[0].length === pageSize)
         setMessages((current) => {
           const live = current.filter((item) => item.conversationId === activeConversationId && changes.has(item.id))
-          const liveIds = new Set(live.map((item) => item.id))
-          return [...data.filter((item) => !liveIds.has(item.id)), ...live].sort((a, b) => a.id - b.id)
+          const existing = jump ? current.filter((item) => item.conversationId === activeConversationId) : []
+          const merged = new Map(existing.map((item) => [item.id, item]))
+          for (const item of data) if (!changes.has(item.id)) merged.set(item.id, item)
+          for (const item of live) merged.set(item.id, item)
+          return [...merged.values()].sort((a, b) => a.id - b.id)
         })
         const restored: Record<number, string> = {}
         for (const message of data) {
@@ -128,6 +153,7 @@ export function useMessageData({
     session?.token,
     targetLanguage,
     translationPreferencesLoaded,
+    jumpToMessage?.revision,
   ])
 
   useEffect(() => {
@@ -153,6 +179,45 @@ export function useMessageData({
       document.removeEventListener('visibilitychange', markWhenVisible)
     }
   }, [session?.sessionId, activeConversationId])
+
+  async function loadMissingMessages() {
+    if (!session || !activeConversationId || !messageGapBefore || gapPagingBusy.current) return
+    const conversationId = activeConversationId
+    const sessionId = session.sessionId
+    const before = messageGapBefore
+    gapPagingBusy.current = true
+    setMessageGapLoading(true)
+    try {
+      const response = await apiFetch(
+        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=80&before=${before}`,
+      )
+      if (!response.ok) throw new Error('Không tải được tin nhắn ở giữa')
+      const data = (await response.json()) as Message[]
+      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId) return
+      const lowerWindowMax = messages.reduce((max, item) => item.id < before ? Math.max(max, item.id) : max, 0)
+      const newMin = data.reduce((min, item) => Math.min(min, item.id), Infinity)
+      setMessageGapBefore(data.length === 80 && newMin > lowerWindowMax ? newMin : null)
+      setMessages(current => {
+        const merged = new Map(current.map(item => [item.id, item]))
+        for (const item of data) if (!merged.has(item.id)) merged.set(item.id, item)
+        return [...merged.values()].sort((a, b) => a.id - b.id)
+      })
+      setTranslations(current => {
+        const next = { ...current }
+        for (const item of data) {
+          if (item.translatedText && item.translationLanguage === targetLanguage) next[item.id] = item.translatedText
+        }
+        return next
+      })
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+        setNotice('Không tải được đoạn tin nhắn ở giữa. Hãy thử lại.', 'error')
+    } finally {
+      gapPagingBusy.current = false
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+        setMessageGapLoading(false)
+    }
+  }
 
   async function loadOlderMessages() {
     if (!session || !activeConversationId || messagesPagingBusy.current ||
@@ -205,6 +270,9 @@ export function useMessageData({
     setHasMoreMessages,
     messagesLoadingMore,
     setMessagesLoadingMore,
+    messageGapBefore,
+    messageGapLoading,
+    loadMissingMessages,
     messagesPagingBusy,
     pendingMessageScrollRestore,
     loadOlderMessages,

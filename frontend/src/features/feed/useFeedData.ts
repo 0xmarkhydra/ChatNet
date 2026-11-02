@@ -17,12 +17,16 @@ export function useFeedData({
   const feedRevision = useRef(0)
   const feedLoads = useRef(0)
   const [posts, setPosts] = useState<Post[]>([])
+  const postsLengthRef = useRef(0)
+  postsLengthRef.current = posts.length
   const [savedPosts, setSavedPosts] = useState<Post[]>([])
   const [hasMoreSavedPosts, setHasMoreSavedPosts] = useState(false)
   const [savedPostsBusy, setSavedPostsBusy] = useState(false)
   const savedPagingBusy = useRef(false)
   const [hasMorePosts, setHasMorePosts] = useState(false)
   const [postsLoadingMore, setPostsLoadingMore] = useState(false)
+  const [postsPagingError, setPostsPagingError] = useState(false)
+  const [savedPagingError, setSavedPagingError] = useState(false)
   const postsPagingBusy = useRef(false)
   const [stories, setStories] = useState<Story[]>([])
 
@@ -32,7 +36,10 @@ export function useFeedData({
     const sessionId = session?.sessionId
     try {
       const response = await apiFetch(`/api/posts?limit=${FEED_PAGE_SIZE}`)
-      if (!response.ok) return
+      if (!response.ok) {
+        if (postsLengthRef.current === 0) setPostsPagingError(true)
+        return
+      }
       const data = (await response.json()) as Post[]
       if (sessionRef.current?.sessionId !== sessionId ||
         revision !== feedRevision.current || request !== feedLoads.current ||
@@ -41,9 +48,11 @@ export function useFeedData({
         const ids = new Set(data.map((item) => item.id))
         return [...data, ...current.filter((item) => !ids.has(item.id))]
       })
+      if (postsLengthRef.current === 0) setPostsPagingError(false)
       if (data.length < FEED_PAGE_SIZE) setHasMorePosts(false)
-      else if (posts.length === 0) setHasMorePosts(true)
+      else if (postsLengthRef.current === 0) setHasMorePosts(true)
     } catch {
+      if (postsLengthRef.current === 0) setPostsPagingError(true)
       setStatus('Đang kết nối lại...')
     }
   }
@@ -54,6 +63,7 @@ export function useFeedData({
     const before = Math.min(...posts.map((item) => item.id))
     postsPagingBusy.current = true
     setPostsLoadingMore(true)
+    setPostsPagingError(false)
     try {
       const response = await apiFetch(`/api/posts?limit=${FEED_PAGE_SIZE}&before=${before}`)
       if (!response.ok) throw new Error('Không tải thêm được bài viết')
@@ -65,7 +75,10 @@ export function useFeedData({
         return [...current, ...data.filter((item) => !ids.has(item.id))]
       })
     } catch {
-      if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được bài viết. Hãy thử lại.', 'error')
+      if (sessionRef.current?.sessionId === sessionId) {
+        setPostsPagingError(true)
+        setNotice('Không tải thêm được bài viết. Hãy thử lại.', 'error')
+      }
     } finally {
       postsPagingBusy.current = false
       if (sessionRef.current?.sessionId === sessionId) setPostsLoadingMore(false)
@@ -77,6 +90,7 @@ export function useFeedData({
     const sessionId = session.sessionId
     savedPagingBusy.current = true
     setSavedPostsBusy(true)
+    setSavedPagingError(false)
     try {
       const before = more && savedPosts.length ? '&before=' + Math.min(...savedPosts.map(p => p.id)) : ''
       const response = await apiFetch('/api/posts?scope=saved&limit=' + FEED_PAGE_SIZE + before)
@@ -90,7 +104,10 @@ export function useFeedData({
       })
       setHasMoreSavedPosts(data.length === FEED_PAGE_SIZE)
     } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không tải được bài đã lưu.', 'error')
+      if (sessionRef.current?.sessionId === sessionId) {
+        setSavedPagingError(true)
+        setNotice(error instanceof Error ? error.message : 'Không tải được bài đã lưu.', 'error')
+      }
     } finally {
       savedPagingBusy.current = false
       if (sessionRef.current?.sessionId === sessionId) setSavedPostsBusy(false)
@@ -143,6 +160,8 @@ export function useFeedData({
     setHasMorePosts,
     postsLoadingMore,
     setPostsLoadingMore,
+    postsPagingError,
+    savedPagingError,
     postsPagingBusy,
     stories,
     setStories,
