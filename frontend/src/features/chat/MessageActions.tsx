@@ -1,5 +1,6 @@
 import { userLabel } from '../../shared/lib/userLabel'
 import type { Message } from './types'
+import { messageReactions } from './messageReactions'
 import { attachmentLabel, formatTime } from '../../shared/lib/format'
 
 type Props = {
@@ -45,18 +46,21 @@ export default function MessageActions({
         </div>
 
         <div className="message-context-reactions" aria-label="Thả cảm xúc">
-          {['❤️', '👍', '😂', '😮', '😢', '🙏'].map((emoji) => (
+          {messageReactions.map(({ emoji, label }) => (
             <button
               key={emoji}
               type="button"
               className={(activeMessageAction.reactions || []).some((reaction) => reaction.emoji === emoji && reaction.mine) ? 'active' : ''}
-              aria-label={`Thả cảm xúc ${emoji}`}
+              aria-pressed={(activeMessageAction.reactions || []).some((reaction) => reaction.emoji === emoji && reaction.mine)}
+              aria-label={`${label} ${emoji}`}
+              title={label}
               onClick={() => {
                 setMessageActionId(null)
                 void toggleReaction(activeMessageAction, emoji)
               }}
             >
               {emoji}
+              <small>{label}</small>
             </button>
           ))}
         </div>

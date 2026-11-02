@@ -32,8 +32,10 @@ import AuthScreen from '../features/auth/AuthScreen'
 import { useAuthFlow } from '../features/auth/useAuthFlow'
 import PostComposer from '../features/feed/PostComposer'
 import FeedPostCard from '../features/feed/FeedPostCard'
+import FeedReactionControl from '../features/feed/FeedReactionControl'
 import StoryViewer from '../features/feed/StoryViewer'
 import MessageActions from '../features/chat/MessageActions'
+import { messageReactionLabel } from '../features/chat/messageReactions'
 import MessageSearchPanel from '../features/chat/MessageSearchPanel'
 import ProfileIdentityForm from '../features/profile/ProfileIdentityForm'
 import BottomNavigation from './BottomNavigation'
@@ -48,7 +50,7 @@ import FeedModeration from '../features/feed/FeedModeration'
 import ProfileOverlay from '../features/profile/ProfileOverlay'
 import type { NearbyUser } from '../features/discover/NearbyExplorer'
 import GroupCreator from '../features/chat/GroupCreator'
-import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
+import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, SmilePlus, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../features/notifications/incomingSound'
 import { createSessionClient, loadSession, type Session } from '../features/auth/session'
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts } from '../features/chat/chatPersistence'
@@ -56,7 +58,7 @@ import { restoreChatOutbox } from '../features/chat/outboxRecovery'
 import { clearChatOutbox, confirmChatMessage, enqueueChatMessage, persistChatOutboxChange, retryableChatMessages, type QueuedChatMessage } from '../chatOutbox'
 import { uploadPresignedFile } from '../features/chat/mediaUpload'
 import { canMarkConversationRead } from '../features/chat/conversationRead'
-import { mergeById, toggleCount } from '../shared/lib/optimistic'
+import { mergeById, toggleMessageReactionCount } from '../shared/lib/optimistic'
 import CallManager, { CallHeaderActions } from '../features/calls/CallManager'
 import GroupActionsSheet from '../features/chat/GroupActionsSheet'
 import SharedContent from '../features/chat/SharedContent'
@@ -2785,7 +2787,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     if (message.deleted || actionLocks.current.has(key)) return
     const sessionId = session?.sessionId
     actionLocks.current.add(key)
-    setReactionPreviews((current) => ({ ...current, [message.id]: toggleCount(message.reactions || [], emoji) }))
+    setReactionPreviews((current) => ({ ...current, [message.id]: toggleMessageReactionCount(message.reactions || [], emoji) }))
     try {
       const response = await apiFetch(`/api/messages/${message.id}/reactions`, {
         method: 'POST',
@@ -2879,23 +2881,26 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     }
   }
 
-  async function like(post: Post) {
+  async function like(post: Post, emoji = '👍') {
     const key = `feed:like:${post.id}`
     if (actionLocks.current.has(key)) return
     const sessionId = session?.sessionId
     actionLocks.current.add(key)
     ++feedRevision.current
-    setLikePreviews((current) => ({ ...current, [post.id]: !post.liked }))
+    setLikePreviews((current) => ({ ...current, [post.id]: (post.myReaction || (post.liked ? '👍' : '')) !== emoji }))
     try {
-      const response = await apiFetch(`/api/posts/${post.id}/like`, { method: 'POST' })
+      const response = await apiFetch(`/api/posts/${post.id}/${emoji === '👍' ? 'like' : 'reactions'}`, {
+        method: 'POST',
+        ...(emoji !== '👍' ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emoji }) } : {}),
+      })
       const updated = await response.json() as Post & { error?: string }
       if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok || updated.id !== post.id || typeof updated.liked !== 'boolean' || !Number.isFinite(updated.likes)) {
         throw new Error(updated.error || 'Không cập nhật được lượt thích.')
       }
-      setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
-      setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
-      setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
+      setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions } : item))
+      setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions } : item))
+      setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions } : item))
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) void refreshPosts()
       if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được lượt thích.', 'error')
@@ -3810,11 +3815,17 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                                     aria-pressed={reaction.mine}
                                     className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
                                     onClick={() => void toggleReaction(message, reaction.emoji)}
-                                    aria-label={`Thả cảm xúc ${reaction.emoji}`}
+                                    aria-label={`${messageReactionLabel(reaction.emoji)}: ${reaction.count} lượt`}
                                   >
                                     {reaction.emoji} {reaction.count}
                                   </button>
                                 ))}
+                                <button type="button" className="reaction-add"
+                                  aria-label="Chọn cảm xúc cho tin nhắn"
+                                  title="Thả cảm xúc"
+                                  onClick={() => openMessageActions(message)}>
+                                  <SmilePlus size={16} aria-hidden="true" />
+                                </button>
                               </div>
                             </>
                           )}
@@ -4136,10 +4147,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                     )}
                     <MediaAttachmentsView items={activePost.attachments} />
                     <div className="post-toolbar">
-                      <button type="button" className={activePost.liked ? 'liked' : ''} disabled={likePreviews[activePost.id] !== undefined}
-                        aria-pressed={activePost.liked} aria-busy={likePreviews[activePost.id] !== undefined} onClick={() => void like(activePost)}>
-                        <UiIcon name="heart" size={21} /><span>Thích</span>{activePost.likes > 0 && <b>{activePost.likes}</b>}
-                      </button>
+                      <FeedReactionControl post={activePost} busy={likePreviews[activePost.id] !== undefined}
+                        react={like} showCount />
                       <span className="post-stat"><UiIcon name="comment" size={21} />{activePost.comments?.length || 0} bình luận</span>
                     </div>
                     <FeedDiscussion

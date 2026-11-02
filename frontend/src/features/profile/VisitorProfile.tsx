@@ -90,11 +90,11 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   finally{paging.current=false;if(alive.current&&id===sequence.current)setLoading(false)}
  }
  function update(post:Post){setPosts(current=>current.map(item=>item.id===post.id?post:item));onUpdated(post)}
- async function like(post:Post){
+ async function like(post:Post,emoji='👍'){
   if(likeBusy[post.id])return
   setLikeBusy(current=>({...current,[post.id]:true}))
   try{
-   const response=await request('/api/posts/'+post.id+'/like',{method:'POST'})
+   const response=await request('/api/posts/'+post.id+(emoji==='👍'?'/like':'/reactions'),{method:'POST',...(emoji==='👍'?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify({emoji})})})
    if(!response.ok)throw new Error('Không cập nhật được lượt thích.')
    const updated=await response.json() as Post
    if(alive.current)update(updated)

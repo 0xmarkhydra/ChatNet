@@ -1342,7 +1342,8 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	allowed := map[string]bool{
-		"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "🙏": true,
+		"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "😡": true,
+		"🙏": true, // Legacy reaction remains removable on existing messages.
 	}
 	if !allowed[body.Emoji] {
 		httpx.Error(w, http.StatusBadRequest, "unsupported reaction")
@@ -1363,30 +1364,52 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var exists bool
-	_ = s.db.QueryRow(r.Context(), `
-		SELECT EXISTS(
-			SELECT 1 FROM message_reactions
-			WHERE message_id=$1 AND user_id=$2 AND emoji=$3
-		)`, messageID, claims.UserID, body.Emoji).Scan(&exists)
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
+		return
+	}
 
-	if exists {
-		if _, err := s.db.Exec(r.Context(), `
-			DELETE FROM message_reactions
-			WHERE message_id=$1 AND user_id=$2 AND emoji=$3
-		`, messageID, claims.UserID, body.Emoji); err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot remove reaction")
-			return
-		}
-	} else {
-		if _, err := s.db.Exec(r.Context(), `
-			INSERT INTO message_reactions(message_id,user_id,emoji)
-			VALUES($1,$2,$3)
-			ON CONFLICT DO NOTHING
+	// Serialize changes to the same message, including requests from multiple tabs.
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot update reaction")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var lockedID int64
+	if err := tx.QueryRow(r.Context(), `
+		SELECT id FROM messages WHERE id=$1 AND deleted_at IS NULL FOR UPDATE
+	`, messageID).Scan(&lockedID); err != nil {
+		httpx.Error(w, http.StatusNotFound, "message not found")
+		return
+	}
+	var previous string
+	err = tx.QueryRow(r.Context(), `
+		SELECT emoji FROM message_reactions
+		WHERE message_id=$1 AND user_id=$2 ORDER BY created_at DESC, emoji DESC LIMIT 1
+	`, messageID, claims.UserID).Scan(&previous)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, http.StatusInternalServerError, "cannot read reaction")
+		return
+	}
+	// Also works before the one-per-user index is installed, during a rolling deploy.
+	if _, err := tx.Exec(r.Context(), `
+		DELETE FROM message_reactions WHERE message_id=$1 AND user_id=$2
+	`, messageID, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update reaction")
+		return
+	}
+	if previous != body.Emoji {
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO message_reactions(message_id,user_id,emoji) VALUES($1,$2,$3)
 		`, messageID, claims.UserID, body.Emoji); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot save reaction")
 			return
 		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot save reaction")
+		return
 	}
 
 	m, err := s.loadMessage(r.Context(), messageID, claims.UserID)
@@ -1752,8 +1775,21 @@ func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, 
 		}
 		userIDs = visible
 	}
-	data, _ := json.Marshal(event)
 	for _, userID := range userIDs {
+		outgoing := event
+		if event.Type == "message.updated" && event.Message != nil {
+			// "mine" and blocked-user counts depend on the recipient.
+			personalized, err := s.loadMessage(ctx, event.Message.ID, userID)
+			if err != nil {
+				log.Printf("cannot personalize message update for recipient: %v", err)
+				continue
+			}
+			outgoing.Message = &personalized
+		}
+		data, err := json.Marshal(outgoing)
+		if err != nil {
+			continue
+		}
 		_ = s.redis.Publish(ctx, userChannel(userID), data).Err()
 	}
 }

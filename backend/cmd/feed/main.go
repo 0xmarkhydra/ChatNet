@@ -44,6 +44,8 @@ type post struct {
 	Content           string              `json:"content"`
 	Likes             int                 `json:"likes"`
 	Liked             bool                `json:"liked"`
+	MyReaction        string              `json:"myReaction,omitempty"`
+	Reactions         []postReaction      `json:"reactions,omitempty"`
 	Comments          []comment           `json:"comments"`
 	Attachments       []mediax.Attachment `json:"attachments,omitempty"`
 	CreatedAt         time.Time           `json:"createdAt"`
@@ -105,6 +107,7 @@ func main() {
 	mux.Handle("PATCH /api/feed/moderation/reports/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reviewModerationReport)))
 	mux.Handle("POST /api/posts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.create)))
 	mux.Handle("POST /api/posts/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.like)))
+	mux.Handle("POST /api/posts/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.react)))
 	mux.Handle("POST /api/posts/{id}/comments", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.addComment)))
 	mux.Handle("GET /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStories)))
 	mux.Handle("POST /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createStory)))
@@ -171,7 +174,10 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.Saved) != nil {
 			continue
 		}
-		_ = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id=$1 AND user_id=$2)`, p.ID, claims.UserID).Scan(&p.Liked)
+		if err := s.attachPostReactions(r.Context(), &p, claims.UserID); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot load post reactions")
+			return
+		}
 		p.Comments = s.comments(r, p.ID, claims.UserID)
 		p.Attachments = s.postAttachments(r.Context(), p.ID)
 		posts = append(posts, p)
@@ -445,69 +451,7 @@ func (s *server) deleteStory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) like(w http.ResponseWriter, r *http.Request) {
-	claims, _ := authx.ClaimsFromContext(r.Context())
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || id <= 0 {
-		httpx.Error(w, http.StatusBadRequest, "invalid post id")
-		return
-	}
-
-	if !s.canReadPost(r.Context(), id, claims.UserID) {
-		httpx.Error(w, http.StatusNotFound, "post not found")
-		return
-	}
-	tx, err := s.db.Begin(r.Context())
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot update like")
-		return
-	}
-	defer tx.Rollback(r.Context())
-
-	tag, err := tx.Exec(r.Context(), `
-		INSERT INTO post_likes(post_id,user_id)
-		VALUES($1,$2) ON CONFLICT DO NOTHING`, id, claims.UserID)
-	if err != nil {
-		httpx.Error(w, http.StatusNotFound, "post not found")
-		return
-	}
-
-	liked := tag.RowsAffected() > 0
-	if liked {
-		if _, err := tx.Exec(r.Context(), `UPDATE posts SET likes_count=likes_count+1 WHERE id=$1`, id); err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot update like")
-			return
-		}
-	} else {
-		tag, err = tx.Exec(r.Context(), `DELETE FROM post_likes WHERE post_id=$1 AND user_id=$2`, id, claims.UserID)
-		if err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot update like")
-			return
-		}
-		if tag.RowsAffected() > 0 {
-			if _, err := tx.Exec(r.Context(), `UPDATE posts SET likes_count=GREATEST(likes_count-1,0) WHERE id=$1`, id); err != nil {
-				httpx.Error(w, http.StatusInternalServerError, "cannot update like")
-				return
-			}
-		}
-	}
-
-	var p post
-	err = tx.QueryRow(r.Context(), `
-		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at
-		FROM posts p JOIN users u ON u.id=p.user_id
-		WHERE p.id=$1`, id,
-	).Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt)
-	if err != nil {
-		httpx.Error(w, http.StatusNotFound, "post not found")
-		return
-	}
-	p.Liked = liked
-
-	if err := tx.Commit(r.Context()); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot save like")
-		return
-	}
-	s.respondPost(w, r, id, claims.UserID, http.StatusOK)
+	s.changePostReaction(w, r, "👍")
 }
 
 func (s *server) addComment(w http.ResponseWriter, r *http.Request) {

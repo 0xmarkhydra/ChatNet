@@ -3766,6 +3766,23 @@ select:focus-visible {
   color: var(--chatnet-accent-ink);
 }
 
+.reaction-add {
+  display: inline-grid;
+  width: 29px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--chatnet-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .82);
+  color: var(--chatnet-muted);
+  cursor: pointer;
+}
+.reaction-add:hover, .reaction-add:focus-visible {
+  border-color: var(--chatnet-accent);
+  background: var(--chatnet-accent-soft);
+  color: var(--chatnet-accent-ink);
+}
+
 .message-context-backdrop {
   position: fixed;
   z-index: 190;
@@ -3838,13 +3855,18 @@ select:focus-visible {
 }
 
 .message-context-reactions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   min-width: 0;
-  height: 46px;
+  height: 56px;
   border: 0;
   border-radius: 14px;
   padding: 0;
   background: transparent;
-  font-size: 27px;
+  font-size: 26px;
   line-height: 1;
   cursor: pointer;
   transition: transform .12s ease, background .12s ease;
@@ -3855,6 +3877,13 @@ select:focus-visible {
   background: #f0f3f5;
   transform: scale(1.08);
 }
+
+.message-context-reactions button small {
+  color: var(--chatnet-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+.message-context-reactions button.active small { color: var(--chatnet-accent-ink); }
 
 .message-context-reactions button.active {
   background: var(--chatnet-accent-soft);
@@ -4000,7 +4029,7 @@ select:focus-visible {
   }
 
   .message-context-reactions button {
-    height: 44px;
+    height: 54px;
     font-size: 25px;
   }
 
