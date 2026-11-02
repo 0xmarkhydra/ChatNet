@@ -26,7 +26,7 @@ const check = (value, message) => { if (!value) throw new Error(message) }
 const conversations = [
   { id: 1, name: 'minhanh', type: 'direct', otherUserId: 2, memberCount: 2, unreadCount: 2, lastMessage: 'Chiều nay mình xem lại bản thiết kế nhé.', online: true, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
   { id: 2, name: 'hoangnam', type: 'direct', otherUserId: 3, memberCount: 2, unreadCount: 0, lastMessage: 'Cảm ơn bạn, mình nhận được rồi.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
-  { id: 3, name: 'Nhóm SOCO kiểm thử giao diện mobile và desktop với tên rất dài', type: 'group', memberCount: 5, unreadCount: 0, lastMessage: 'Hẹn cả nhóm ngày mai.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
+  { id: 3, name: 'Nhóm SocCo kiểm thử giao diện mobile và desktop với tên rất dài', type: 'group', memberCount: 5, unreadCount: 0, lastMessage: 'Hẹn cả nhóm ngày mai.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
 ]
 const pagedConversations = [...conversations, ...Array.from({ length: 27 }, (_, index) => ({
   id: index + 4, name: 'user_' + (index + 4), type: 'direct',
@@ -36,7 +36,10 @@ const pagedConversations = [...conversations, ...Array.from({ length: 27 }, (_, 
 }))]
 // Keep the newest 40 messages in the first response and add older messages on demand.
 const pagedMessages = Array.from({ length: 45 }, (_, index) => ({
-  id: index + 1, conversationId: 1, senderId: 1, sender: 'soco_user',
+  id: index + 1, conversationId: 1,
+  senderId: [4, 44].includes(index + 1) ? 2 : 1,
+  sender: [4, 44].includes(index + 1) ? 'minhanh' : 'soco_user',
+  senderDisplayName: [4, 44].includes(index + 1) ? 'Minh Anh' : 'SOCO Test User',
   text: 'Lịch sử tin nhắn ' + (index + 1),
   createdAt: new Date(Date.UTC(2026, 9, 2, 7, index)).toISOString(),
 }))
@@ -49,7 +52,7 @@ const session = {
   token: 'mock.' + Buffer.from(JSON.stringify({ exp: 4102444800 })).toString('base64url') + '.signed',
   refreshToken: 'm'.repeat(43),
   sessionId: 'ui-layout-test',
-  user: { id: 1, username: 'soco_user', displayName: 'SOCO Test User', email: 'test@example.com' },
+  user: { id: 1, username: 'soco_user', displayName: 'SocCo Test User', email: 'test@example.com' },
 }
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization, Content-Type', 'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS' }
 try {
@@ -96,6 +99,8 @@ try {
   })
   const errors = []
   let submittedStory = null
+  let searchRequestCount = 0
+  let releasePendingChatSend = null
   page.on('pageerror', e => errors.push(e.message))
   await page.route(origin + '/mock-story-upload', route =>
     route.fulfill({ status: 200, body: '' }))
@@ -109,17 +114,40 @@ try {
     const json = (data, status = 200) => route.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify(data) })
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
     if (path === '/api/events') return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: ': connected\n\n' })
+    if (path === '/api/conversation-categories') return json([])
     if (path === '/api/conversations') return json(pagedConversations.slice(offset, offset + limit))
+    if (path === '/api/chat/search') return json({
+      contacts: [{ id: 2, username: 'minhanh', name: 'Minh Anh' }],
+      messages: [{ id: 3, conversation: conversations[0], sender: 'Minh Anh', text: 'Tìm kiếm lịch sử',
+        createdAt: '2026-10-02T07:00:00Z' }],
+      files: [{ id: 2, attachmentId: 10, conversation: conversations[0], sender: 'Minh Anh',
+        text: '', fileName: 'Báo cáo.pdf', fileKind: 'file', createdAt: '2026-10-02T07:00:00Z' }],
+    })
     if (/^\/api\/conversations\/\d+\/members$/.test(path)) return json([
-      { id: 1, username: 'soco_user', displayName: 'SOCO Test User', role: 'owner', online: true },
+      { id: 1, username: 'soco_user', displayName: 'SocCo Test User', role: 'owner', online: true },
       ...Array.from({ length: 8 }, (_, index) => ({
         id: index + 2, username: 'member_' + (index + 2),
         displayName: 'Thành viên ' + (index + 2), role: index === 0 ? 'admin' : 'member', online: index % 2 === 0,
       })),
     ])
-    if (path.endsWith('/messages')) return json(
-      pagedMessages.filter(message => !before || message.id < before).slice(-limit),
-    )
+    if (req.method() === 'POST' && /^\/api\/conversations\/\d+\/messages$/.test(path)
+      && req.postDataJSON()?.text === 'Kiểm tra trạng thái gửi') {
+      return new Promise(resolve => {
+        releasePendingChatSend = () => {
+          const sent = req.postDataJSON()
+          resolve(json({
+            id: 9001, conversationId: 1, senderId: 1, sender: 'soco_user',
+            clientId: sent.clientId, text: sent.text, attachments: [],
+            createdAt: new Date().toISOString(),
+          }))
+        }
+      })
+    }
+    if (path.endsWith('/messages')) {
+      const search = (currentURL.searchParams.get('search') || '').toLocaleLowerCase('vi-VN')
+      return json(pagedMessages.filter(message => (!before || message.id < before) &&
+        (!search || message.text.toLocaleLowerCase('vi-VN').includes(search))).slice(-limit))
+    }
     if (path === '/api/friends') return json(friends)
     if (path === '/api/friends/requests') return json([])
     if (path === '/api/users/suggestions' || path === '/api/users/search') return json(friends)
@@ -129,7 +157,13 @@ try {
       const text = req.postDataJSON()?.text || ''
       return json({ translatedText: text, translation: text, sourceLanguage: 'vi', targetLanguage: 'en' })
     }
-    if (path === '/api/posts') return json(pagedPosts.filter(post => !before || post.id < before).slice(0, limit))
+    if (path === '/api/posts') {
+      const q = (currentURL.searchParams.get('q') || '').toLocaleLowerCase('vi-VN')
+      if (q) searchRequestCount++
+      return json(pagedPosts.filter(post =>
+        (!before || post.id < before) && (!q || [post.content, post.author].some(value => value.toLocaleLowerCase('vi-VN').includes(q)))
+      ).slice(0, limit))
+    }
     if (path === '/api/media/presign' && req.method() === 'POST') return json({
       uploadUrl: origin + '/mock-story-upload',
       storageRef: 'story/1/upload.png', kind: 'image', downloadUrl: origin + '/mock-story-image.png',
@@ -154,6 +188,137 @@ try {
   })
   await page.goto(origin)
   await page.locator('.conversation-item').first().waitFor({ timeout: 12000 })
+  // The global search is a grouped, keyboard-dismissible dropdown. File results jump to their message.
+  const chatSearchBox = page.locator('.appbar-search input')
+  const chatList = page.locator('.conversation-list.zalo-conversation-list')
+  await chatList.evaluate(node => { node.scrollTop = Math.min(130, node.scrollHeight - node.clientHeight) })
+  const beforeDropdownSearch = await chatList.evaluate(node => ({
+    top: node.scrollTop,
+    rows: [...node.querySelectorAll('.conversation-item .conversation-title strong')].map(row => row.textContent),
+  }))
+  check(beforeDropdownSearch.top > 0, 'Search regression fixture must provide a scrollable conversation list')
+  await chatSearchBox.fill('tim kiem')
+  const searchFocus = await chatSearchBox.evaluate(input => {
+    const label = input.closest('.appbar-search')
+    return {
+      inputOutline: getComputedStyle(input).outlineStyle,
+      labelBorder: label ? getComputedStyle(label).borderColor : '',
+    }
+  })
+  check(searchFocus.inputOutline === 'none' && searchFocus.labelBorder === 'rgb(174, 198, 255)',
+    'Search focus should highlight only its rounded wrapper, not draw a rectangular input outline: ' +
+      JSON.stringify(searchFocus))
+  const groupedResults = page.locator('#chat-quick-search-results')
+  await groupedResults.waitFor({ timeout: 7000 })
+  await groupedResults.locator('.chat-quick-search-section', { hasText: 'Liên hệ' }).waitFor()
+  await groupedResults.locator('.chat-quick-search-section', { hasText: 'Tin nhắn' }).waitFor()
+  await groupedResults.locator('.chat-quick-search-section', { hasText: 'File' }).waitFor()
+  await groupedResults.getByRole('button', { name: /Báo cáo.pdf/ }).waitFor()
+  const afterDropdownSearch = await chatList.evaluate(node => ({
+    top: node.scrollTop,
+    rows: [...node.querySelectorAll('.conversation-item .conversation-title strong')].map(row => row.textContent),
+  }))
+  check(JSON.stringify(afterDropdownSearch) === JSON.stringify(beforeDropdownSearch),
+    'Typing a chat keyword must not filter, reorder or scroll the conversation list')
+  await page.keyboard.press('Escape')
+  await groupedResults.waitFor({ state: 'hidden' })
+  check(await chatList.evaluate(node => node.scrollTop) === beforeDropdownSearch.top,
+    'Closing search dropdown must preserve conversation list scroll position')
+  await chatSearchBox.click()
+  await groupedResults.waitFor()
+  await groupedResults.getByRole('button', { name: /Báo cáo.pdf/ }).click()
+  await page.locator('[data-message-id="2"]').waitFor({ timeout: 7000 })
+  // Jumping to an older hit must not replace the chat with only older messages.
+  await page.locator('[data-message-id="4"]').waitFor({ timeout: 7000 })
+  await page.locator('[data-message-id="44"]').waitFor({ timeout: 7000 })
+  await page.locator('[data-message-id="45"]').waitFor({ timeout: 7000 })
+  check(await page.locator('.message-press-target').count() === 45,
+    'Jumping to an older hit must retain both participants and the latest messages')
+  check(await page.locator('[data-message-id="44"] .message-meta').getByText('Minh Anh').isVisible(),
+    'The other participant\'s newer message must remain visible')
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  const afterQuickResult = await chatList.evaluate(node => ({
+    top: node.scrollTop,
+    rows: [...node.querySelectorAll('.conversation-item .conversation-title strong')].map(row => row.textContent),
+  }))
+  check(JSON.stringify(afterQuickResult.rows) === JSON.stringify(beforeDropdownSearch.rows),
+    'Opening an existing search result must not reorder conversations')
+  // Long conversations need a way to backfill the gap between an old search hit and the latest page.
+  pagedMessages.push(...Array.from({ length: 220 }, (_, index) => ({
+    id: index + 46, conversationId: 1,
+    senderId: index === 100 ? 2 : 1, sender: index === 100 ? 'minhanh' : 'soco_user',
+    senderDisplayName: index === 100 ? 'Minh Anh' : 'SOCO Test User',
+    text: 'Tin nhắn sau tìm kiếm ' + (index + 46),
+    createdAt: new Date(Date.UTC(2026, 9, 2, 8, index)).toISOString(),
+  })))
+  await chatSearchBox.fill('tim kiem')
+  await groupedResults.getByRole('button', { name: /Báo cáo.pdf/ }).click()
+  const missingMiddle = page.getByRole('button', { name: 'Tải tin nhắn ở giữa' })
+  await missingMiddle.waitFor({ timeout: 7000 })
+  await missingMiddle.click()
+  await missingMiddle.waitFor({ state: 'hidden', timeout: 7000 })
+  check(await page.locator('.message-press-target').count() === 265,
+    'Long conversation search must allow loading the missing middle pages')
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  pagedMessages.splice(45)
+  // The per-conversation search panel must reuse the same non-destructive jump handler.
+  await page.locator('.conversation-item').first().click()
+  await page.locator('.message-press-target').last().waitFor()
+  await page.getByRole('button', { name: 'Tìm tin nhắn trong cuộc trò chuyện' }).click()
+  const localSearch = page.getByRole('dialog', { name: 'Tìm trong hội thoại' })
+  await localSearch.locator('input[aria-label="Từ khóa tin nhắn"]').fill('Lịch sử tin nhắn 2')
+  await localSearch.getByText('Lịch sử tin nhắn 2', { exact: true }).click()
+  await localSearch.waitFor({ state: 'hidden' })
+  await page.locator('[data-message-id="2"]').waitFor()
+  check(await page.locator('.message-press-target').count() === 45,
+    'Search inside a conversation must preserve newer messages from both senders')
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  // Restore the original fixture so unrelated layout/translation tests remain unchanged.
+  for (const id of [4, 44]) {
+    const item = pagedMessages.find(message => message.id === id)
+    if (item) Object.assign(item, { senderId: 1, sender: 'soco_user', senderDisplayName: 'SOCO Test User' })
+  }
+  console.log('PASS: grouped and local chat search, both participants, full history and middle-page backfill')
+  // Sending retains its outbox status, but must not show the generic "Đang xử lý" banner.
+  await page.locator('.conversation-item').first().click()
+  const chatTimeline = page.locator('.messages')
+  await page.locator('.message-press-target').last().waitFor()
+  await chatTimeline.evaluate(element => {
+    element.scrollTop = Math.min(120, element.scrollHeight - element.clientHeight)
+    element.dispatchEvent(new Event('scroll', { bubbles: true }))
+  })
+  const scrolledOldTop = await chatTimeline.evaluate(element => element.scrollTop)
+  check(scrolledOldTop > 0, 'Chat history fixture must allow scrolling away from latest')
+  await page.evaluate(() => window.__socoEmitRealtime({
+    type: 'message', conversationId: 1,
+    message: { id: 8999, conversationId: 1, senderId: 2, sender: 'minhanh',
+      senderDisplayName: 'Minh Anh', text: 'Tin mới từ đối phương', createdAt: new Date().toISOString() },
+  }))
+  await page.locator('[data-message-id="8999"]').waitFor()
+  await page.waitForTimeout(50)
+  const incomingScrollTop = await chatTimeline.evaluate(element => element.scrollTop)
+  check(Math.abs(incomingScrollTop - scrolledOldTop) < 5,
+    'Incoming message must preserve the old reading position: ' + JSON.stringify({ scrolledOldTop, incomingScrollTop }))
+  await page.getByRole('textbox', { name: 'Tin nhắn', exact: true }).fill('Kiểm tra trạng thái gửi')
+  const pendingSendRequest = page.waitForRequest(req => req.method() === 'POST' &&
+    /\/api\/conversations\/\d+\/messages$/.test(new URL(req.url()).pathname))
+  await page.getByRole('button', { name: 'Gửi tin nhắn', exact: true }).click()
+  await pendingSendRequest
+  await page.waitForFunction(() => {
+    const timeline = document.querySelector('.messages')
+    return timeline && timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 5
+  }, null, { timeout: 4000 })
+  check(await page.locator('.chat-outbox-message').count() === 1, 'Message must remain visible in the outbox while sending')
+  check(await page.locator('.request-progress').count() === 0,
+    'Sending messages must not show the generic processing banner')
+  check(typeof releasePendingChatSend === 'function', 'Chat send request was not held for status check')
+  releasePendingChatSend()
+  await page.locator('.chat-outbox-message').waitFor({ state: 'hidden' })
+  const confirmedScrollGap = await chatTimeline.evaluate(element =>
+    element.scrollHeight - element.scrollTop - element.clientHeight)
+  check(confirmedScrollGap < 5, 'Server acknowledgement must not undo the scroll to the latest own message')
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
+  console.log('PASS: incoming preserves old scroll, self-send follows latest, ACK remains at bottom, no processing banner')
   const widths = [320, 375, 390, 430, 768, 1024, 1440]
   let checks = 0
   const geometry = async (label, width, selectors) => {
@@ -192,10 +357,84 @@ try {
     await page.getByRole('button', { name: 'Danh bạ', exact: true }).click()
     await geometry('contacts', width, ['.modern-frame', '.contacts-view', '.contact-shortcuts'])
     check(await page.locator('.contacts-view > .soco-section-heading').count() === 0, 'Removed Contacts banner reappeared: ' + width)
+    // Regression: the friend menu must escape the rounded card and its Block action must be clickable.
+    const friendOptions = page.locator('.friend-contact-row .friend-contact-more').first()
+    await friendOptions.click()
+    const friendMenu = page.locator('.friend-contact-row .friend-contact-popover')
+    await friendMenu.waitFor()
+    const menuBounds = await friendMenu.boundingBox()
+    check(menuBounds && menuBounds.y >= -1 && menuBounds.y + menuBounds.height <= (width <= 375 ? 667 : width <= 430 ? 844 : 900) + 1,
+      'Friend options are outside the viewport at ' + width + ': ' + JSON.stringify(menuBounds))
+    check(await friendMenu.evaluate(node => getComputedStyle(node.closest('.contacts-suggestions')).overflowY === 'visible'),
+      'Friend options are clipped by the contacts card at ' + width)
+    const blockFriend = friendMenu.getByRole('menuitem', { name: 'Chặn người dùng' })
+    await blockFriend.scrollIntoViewIfNeeded()
+    await blockFriend.click() // Native confirmation is dismissed by Playwright; do not block the test account.
+    await page.keyboard.press('Escape')
+    if (width === 390) {
+      // Search rows must never shrink while the mouse is held, even with animations enabled.
+      const contactSearch = page.locator('.appbar-search input')
+      await contactSearch.fill('minhanh')
+      const searchRow = page.locator('.contact-search-row').first()
+      await searchRow.waitFor()
+      await page.emulateMedia({ reducedMotion: 'no-preference' })
+      const beforePress = await searchRow.boundingBox()
+      check(beforePress, 'Search result missing before pointer-down test')
+      await page.mouse.move(beforePress.x + beforePress.width / 2, beforePress.y + beforePress.height / 2)
+      await page.mouse.down()
+      await page.waitForTimeout(180)
+      const pressedRow = await searchRow.evaluate(node => ({
+        transform: getComputedStyle(node).transform,
+        transitionDuration: getComputedStyle(node).transitionDuration,
+      }))
+      const afterPress = await searchRow.boundingBox()
+      await page.mouse.up()
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      check(pressedRow.transform === 'none' && pressedRow.transitionDuration.split(',').every(t => parseFloat(t) === 0),
+        'Search result must not scale or animate on pointer-down: ' + JSON.stringify(pressedRow))
+      check(afterPress && Math.abs(afterPress.width - beforePress.width) < 1 &&
+        Math.abs(afterPress.height - beforePress.height) < 1,
+        'Search row shrank while mouse was held: ' + JSON.stringify({ beforePress, afterPress }))
+      await contactSearch.fill('')
+    }
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
+    if (width === 390) {
+      const scroller = page.locator('.feed-view.zalo-feed-view')
+      await scroller.evaluate(element => { element.scrollTop = element.scrollHeight })
+      const keyword = page.locator('.appbar-search input')
+      const firstPage = page.waitForResponse(response => {
+        const url = new URL(response.url())
+        return url.pathname === '/api/posts' && url.searchParams.get('q') === 'minhanh' && url.searchParams.get('limit') === '5'
+      })
+      await keyword.fill('minhanh')
+      await page.waitForTimeout(300)
+      check(searchRequestCount === 0, 'Feed search must debounce until user stops typing')
+      await firstPage
+      await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 5)
+      check(await scroller.evaluate(element => element.scrollTop) === 0, 'New search should reset feed scroll to top')
+      await page.waitForTimeout(200)
+      check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 5,
+        'Search must not auto-fetch a second page before scrolling')
+      await scroller.evaluate(element => { element.scrollTop = element.scrollHeight })
+      await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length >= 10, null, { timeout: 7000 })
+      check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() >= 10,
+        'Scrolling did not load the next five matching posts')
+      const contentPage = page.waitForResponse(response => {
+        const url = new URL(response.url())
+        return url.pathname === '/api/posts' && url.searchParams.get('q') === 'bài viết' && url.searchParams.get('limit') === '5'
+      })
+      await keyword.fill('Bài viết')
+      await contentPage
+      await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 5)
+      check(await scroller.evaluate(element => element.scrollTop) === 0,
+        'Changing from author to content search should reset scroll to top')
+      await keyword.fill('')
+      check(await scroller.evaluate(element => element.scrollTop) === 0, 'Clearing search should reset feed scroll')
+      console.log('PASS: feed search debounce, 5-post first page, scroll reset and infinite pagination')
+    }
     // Only social engagement actions belong in the footer. Manage post from •••.
-    const ownPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 18' })
+    const ownPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 18' }).first()
     check(await ownPost.locator('.feed-share-action').isVisible(),
       'Sharing must appear alongside Like and Comment: ' + width)
     check(await page.locator('.feed-owner-shortcuts').count() === 0,
@@ -222,7 +461,7 @@ try {
         'Delete action must show confirmation: ' + width)
       await options.getByRole('button', { name: 'Hủy' }).click()
       await options.getByRole('button', { name: 'Đóng', exact: true }).click()
-      const otherPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 17' })
+      const otherPost = page.locator('.feed .zalo-post').filter({ hasText: 'Bài viết kiểm thử phân trang số 17' }).first()
       await otherPost.getByRole('button', { name: 'Tùy chọn bài viết' }).click()
       check(await page.getByRole('dialog').getByRole('button', { name: 'Báo cáo bài viết' }).isVisible(),
         'Other posts must show reporting: ' + width)
@@ -263,6 +502,20 @@ try {
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
     await page.locator('.conversation-item').first().click()
     await geometry('chat-room', width, ['.modern-frame', '.conversation-panel', '.chat-head'])
+    if ([390, 1440].includes(width)) {
+      const translationTrigger = page.locator('.chat-head .translation-hub-trigger')
+      const translationMenu = page.getByRole('dialog', { name: 'Cài đặt dịch AI' })
+      await translationTrigger.click()
+      await translationMenu.waitFor()
+      await translationMenu.locator('.translation-language-search input').fill('en')
+      check(await translationMenu.isVisible(), 'Translation menu closed while interacting inside: ' + width)
+      await page.locator('.chat-head .room-info').click()
+      await translationMenu.waitFor({ state: 'hidden' })
+      await translationTrigger.click()
+      await translationMenu.waitFor()
+      await page.keyboard.press('Escape')
+      await translationMenu.waitFor({ state: 'hidden' })
+    }
     if (width <= 760) await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
   }
   // Regression: connection sheet stays a fixed 50% of the viewport while results change.
@@ -362,9 +615,10 @@ try {
   }))
   check(activeNavStyle.bg === 'rgba(0, 0, 0, 0)' && (activeNavStyle.indicator === 'none' || activeNavStyle.indicator === 'normal'),
     'Bulky active navigation highlight was not removed')
-  check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 15, 'Feed first page must have 15 posts')
-  await page.getByRole('button', { name: 'Tải thêm bài viết' }).click()
-  await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 18, null, { timeout: 6000 })
+  check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() >= 15,
+    'Feed should have its first 15 posts')
+  await page.locator('.feed-view.zalo-feed-view').evaluate(element => { element.scrollTop = element.scrollHeight })
+  await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 18, null, { timeout: 7000 })
   check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 18,
     'Feed load more did not append the remaining 3 posts')
   check(await page.getByRole('button', { name: 'Tải thêm bài viết' }).count() === 0,
@@ -377,6 +631,27 @@ try {
   await page.locator('.conversation-item').first().click()
   await page.waitForFunction(() => document.querySelectorAll('.message-press-target').length === 40, null, { timeout: 6000 })
   check(await page.locator('.message-press-target').count() === 40, 'Initial message page must show 40 items')
+  const selectableMessageText = page.locator('.message-press-target .message-selectable-text').first()
+  const selectableMessageResult = await selectableMessageText.evaluate(node => {
+    const style = getComputedStyle(node)
+    const textNode = Array.from(node.childNodes).find(child => child.nodeType === Node.TEXT_NODE)
+    if (!(textNode instanceof Text) || textNode.data.length < 2) {
+      return { cursor: style.cursor, userSelect: style.userSelect, selected: '', total: textNode?.textContent?.length || 0 }
+    }
+    const range = document.createRange()
+    range.setStart(textNode, 0)
+    range.setEnd(textNode, Math.min(5, textNode.data.length - 1))
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    const selected = selection?.toString() || ''
+    selection?.removeAllRanges()
+    return { cursor: style.cursor, userSelect: style.userSelect, selected, total: textNode.data.length }
+  })
+  check(selectableMessageResult.cursor === 'text' && selectableMessageResult.userSelect === 'text',
+    'Message text must show an I-beam cursor and allow text selection: ' + JSON.stringify(selectableMessageResult))
+  check(selectableMessageResult.selected.length > 0 && selectableMessageResult.selected.length < selectableMessageResult.total,
+    'Message text must allow selecting only part of its content: ' + JSON.stringify(selectableMessageResult))
   const oldList = page.locator('.messages')
   await page.getByRole('button', { name: 'Tải thêm tin nhắn cũ' }).scrollIntoViewIfNeeded()
   const beforePosition = await oldList.evaluate(node => ({ scrollTop: node.scrollTop, height: node.scrollHeight }))
@@ -396,7 +671,7 @@ try {
   for (const width of [320, 375, 390, 430]) {
     await page.setViewportSize({ width, height: width <= 375 ? 667 : width === 390 ? 844 : 932 })
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
-    await page.locator('.conversation-item').filter({ hasText: 'Nhóm SOCO' }).first().click()
+    await page.locator('.conversation-item').filter({ hasText: 'Nhóm SocCo' }).first().click()
     const headerAction = await page.locator('.chat-head .group-mobile-actions .call-header-actions button').first().boundingBox()
     const backAction = await page.getByRole('button', { name: 'Quay lại danh sách' }).boundingBox()
     const more = page.getByRole('button', { name: 'Tùy chọn nhóm' })
@@ -540,6 +815,30 @@ try {
       await page.screenshot({ path: 'output/playwright/layout/profile-actions-' + width + '.png' })
   }
 
+  // A former friend can be blocked again from the direct-chat options without re-friending.
+  friends.length = 0
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.reload()
+  await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
+  await page.locator('.conversation-item').filter({ hasText: 'minhanh' }).first().click()
+  await page.locator('.chat-friend-bar').waitFor()
+  await page.getByText('Hai bạn chưa kết bạn', { exact: true }).waitFor()
+  const chatOptions = page.getByRole('button', { name: 'Tùy chọn cuộc trò chuyện' })
+  check(await chatOptions.isVisible() && await chatOptions.isEnabled(),
+    'A non-friend with existing direct chat must have a chat options menu')
+  await chatOptions.click()
+  const blockNonFriend = page.getByRole('menu', { name: 'Tùy chọn cuộc trò chuyện' }).getByRole('menuitem', { name: 'Chặn người dùng' })
+  check(await blockNonFriend.isVisible() && await blockNonFriend.isEnabled(),
+    'A non-friend must be able to block via the three-dot menu')
+  const confirmation = new Promise(resolve => page.once('dialog', async dialog => {
+    check(dialog.type() === 'confirm' && dialog.message().includes('Chặn'),
+      'Block must ask for confirmation')
+    await dialog.dismiss()
+    resolve()
+  }))
+  await blockNonFriend.click()
+  await confirmation
+
   // Regression: frontend must POST only strict AttachmentInput fields.
   // A presigned download URL in POST /api/stories previously triggered "invalid body".
   await page.setViewportSize({ width: 390, height: 844 })
@@ -592,7 +891,7 @@ try {
   await page.getByRole('button', { name: 'Nghe thử' }).click()
   check(await tones() >= beforeTone + 6, 'Manual sound preview must generate sound')
   check(!errors.length, 'Uncaught JS errors: ' + errors.join('; '))
-  console.log('PASS: SOCO layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')
+  console.log('PASS: SocCo layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')
 } catch (error) {
   console.error(error)
   process.exitCode = 1

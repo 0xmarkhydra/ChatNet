@@ -1,9 +1,16 @@
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /src
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
-RUN npm run build
+COPY backend/cmd/call/translation.go /backend/cmd/call/translation.go
+COPY backend/cmd/call/main.go /backend/cmd/call/main.go
+RUN npm run build \
+    && npm run check:pwa \
+    && npm run check:session \
+    && npm run check:incoming-sound \
+    && npm run check:onesignal \
+    && npm run check:call-live
 
 FROM nginx:1.27-alpine
 COPY frontend-nginx.conf.template /etc/nginx/templates/default.conf.template

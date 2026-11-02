@@ -75,7 +75,14 @@ func TestUserSearchIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Exec(ctx, "DELETE FROM users WHERE id=$1", id)
-	token, err := authx.Sign("test", 0, "viewer", "Viewer")
+	viewer := username + "_viewer"
+	var viewerID int64
+	if err := db.QueryRow(ctx, `INSERT INTO users(email,username,password_hash,display_name)
+		VALUES($1,$2,'!','Viewer') RETURNING id`, viewer+"@example.com", viewer).Scan(&viewerID); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec(ctx, "DELETE FROM users WHERE id=$1", viewerID)
+	token, err := authx.Sign("test", viewerID, viewer, "Viewer")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -88,6 +88,7 @@ func TestFriendRequestsIntegration(t *testing.T) {
 		t.Fatalf("sender direction: %+v", item)
 	}
 	eventBoth()
+	request(0, s.removeFriendConnection, "DELETE", "?direction=accepted", 409)
 	request(0, s.sendFriendRequest, "POST", "", 200)
 	if item := request(1, s.sendFriendRequest, "POST", "", 200); item.Direction != "incoming" {
 		t.Fatalf("crossed request lost direction: %+v", item)
@@ -102,7 +103,7 @@ func TestFriendRequestsIntegration(t *testing.T) {
 	if item := request(0, s.sendFriendRequest, "POST", "", 200); item.Status != "accepted" {
 		t.Fatal("stale cancellation removed friendship")
 	}
-	request(0, s.removeFriendConnection, "DELETE", "", 200)
+	request(0, s.removeFriendConnection, "DELETE", "?direction=accepted", 200)
 	eventBoth()
 	request(1, s.sendFriendRequest, "POST", "", 200)
 	eventBoth()

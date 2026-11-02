@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><title>Notification hook contract fixture — not live API</title></head><body><div id="root"></div>
+<script type="module">
+import React, { useRef, useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import { useDesktopNotifications, refreshDesktopUnread } from '../../src/platform/useDesktopNotifications'
+const initial = { sessionId: 'a7ce5309-8fb5-4f57-861c-ef54c75db291', token: 'fixture-access-only', user: { id: 7, email: 'qa@example.invalid', username: 'qa', displayName: 'QA' } }
+let clicked
+const state = window.qa = {
+  session: initial, unread: 12, status: 200, allowed: true, check: true, hold: false,
+  syncs: [], paths: [], opened: [], errors: [], checks: 0, refresh: refreshDesktopUnread,
+  click: (overrides = {}) => clicked?.({ sessionId: state.session.sessionId, conversationId: 91, kind: 'message', ...overrides }),
+}
+window.socoDesktop = { auth: {}, notifications: {
+  sync: async input => { state.syncs.push(input); return true },
+  show: async () => ({ shown: false, reason: 'unavailable' }),
+  clear: async () => true, dismiss: async () => true,
+  onClicked: callback => { clicked = callback; return () => { clicked = null } },
+} }
+function Harness() {
+  const [session, setSession] = useState(initial), sessionRef = useRef(session)
+  sessionRef.current = session
+  state.setSession = value => { state.session = value; setSession(value) }
+  const settings = useDesktopNotifications({ session, sessionRef, tab: 'chat', activeConversationId: 3, sound: true,
+    checkSession: async () => { state.checks++; return state.check },
+    apiFetch: async path => {
+      state.paths.push(path)
+      if (path.includes('/unread')) return Response.json({ unreadCount: state.unread }, { status: state.status })
+      if (state.hold) await new Promise(resolve => { state.release = resolve })
+      return Response.json(state.allowed ? [{ id: 91, type: 'group', name: 'QA fixture', unreadCount: 0 }] : [])
+    },
+    onOpen: conversation => state.opened.push(conversation.id), onError: error => state.errors.push(error),
+  })
+  return React.createElement('main', null,
+    React.createElement('button', { onClick: settings.toggle }, settings.enabled ? 'Disable' : 'Enable'),
+    React.createElement('div', { role: 'status' }, settings.warning))
+}
+createRoot(document.getElementById('root')).render(React.createElement(React.StrictMode, null, React.createElement(Harness)))
+</script></body></html>

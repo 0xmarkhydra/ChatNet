@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,6 +22,8 @@ import (
 	"chatnet/internal/objectstore"
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
+	"chatnet/internal/searchx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -29,9 +34,11 @@ type message struct {
 	ConversationID      int64               `json:"conversationId"`
 	SenderID            int64               `json:"senderId"`
 	Sender              string              `json:"sender"`
+	SenderDisplayName   string              `json:"senderDisplayName,omitempty"`
 	Text                string              `json:"text"`
 	ReplyToMessageID    *int64              `json:"replyToMessageId,omitempty"`
 	ReplyToSender       string              `json:"replyToSender,omitempty"`
+	ReplyToDisplayName  string              `json:"replyToDisplayName,omitempty"`
 	ReplyToText         string              `json:"replyToText,omitempty"`
 	EditedAt            *time.Time          `json:"editedAt,omitempty"`
 	Deleted             bool                `json:"deleted,omitempty"`
@@ -50,10 +57,12 @@ type messageReaction struct {
 }
 
 type conversation struct {
+	CategoryID    *int64     `json:"categoryId,omitempty"`
 	ID            int64      `json:"id"`
 	Type          string     `json:"type"`
 	Name          string     `json:"name"`
 	OtherUserID   *int64     `json:"otherUserId,omitempty"`
+	OtherUsername string     `json:"otherUsername,omitempty"`
 	MemberCount   int        `json:"memberCount"`
 	UnreadCount   int        `json:"unreadCount"`
 	LastMessage   string     `json:"lastMessage"`
@@ -63,6 +72,7 @@ type conversation struct {
 }
 
 type realtimeEvent struct {
+	CategoryID        *int64        `json:"categoryId,omitempty"`
 	Type              string        `json:"type"`
 	ConversationID    int64         `json:"conversationId"`
 	Message           *message      `json:"message,omitempty"`
@@ -105,45 +115,66 @@ func main() {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
 	})
-	mux.Handle("GET /api/push/config", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.pushConfig)))
-	mux.Handle("POST /api/push/subscription", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.upsertPushSubscription)))
-	mux.Handle("DELETE /api/push/subscription", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deletePushSubscription)))
-	mux.Handle("POST /api/push/test", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.testPushNotification)))
-	mux.Handle("POST /api/media/presign", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.presignMedia)))
-	mux.Handle("GET /api/profile", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getProfile)))
-	mux.Handle("PUT /api/profile", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateProfile)))
-	mux.Handle("PUT /api/profile/media", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateProfileMedia)))
+	mux.Handle("GET /api/push/config", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.pushConfig)))
+	mux.Handle("POST /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.upsertPushSubscription)))
+	mux.Handle("DELETE /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deletePushSubscription)))
+	mux.Handle("POST /api/push/test", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.testPushNotification)))
+	mux.Handle("POST /api/media/presign", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.presignMedia)))
+	mux.Handle("GET /api/users/{username}/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getUserProfile)))
+	mux.Handle("GET /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfileNote)))
+	mux.Handle("POST /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveProfileNote)))
+	mux.Handle("DELETE /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteProfileNote)))
+	mux.Handle("GET /api/users/{username}/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfileNote)))
+	mux.Handle("GET /api/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfile)))
+	mux.Handle("PUT /api/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateProfile)))
+	mux.Handle("PUT /api/profile/media", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateProfileMedia)))
 	mux.HandleFunc("GET /api/users/{username}/avatar", func(w http.ResponseWriter, r *http.Request) { s.profileAsset(w, r, "avatar") })
 	mux.HandleFunc("GET /api/users/{username}/cover", func(w http.ResponseWriter, r *http.Request) { s.profileAsset(w, r, "cover") })
-	mux.Handle("GET /api/users/search", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.searchUsers)))
-	mux.Handle("GET /api/users/suggestions", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.suggestUsers)))
-	mux.Handle("POST /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.findNearby)))
-	mux.Handle("DELETE /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.stopNearby)))
-	mux.Handle("GET /api/friends", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriends)))
-	mux.Handle("GET /api/friends/requests", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriendRequests)))
-	mux.Handle("POST /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.sendFriendRequest)))
-	mux.Handle("POST /api/friends/{id}/accept", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.acceptFriendRequest)))
-	mux.Handle("DELETE /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeFriendConnection)))
-	mux.Handle("GET /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPreferences)))
-	mux.Handle("PUT /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePreferences)))
-	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
-	mux.Handle("PUT /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateTranslationPreferences)))
-	mux.Handle("GET /api/conversations", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversations)))
-	mux.Handle("POST /api/conversations/direct", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createDirect)))
-	mux.Handle("POST /api/conversations/groups", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createGroup)))
-	mux.Handle("GET /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listMessages)))
-	mux.Handle("GET /api/conversations/{id}/shared", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listSharedContent)))
-	mux.Handle("POST /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createMessage)))
-	mux.Handle("PATCH /api/messages/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.editMessage)))
-	mux.Handle("DELETE /api/messages/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteMessage)))
-	mux.Handle("POST /api/messages/{id}/reactions", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.toggleMessageReaction)))
-	mux.Handle("POST /api/conversations/{id}/read", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.markRead)))
-	mux.Handle("PATCH /api/conversations/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateGroup)))
-	mux.Handle("GET /api/conversations/{id}/members", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listGroupMembers)))
-	mux.Handle("POST /api/conversations/{id}/members", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.addGroupMembers)))
-	mux.Handle("PATCH /api/conversations/{id}/members/{userId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateGroupMemberRole)))
-	mux.Handle("DELETE /api/conversations/{id}/members/{userId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeGroupMember)))
-	mux.Handle("GET /api/events", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.events)))
+	mux.Handle("GET /api/users/search", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.searchUsers)))
+	mux.Handle("GET /api/users/suggestions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.suggestUsers)))
+	mux.Handle("POST /api/users/nearby", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.findNearby)))
+	mux.Handle("DELETE /api/users/nearby", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.stopNearby)))
+	mux.Handle("GET /api/friends", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listFriends)))
+	mux.Handle("GET /api/contacts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listContactMetadata)))
+	mux.Handle("PUT /api/contacts/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateContactMetadata)))
+	mux.Handle("GET /api/friends/requests", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listFriendRequests)))
+	mux.Handle("POST /api/friends/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.sendFriendRequest)))
+	mux.Handle("POST /api/friends/{id}/accept", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.acceptFriendRequest)))
+	mux.Handle("DELETE /api/friends/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.removeFriendConnection)))
+	mux.Handle("GET /api/privacy", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getPrivacy)))
+	mux.Handle("PUT /api/privacy", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updatePrivacy)))
+	mux.Handle("GET /api/users/blocked", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listBlockedUsers)))
+	mux.Handle("POST /api/users/{id}/block", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.blockUser)))
+	mux.Handle("DELETE /api/users/{id}/block", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.unblockUser)))
+	mux.Handle("POST /api/users/{id}/report", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reportUser)))
+	mux.Handle("GET /api/preferences", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getPreferences)))
+	mux.Handle("PUT /api/preferences", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updatePreferences)))
+	mux.Handle("GET /api/preferences/translation", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getTranslationPreferences)))
+	mux.Handle("PUT /api/preferences/translation", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateTranslationPreferences)))
+	mux.Handle("GET /api/conversation-categories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listCategories)))
+	mux.Handle("POST /api/conversation-categories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveCategory)))
+	mux.Handle("PUT /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveCategory)))
+	mux.Handle("DELETE /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteCategory)))
+	mux.Handle("PUT /api/conversations/{id}/category", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.assignCategory)))
+	mux.Handle("GET /api/conversations", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversations)))
+	mux.Handle("GET /api/chat/search", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.quickChatSearch)))
+	mux.Handle("GET /api/conversations/unread", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.unreadSummary)))
+	mux.Handle("GET /api/conversations/memberships", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversationMemberships)))
+	mux.Handle("POST /api/conversations/direct", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createDirect)))
+	mux.Handle("POST /api/conversations/groups", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroup)))
+	mux.Handle("GET /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessages)))
+	mux.Handle("GET /api/conversations/{id}/shared", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listSharedContent)))
+	mux.Handle("POST /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createMessage)))
+	mux.Handle("PATCH /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editMessage)))
+	mux.Handle("DELETE /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteMessage)))
+	mux.Handle("POST /api/messages/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.toggleMessageReaction)))
+	mux.Handle("POST /api/conversations/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markRead)))
+	mux.Handle("PATCH /api/conversations/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroup)))
+	mux.Handle("GET /api/conversations/{id}/members", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupMembers)))
+	mux.Handle("POST /api/conversations/{id}/members", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.addGroupMembers)))
+	mux.Handle("PATCH /api/conversations/{id}/members/{userId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupMemberRole)))
+	mux.Handle("DELETE /api/conversations/{id}/members/{userId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.removeGroupMember)))
+	mux.Handle("GET /api/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.events)))
 
 	port := config.Env("PORT", "8082")
 	log.Printf("chat service listening on :%s", port)
@@ -298,10 +329,16 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 				ON other.conversation_id=c.id AND other.user_id<>$1
 			WHERE c.type='direct'
 		)
-		SELECT u.id,u.username,u.display_name,COALESCE(sg.mutual_groups,0)
+		SELECT u.id,u.username,u.display_name,u.show_online_status,COALESCE(sg.mutual_groups,0)
 		FROM users u
 		LEFT JOIN shared_groups sg ON sg.user_id=u.id
 		WHERE u.id<>$1
+		  AND (u.searchable_by_username OR u.searchable_by_name)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=u.id)
+		       OR (b.blocker_id=u.id AND b.blocked_id=$1)
+		  )
 		  AND NOT EXISTS (
 			SELECT 1 FROM direct_contacts dc WHERE dc.user_id=u.id
 		  )
@@ -317,8 +354,9 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int64
 		var username, displayName string
+		var showOnline bool
 		var mutualGroups int
-		if rows.Scan(&id, &username, &displayName, &mutualGroups) != nil {
+		if rows.Scan(&id, &username, &displayName, &showOnline, &mutualGroups) != nil {
 			continue
 		}
 
@@ -333,7 +371,7 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 			"id":           id,
 			"username":     username,
 			"displayName":  displayName,
-			"online":       s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
+			"online":       showOnline && s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
 			"mutualGroups": mutualGroups,
 			"reason":       reason,
 		})
@@ -355,21 +393,26 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT id,username,display_name
+		SELECT id,username,display_name,show_online_status
 		FROM users
 		WHERE id<>$1
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=users.id)
+		       OR (b.blocker_id=users.id AND b.blocked_id=$1)
+		  )
 		  AND (
-			(searchable_by_username AND strpos(lower(username), $2)>0)
+			(searchable_by_username AND strpos(`+searchx.FoldSQL("username")+`, `+searchx.FoldSQL("$2")+`)>0)
 			OR (searchable_by_email AND lower(email)=$2)
-			OR (searchable_by_name AND strpos(lower(display_name), $2)>0)
+			OR (searchable_by_name AND strpos(`+searchx.FoldSQL("display_name")+`, `+searchx.FoldSQL("$2")+`)>0)
 		  )
 		ORDER BY
 		  CASE
 			WHEN searchable_by_username AND lower(username)=$2 THEN 0
 			WHEN searchable_by_email AND lower(email)=$2 THEN 1
-			WHEN searchable_by_username AND strpos(lower(username), $2)=1 THEN 2
-			WHEN searchable_by_username AND strpos(lower(username), $2)>0 THEN 3
-			WHEN searchable_by_name AND strpos(lower(display_name), $2)=1 THEN 4
+			WHEN searchable_by_username AND strpos(`+searchx.FoldSQL("username")+`, `+searchx.FoldSQL("$2")+`)=1 THEN 2
+			WHEN searchable_by_username AND strpos(`+searchx.FoldSQL("username")+`, `+searchx.FoldSQL("$2")+`)>0 THEN 3
+			WHEN searchable_by_name AND strpos(`+searchx.FoldSQL("display_name")+`, `+searchx.FoldSQL("$2")+`)=1 THEN 4
 			ELSE 5
 		  END,
 		  username ASC
@@ -384,10 +427,11 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int64
 		var username, displayName string
-		if rows.Scan(&id, &username, &displayName) == nil {
+		var showOnline bool
+		if rows.Scan(&id, &username, &displayName, &showOnline) == nil {
 			items = append(items, map[string]any{
 				"id": id, "username": username, "displayName": displayName,
-				"online": s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
+				"online": showOnline && s.redis.Exists(r.Context(), presenceKey(id)).Val() > 0,
 			})
 		}
 	}
@@ -461,6 +505,16 @@ func validTranslationTarget(value string) bool {
 
 func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	// Optional exact lookup reuses the same membership/privacy projection as the list.
+	conversationID := int64(0)
+	if raw := r.URL.Query().Get("id"); raw != "" {
+		var err error
+		conversationID, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || conversationID <= 0 {
+			httpx.Error(w, http.StatusBadRequest, "invalid conversation id")
+			return
+		}
+	}
 	limit := 2147483647 // Preserve the original unpaginated response for older app versions.
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
@@ -479,8 +533,22 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		}
 		offset = n
 	}
+	keyword := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len([]rune(keyword)) > 120 {
+		httpx.Error(w, http.StatusBadRequest, "search query too long")
+		return
+	}
+	categoryID := int64(-1)
+	if raw := r.URL.Query().Get("category"); raw != "" {
+		var err error
+		categoryID, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || categoryID < 0 {
+			httpx.Error(w, 400, "invalid category")
+			return
+		}
+	}
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,
+		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,
 		       COALESCE((SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id=c.id),0),
 		       COALESCE((
 		           SELECT CASE
@@ -499,18 +567,41 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		               ), '')
 		           END
 		           FROM messages m
-		           WHERE m.conversation_id=c.id
+		           WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		             (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))
 		           ORDER BY m.id DESC
 		           LIMIT 1
 		       ),''),
-		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id ORDER BY m.id DESC LIMIT 1),c.created_at),
-		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1),0)
+		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)) ORDER BY m.id DESC LIMIT 1),c.created_at),
+		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0)
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
-		WHERE cm.user_id=$1
-		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id), c.created_at) DESC, c.id DESC
+		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
+        WHERE cm.user_id=$1
+          AND ($5::bigint=0 OR c.id=$5)
+          AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
+		  AND ($6::text='' OR strpos(`+searchx.FoldSQL("COALESCE(c.name,'')")+`, `+searchx.FoldSQL("$6")+`)>0
+		    OR EXISTS (SELECT 1 FROM conversation_members other
+		       JOIN users u ON u.id=other.user_id
+		       WHERE other.conversation_id=c.id AND other.user_id<>$1
+		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$6")+`)>0))
+		    OR EXISTS (SELECT 1 FROM messages msg WHERE msg.conversation_id=c.id
+		       AND msg.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$6")+`)>0
+		       AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id))))
+		  AND (c.type <> 'direct' OR NOT EXISTS (
+		    SELECT 1 FROM conversation_members other
+		    JOIN user_blocks b ON
+		      (b.blocker_id=$1 AND b.blocked_id=other.user_id)
+		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
+		    WHERE other.conversation_id=c.id AND other.user_id<>$1
+		  ))
+		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
-		claims.UserID, limit, offset)
+		claims.UserID, limit, offset, categoryID, conversationID, keyword)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
@@ -522,7 +613,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		var c conversation
 		var lastRead, memberCount, unreadCount int64
 		var lastMessageAt time.Time
-		if err := rows.Scan(&c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount); err != nil {
+		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount); err != nil {
 			continue
 		}
 		c.MemberCount = int(memberCount)
@@ -531,17 +622,19 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 
 		if c.Type == "direct" {
 			var otherID int64
-			var displayName string
+			var username, displayName string
+			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username
+				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
-				c.ID, claims.UserID).Scan(&otherID, &displayName)
+				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline)
 			if err == nil {
 				c.Name = displayName
+				c.OtherUsername = username
 				c.OtherUserID = &otherID
-				c.Online = s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
+				c.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
 			}
 		}
 		items = append(items, c)
@@ -565,11 +658,21 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var otherID int64
-	var otherName string
+	var otherName, otherUsername string
+	var showOnline bool
 	if err := s.db.QueryRow(r.Context(),
-		`SELECT id,username FROM users WHERE username=$1`, username,
-	).Scan(&otherID, &otherName); err != nil {
+		`SELECT id,username,COALESCE(NULLIF(BTRIM(display_name),''),username),show_online_status FROM users WHERE username=$1`, username,
+	).Scan(&otherID, &otherUsername, &otherName, &showOnline); err != nil {
 		httpx.Error(w, http.StatusNotFound, "user not found")
+		return
+	}
+	blocked, err := s.blockedPair(r.Context(), claims.UserID, otherID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify contact policy")
+		return
+	}
+	if blocked {
+		httpx.Error(w, http.StatusForbidden, "direct contact is blocked")
 		return
 	}
 
@@ -610,9 +713,9 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := conversation{
-		ID: id, Type: "direct", Name: otherName, OtherUserID: &otherID,
+		ID: id, Type: "direct", Name: otherName, OtherUserID: &otherID, OtherUsername: otherUsername,
 		MemberCount: 2, CreatedAt: createdAt,
-		Online: s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0,
+		Online: showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0,
 	}
 	s.publishConversationEvent(r.Context(), ids, realtimeEvent{Type: "conversation.created", ConversationID: id, Conversation: &c})
 	httpx.JSON(w, http.StatusCreated, c)
@@ -697,6 +800,24 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, c)
 }
 
+func searchDateBounds(fromDate, toDate *time.Time, offsetMinutes int) (from, to time.Time) {
+	offset := time.Duration(offsetMinutes) * time.Minute
+	if fromDate != nil {
+		from = fromDate.Add(offset)
+	}
+	if toDate != nil {
+		to = toDate.AddDate(0, 0, 1).Add(offset)
+	}
+	return
+}
+
+func nullableSearchTime(source *time.Time, value time.Time) *time.Time {
+	if source == nil {
+		return nil
+	}
+	return &value
+}
+
 func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -704,6 +825,9 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		if ok {
 			httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		}
+		return
+	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
 		return
 	}
 
@@ -731,9 +855,50 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		before = n
 	}
 
+	keyword := strings.TrimSpace(r.URL.Query().Get("search"))
+	sender := strings.TrimSpace(r.URL.Query().Get("sender"))
+	if len([]rune(keyword)) > 200 || len([]rune(sender)) > 100 {
+		httpx.Error(w, http.StatusBadRequest, "search filter too long")
+		return
+	}
+	var fromDate, toDate *time.Time
+	for _, filter := range []struct {
+		raw    string
+		output **time.Time
+	}{
+		{r.URL.Query().Get("from"), &fromDate},
+		{r.URL.Query().Get("to"), &toDate},
+	} {
+		if filter.raw == "" {
+			continue
+		}
+		parsed, err := time.Parse("2006-01-02", filter.raw)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid date filter (YYYY-MM-DD)")
+			return
+		}
+		*filter.output = &parsed
+	}
+	if fromDate != nil && toDate != nil && fromDate.After(*toDate) {
+		httpx.Error(w, http.StatusBadRequest, "invalid date range")
+		return
+	}
+	// Browser date inputs represent days in the viewer's local timezone.
+	// JavaScript getTimezoneOffset() is UTC minus local time in minutes.
+	var tzOffset int
+	if raw := r.URL.Query().Get("tzOffset"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < -840 || value > 840 {
+			httpx.Error(w, http.StatusBadRequest, "invalid timezone offset")
+			return
+		}
+		tzOffset = value
+	}
+	from, to := searchDateBounds(fromDate, toDate, tzOffset)
+
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
-		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
+		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
+		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
@@ -741,17 +906,26 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		           WHERE cmr.conversation_id=m.conversation_id
 		             AND cmr.user_id<>m.user_id
 		             AND cmr.last_read_message_id>=m.id
+		             AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		               (b.blocker_id=$5 AND b.blocked_id=cmr.user_id) OR (b.blocked_id=$5 AND b.blocker_id=cmr.user_id))
 		           ORDER BY cmr.user_id
 		       ),
 		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id))
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
 		WHERE m.conversation_id=$1 AND ($3::bigint=0 OR m.id<$3)
-		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit)
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
+		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("m.text")+`, `+searchx.FoldSQL("$6")+`)>0))
+		  AND ($7::text='' OR lower(u.username)=lower($7))
+		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)
+		  AND ($9::timestamptz IS NULL OR m.created_at < $9)
+		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to))
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return
@@ -762,8 +936,8 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m message
 		if rows.Scan(
-			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
-			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
+			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
+			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 			&m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
 			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
 		) == nil {
@@ -794,6 +968,74 @@ func validClientID(id string) bool {
 	}) < 0
 }
 
+// messageRequestFingerprint is computed from the *original* validated request,
+// not the mutable message row. An edit/recall cannot turn a valid retry into 409.
+func messageRequestFingerprint(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) string {
+	refs := make([]string, 0, len(attachments))
+	for _, attachment := range attachments {
+		refs = append(refs, strings.TrimSpace(attachment.StorageRef))
+	}
+	payload, _ := json.Marshal(struct {
+		ConversationID int64    `json:"conversationId"`
+		Text           string   `json:"text"`
+		ReplyTo        *int64   `json:"replyTo"`
+		StorageRefs    []string `json:"storageRefs"`
+	}{conversationID, text, replyTo, refs})
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:])
+}
+
+func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+	if m.ConversationID != conversationID || m.Text != text || len(m.Attachments) != len(attachments) {
+		return false
+	}
+	if (m.ReplyToMessageID == nil) != (replyTo == nil) {
+		return false
+	}
+	if replyTo != nil && *m.ReplyToMessageID != *replyTo {
+		return false
+	}
+	for i, item := range attachments {
+		if m.Attachments[i].StorageRef != strings.TrimSpace(item.StorageRef) {
+			return false
+		}
+	}
+	return true
+}
+
+// replyExistingMessage returns true once it wrote a response for an existing client ID.
+func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+	var messageID int64
+	var fingerprint *string
+	err := s.db.QueryRow(r.Context(), `
+		SELECT id,request_fingerprint FROM messages WHERE user_id=$1 AND client_id=$2
+	`, senderID, clientID).Scan(&messageID, &fingerprint)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false
+	}
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot look up message retry")
+		return true
+	}
+	m, err := s.loadMessage(r.Context(), messageID, senderID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load message retry")
+		return true
+	}
+	if fingerprint != nil {
+		if *fingerprint != messageRequestFingerprint(conversationID, text, replyTo, attachments) {
+			httpx.Error(w, http.StatusConflict, "client id was already used for another message")
+			return true
+		}
+	} else if !sameMessageRequest(m, conversationID, text, replyTo, attachments) {
+		// Compatibility for rows created before the additive fingerprint migration.
+		httpx.Error(w, http.StatusConflict, "client id was already used for another message")
+		return true
+	}
+	httpx.JSON(w, http.StatusOK, m)
+	return true
+}
+
 func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -801,6 +1043,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		if ok {
 			httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		}
+		return
+	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
 		return
 	}
 
@@ -815,13 +1060,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Text = strings.TrimSpace(body.Text)
-	// ponytail: correlation only, not durable idempotency; do not auto-retry message creation.
 	if !validClientID(body.ClientID) {
 		httpx.Error(w, http.StatusBadRequest, "invalid client id")
 		return
 	}
 	if len(body.Text) > 4000 {
 		httpx.Error(w, http.StatusBadRequest, "text must be <= 4000 characters")
+		return
+	}
+	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
 		return
 	}
 
@@ -844,8 +1091,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	if body.ReplyToMessageID != nil {
 		var replyConversationID int64
 		if err := s.db.QueryRow(r.Context(), `
-			SELECT conversation_id FROM messages WHERE id=$1
-		`, *body.ReplyToMessageID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
+			SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+			  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+		`, *body.ReplyToMessageID, claims.UserID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
 			httpx.Error(w, http.StatusBadRequest, "invalid reply message")
 			return
 		}
@@ -858,6 +1106,21 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
+	// Lock active membership until the message commits. A group removal cannot
+	// race a slow S3 validation and leave a message sent after removal.
+	var membership int64
+	if err := tx.QueryRow(r.Context(), `
+		SELECT conversation_id FROM conversation_members
+		WHERE conversation_id=$1 AND user_id=$2 FOR SHARE
+	`, conversationID, claims.UserID).Scan(&membership); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.Error(w, http.StatusForbidden, "not a conversation member")
+		} else {
+			httpx.Error(w, http.StatusInternalServerError, "cannot verify conversation membership")
+		}
+		return
+	}
+
 	m := message{
 		ClientID:         body.ClientID,
 		ConversationID:   conversationID,
@@ -867,11 +1130,30 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		Attachments:      attachments,
 		Reactions:        []messageReaction{},
 	}
-	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id)
-		VALUES($1,$2,$3,$4) RETURNING id,text,created_at`,
-		conversationID, claims.UserID, body.Text, body.ReplyToMessageID,
-	).Scan(&m.ID, &m.Text, &m.CreatedAt); err != nil {
+	fingerprint := ""
+	if body.ClientID != "" {
+		fingerprint = messageRequestFingerprint(conversationID, body.Text, body.ReplyToMessageID, body.Attachments)
+	}
+	if err := tx.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&m.Sender, &m.SenderDisplayName); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load message sender")
+		return
+	}
+
+	err = tx.QueryRow(r.Context(), `
+		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint)
+		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''))
+		ON CONFLICT (user_id,client_id) WHERE client_id IS NOT NULL DO NOTHING
+		RETURNING id,text,created_at`,
+		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint,
+	).Scan(&m.ID, &m.Text, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		_ = tx.Rollback(r.Context())
+		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
+			httpx.Error(w, http.StatusConflict, "message retry could not be resolved")
+		}
+		return
+	}
+	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create message")
 		return
 	}
@@ -900,18 +1182,23 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if m.ReplyToMessageID != nil {
 		_ = s.db.QueryRow(r.Context(), `
-			SELECT u.username, CASE WHEN rm.deleted_at IS NULL THEN rm.text ELSE '' END
+			SELECT u.username,u.display_name, CASE WHEN rm.deleted_at IS NULL THEN rm.text ELSE '' END
 			FROM messages rm
 			JOIN users u ON u.id=rm.user_id
 			WHERE rm.id=$1
-		`, *m.ReplyToMessageID).Scan(&m.ReplyToSender, &m.ReplyToText)
+		`, *m.ReplyToMessageID).Scan(&m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText)
 	}
 
 	memberIDs := s.memberIDs(r.Context(), conversationID)
-	s.publishConversationEvent(r.Context(), memberIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
+	visibleIDs, visibilityErr := s.visibleRecipients(r.Context(), claims.UserID, memberIDs)
+	if visibilityErr != nil {
+		log.Printf("cannot filter message recipients: %v", visibilityErr)
+		visibleIDs = []int64{claims.UserID} // Message persisted; never notify blocked peers on failure.
+	}
+	s.publishConversationEvent(r.Context(), visibleIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
 
-	recipients := make([]int64, 0, len(memberIDs))
-	for _, uid := range memberIDs {
+	recipients := make([]int64, 0, len(visibleIDs))
+	for _, uid := range visibleIDs {
 		if uid != claims.UserID {
 			recipients = append(recipients, uid)
 		}
@@ -933,8 +1220,8 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (message, error) {
 	var m message
 	err := s.db.QueryRow(ctx, `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,
-		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(rm.text,''),
+		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
+		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
@@ -942,16 +1229,20 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		           WHERE cmr.conversation_id=m.conversation_id
 		             AND cmr.user_id<>m.user_id
 		             AND cmr.last_read_message_id>=m.id
+		             AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		               (b.blocker_id=$2 AND b.blocked_id=cmr.user_id) OR (b.blocked_id=$2 AND b.blocker_id=cmr.user_id))
 		           ORDER BY cmr.user_id
 		       ),
 		       m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$2 AND b.blocker_id=rm.user_id))
 		LEFT JOIN users ru ON ru.id=rm.user_id
-		WHERE m.id=$1`, messageID).Scan(
-		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.Text,
-		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToText,
+		WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))`, messageID, viewerID).Scan(
+		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
+		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
 	)
 	if err != nil {
@@ -992,10 +1283,15 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		UPDATE messages
+		UPDATE messages m
 		SET text=$1,edited_at=NOW()
-		WHERE id=$2 AND user_id=$3 AND deleted_at IS NULL
-		RETURNING conversation_id`, body.Text, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		WHERE m.id=$2 AND m.user_id=$3 AND m.deleted_at IS NULL
+		  AND EXISTS (
+			SELECT 1 FROM conversation_members cm
+			WHERE cm.conversation_id=m.conversation_id AND cm.user_id=$3
+			FOR SHARE
+		  )
+		RETURNING m.conversation_id`, body.Text, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be edited")
 		return
 	}
@@ -1021,10 +1317,15 @@ func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		UPDATE messages
+		UPDATE messages m
 		SET text='',deleted_at=NOW(),edited_at=NULL
-		WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-		RETURNING conversation_id`, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		WHERE m.id=$1 AND m.user_id=$2 AND m.deleted_at IS NULL
+		  AND EXISTS (
+			SELECT 1 FROM conversation_members cm
+			WHERE cm.conversation_id=m.conversation_id AND cm.user_id=$2
+			FOR SHARE
+		  )
+		RETURNING m.conversation_id`, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be recalled")
 		return
 	}
@@ -1066,8 +1367,10 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		SELECT conversation_id FROM messages WHERE id=$1 AND deleted_at IS NULL
-	`, messageID).Scan(&conversationID); err != nil {
+		SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND m.deleted_at IS NULL
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+	`, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found")
 		return
 	}
@@ -1173,6 +1476,9 @@ func (s *server) attachMessageReactions(ctx context.Context, viewerID int64, ite
 		SELECT message_id,emoji,COUNT(*)::int,BOOL_OR(user_id=$2)
 		FROM message_reactions
 		WHERE message_id = ANY($1::bigint[])
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$2 AND b.blocked_id=message_reactions.user_id) OR
+		    (b.blocked_id=$2 AND b.blocker_id=message_reactions.user_id))
 		GROUP BY message_id,emoji
 		ORDER BY message_id,MIN(created_at)
 	`, ids, viewerID)
@@ -1211,19 +1517,30 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var maxID int64
-	_ = s.db.QueryRow(r.Context(), `
-		SELECT COALESCE(MAX(id),0)
-		FROM messages
-		WHERE conversation_id=$1
-	`, conversationID).Scan(&maxID)
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
+		return
+	}
 
+	var maxID int64
+	if err := s.db.QueryRow(r.Context(), `
+		SELECT COALESCE(MAX(m.id),0)
+		FROM messages m
+		WHERE m.conversation_id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR
+		  (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+	`, conversationID, claims.UserID).Scan(&maxID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify read policy")
+		return
+	}
+
+	lastReadID := previousReadID
 	if maxID > previousReadID {
-		if _, err := s.db.Exec(r.Context(), `
+		if err := s.db.QueryRow(r.Context(), `
 			UPDATE conversation_members
-			SET last_read_message_id=$1
+			SET last_read_message_id=GREATEST(last_read_message_id,$1)
 			WHERE conversation_id=$2 AND user_id=$3
-		`, maxID, conversationID, claims.UserID); err != nil {
+			RETURNING last_read_message_id
+		`, maxID, conversationID, claims.UserID).Scan(&lastReadID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot update read state")
 			return
 		}
@@ -1231,13 +1548,13 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 			Type:              "conversation.read",
 			ConversationID:    conversationID,
 			ReaderID:          claims.UserID,
-			LastReadMessageID: maxID,
+			LastReadMessageID: lastReadID,
 		})
 	}
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"conversationId":    conversationID,
-		"lastReadMessageId": maxID,
+		"lastReadMessageId": lastReadID,
 	})
 }
 
@@ -1262,8 +1579,9 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	ch := pubsub.Channel()
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	lastPing := time.Now()
 
 	for {
 		select {
@@ -1273,12 +1591,71 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 			if !open {
 				return
 			}
-			fmt.Fprintf(w, "event: update\ndata: %s\n\n", item.Payload)
+			if item.Payload == authx.SessionRevocationSignal {
+				active, err := authx.SessionActiveCached(r.Context(), s.db, s.redis, claims)
+				if err != nil {
+					return
+				}
+				if !active {
+					fmt.Fprint(w, "event: session-revoked\ndata: {}\n\n")
+					flusher.Flush()
+					return
+				}
+				continue
+			}
+			var event realtimeEvent
+			if json.Unmarshal([]byte(item.Payload), &event) != nil {
+				continue
+			}
+			actorID := int64(0)
+			if event.Message != nil {
+				actorID = event.Message.SenderID
+			}
+			if event.Type == "conversation.read" {
+				actorID = event.ReaderID
+			}
+			if actorID > 0 && actorID != claims.UserID {
+				blocked, err := s.blockedPair(r.Context(), claims.UserID, actorID)
+				if err != nil || blocked {
+					continue
+				} // Also cover in-flight messages after a block.
+			}
+			// Reload in the recipient's privacy scope. C replying to B
+			// must not expose B's quoted text or reaction identities to A.
+			payload := item.Payload
+			if event.Message != nil {
+				if !s.isMember(r.Context(), event.ConversationID, claims.UserID) {
+					continue
+				}
+				personalized, err := s.loadMessage(r.Context(), event.Message.ID, claims.UserID)
+				if err != nil {
+					continue
+				}
+				event.Message = &personalized
+				filtered, err := json.Marshal(event)
+				if err != nil {
+					continue
+				}
+				payload = string(filtered)
+			}
+			fmt.Fprintf(w, "event: update\ndata: %s\n\n", payload)
 			flusher.Flush()
 		case <-ticker.C:
-			_ = s.redis.Expire(r.Context(), key, 45*time.Second).Err()
-			fmt.Fprint(w, ": ping\n\n")
-			flusher.Flush()
+			active, err := authx.SessionActiveCached(r.Context(), s.db, s.redis, claims)
+			if err != nil {
+				return // Stream is closed on database outage; never treat it as a revocation.
+			}
+			if !active {
+				fmt.Fprint(w, "event: session-revoked\ndata: {}\n\n")
+				flusher.Flush()
+				return
+			}
+			if time.Since(lastPing) >= 20*time.Second {
+				_ = s.redis.Expire(r.Context(), key, 45*time.Second).Err()
+				fmt.Fprint(w, ": ping\n\n")
+				flusher.Flush()
+				lastPing = time.Now()
+			}
 		}
 	}
 }
@@ -1376,6 +1753,21 @@ func (s *server) memberIDs(ctx context.Context, conversationID int64) []int64 {
 }
 
 func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, event realtimeEvent) {
+	actorID := int64(0)
+	if event.Message != nil {
+		actorID = event.Message.SenderID
+	}
+	if event.Type == "conversation.read" {
+		actorID = event.ReaderID
+	}
+	if actorID > 0 {
+		visible, err := s.visibleRecipients(ctx, actorID, userIDs)
+		if err != nil {
+			log.Printf("cannot filter chat event recipients: %v", err)
+			return // Fail closed: never broadcast blocked message payloads.
+		}
+		userIDs = visible
+	}
 	data, _ := json.Marshal(event)
 	for _, userID := range userIDs {
 		_ = s.redis.Publish(ctx, userChannel(userID), data).Err()
@@ -1383,7 +1775,7 @@ func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, 
 }
 
 func userChannel(userID int64) string {
-	return fmt.Sprintf("chatnet:user:%d", userID)
+	return authx.UserChannel(userID)
 }
 
 func presenceKey(userID int64) string {

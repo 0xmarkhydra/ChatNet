@@ -1,0 +1,24 @@
+.visitor-name-link{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-align:left;padding:0;cursor:pointer;overflow-wrap:anywhere}
+.visitor-name-link:hover{text-decoration:underline}
+.visitor-profile{position:fixed;inset:0;z-index:90;background:#f2f5fc;display:flex;flex-direction:column;color:#243654}
+.visitor-toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px max(16px,calc((100vw - 760px)/2));background:#fff;border-bottom:1px solid #e3e9f7;gap:18px}
+.visitor-toolbar button{display:grid;place-items:center;min-width:40px;min-height:40px;border:0;border-radius:50%;background:#f2f4fb;color:#454ccc;cursor:pointer}
+.visitor-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.visitor-content{max-width:760px;margin:auto;padding-bottom:40px}
+.visitor-hero{background:white;border-radius:0 0 22px 22px;overflow:hidden}
+.visitor-cover{height:250px;background:linear-gradient(135deg,#5265df,#a2aff3);position:relative;display:grid;place-items:center;color:white}
+.visitor-cover>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.visitor-identity{position:relative;text-align:center;padding:0 20px 25px}
+.visitor-identity>.profile-avatar{margin:-48px auto 12px;z-index:2;border:4px solid white}
+.visitor-identity h1{margin:0;font-size:24px;overflow-wrap:anywhere}
+.visitor-identity p{margin:6px 0 18px;color:#71809b}
+.visitor-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.visitor-actions button,.visitor-empty button{min-height:42px;padding:10px 20px;border:0;border-radius:12px;background:#eef1ff;color:#454ccc;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.visitor-actions button:first-child{background:#5265df;color:#fff}
+.visitor-actions button:disabled{opacity:.6;cursor:default}
+.visitor-timeline-title{padding:22px 18px 10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.visitor-timeline-title h2{font-size:18px;margin:0}
+.visitor-timeline-title span{font-size:12px;color:#71809b}
+.visitor-empty{text-align:center;padding:28px 18px;color:#65748e}
+.visitor-profile button:focus-visible{outline:2px solid #6366f1;outline-offset:3px}
+@media(max-width:760px){.visitor-cover{height:190px}.visitor-content{width:100%}.visitor-toolbar{padding:8px 12px}.visitor-hero{border-radius:0 0 18px 18px}}

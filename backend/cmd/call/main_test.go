@@ -87,6 +87,40 @@ func TestLiveKitJoinTokenHasMinimalRoomGrant(t *testing.T) {
 	}
 }
 
+func TestCurrentCallsDoesNotResurfaceLeftOrDeclinedGroupMember(t *testing.T) {
+	for _, condition := range []string{
+		"cp.declined_at IS NULL",
+		"cp.left_at IS NULL",
+		"JOIN conversation_members cm",
+	} {
+		if !strings.Contains(currentCallsSQL, condition) {
+			t.Fatalf("current calls query must exclude departed and unauthorized members: %s", condition)
+		}
+	}
+}
+
+func TestLiveKitRemovalUsesScopedRoomAdminGrant(t *testing.T) {
+	secret := "0123456789abcdef0123456789abcdef"
+	s := server{liveKitAPIKey: "api-key", liveKitAPISecret: secret}
+	roomName := "cn_testroom0123456789"
+	raw, err := s.liveKitParticipantRemovalToken(roomName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := jwt.Parse(raw, func(token *jwt.Token) (any, error) { return []byte(secret), nil })
+	if err != nil || !token.Valid {
+		t.Fatalf("invalid LiveKit admin token: %v", err)
+	}
+	claims := token.Claims.(jwt.MapClaims)
+	video, ok := claims["video"].(map[string]any)
+	if !ok || video["roomAdmin"] != true || video["room"] != roomName {
+		t.Fatalf("participant removal token requires room-scoped admin permission: %#v", video)
+	}
+	if video["roomCreate"] == true || video["roomList"] == true || video["roomJoin"] == true {
+		t.Fatalf("participant removal must not grant unrelated privileges: %#v", video)
+	}
+}
+
 func TestParticipantIdentityContainsNoProfileData(t *testing.T) {
 	if got := participantIdentity(987); got != "u_987" {
 		t.Fatalf("unexpected participant identity: %q", got)

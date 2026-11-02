@@ -166,7 +166,7 @@ class _HomeShellState extends State<HomeShell> {
                     const SocoLogo(size: 34),
                     const SizedBox(width: 7),
                     const GradientText(
-                      'SOCO',
+                      'SocCo',
                       style: TextStyle(
                         fontSize: 21,
                         fontWeight: FontWeight.w900,
@@ -185,7 +185,7 @@ class _HomeShellState extends State<HomeShell> {
                 const SocoLogo(size: 40),
                 const SizedBox(width: 10),
                 const GradientText(
-                  'SOCO',
+                  'SocCo',
                   style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(width: 26),

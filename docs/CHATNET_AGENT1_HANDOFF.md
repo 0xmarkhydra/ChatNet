@@ -1,0 +1,100 @@
+# CHATNET Agent 1 — Identity, Friends & Privacy handoff
+
+**Ngày:** 2026-10-19
+
+**Nhánh:** `feat/chatnet-a1-identity-friends` (từ `origin/main`, commit gốc `348f91d`)
+
+**Feature commit:** `624648c` (`feat(friends): improve contacts search and safe friend actions`).
+
+**Worktree:** `.worktrees/chatnet-a1-identity-friends`
+
+**Phạm vi:** Web/PWA, backend Go, frontend React; không sửa mobile native.
+**Nguồn backlog:** `docs/CHATNET_WEB_PWA_MASTER_TASKS.md` (tài liệu hiện chỉ có ở checkout chính dưới dạng file untracked, chưa nằm trong branch này).
+
+## Thay đổi đã triển khai ở nhánh Agent 1
+
+- **FR-01/02:** Tab Danh bạ nay hiển thị kết quả tìm ngay trong tab, ghép kết quả API với bạn bè/lời mời sẵn có, trạng thái quan hệ rõ ràng; giữ debounce 250ms, AbortController, loading, empty, error/retry và xóa truy vấn.
+- **FR-04:** Bạn bè hiển thị display name + username, nút chat nhanh và menu ba chấm riêng (xem tóm tắt hồ sơ, nhắn tin, hủy kết bạn). Hủy kết bạn có xác nhận.
+- **FR-07:** Thay khóa action toàn cục bằng khóa theo user ID để không khóa toàn trang; backend DELETE cho phép `direction=accepted` và chỉ xóa quan hệ accepted, tránh xóa một lời mời mới do race/stale action.
+- **FR-17/privacy:** API gợi ý không liệt kê người đã tắt cả searchable_by_username và searchable_by_name; API tìm người theo email chỉ khớp email nếu `searchable_by_email`, không gửi trường email cho client.
+- **Kiểm thử:** Mở rộng integration test để xác nhận hủy kết bạn `direction=accepted` và từ chối kiểu xóa accepted trong lúc vẫn pending.
+- **Đợt tiếp (FR-03/05/16):** Có GET/PUT `/api/privacy` (auth + no-store), 5 công tắc riêng tư ở Hồ sơ, schema mặc định tương thích ngược, Gateway proxy sang Chat service, backend từ chối lời mời mới khi người nhận không cho phép và giấu trạng thái online trong danh sách lời mời/bạn bè, tìm kiếm và gợi ý. Tìm theo email chỉ trả về định danh công khai khi đã opt-in, không trả email.
+- **Lưu ý tích hợp:** Đã chạm `backend/cmd/gateway/main.go` đúng 1 tuyến `/api/privacy` để FE gọi API thật; Agent 5 review route khi tích hợp. Block/report và quyền riêng tư trong Call service vẫn cần phối hợp Agent 3/5.
+- **Đợt bảo mật bổ sung (P0):** Trạng thái online trong danh sách chat 1–1, phản hồi tạo chat, danh sách thành viên nhóm và Nearby được ràng buộc bởi `show_online_status` từ PostgreSQL, không chỉ presence Redis. API PUT privacy bắt buộc đủ 5 trường boolean, tránh vô ý lưu `false` hàng loạt. Auth giới hạn 4KB/JSON strict cho đăng ký, xác thực OTP, gửi lại OTP và login; refresh/logout chỉ chấp nhận JSON 1KB/strict và reject trailing payload. Middleware chỉ cho token trên URL ở GET `/api/events` do trình duyệt EventSource không thiết lập được header Authorization. Đây là giảm bề mặt lộ token, không xóa bỏ rủi ro log URL SSE.
+- **FR-09:** Bổ sung test gửi tạo chat 1–1 đồng thời từ hai tài khoản, bảo đảm cùng conversation ID và chỉ một direct_key trong PostgreSQL.
+- **FR-14/15/21/22 (đợt tiếp):** Thêm `user_blocks`, `user_reports`, `friend_request_events` và các API thật của Chat service: `GET /api/users/blocked`, `POST/DELETE /api/users/{id}/block`, `POST /api/users/{id}/report`. Block hai chiều ẩn tìm kiếm, gợi ý, Nearby, friends/requests; block xóa quan hệ kết bạn, không cho tạo direct, gửi/đọc tin nhắn hoặc truy xuất media/link đã chia sẻ của direct bị chặn. UI Web/PWA có chặn/báo cáo từ Danh bạ/tìm kiếm, danh sách bỏ chặn ở Hồ sơ. Báo cáo lưu riêng trong PostgreSQL với lý do giới hạn + hạn mức 10/24 giờ. Lời mời mới giữ lịch sử và quota 30/24 giờ, kể cả sau khi cancel, đồng bộ bằng PostgreSQL advisory lock. `TestBlockReportAndFriendQuotaIntegration` kiểm chứng trên hai tài khoản và nhiều người nhận.
+- **Handoff Agent 2/3/4/5:** Block trên direct được kiểm soát ở Chat service, nhưng call service, Feed service, group visibility, phản hồi dịch và push xuyên service cần policy chung và test tích hợp riêng. Reports mới là record lưu an toàn, chưa có moderation dashboard/triage SLA; không coi FR-14/15 xong 100%.
+- **FR-18/19/20 (đợt tiếp):** Bảng `friend_contact_metadata` với PK `(owner_id,contact_id)` lưu biệt danh riêng (60 ký tự), ghi chú riêng (1500 ký tự), đánh dấu bạn thân; `GET /api/contacts` và `PUT /api/contacts/{id}` yêu cầu quan hệ bạn bè accepted và không bị block. Gateway có proxy routes; UI Danh bạ hiển thị biệt danh, ghi chú, ưu tiên bạn thân ở đầu danh sách và menu sửa. Dữ liệu không ghi vào public profile hay gửi cho tài khoản đối diện. `TestContactMetadataIntegration` xác minh quyền, không lộ note, block policy, owner isolation trên PostgreSQL. Cần nâng UX từ prompt lên sheet riêng, test trình duyệt mobile và nhánh tích hợp.
+- **ACC-02 / quản lý phiên:** Ngăn cấp refresh token mới từ access token kiểu cũ (lỗ hổng tái tạo phiên sau logout); client cũ không có refresh token phải đăng nhập lại. Thêm ID phiên UUID, metadata User-Agent/lastSeen và API `/api/auth/sessions/list`, `/revoke`, `/revoke-others` dùng refresh token hợp lệ để xem và thu hồi chỉ các phiên thuộc cùng chủ tài khoản. Có UI Web/PWA trong Hồ sơ. Revocation ngăn gia hạn refresh; access JWT đang phát hành có thể còn được chấp nhận tối đa 24h, vì vậy **chưa thể gọi đây là thu hồi access token tức thì**. Phải tích hợp cơ chế session-bound access token trên mọi service trước khi nghiệm thu ACC-02.
+
+## Phân loại toàn bộ 34 task
+
+Quy ước: **Cần cải tiến** nghĩa là có một phần luồng/đã sửa một phần, nhưng **chưa đủ kiểm thử để kết luận đạt**. Không tick Done chỉ vì build/unit test pass.
+
+| Task | P | Trạng thái | Lý do / bước còn thiếu |
+|---|---|---|---|
+| FR-01 | P0 | Cần cải tiến | Đã nối UI tìm trong Danh bạ và API quyền tìm; chưa test 2 browser + 7 kích thước |
+| FR-02 | P0 | Cần cải tiến | Debounce/abort/error/retry đã có; cần test mạng chậm, timeout và race trên trình duyệt |
+| FR-03 | P0 | Cần cải tiến | Đã ẩn online theo opt-in ở Friends/search API; avatar còn fallback, các luồng presence khác chưa kiểm đủ |
+| FR-04 | P0 | Cần cải tiến | Menu và xác nhận hủy đã code; hồ sơ mới là preview tối thiểu, cần UX/a11y/E2E |
+| FR-05 | P0 | Cần cải tiến | API chặn lời mời mới khi người nhận tắt quyền (integration PASS); cần case refresh/lỗi mạng/đa tab |
+| FR-06 | P0 | Cần cải tiến | Accept/decline + push + Redis integration PASS; chưa E2E browser/push thật |
+| FR-07 | P0 | Cần cải tiến | Lock theo ID, accepted guard và integration PASS; cần stress/race nhiều tab |
+| FR-08 | P0 | Cần cải tiến | `friend.updated` Redis 2 account integration PASS; SSE reconnect và browser đa tab chưa kiểm |
+| FR-09 | P0 | Cần cải tiến | Đã thêm kiểm thử 12 request song song hai chiều, cùng conversation ID, không có direct_key trùng; vẫn thiếu full browser E2E |
+| FR-10 | P1 | Cần cải tiến | Có 4 khu vực, badge chờ xử lý và đồng nhất mobile chưa đủ |
+| FR-11 | P1 | Cần cải tiến | Có lọc client/tìm server, chưa chuẩn hóa dấu tiếng Việt và sort dài |
+| FR-12 | P1 | Cần cải tiến | Chỉ có public preview cơ bản; thiếu hồ sơ đầy đủ/quyền/đường dẫn từ mọi bề mặt |
+| FR-13 | P1 | Cần cải tiến | Có ProfileQr, chưa xác minh browser camera/deep link/PWA |
+| FR-14 | P1 | Cần cải tiến | Block/unblock và enforcement search/nearby/friends/direct messages/media PASS integration; còn calls, feed, group policy + browser E2E |
+| FR-15 | P1 | Cần cải tiến | API báo cáo + giới hạn 10/24h lưu DB và UI đã có; thiếu admin moderation/triage và audit reviewer |
+| FR-16 | P1 | Cần cải tiến | Có 5 công tắc Web/PWA lưu DB và enforce Friends/search; vẫn thiếu privacy profile/call/nearby/toàn hệ thống |
+| FR-17 | P2 | Cần cải tiến | Có mutual groups, giới hạn gợi ý riêng tư bước đầu; thiếu hide/block/consent |
+| FR-18 | P1 | Cần cải tiến | Nickname riêng 60 ký tự lưu DB theo owner + UI/menu; integration owner isolation PASS, chưa E2E/mobile |
+| FR-19 | P1 | Cần cải tiến | Đã có favorite/bạn thân, sắp xếp list ưu tiên favorites; thiếu nhóm/phân loại tùy chỉnh |
+| FR-20 | P1 | Cần cải tiến | Ghi chú riêng 1500 ký tự owner-only, API/DB/UI và integration privacy PASS; thiếu form UX/mobile E2E |
+| FR-21 | P1 | Cần cải tiến | Lưu ledger lời mời để hạn chế send/cancel spam; thiếu UI lịch sử và abuse review |
+| FR-22 | P1 | Cần cải tiến | Quota 30 lượt gửi lời mời mới/24 giờ, race-safe SQL + HTTP 429, UI hiển thị lỗi từ API; cần UX thông tin hạn mức/còn lại |
+| ACC-01 | P0 | Cần cải tiến | Đã có auth/session; cần E2E OTP/refresh/logout/đa phiên |
+| ACC-02 | P0 | Cần cải tiến | Đã có quản lý thiết bị, revoke refresh, chặn tái tạo phiên legacy sau logout, test chống IDOR; còn thiếu revoke access JWT tức thì trên mọi service |
+| ACC-03 | P0 | Cần cải tiến | Đã có Redis rate limiting, OTP attempts và test strict/4KB body; còn audit proxy IP spoof, enumeration, UAT và load |
+| ACC-04 | P0 | Cần cải tiến | Có form sửa hồ sơ/ảnh, cần IDOR/media visibility tests |
+| ACC-05 | P1 | Cần cải tiến | Đã có danh sách/thu hồi device refresh sessions; còn thiếu đổi/quên mật khẩu, email và revoke access token tức thì |
+| ACC-06 | P1 | Cần cải tiến | Có UI ngôn ngữ/translation/push; cần cross-device permission/persistence |
+| ACC-07 | P1 | Chưa có | Xóa tài khoản, export dữ liệu và retention/terms |
+| ACC-08 | P1 | Chưa có | Tìm tổng hợp có enforcement privacy/block |
+| ACC-09 | P1 | Cần cải tiến | Có ảnh bìa, thiếu bio/links public profile và quyền từng field |
+| ACC-10 | P1 | Chưa có | Xuất dữ liệu/yêu cầu xóa, tiến độ xử lý |
+| SEARCH-01 | P1 | Chưa có | Global federated search trên chat/group/feed/media với phân quyền |
+| SEARCH-02 | P1 | Chưa có | Lọc loại, recent, lịch sử/xóa lịch sử và layout ổn định |
+
+## Kiểm thử và bằng chứng (2026-10-19)
+
+- **PASS:** `git diff --check` trên worktree Agent 1.
+- **PASS:** `go test ./...` chạy toàn bộ backend (các module không có test được Go báo rõ).
+- **PASS:** `npm run build` tại frontend: TypeScript `tsc --noEmit` + Vite production build.
+- **PASS:** `npm run check:session`: refresh, concurrency, legacy migration, offline, expiry, stale response, bounded retry.
+- **PASS (mock UI):** `npm run check:ui`: 42 viewport/screen checks về layout, overflow, profile stacking dùng dữ liệu/session mô phỏng. Đây không phải E2E hai tài khoản thực.
+- **PASS:** `TestFriendRequestsIntegration` với 2 user/token độc lập trên PostgreSQL 17 và Redis 7.4 container riêng Agent 1: gửi, gửi chéo, chấp nhận, từ chối, cancel, unfriend, Redis `friend.updated` hai phía và conflict.
+- **PASS:** `TestPrivacyIntegration` sử dụng 2 tài khoản và PostgreSQL/Redis riêng: GET/PUT riêng tư, tắt search/nhận lời mời, chặn tạo liên kết qua API, email không bị trả ra, opt-in online được phản ánh trong danh sách bạn bè. Không sử dụng dữ liệu production.
+- **PASS:** `TestBlockReportAndFriendQuotaIntegration` trên PostgreSQL/Redis độc lập: tự block/report bị từ chối; chặn hai chiều, direct list/messages/shared media, không gửi lời mời và không tạo direct khi chặn; unblock phục hồi chat; report validation + quota 10/24h; quota lời mời 30/24h chống xóa/gửi lại; idempotent khi đã pending.
+- **PASS:** `TestContactMetadataIntegration` trên PostgreSQL riêng: không ghi được liên hệ chưa chấp nhận, nickname/note/favorite theo owner riêng biệt A/B, bắt buộc dữ liệu đầy đủ, blocked relation không được ghi/đọc và ghi chú của A không bị B nhìn thấy.
+- **PASS:** `TestUserSearchIntegration` dùng hai tài khoản DB hợp lệ (sửa fixture cũ UserID 0 bị middleware từ chối); không hạ tiêu chuẩn auth.
+- **NOT RUN:** E2E thực tế trên 2 browser profiles đăng nhập độc lập; kiểm tra offline/weak network/F5 nhiều tab, kích thước 320/375/390/430/768/1024/1440, quyền camera và iOS PWA.
+- **PASS:** Backend auth integration trên PostgreSQL + Redis: OTP/attempt lockout/atomic consumption, session refresh/logout và JSON 4KB/strict regression.
+- **PASS:** JWT regression: query token chỉ được chấp nhận ở GET `/api/events`, REST yêu cầu bearer header; token query SSE vẫn cần privacy/security review khi ghi log.
+- **PASS:** PostgreSQL/Redis privacy integration cho chat/direct và nhóm, 12 lượt tạo chat 1–1 song song hai phía trước khi thêm test Nearby.
+- **CHƯA XÁC NHẬN:** Test mở rộng Nearby ẩn/hiện online mới thêm chưa được thực thi lại ở môi trường tích hợp vì công cụ thực thi chặn lệnh chạy có biến môi trường database/Redis; Go tests không có env vẫn PASS (test integration SKIP). Không gọi test chưa chạy là PASS.
+- **PASS:** `TestSessionManagementIntegration` trên PostgreSQL 17 riêng: nhiều phiên 2 tài khoản, phân biệt current/others, không trả token hash, từ chối IDOR khi A thu hồi phiên B, thu hồi phiên khác và thu hồi current, logout không thể tạo refresh token mới bằng access token cũ. `TestSessionIntegration` cũng PASS sau thay đổi, frontend `check:session` xác minh không dùng legacy upgrade.
+- **GIỚI HẠN AN NINH:** Thu hồi refresh session không thu hồi access JWT 24h đang lưu ở các service, ngoại lệ SSE sử dụng token trên URL vẫn cần hardening. Backend không tuyên bố revocation tức thì.
+- **NOT RUN:** Review security toàn diện JWT/IDOR, brute-force qua X-Forwarded-For/trusted-proxy, mọi service Calls, API media và load test.
+- **Tồn tại:** Vite build cảnh báo chunk >500KB; profile người khác mới là preview nhỏ, chưa phải màn profile P1 đầy đủ.
+
+## Kế hoạch xử lý tiếp (P0 trước P1)
+
+1. Nghiệm thu FR-01..09 bằng browser profiles A/B và HTTP độc lập, throttled/offline, multi-tab SSE reconnect; bổ sung regression test UI/IDOR.
+2. P0 ACC-01..04: auth OTP enumeration/brute force, JWT rotation/revocation, media/profile authorization; đảm bảo không lộ email/presence.
+3. P1 FR-10..16 rồi FR-18..22: block/report/privacy enforcement, full public profile + QR, badge, contact organization/history; sau đó ACC-05..10 và SEARCH-01/02.
+4. Integration review, UAT mobile Web/PWA và chỉ merge `dev` khi toàn bộ gate đạt. Không merge/deploy tự động.
+
+**Không được diễn giải các sửa đổi đã có thành 100% Done.** Handoff ghi rõ thiếu E2E và việc cần làm; quyền của Agent khác không bị thay đổi.

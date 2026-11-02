@@ -100,7 +100,7 @@ class _NotificationSheetState extends State<_NotificationSheet> {
                     ),
                     _NotificationItem(
                       icon: Icons.groups_outlined,
-                      title: 'SOCO Design Team',
+                      title: 'SocCo Design Team',
                       detail: 'Chốt bản demo sáng mai nhé!',
                       time: '1 giờ',
                     ),

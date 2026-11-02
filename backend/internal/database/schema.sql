@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
     searchable_by_name BOOLEAN NOT NULL DEFAULT TRUE,
     searchable_by_email BOOLEAN NOT NULL DEFAULT TRUE,
     searchable_by_phone BOOLEAN NOT NULL DEFAULT FALSE,
+    allow_friend_requests BOOLEAN NOT NULL DEFAULT TRUE,
+    show_online_status BOOLEAN NOT NULL DEFAULT TRUE,
     avatar_ref TEXT,
     cover_ref TEXT,
     profile_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -24,6 +26,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_username BOOLEAN NOT NU
 ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_name BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_email BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS searchable_by_phone BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_friend_requests BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online_status BOOLEAN NOT NULL DEFAULT TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -38,6 +42,11 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS session_id UUID NOT NULL DEFAULT gen_random_uuid();
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS user_agent VARCHAR(180) NOT NULL DEFAULT '';
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_sessions_public_id ON auth_sessions(session_id);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_expiry ON auth_sessions(user_id, expires_at DESC);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS conversations (
@@ -79,6 +88,53 @@ ON friend_connections(user_low, status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_friend_connections_high
 ON friend_connections(user_high, status, updated_at DESC);
 
+-- Blocks are directional, but neither party can contact the other directly.
+CREATE TABLE IF NOT EXISTS user_blocks (
+    blocker_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (blocker_id, blocked_id),
+    CHECK (blocker_id <> blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_blocks_target ON user_blocks(blocked_id,blocker_id);
+
+-- Reports are private moderation records. Never include them in public profiles.
+CREATE TABLE IF NOT EXISTS user_reports (
+    id BIGSERIAL PRIMARY KEY,
+    reporter_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reported_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(24) NOT NULL CHECK (reason IN ('spam','harassment','impersonation','other')),
+    details VARCHAR(1000) NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (reporter_id <> reported_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_reports_reporter_time
+ON user_reports(reporter_id, created_at DESC);
+
+-- A friend-request ledger persists independently of cancellation/unfriend;
+-- otherwise send/cancel loops could bypass anti-harassment controls.
+CREATE TABLE IF NOT EXISTS friend_request_events (
+    id BIGSERIAL PRIMARY KEY,
+    sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (sender_id <> recipient_id)
+);
+CREATE INDEX IF NOT EXISTS idx_friend_request_events_sender_time
+ON friend_request_events(sender_id, created_at DESC);
+
+-- Personal friend labels are visible only to the owner of the account.
+CREATE TABLE IF NOT EXISTS friend_contact_metadata (
+    owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    contact_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    nickname VARCHAR(60) NOT NULL DEFAULT '',
+    note VARCHAR(1500) NOT NULL DEFAULT '',
+    favorite BOOLEAN NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (owner_id, contact_id),
+    CHECK (owner_id <> contact_id)
+);
+
 CREATE TABLE IF NOT EXISTS messages (
     id BIGSERIAL PRIMARY KEY,
     conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -93,6 +149,12 @@ CREATE TABLE IF NOT EXISTS messages (
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_message_id BIGINT;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
+-- Immutable fingerprint of the original POST body for loss-of-ACK retries.
+-- Unlike messages.text/attachments, this never changes on edit or recall.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS request_fingerprint CHAR(64);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_sender_client_id
+ON messages(user_id, client_id) WHERE client_id IS NOT NULL;
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -170,6 +232,16 @@ CREATE TABLE IF NOT EXISTS feed_reports (
     UNIQUE(reporter_id,target_type,target_id)
 );
 CREATE INDEX IF NOT EXISTS idx_feed_reports_status ON feed_reports(status,created_at DESC);
+
+-- A trusted database administrator provisions reviewers; user-controlled profile
+-- settings must never be able to grant moderation permissions.
+CREATE TABLE IF NOT EXISTS feed_moderators (
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE feed_reports ADD COLUMN IF NOT EXISTS reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE feed_reports ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+
 
 
 CREATE TABLE IF NOT EXISTS post_attachments (
@@ -302,3 +374,57 @@ ALTER TABLE call_participants ALTER COLUMN joined_at DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_call_participants_user_invited
 ON call_participants(user_id, invited_at DESC);
+
+-- Marketplace v1: product price unit is seller-supplied catalog metadata,
+-- NOT an approved payment method. No customer funds are held or moved here.
+CREATE TABLE IF NOT EXISTS market_products (
+    id BIGSERIAL PRIMARY KEY,
+    seller_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(160) NOT NULL CHECK (length(trim(title)) > 0),
+    description TEXT NOT NULL DEFAULT '',
+    price_amount BIGINT NOT NULL CHECK (price_amount > 0),
+    price_unit VARCHAR(16) NOT NULL CHECK (length(trim(price_unit)) > 0),
+    stock INTEGER NOT NULL CHECK (stock >= 0),
+    status VARCHAR(16) NOT NULL DEFAULT 'draft'
+       CHECK (status IN ('draft','published','archived')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_market_products_published
+    ON market_products(id DESC) WHERE status='published';
+CREATE INDEX IF NOT EXISTS idx_market_products_seller
+    ON market_products(seller_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS market_cart_items (
+    buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
+    quantity INTEGER NOT NULL CHECK (quantity > 0 AND quantity <= 99),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (buyer_id, product_id)
+);
+
+-- Checkout creates a non-binding preview order until payment method,
+-- compliance, funds flow, inventory reservation and refund rules are approved.
+CREATE TABLE IF NOT EXISTS market_orders (
+    id BIGSERIAL PRIMARY KEY,
+    buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    seller_id BIGINT NOT NULL REFERENCES users(id),
+    idempotency_key VARCHAR(100) NOT NULL,
+    amount_total BIGINT NOT NULL CHECK (amount_total > 0),
+    price_unit VARCHAR(16) NOT NULL,
+    status VARCHAR(40) NOT NULL DEFAULT 'awaiting_payment_configuration'
+        CHECK (status = 'awaiting_payment_configuration'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (buyer_id, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_market_orders_buyer
+    ON market_orders(buyer_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS market_order_items (
+    order_id BIGINT NOT NULL REFERENCES market_orders(id) ON DELETE CASCADE,
+    product_id BIGINT NOT NULL REFERENCES market_products(id),
+    title VARCHAR(160) NOT NULL,
+    unit_price BIGINT NOT NULL CHECK (unit_price > 0),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    PRIMARY KEY (order_id, product_id)
+);

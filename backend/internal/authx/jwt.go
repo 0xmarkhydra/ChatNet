@@ -15,6 +15,7 @@ type Claims struct {
 	UserID      int64  `json:"uid"`
 	Username    string `json:"username"`
 	DisplayName string `json:"displayName"`
+	SessionID   string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -22,12 +23,17 @@ type contextKey string
 
 const claimsKey contextKey = "claims"
 
-func Sign(secret string, userID int64, username, displayName string) (string, error) {
+func Sign(secret string, userID int64, username, displayName string, sessionIDs ...string) (string, error) {
 	now := time.Now()
+	sid := ""
+	if len(sessionIDs) > 0 {
+		sid = sessionIDs[0]
+	}
 	claims := Claims{
 		UserID:      userID,
 		Username:    username,
 		DisplayName: displayName,
+		SessionID:   sid,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   strconv.FormatInt(userID, 10),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -59,7 +65,12 @@ func TokenFromRequest(r *http.Request) string {
 	if strings.HasPrefix(strings.ToLower(header), "bearer ") {
 		return strings.TrimSpace(header[7:])
 	}
-	return strings.TrimSpace(r.URL.Query().Get("token"))
+	// Only native EventSource (which cannot set Authorization headers) accepts
+	// a query bearer. Never accept URL tokens for ordinary REST endpoints.
+	if r.Method == http.MethodGet && r.URL.Path == "/api/events" {
+		return strings.TrimSpace(r.URL.Query().Get("token"))
+	}
+	return ""
 }
 
 func Middleware(secret string, next http.Handler) http.Handler {

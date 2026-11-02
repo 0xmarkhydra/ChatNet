@@ -1,5 +1,5 @@
 /*
- * SOCO iOS Motion System — composited micro-interactions.
+ * SocCo iOS Motion System — composited micro-interactions.
  *
  * Keep motion owned by one place instead of stacking ad-hoc CSS overrides.
  * Animates opacity/transform for fluid 60fps-feeling feedback without changing
@@ -25,8 +25,8 @@
   .composer button,
   .soco-text-action,
   .contact-shortcuts > button,
-  .contact-result,
-  .friend-result,
+  .contact-result:not(.contact-search-row),
+  .friend-result:not(.contact-search-row),
   .connect-identity-actions > button,
   .story-card,
   .post-toolbar button,
@@ -63,8 +63,8 @@
   .composer button,
   .soco-text-action,
   .contact-shortcuts > button,
-  .contact-result,
-  .friend-result,
+  .contact-result:not(.contact-search-row),
+  .friend-result:not(.contact-search-row),
   .connect-identity-actions > button,
   .story-card,
   .post-toolbar button,
