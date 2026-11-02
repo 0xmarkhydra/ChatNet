@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { ApiRequest } from "../../app/dataTypes";
-import { FEED_PAGE_SIZE, type Post } from "./types";
+import type { Post } from "./types";
+
+const SEARCH_PAGE_SIZE = 5;
+
+const foldVietnamese = (value: string) => value.toLocaleLowerCase('vi-VN')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
 
 type SearchState = {
   key: string;
@@ -50,7 +55,7 @@ export function usePostSearch({
 
   const baseUrl =
     "/api/posts?limit=" +
-    FEED_PAGE_SIZE +
+    SEARCH_PAGE_SIZE +
     (scope === "saved" ? "&scope=saved" : "") +
     "&q=" +
     encodeURIComponent(normalizedQuery);
@@ -78,7 +83,7 @@ export function usePostSearch({
           posts,
           loading: false,
           loadingMore: false,
-          hasMore: posts.length === FEED_PAGE_SIZE,
+          hasMore: posts.length === SEARCH_PAGE_SIZE,
           error: "",
         });
       } catch {
@@ -89,7 +94,7 @@ export function usePostSearch({
           error: "Không thể tìm kiếm bài viết. Hãy thử lại.",
         });
       }
-    }, 300);
+    }, 500);
 
     return () => {
       window.clearTimeout(timer);
@@ -100,14 +105,14 @@ export function usePostSearch({
   const current =
     state.key === key ? state : { ...emptyState, loading: Boolean(key) };
 
-  async function loadMore() {
+  async function loadMore(retryOnError = false) {
     if (
       !key ||
       state.key !== key ||
       pagingBusy.current ||
       !state.hasMore ||
       state.loading ||
-      state.error
+      (state.error && !retryOnError)
     )
       return;
     const before = state.posts[state.posts.length - 1]?.id;
@@ -116,7 +121,7 @@ export function usePostSearch({
     const abort = new AbortController();
     controller.current = abort;
     setState((previous) =>
-      previous.key === key ? { ...previous, loadingMore: true } : previous,
+      previous.key === key ? { ...previous, loadingMore: true, error: '' } : previous,
     );
     try {
       const response = await requestRef.current(baseUrl + "&before=" + before, {
@@ -135,7 +140,7 @@ export function usePostSearch({
             ...previous.posts,
             ...posts.filter((post) => !existing.has(post.id)),
           ],
-          hasMore: posts.length === FEED_PAGE_SIZE,
+          hasMore: posts.length === SEARCH_PAGE_SIZE,
           loadingMore: false,
           error: "",
         };
@@ -153,16 +158,21 @@ export function usePostSearch({
         );
       }
     } finally {
-      pagingBusy.current = false;
+      if (controller.current === abort) {
+        pagingBusy.current = false;
+        controller.current = null;
+      }
     }
   }
 
   function syncPost(updated: Post) {
+    const matchesQuery = [updated.content, updated.author, updated.authorDisplayName || '']
+      .some(value => foldVietnamese(value).includes(foldVietnamese(normalizedQuery)))
     setState((previous) => ({
       ...previous,
-      posts: previous.posts.map((post) =>
-        post.id === updated.id ? updated : post,
-      ),
+      posts: previous.posts
+        .filter(post => post.id !== updated.id || (matchesQuery && (scope !== 'saved' || updated.saved)))
+        .map(post => post.id === updated.id ? updated : post),
     }));
   }
 
@@ -180,7 +190,10 @@ export function usePostSearch({
     hasMore: current.hasMore,
     error: current.error,
     loadMore,
-    retry: () => setRetryNumber((previous) => previous + 1),
+    retry: () => {
+      if (state.key === key && state.posts.length > 0 && state.error) void loadMore(true)
+      else setRetryNumber((previous) => previous + 1)
+    },
     syncPost,
     removePost,
   };
