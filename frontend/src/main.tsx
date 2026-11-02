@@ -1,19 +1,23 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
-import { PWAUpdate } from './PWAUpdate'
-import './styles.css'
-import './mobile.css'
-import './mobile-nav.css'
-import './notifications.css'
-import './friends.css'
-import './zalo-inspired.css'
-import './nearby-explorer.css'
-import './conversation-content.css'
-import './soco-theme.css'
-import './soco-screens.css'
-import './soco-layout-v2.css'
+import App from './app/App'
+import { PWAUpdate } from './features/pwa/PWAUpdate'
+import DesktopBootstrap from './platform/DesktopBootstrap'
+import { isDesktopBuild } from './platform/desktop'
+import './styles/styles.css'
+import './styles/mobile.css'
+import './styles/mobile-nav.css'
+import './features/notifications/notifications.css'
+import './styles/friends.css'
+import './styles/zalo-inspired.css'
+import './features/discover/nearby-explorer.css'
+import './features/chat/conversation-content.css'
+import './styles/soco-theme.css'
+import './styles/soco-screens.css'
+import './styles/soco-layout-v2.css'
 import './design-system/motion.css'
+import './features/profile/personal-timeline.css'
+import './platform/desktop.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)
@@ -21,7 +25,7 @@ if (window.location.search.includes('pwa=')) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
-    {import.meta.env.PROD && <PWAUpdate />}
+    {isDesktopBuild ? <DesktopBootstrap /> : <App />}
+    {import.meta.env.PROD && !isDesktopBuild && <PWAUpdate />}
   </React.StrictMode>,
 )

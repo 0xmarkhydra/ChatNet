@@ -3,7 +3,7 @@ import {
   createCallTranscript,
   decryptCallTranscript,
   encryptCallTranscript,
-} from '../src/callTranslation.ts'
+} from '../src/features/calls/callTranslation.ts'
 
 const key = crypto.getRandomValues(new Uint8Array(32))
 const transcript = createCallTranscript('  Xin   chào cả nhóm  ', 'vi-VN')

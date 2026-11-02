@@ -32,6 +32,27 @@ func (s *server) blockedPair(ctx context.Context, a, b int64) (bool, error) {
 	return blocked, err
 }
 
+// Pair visibility is symmetric although blocks are stored directionally.
+func (s *server) visibleRecipients(ctx context.Context, actorID int64, recipients []int64) ([]int64, error) {
+	rows, err := s.db.Query(ctx, `SELECT ids.id FROM unnest($1::bigint[]) WITH ORDINALITY AS ids(id, position)
+        WHERE NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+          (b.blocker_id=$2 AND b.blocked_id=ids.id) OR
+          (b.blocked_id=$2 AND b.blocker_id=ids.id)) ORDER BY ids.position`, recipients, actorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]int64, 0, len(recipients))
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		result = append(result, id)
+	}
+	return result, rows.Err()
+}
+
 // Direct messages cannot be opened or delivered while either participant
 // blocks the other. Group membership and group-message policy are separate.
 func (s *server) blockedDirectConversation(ctx context.Context, conversationID, userID int64) (bool, error) {
@@ -102,6 +123,7 @@ func (s *server) blockUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.publishConversationEvent(r.Context(), []int64{claims.UserID, targetID}, realtimeEvent{Type: "friend.updated"})
+	s.publishConversationEvent(r.Context(), []int64{claims.UserID, targetID}, realtimeEvent{Type: "privacy.updated"})
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.JSON(w, http.StatusOK, map[string]any{"ok": true, "userId": id, "blocked": true})
 }
@@ -122,6 +144,7 @@ func (s *server) unblockUser(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot unblock user")
 		return
 	}
+	s.publishConversationEvent(r.Context(), []int64{claims.UserID, targetID}, realtimeEvent{Type: "privacy.updated"})
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.JSON(w, http.StatusOK, map[string]any{"ok": true, "userId": targetID, "blocked": false})
 }

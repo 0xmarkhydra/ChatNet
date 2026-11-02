@@ -19,40 +19,44 @@ import (
 	"chatnet/internal/objectstore"
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
+	"chatnet/internal/searchx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
 type comment struct {
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	ID        int64      `json:"id"`
-	ParentID  *int64     `json:"parentId"`
-	Author    string     `json:"author"`
-	Content   string     `json:"content"`
-	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt         *time.Time `json:"updatedAt,omitempty"`
+	ID                int64      `json:"id"`
+	ParentID          *int64     `json:"parentId"`
+	Author            string     `json:"author"`
+	AuthorDisplayName string     `json:"authorDisplayName,omitempty"`
+	Content           string     `json:"content"`
+	CreatedAt         time.Time  `json:"createdAt"`
 }
 
 type post struct {
-	Visibility  string              `json:"visibility"`
-	Background  string              `json:"background"`
-	Saved       bool                `json:"saved"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
-	ID          int64               `json:"id"`
-	Author      string              `json:"author"`
-	Content     string              `json:"content"`
-	Likes       int                 `json:"likes"`
-	Liked       bool                `json:"liked"`
-	Comments    []comment           `json:"comments"`
-	Attachments []mediax.Attachment `json:"attachments,omitempty"`
-	CreatedAt   time.Time           `json:"createdAt"`
+	Visibility        string              `json:"visibility"`
+	Background        string              `json:"background"`
+	Saved             bool                `json:"saved"`
+	UpdatedAt         time.Time           `json:"updatedAt"`
+	ID                int64               `json:"id"`
+	Author            string              `json:"author"`
+	AuthorDisplayName string              `json:"authorDisplayName,omitempty"`
+	Content           string              `json:"content"`
+	Likes             int                 `json:"likes"`
+	Liked             bool                `json:"liked"`
+	Comments          []comment           `json:"comments"`
+	Attachments       []mediax.Attachment `json:"attachments,omitempty"`
+	CreatedAt         time.Time           `json:"createdAt"`
 }
 
 type story struct {
-	ID         int64             `json:"id"`
-	Author     string            `json:"author"`
-	Attachment mediax.Attachment `json:"attachment"`
-	CreatedAt  time.Time         `json:"createdAt"`
-	ExpiresAt  time.Time         `json:"expiresAt"`
+	ID                int64             `json:"id"`
+	Author            string            `json:"author"`
+	AuthorDisplayName string            `json:"authorDisplayName,omitempty"`
+	Attachment        mediax.Attachment `json:"attachment"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	ExpiresAt         time.Time         `json:"expiresAt"`
 }
 
 type server struct {
@@ -90,22 +94,23 @@ func main() {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "feed"})
 	})
-	mux.Handle("GET /api/posts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.list)))
-	mux.Handle("GET /api/posts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.detailPost)))
-	mux.Handle("PATCH /api/posts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.editPost)))
-	mux.Handle("DELETE /api/posts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deletePost)))
-	mux.Handle("POST /api/posts/{id}/save", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.toggleSave)))
-	mux.Handle("PATCH /api/posts/{id}/comments/{commentId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.editComment)))
-	mux.Handle("DELETE /api/posts/{id}/comments/{commentId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteComment)))
-	mux.Handle("POST /api/feed/reports", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reportFeed)))
-	mux.Handle("GET /api/feed/moderation/reports", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listModerationReports)))
-	mux.Handle("PATCH /api/feed/moderation/reports/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reviewModerationReport)))
-	mux.Handle("POST /api/posts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.create)))
-	mux.Handle("POST /api/posts/{id}/like", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.like)))
-	mux.Handle("POST /api/posts/{id}/comments", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.addComment)))
-	mux.Handle("GET /api/stories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listStories)))
-	mux.Handle("POST /api/stories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createStory)))
-	mux.Handle("DELETE /api/stories/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteStory)))
+	mux.Handle("GET /api/posts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.list)))
+	mux.Handle("GET /api/posts/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.detailPost)))
+	mux.Handle("PATCH /api/posts/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editPost)))
+	mux.Handle("DELETE /api/posts/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deletePost)))
+	mux.Handle("POST /api/posts/{id}/save", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.toggleSave)))
+	mux.Handle("PATCH /api/posts/{id}/comments/{commentId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editComment)))
+	mux.Handle("DELETE /api/posts/{id}/comments/{commentId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteComment)))
+	mux.Handle("POST /api/feed/reports", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reportFeed)))
+	mux.Handle("GET /api/feed/moderation/reports", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listModerationReports)))
+	mux.Handle("PATCH /api/feed/moderation/reports/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reviewModerationReport)))
+	mux.Handle("POST /api/posts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.create)))
+	mux.Handle("POST /api/posts/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.like)))
+	mux.Handle("POST /api/posts/{id}/comments", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.addComment)))
+	mux.Handle("GET /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStories)))
+	mux.Handle("POST /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createStory)))
+	mux.Handle("DELETE /api/stories/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteStory)))
+	s.mountMarketplace(mux)
 
 	port := config.Env("PORT", "8083")
 	log.Printf("feed service listening on :%s", port)
@@ -124,8 +129,21 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
+	author := strings.TrimSpace(r.URL.Query().Get("author"))
+	if len(author) > 64 {
+		httpx.Error(w, 400, "invalid author")
+		return
+	}
+	// Search the complete authorized feed, not just posts already fetched by a client.
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if utf8.RuneCountInString(query) > 120 {
+		httpx.Error(w, http.StatusBadRequest, "invalid search query (max 120 characters)")
+		return
+	}
+	// Treat LIKE metacharacters as literal input, not as user-supplied wildcards.
+	query = strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(query)
 	scope := r.URL.Query().Get("scope")
-	if scope != "" && scope != "saved" {
+	if scope != "" && scope != "saved" && scope != "mine" {
 		httpx.Error(w, http.StatusBadRequest, "invalid scope")
 		return
 	}
@@ -142,13 +160,17 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		before = n
 	}
 	rows, err := s.db.Query(r.Context(), `
-		SELECT p.id,u.username,p.content,p.likes_count,p.created_at,
+		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
 		       p.visibility,p.background,p.updated_at,
 		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
 		FROM posts p JOIN users u ON u.id=p.user_id
-		WHERE ($1::bigint=0 OR p.id<$1) AND `+feedAccessSQL+`
-		  AND ($4='all' OR EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2))
-		ORDER BY p.id DESC LIMIT $3`, before, claims.UserID, limit, scope)
+		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND `+feedAccessSQL+`
+		  AND ($4='all' OR ($4='mine' AND p.user_id=$2)
+		       OR ($4='saved' AND EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)))
+		  AND ($6='' OR `+searchx.FoldSQL("p.content")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%'
+		       OR `+searchx.FoldSQL("u.username")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%'
+		       OR `+searchx.FoldSQL("u.display_name")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%')
+		ORDER BY p.id DESC LIMIT $3`, before, claims.UserID, limit, scope, author, query)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")
 		return
@@ -158,22 +180,24 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	posts := []post{}
 	for rows.Next() {
 		var p post
-		if rows.Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.Saved) != nil {
+		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.Saved) != nil {
 			continue
 		}
 		_ = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id=$1 AND user_id=$2)`, p.ID, claims.UserID).Scan(&p.Liked)
-		p.Comments = s.comments(r, p.ID)
+		p.Comments = s.comments(r, p.ID, claims.UserID)
 		p.Attachments = s.postAttachments(r.Context(), p.ID)
 		posts = append(posts, p)
 	}
 	httpx.JSON(w, http.StatusOK, posts)
 }
 
-func (s *server) comments(r *http.Request, postID int64) []comment {
+func (s *server) comments(r *http.Request, postID, viewerID int64) []comment {
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id,c.parent_id,u.username,c.content,c.created_at,c.updated_at
+		SELECT c.id,c.parent_id,u.username,u.display_name,c.content,c.created_at,c.updated_at
 		FROM comments c JOIN users u ON u.id=c.user_id
-		WHERE c.post_id=$1 ORDER BY c.id ASC`, postID)
+		WHERE c.post_id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))
+		ORDER BY c.id ASC`, postID, viewerID)
 	if err != nil {
 		return []comment{}
 	}
@@ -182,7 +206,7 @@ func (s *server) comments(r *http.Request, postID int64) []comment {
 	items := []comment{}
 	for rows.Next() {
 		var c comment
-		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.Content, &c.CreatedAt, &c.UpdatedAt) == nil {
+		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.AuthorDisplayName, &c.Content, &c.CreatedAt, &c.UpdatedAt) == nil {
 			items = append(items, c)
 		}
 	}
@@ -271,7 +295,10 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 
 	var p post
-	p.Author = claims.Username
+	if err := tx.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&p.Author, &p.AuthorDisplayName); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load post author")
+		return
+	}
 	p.Visibility = body.Visibility
 	p.Background = body.Background
 	p.Attachments = attachments
@@ -317,9 +344,11 @@ func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 	// ponytail: rows expire eagerly on reads; add object-store lifecycle cleanup when orphan cleanup ships.
 	_, _ = s.db.Exec(r.Context(), `DELETE FROM stories WHERE expires_at <= NOW()`)
 	rows, err := s.db.Query(r.Context(), `
-		SELECT s.id,u.username,s.storage_ref,s.original_name,s.content_type,s.size_bytes,s.kind,s.created_at,s.expires_at
+		SELECT s.id,u.username,u.display_name,s.storage_ref,s.original_name,s.content_type,s.size_bytes,s.kind,s.created_at,s.expires_at
 		FROM stories s JOIN users u ON u.id=s.user_id
 		WHERE s.expires_at > NOW()
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$1 AND b.blocked_id=s.user_id) OR (b.blocked_id=$1 AND b.blocker_id=s.user_id))
 		ORDER BY (s.user_id=$1) DESC,s.created_at DESC
 		LIMIT 100`, claims.UserID)
 	if err != nil {
@@ -334,6 +363,7 @@ func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 		if rows.Scan(
 			&item.ID,
 			&item.Author,
+			&item.AuthorDisplayName,
 			&item.Attachment.StorageRef,
 			&item.Attachment.Name,
 			&item.Attachment.ContentType,
@@ -384,7 +414,11 @@ func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item := story{Author: claims.Username, Attachment: attachments[0]}
+	item := story{Attachment: attachments[0]}
+	if err := s.db.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&item.Author, &item.AuthorDisplayName); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load story author")
+		return
+	}
 	err = s.db.QueryRow(r.Context(), `
 		INSERT INTO stories(user_id,storage_ref,original_name,content_type,size_bytes,kind)
 		VALUES($1,$2,$3,$4,$5,$6)
@@ -471,10 +505,10 @@ func (s *server) like(w http.ResponseWriter, r *http.Request) {
 
 	var p post
 	err = tx.QueryRow(r.Context(), `
-		SELECT p.id,u.username,p.content,p.likes_count,p.created_at
+		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE p.id=$1`, id,
-	).Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt)
+	).Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt)
 	if err != nil {
 		httpx.Error(w, http.StatusNotFound, "post not found")
 		return
@@ -524,7 +558,9 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 		FROM posts p
 		WHERE p.id=$1 AND `+feedAccessSQL+`
 		  AND ($4::bigint IS NULL OR EXISTS (
-		    SELECT 1 FROM comments WHERE id=$4 AND post_id=p.id
+		    SELECT 1 FROM comments c WHERE c.id=$4 AND c.post_id=p.id
+		    AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))
 		  ))`, postID, claims.UserID, body.Content, body.ParentID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create comment")
@@ -577,9 +613,9 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 
 	var p post
 	err = s.db.QueryRow(r.Context(), `
-		SELECT p.id,u.username,p.content,p.likes_count,p.created_at
+		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at
 		FROM posts p JOIN users u ON u.id=p.user_id WHERE p.id=$1`, postID,
-	).Scan(&p.ID, &p.Author, &p.Content, &p.Likes, &p.CreatedAt)
+	).Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt)
 	if err != nil {
 		httpx.Error(w, http.StatusNotFound, "post not found")
 		return

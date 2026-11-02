@@ -58,11 +58,14 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,m.text,m.created_at
+		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,m.text,m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
 		WHERE m.conversation_id=$1
 		  AND m.deleted_at IS NULL
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR
+		    (b.blocked_id=$5 AND b.blocker_id=m.user_id))
 		  AND ($2::bigint=0 OR m.id<$2)
 		  AND (
 		    ($3='media' AND EXISTS (
@@ -79,7 +82,7 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 		  )
 		ORDER BY m.id DESC
 		LIMIT $4
-	`, conversationID, before, kind, limit)
+	`, conversationID, before, kind, limit, claims.UserID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load shared content")
 		return
@@ -94,6 +97,7 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 			&item.ConversationID,
 			&item.SenderID,
 			&item.Sender,
+			&item.SenderDisplayName,
 			&item.Text,
 			&item.CreatedAt,
 		); err != nil {

@@ -156,23 +156,23 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
-	mux.Handle("POST /api/calls", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createCall)))
-	mux.Handle("GET /api/calls/current", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.currentCalls)))
-	mux.Handle("GET /api/calls/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getCall)))
-	mux.Handle("GET /api/calls/{id}/participants", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listParticipants)))
-	mux.Handle("POST /api/calls/{id}/join", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.joinCall)))
-	mux.Handle("GET /api/calls/translation/languages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.callTranslationLanguages)))
-	mux.Handle("GET /api/calls/{id}/translation-consent", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getCallTranslationConsent)))
-	mux.Handle("POST /api/calls/{id}/translation-consent", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.setCallTranslationConsent)))
-	mux.Handle("POST /api/calls/{id}/translation-session", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createCallTranslationSession)))
+	mux.Handle("POST /api/calls", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createCall)))
+	mux.Handle("GET /api/calls/current", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.currentCalls)))
+	mux.Handle("GET /api/calls/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getCall)))
+	mux.Handle("GET /api/calls/{id}/participants", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listParticipants)))
+	mux.Handle("POST /api/calls/{id}/join", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.joinCall)))
+	mux.Handle("GET /api/calls/translation/languages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.callTranslationLanguages)))
+	mux.Handle("GET /api/calls/{id}/translation-consent", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getCallTranslationConsent)))
+	mux.Handle("POST /api/calls/{id}/translation-consent", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setCallTranslationConsent)))
+	mux.Handle("POST /api/calls/{id}/translation-session", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createCallTranslationSession)))
 	mux.HandleFunc("GET /api/calls/{id}/translation-stream", s.streamCallTranslation)
-	mux.Handle("POST /api/calls/{id}/decline", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.declineCall)))
-	mux.Handle("POST /api/calls/{id}/leave", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.leaveCall)))
-	mux.Handle("POST /api/calls/{id}/end", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.endCall)))
-	mux.Handle("POST /api/calls/{id}/e2ee/public-key", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.putPublicKey)))
-	mux.Handle("GET /api/calls/{id}/e2ee/public-keys", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listPublicKeys)))
-	mux.Handle("POST /api/calls/{id}/e2ee/envelopes", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.putEnvelope)))
-	mux.Handle("GET /api/calls/{id}/e2ee/envelope", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getEnvelope)))
+	mux.Handle("POST /api/calls/{id}/decline", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.declineCall)))
+	mux.Handle("POST /api/calls/{id}/leave", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.leaveCall)))
+	mux.Handle("POST /api/calls/{id}/end", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.endCall)))
+	mux.Handle("POST /api/calls/{id}/e2ee/public-key", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.putPublicKey)))
+	mux.Handle("GET /api/calls/{id}/e2ee/public-keys", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPublicKeys)))
+	mux.Handle("POST /api/calls/{id}/e2ee/envelopes", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.putEnvelope)))
+	mux.Handle("GET /api/calls/{id}/e2ee/envelope", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getEnvelope)))
 
 	port := config.Env("PORT", "8085")
 	httpServer := &http.Server{
@@ -195,6 +195,14 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"ready":             configured,
 		"livekitConfigured": configured,
 	})
+}
+
+// A direct call must never be created or resumed across a blocked pair.
+func (s *server) blockedPair(ctx context.Context, a, b int64) (bool, error) {
+	var blocked bool
+	err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM user_blocks ub WHERE
+        (ub.blocker_id=$1 AND ub.blocked_id=$2) OR (ub.blocker_id=$2 AND ub.blocked_id=$1))`, a, b).Scan(&blocked)
+	return blocked, err
 }
 
 func (s *server) createCall(w http.ResponseWriter, r *http.Request) {
@@ -229,8 +237,28 @@ func (s *server) createCall(w http.ResponseWriter, r *http.Request) {
 	}
 
 	members, err := s.conversationMembers(r.Context(), body.ConversationID)
-	if err != nil || len(members) < 2 {
-		httpx.Error(w, http.StatusConflict, "call requires at least two conversation members")
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot load call participants")
+		return
+	}
+	// A group call can still reach C when A blocks B: exclude B from A's invite.
+	eligible := make([]participant, 0, len(members))
+	for _, item := range members {
+		if item.UserID != claims.UserID {
+			blocked, err := s.blockedPair(r.Context(), claims.UserID, item.UserID)
+			if err != nil {
+				httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+				return
+			}
+			if blocked {
+				continue
+			}
+		}
+		eligible = append(eligible, item)
+	}
+	members = eligible
+	if len(members) < 2 {
+		httpx.Error(w, http.StatusConflict, "call requires at least two unblocked members")
 		return
 	}
 
@@ -329,6 +357,11 @@ const currentCallsSQL = `
 	JOIN conversations c ON c.id=cs.conversation_id
 	JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=$1
 	WHERE cs.status IN ('ringing','active') AND cp.declined_at IS NULL AND cp.left_at IS NULL
+      AND (c.type <> 'direct' OR NOT EXISTS(
+        SELECT 1 FROM conversation_members other JOIN user_blocks b ON
+        (b.blocker_id=$1 AND b.blocked_id=other.user_id) OR
+        (b.blocked_id=$1 AND b.blocker_id=other.user_id)
+        WHERE other.conversation_id=c.id AND other.user_id<>$1))
 	ORDER BY cs.created_at DESC
 	LIMIT 20`
 
@@ -435,10 +468,38 @@ func (s *server) joinCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := s.db.Exec(r.Context(), `
-		UPDATE call_participants SET joined_at=COALESCE(joined_at,NOW()),left_at=NULL
-		WHERE call_id=$1 AND user_id=$2 AND declined_at IS NULL`, call.ID, claims.UserID); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot join call")
+	// Serialize simultaneous joins to prevent blocked users joining the same
+	// LiveKit room even when different service instances handle the requests.
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	if _, err := tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", call.ID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	var conflict bool
+	err = tx.QueryRow(r.Context(), `SELECT EXISTS(
+      SELECT 1 FROM call_participants cp JOIN user_blocks b ON
+        (b.blocker_id=$2 AND b.blocked_id=cp.user_id) OR
+        (b.blocked_id=$2 AND b.blocker_id=cp.user_id)
+      WHERE cp.call_id=$1 AND cp.user_id<>$2 AND cp.joined_at IS NOT NULL
+        AND cp.left_at IS NULL AND cp.declined_at IS NULL)`, call.ID, claims.UserID).Scan(&conflict)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	if conflict {
+		httpx.Error(w, http.StatusForbidden, "blocked participants cannot join the same call")
+		return
+	}
+	tag, err := tx.Exec(r.Context(), `
+        UPDATE call_participants SET joined_at=COALESCE(joined_at,NOW()),left_at=NULL
+        WHERE call_id=$1 AND user_id=$2 AND declined_at IS NULL`, call.ID, claims.UserID)
+	if err != nil || tag.RowsAffected() == 0 || tx.Commit(r.Context()) != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot join call")
 		return
 	}
 	// Rejoining requires fresh voice consent; never reuse a grant from a prior connection.
@@ -688,6 +749,14 @@ func (s *server) listPublicKeys(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
+		blocked, err := s.blockedPair(r.Context(), claims.UserID, userID)
+		if err != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+			return
+		}
+		if blocked {
+			continue
+		}
 		var record publicKeyRecord
 		if json.Unmarshal(raw, &record) == nil && validP256PublicJWK(record.PublicKey) {
 			items = append(items, record)
@@ -731,6 +800,15 @@ func (s *server) putEnvelope(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusForbidden, "recipient has not joined the call")
 		return
 	}
+	blocked, err := s.blockedPair(r.Context(), claims.UserID, body.RecipientUserID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	if blocked {
+		httpx.Error(w, http.StatusForbidden, "cannot exchange keys with blocked participant")
+		return
+	}
 	envelope := keyEnvelope{
 		SenderUserID: claims.UserID, RecipientUserID: body.RecipientUserID,
 		Generation: body.Generation, IV: body.IV, Ciphertext: body.Ciphertext, UpdatedAt: time.Now().UTC(),
@@ -763,6 +841,15 @@ func (s *server) getEnvelope(w http.ResponseWriter, r *http.Request) {
 	var envelope keyEnvelope
 	if json.Unmarshal(raw, &envelope) != nil || envelope.RecipientUserID != claims.UserID {
 		httpx.Error(w, http.StatusServiceUnavailable, "invalid key relay state")
+		return
+	}
+	blocked, err := s.blockedPair(r.Context(), claims.UserID, envelope.SenderUserID)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	if blocked {
+		httpx.Error(w, http.StatusForbidden, "cannot exchange keys with blocked participant")
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"envelope": envelope})
@@ -847,7 +934,12 @@ func (s *server) membership(ctx context.Context, conversationID, userID int64) (
 	err := s.db.QueryRow(ctx, `
 		SELECT c.type,cm.role FROM conversation_members cm
 		JOIN conversations c ON c.id=cm.conversation_id
-		WHERE cm.conversation_id=$1 AND cm.user_id=$2`, conversationID, userID,
+		WHERE cm.conversation_id=$1 AND cm.user_id=$2
+          AND (c.type <> 'direct' OR NOT EXISTS(
+            SELECT 1 FROM conversation_members other JOIN user_blocks b ON
+              (b.blocker_id=$2 AND b.blocked_id=other.user_id) OR
+              (b.blocked_id=$2 AND b.blocker_id=other.user_id)
+            WHERE other.conversation_id=c.id AND other.user_id<>$2))`, conversationID, userID,
 	).Scan(&member.ConversationType, &member.Role)
 	return member, err
 }

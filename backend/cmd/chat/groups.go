@@ -40,8 +40,7 @@ func (s *server) groupMembers(ctx context.Context, conversationID int64) ([]grou
 		SELECT u.id,u.username,u.display_name,u.show_online_status,cm.role
 		FROM conversation_members cm
 		JOIN users u ON u.id=cm.user_id
-		JOIN conversations c ON c.id=cm.conversation_id
-		WHERE cm.conversation_id=$1 AND c.type='group'
+		WHERE cm.conversation_id=$1
 		ORDER BY
 		  CASE cm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
 		  u.username ASC
@@ -70,8 +69,11 @@ func (s *server) listGroupMembers(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := s.groupRole(r.Context(), conversationID, claims.UserID); err != nil {
-		httpx.Error(w, http.StatusForbidden, "not a group member")
+	if !s.isMember(r.Context(), conversationID, claims.UserID) {
+		httpx.Error(w, http.StatusForbidden, "not a conversation member")
+		return
+	}
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
 		return
 	}
 

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-import { canMarkConversationRead } from '../src/conversationRead.ts'
+import { canMarkConversationRead } from '../src/features/chat/conversationRead.ts'
 import {
   clearChatPersistence, clearPendingSend, loadChatDrafts,
   loadPendingSend, saveChatDrafts, savePendingSend,
-} from '../src/chatPersistence.ts'
+} from '../src/features/chat/chatPersistence.ts'
 
 const items = new Map()
 const store = {
@@ -55,6 +55,8 @@ savePendingSend(100, previous, deniedStore)
 clearChatPersistence(100, deniedStore)
 
 assert.equal(canMarkConversationRead(42, 42, 'chat', 'visible'), true)
+assert.equal(canMarkConversationRead(42, 42, 'chat', 'visible', false), false, 'Unfocused desktop must not mark read')
+assert.equal(canMarkConversationRead(42, 42, 'chat', 'visible', true), true, 'Focused desktop may mark read')
 assert.equal(canMarkConversationRead(42, 42, 'chat', 'hidden'), false, 'Background PWA must not mark read')
 assert.equal(canMarkConversationRead(42, 42, 'feed', 'visible'), false, 'Hidden chat tab must not mark read')
 assert.equal(canMarkConversationRead(42, 43, 'chat', 'visible'), false, 'Other conversation must stay unread')

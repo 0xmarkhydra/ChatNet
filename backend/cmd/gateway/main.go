@@ -70,8 +70,11 @@ func main() {
 	mux.Handle("/api/contacts/", chatProxy)
 	mux.Handle("/api/privacy", chatProxy)
 	mux.Handle("/api/preferences/", chatProxy)
+	mux.Handle("/api/conversation-categories", chatProxy)
+	mux.Handle("/api/conversation-categories/", chatProxy)
 	mux.Handle("/api/conversations", chatProxy)
 	mux.Handle("/api/conversations/", chatProxy)
+	mux.Handle("/api/chat/", chatProxy)
 	mux.Handle("/api/calls", callProxy)
 	mux.Handle("/api/calls/", callProxy)
 	mux.Handle("/api/translate", translateProxy)
@@ -81,6 +84,7 @@ func main() {
 	mux.Handle("/api/feed/", feedProxy)
 	mux.Handle("/api/stories", feedProxy)
 	mux.Handle("/api/stories/", feedProxy)
+	mux.Handle("/api/marketplace/", feedProxy)
 
 	if staticDir := strings.TrimSpace(os.Getenv("STATIC_DIR")); staticDir != "" {
 		mux.Handle("/", spaHandler(staticDir))

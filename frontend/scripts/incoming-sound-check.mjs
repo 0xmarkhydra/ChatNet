@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../src/incomingSound.ts'
+import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../src/features/notifications/incomingSound.ts'
 
 const storage = new Map()
 globalThis.localStorage = {
