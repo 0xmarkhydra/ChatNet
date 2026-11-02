@@ -91,6 +91,7 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   border-color: #aec6ff;
   box-shadow: 0 0 0 3px rgba(37,99,235,.08);
 }
+.appbar-search input:focus-visible { outline: none; }
 .appbar-search input { font-size: 15px; color: var(--soco-text); }
 .appbar-search input::placeholder { color: #8995ad; }
 .appbar-icon-button {
