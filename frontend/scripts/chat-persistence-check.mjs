@@ -55,6 +55,8 @@ savePendingSend(100, previous, deniedStore)
 clearChatPersistence(100, deniedStore)
 
 assert.equal(canMarkConversationRead(42, 42, 'chat', 'visible'), true)
+assert.equal(canMarkConversationRead(42, 42, 'chat', 'visible', false), false, 'Unfocused desktop must not mark read')
+assert.equal(canMarkConversationRead(42, 42, 'chat', 'visible', true), true, 'Focused desktop may mark read')
 assert.equal(canMarkConversationRead(42, 42, 'chat', 'hidden'), false, 'Background PWA must not mark read')
 assert.equal(canMarkConversationRead(42, 42, 'feed', 'visible'), false, 'Hidden chat tab must not mark read')
 assert.equal(canMarkConversationRead(42, 43, 'chat', 'visible'), false, 'Other conversation must stay unread')

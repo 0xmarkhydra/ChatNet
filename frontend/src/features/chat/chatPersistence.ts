@@ -17,8 +17,13 @@ const PENDING_TTL_MS = 24 * 60 * 60 * 1000
 const draftKey = (userId: number) => `chatnet:drafts:v1:${userId}`
 const pendingKey = (userId: number) => `chatnet:pending-send:v1:${userId}`
 
+let platformStore: ChatStore | undefined
+
+// Desktop keeps drafts across window/process restarts; Web retains tab-local behavior.
+export function configureChatPersistenceStore(store: ChatStore): void { platformStore = store }
+
 function usableStore(store?: ChatStore): ChatStore | null {
-  try { return store ?? window.sessionStorage } catch { return null }
+  try { return store ?? platformStore ?? window.sessionStorage } catch { return null }
 }
 
 function validUser(userId: number): boolean {

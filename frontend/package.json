@@ -10,6 +10,8 @@
     "check:incoming-sound": "node --experimental-strip-types scripts/incoming-sound-check.mjs",
     "check:pwa": "node --experimental-strip-types scripts/pwa-update-check.mjs",
     "check:session": "node --experimental-strip-types scripts/session-check.mjs",
+    "check:desktop-session": "node --experimental-strip-types scripts/desktop-session-check.mjs",
+    "check:desktop-notifications": "node scripts/desktop-notifications-check.mjs",
     "check:optimistic": "node --experimental-strip-types scripts/optimistic-check.mjs",
     "check:chat": "node --experimental-strip-types scripts/chat-persistence-check.mjs",
     "check:message-search": "node --experimental-strip-types scripts/message-search-check.mjs",
@@ -24,7 +26,8 @@
     "preview": "vite preview",
     "check:categories": "node scripts/conversation-categories-check.mjs",
     "check:profile-note": "node scripts/profile-note-check.mjs",
-    "check:cache": "node --experimental-strip-types scripts/session-cache-check.mjs"
+    "check:cache": "node --experimental-strip-types scripts/session-cache-check.mjs",
+    "build:desktop": "tsc --noEmit && vite build --mode desktop --base ./ --outDir ../desktop/dist/renderer --emptyOutDir"
   },
   "dependencies": {
     "livekit-client": "^2.22.3",
@@ -42,6 +45,6 @@
     "@vitejs/plugin-react": "^5.0.4",
     "playwright": "^1.64.1",
     "typescript": "^5.9.2",
-    "vite": "^7.1.7"
+    "vite": "7.3.7"
   }
 }

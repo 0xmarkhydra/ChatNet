@@ -62,6 +62,16 @@ func TestTranslationOriginIsRestricted(t *testing.T) {
 	if !translationAllowedOrigin(r) {
 		t.Fatal("expected official web origin")
 	}
+	r.Header.Set("Origin", "app://soco")
+	if !translationAllowedOrigin(r) {
+		t.Fatal("expected packaged desktop origin")
+	}
+	for _, badOrigin := range []string{"app://soco.evil.example", "app://evil", "app://soco/path", "file://soco", "null"} {
+		r.Header.Set("Origin", badOrigin)
+		if translationAllowedOrigin(r) {
+			t.Fatalf("untrusted desktop origin allowed: %q", badOrigin)
+		}
+	}
 }
 func TestGeminiErrorCategoryDoesNotLeakProviderDetails(t *testing.T) {
 	if message := publicGeminiLiveError(errGeminiQuota); message == "" || !strings.Contains(message, "quota") {

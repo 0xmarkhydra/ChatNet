@@ -4,6 +4,8 @@ ChatNet là MVP mạng giao tiếp đa ngôn ngữ cho hackathon: **chat riêng 
 
 Mục tiêu của bản thi là chứng minh một flow end-to-end đủ giống sản phẩm thật nhưng vẫn có kiến trúc để tiếp tục scale sau cuộc thi.
 
+> **SOCO Desktop (kế hoạch, chưa code):** bộ tài liệu đặc tả, kiến trúc, backlog, QA và phân công nằm ở [docs/desktop/README.md](docs/desktop/README.md). Phát triển trên nhánh riêng `feat/chatnet-desktop-electron`, không ảnh hưởng giai đoạn Web/PWA.
+
 ## Tính năng
 
 ### Tài khoản
