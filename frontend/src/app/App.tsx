@@ -1135,7 +1135,9 @@ export default function App({ initialSession }: { initialSession?: Session | nul
               sizeBytes: file.size,
               contentType,
               kind: ticket.kind,
-              url: ticket.downloadUrl,
+              // Pending chat media uses a local preview. Never persist/reuse
+              // the raw S3 GET URL from the upload ticket.
+              url: scope === 'chat' ? URL.createObjectURL(file) : ticket.downloadUrl,
             }
           }
         } catch (error) {

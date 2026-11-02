@@ -72,9 +72,13 @@ func Presign(store *objectstore.Client, userID int64, req UploadRequest) (Presig
 	if err != nil {
 		return PresignedUpload{}, err
 	}
-	downloadURL, err := store.SignedGetURL(ticket.StorageRef, time.Hour)
-	if err != nil {
-		return PresignedUpload{}, err
+	// Chat objects must not expose reusable raw S3 download links.
+	downloadURL := ""
+	if scope != "chat" {
+		downloadURL, err = store.SignedGetURL(ticket.StorageRef, time.Hour)
+		if err != nil {
+			return PresignedUpload{}, err
+		}
 	}
 	return PresignedUpload{
 		UploadURL:   ticket.UploadURL,
@@ -125,9 +129,12 @@ func ValidateAttachments(ctx context.Context, store *objectstore.Client, scope s
 			return nil, fmt.Errorf("file %q vượt quá giới hạn dung lượng", name)
 		}
 
-		url, err := store.SignedGetURL(ref, time.Hour)
-		if err != nil {
-			return nil, err
+		url := ""
+		if scope != "chat" {
+			url, err = store.SignedGetURL(ref, time.Hour)
+			if err != nil {
+				return nil, err
+			}
 		}
 		items = append(items, Attachment{
 			StorageRef:  ref,
