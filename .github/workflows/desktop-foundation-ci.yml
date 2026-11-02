@@ -1,4 +1,4 @@
-name: SOCO Desktop core checks
+name: SocCO Desktop core checks
 
 on:
   push:

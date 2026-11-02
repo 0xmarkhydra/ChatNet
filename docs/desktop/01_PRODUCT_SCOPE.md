@@ -1,11 +1,11 @@
-# SOCO Desktop — Product Scope / PRD v1
+# SocCO Desktop — Product Scope / PRD v1
 
 **Ngày:** 30/10/2026 · **Trạng thái:** KẾ HOẠCH, chưa code · **Target:** Windows + macOS.
 **Đích:** Desktop app dùng chung tài khoản/hội thoại với `chat.codelocal.cloud`, không dựng mạng xã hội hay hệ thống dữ liệu thứ hai.
 
 ## 1. User Journey (MVP/P0)
 
-1. Người dùng tải bộ cài có ký, mở SOCO từ icon desktop, thấy giao diện SOCO; chọn cửa sổ nhỏ/lớn không tràn.
+1. Người dùng tải bộ cài có ký, mở SocCO từ icon desktop, thấy giao diện SocCO; chọn cửa sổ nhỏ/lớn không tràn.
 2. Đăng nhập email/OTP qua Auth hiện tại; desktop có thiết bị/phiên riêng, logout hoặc thu hồi từ thiết bị khác phải chấm dứt phiên.
 3. Mở danh sách chat, tìm hội thoại, gửi/nhận text + file/voice, react/edit/recall, trạng thái đọc, chat nhóm và quyền nhóm; ảnh/media đúng scope.
 4. Ngắt mạng rồi gửi: giữ bản nháp/hàng đợi, hiển thị trạng thái, khôi phục sau restart; khi nối lại không gửi trùng.

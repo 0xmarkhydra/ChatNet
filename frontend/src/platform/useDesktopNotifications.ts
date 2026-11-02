@@ -90,7 +90,7 @@ export function useDesktopNotifications(options: Options) {
       } finally { busy = false; if (dirty && matches()) { dirty = false; schedule() } }
     }
     const schedule = () => { window.clearTimeout(timer); timer = window.setTimeout(() => void refresh(), 400) }
-    const unavailable = () => { if (matches()) setNativeWarning('Hệ điều hành chưa hiển thị được thông báo SocCo. Kiểm tra quyền thông báo và bản cài có ký.') }
+    const unavailable = () => { if (matches()) setNativeWarning('Hệ điều hành chưa hiển thị được thông báo SocCO. Kiểm tra quyền thông báo và bản cài có ký.') }
     const unsubscribe = desktopBridge().notifications.onClicked((input) => {
       if (!matches() || input.sessionId !== sessionId || !Number.isSafeInteger(input.conversationId) || input.conversationId <= 0 || opening) return
       opening = true

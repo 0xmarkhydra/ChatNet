@@ -8,9 +8,16 @@ import 'widgets.dart';
 
 Future<void> showCallSurface(
   BuildContext context, {
+  required Api api,
   required Json conversation,
   required bool video,
 }) {
+  if (!api.isDemo) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Cuộc gọi trên mobile chưa được hỗ trợ.')),
+    );
+    return Future<void>.value();
+  }
   return showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -88,7 +95,7 @@ class _CallSurfaceState extends State<_CallSurface> {
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'SocCo SECURE CALL',
+                        'SocCO SECURE CALL',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 12,

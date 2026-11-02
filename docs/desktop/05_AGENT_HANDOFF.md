@@ -1,6 +1,6 @@
-# SOCO Desktop — Agent Handoff / Execution Contract
+# SocCO Desktop — Agent Handoff / Execution Contract
 
-**Bàn giao B05 — 31/10/2026:** Xem `10_BATCH_05_STATUS.md`. Có EXE Windows x64, DMG/ZIP Mac arm64/x64 nội bộ chưa ký, SHA-256 inventory, icon SOCO, signing fail-closed, native CI matrix. 62/62 tests, clean install deps/Web build, DMG arm64 copy-install/native smoke PASS. GitHub CI bị billing lock; không chạy được job, không có CI PASS. Updater runtime chưa triển khai; signing/notarization, Windows/Intel native UAT và call/translation thật vẫn BLOCKED/NOT RUN. B03 push `2330cc3`, B04 push `76b56f1`; không áp dụng gói WIP B02 cũ. Tiếp tục các lỗi dữ liệu/cache/CSP/SSE được liệt kê, rồi updater có feed ký và UAT, không tự release.
+**Bàn giao B05 — 31/10/2026:** Xem `10_BATCH_05_STATUS.md`. Có EXE Windows x64, DMG/ZIP Mac arm64/x64 nội bộ chưa ký, SHA-256 inventory, icon SocCO, signing fail-closed, native CI matrix. 62/62 tests, clean install deps/Web build, DMG arm64 copy-install/native smoke PASS. GitHub CI bị billing lock; không chạy được job, không có CI PASS. Updater runtime chưa triển khai; signing/notarization, Windows/Intel native UAT và call/translation thật vẫn BLOCKED/NOT RUN. B03 push `2330cc3`, B04 push `76b56f1`; không áp dụng gói WIP B02 cũ. Tiếp tục các lỗi dữ liệu/cache/CSP/SSE được liệt kê, rồi updater có feed ký và UAT, không tự release.
 
 **Bàn giao B04 — 31/10/2026:** Xem `09_BATCH_04_STATUS.md`. Đã có notification/call notice native, badge theo tổng server, click reauthorize, focus-aware read receipt. Backend bổ sung unread summary và exact conversation lookup, chưa deploy. 59 native tests, React contract tests, real PG/Redis suite và packaged negative IPC smoke PASS; positive OS notification/UAT chưa chứng minh. B03 đã push `2330cc3`. Tiếp tục B05 trên nhánh Desktop, giữ nguyên blockers và không public release.
 
@@ -15,7 +15,7 @@
 
 ## 1. Prompt chuẩn cho mọi dev/agent
 
-> Bạn là kỹ sư triển khai SOCO Desktop, làm việc **chỉ** trên branch `feat/chatnet-desktop-electron` hoặc branch con được gán, trong worktree Desktop độc lập.
+> Bạn là kỹ sư triển khai SocCO Desktop, làm việc **chỉ** trên branch `feat/chatnet-desktop-electron` hoặc branch con được gán, trong worktree Desktop độc lập.
 >
 > Trước khi sửa: đọc `AGENTS.md`, `docs/desktop/README.md`, PRD, architecture, backlog, QA gates và các specs ChatNet liên quan. Kiểm tra `git status` + commit nền. Tôn trọng file của agent khác.
 >
@@ -73,7 +73,7 @@ Mỗi batch là **đề xuất**, cần phát triển tuần tự theo dependenc
 ## 5. Báo cáo mẫu sau mỗi batch
 
 ```text
-SOCO Desktop / Bxx
+SocCO Desktop / Bxx
 Base: <commit>
 Branch: <branch>
 Changed files: <paths>

@@ -2,8 +2,8 @@
   "name": "soco-desktop",
   "private": true,
   "version": "0.1.0",
-  "description": "SOCO Desktop shell for ChatNet",
-  "author": "SOCO",
+  "description": "SocCO Desktop shell for ChatNet",
+  "author": "SocCO",
   "main": "src/main.cjs",
   "scripts": {
     "dev:web": "npm --prefix ../frontend run dev -- --host 127.0.0.1 --mode desktop",
@@ -24,7 +24,7 @@
   },
   "build": {
     "appId": "asia.soco.desktop",
-    "productName": "SOCO",
+    "productName": "SocCO",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "icon": "assets/icon.png",
     "asar": true,
@@ -36,8 +36,8 @@
       "target": ["dmg", "zip"],
       "hardenedRuntime": true,
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "SOCO sử dụng microphone khi bạn gọi thoại/video hoặc ghi tin nhắn thoại.",
-        "NSCameraUsageDescription": "SOCO sử dụng camera khi bạn gọi video hoặc quét mã QR."
+        "NSMicrophoneUsageDescription": "SocCO sử dụng microphone khi bạn gọi thoại/video hoặc ghi tin nhắn thoại.",
+        "NSCameraUsageDescription": "SocCO sử dụng camera khi bạn gọi video hoặc quét mã QR."
       }
     },
     "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },

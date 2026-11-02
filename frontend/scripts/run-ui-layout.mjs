@@ -26,7 +26,7 @@ const check = (value, message) => { if (!value) throw new Error(message) }
 const conversations = [
   { id: 1, name: 'minhanh', type: 'direct', otherUserId: 2, memberCount: 2, unreadCount: 2, lastMessage: 'Chiều nay mình xem lại bản thiết kế nhé.', online: true, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
   { id: 2, name: 'hoangnam', type: 'direct', otherUserId: 3, memberCount: 2, unreadCount: 0, lastMessage: 'Cảm ơn bạn, mình nhận được rồi.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
-  { id: 3, name: 'Nhóm SocCo kiểm thử giao diện mobile và desktop với tên rất dài', type: 'group', memberCount: 5, unreadCount: 0, lastMessage: 'Hẹn cả nhóm ngày mai.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
+  { id: 3, name: 'Nhóm SocCO kiểm thử giao diện mobile và desktop với tên rất dài', type: 'group', memberCount: 5, unreadCount: 0, lastMessage: 'Hẹn cả nhóm ngày mai.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
 ]
 const pagedConversations = [...conversations, ...Array.from({ length: 27 }, (_, index) => ({
   id: index + 4, name: 'user_' + (index + 4), type: 'direct',
@@ -39,7 +39,7 @@ const pagedMessages = Array.from({ length: 45 }, (_, index) => ({
   id: index + 1, conversationId: 1,
   senderId: [4, 44].includes(index + 1) ? 2 : 1,
   sender: [4, 44].includes(index + 1) ? 'minhanh' : 'soco_user',
-  senderDisplayName: [4, 44].includes(index + 1) ? 'Minh Anh' : 'SOCO Test User',
+  senderDisplayName: [4, 44].includes(index + 1) ? 'Minh Anh' : 'SocCO Test User',
   text: 'Lịch sử tin nhắn ' + (index + 1),
   createdAt: new Date(Date.UTC(2026, 9, 2, 7, index)).toISOString(),
 }))
@@ -52,7 +52,7 @@ const session = {
   token: 'mock.' + Buffer.from(JSON.stringify({ exp: 4102444800 })).toString('base64url') + '.signed',
   refreshToken: 'm'.repeat(43),
   sessionId: 'ui-layout-test',
-  user: { id: 1, username: 'soco_user', displayName: 'SocCo Test User', email: 'test@example.com' },
+  user: { id: 1, username: 'soco_user', displayName: 'SocCO Test User', email: 'test@example.com' },
 }
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization, Content-Type', 'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS' }
 try {
@@ -124,7 +124,7 @@ try {
         text: '', fileName: 'Báo cáo.pdf', fileKind: 'file', createdAt: '2026-10-02T07:00:00Z' }],
     })
     if (/^\/api\/conversations\/\d+\/members$/.test(path)) return json([
-      { id: 1, username: 'soco_user', displayName: 'SocCo Test User', role: 'owner', online: true },
+      { id: 1, username: 'soco_user', displayName: 'SocCO Test User', role: 'owner', online: true },
       ...Array.from({ length: 8 }, (_, index) => ({
         id: index + 2, username: 'member_' + (index + 2),
         displayName: 'Thành viên ' + (index + 2), role: index === 0 ? 'admin' : 'member', online: index % 2 === 0,
@@ -247,7 +247,7 @@ try {
   pagedMessages.push(...Array.from({ length: 220 }, (_, index) => ({
     id: index + 46, conversationId: 1,
     senderId: index === 100 ? 2 : 1, sender: index === 100 ? 'minhanh' : 'soco_user',
-    senderDisplayName: index === 100 ? 'Minh Anh' : 'SOCO Test User',
+    senderDisplayName: index === 100 ? 'Minh Anh' : 'SocCO Test User',
     text: 'Tin nhắn sau tìm kiếm ' + (index + 46),
     createdAt: new Date(Date.UTC(2026, 9, 2, 8, index)).toISOString(),
   })))
@@ -276,7 +276,7 @@ try {
   // Restore the original fixture so unrelated layout/translation tests remain unchanged.
   for (const id of [4, 44]) {
     const item = pagedMessages.find(message => message.id === id)
-    if (item) Object.assign(item, { senderId: 1, sender: 'soco_user', senderDisplayName: 'SOCO Test User' })
+    if (item) Object.assign(item, { senderId: 1, sender: 'soco_user', senderDisplayName: 'SocCO Test User' })
   }
   console.log('PASS: grouped and local chat search, both participants, full history and middle-page backfill')
   // Sending retains its outbox status, but must not show the generic "Đang xử lý" banner.
@@ -671,7 +671,7 @@ try {
   for (const width of [320, 375, 390, 430]) {
     await page.setViewportSize({ width, height: width <= 375 ? 667 : width === 390 ? 844 : 932 })
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
-    await page.locator('.conversation-item').filter({ hasText: 'Nhóm SocCo' }).first().click()
+    await page.locator('.conversation-item').filter({ hasText: 'Nhóm SocCO' }).first().click()
     const headerAction = await page.locator('.chat-head .group-mobile-actions .call-header-actions button').first().boundingBox()
     const backAction = await page.getByRole('button', { name: 'Quay lại danh sách' }).boundingBox()
     const more = page.getByRole('button', { name: 'Tùy chọn nhóm' })
@@ -891,7 +891,7 @@ try {
   await page.getByRole('button', { name: 'Nghe thử' }).click()
   check(await tones() >= beforeTone + 6, 'Manual sound preview must generate sound')
   check(!errors.length, 'Uncaught JS errors: ' + errors.join('; '))
-  console.log('PASS: SocCo layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')
+  console.log('PASS: SocCO layout, overflow, profile stacking: ' + checks + ' viewport/screen checks')
 } catch (error) {
   console.error(error)
   process.exitCode = 1

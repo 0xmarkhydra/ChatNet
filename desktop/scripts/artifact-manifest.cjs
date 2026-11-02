@@ -9,8 +9,8 @@ const { execFileSync } = require('node:child_process')
 async function internalManifest(directory, version) {
   const artifacts = []
   for (const name of (await fs.readdir(directory)).sort()) {
-    if (!name.startsWith(`SOCO-${version}-`)) continue
-    const match = /^SOCO-[0-9A-Za-z.+-]+-(mac|win)-(arm64|x64)\.(dmg|zip|exe)$/.exec(name)
+    if (!name.startsWith(`SocCO-${version}-`)) continue
+    const match = /^SocCO-[0-9A-Za-z.+-]+-(mac|win)-(arm64|x64)\.(dmg|zip|exe)$/.exec(name)
     if (!match) continue
     const [platform, arch, extension] = match.slice(1)
     if (platform === 'win' ? arch !== 'x64' || extension !== 'exe' : extension === 'exe') throw new Error('Invalid installer target')

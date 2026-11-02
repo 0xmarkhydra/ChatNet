@@ -17,20 +17,20 @@ let mounted = false
 try {
   const { version } = JSON.parse(await readFile(join(root, 'desktop/package.json'), 'utf8'))
   assert.match(version, /^[0-9A-Za-z.+-]+$/)
-  const dmg = join(root, `desktop/release/SOCO-${version}-mac-arm64.dmg`)
+  const dmg = join(root, `desktop/release/SocCO-${version}-mac-arm64.dmg`)
   await exec('hdiutil', ['verify', dmg], { timeout: 60000 })
   await mkdir(mount); await mkdir(install)
   await exec('hdiutil', ['attach', dmg, '-readonly', '-nobrowse', '-mountpoint', mount], { timeout: 60000 })
   mounted = true
-  const source = join(mount, 'SOCO.app')
+  const source = join(mount, 'SocCO.app')
   assert.equal((await lstat(source)).isDirectory(), true)
   assert.equal((await lstat(source)).isSymbolicLink(), false)
-  const destination = join(install, 'SOCO.app')
+  const destination = join(install, 'SocCO.app')
   // Copy only the application, never follow the DMG's /Applications convenience link.
   await cp(source, destination, { recursive: true, dereference: false, verbatimSymlinks: true })
   await exec('hdiutil', ['detach', mount], { timeout: 30000 }); mounted = false
   const result = await exec(process.execPath, [join(scripts, 'desktop-shell-smoke.mjs')], {
-    cwd: root, env: { ...process.env, SOCO_TEST_EXECUTABLE: join(destination, 'Contents/MacOS/SOCO') },
+    cwd: root, env: { ...process.env, SOCO_TEST_EXECUTABLE: join(destination, 'Contents/MacOS/SocCO') },
     timeout: 120000, maxBuffer: 2 * 1024 * 1024,
   })
   await writeFile(join(output, 'dmg-install-smoke.log'), result.stdout + result.stderr)

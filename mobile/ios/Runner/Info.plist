@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>SocCo</string>
+	<string>SocCO</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,15 +15,15 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>SocCo</string>
+	<string>SocCO</string>
 	<key>NSCameraUsageDescription</key>
-	<string>SocCo uses the camera for profile QR scanning and video calls.</string>
+	<string>SocCO uses the camera for profile QR scanning and video calls.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>SocCo uses your temporary location to find nearby people.</string>
+	<string>SocCO uses your temporary location to find nearby people.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>SocCo uses the microphone for voice messages and calls.</string>
+	<string>SocCO uses the microphone for voice messages and calls.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>SocCo uses selected photos and videos in chats, stories, and posts.</string>
+	<string>SocCO uses selected photos and videos in chats, stories, and posts.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

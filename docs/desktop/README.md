@@ -1,14 +1,14 @@
-# ChatNet / SOCO Desktop — Tài liệu tổng (Source of Truth)
+# ChatNet / SocCO Desktop — Tài liệu tổng (Source of Truth)
 
 > **Trạng thái tại 30/10/2026: ĐÃ CÓ ELECTRON FOUNDATION TRÊN NHÁNH RIÊNG — CHƯA ĐỦ BETA.**
 > Những mục [CHỐT] là quyết định kỹ thuật/sản phẩm; [ĐỀ XUẤT] cần xác nhận hoặc spike; [CHƯA CHỐT] không được tự áp đặt thành chính sách phát hành.
 
 ## 1. Bối cảnh và nguyên tắc
 
-- ChatNet/SOCO hiện phát triển **Web/PWA giai đoạn 1**. Desktop là **luồng phát triển riêng / giai đoạn mở rộng**, không thay thế Web/PWA và không mở phạm vi native iOS/Android.
+- ChatNet/SocCO hiện phát triển **Web/PWA giai đoạn 1**. Desktop là **luồng phát triển riêng / giai đoạn mở rộng**, không thay thế Web/PWA và không mở phạm vi native iOS/Android.
 - **[CHỐT]** Sử dụng **Electron + React 19 + TypeScript + Vite** cho vòng triển khai đầu; giữ nguyên **Go/Node services + PostgreSQL + Redis + LiveKit + hệ thống dịch Gemini qua backend**.
 - **[CHỐT]** Chia sẻ frontend ở `frontend/` và chỉ bổ sung phần **native shell** tại `desktop/` khi được phép code. **Không clone cả App.tsx**, không dựng API/DB/authorization riêng.
-- **[CHỐT]** Giữ brand SOCO xanh `#2563EB`, tím `#8B5CF6`; UI tinh gọn, native cảm giác desktop và responsive khi resize.
+- **[CHỐT]** Giữ brand SocCO xanh `#2563EB`, tím `#8B5CF6`; UI tinh gọn, native cảm giác desktop và responsive khi resize.
 - **[CHỐT]** Không đưa Gemini provider key, refresh token plaintext hay privileged IPC vào renderer; việc lưu token an toàn là một hạng mục P0 phải làm trước beta.
 - **[CHỐT]** Desktop tích hợp lên `dev` **chỉ khi đã review/test**, không merge `main` hoặc deploy tự động từ nhánh này.
 

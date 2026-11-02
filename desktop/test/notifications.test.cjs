@@ -39,7 +39,7 @@ test('notification payloads cannot introduce previews, paths, credentials or inv
 test('message notification uses generic text and correct session-bound click', async t => {
   const f = fixture(t)
   assert.deepEqual(await f.notifications.show(f.message()), { shown: true })
-  assert.deepEqual(f.state.shown[0].options, { title: 'SOCO', body: 'Bạn có tin nhắn mới. Mở SOCO để xem.', silent: false })
+  assert.deepEqual(f.state.shown[0].options, { title: 'SocCO', body: 'Bạn có tin nhắn mới. Mở SocCO để xem.', silent: false })
   f.state.shown[0].emit('click')
   assert.equal(f.state.opens, 1)
   assert.deepEqual(f.state.events, [{ sessionId, conversationId: 9, kind: 'message' }])

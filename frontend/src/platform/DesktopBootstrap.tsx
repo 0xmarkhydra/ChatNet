@@ -43,7 +43,7 @@ export default function DesktopBootstrap() {
       const message = detail.includes('VAULT_')
         ? 'Không mở được kho phiên an toàn của hệ điều hành. Kiểm tra quyền Keychain hoặc tài khoản Windows rồi thử lại.'
         : detail.includes('DESKTOP_')
-          ? 'Bản Desktop thiếu bridge hoặc cấu hình API không khớp. Hãy dùng đúng bộ cài SocCo.'
+          ? 'Bản Desktop thiếu bridge hoặc cấu hình API không khớp. Hãy dùng đúng bộ cài SocCO.'
           : 'Chưa xác minh được phiên đăng nhập. Kiểm tra kết nối rồi thử lại. Tin đang chờ và bản nháp vẫn được giữ.'
       setStartup({ phase: 'error', message })
     })
@@ -53,7 +53,7 @@ export default function DesktopBootstrap() {
   if (startup.phase === 'ready') return <><App initialSession={startup.session} /><DesktopScreenPicker /></>
   return (
     <main className="desktop-startup" aria-live="polite">
-      <h1>SocCo</h1>
+      <h1>SocCO</h1>
       {startup.phase === 'loading' ? <p role="status">Đang khôi phục phiên an toàn…</p> : <>
         <p role="alert">{startup.message}</p>
         <button type="button" onClick={() => setAttempt((value) => value + 1)}>Thử lại</button>

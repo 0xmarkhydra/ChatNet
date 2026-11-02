@@ -41,7 +41,7 @@ async function boundedJSON(response) {
   }
 }
 
-function createAuthBroker({ vault, baseURL, fetchImpl = fetch, userAgent = 'SOCO Desktop', onExpired = () => {} }) {
+function createAuthBroker({ vault, baseURL, fetchImpl = fetch, userAgent = 'SocCO Desktop', onExpired = () => {} }) {
   if (!['https://api-chat.codelocal.cloud', 'http://localhost:8080'].includes(baseURL)) {
     throw new Error('AUTH_UNTRUSTED_ENDPOINT')
   }

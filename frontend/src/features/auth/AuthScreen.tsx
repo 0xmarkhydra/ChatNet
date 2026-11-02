@@ -22,8 +22,8 @@ export default function AuthScreen({
   return (
     <main className="auth-screen">
       <section className="auth-copy">
-        <img src="/soco-mark.svg" width="52" height="52" alt="SocCo" />
-        <h1>SocCo</h1>
+        <img src="/soco-mark.svg" width="52" height="52" alt="SocCO" />
+        <h1>SocCO</h1>
         <p>Understand. Connect. Together.</p>
       </section>
 
@@ -32,7 +32,7 @@ export default function AuthScreen({
           <div className="otp-icon">✉️</div>
           <h2>Kiểm tra email của bạn</h2>
           <p className="auth-hint">
-            SocCo đã gửi mã xác minh 6 số tới <strong>{verificationEmail || 'email của bạn'}</strong>.
+            SocCO đã gửi mã xác minh 6 số tới <strong>{verificationEmail || 'email của bạn'}</strong>.
             Mã có hiệu lực trong 10 phút.
           </p>
 
@@ -66,7 +66,7 @@ export default function AuthScreen({
 
           {authError && <div className="auth-error">{authError}</div>}
           <button className="auth-submit" disabled={authLoading || otpCode.length !== 6 || otpSecondsLeft <= 0}>
-            {authLoading ? 'Đang xác minh...' : 'Xác minh & vào SocCo'}
+            {authLoading ? 'Đang xác minh...' : 'Xác minh & vào SocCO'}
           </button>
           <button type="button" className="auth-secondary" onClick={resetRegistration} disabled={authLoading}>
             Dùng email khác

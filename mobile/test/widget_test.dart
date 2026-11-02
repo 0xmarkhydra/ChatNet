@@ -4,9 +4,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/app.dart';
 import 'package:soco/demo.dart';
 import 'package:soco/profile_qr.dart';
+import 'package:soco/call_surface.dart';
+import 'package:soco/api.dart';
 
 void main() {
-  testWidgets('demo opens responsive SocCo shell', (tester) async {
+  testWidgets('real mobile calls do not show a simulated connection', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: Builder(builder: (context) =>
+      TextButton(onPressed: () => showCallSurface(context, api: Api(), conversation: const {}, video: true), child: const Text('Call'))))));
+    await tester.tap(find.text('Call'));
+    await tester.pump();
+    expect(find.textContaining('chưa được hỗ trợ'), findsOneWidget);
+    expect(find.text('SocCO SECURE CALL'), findsNothing);
+  });
+
+  testWidgets('demo opens responsive SocCO shell', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -14,7 +25,7 @@ void main() {
     await tester.pumpWidget(SocoApp(api: DemoApi()));
     await tester.pumpAndSettle();
 
-    expect(find.text('SocCo'), findsWidgets);
+    expect(find.text('SocCO'), findsWidgets);
     expect(find.text('Trò chuyện'), findsOneWidget);
     expect(find.text('Kết nối'), findsOneWidget);
     expect(find.text('14:00'), findsNWidgets(3));
@@ -37,7 +48,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('web-appbar')), findsOneWidget);
     expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
-    expect(find.text('SocCo'), findsWidgets);
+    expect(find.text('SocCO'), findsWidgets);
     expect(find.text('Kết nối'), findsOneWidget);
   });
 
@@ -77,7 +88,7 @@ void main() {
 
     await tester.pumpWidget(SocoApp(api: DemoApi()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SocCo Design Team').first);
+    await tester.tap(find.text('SocCO Design Team').first);
     await tester.pumpAndSettle();
     expect(find.textContaining('Sẵn sàng!'), findsOneWidget);
     expect(find.byKey(const ValueKey('web-appbar')), findsOneWidget);
@@ -215,7 +226,7 @@ void main() {
     await tester.tap(find.byTooltip('Gọi video'));
     await tester.pump();
 
-    expect(find.text('SocCo SECURE CALL'), findsOneWidget);
+    expect(find.text('SocCO SECURE CALL'), findsOneWidget);
     expect(find.text('Tắt mic'), findsOneWidget);
     expect(find.text('Tắt camera'), findsOneWidget);
     expect(find.text('Kết thúc'), findsOneWidget);

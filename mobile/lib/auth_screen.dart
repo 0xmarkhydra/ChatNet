@@ -147,7 +147,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SocoLogo(size: 68),
                     const SizedBox(height: 16),
                     const GradientText(
-                      'SocCo',
+                      'SocCO',
                       style: TextStyle(
                         fontSize: 42,
                         fontWeight: FontWeight.w900,
@@ -180,14 +180,14 @@ class _AuthScreenState extends State<AuthScreen> {
                             Text(
                               otp
                                   ? 'Kiểm tra email của bạn'
-                                  : 'Chào mừng đến SocCo',
+                                  : 'Chào mừng đến SocCO',
                               style: Theme.of(context).textTheme.headlineSmall,
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 8),
                             Text(
                               otp
-                                  ? 'SocCo đã gửi mã xác minh 6 số tới $maskedEmail.'
+                                  ? 'SocCO đã gửi mã xác minh 6 số tới $maskedEmail.'
                                   : 'Nhập email để đăng ký hoặc đăng nhập.',
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.bodySmall,
@@ -285,7 +285,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ),
                                     )
                                   : Text(
-                                      otp ? 'Xác minh & vào SocCo' : 'Tiếp tục',
+                                      otp ? 'Xác minh & vào SocCO' : 'Tiếp tục',
                                     ),
                             ),
                             if (otp)
