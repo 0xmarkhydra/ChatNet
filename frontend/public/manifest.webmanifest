@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "SOCO",
-  "short_name": "SOCO",
-  "description": "SOCO – Understand. Connect. Together. Trò chuyện, kết bạn và giao tiếp xuyên ngôn ngữ với AI.",
+  "name": "SocCo",
+  "short_name": "SocCo",
+  "description": "SocCo – Understand. Connect. Together. Trò chuyện, kết bạn và giao tiếp xuyên ngôn ngữ với AI.",
   "lang": "vi",
   "start_url": "/",
   "scope": "/",

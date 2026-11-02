@@ -124,7 +124,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
     <section className="marketplace-view">
       <header className="marketplace-header">
         <button type="button" aria-label="Quay lại Khám phá" onClick={onBack}><ArrowLeft size={20}/></button>
-        <h2>SOCO Market</h2>
+        <h2>SocCo Market</h2>
         <span>Sàn mua bán trên ChatNet</span>
       </header>
       <nav className="marketplace-tabs" aria-label="Sàn mua bán">

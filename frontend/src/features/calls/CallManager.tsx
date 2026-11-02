@@ -964,7 +964,7 @@ function SecureCallRoom({
             <div className="call-notice-icon"><Mic size={18} /></div>
             <div className="call-notice-copy">
               <strong>Cần quyền micro{call.mediaType === 'video' ? ' / camera' : ''}</strong>
-              <span>{mediaPermissionError} {isDesktopBuild ? 'Nếu đã chặn, hãy bật quyền SOCO trong cài đặt quyền riêng tư của hệ điều hành.' : 'Nếu đã chặn, hãy bật quyền trong cài đặt trình duyệt.'}</span>
+              <span>{mediaPermissionError} {isDesktopBuild ? 'Nếu đã chặn, hãy bật quyền SocCo trong cài đặt quyền riêng tư của hệ điều hành.' : 'Nếu đã chặn, hãy bật quyền trong cài đặt trình duyệt.'}</span>
             </div>
             <button type="button" disabled={!room || permissionRetrying}
               onClick={() => void requestCallMediaPermission()}>

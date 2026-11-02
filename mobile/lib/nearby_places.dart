@@ -23,7 +23,7 @@ List<Json> demoNearbyPlaces(double latitude, double longitude) {
     ('Nhà thuốc Trung Tâm', 'health', 'Nhà thuốc', 0.0032, 0.0017),
     ('Nhà sách Thành Phố', 'shopping', 'Nhà sách', -0.0028, -0.0022),
     ('Thư viện Khoa học', 'education', 'Thư viện', 0.0010, 0.0038),
-    ('SOCO Stay', 'stay', 'Khách sạn', -0.0036, 0.0011),
+    ('SocCo Stay', 'stay', 'Khách sạn', -0.0036, 0.0011),
   ];
   return [
     for (var index = 0; index < samples.length; index++)

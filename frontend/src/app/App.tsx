@@ -364,7 +364,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   if (!messageSound.current) messageSound.current = new IncomingMessageSound()
   useEffect(() => {
     // Browsers permit sound only after an interaction. Warm up Web Audio on a
-    // real user gesture, without playing a notification just for opening SOCO.
+    // real user gesture, without playing a notification just for opening SocCo.
     const unlockAudio = () => {
       if (messageSoundEnabledRef.current) messageSound.current?.unlock()
     }
@@ -730,8 +730,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     if (!session?.user.username) return
     const url = connectUrl(session.user.username)
     const shareData = {
-      title: `Kết nối với @${session.user.username} trên SOCO`,
-      text: `Kết nối với ${session.user.displayName || '@' + session.user.username} trên SOCO`,
+      title: `Kết nối với @${session.user.username} trên SocCo`,
+      text: `Kết nối với ${session.user.displayName || '@' + session.user.username} trên SocCo`,
       url,
     }
     try {
@@ -740,7 +740,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         return
       }
       await navigator.clipboard.writeText(url)
-      setNotice('Đã sao chép link hồ sơ SOCO.', 'success')
+      setNotice('Đã sao chép link hồ sơ SocCo.', 'success')
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
       setNotice('Không thể chia sẻ hồ sơ trên thiết bị này.', 'error')
@@ -751,7 +751,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     if (!session?.user.username) return
     try {
       await navigator.clipboard.writeText(connectUrl(session.user.username))
-      setNotice('Đã sao chép link kết nối SOCO.', 'success')
+      setNotice('Đã sao chép link kết nối SocCo.', 'success')
     } catch {
       setNotice('Không sao chép được link trên trình duyệt này.', 'error')
     }
@@ -882,7 +882,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     const handleInstalled = () => {
       setInstallPrompt(null)
       setIsStandalone(true)
-      setNotice('SOCO đã được cài vào thiết bị')
+      setNotice('SocCo đã được cài vào thiết bị')
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall)
@@ -1622,7 +1622,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
   async function previewMessageSound() {
     const played = await messageSound.current?.preview()
-    if (!played) setNotice('Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SOCO.', 'warning')
+    if (!played) setNotice('Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SocCo.', 'warning')
   }
 
   function toggleMessageSound() {
@@ -1659,7 +1659,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
     const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
     if (isiOS && !isStandalone && !pushEnabled) {
-      setNotice('Trên iPhone: thêm SOCO vào Màn hình chính trước, rồi mở app và bật thông báo.')
+      setNotice('Trên iPhone: thêm SocCo vào Màn hình chính trước, rồi mở app và bật thông báo.')
       return
     }
 
@@ -1675,7 +1675,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
       if (state.permission === 'denied') {
         setNotice(
-          'Thông báo đang bị chặn. Hãy mở cài đặt của trình duyệt/PWA → Notifications → Allow rồi quay lại SOCO.',
+          'Thông báo đang bị chặn. Hãy mở cài đặt của trình duyệt/PWA → Notifications → Allow rồi quay lại SocCo.',
         )
       } else if (state.permission === 'unsupported') {
         setNotice('Thiết bị hoặc trình duyệt này chưa hỗ trợ Web Push.')
@@ -1684,9 +1684,9 @@ export default function App({ initialSession }: { initialSession?: Session | nul
           'Chưa bật được thông báo. Vui lòng thử lại và chọn Cho phép.',
         )
       } else if (state.optedIn) {
-        setNotice('Đã bật thông báo SOCO.')
+        setNotice('Đã bật thông báo SocCo.')
       } else {
-        setNotice('Đã tắt thông báo SOCO')
+        setNotice('Đã tắt thông báo SocCo')
       }
     } catch {
       setNotice('Không thể bật thông báo. Kiểm tra quyền Notification của trình duyệt/PWA rồi thử lại.')
@@ -3196,7 +3196,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
       {tab !== 'profile' && tab !== 'discover' && tab !== 'market' && (
       <header className="chatnet-appbar">
-        <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SOCO</strong></div>
+        <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SocCo</strong></div>
           <div className="appbar-search-anchor" ref={quickSearchAnchorRef}>
           <label className="appbar-search">
             <UiIcon name="search" size={27} />
@@ -3404,7 +3404,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                     <div className="connect-ios-header">
                       <div>
                         <strong id="connect-modal-title">Kết nối</strong>
-                        <small>Tìm bạn bè trên SOCO</small>
+                        <small>Tìm bạn bè trên SocCo</small>
                       </div>
                       <button
                         type="button"
@@ -4097,7 +4097,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
         {tab === 'discover' && (
           <div className="marketplace-entry">
-            <div><h3>SOCO Market</h3><p>Mua bán trong ChatNet — trò chuyện, giỏ hàng và theo dõi yêu cầu đơn.</p></div>
+            <div><h3>SocCo Market</h3><p>Mua bán trong ChatNet — trò chuyện, giỏ hàng và theo dõi yêu cầu đơn.</p></div>
             <button type="button" onClick={() => switchTab('market')}>Mở sàn mua bán</button>
           </div>
         )}
@@ -4137,7 +4137,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         )}
 
         {tab === 'market' && (
-          <Suspense fallback={<p role="status">Đang mở SOCO Market...</p>}>
+          <Suspense fallback={<p role="status">Đang mở SocCo Market...</p>}>
             <Marketplace key={session.sessionId} userId={session.user.id} request={apiFetch} onBack={() => switchTab('discover')} />
           </Suspense>
         )}
@@ -4365,7 +4365,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
             <section className="profile-hero">
               <div className={`profile-cover-art ${profileMedia?.coverSet ? 'has-cover' : ''}`}>
                 <div className="profile-cover-placeholder">
-                  <strong>SOCO</strong>
+                  <strong>SocCo</strong>
                   <small>Understand. Connect. Together.</small>
                 </div>
                 {profileMedia?.coverSet && (
@@ -4512,7 +4512,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
               <div className="settings-row">
                 <div>
                   <strong>{isDesktopBuild ? 'Thông báo Desktop' : t('profile.notifications')}</strong>
-                  <small>{isDesktopBuild ? 'Ẩn nội dung và tên người gửi. Nhận khi SOCO còn chạy; thoát hẳn sẽ dừng thông báo.' : t('profile.notificationsHint')}</small>
+                  <small>{isDesktopBuild ? 'Ẩn nội dung và tên người gửi. Nhận khi SocCo còn chạy; thoát hẳn sẽ dừng thông báo.' : t('profile.notificationsHint')}</small>
                 </div>
                 <button
                   type="button"
