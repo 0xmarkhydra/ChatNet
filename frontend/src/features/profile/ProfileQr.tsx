@@ -119,7 +119,7 @@ export default function ProfileQr({ username, displayName, url, initialMode, onC
   }
 
   return (
-    <dialog ref={dialog} className="connection-dialog" aria-labelledby="qr-title" onCancel={onClose} onClose={onClose}>
+    <dialog ref={dialog} className="connection-dialog qr-dialog" aria-labelledby="qr-title" onCancel={onClose} onClose={onClose}>
       <header><h2 id="qr-title">Kết nối bằng QR</h2><button type="button" onClick={onClose} aria-label="Đóng QR" title="Đóng QR"><X size={20} /></button></header>
       <div className="connection-segments" aria-label="Chế độ QR">
         <button type="button" aria-pressed={mode === 'mine'} onClick={() => { fileRead.current++; setReading(false); setMode('mine'); setCamera(false); setMessage(''); setMatch('') }}>QR của tôi</button>
