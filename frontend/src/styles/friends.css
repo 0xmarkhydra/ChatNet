@@ -838,10 +838,14 @@
   cursor: pointer;
 }
 .contact-search-row {
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) 108px 42px;
+  align-items: center;
 }
 .contact-search-action {
-  min-width: 82px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
   min-height: 38px;
   padding: 8px 10px;
   border: 1px solid #dbe4ff;
@@ -885,17 +889,28 @@
   cursor: pointer;
 }
 .friend-contact-more[aria-expanded="true"] { color: #4338ca; background: #e5eaff; }
+.contacts-suggestions:has(.friend-contact-popover) {
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+}
 .friend-contact-popover {
   position: absolute;
   z-index: 25;
   top: calc(100% + 4px);
   right: 0;
   width: 174px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 5px;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 15px 40px rgba(15, 23, 42, .15);
+}
+.friend-contact-popover--up {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 .friend-contact-popover button {
   display: block;
@@ -1000,5 +1015,5 @@
   .account-sessions-panel { padding-inline: 10px; }
   .account-session-item { gap: 8px; }
   .contact-search-row { gap: 6px; }
-  .contact-search-action { min-width: 74px; padding-inline: 6px; font-size: 11px; }
+  .contact-search-action { padding-inline: 6px; font-size: 11px; }
 }

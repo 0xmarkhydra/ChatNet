@@ -1,1 +1,1 @@
-export type Tab = 'chat' | 'contacts' | 'discover' | 'feed' | 'profile'
+export type Tab = 'chat' | 'contacts' | 'discover' | 'market' | 'feed' | 'profile'

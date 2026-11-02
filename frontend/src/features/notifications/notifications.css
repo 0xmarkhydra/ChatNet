@@ -118,6 +118,15 @@
 
 .request-progress svg { flex-shrink: 0; animation: request-spin 1s linear infinite; }
 .outgoing-preview { opacity: .75; }
+.chat-outbox-message { opacity: 1; }
+.chat-outbox-message .bubble { box-shadow: 0 0 0 1px rgba(65, 107, 216, .18); }
+.chat-outbox-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.chat-outbox-footer .message-stamp { font-size: 11px; color: var(--chatnet-muted); }
+.chat-outbox-footer .chat-outbox-error { color: #ba343f; }
+.chat-outbox-retry { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; border: 1px solid var(--chatnet-line);
+  border-radius: 9px; background: var(--chatnet-surface); color: var(--chatnet-accent-ink); padding: 4px 9px;
+  font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
+.chat-outbox-retry:hover, .chat-outbox-retry:focus-visible { background: var(--chatnet-accent-soft); }
 .pending-content { white-space: pre-wrap; overflow-wrap: anywhere; }
 @keyframes request-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .request-progress svg { animation: none; } }

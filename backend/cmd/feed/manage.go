@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 )
 
+// A block in either direction overrides post visibility.
 const feedAccessSQL = `NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
  (b.blocker_id=$2 AND b.blocked_id=p.user_id) OR (b.blocker_id=p.user_id AND b.blocked_id=$2)) AND (p.user_id=$2 OR p.visibility='public' OR
  (p.visibility='friends' AND EXISTS(SELECT 1 FROM friend_connections fc
@@ -54,7 +55,7 @@ func (s *server) respondPost(w http.ResponseWriter, r *http.Request, id, uid int
 		httpx.Error(w, 404, "post not found")
 		return
 	}
-	p.Comments = s.comments(r, p.ID)
+	p.Comments = s.comments(r, p.ID, uid)
 	p.Attachments = s.postAttachments(r.Context(), p.ID)
 	httpx.JSON(w, status, p)
 }
@@ -181,7 +182,8 @@ func (s *server) editComment(w http.ResponseWriter, r *http.Request) {
 	}
 	tag, err := s.db.Exec(r.Context(), `UPDATE comments c SET content=$1,updated_at=NOW()
  WHERE c.id=$4 AND c.post_id=$3 AND c.user_id=$2
- AND EXISTS(SELECT 1 FROM posts p WHERE p.id=c.post_id AND `+feedAccessSQL+`)`, b.Content, c.UserID, id, cid)
+ AND EXISTS(SELECT 1 FROM posts p WHERE p.id=c.post_id AND `+feedAccessSQL+`)
+ AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))`, b.Content, c.UserID, id, cid)
 	if err != nil {
 		httpx.Error(w, 500, "cannot edit comment")
 		return
@@ -203,7 +205,8 @@ func (s *server) deleteComment(w http.ResponseWriter, r *http.Request) {
 	}
 	c, _ := authx.ClaimsFromContext(r.Context())
 	tag, err := s.db.Exec(r.Context(), `DELETE FROM comments c WHERE c.id=$1 AND c.post_id=$3 AND c.user_id=$2
- AND EXISTS(SELECT 1 FROM posts p WHERE p.id=c.post_id AND `+feedAccessSQL+`)`, cid, c.UserID, id)
+ AND EXISTS(SELECT 1 FROM posts p WHERE p.id=c.post_id AND `+feedAccessSQL+`)
+ AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))`, cid, c.UserID, id)
 	if err != nil {
 		httpx.Error(w, 500, "cannot delete comment")
 		return
@@ -242,9 +245,9 @@ func (s *server) reportFeed(w http.ResponseWriter, r *http.Request) {
 	case "post":
 		allowed = s.canReadPost(r.Context(), b.TargetID, c.UserID)
 	case "comment":
-		err = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM comments c JOIN posts p ON p.id=c.post_id WHERE c.id=$1 AND `+feedAccessSQL+`)`, b.TargetID, c.UserID).Scan(&allowed)
+		err = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM comments c JOIN posts p ON p.id=c.post_id WHERE c.id=$1 AND `+feedAccessSQL+` AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id)))`, b.TargetID, c.UserID).Scan(&allowed)
 	case "story":
-		err = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM stories WHERE id=$1 AND expires_at>NOW())`, b.TargetID).Scan(&allowed)
+		err = s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM stories st WHERE id=$1 AND expires_at>NOW() AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker_id=$2 AND b.blocked_id=st.user_id) OR (b.blocked_id=$2 AND b.blocker_id=st.user_id)))`, b.TargetID, c.UserID).Scan(&allowed)
 	}
 	if err != nil {
 		httpx.Error(w, 500, "cannot check report")

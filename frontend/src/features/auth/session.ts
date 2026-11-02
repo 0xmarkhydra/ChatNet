@@ -40,14 +40,26 @@ export function createSessionClient(baseURL: string, state: {
   get: () => Session | null
   save: (session: Session) => void
   expire: () => void
-}) {
+}, nativeAuth?: { refresh: (sessionId: string) => Promise<Session | null> }) {
   let pending: { sessionId: string; promise: Promise<Session | null> } | undefined
+  let checking: { sessionId: string; promise: Promise<boolean> } | undefined
   const unchanged = (previous: Session) => {
     const current = state.get()
     return current?.sessionId === previous.sessionId && current.token === previous.token
   }
 
   async function renew(previous: Session): Promise<Session | null> {
+    if (nativeAuth) {
+      const result = await nativeAuth.refresh(previous.sessionId)
+      if (!unchanged(previous)) return state.get()
+      if (!result) { state.expire(); return null }
+      const next = parseSession(result)
+      if (!next || next.refreshToken !== undefined || next.sessionId !== previous.sessionId || next.user.id !== previous.user.id) {
+        throw new Error('Phản hồi gia hạn phiên không hợp lệ.')
+      }
+      state.save(next)
+      return next
+    }
     // Legacy access-only credentials cannot safely recreate a refresh token.
     // Otherwise logging out could be reversed while a JWT remains valid.
     if (!previous.refreshToken) {
@@ -84,13 +96,47 @@ export function createSessionClient(baseURL: string, state: {
     const current = state.get()
     if (!current) return Promise.resolve(null)
     if (pending?.sessionId === current.sessionId) return pending.promise
-    if (!force && current.refreshToken && !expiresSoon(current.token)) return Promise.resolve(current)
+    if (!force && (nativeAuth || current.refreshToken) && !expiresSoon(current.token)) return Promise.resolve(current)
     const operation = { sessionId: current.sessionId, promise: renew(current) }
     pending = operation
     void operation.promise.finally(() => {
       if (pending === operation) pending = undefined
     }).catch(() => undefined)
     return operation.promise
+  }
+
+  // Verify the session-bound access JWT through the lightweight Redis-backed
+  // Auth endpoint. No refresh rotation or extra PostgreSQL write per mutation.
+  function check(): Promise<boolean> {
+    const current = state.get()
+    if (!current) return Promise.resolve(false)
+    if (checking?.sessionId === current.sessionId) return checking.promise
+    const operation = { sessionId: current.sessionId, promise: verify(current) }
+    checking = operation
+    void operation.promise.finally(() => {
+      if (checking === operation) checking = undefined
+    }).catch(() => undefined)
+    return operation.promise
+  }
+
+  async function verify(previous: Session): Promise<boolean> {
+    if (!nativeAuth && !previous.refreshToken) {
+      if (state.get()?.sessionId === previous.sessionId) state.expire()
+      return false
+    }
+    const response = await fetch(`${baseURL}/api/auth/session/status`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${previous.token}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!unchanged(previous)) return false
+    if (response.status === 401) {
+      state.expire()
+      return false
+    }
+    if (!response.ok) throw new Error('Không xác minh được phiên đăng nhập.')
+    return true
   }
 
   async function request(path: string, init: RequestInit = {}, sessionId?: string) {
@@ -104,7 +150,11 @@ export function createSessionClient(baseURL: string, state: {
     }
     const ready = await refresh()
     if (!ready || ready.sessionId !== sessionId) throw new Error('Phiên đăng nhập đã hết hạn.')
-    let response = await send(ready)
+    const method = (init.method || 'GET').toUpperCase()
+    if (method !== 'GET' && method !== 'HEAD' && !await check()) {
+      throw new Error('Phiên đăng nhập đã hết hạn.')
+    }
+    let response = await send(state.get() || ready)
     if (response.status === 401) {
       const current = state.get()
       if (!current || current.sessionId !== sessionId) return response
@@ -114,5 +164,5 @@ export function createSessionClient(baseURL: string, state: {
     return response
   }
 
-  return { refresh, request }
+  return { refresh, check, request }
 }

@@ -8,3 +8,8 @@ frontend/dist/
 output/playwright/
 # Local visual regression screenshots; never publish customer/test content.
 frontend/output/
+# Desktop native shell artifacts
+desktop/node_modules/
+desktop/dist/
+desktop/release/
+desktop/.vite/

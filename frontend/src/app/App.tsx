@@ -7,6 +7,7 @@ import { userLabel } from '../shared/lib/userLabel'
 import { useMessageData } from '../features/chat/useMessageData'
 import { useApiRequest } from './useApiRequest'
 import { useAppRealtime } from './useAppRealtime'
+import { useDesktopNotifications } from '../platform/useDesktopNotifications'
 import { useConversationData } from '../features/chat/useConversationData'
 import { useContactData } from '../features/contacts/useContactData'
 import { useFeedData } from '../features/feed/useFeedData'
@@ -33,6 +34,7 @@ import PostComposer from '../features/feed/PostComposer'
 import FeedPostCard from '../features/feed/FeedPostCard'
 import StoryViewer from '../features/feed/StoryViewer'
 import MessageActions from '../features/chat/MessageActions'
+import MessageSearchPanel from '../features/chat/MessageSearchPanel'
 import ProfileIdentityForm from '../features/profile/ProfileIdentityForm'
 import BottomNavigation from './BottomNavigation'
 import GroupSettingsPanel from '../features/chat/GroupSettingsPanel'
@@ -49,7 +51,9 @@ import GroupCreator from '../features/chat/GroupCreator'
 import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../features/notifications/incomingSound'
 import { createSessionClient, loadSession, type Session } from '../features/auth/session'
-import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts, savePendingSend } from '../features/chat/chatPersistence'
+import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts } from '../features/chat/chatPersistence'
+import { restoreChatOutbox } from '../features/chat/outboxRecovery'
+import { clearChatOutbox, confirmChatMessage, enqueueChatMessage, persistChatOutboxChange, retryableChatMessages, type QueuedChatMessage } from '../chatOutbox'
 import { uploadPresignedFile } from '../features/chat/mediaUpload'
 import { canMarkConversationRead } from '../features/chat/conversationRead'
 import { mergeById, toggleCount } from '../shared/lib/optimistic'
@@ -61,6 +65,7 @@ import { SocoEmptyState, SocoTextAction } from '../shared/ui/SocoUI'
 import { getCurrentPositionSmart, geolocationErrorMessage } from '../features/discover/geolocation'
 
 const NearbyExplorer = lazy(() => import('../features/discover/NearbyExplorer'))
+const Marketplace = lazy(() => import('../Marketplace'))
 const ProfileQr = lazy(() => import('../features/profile/ProfileQr'))
 import {
   defaultBundle,
@@ -84,15 +89,17 @@ import {
   type PushState,
 } from '../features/notifications/onesignal'
 
-export default function App() {
-  const [session, setSession] = useState<Session | null>(loadSession)
+import { desktopBridge, isDesktopBuild } from '../platform/desktop'
+
+export default function App({ initialSession }: { initialSession?: Session | null }) {
+  const [session, setSession] = useState<Session | null>(() => isDesktopBuild ? initialSession ?? null : loadSession())
   const sessionRef = useRef(session)
   const responseCache = useRef(new SessionResponseCache())
   const [sessionClient] = useState(() => createSessionClient(API, {
     get: () => sessionRef.current,
     save: saveSession,
     expire: () => logout(false),
-  }))
+  }, isDesktopBuild ? desktopBridge().auth : undefined))
   const auth = useAuthFlow(saveSession)
 
   const [tab, setTab] = useState<Tab>('chat')
@@ -118,6 +125,8 @@ export default function App() {
   const messageLongPressStart = useRef<{ x: number; y: number; messageId: number } | null>(null)
 
   const [sharedContentOpen, setSharedContentOpen] = useState(false)
+  const [messageSearchOpen, setMessageSearchOpen] = useState(false)
+  useEffect(() => { setMessageSearchOpen(false) }, [activeConversationId])
 
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
   const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>(() => {
@@ -144,6 +153,38 @@ export default function App() {
   const messageReceipts = useRef(new Map<string, Message | null>())
   // Preserve the request ID for an ambiguous send so a retry cannot create another row.
   const pendingSend = useRef<{ sessionId: string; conversationId: number; signature: string; clientId: string; draft: MessageDraft } | null>(null)
+  const [chatOutbox, setChatOutbox] = useState<QueuedChatMessage[]>(() =>
+    restoreChatOutbox(session?.user.id ?? 0, session?.sessionId ?? ''))
+  const chatOutboxRef = useRef(chatOutbox)
+  const chatOutboxSession = useRef(session?.sessionId ?? '')
+  const sendingClientIDs = useRef(new Set<string>())
+  const retryOutboxBusy = useRef(false)
+  const [chatOnline, setChatOnline] = useState(() => navigator.onLine)
+
+  function updateChatOutbox(transform: (items: QueuedChatMessage[]) => QueuedChatMessage[]) {
+    const current = sessionRef.current
+    if (!current || current.sessionId !== chatOutboxSession.current) return chatOutboxRef.current
+    const previous = chatOutboxRef.current
+    const next = transform(previous)
+    if (previous === next) return next
+    if (!persistChatOutboxChange(current.user.id, current.sessionId, previous, next)) {
+      setNotice('Không lưu được hàng đợi tin nhắn trên thiết bị này.', 'warning')
+      return previous
+    }
+    chatOutboxRef.current = next
+    setChatOutbox(next)
+    return next
+  }
+  useEffect(() => {
+    const nextSessionId = session?.sessionId ?? ''
+    if (nextSessionId === chatOutboxSession.current) return
+    chatOutboxSession.current = nextSessionId
+    const restored = restoreChatOutbox(session?.user.id ?? 0, nextSessionId)
+    chatOutboxRef.current = restored
+    setChatOutbox(restored)
+    sendingClientIDs.current.clear()
+    retryOutboxBusy.current = false
+  }, [session?.sessionId])
   const preferenceQueue = useRef(Promise.resolve())
   const preferenceRevision = useRef(0)
   const [newChatMode, setNewChatMode] = useState<NewChatMode>('none')
@@ -252,6 +293,23 @@ export default function App() {
   const [translations, setTranslations] = useState<Record<number, string>>({})
   const [translationOriginals, setTranslationOriginals] = useState<Record<number, boolean>>({})
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false)
+  useEffect(() => {
+    if (!translationMenuOpen) return
+    const onOutsidePointer = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest('.translation-hub')) {
+        setTranslationMenuOpen(false)
+      }
+    }
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTranslationMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onOutsidePointer, true)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('pointerdown', onOutsidePointer, true)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [translationMenuOpen])
   const [languageSearch, setLanguageSearch] = useState('')
   const [appLocale, setAppLocale] = useState(loadAppLocalePreference)
   const [uiBundle, setUiBundle] = useState<UIBundle>(defaultBundle)
@@ -303,6 +361,33 @@ export default function App() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const postComposerRef = useRef<HTMLTextAreaElement>(null)
   const messageInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!isDesktopBuild) return
+    const preventFileNavigation = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
+    }
+    const keyboard = (event: KeyboardEvent) => {
+      if (!sessionRef.current || event.isComposing || event.altKey || !(event.ctrlKey || event.metaKey) ||
+          document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      if (event.key.toLowerCase() === 'k' && !event.shiftKey) {
+        event.preventDefault()
+        setTab('chat')
+        requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.appbar-search input')?.focus())
+      } else if (event.key.toLowerCase() === 'l' && event.shiftKey) {
+        event.preventDefault()
+        messageInputRef.current?.focus()
+      }
+    }
+    document.addEventListener('dragover', preventFileNavigation)
+    document.addEventListener('drop', preventFileNavigation)
+    window.addEventListener('keydown', keyboard)
+    return () => {
+      document.removeEventListener('dragover', preventFileNavigation)
+      document.removeEventListener('drop', preventFileNavigation)
+      window.removeEventListener('keydown', keyboard)
+    }
+  }, [])
   const chatFileInputRef = useRef<HTMLInputElement>(null)
   const feedImageInputRef = useRef<HTMLInputElement>(null)
   const feedVideoInputRef = useRef<HTMLInputElement>(null)
@@ -613,7 +698,7 @@ export default function App() {
 
   function beginMessageLongPress(message: Message, x: number, y: number, button: number, target: EventTarget | null) {
     if (message.deleted || button !== 0) return
-    if (target instanceof Element && target.closest('button,a,input,textarea,select,video,audio')) return
+    if (target instanceof Element && target.closest('button,a,input,textarea,select,video,audio,.message-selectable-text')) return
     cancelMessageLongPress()
     messageLongPressStart.current = { x, y, messageId: message.id }
     messageLongPressTimer.current = window.setTimeout(() => {
@@ -753,7 +838,12 @@ export default function App() {
   }
 
   function saveSession(next: Session) {
-    localStorage.setItem('chatnet-session', JSON.stringify(next))
+    if (isDesktopBuild) {
+      if (next.refreshToken !== undefined) throw new Error('Desktop credential boundary violation')
+      localStorage.removeItem('chatnet-session')
+    } else {
+      localStorage.setItem('chatnet-session', JSON.stringify(next))
+    }
     sessionRef.current = next
     setSession(next)
   }
@@ -1594,19 +1684,24 @@ export default function App() {
 
   async function fetchAccountSessions() {
     const current = sessionRef.current
-    if (!current?.refreshToken || sessionsBusy) return
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy) return
     const identity = current.sessionId
     setSessionsBusy(true)
     setSessionsError('')
     try {
-      const response = await fetch(`${API}/api/auth/sessions/list`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ refreshToken: current.refreshToken }),
-      })
-      if (!response.ok) throw new Error('Không tải được phiên đăng nhập.')
-      const data = await response.json() as ManagedAccountSession[]
+      let data: ManagedAccountSession[]
+      if (isDesktopBuild) {
+        data = await desktopBridge().auth.listSessions(identity)
+      } else {
+        const response = await fetch(`${API}/api/auth/sessions/list`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({ refreshToken: current.refreshToken }),
+        })
+        if (!response.ok) throw new Error('Không tải được phiên đăng nhập.')
+        data = await response.json() as ManagedAccountSession[]
+      }
       if (sessionRef.current?.sessionId === identity) {
         setManagedSessions(data)
         setSessionsOpen(true)
@@ -1622,7 +1717,7 @@ export default function App() {
 
   async function revokeAccountSessions(sessionID?: string) {
     const current = sessionRef.current
-    if (!current?.refreshToken || sessionsBusy) return
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy) return
     const identity = current.sessionId
     const selected = managedSessions.find((item) => item.id === sessionID)
     if (sessionID && !selected) return
@@ -1635,13 +1730,21 @@ export default function App() {
     setSessionsBusy(true)
     setSessionsError('')
     try {
-      const response = await fetch(`${API}/api/auth/sessions/${sessionID ? 'revoke' : 'revoke-others'}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ refreshToken: current.refreshToken, ...(sessionID ? { sessionId: sessionID } : {}) }),
-      })
-      if (!response.ok) throw new Error('Không thu hồi được phiên đăng nhập.')
+      if (isDesktopBuild) {
+        const nativeAuth = desktopBridge().auth
+        const revoked = sessionID
+          ? await nativeAuth.revokeSession(identity, sessionID)
+          : await nativeAuth.revokeOthers(identity)
+        if (!revoked) throw new Error('Không thu hồi được phiên đăng nhập.')
+      } else {
+        const response = await fetch(`${API}/api/auth/sessions/${sessionID ? 'revoke' : 'revoke-others'}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({ refreshToken: current.refreshToken, ...(sessionID ? { sessionId: sessionID } : {}) }),
+        })
+        if (!response.ok) throw new Error('Không thu hồi được phiên đăng nhập.')
+      }
       if (sessionRef.current?.sessionId !== identity) return
       if (selected?.current) {
         logout(false)
@@ -2100,7 +2203,11 @@ export default function App() {
     setVisitorUsername(null)
     const current = sessionRef.current
     const currentToken = current?.token
-    if (revoke && current?.refreshToken) {
+    if (isDesktopBuild) {
+      void desktopBridge().auth.logout({ sessionId: current?.sessionId ?? null, revoke }).then((result) => {
+        if (!result.revoked) setNotice('Đã đăng xuất trên máy này. Chưa thu hồi được phiên trên server.', 'warning')
+      }).catch(() => setNotice('Không xóa hoặc thu hồi được phiên an toàn. Hãy thu hồi thiết bị này từ một phiên khác.', 'error'))
+    } else if (revoke && current?.refreshToken) {
       void fetch(`${API}/api/auth/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2134,7 +2241,11 @@ export default function App() {
       })
       .catch(() => undefined)
 
-    if (current?.user.id) clearChatPersistence(current.user.id)
+    if (current?.user.id) { clearChatPersistence(current.user.id); clearChatOutbox(current.user.id) }
+    chatOutboxRef.current = []
+    setChatOutbox([])
+    chatOutboxSession.current = ''
+    sendingClientIDs.current.clear()
     pendingSend.current = null
     if (clearStorage) localStorage.removeItem('chatnet-session')
     sessionRef.current = null
@@ -2209,6 +2320,11 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (isDesktopBuild) {
+      return desktopBridge().auth.onExpired((sessionId) => {
+        if (sessionRef.current?.sessionId === sessionId) logout(false)
+      })
+    }
     const sync = (event: StorageEvent) => {
       if (event.key !== 'chatnet-session' && event.key !== null) return
       const next = loadSession()
@@ -2223,8 +2339,10 @@ export default function App() {
   useEffect(() => {
     if (!session) return
     const refresh = () => {
-      if (document.visibilityState === 'hidden') return
-      void sessionClient.refresh().catch(() => setStatus('Đang kết nối lại...'))
+      if (!isDesktopBuild && document.visibilityState === 'hidden') return
+      void sessionClient.refresh().then((current) => {
+        if (isDesktopBuild && current) return sessionClient.check()
+      }).catch(() => setStatus('Đang kết nối lại...'))
     }
     refresh()
     const timer = window.setInterval(refresh, 60_000)
@@ -2239,11 +2357,27 @@ export default function App() {
     }
   }, [session?.sessionId, sessionClient])
 
+  const nativeNotifications = useDesktopNotifications({
+    session, sessionRef, apiFetch, checkSession: sessionClient.check,
+    activeConversationId, tab, sound: messageSoundEnabled,
+    onError: (message) => setNotice(message, 'warning'),
+    onOpen: (conversation) => {
+      revokedConversationIds.current.delete(conversation.id)
+      membershipSnapshot.current?.add(conversation.id)
+      setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)])
+      if (activeConversationIdRef.current !== conversation.id) setMessages([])
+      switchTab('chat')
+      setActiveConversationId(conversation.id)
+    },
+  })
+
   useAppRealtime({
     onCategoryAssignmentChanged: conversationCategories.applyAssignment,
     onCategoriesChanged: () => { void conversationCategories.refreshCategories(); conversationCategories.refreshFiltered() },
     refreshCategoryConversations: conversationCategories.refreshFiltered,
     responseCache,
+    expireSession: () => { logout(false); setNotice('Phiên đăng nhập đã bị thu hồi. Vui lòng đăng nhập lại.', 'warning') },
+    checkSession: sessionClient.check,
     session,
     sessionRef,
     apiFetch,
@@ -2272,6 +2406,13 @@ export default function App() {
     messageReceipts,
     setOutgoingMessage,
     setConversations,
+    onMessageConfirmed: (message) => {
+      if (!message.clientId || message.senderId !== sessionRef.current?.user.id) return
+      updateChatOutbox((items) => {
+        if (!items.some((item) => item.clientId === message.clientId && item.conversationId === message.conversationId)) return items
+        return confirmChatMessage(items, message.clientId!, message.conversationId)
+      })
+    },
   })
 
 
@@ -2423,98 +2564,151 @@ export default function App() {
     }
   }
 
-  async function sendMessage(event: FormEvent) {
-    event.preventDefault()
-    if (!canSend || !activeConversationId || sendingRef.current) return
 
-    const conversationId = activeConversationId
-    const submittedDraft = draft
-    const text = messageText.trim()
-    const attachments = messageAttachments
-    if (!session) return
-    const sessionId = session.sessionId
-    const reply = replyingTo
-    const signature = JSON.stringify({ text, attachments: attachments.map((file) => file.storageRef), replyToMessageId: reply?.id ?? null })
-    const previous = pendingSend.current ?? loadPendingSend(session.user.id, sessionId)
-    // A refresh cannot restore unsigned media URLs. Never silently resend a
-    // text-only copy of an ambiguous attachment message as a new message.
-    if (previous?.conversationId === conversationId && messageAttachments.length === 0) {
-      try {
-        const earlier = JSON.parse(previous.signature) as { text?: string; attachments?: string[] }
-        if (earlier.text === text && Array.isArray(earlier.attachments) && earlier.attachments.length > 0) {
-          setNotice('Tin kèm tệp trước đó chưa được xác nhận. Hãy kiểm tra lịch sử hoặc thay đổi nội dung trước khi gửi lại.', 'warning')
-          return
-        }
-      } catch { /* Invalid old receipt is ignored. */ }
-    }
-    const clientId = previous && previous.sessionId === sessionId && previous.conversationId === conversationId && previous.signature === signature
-      ? previous.clientId : crypto.randomUUID()
-    pendingSend.current = { sessionId, conversationId, signature, clientId, draft: submittedDraft }
-    savePendingSend(session.user.id, { sessionId, conversationId, signature, clientId })
-    // A matching realtime receipt can confirm delivery even if the HTTP response is lost.
-    messageReceipts.current.set(clientId, null)
-    sendingRef.current = true
-    setMessageSending(true)
-    setOutgoingMessage({
-      id: -1, clientId, conversationId, senderId: session.user.id, sender: session.user.username, senderDisplayName: session.user.displayName,
-      text, attachments, createdAt: new Date().toISOString(),
-      replyToMessageId: reply?.id, replyToSender: reply?.sender, replyToDisplayName: reply?.senderDisplayName, replyToText: reply?.text,
-    })
+  async function deliverQueuedChatMessage(item: QueuedChatMessage) {
+    const identity = sessionRef.current
+    if (!identity || chatOutboxSession.current !== identity.sessionId ||
+      !navigator.onLine || sendingClientIDs.current.has(item.clientId) ||
+      !chatOutboxRef.current.some((pending) => pending.clientId === item.clientId &&
+        pending.conversationId === item.conversationId && pending.status !== 'failed')) return
+    sendingClientIDs.current.add(item.clientId)
     try {
-      const response = await apiFetch(`/api/conversations/${conversationId}/messages`, {
+      const response = await apiFetch(`/api/conversations/${item.conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text,
-          attachments: attachments.map(attachmentRequestBody),
-          clientId,
-          ...(reply ? { replyToMessageId: reply.id } : {}),
+          text: item.text,
+          attachments: item.attachments,
+          clientId: item.clientId,
+          ...(item.replyToMessageId ? { replyToMessageId: item.replyToMessageId } : {}),
         }),
       })
-      if (sessionRef.current?.sessionId !== sessionId) return
-      const receipt = messageReceipts.current.get(clientId)
-      if (!response.ok && !receipt?.id) {
-        if (response.status >= 400 && response.status < 500 && pendingSend.current?.clientId === clientId) {
-          pendingSend.current = null
-          clearPendingSend(session.user.id, clientId)
-        }
-        const result = await response.json().catch(() => null) as { error?: string } | null
-        setNotice(result?.error || 'Gửi tin nhắn thất bại')
+      if (sessionRef.current?.sessionId !== identity.sessionId) return
+      if (!response.ok) {
+        const permanent = response.status >= 400 && response.status < 500 &&
+          response.status !== 408 && response.status !== 429
+        const error = permanent
+          ? (await response.json().catch(() => null) as { error?: string } | null)?.error
+          : undefined
+        updateChatOutbox((items) => items.map((pending) =>
+          pending.clientId === item.clientId && pending.conversationId === item.conversationId
+            ? { ...pending, status: permanent ? 'failed' : 'unconfirmed',
+                error: permanent ? (error || 'Không gửi được. Kiểm tra quyền hoặc nội dung.') : undefined }
+            : pending))
         return
       }
-      const sent = receipt?.id ? receipt : await response.json() as Message
-      if (!Number.isSafeInteger(sent.id) || sent.id <= 0 || sent.conversationId !== conversationId) {
-        throw new Error('Invalid message response')
-      }
-      if (pendingSend.current?.clientId === clientId) pendingSend.current = null
-      clearPendingSend(session.user.id, clientId)
-      if (activeConversationIdRef.current === conversationId) {
-        messageChanges.current.add(sent.id)
-        setMessages((current) => mergeById(current, sent).sort((a, b) => a.id - b.id))
+      const confirmed = await response.json() as Message
+      if (!Number.isSafeInteger(confirmed.id) || confirmed.id <= 0 ||
+        confirmed.clientId !== item.clientId || confirmed.conversationId !== item.conversationId ||
+        confirmed.senderId !== identity.user.id) throw new Error('Unexpected send receipt')
+      updateChatOutbox((items) => confirmChatMessage(items, item.clientId, item.conversationId))
+      if (activeConversationIdRef.current === item.conversationId) {
+        messageChanges.current.add(confirmed.id)
+        setMessages((current) => mergeById(current, confirmed).sort((a, b) => a.id - b.id))
       }
       void refreshConversations()
-      setMessageDrafts((current) => {
-        if (current[conversationId] !== submittedDraft) return current
-        const next = { ...current }
-        delete next[conversationId]
-        return next
-      })
-      if (activeConversationIdRef.current === conversationId) setReplyingTo((current) => current === reply ? null : current)
     } catch {
-      if (sessionRef.current?.sessionId === sessionId) {
-        setNotice('Chưa xác nhận được tin đã gửi. Bản nháp được giữ lại; kiểm tra hội thoại trước khi gửi lại.')
+      if (sessionRef.current?.sessionId === identity.sessionId) {
+        // The HTTP ACK might be lost after the database commit. Reuse the same clientId.
+        updateChatOutbox((items) => items.map((pending) =>
+          pending.clientId === item.clientId && pending.conversationId === item.conversationId
+            ? { ...pending, status: 'unconfirmed', error: undefined }
+            : pending))
       }
     } finally {
-      messageReceipts.current.delete(clientId)
-      if (sessionRef.current?.sessionId === sessionId) {
-        setOutgoingMessage(null)
-        sendingRef.current = false
-        setMessageSending(false)
-        if (activeConversationIdRef.current === conversationId) {
-          window.requestAnimationFrame(() => messageInputRef.current?.focus({ preventScroll: true }))
-        }
-      }
+      sendingClientIDs.current.delete(item.clientId)
     }
+  }
+
+  async function retryQueuedChatMessages() {
+    if (!navigator.onLine || retryOutboxBusy.current || !sessionRef.current) return
+    retryOutboxBusy.current = true
+    try {
+      while (navigator.onLine) {
+        const item = retryableChatMessages(chatOutboxRef.current)[0]
+        if (!item) break
+        await deliverQueuedChatMessage(item)
+        const remaining = chatOutboxRef.current.find((pending) =>
+          pending.clientId === item.clientId && pending.conversationId === item.conversationId)
+        if (remaining && remaining.status !== 'failed') break
+      }
+    } finally {
+      retryOutboxBusy.current = false
+    }
+  }
+
+  useEffect(() => {
+    if (!session?.sessionId) return
+    const onOnline = () => {
+      setChatOnline(true)
+      void retryQueuedChatMessages()
+    }
+    const onOffline = () => setChatOnline(false)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') onOnline()
+    }
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = window.setInterval(() => void retryQueuedChatMessages(), 15_000)
+    const initial = window.setTimeout(() => void retryQueuedChatMessages(), 250)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.clearInterval(timer)
+      window.clearTimeout(initial)
+    }
+  }, [session?.sessionId])
+
+  useEffect(() => {
+    if (!session || !messages.length || !chatOutboxRef.current.length) return
+    const delivered = new Set(messages.filter((message) =>
+      message.senderId === session.user.id && Boolean(message.clientId)).map((message) =>
+      `${message.conversationId}:${message.clientId}`))
+    if (!delivered.size) return
+    updateChatOutbox((items) => {
+      if (!items.some((item) => delivered.has(`${item.conversationId}:${item.clientId}`))) return items
+      return items.filter((item) => !delivered.has(`${item.conversationId}:${item.clientId}`))
+    })
+  }, [messages, session?.sessionId])
+
+  function sendMessage(event: FormEvent) {
+    event.preventDefault()
+    if (!canSend || !activeConversationId || sendingRef.current || !session) return
+    sendingRef.current = true
+    window.setTimeout(() => { sendingRef.current = false }, 0)
+
+    const conversationId = activeConversationId
+    const submittedDraft = draft
+    const reply = replyingTo
+    const item: QueuedChatMessage = {
+      clientId: crypto.randomUUID(),
+      conversationId,
+      text: messageText.trim(),
+      attachments: messageAttachments.map(attachmentRequestBody),
+      ...(reply ? {
+        replyToMessageId: reply.id,
+        replyToSender: reply.sender,
+        replyToText: reply.text,
+      } : {}),
+      createdAt: new Date().toISOString(),
+      status: 'queued',
+    }
+    const next = updateChatOutbox((items) => enqueueChatMessage(items, item))
+    if (!next.some((pending) => pending.clientId === item.clientId)) {
+      setNotice('Hàng đợi tin nhắn đã đầy. Nội dung vẫn ở ô nhập; hãy thử lại sau.', 'warning')
+      return
+    }
+    setMessageDrafts((current) => {
+      if (current[conversationId] !== submittedDraft) return current
+      const updated = { ...current }
+      delete updated[conversationId]
+      return updated
+    })
+    setReplyingTo((current) => current === reply ? null : current)
+    if (navigator.onLine) void retryQueuedChatMessages()
+    else setChatOnline(false)
   }
 
   async function editOwnMessage(message: Message) {
@@ -2892,7 +3086,7 @@ export default function App() {
         friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
         searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
-      {tab !== 'profile' && tab !== 'discover' && (
+      {tab !== 'profile' && tab !== 'discover' && tab !== 'market' && (
       <header className="chatnet-appbar">
         <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SOCO</strong></div>
           <label className="appbar-search">
@@ -3238,9 +3432,20 @@ export default function App() {
               </div>
             </aside>
 
-            <section className={activeConversation?.type === 'group'
-              ? `conversation-panel group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}`
-              : 'conversation-panel'}>
+            <section
+              onDragOver={(event) => {
+                if (isDesktopBuild && event.dataTransfer.types.includes('Files')) event.preventDefault()
+              }}
+              onDrop={(event) => {
+                if (!isDesktopBuild || !event.dataTransfer.types.includes('Files')) return
+                event.preventDefault()
+                if (!activeConversationId) { setNotice('Chọn hội thoại trước khi thả tệp.', 'warning'); return }
+                if (mediaUploading || messageSending) { setNotice('Hãy hoàn tất hoặc hủy tác vụ hiện tại trước khi thả thêm tệp.', 'warning'); return }
+                void addChatFiles(Array.from(event.dataTransfer.files))
+              }}
+              className={activeConversation?.type === 'group'
+                ? `conversation-panel group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}`
+                : 'conversation-panel'}>
               {!activeConversation ? (
                 <div className="conversation-empty">
                   <SocoEmptyState kind="chat" title="Kết nối không biên giới"
@@ -3286,6 +3491,7 @@ export default function App() {
 
                     <div className="translate-controls">
                       <CallHeaderActions conversationId={activeConversation.id} />
+                      <button type="button" className="group-settings-toggle" onClick={() => setMessageSearchOpen(true)} title="Tìm trong cuộc trò chuyện" aria-label="Tìm tin nhắn trong cuộc trò chuyện"><Search size={19} /></button>
                       <button
                         type="button"
                         className="group-settings-toggle shared-content-trigger"
@@ -3493,6 +3699,20 @@ export default function App() {
                     />
                   )}
 
+                  {messageSearchOpen && (
+                    <MessageSearchPanel conversationId={activeConversation.id} request={apiFetch}
+                      onClose={() => setMessageSearchOpen(false)}
+                      onJump={async (result) => {
+                        const response = await apiFetch(`/api/conversations/${activeConversation.id}/messages?before=${result.id + 1}&limit=80&target=${encodeURIComponent(targetLanguage)}`)
+                        if (!response.ok) throw new Error('Không tải được tin nhắn')
+                        const history = (await response.json()) as Message[]
+                        if (activeConversationIdRef.current !== activeConversation.id) return
+                        setMessages(history.sort((a, b) => a.id - b.id))
+                        setHasMoreMessages(history.length === 80)
+                        window.setTimeout(() => document.querySelector(`[data-message-id="${result.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 90)
+                      }}
+                    />
+                  )}
                   <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
                     const element = event.currentTarget
                     messageScrollAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100
@@ -3514,6 +3734,7 @@ export default function App() {
                       return (
                         <article
                           key={message.id}
+                          data-message-id={message.id}
                           className={mine ? 'message mine message-press-target' : 'message message-press-target'}
                           onPointerDown={(event) => beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)}
                           onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
@@ -3522,6 +3743,7 @@ export default function App() {
                           onPointerLeave={cancelMessageLongPress}
                           onContextMenu={(event) => {
                             if (message.deleted) return
+                            if (event.target instanceof Element && event.target.closest('.message-selectable-text')) return
                             event.preventDefault()
                             openMessageActions(message)
                           }}
@@ -3541,7 +3763,7 @@ export default function App() {
                                 <div className={translatedText ? 'bubble translated-bubble translation-flip-bubble' : 'bubble'}>
                                   <span
                                     key={translatedText ? `${message.id}-${originalVisible ? 'original' : 'translated'}` : `${message.id}-plain`}
-                                    className="translation-flip-content"
+                                    className="translation-flip-content message-selectable-text"
                                   >
                                     {translatedText
                                       ? originalVisible ? message.text : translatedText
@@ -3599,22 +3821,39 @@ export default function App() {
                         </article>
                       )
                     })}
-                    {outgoingMessage?.conversationId === activeConversationId && (
-                      <article className="message mine outgoing-preview" aria-busy="true">
-                        {outgoingMessage.replyToMessageId && (
+                    {chatOutbox.filter((item) => item.conversationId === activeConversationId).map((item) => (
+                      <article className="message mine outgoing-preview chat-outbox-message" key={item.clientId} aria-busy={item.status !== 'failed'}>
+                        {item.replyToMessageId && (
                           <div className="message-reply-quote">
-                            <strong>{userLabel(outgoingMessage.replyToDisplayName, outgoingMessage.replyToSender)}</strong><span>{outgoingMessage.replyToText}</span>
+                            <strong>{item.replyToSender || 'Trả lời'}</strong><span>{item.replyToText}</span>
                           </div>
                         )}
-                        {outgoingMessage.text && <div className="bubble">{outgoingMessage.text}</div>}
-                        <MediaAttachmentsView items={outgoingMessage.attachments} />
-                        <div className="message-stamp" role="status">Đang gửi...</div>
+                        {item.text && <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>}
+                        <MediaAttachmentsView items={item.attachments} />
+                        <div className="chat-outbox-footer">
+                          <span className={item.status === 'failed' ? 'message-stamp chat-outbox-error' : 'message-stamp'} role="status">
+                            {item.status === 'failed' ? item.error || 'Không gửi được' :
+                              !chatOnline ? 'Chờ có mạng' : item.status === 'unconfirmed' ? 'Đang xác nhận...' : 'Đang gửi...'}
+                          </span>
+                          {(item.status === 'failed' || (item.status === 'unconfirmed' && chatOnline)) && (
+                            <button type="button" className="chat-outbox-retry"
+                              aria-label={item.status === 'failed' ? 'Gửi lại tin nhắn bị lỗi' : 'Gửi lại tin nhắn đang chờ'}
+                              onClick={() => {
+                              updateChatOutbox((items) => items.map((old) =>
+                                old.clientId === item.clientId ? { ...old, status: 'queued', error: undefined } : old))
+                              void retryQueuedChatMessages()
+                            }}><RefreshCw size={14} /> Gửi lại</button>
+                          )}
+                        </div>
                       </article>
-                    )}
+                    ))}
                     <div ref={bottomRef} />
                   </div>
 
-                  <form className="composer media-composer" onSubmit={sendMessage}>
+                  <form className="composer media-composer" onSubmit={(event) => {
+                    void sendMessage(event)
+                    if (isDesktopBuild) messageInputRef.current?.focus()
+                  }}>
                     <input
                       ref={chatFileInputRef}
                       className="hidden-media-input"
@@ -3709,6 +3948,13 @@ export default function App() {
         )}
 
         {tab === 'discover' && (
+          <div className="marketplace-entry">
+            <div><h3>SOCO Market</h3><p>Mua bán trong ChatNet — trò chuyện, giỏ hàng và theo dõi yêu cầu đơn.</p></div>
+            <button type="button" onClick={() => switchTab('market')}>Mở sàn mua bán</button>
+          </div>
+        )}
+
+        {tab === 'discover' && (
           <Suspense
             fallback={(
               <p role="status">Đang mở Quanh đây...</p>
@@ -3739,6 +3985,12 @@ export default function App() {
                       : 'Kết bạn'
               }}
             />
+          </Suspense>
+        )}
+
+        {tab === 'market' && (
+          <Suspense fallback={<p role="status">Đang mở SOCO Market...</p>}>
+            <Marketplace key={session.sessionId} userId={session.user.id} request={apiFetch} onBack={() => switchTab('discover')} />
           </Suspense>
         )}
 
@@ -4060,7 +4312,7 @@ export default function App() {
               {profilePrivacyControls}
             <AccountSessionsPanel
               sessionsBusy={sessionsBusy}
-              refreshToken={session.refreshToken}
+              canManageSessions={isDesktopBuild || Boolean(session.refreshToken)}
               sessionsOpen={sessionsOpen}
               setSessionsOpen={setSessionsOpen}
               fetchAccountSessions={fetchAccountSessions}
@@ -4100,17 +4352,21 @@ export default function App() {
               </button>
 
               <div className="settings-row">
-                <div><strong>{t('profile.notifications')}</strong><small>{t('profile.notificationsHint')}</small></div>
+                <div>
+                  <strong>{isDesktopBuild ? 'Thông báo Desktop' : t('profile.notifications')}</strong>
+                  <small>{isDesktopBuild ? 'Ẩn nội dung và tên người gửi. Nhận khi SOCO còn chạy; thoát hẳn sẽ dừng thông báo.' : t('profile.notificationsHint')}</small>
+                </div>
                 <button
                   type="button"
-                  className={`switch-button ${pushEnabled ? 'on' : ''}`}
-                  onClick={() => void togglePush()}
-                  disabled={pushBusy}
-                  aria-label={pushEnabled ? 'Tắt thông báo' : 'Bật thông báo'}
+                  className={`switch-button ${(isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? 'on' : ''}`}
+                  onClick={() => isDesktopBuild ? nativeNotifications.toggle() : void togglePush()}
+                  disabled={!isDesktopBuild && pushBusy}
+                  aria-label={(isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? 'Tắt thông báo' : 'Bật thông báo'}
                   role="switch"
-                  aria-checked={pushEnabled}
+                  aria-checked={isDesktopBuild ? nativeNotifications.enabled : pushEnabled}
                 ><span /></button>
               </div>
+              {isDesktopBuild && nativeNotifications.warning && <div className="settings-row" role="status"><small>{nativeNotifications.warning}</small></div>}
               <div className="settings-row message-sound-row">
                 <div><strong>{t('profile.messageSound')}</strong><small>{t('profile.messageSoundHint')}</small></div>
                 <button
@@ -4132,10 +4388,10 @@ export default function App() {
                   </button>
                 </div>
               )}
-              <div className="settings-row">
+              {!isDesktopBuild && <div className="settings-row">
                 <div><strong>{t('profile.testNotification')}</strong><small>{t('profile.testNotificationHint')}</small></div>
                 <button type="button" className="settings-action" onClick={() => void sendTestPush()} disabled={pushBusy || !pushEnabled}>{t('common.test')}</button>
-              </div>
+              </div>}
               <div className="settings-row">
                 <div><strong>{t('profile.autoTranslate')}</strong></div>
                 <button
@@ -4344,6 +4600,7 @@ export default function App() {
         request={apiFetch}
         apiBase={API}
         token={session.token}
+        sessionId={session.sessionId}
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}

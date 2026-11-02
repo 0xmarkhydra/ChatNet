@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import type { Tab } from '../../app/types'
 import type { NewChatMode } from '../chat/types'
@@ -61,6 +61,15 @@ export default function ContactsView({
   removeAcceptedFriend,
   friendResults,
 }: Props) {
+  const [menuLayout, setMenuLayout] = useState({ openUp: false, maxHeight: 352 })
+  function toggleFriendMenu(id: number, button: HTMLButtonElement) {
+    const box = button.getBoundingClientRect()
+    const availableBelow = Math.max(0, window.innerHeight - box.bottom - 8)
+    const availableAbove = Math.max(0, box.top - 8)
+    const openUp = availableBelow < 352 && availableAbove > availableBelow
+    setMenuLayout({ openUp, maxHeight: Math.max(80, Math.min(352, openUp ? availableAbove : availableBelow)) })
+    setFriendMenuId((current) => current === id ? null : id)
+  }
   return (
     <div className="simple-view contacts-view">
       {friendQuery.trim() ? (
@@ -102,11 +111,11 @@ export default function ContactsView({
                   <button type="button" className="friend-contact-more"
                     aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
                     aria-expanded={friendMenuId === friend.id} aria-haspopup="menu"
-                    onClick={() => setFriendMenuId((old) => old === friend.id ? null : friend.id)}>
+                    onClick={(event) => toggleFriendMenu(friend.id, event.currentTarget)}>
                     <MoreHorizontal size={19} aria-hidden="true" />
                   </button>
                   {friendMenuId === friend.id && (
-                    <div className="friend-contact-popover" role="menu">
+                    <div className={menuLayout.openUp ? "friend-contact-popover friend-contact-popover--up" : "friend-contact-popover"} role="menu" style={{ maxHeight: menuLayout.maxHeight }}>
                       <button type="button" role="menuitem" className="friend-contact-danger"
                         disabled={friendBusyIds.has(friend.id)}
                         onClick={() => void blockContact(friend)}>Chặn người dùng</button>
@@ -189,12 +198,12 @@ export default function ContactsView({
                 aria-label={`Tùy chọn của ${friend.displayName || friend.username}`}
                 aria-expanded={friendMenuId === friend.id}
                 aria-haspopup="menu"
-                onClick={() => setFriendMenuId((current) => current === friend.id ? null : friend.id)}
+                onClick={(event) => toggleFriendMenu(friend.id, event.currentTarget)}
               >
                 <MoreHorizontal size={20} aria-hidden="true" />
               </button>
               {friendMenuId === friend.id && (
-                <div className="friend-contact-popover" role="menu">
+                <div className={menuLayout.openUp ? "friend-contact-popover friend-contact-popover--up" : "friend-contact-popover"} role="menu" style={{ maxHeight: menuLayout.maxHeight }}>
                   <button type="button" role="menuitem" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem hồ sơ</button>
                   <button type="button" role="menuitem" onClick={() => { setFriendMenuId(null); void openDirectByUsername(friend.username) }}>Nhắn tin</button>
                   <button type="button" role="menuitem" onClick={() => void changePersonalContact(friend, 'nickname')}>Đặt biệt danh</button>

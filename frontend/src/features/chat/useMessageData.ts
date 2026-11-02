@@ -5,6 +5,8 @@ import type { useConversationData } from './useConversationData'
 import { MESSAGE_PAGE_SIZE, type Message, type MessageDraft } from './types'
 import { clearPendingSend, loadPendingSend } from './chatPersistence'
 import { canMarkConversationRead } from './conversationRead'
+import { isDesktopBuild } from '../../platform/desktop'
+import { refreshDesktopUnread } from '../../platform/useDesktopNotifications'
 
 type Options = Omit<AppDataContext, 'setStatus'> &
   Pick<ReturnType<typeof useConversationData>, 'setConversations'> & {
@@ -102,9 +104,10 @@ export function useMessageData({
           }
         }
         setTranslations(restored)
-        if (!canMarkConversationRead(activeConversationIdRef.current, activeConversationId, tabRef.current, document.visibilityState)) return
+        if (!canMarkConversationRead(activeConversationIdRef.current, activeConversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) return
         const read = await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
         if (!read.ok) return
+        refreshDesktopUnread()
         if (!cancelled) {
           setConversations((current) =>
             current.map((item) =>
@@ -132,10 +135,11 @@ export function useMessageData({
     const id = activeConversationId
     const sessionId = session.sessionId
     const markWhenVisible = () => {
-      if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState)) return
+      if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) return
       void apiFetch(`/api/conversations/${id}/read`, { method: 'POST' })
         .then((response) => {
           if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId) return
+          refreshDesktopUnread()
           setConversations((current) =>
             current.map((item) => item.id === id ? { ...item, unreadCount: 0 } : item),
           )

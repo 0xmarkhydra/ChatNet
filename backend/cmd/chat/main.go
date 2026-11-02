@@ -114,64 +114,65 @@ func main() {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
 	})
-	mux.Handle("GET /api/push/config", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.pushConfig)))
-	mux.Handle("POST /api/push/subscription", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.upsertPushSubscription)))
-	mux.Handle("DELETE /api/push/subscription", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deletePushSubscription)))
-	mux.Handle("POST /api/push/test", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.testPushNotification)))
-	mux.Handle("POST /api/media/presign", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.presignMedia)))
-	mux.Handle("GET /api/users/{username}/profile", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getUserProfile)))
-	mux.Handle("GET /api/profile/note", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getProfileNote)))
-	mux.Handle("POST /api/profile/note", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.saveProfileNote)))
-	mux.Handle("DELETE /api/profile/note", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteProfileNote)))
-	mux.Handle("GET /api/users/{username}/note", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getProfileNote)))
-	mux.Handle("GET /api/profile", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getProfile)))
-	mux.Handle("PUT /api/profile", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateProfile)))
-	mux.Handle("PUT /api/profile/media", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateProfileMedia)))
+	mux.Handle("GET /api/push/config", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.pushConfig)))
+	mux.Handle("POST /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.upsertPushSubscription)))
+	mux.Handle("DELETE /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deletePushSubscription)))
+	mux.Handle("POST /api/push/test", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.testPushNotification)))
+	mux.Handle("POST /api/media/presign", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.presignMedia)))
+	mux.Handle("GET /api/users/{username}/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getUserProfile)))
+	mux.Handle("GET /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfileNote)))
+	mux.Handle("POST /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveProfileNote)))
+	mux.Handle("DELETE /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteProfileNote)))
+	mux.Handle("GET /api/users/{username}/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfileNote)))
+	mux.Handle("GET /api/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfile)))
+	mux.Handle("PUT /api/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateProfile)))
+	mux.Handle("PUT /api/profile/media", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateProfileMedia)))
 	mux.HandleFunc("GET /api/users/{username}/avatar", func(w http.ResponseWriter, r *http.Request) { s.profileAsset(w, r, "avatar") })
 	mux.HandleFunc("GET /api/users/{username}/cover", func(w http.ResponseWriter, r *http.Request) { s.profileAsset(w, r, "cover") })
-	mux.Handle("GET /api/users/search", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.searchUsers)))
-	mux.Handle("GET /api/users/suggestions", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.suggestUsers)))
-	mux.Handle("POST /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.findNearby)))
-	mux.Handle("DELETE /api/users/nearby", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.stopNearby)))
-	mux.Handle("GET /api/friends", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriends)))
-	mux.Handle("GET /api/contacts", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listContactMetadata)))
-	mux.Handle("PUT /api/contacts/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateContactMetadata)))
-	mux.Handle("GET /api/friends/requests", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listFriendRequests)))
-	mux.Handle("POST /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.sendFriendRequest)))
-	mux.Handle("POST /api/friends/{id}/accept", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.acceptFriendRequest)))
-	mux.Handle("DELETE /api/friends/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeFriendConnection)))
-	mux.Handle("GET /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPrivacy)))
-	mux.Handle("PUT /api/privacy", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePrivacy)))
-	mux.Handle("GET /api/users/blocked", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listBlockedUsers)))
-	mux.Handle("POST /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.blockUser)))
-	mux.Handle("DELETE /api/users/{id}/block", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.unblockUser)))
-	mux.Handle("POST /api/users/{id}/report", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.reportUser)))
-	mux.Handle("GET /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getPreferences)))
-	mux.Handle("PUT /api/preferences", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updatePreferences)))
-	mux.Handle("GET /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.getTranslationPreferences)))
-	mux.Handle("PUT /api/preferences/translation", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateTranslationPreferences)))
-	mux.Handle("GET /api/conversation-categories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listCategories)))
-	mux.Handle("POST /api/conversation-categories", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.saveCategory)))
-	mux.Handle("PUT /api/conversation-categories/{categoryId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.saveCategory)))
-	mux.Handle("DELETE /api/conversation-categories/{categoryId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteCategory)))
-	mux.Handle("PUT /api/conversations/{id}/category", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.assignCategory)))
-	mux.Handle("GET /api/conversations", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversations)))
-	mux.Handle("GET /api/conversations/memberships", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listConversationMemberships)))
-	mux.Handle("POST /api/conversations/direct", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createDirect)))
-	mux.Handle("POST /api/conversations/groups", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createGroup)))
-	mux.Handle("GET /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listMessages)))
-	mux.Handle("GET /api/conversations/{id}/shared", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listSharedContent)))
-	mux.Handle("POST /api/conversations/{id}/messages", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.createMessage)))
-	mux.Handle("PATCH /api/messages/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.editMessage)))
-	mux.Handle("DELETE /api/messages/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.deleteMessage)))
-	mux.Handle("POST /api/messages/{id}/reactions", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.toggleMessageReaction)))
-	mux.Handle("POST /api/conversations/{id}/read", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.markRead)))
-	mux.Handle("PATCH /api/conversations/{id}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateGroup)))
-	mux.Handle("GET /api/conversations/{id}/members", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listGroupMembers)))
-	mux.Handle("POST /api/conversations/{id}/members", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.addGroupMembers)))
-	mux.Handle("PATCH /api/conversations/{id}/members/{userId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.updateGroupMemberRole)))
-	mux.Handle("DELETE /api/conversations/{id}/members/{userId}", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.removeGroupMember)))
-	mux.Handle("GET /api/events", authx.Middleware(s.jwtSecret, http.HandlerFunc(s.events)))
+	mux.Handle("GET /api/users/search", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.searchUsers)))
+	mux.Handle("GET /api/users/suggestions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.suggestUsers)))
+	mux.Handle("POST /api/users/nearby", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.findNearby)))
+	mux.Handle("DELETE /api/users/nearby", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.stopNearby)))
+	mux.Handle("GET /api/friends", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listFriends)))
+	mux.Handle("GET /api/contacts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listContactMetadata)))
+	mux.Handle("PUT /api/contacts/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateContactMetadata)))
+	mux.Handle("GET /api/friends/requests", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listFriendRequests)))
+	mux.Handle("POST /api/friends/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.sendFriendRequest)))
+	mux.Handle("POST /api/friends/{id}/accept", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.acceptFriendRequest)))
+	mux.Handle("DELETE /api/friends/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.removeFriendConnection)))
+	mux.Handle("GET /api/privacy", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getPrivacy)))
+	mux.Handle("PUT /api/privacy", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updatePrivacy)))
+	mux.Handle("GET /api/users/blocked", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listBlockedUsers)))
+	mux.Handle("POST /api/users/{id}/block", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.blockUser)))
+	mux.Handle("DELETE /api/users/{id}/block", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.unblockUser)))
+	mux.Handle("POST /api/users/{id}/report", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reportUser)))
+	mux.Handle("GET /api/preferences", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getPreferences)))
+	mux.Handle("PUT /api/preferences", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updatePreferences)))
+	mux.Handle("GET /api/preferences/translation", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getTranslationPreferences)))
+	mux.Handle("PUT /api/preferences/translation", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateTranslationPreferences)))
+	mux.Handle("GET /api/conversation-categories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listCategories)))
+	mux.Handle("POST /api/conversation-categories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveCategory)))
+	mux.Handle("PUT /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveCategory)))
+	mux.Handle("DELETE /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteCategory)))
+	mux.Handle("PUT /api/conversations/{id}/category", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.assignCategory)))
+	mux.Handle("GET /api/conversations", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversations)))
+	mux.Handle("GET /api/conversations/unread", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.unreadSummary)))
+	mux.Handle("GET /api/conversations/memberships", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversationMemberships)))
+	mux.Handle("POST /api/conversations/direct", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createDirect)))
+	mux.Handle("POST /api/conversations/groups", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroup)))
+	mux.Handle("GET /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessages)))
+	mux.Handle("GET /api/conversations/{id}/shared", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listSharedContent)))
+	mux.Handle("POST /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createMessage)))
+	mux.Handle("PATCH /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editMessage)))
+	mux.Handle("DELETE /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteMessage)))
+	mux.Handle("POST /api/messages/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.toggleMessageReaction)))
+	mux.Handle("POST /api/conversations/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markRead)))
+	mux.Handle("PATCH /api/conversations/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroup)))
+	mux.Handle("GET /api/conversations/{id}/members", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupMembers)))
+	mux.Handle("POST /api/conversations/{id}/members", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.addGroupMembers)))
+	mux.Handle("PATCH /api/conversations/{id}/members/{userId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupMemberRole)))
+	mux.Handle("DELETE /api/conversations/{id}/members/{userId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.removeGroupMember)))
+	mux.Handle("GET /api/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.events)))
 
 	port := config.Env("PORT", "8082")
 	log.Printf("chat service listening on :%s", port)
@@ -502,6 +503,16 @@ func validTranslationTarget(value string) bool {
 
 func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	// Optional exact lookup reuses the same membership/privacy projection as the list.
+	conversationID := int64(0)
+	if raw := r.URL.Query().Get("id"); raw != "" {
+		var err error
+		conversationID, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || conversationID <= 0 {
+			httpx.Error(w, http.StatusBadRequest, "invalid conversation id")
+			return
+		}
+	}
 	limit := 2147483647 // Preserve the original unpaginated response for older app versions.
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
@@ -549,16 +560,20 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		               ), '')
 		           END
 		           FROM messages m
-		           WHERE m.conversation_id=c.id
+		           WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		             (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))
 		           ORDER BY m.id DESC
 		           LIMIT 1
 		       ),''),
-		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id ORDER BY m.id DESC LIMIT 1),c.created_at),
-		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1),0)
+		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)) ORDER BY m.id DESC LIMIT 1),c.created_at),
+		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0)
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
         WHERE cm.user_id=$1
+          AND ($5::bigint=0 OR c.id=$5)
           AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
 		  AND (c.type <> 'direct' OR NOT EXISTS (
 		    SELECT 1 FROM conversation_members other
@@ -567,9 +582,10 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
 		    WHERE other.conversation_id=c.id AND other.user_id<>$1
 		  ))
-		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id), c.created_at) DESC, c.id DESC
+		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
-		claims.UserID, limit, offset, categoryID)
+		claims.UserID, limit, offset, categoryID, conversationID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
@@ -768,6 +784,24 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, c)
 }
 
+func searchDateBounds(fromDate, toDate *time.Time, offsetMinutes int) (from, to time.Time) {
+	offset := time.Duration(offsetMinutes) * time.Minute
+	if fromDate != nil {
+		from = fromDate.Add(offset)
+	}
+	if toDate != nil {
+		to = toDate.AddDate(0, 0, 1).Add(offset)
+	}
+	return
+}
+
+func nullableSearchTime(source *time.Time, value time.Time) *time.Time {
+	if source == nil {
+		return nil
+	}
+	return &value
+}
+
 func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -805,9 +839,50 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		before = n
 	}
 
+	keyword := strings.TrimSpace(r.URL.Query().Get("search"))
+	sender := strings.TrimSpace(r.URL.Query().Get("sender"))
+	if len([]rune(keyword)) > 200 || len([]rune(sender)) > 100 {
+		httpx.Error(w, http.StatusBadRequest, "search filter too long")
+		return
+	}
+	var fromDate, toDate *time.Time
+	for _, filter := range []struct {
+		raw    string
+		output **time.Time
+	}{
+		{r.URL.Query().Get("from"), &fromDate},
+		{r.URL.Query().Get("to"), &toDate},
+	} {
+		if filter.raw == "" {
+			continue
+		}
+		parsed, err := time.Parse("2006-01-02", filter.raw)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid date filter (YYYY-MM-DD)")
+			return
+		}
+		*filter.output = &parsed
+	}
+	if fromDate != nil && toDate != nil && fromDate.After(*toDate) {
+		httpx.Error(w, http.StatusBadRequest, "invalid date range")
+		return
+	}
+	// Browser date inputs represent days in the viewer's local timezone.
+	// JavaScript getTimezoneOffset() is UTC minus local time in minutes.
+	var tzOffset int
+	if raw := r.URL.Query().Get("tzOffset"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < -840 || value > 840 {
+			httpx.Error(w, http.StatusBadRequest, "invalid timezone offset")
+			return
+		}
+		tzOffset = value
+	}
+	from, to := searchDateBounds(fromDate, toDate, tzOffset)
+
 	rows, err := s.db.Query(r.Context(), `
 		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
-		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
+		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
@@ -815,17 +890,26 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		           WHERE cmr.conversation_id=m.conversation_id
 		             AND cmr.user_id<>m.user_id
 		             AND cmr.last_read_message_id>=m.id
+		             AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		               (b.blocker_id=$5 AND b.blocked_id=cmr.user_id) OR (b.blocked_id=$5 AND b.blocker_id=cmr.user_id))
 		           ORDER BY cmr.user_id
 		       ),
 		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id))
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
 		WHERE m.conversation_id=$1 AND ($3::bigint=0 OR m.id<$3)
-		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit)
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
+		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(lower(m.text), lower($6))>0))
+		  AND ($7::text='' OR lower(u.username)=lower($7))
+		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)
+		  AND ($9::timestamptz IS NULL OR m.created_at < $9)
+		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to))
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return
@@ -991,8 +1075,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	if body.ReplyToMessageID != nil {
 		var replyConversationID int64
 		if err := s.db.QueryRow(r.Context(), `
-			SELECT conversation_id FROM messages WHERE id=$1
-		`, *body.ReplyToMessageID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
+			SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+			  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+		`, *body.ReplyToMessageID, claims.UserID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
 			httpx.Error(w, http.StatusBadRequest, "invalid reply message")
 			return
 		}
@@ -1089,10 +1174,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	memberIDs := s.memberIDs(r.Context(), conversationID)
-	s.publishConversationEvent(r.Context(), memberIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
+	visibleIDs, visibilityErr := s.visibleRecipients(r.Context(), claims.UserID, memberIDs)
+	if visibilityErr != nil {
+		log.Printf("cannot filter message recipients: %v", visibilityErr)
+		visibleIDs = []int64{claims.UserID} // Message persisted; never notify blocked peers on failure.
+	}
+	s.publishConversationEvent(r.Context(), visibleIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
 
-	recipients := make([]int64, 0, len(memberIDs))
-	for _, uid := range memberIDs {
+	recipients := make([]int64, 0, len(visibleIDs))
+	for _, uid := range visibleIDs {
 		if uid != claims.UserID {
 			recipients = append(recipients, uid)
 		}
@@ -1115,7 +1205,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 	var m message
 	err := s.db.QueryRow(ctx, `
 		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
-		       m.reply_to_message_id,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
+		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
@@ -1123,14 +1213,18 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		           WHERE cmr.conversation_id=m.conversation_id
 		             AND cmr.user_id<>m.user_id
 		             AND cmr.last_read_message_id>=m.id
+		             AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		               (b.blocker_id=$2 AND b.blocked_id=cmr.user_id) OR (b.blocked_id=$2 AND b.blocker_id=cmr.user_id))
 		           ORDER BY cmr.user_id
 		       ),
 		       m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$2 AND b.blocker_id=rm.user_id))
 		LEFT JOIN users ru ON ru.id=rm.user_id
-		WHERE m.id=$1`, messageID).Scan(
+		WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))`, messageID, viewerID).Scan(
 		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
@@ -1257,8 +1351,10 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 
 	var conversationID int64
 	if err := s.db.QueryRow(r.Context(), `
-		SELECT conversation_id FROM messages WHERE id=$1 AND deleted_at IS NULL
-	`, messageID).Scan(&conversationID); err != nil {
+		SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND m.deleted_at IS NULL
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+	`, messageID, claims.UserID).Scan(&conversationID); err != nil {
 		httpx.Error(w, http.StatusNotFound, "message not found")
 		return
 	}
@@ -1364,6 +1460,9 @@ func (s *server) attachMessageReactions(ctx context.Context, viewerID int64, ite
 		SELECT message_id,emoji,COUNT(*)::int,BOOL_OR(user_id=$2)
 		FROM message_reactions
 		WHERE message_id = ANY($1::bigint[])
+		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		    (b.blocker_id=$2 AND b.blocked_id=message_reactions.user_id) OR
+		    (b.blocked_id=$2 AND b.blocker_id=message_reactions.user_id))
 		GROUP BY message_id,emoji
 		ORDER BY message_id,MIN(created_at)
 	`, ids, viewerID)
@@ -1402,12 +1501,21 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
+		return
+	}
+
 	var maxID int64
-	_ = s.db.QueryRow(r.Context(), `
-		SELECT COALESCE(MAX(id),0)
-		FROM messages
-		WHERE conversation_id=$1
-	`, conversationID).Scan(&maxID)
+	if err := s.db.QueryRow(r.Context(), `
+		SELECT COALESCE(MAX(m.id),0)
+		FROM messages m
+		WHERE m.conversation_id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR
+		  (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+	`, conversationID, claims.UserID).Scan(&maxID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify read policy")
+		return
+	}
 
 	lastReadID := previousReadID
 	if maxID > previousReadID {
@@ -1455,8 +1563,9 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	ch := pubsub.Channel()
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	lastPing := time.Now()
 
 	for {
 		select {
@@ -1466,12 +1575,71 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 			if !open {
 				return
 			}
-			fmt.Fprintf(w, "event: update\ndata: %s\n\n", item.Payload)
+			if item.Payload == authx.SessionRevocationSignal {
+				active, err := authx.SessionActiveCached(r.Context(), s.db, s.redis, claims)
+				if err != nil {
+					return
+				}
+				if !active {
+					fmt.Fprint(w, "event: session-revoked\ndata: {}\n\n")
+					flusher.Flush()
+					return
+				}
+				continue
+			}
+			var event realtimeEvent
+			if json.Unmarshal([]byte(item.Payload), &event) != nil {
+				continue
+			}
+			actorID := int64(0)
+			if event.Message != nil {
+				actorID = event.Message.SenderID
+			}
+			if event.Type == "conversation.read" {
+				actorID = event.ReaderID
+			}
+			if actorID > 0 && actorID != claims.UserID {
+				blocked, err := s.blockedPair(r.Context(), claims.UserID, actorID)
+				if err != nil || blocked {
+					continue
+				} // Also cover in-flight messages after a block.
+			}
+			// Reload in the recipient's privacy scope. C replying to B
+			// must not expose B's quoted text or reaction identities to A.
+			payload := item.Payload
+			if event.Message != nil {
+				if !s.isMember(r.Context(), event.ConversationID, claims.UserID) {
+					continue
+				}
+				personalized, err := s.loadMessage(r.Context(), event.Message.ID, claims.UserID)
+				if err != nil {
+					continue
+				}
+				event.Message = &personalized
+				filtered, err := json.Marshal(event)
+				if err != nil {
+					continue
+				}
+				payload = string(filtered)
+			}
+			fmt.Fprintf(w, "event: update\ndata: %s\n\n", payload)
 			flusher.Flush()
 		case <-ticker.C:
-			_ = s.redis.Expire(r.Context(), key, 45*time.Second).Err()
-			fmt.Fprint(w, ": ping\n\n")
-			flusher.Flush()
+			active, err := authx.SessionActiveCached(r.Context(), s.db, s.redis, claims)
+			if err != nil {
+				return // Stream is closed on database outage; never treat it as a revocation.
+			}
+			if !active {
+				fmt.Fprint(w, "event: session-revoked\ndata: {}\n\n")
+				flusher.Flush()
+				return
+			}
+			if time.Since(lastPing) >= 20*time.Second {
+				_ = s.redis.Expire(r.Context(), key, 45*time.Second).Err()
+				fmt.Fprint(w, ": ping\n\n")
+				flusher.Flush()
+				lastPing = time.Now()
+			}
 		}
 	}
 }
@@ -1569,6 +1737,21 @@ func (s *server) memberIDs(ctx context.Context, conversationID int64) []int64 {
 }
 
 func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, event realtimeEvent) {
+	actorID := int64(0)
+	if event.Message != nil {
+		actorID = event.Message.SenderID
+	}
+	if event.Type == "conversation.read" {
+		actorID = event.ReaderID
+	}
+	if actorID > 0 {
+		visible, err := s.visibleRecipients(ctx, actorID, userIDs)
+		if err != nil {
+			log.Printf("cannot filter chat event recipients: %v", err)
+			return // Fail closed: never broadcast blocked message payloads.
+		}
+		userIDs = visible
+	}
 	data, _ := json.Marshal(event)
 	for _, userID := range userIDs {
 		_ = s.redis.Publish(ctx, userChannel(userID), data).Err()
@@ -1576,7 +1759,7 @@ func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, 
 }
 
 func userChannel(userID int64) string {
-	return fmt.Sprintf("chatnet:user:%d", userID)
+	return authx.UserChannel(userID)
 }
 
 func presenceKey(userID int64) string {

@@ -26,6 +26,10 @@ import {
 } from './callCrypto'
 import { startCallMediaInterpreter, type InterpreterSession, type InterpreterUpdate } from './callMediaInterpreter'
 import { buildLanguageOptions } from '../i18n/languages'
+import { isDesktopBuild } from '../../platform/desktop'
+import { requireDesktopMedia } from '../../platform/desktopMedia'
+import CallDeviceSettings from './CallDeviceSettings'
+import { notifyDesktopCall, dismissDesktopCall } from '../../platform/useDesktopNotifications'
 import './call.css'
 
 type ConversationLite = { id: number; name: string; type: 'direct' | 'group' }
@@ -35,6 +39,7 @@ type CallManagerProps = {
   request: CallRequest
   apiBase: string
   token: string
+  sessionId?: string
   userId: number
   sourceLanguage: string
   targetLanguage: string
@@ -68,15 +73,23 @@ export function CallHeaderActions({ conversationId }: { conversationId: number }
 }
 
 export default function CallManager({
-  request, apiBase, token, userId, sourceLanguage, targetLanguage, conversations,
+  request, apiBase, token, sessionId, userId, sourceLanguage, targetLanguage, conversations,
 }: CallManagerProps) {
   const [incoming, setIncoming] = useState<CallView | null>(null)
   const [active, setActive] = useState<CallView | CallSession | null>(null)
   const [busy, setBusy] = useState(false)
+  const userActivatedCall = useRef<string | null>(null)
   const [error, setError] = useState('')
   const requestRef = useRef(request)
   requestRef.current = request
   const callRequest = useCallback<CallRequest>((path, init) => requestRef.current(path, init), [])
+
+  useEffect(() => {
+    if (!isDesktopBuild || !sessionId || !incoming) return
+    // Defer one tick so StrictMode setup/cleanup cannot consume dedupe before the live effect.
+    const timer = window.setTimeout(() => notifyDesktopCall(sessionId, incoming), 0)
+    return () => { window.clearTimeout(timer); dismissDesktopCall(sessionId, incoming.id) }
+  }, [incoming?.id, sessionId])
 
   const conversationMap = useMemo(
     () => new Map(conversations.map((item) => [item.id, item])),
@@ -141,7 +154,10 @@ export default function CallManager({
       if (!window.isSecureContext || !isE2EESupported()) {
         throw new Error('Trình duyệt này chưa hỗ trợ cuộc gọi E2EE an toàn.')
       }
+      await requireDesktopMedia('microphone')
+      if (mediaType === 'video') await requireDesktopMedia('camera')
       const call = await createCall(callRequest, conversationId, mediaType)
+      userActivatedCall.current = call.id
       setIncoming(null)
       setActive(call)
     } catch (err) {
@@ -158,6 +174,9 @@ export default function CallManager({
     try {
       if (!incoming.configured) throw new Error('Máy chủ gọi video chưa được cấu hình.')
       if (!window.isSecureContext || !isE2EESupported()) throw new Error('Thiết bị này chưa hỗ trợ E2EE WebRTC.')
+      await requireDesktopMedia('microphone')
+      if (incoming.mediaType === 'video') await requireDesktopMedia('camera')
+      userActivatedCall.current = incoming.id
       setActive(incoming)
       setIncoming(null)
     } catch (err) {
@@ -213,6 +232,7 @@ export default function CallManager({
       {active && (
         <SecureCallRoom
           call={active}
+          autoPublish={!isDesktopBuild || userActivatedCall.current === active.id}
           title={activeName}
           apiBase={apiBase}
           request={callRequest}
@@ -229,6 +249,7 @@ export default function CallManager({
 }
 
 type SecureCallRoomProps = {
+  autoPublish: boolean
   call: CallSession
   title: string
   apiBase: string
@@ -250,7 +271,7 @@ type RoomRuntime = {
 }
 
 function SecureCallRoom({
-  call, title, apiBase, request, userId, sourceLanguage, targetLanguage, canEnd, onClosed, onError,
+  call, autoPublish, title, apiBase, request, userId, sourceLanguage, targetLanguage, canEnd, onClosed, onError,
 }: SecureCallRoomProps) {
   const [phase, setPhase] = useState<'securing' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('securing')
   const [detail, setDetail] = useState('Đang thiết lập mã hóa đầu cuối…')
@@ -343,10 +364,9 @@ function SecureCallRoom({
   }, [call.id])
   const lastEnvelopeGeneration = useRef('')
   const hostWrappedKeys = useRef(new Map<number, string>())
-  const disposed = useRef(false)
-
   useEffect(() => {
-    disposed.current = false
+    // Effect-local cancellation: StrictMode cleanup must not be undone by the next setup.
+    let disposed = false
     let hostSyncTimer = 0
     let participantSyncTimer = 0
     let localRuntime: RoomRuntime | null = null
@@ -358,8 +378,11 @@ function SecureCallRoom({
         setDetail('Đang tạo khóa tạm thời trên thiết bị…')
 
         const credentials = await joinCall(request, call.id)
+        if (disposed) return
         const keyPair = await generateEphemeralCallKeyPair()
+        if (disposed) return
         await publishE2EEPublicKey(request, call.id, keyPair.publicKey)
+        if (disposed) return
 
         const keyProvider = new ExternalE2EEKeyProvider({ keySize: 256 })
         const worker = new Worker(new URL('livekit-client/e2ee-worker', import.meta.url), { type: 'module' })
@@ -385,11 +408,19 @@ function SecureCallRoom({
           await keyProvider.setKey(mediaKeyBuffer(mediaKey.key))
         }
 
+        if (disposed) { await room.disconnect(); worker.terminate(); return }
         await room.setE2EEEnabled(true)
+        if (disposed) { await room.disconnect(); worker.terminate(); return }
         setPhase('connecting')
         setDetail('Đang kết nối media an toàn…')
 
-        const update = () => setRevision((value) => value + 1)
+        const update = () => {
+          if (disposed) return
+          setRevision((value) => value + 1)
+          setMicOn(room.localParticipant.isMicrophoneEnabled)
+          setCameraOn(room.localParticipant.isCameraEnabled)
+          setScreenOn(room.localParticipant.isScreenShareEnabled)
+        }
         room.on(RoomEvent.TrackSubscribed, update)
         room.on(RoomEvent.TrackUnsubscribed, update)
         room.on(RoomEvent.ParticipantConnected, update)
@@ -400,79 +431,105 @@ function SecureCallRoom({
         room.on(RoomEvent.Reconnecting, () => { setPhase('reconnecting'); setDetail('Mạng thay đổi, đang nối lại…') })
         room.on(RoomEvent.Reconnected, () => { setPhase('connected'); setDetail('Đã kết nối lại') })
         room.on(RoomEvent.Disconnected, () => {
-          if (!disposed.current) { setPhase('error'); setDetail('Cuộc gọi đã ngắt kết nối.') }
+          if (!disposed) { setPhase('error'); setDetail('Cuộc gọi đã ngắt kết nối.') }
         })
 
         await room.connect(credentials.serverUrl, credentials.token, { autoSubscribe: true })
-        if (disposed.current) return
+        if (disposed) { await room.disconnect(); worker.terminate(); return }
         setRuntime(localRuntime)
         setPhase('connected')
         setDetail('Mã hóa đầu cuối đang bật')
 
-        try {
-          await room.localParticipant.setMicrophoneEnabled(true)
-          setMicOn(true)
-        } catch (permissionError) {
-          setMicOn(false)
-          setMediaPermissionError(friendlyCallError(permissionError))
-        }
-        if (call.mediaType === 'video') {
+        if (autoPublish) {
           try {
-            await room.localParticipant.setCameraEnabled(true)
-            setCameraOn(true)
+            await room.localParticipant.setMicrophoneEnabled(true)
+            if (disposed) { await room.disconnect(); return }
+            setMicOn(true)
           } catch (permissionError) {
-            setCameraOn(false)
+            setMicOn(false)
             setMediaPermissionError(friendlyCallError(permissionError))
           }
+          if (call.mediaType === 'video' && !disposed) {
+            try {
+              await room.localParticipant.setCameraEnabled(true)
+              if (disposed) { await room.disconnect(); return }
+              setCameraOn(true)
+            } catch (permissionError) {
+              setCameraOn(false)
+              setMediaPermissionError(friendlyCallError(permissionError))
+            }
+          }
+        } else {
+          setMicOn(false)
+          setCameraOn(false)
+          setMediaPermissionError('Cuộc gọi được khôi phục nhưng mic/camera vẫn tắt. Bấm Cấp quyền khi bạn muốn phát âm thanh hoặc video.')
         }
         try { await room.startAudio() } catch { /* user can re-enable audio from the control */ }
 
         if (isHost && hostMediaKey) {
+          let syncingHost = false
           const syncHostKeys = async () => {
+            if (disposed || syncingHost) return
+            syncingHost = true
             try {
               const publicKeys = await listE2EEPublicKeys(request, call.id)
+              if (disposed) return
               for (const record of publicKeys) {
                 if (record.userId === userId) continue
                 const fingerprint = `${record.updatedAt}:${hostGeneration}`
                 if (hostWrappedKeys.current.get(record.userId) === fingerprint) continue
                 const wrapped = await wrapMediaKey(hostMediaKey!, keyPair.privateKey, record.publicKey, call.id, userId, record.userId)
+                if (disposed) return
                 await putE2EEEnvelope(request, call.id, {
                   recipientUserId: record.userId,
                   generation: hostGeneration,
                   iv: wrapped.iv,
                   ciphertext: wrapped.ciphertext,
                 })
+                if (disposed) return
                 hostWrappedKeys.current.set(record.userId, fingerprint)
               }
             } catch {
               // Retry on the next interval; never fall back to plaintext media.
-            }
+            } finally { syncingHost = false }
           }
           await syncHostKeys()
-          hostSyncTimer = window.setInterval(() => void syncHostKeys(), 1800)
+          if (disposed) return
+          hostSyncTimer = window.setInterval(() => { if (!disposed) void syncHostKeys() }, 1800)
         } else {
+          let syncingParticipant = false
           const syncParticipantKey = async () => {
+            if (disposed || syncingParticipant) return
+            syncingParticipant = true
             try {
               const result = await getE2EEEnvelope(request, call.id)
+              if (disposed) return
               const envelope = result.envelope
               if (!envelope || envelope.generation === lastEnvelopeGeneration.current) return
               const keys = await listE2EEPublicKeys(request, call.id)
+              if (disposed) return
               const sender = keys.find((item) => item.userId === envelope.senderUserId)
               if (!sender) return
               const key = await unwrapMediaKey(
                 envelope.iv, envelope.ciphertext, keyPair.privateKey, sender.publicKey,
                 call.id, envelope.senderUserId, userId,
               )
+              if (disposed) return
               await keyProvider.setKey(mediaKeyBuffer(key))
+              if (disposed) return
               lastEnvelopeGeneration.current = envelope.generation
               setDetail('E2EE đã xoay khóa an toàn')
             } catch {
               // Keep the existing valid key and retry; do not downgrade encryption.
-            }
+            } finally { syncingParticipant = false }
           }
-          participantSyncTimer = window.setInterval(() => void syncParticipantKey(), 1800)
+          if (!disposed) participantSyncTimer = window.setInterval(() => void syncParticipantKey(), 1800)
         }
       } catch (err) {
+        if (disposed) {
+          if (localRuntime) { await localRuntime.room.disconnect().catch(() => undefined); localRuntime.worker.terminate() }
+          return // A stale setup must never end the newer call instance on the backend.
+        }
         const message = friendlyCallError(err)
         setPhase('error')
         setDetail(message)
@@ -493,11 +550,11 @@ function SecureCallRoom({
 
     void setup()
     return () => {
-      disposed.current = true
+      disposed = true
       window.clearInterval(hostSyncTimer)
       window.clearInterval(participantSyncTimer)
       if (localRuntime) {
-        void localRuntime.room.disconnect()
+        void localRuntime.room.disconnect().catch(() => undefined)
         localRuntime.worker.terminate()
       }
     }
@@ -674,14 +731,18 @@ function SecureCallRoom({
   }, [translationOn])
 
   async function requestCallMediaPermission() {
-    if (!room || permissionRetrying) return
+    if (!room || permissionRetrying || ending) return
     setPermissionRetrying(true)
     try {
       if (!micOn) {
+        await requireDesktopMedia('microphone')
+        if (room.state !== 'connected') return
         await room.localParticipant.setMicrophoneEnabled(true)
         setMicOn(true)
       }
       if (call.mediaType === 'video' && !cameraOn) {
+        await requireDesktopMedia('camera')
+        if (room.state !== 'connected') return
         await room.localParticipant.setCameraEnabled(true)
         setCameraOn(true)
       }
@@ -694,29 +755,40 @@ function SecureCallRoom({
   }
 
   async function toggleMic() {
-    if (!room) return
+    if (!room || ending || permissionRetrying) return
+    setPermissionRetrying(true)
     try {
       const next = !micOn
+      if (next) await requireDesktopMedia('microphone')
+      if (next && room.state !== 'connected') return
       await room.localParticipant.setMicrophoneEnabled(next)
       setMicOn(next)
+      setMediaPermissionError('')
     } catch (err) { setMediaPermissionError(friendlyCallError(err)) }
+    finally { setPermissionRetrying(false) }
   }
 
   async function toggleCamera() {
-    if (!room) return
+    if (!room || ending || permissionRetrying) return
+    setPermissionRetrying(true)
     try {
       const next = !cameraOn
+      if (next) await requireDesktopMedia('camera')
+      if (next && room.state !== 'connected') return
       await room.localParticipant.setCameraEnabled(next)
       setCameraOn(next)
+      setMediaPermissionError('')
     } catch (err) { setMediaPermissionError(friendlyCallError(err)) }
+    finally { setPermissionRetrying(false) }
   }
 
   async function toggleScreen() {
-    if (!room) return
+    if (!room || ending) return
     try {
       const next = !screenOn
-      await room.localParticipant.setScreenShareEnabled(next)
-      setScreenOn(next)
+      // Desktop grants video only; system audio is not implicitly shared.
+      await room.localParticipant.setScreenShareEnabled(next, isDesktopBuild ? { audio: false } : undefined)
+      setScreenOn(room.localParticipant.isScreenShareEnabled)
     } catch (err) { onError(friendlyCallError(err)) }
   }
 
@@ -892,7 +964,7 @@ function SecureCallRoom({
             <div className="call-notice-icon"><Mic size={18} /></div>
             <div className="call-notice-copy">
               <strong>Cần quyền micro{call.mediaType === 'video' ? ' / camera' : ''}</strong>
-              <span>{mediaPermissionError} Nếu đã chặn, hãy bật quyền trong cài đặt trình duyệt.</span>
+              <span>{mediaPermissionError} {isDesktopBuild ? 'Nếu đã chặn, hãy bật quyền SOCO trong cài đặt quyền riêng tư của hệ điều hành.' : 'Nếu đã chặn, hãy bật quyền trong cài đặt trình duyệt.'}</span>
             </div>
             <button type="button" disabled={!room || permissionRetrying}
               onClick={() => void requestCallMediaPermission()}>
@@ -939,6 +1011,7 @@ function SecureCallRoom({
               </button>
               {moreOpen && (
                 <div className="call-more-popover">
+                  {isDesktopBuild && room && <CallDeviceSettings room={room} micOn={micOn} cameraOn={cameraOn} />}
                   <button type="button" onClick={() => { setMoreOpen(false); void toggleScreen() }}>
                     {screenOn ? <MonitorX size={17} /> : <MonitorUp size={17} />} {screenOn ? 'Dừng chia sẻ màn hình' : 'Chia sẻ màn hình'}
                   </button>

@@ -50,7 +50,7 @@ export type Conversation = {
 
 export type RealtimeEvent = {
   categoryId?: number | null
-  type: 'category.updated' | 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
+  type: 'category.updated' | 'privacy.updated' | 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
   conversationId: number
   message?: Message
   conversation?: Conversation

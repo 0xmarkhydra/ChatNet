@@ -135,7 +135,7 @@ func (s *server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load updated profile")
 		return
 	}
-	token, err := authx.Sign(s.jwtSecret, claims.UserID, profile.Username, profile.DisplayName)
+	token, err := authx.Sign(s.jwtSecret, claims.UserID, profile.Username, profile.DisplayName, claims.SessionID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot refresh session")
 		return

@@ -3729,10 +3729,17 @@ select:focus-visible {
   -webkit-touch-callout: none;
 }
 
-.message-press-target .bubble,
 .message-press-target .message-reply-quote {
   -webkit-user-select: none;
   user-select: none;
+}
+
+.message-selectable-text {
+  display: block;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+  cursor: text;
 }
 
 .message-reactions {
@@ -4253,16 +4260,6 @@ select:focus-visible {
   margin-left: 1px;
   color: #8b969f;
   font-size: 10px;
-}
-
-.translation-hub-scrim {
-  position: fixed;
-  z-index: 198;
-  inset: 0;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: default;
 }
 
 .translation-hub-popover {
