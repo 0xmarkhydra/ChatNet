@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { ArrowUpRight, MessageCircleMore, SearchX, UsersRound } from 'lucide-react'
 
-/** Presentational primitives for consistent SOCO mobile and desktop screens. */
+/** Presentational primitives for consistent SocCo mobile and desktop screens. */
 export function SocoSectionHeading({
   eyebrow,
   title,

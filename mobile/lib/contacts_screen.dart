@@ -161,7 +161,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             SectionHeading(
               eyebrow: 'KẾT NỐI',
               title: 'Danh bạ',
-              description: '${friends.length} bạn bè · Đồng bộ từ SOCO',
+              description: '${friends.length} bạn bè · Đồng bộ từ SocCo',
               action: OutlinedButton(
                 onPressed: widget.onAddFriend,
                 style: OutlinedButton.styleFrom(

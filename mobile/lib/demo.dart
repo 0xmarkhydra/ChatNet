@@ -52,7 +52,7 @@ class DemoApi extends Api {
     {
       'id': 1,
       'type': 'group',
-      'name': 'SOCO Design Team',
+      'name': 'SocCo Design Team',
       'memberCount': 4,
       'unreadCount': 0,
       'online': true,
@@ -128,7 +128,7 @@ class DemoApi extends Api {
         ..['attachments'] = [
           {
             'kind': 'file',
-            'name': 'SOCO-demo-checklist.pdf',
+            'name': 'SocCo-demo-checklist.pdf',
             'contentType': 'application/pdf',
             'sizeBytes': 284000,
             'url': 'https://chat.codelocal.cloud',
@@ -152,7 +152,7 @@ class DemoApi extends Api {
       'id': 1,
       'author': 'Linh Nguyễn',
       'content':
-          'Một góc làm việc, một ý tưởng mới.\nHẹn cả nhóm ở buổi demo SOCO sáng mai!',
+          'Một góc làm việc, một ý tưởng mới.\nHẹn cả nhóm ở buổi demo SocCo sáng mai!',
       'likes': 24,
       'liked': false,
       'comments': [

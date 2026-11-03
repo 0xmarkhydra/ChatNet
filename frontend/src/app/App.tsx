@@ -7,9 +7,14 @@ import { userLabel } from '../shared/lib/userLabel'
 import { useMessageData } from '../features/chat/useMessageData'
 import { useApiRequest } from './useApiRequest'
 import { useAppRealtime } from './useAppRealtime'
+import { useDesktopNotifications } from '../platform/useDesktopNotifications'
 import { useConversationData } from '../features/chat/useConversationData'
+import { useChatQuickSearch, type ChatQuickContact, type ChatQuickHit } from '../features/chat/useChatQuickSearch'
+import ChatQuickSearch from '../features/chat/ChatQuickSearch'
 import { useContactData } from '../features/contacts/useContactData'
 import { useFeedData } from '../features/feed/useFeedData'
+import { usePostSearch } from '../features/feed/usePostSearch'
+import { useFeedInfiniteScroll } from '../features/feed/useFeedInfiniteScroll'
 
 import { useGroupManagement } from '../features/chat/useGroupManagement'
 import { API } from '../shared/lib/config'
@@ -43,7 +48,7 @@ import ContactsView from '../features/contacts/ContactsView'
 import PrivacyControls from '../features/profile/PrivacyControls'
 import AccountSessionsPanel from '../features/auth/AccountSessionsPanel'
 import BlockedUsersPanel from '../features/contacts/BlockedUsersPanel'
-import { FormEvent, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, Fragment, lazy, Suspense, type SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FeedDiscussion, FeedText, type FeedComment, type DiscussionDraft } from '../features/feed/FeedDiscussion'
 import FeedModeration from '../features/feed/FeedModeration'
 import ProfileOverlay from '../features/profile/ProfileOverlay'
@@ -90,21 +95,40 @@ import {
   type PushState,
 } from '../features/notifications/onesignal'
 
-export default function App() {
-  const [session, setSession] = useState<Session | null>(loadSession)
+import { desktopBridge, isDesktopBuild } from '../platform/desktop'
+
+export default function App({ initialSession }: { initialSession?: Session | null }) {
+  const [session, setSession] = useState<Session | null>(() => isDesktopBuild ? initialSession ?? null : loadSession())
   const sessionRef = useRef(session)
   const responseCache = useRef(new SessionResponseCache())
   const [sessionClient] = useState(() => createSessionClient(API, {
     get: () => sessionRef.current,
     save: saveSession,
     expire: () => logout(false),
-  }))
+  }, isDesktopBuild ? desktopBridge().auth : undefined))
   const auth = useAuthFlow(saveSession)
 
   const [tab, setTab] = useState<Tab>('chat')
   const tabRef = useRef(tab)
   tabRef.current = tab
   const [globalSearch, setGlobalSearch] = useState('')
+  const [quickSearchOpen, setQuickSearchOpen] = useState(false)
+  const quickSearchAnchorRef = useRef<HTMLDivElement>(null)
+  const [chatSearchJump, setChatSearchJump] = useState<{ conversationId: number; messageId: number; revision: number } | null>(null)
+  const chatSearchJumpRevision = useRef(0)
+  const lastScrolledSearchJump = useRef(0)
+  useEffect(() => {
+    if (!quickSearchOpen) return
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !quickSearchAnchorRef.current?.contains(event.target)) setQuickSearchOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setQuickSearchOpen(false)
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
+  }, [quickSearchOpen])
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   useEffect(() => {
     if (!quickCreateOpen) return
@@ -120,6 +144,7 @@ export default function App() {
   const activeConversationIdRef = useRef<number | null>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
   const messageScrollAtBottom = useRef(true)
+  const ownSendScrollConversation = useRef<number | null>(null)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
   const messageLongPressTimer = useRef<number | null>(null)
@@ -245,6 +270,13 @@ export default function App() {
   }, [profileTimelineOpen, tab, session?.sessionId, session?.user.username])
 
   const [feedFilter, setFeedFilter] = useState<'all' | 'saved'>('all')
+  const feedViewRef = useRef<HTMLDivElement>(null)
+  const [searchHasScrolled, setSearchHasScrolled] = useState(false)
+  useLayoutEffect(() => {
+    if (tab !== 'feed') return
+    if (feedViewRef.current) feedViewRef.current.scrollTop = 0
+    setSearchHasScrolled(false)
+  }, [tab, globalSearch.trim().toLocaleLowerCase('vi-VN'), feedFilter])
   const [activePostId, setActivePostId] = useState<number | null>(null)
   useEffect(() => {
     if (!session?.token) return
@@ -336,7 +368,7 @@ export default function App() {
   if (!messageSound.current) messageSound.current = new IncomingMessageSound()
   useEffect(() => {
     // Browsers permit sound only after an interaction. Warm up Web Audio on a
-    // real user gesture, without playing a notification just for opening SOCO.
+    // real user gesture, without playing a notification just for opening SocCo.
     const unlockAudio = () => {
       if (messageSoundEnabledRef.current) messageSound.current?.unlock()
     }
@@ -362,6 +394,33 @@ export default function App() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const postComposerRef = useRef<HTMLTextAreaElement>(null)
   const messageInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!isDesktopBuild) return
+    const preventFileNavigation = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
+    }
+    const keyboard = (event: KeyboardEvent) => {
+      if (!sessionRef.current || event.isComposing || event.altKey || !(event.ctrlKey || event.metaKey) ||
+          document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      if (event.key.toLowerCase() === 'k' && !event.shiftKey) {
+        event.preventDefault()
+        setTab('chat')
+        requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.appbar-search input')?.focus())
+      } else if (event.key.toLowerCase() === 'l' && event.shiftKey) {
+        event.preventDefault()
+        messageInputRef.current?.focus()
+      }
+    }
+    document.addEventListener('dragover', preventFileNavigation)
+    document.addEventListener('drop', preventFileNavigation)
+    window.addEventListener('keydown', keyboard)
+    return () => {
+      document.removeEventListener('dragover', preventFileNavigation)
+      document.removeEventListener('drop', preventFileNavigation)
+      window.removeEventListener('keydown', keyboard)
+    }
+  }, [])
   const chatFileInputRef = useRef<HTMLInputElement>(null)
   const feedImageInputRef = useRef<HTMLInputElement>(null)
   const feedVideoInputRef = useRef<HTMLInputElement>(null)
@@ -455,6 +514,8 @@ export default function App() {
     setHasMorePosts,
     postsLoadingMore,
     setPostsLoadingMore,
+    postsPagingError,
+    savedPagingError,
     postsPagingBusy,
     stories,
     setStories,
@@ -474,6 +535,28 @@ export default function App() {
     setActivePostId,
   })
 
+  const feedSearchActive = tab === 'feed' && globalSearch.trim().length > 0
+  const postSearch = usePostSearch({
+    query: globalSearch,
+    scope: feedFilter,
+    enabled: tab === 'feed',
+    sessionId: session?.sessionId,
+    request: apiFetch,
+  })
+  const feedLoadingMore = feedSearchActive ? postSearch.loadingMore : feedFilter === 'saved' ? savedPostsBusy : postsLoadingMore
+  const feedPagingError = feedSearchActive ? Boolean(postSearch.error) : feedFilter === 'saved' ? savedPagingError : postsPagingError
+  const feedInfiniteScrollRef = useFeedInfiniteScroll({
+    enabled: tab === 'feed' && (!feedSearchActive || searchHasScrolled),
+    hasMore: feedSearchActive ? postSearch.hasMore : feedFilter === 'saved' ? hasMoreSavedPosts : hasMorePosts,
+    loading: (feedSearchActive && postSearch.loading) || feedLoadingMore,
+    error: feedPagingError,
+    onLoadMore: () => {
+      if (feedSearchActive) void postSearch.loadMore()
+      else if (feedFilter === 'saved') void loadSavedPosts(true)
+      else void loadMorePosts()
+    },
+  })
+
   const {
     messages,
     setMessages,
@@ -481,6 +564,9 @@ export default function App() {
     setHasMoreMessages,
     messagesLoadingMore,
     setMessagesLoadingMore,
+    messageGapBefore,
+    messageGapLoading,
+    loadMissingMessages,
     messagesPagingBusy,
     pendingMessageScrollRestore,
     loadOlderMessages,
@@ -501,6 +587,7 @@ export default function App() {
     tabRef,
     messagesScrollRef,
     purgeConversation,
+    jumpToMessage: chatSearchJump,
   })
 
   const {
@@ -559,6 +646,25 @@ export default function App() {
     return () => window.removeEventListener('keydown', onEscape)
   }, [groupSettingsOpen, groupNameEditing, setGroupSettingsOpen])
 
+  const conversationSearching = tab === 'chat' && globalSearch.trim().length > 0
+  const chatQuickSearch = useChatQuickSearch({
+    keyword: globalSearch,
+    sessionId: session?.sessionId,
+    enabled: tab === 'chat',
+    request: apiFetch,
+  })
+  useEffect(() => {
+    const jump = chatSearchJump
+    if (!jump || jump.conversationId !== activeConversationId || lastScrolledSearchJump.current === jump.revision ||
+      !messages.some(item => item.id === jump.messageId)) return
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.querySelector(`[data-message-id="${jump.messageId}"]`)
+      if (!target) return
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      lastScrolledSearchJump.current = jump.revision
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [messages, activeConversationId, chatSearchJump])
   const name = session?.user.username || ''
   const displayConversations = useMemo(() => conversations.map(conversation => ({
     ...conversation,
@@ -584,7 +690,7 @@ export default function App() {
     ...post, liked: likePreviews[post.id],
     likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
   })
-  const activePost = activePostId ? [...visibleProfilePosts, ...visiblePosts, ...savedPosts].find((item) => item.id === activePostId) || null : null
+  const activePost = activePostId ? [...visibleProfilePosts, ...visiblePosts, ...savedPosts, ...postSearch.posts].find((item) => item.id === activePostId) || null : null
   const activeMessageAction = messageActionId
     ? messages.find((item) => item.id === messageActionId) || null
     : null
@@ -642,8 +748,8 @@ export default function App() {
     if (!session?.user.username) return
     const url = connectUrl(session.user.username)
     const shareData = {
-      title: `Kết nối với @${session.user.username} trên SOCO`,
-      text: `Kết nối với ${session.user.displayName || '@' + session.user.username} trên SOCO`,
+      title: `Kết nối với @${session.user.username} trên SocCo`,
+      text: `Kết nối với ${session.user.displayName || '@' + session.user.username} trên SocCo`,
       url,
     }
     try {
@@ -652,7 +758,7 @@ export default function App() {
         return
       }
       await navigator.clipboard.writeText(url)
-      setNotice('Đã sao chép link hồ sơ SOCO.', 'success')
+      setNotice('Đã sao chép link hồ sơ SocCo.', 'success')
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
       setNotice('Không thể chia sẻ hồ sơ trên thiết bị này.', 'error')
@@ -663,7 +769,7 @@ export default function App() {
     if (!session?.user.username) return
     try {
       await navigator.clipboard.writeText(connectUrl(session.user.username))
-      setNotice('Đã sao chép link kết nối SOCO.', 'success')
+      setNotice('Đã sao chép link kết nối SocCo.', 'success')
     } catch {
       setNotice('Không sao chép được link trên trình duyệt này.', 'error')
     }
@@ -795,7 +901,7 @@ export default function App() {
     const handleInstalled = () => {
       setInstallPrompt(null)
       setIsStandalone(true)
-      setNotice('SOCO đã được cài vào thiết bị')
+      setNotice('SocCo đã được cài vào thiết bị')
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall)
@@ -827,7 +933,12 @@ export default function App() {
   }
 
   function saveSession(next: Session) {
-    localStorage.setItem('chatnet-session', JSON.stringify(next))
+    if (isDesktopBuild) {
+      if (next.refreshToken !== undefined) throw new Error('Desktop credential boundary violation')
+      localStorage.removeItem('chatnet-session')
+    } else {
+      localStorage.setItem('chatnet-session', JSON.stringify(next))
+    }
     sessionRef.current = next
     setSession(next)
   }
@@ -1530,7 +1641,7 @@ export default function App() {
 
   async function previewMessageSound() {
     const played = await messageSound.current?.preview()
-    if (!played) setNotice('Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SOCO.', 'warning')
+    if (!played) setNotice('Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SocCo.', 'warning')
   }
 
   function toggleMessageSound() {
@@ -1567,7 +1678,7 @@ export default function App() {
 
     const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
     if (isiOS && !isStandalone && !pushEnabled) {
-      setNotice('Trên iPhone: thêm SOCO vào Màn hình chính trước, rồi mở app và bật thông báo.')
+      setNotice('Trên iPhone: thêm SocCo vào Màn hình chính trước, rồi mở app và bật thông báo.')
       return
     }
 
@@ -1583,7 +1694,7 @@ export default function App() {
 
       if (state.permission === 'denied') {
         setNotice(
-          'Thông báo đang bị chặn. Hãy mở cài đặt của trình duyệt/PWA → Notifications → Allow rồi quay lại SOCO.',
+          'Thông báo đang bị chặn. Hãy mở cài đặt của trình duyệt/PWA → Notifications → Allow rồi quay lại SocCo.',
         )
       } else if (state.permission === 'unsupported') {
         setNotice('Thiết bị hoặc trình duyệt này chưa hỗ trợ Web Push.')
@@ -1592,9 +1703,9 @@ export default function App() {
           'Chưa bật được thông báo. Vui lòng thử lại và chọn Cho phép.',
         )
       } else if (state.optedIn) {
-        setNotice('Đã bật thông báo SOCO.')
+        setNotice('Đã bật thông báo SocCo.')
       } else {
-        setNotice('Đã tắt thông báo SOCO')
+        setNotice('Đã tắt thông báo SocCo')
       }
     } catch {
       setNotice('Không thể bật thông báo. Kiểm tra quyền Notification của trình duyệt/PWA rồi thử lại.')
@@ -1668,19 +1779,24 @@ export default function App() {
 
   async function fetchAccountSessions() {
     const current = sessionRef.current
-    if (!current?.refreshToken || sessionsBusy) return
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy) return
     const identity = current.sessionId
     setSessionsBusy(true)
     setSessionsError('')
     try {
-      const response = await fetch(`${API}/api/auth/sessions/list`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ refreshToken: current.refreshToken }),
-      })
-      if (!response.ok) throw new Error('Không tải được phiên đăng nhập.')
-      const data = await response.json() as ManagedAccountSession[]
+      let data: ManagedAccountSession[]
+      if (isDesktopBuild) {
+        data = await desktopBridge().auth.listSessions(identity)
+      } else {
+        const response = await fetch(`${API}/api/auth/sessions/list`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({ refreshToken: current.refreshToken }),
+        })
+        if (!response.ok) throw new Error('Không tải được phiên đăng nhập.')
+        data = await response.json() as ManagedAccountSession[]
+      }
       if (sessionRef.current?.sessionId === identity) {
         setManagedSessions(data)
         setSessionsOpen(true)
@@ -1696,7 +1812,7 @@ export default function App() {
 
   async function revokeAccountSessions(sessionID?: string) {
     const current = sessionRef.current
-    if (!current?.refreshToken || sessionsBusy) return
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy) return
     const identity = current.sessionId
     const selected = managedSessions.find((item) => item.id === sessionID)
     if (sessionID && !selected) return
@@ -1709,13 +1825,21 @@ export default function App() {
     setSessionsBusy(true)
     setSessionsError('')
     try {
-      const response = await fetch(`${API}/api/auth/sessions/${sessionID ? 'revoke' : 'revoke-others'}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ refreshToken: current.refreshToken, ...(sessionID ? { sessionId: sessionID } : {}) }),
-      })
-      if (!response.ok) throw new Error('Không thu hồi được phiên đăng nhập.')
+      if (isDesktopBuild) {
+        const nativeAuth = desktopBridge().auth
+        const revoked = sessionID
+          ? await nativeAuth.revokeSession(identity, sessionID)
+          : await nativeAuth.revokeOthers(identity)
+        if (!revoked) throw new Error('Không thu hồi được phiên đăng nhập.')
+      } else {
+        const response = await fetch(`${API}/api/auth/sessions/${sessionID ? 'revoke' : 'revoke-others'}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({ refreshToken: current.refreshToken, ...(sessionID ? { sessionId: sessionID } : {}) }),
+        })
+        if (!response.ok) throw new Error('Không thu hồi được phiên đăng nhập.')
+      }
       if (sessionRef.current?.sessionId !== identity) return
       if (selected?.current) {
         logout(false)
@@ -2123,12 +2247,14 @@ export default function App() {
     ++feedRevision.current
     setProfilePosts(current => current.map(p => p.id === updated.id ? updated : p))
     syncFeedDataPost(updated)
+    postSearch.syncPost(updated)
   }
 
   function removeFeedPost(id: number) {
     ++feedRevision.current
     setProfilePosts(current => current.filter(p => p.id !== id))
     removeFeedDataPost(id)
+    postSearch.removePost(id)
   }
 
   async function loadProfilePosts(more = false, force = false) {
@@ -2174,7 +2300,11 @@ export default function App() {
     setVisitorUsername(null)
     const current = sessionRef.current
     const currentToken = current?.token
-    if (revoke && current?.refreshToken) {
+    if (isDesktopBuild) {
+      void desktopBridge().auth.logout({ sessionId: current?.sessionId ?? null, revoke }).then((result) => {
+        if (!result.revoked) setNotice('Đã đăng xuất trên máy này. Chưa thu hồi được phiên trên server.', 'warning')
+      }).catch(() => setNotice('Không xóa hoặc thu hồi được phiên an toàn. Hãy thu hồi thiết bị này từ một phiên khác.', 'error'))
+    } else if (revoke && current?.refreshToken) {
       void fetch(`${API}/api/auth/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2266,6 +2396,8 @@ export default function App() {
     setFriendPreview(null)
     setPostText('')
     setPosts([])
+    setSavedPosts([])
+    setHasMoreSavedPosts(false)
     ++profileLoadSequence.current
     profilePagingBusy.current = false
     setProfileTimelineOpen(false)
@@ -2287,6 +2419,11 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (isDesktopBuild) {
+      return desktopBridge().auth.onExpired((sessionId) => {
+        if (sessionRef.current?.sessionId === sessionId) logout(false)
+      })
+    }
     const sync = (event: StorageEvent) => {
       if (event.key !== 'chatnet-session' && event.key !== null) return
       const next = loadSession()
@@ -2301,8 +2438,10 @@ export default function App() {
   useEffect(() => {
     if (!session) return
     const refresh = () => {
-      if (document.visibilityState === 'hidden') return
-      void sessionClient.refresh().catch(() => setStatus('Đang kết nối lại...'))
+      if (!isDesktopBuild && document.visibilityState === 'hidden') return
+      void sessionClient.refresh().then((current) => {
+        if (isDesktopBuild && current) return sessionClient.check()
+      }).catch(() => setStatus('Đang kết nối lại...'))
     }
     refresh()
     const timer = window.setInterval(refresh, 60_000)
@@ -2316,6 +2455,20 @@ export default function App() {
       document.removeEventListener('visibilitychange', refresh)
     }
   }, [session?.sessionId, sessionClient])
+
+  const nativeNotifications = useDesktopNotifications({
+    session, sessionRef, apiFetch, checkSession: sessionClient.check,
+    activeConversationId, tab, sound: messageSoundEnabled,
+    onError: (message) => setNotice(message, 'warning'),
+    onOpen: (conversation) => {
+      revokedConversationIds.current.delete(conversation.id)
+      membershipSnapshot.current?.add(conversation.id)
+      setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)])
+      if (activeConversationIdRef.current !== conversation.id) setMessages([])
+      switchTab('chat')
+      setActiveConversationId(conversation.id)
+    },
+  })
 
   useAppRealtime({
     onCategoryAssignmentChanged: conversationCategories.applyAssignment,
@@ -2375,8 +2528,19 @@ export default function App() {
   }, [tab, session?.token])
 
   useLayoutEffect(() => {
-    const restore = pendingMessageScrollRestore.current
     const container = messagesScrollRef.current
+    if (ownSendScrollConversation.current !== null) {
+      const sentInCurrentConversation = ownSendScrollConversation.current === activeConversationId
+      ownSendScrollConversation.current = null
+      if (sentInCurrentConversation && container) {
+        // Only a local send overrides the reader's position; incoming messages never do.
+        pendingMessageScrollRestore.current = null
+        container.scrollTop = container.scrollHeight
+        messageScrollAtBottom.current = true
+        return
+      }
+    }
+    const restore = pendingMessageScrollRestore.current
     if (restore && container) {
       container.scrollTop = restore.top + container.scrollHeight - restore.height
       pendingMessageScrollRestore.current = null
@@ -2385,7 +2549,7 @@ export default function App() {
     // Preserve scroll position when reading history; only follow new messages
     // when the reader was already near the bottom of the conversation.
     if (container && messageScrollAtBottom.current) container.scrollTop = container.scrollHeight
-  }, [messages, outgoingMessage])
+  }, [messages, outgoingMessage, chatOutbox])
 
   useEffect(() => {
     if (
@@ -2646,6 +2810,7 @@ export default function App() {
       setNotice('Hàng đợi tin nhắn đã đầy. Nội dung vẫn ở ô nhập; hãy thử lại sau.', 'warning')
       return
     }
+    ownSendScrollConversation.current = conversationId
     setMessageDrafts((current) => {
       if (current[conversationId] !== submittedDraft) return current
       const updated = { ...current }
@@ -2842,6 +3007,7 @@ export default function App() {
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
       setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
+      postSearch.syncPost({ ...post, liked: updated.liked, likes: updated.likes })
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) void refreshPosts()
       if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được lượt thích.', 'error')
@@ -2898,6 +3064,7 @@ export default function App() {
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, comments: updated.comments } : item))
       setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, comments: updated.comments } : item))
+      postSearch.syncPost({ ...post, comments: updated.comments })
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         ++feedRevision.current
@@ -2911,28 +3078,42 @@ export default function App() {
 
   const unreadTotal = conversations.reduce((sum, conversation) => sum + conversation.unreadCount, 0)
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase('vi-VN')
-  const searchedConversations = displayConversations.filter((conversation) => {
-    if (!normalizedSearch) return true
-    return (
-      conversation.name.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
-      (conversation.otherUsername || '').toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
-      conversation.lastMessage.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
-    )
-  })
-  const visibleConversations = conversationCategories.selected === null ? searchedConversations :
+  // The conversation sidebar is independent of the keyword. Only the dropdown searches.
+  const visibleConversations = conversationCategories.selected === null ? displayConversations :
     conversationCategories.items.map(item => displayConversations.find(c => c.id === item.id) || item)
       .filter(item => !revokedConversationIds.current.has(item.id) &&
-        (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)) &&
-        (!normalizedSearch || (item.name + ' ' + (item.otherUsername || '') + ' ' + item.lastMessage).toLocaleLowerCase('vi-VN').includes(normalizedSearch)))
-  const searchedPosts = (feedFilter === 'saved' ? savedPosts : visiblePosts).filter((post) => {
-    if (!normalizedSearch || tab !== 'feed') return true
-    return (
-      post.author.toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
-      userLabel(post.authorDisplayName, post.author).toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
-      post.content.toLocaleLowerCase('vi-VN').includes(normalizedSearch)
-    )
-  })
+        (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
+  const searchedPosts = feedSearchActive ? postSearch.posts.map(post => likePreviews[post.id] === undefined ? post : {
+    ...post,
+    liked: likePreviews[post.id],
+    likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
+  }) : feedFilter === 'saved' ? savedPosts : visiblePosts
+  const openChatQuickContact = (contact: ChatQuickContact) => {
+    setQuickSearchOpen(false)
+    setGlobalSearch('')
+    setChatSearchJump(null)
+    if (contact.conversation) {
+      const selected = contact.conversation
+      setConversations(current => current.some(item => item.id === selected.id) ? current : [...current, selected])
+      setActiveConversationId(selected.id)
+    } else if (contact.username) {
+      void openDirectByUsername(contact.username)
+    }
+  }
+  const openChatQuickHit = (hit: ChatQuickHit) => {
+    setQuickSearchOpen(false)
+    setGlobalSearch('')
+    setConversations(current => current.some(item => item.id === hit.conversation.id) ? current : [...current, hit.conversation])
+    setChatSearchJump({
+      conversationId: hit.conversation.id, messageId: hit.id,
+      revision: ++chatSearchJumpRevision.current,
+    })
+    setActiveConversationId(hit.conversation.id)
+    setTranslations({})
+    setTranslationOriginals({})
+  }
   const switchTab = (nextTab: Tab) => {
+    setQuickSearchOpen(false)
     setTab(nextTab)
     setQuickCreateOpen(false)
     setGlobalSearch('')
@@ -3047,19 +3228,36 @@ export default function App() {
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
       {tab !== 'profile' && tab !== 'discover' && tab !== 'market' && (
       <header className="chatnet-appbar">
-        <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SOCO</strong></div>
+        <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SocCo</strong></div>
+          <div className="appbar-search-anchor" ref={quickSearchAnchorRef}>
           <label className="appbar-search">
             <UiIcon name="search" size={27} />
             <input
               value={tab === 'contacts' ? friendQuery : globalSearch}
+              maxLength={tab === 'feed' || tab === 'chat' ? 120 : undefined}
+              type="search"
+              onKeyDown={(event) => {
+                if (tab === 'chat' && event.key === 'Escape') {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setQuickSearchOpen(false)
+                }
+              }}
+              aria-expanded={tab === 'chat' && conversationSearching && quickSearchOpen}
+              aria-controls={tab === 'chat' ? 'chat-quick-search-results' : undefined}
+              onFocus={() => { if (tab === 'chat' && globalSearch.trim()) setQuickSearchOpen(true) }}
+              onClick={() => { if (tab === 'chat' && globalSearch.trim()) setQuickSearchOpen(true) }}
               onChange={(event) => {
                 if (tab === 'contacts') setFriendQuery(event.target.value)
-                else setGlobalSearch(event.target.value)
+                else {
+                  setGlobalSearch(event.target.value)
+                  if (tab === 'chat') setQuickSearchOpen(Boolean(event.target.value.trim()))
+                }
               }}
               placeholder={
                 tab === 'contacts' ? 'Tên, @username hoặc email'
                   : tab === 'feed' ? 'Tìm tác giả hoặc nội dung bài viết'
-                    : 'Tìm cuộc trò chuyện'
+                    : 'Tìm liên hệ, tin nhắn, file'
               }
               aria-label={
                 tab === 'contacts' ? 'Tìm bạn bằng tên, username hoặc email'
@@ -3068,6 +3266,18 @@ export default function App() {
               }
             />
           </label>
+          {tab === 'chat' && conversationSearching && quickSearchOpen && (
+            <ChatQuickSearch
+              results={chatQuickSearch.results}
+              loading={chatQuickSearch.loading}
+              error={chatQuickSearch.error}
+              onRetry={chatQuickSearch.retry}
+              onClose={() => setQuickSearchOpen(false)}
+              onContact={openChatQuickContact}
+              onHit={openChatQuickHit}
+            />
+          )}
+          </div>
         <div className="appbar-actions">
           {tab === 'chat' && (
             <>
@@ -3226,7 +3436,7 @@ export default function App() {
                     <div className="connect-ios-header">
                       <div>
                         <strong id="connect-modal-title">Kết nối</strong>
-                        <small>Tìm bạn bè trên SOCO</small>
+                        <small>Tìm bạn bè trên SocCo</small>
                       </div>
                       <button
                         type="button"
@@ -3340,10 +3550,10 @@ export default function App() {
                 {visibleConversations.length === 0 && !conversationCategories.loading && !conversationCategories.listError && (
                   <div className="conversation-list-empty">
                     <SocoEmptyState
-                      kind={normalizedSearch ? 'search' : 'chat'}
-                      title={normalizedSearch ? 'Không tìm thấy cuộc trò chuyện' : 'Chưa có cuộc trò chuyện'}
-                      description={normalizedSearch ? 'Thử tìm bằng tên hoặc nội dung khác.' : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
-                      action={!normalizedSearch && <SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
+                      kind="chat"
+                      title="Chưa có cuộc trò chuyện"
+                      description="Tìm bạn bè để bắt đầu kết nối và trò chuyện."
+                      action={<SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
                     />
                   </div>
                 )}
@@ -3353,6 +3563,8 @@ export default function App() {
                     key={conversation.id}
                     className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''}`}
                     onClick={() => {
+                      setChatSearchJump(null)
+                      setQuickSearchOpen(false)
                       setActiveConversationId(conversation.id)
                       setTranslations({})
                       setTranslationOriginals({})
@@ -3391,7 +3603,18 @@ export default function App() {
               </div>
             </aside>
 
-            <section className={activeConversation?.type === 'group' ? 'conversation-panel group-chat-panel' : 'conversation-panel'}>
+            <section
+              onDragOver={(event) => {
+                if (isDesktopBuild && event.dataTransfer.types.includes('Files')) event.preventDefault()
+              }}
+              onDrop={(event) => {
+                if (!isDesktopBuild || !event.dataTransfer.types.includes('Files')) return
+                event.preventDefault()
+                if (!activeConversationId) { setNotice('Chọn hội thoại trước khi thả tệp.', 'warning'); return }
+                if (mediaUploading || messageSending) { setNotice('Hãy hoàn tất hoặc hủy tác vụ hiện tại trước khi thả thêm tệp.', 'warning'); return }
+                void addChatFiles(Array.from(event.dataTransfer.files))
+              }}
+              className={activeConversation?.type === 'group' ? 'conversation-panel group-chat-panel' : 'conversation-panel'}>
               {!activeConversation ? (
                 <div className="conversation-empty">
                   <SocoEmptyState kind="chat" title="Kết nối không biên giới"
@@ -3659,13 +3882,13 @@ export default function App() {
                     <MessageSearchPanel conversationId={activeConversation.id} request={apiFetch}
                       onClose={() => setMessageSearchOpen(false)}
                       onJump={async (result) => {
-                        const response = await apiFetch(`/api/conversations/${activeConversation.id}/messages?before=${result.id + 1}&limit=80&target=${encodeURIComponent(targetLanguage)}`)
-                        if (!response.ok) throw new Error('Không tải được tin nhắn')
-                        const history = (await response.json()) as Message[]
                         if (activeConversationIdRef.current !== activeConversation.id) return
-                        setMessages(history.sort((a, b) => a.id - b.id))
-                        setHasMoreMessages(history.length === 80)
-                        window.setTimeout(() => document.querySelector(`[data-message-id="${result.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 90)
+                        // Both search entry points use the same history loader; never replace the current timeline.
+                        setChatSearchJump({
+                          conversationId: activeConversation.id,
+                          messageId: result.id,
+                          revision: ++chatSearchJumpRevision.current,
+                        })
                       }}
                     />
                   )}
@@ -3688,8 +3911,16 @@ export default function App() {
                       const originalVisible = Boolean(translationOriginals[message.id])
                       const translatedLanguage = selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()
                       return (
+                        <Fragment key={message.id}>
+                          {messageGapBefore === message.id && (
+                            <button type="button" className="soco-load-more soco-middle-messages"
+                              onClick={() => void loadMissingMessages()} disabled={messageGapLoading}
+                              aria-busy={messageGapLoading}>
+                              <RefreshCw size={15} aria-hidden="true" />
+                              {messageGapLoading ? 'Đang tải...' : 'Tải tin nhắn ở giữa'}
+                            </button>
+                          )}
                         <article
-                          key={message.id}
                           data-message-id={message.id}
                           className={mine ? 'message mine message-press-target' : 'message message-press-target'}
                           onPointerDown={(event) => beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)}
@@ -3775,6 +4006,7 @@ export default function App() {
                             </>
                           )}
                         </article>
+                        </Fragment>
                       )
                     })}
                     {chatOutbox.filter((item) => item.conversationId === activeConversationId).map((item) => (
@@ -3806,7 +4038,10 @@ export default function App() {
                     <div ref={bottomRef} />
                   </div>
 
-                  <form className="composer media-composer" onSubmit={sendMessage}>
+                  <form className="composer media-composer" onSubmit={(event) => {
+                    void sendMessage(event)
+                    if (isDesktopBuild) messageInputRef.current?.focus()
+                  }}>
                     <input
                       ref={chatFileInputRef}
                       className="hidden-media-input"
@@ -3953,7 +4188,7 @@ export default function App() {
 
         {tab === 'discover' && (
           <div className="marketplace-entry">
-            <div><h3>SOCO Market</h3><p>Mua bán trong ChatNet — trò chuyện, giỏ hàng và theo dõi yêu cầu đơn.</p></div>
+            <div><h3>SocCo Market</h3><p>Mua bán trong ChatNet — trò chuyện, giỏ hàng và theo dõi yêu cầu đơn.</p></div>
             <button type="button" onClick={() => switchTab('market')}>Mở sàn mua bán</button>
           </div>
         )}
@@ -3993,17 +4228,21 @@ export default function App() {
         )}
 
         {tab === 'market' && (
-          <Suspense fallback={<p role="status">Đang mở SOCO Market...</p>}>
+          <Suspense fallback={<p role="status">Đang mở SocCo Market...</p>}>
             <Marketplace key={session.sessionId} userId={session.user.id} request={apiFetch} onBack={() => switchTab('discover')} />
           </Suspense>
         )}
 
         {tab === 'feed' && (
-          <div className="feed-view zalo-feed-view">
+          <div className="feed-view zalo-feed-view" ref={feedViewRef}
+            onScroll={(event) => {
+              if (feedSearchActive && event.currentTarget.scrollTop > 0) setSearchHasScrolled(true)
+            }}>
             <FeedModeration request={apiFetch} onRemoved={(type, id) => {
               if (type === 'post') {
                 setPosts((current) => current.filter((post) => post.id !== id))
                 setSavedPosts((current) => current.filter((post) => post.id !== id))
+                postSearch.removePost(id)
                 if (activePostId === id) setActivePostId(null)
               } else if (type === 'comment') {
                 void refreshPosts()
@@ -4079,16 +4318,22 @@ export default function App() {
                   </div>
                 </article>
               )}
+              {feedSearchActive && postSearch.loading && <p role="status" className="soco-feed-load-more">Đang tìm bài viết...</p>}
               {renderPosts(searchedPosts)}
-              {(feedFilter === 'saved' ? hasMoreSavedPosts : hasMorePosts) && (
-                <button type="button" className="soco-load-more soco-feed-load-more"
-                  onClick={() => void (feedFilter === 'saved' ? loadSavedPosts(true) : loadMorePosts())}
-                  disabled={feedFilter === 'saved' ? savedPostsBusy : postsLoadingMore}>
-                  <RefreshCw size={17} aria-hidden="true" />
-                  {(feedFilter === 'saved' ? savedPostsBusy : postsLoadingMore) ? 'Đang tải...' : 'Tải thêm bài viết'}
-                </button>
+              {feedLoadingMore && <p role="status" className="soco-feed-load-more">Đang tải thêm bài viết...</p>}
+              {feedPagingError && (
+                <div role="alert" className="soco-feed-load-more">
+                  <span>{feedSearchActive ? postSearch.error : 'Không thể tải bài viết.'}</span>
+                  <button type="button" onClick={() => {
+                    if (feedSearchActive) postSearch.retry()
+                    else if (feedFilter === 'saved') void loadSavedPosts(savedPosts.length > 0)
+                    else if (posts.length === 0) void refreshPosts()
+                    else void loadMorePosts()
+                  }}>Thử lại</button>
+                </div>
               )}
-              {searchedPosts.length === 0 && (
+              <div ref={feedInfiniteScrollRef} aria-hidden="true" style={{ height: 1 }} />
+              {searchedPosts.length === 0 && !feedLoadingMore && !(feedSearchActive && postSearch.loading) && !feedPagingError && (
                 <div className="feed-empty">
                   <SocoEmptyState title={normalizedSearch ? 'Không tìm thấy bài viết' : 'Chưa có bài viết'}
                     description={normalizedSearch ? 'Thử một từ khóa khác nhé.' : 'Hãy chia sẻ khoảnh khắc đầu tiên của bạn.'}
@@ -4211,7 +4456,7 @@ export default function App() {
             <section className="profile-hero">
               <div className={`profile-cover-art ${profileMedia?.coverSet ? 'has-cover' : ''}`}>
                 <div className="profile-cover-placeholder">
-                  <strong>SOCO</strong>
+                  <strong>SocCo</strong>
                   <small>Understand. Connect. Together.</small>
                 </div>
                 {profileMedia?.coverSet && (
@@ -4316,7 +4561,7 @@ export default function App() {
               {profilePrivacyControls}
             <AccountSessionsPanel
               sessionsBusy={sessionsBusy}
-              refreshToken={session.refreshToken}
+              canManageSessions={isDesktopBuild || Boolean(session.refreshToken)}
               sessionsOpen={sessionsOpen}
               setSessionsOpen={setSessionsOpen}
               fetchAccountSessions={fetchAccountSessions}
@@ -4356,17 +4601,21 @@ export default function App() {
               </button>
 
               <div className="settings-row">
-                <div><strong>{t('profile.notifications')}</strong><small>{t('profile.notificationsHint')}</small></div>
+                <div>
+                  <strong>{isDesktopBuild ? 'Thông báo Desktop' : t('profile.notifications')}</strong>
+                  <small>{isDesktopBuild ? 'Ẩn nội dung và tên người gửi. Nhận khi SocCo còn chạy; thoát hẳn sẽ dừng thông báo.' : t('profile.notificationsHint')}</small>
+                </div>
                 <button
                   type="button"
-                  className={`switch-button ${pushEnabled ? 'on' : ''}`}
-                  onClick={() => void togglePush()}
-                  disabled={pushBusy}
-                  aria-label={pushEnabled ? 'Tắt thông báo' : 'Bật thông báo'}
+                  className={`switch-button ${(isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? 'on' : ''}`}
+                  onClick={() => isDesktopBuild ? nativeNotifications.toggle() : void togglePush()}
+                  disabled={!isDesktopBuild && pushBusy}
+                  aria-label={(isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? 'Tắt thông báo' : 'Bật thông báo'}
                   role="switch"
-                  aria-checked={pushEnabled}
+                  aria-checked={isDesktopBuild ? nativeNotifications.enabled : pushEnabled}
                 ><span /></button>
               </div>
+              {isDesktopBuild && nativeNotifications.warning && <div className="settings-row" role="status"><small>{nativeNotifications.warning}</small></div>}
               <div className="settings-row message-sound-row">
                 <div><strong>{t('profile.messageSound')}</strong><small>{t('profile.messageSoundHint')}</small></div>
                 <button
@@ -4388,10 +4637,10 @@ export default function App() {
                   </button>
                 </div>
               )}
-              <div className="settings-row">
+              {!isDesktopBuild && <div className="settings-row">
                 <div><strong>{t('profile.testNotification')}</strong><small>{t('profile.testNotificationHint')}</small></div>
                 <button type="button" className="settings-action" onClick={() => void sendTestPush()} disabled={pushBusy || !pushEnabled}>{t('common.test')}</button>
-              </div>
+              </div>}
               <div className="settings-row">
                 <div><strong>{t('profile.autoTranslate')}</strong></div>
                 <button
@@ -4610,6 +4859,7 @@ export default function App() {
         request={apiFetch}
         apiBase={API}
         token={session.token}
+        sessionId={session.sessionId}
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}

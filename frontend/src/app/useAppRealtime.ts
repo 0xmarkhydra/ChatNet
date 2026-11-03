@@ -1,6 +1,8 @@
 import type { SessionResponseCache } from '../shared/lib/sessionCache'
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { API } from '../shared/lib/config'
+import { isDesktopBuild } from '../platform/desktop'
+import { notifyDesktopMessage, clearDesktopNotifications, refreshDesktopUnread } from '../platform/useDesktopNotifications'
 import { attachmentLabel } from '../shared/lib/format'
 import { mergeById } from '../shared/lib/optimistic'
 import { canMarkConversationRead } from '../features/chat/conversationRead'
@@ -112,6 +114,8 @@ export function useAppRealtime({
     events.addEventListener('update', (event) => {
       if (sessionRef.current?.sessionId !== session.sessionId) return
       const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
+      if (['message', 'conversation.read', 'conversation.created', 'conversation.removed', 'privacy.updated'].includes(update.type)) refreshDesktopUnread()
+      if (update.type === 'privacy.updated' || update.type === 'conversation.removed') clearDesktopNotifications(session.sessionId)
       if (update.type === 'privacy.updated') {
         // Remove potentially forbidden content immediately; refetch using current access rules.
         responseCache.current.invalidate(['messages', 'conversations', 'friends', 'feed', 'stories', 'profiles', 'notes'])
@@ -218,7 +222,10 @@ export function useAppRealtime({
         const incoming = update.message
         // Only genuine, recent messages from other users make a sound. Loading
         // history, updating reactions and our own sends never trigger one.
-        messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
+        const viewingDesktopChat = isDesktopBuild && document.hasFocus() && document.visibilityState === 'visible' &&
+          tabRef.current === 'chat' && activeConversationIdRef.current === incoming.conversationId
+        messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current && !viewingDesktopChat)
+        notifyDesktopMessage(session, incoming)
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
           onMessageConfirmed(incoming)
@@ -260,7 +267,7 @@ export function useAppRealtime({
                   lastMessageAt: incoming.createdAt,
                   unreadCount:
                     incoming.senderId !== session.user.id &&
-                      !canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState)
+                      !canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())
                       ? item.unreadCount + 1
                       : item.unreadCount,
                 }
@@ -281,7 +288,7 @@ export function useAppRealtime({
               : [...current, incoming],
           )
           if (incoming.senderId !== session.user.id &&
-              canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState)) {
+              canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) {
             void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
               .catch(() => setStatus('Đang kết nối lại...'))
           }

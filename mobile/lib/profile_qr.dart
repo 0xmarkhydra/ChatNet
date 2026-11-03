@@ -37,7 +37,7 @@ String profileFromQr(String value, String ownUsername) {
       url.host != origin.host ||
       url.port != origin.port ||
       url.queryParametersAll['connect']?.length != 1) {
-    throw const FormatException('Link không phải hồ sơ SOCO hợp lệ.');
+    throw const FormatException('Link không phải hồ sơ SocCo hợp lệ.');
   }
   final username = url.queryParameters['connect'] ?? '';
   if (!RegExp(
@@ -325,7 +325,7 @@ class _ProfileQrDialogState extends State<_ProfileQrDialog> {
                   keyboardType: TextInputType.url,
                   onSubmitted: (_) => _read(),
                   decoration: InputDecoration(
-                    labelText: 'Link hồ sơ SOCO',
+                    labelText: 'Link hồ sơ SocCo',
                     hintText: '${Api.siteUrl}/?connect=username',
                     suffixIcon: IconButton(
                       tooltip: 'Dán từ clipboard',

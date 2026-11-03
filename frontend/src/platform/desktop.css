@@ -1,0 +1,39 @@
+.desktop-startup {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+  background: var(--soco-canvas, #f5f7fd);
+  color: var(--soco-text, #17233d);
+}
+.desktop-startup h1 { margin: 0; color: #2563eb; font-size: 32px; }
+.desktop-startup p { max-width: 540px; line-height: 1.6; }
+.desktop-startup button {
+  background: #2563eb; color: white; border: 0; border-radius: 10px;
+  padding: 10px 24px; font-size: 14px; cursor: pointer;
+}
+html[data-app-platform="desktop"] { height: 100%; overflow: hidden; }
+html[data-app-platform="desktop"] body,
+html[data-app-platform="desktop"] #root { height: 100%; overflow: hidden; }
+.desktop-screen-picker {
+  width: min(760px, calc(100vw - 48px)); max-height: calc(100dvh - 48px);
+  padding: 24px; border: 1px solid var(--border, #dbe3ef); border-radius: 16px;
+  background: var(--soco-canvas, #f5f7fd); color: var(--soco-text, #17233d); overflow: auto;
+}
+.desktop-screen-picker::backdrop { background: rgb(15 23 42 / 65%); }
+.desktop-screen-picker h2 { margin: 0 0 12px; font-size: 20px; }
+.desktop-screen-picker p { line-height: 1.5; font-size: 14px; }
+.desktop-screen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.desktop-screen-grid button { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--border, #dbe3ef); border-radius: 10px; background: var(--soco-canvas, #fff); color: inherit; cursor: pointer; }
+.desktop-screen-grid button:focus-visible, .desktop-screen-cancel:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.desktop-screen-grid img { width: 100%; object-fit: contain; background: #e2e8f0; }
+.desktop-screen-grid span { overflow-wrap: anywhere; font-size: 13px; }
+.desktop-screen-cancel { margin-top: 20px; min-height: 40px; padding: 8px 18px; border-radius: 8px; cursor: pointer; }
+.call-device-settings { display: grid; gap: 10px; padding: 12px; max-height: 50vh; overflow: auto; }
+.call-device-settings label { display: grid; gap: 4px; font-size: 13px; }
+.call-device-settings select { max-width: 100%; min-height: 36px; background: #17233d; color: #fff; border: 1px solid #64748b; border-radius: 8px; padding: 6px; }
+.call-device-settings p { margin: 0; font-size: 12px; line-height: 1.4; }

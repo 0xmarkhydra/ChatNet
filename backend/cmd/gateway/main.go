@@ -75,6 +75,7 @@ func main() {
 	mux.Handle("/api/conversations", chatProxy)
 	mux.Handle("/api/conversations/", chatProxy)
 	mux.Handle("/api/group-invites/", chatProxy)
+	mux.Handle("/api/chat/", chatProxy)
 	mux.Handle("/api/calls", callProxy)
 	mux.Handle("/api/calls/", callProxy)
 	mux.Handle("/api/translate", translateProxy)

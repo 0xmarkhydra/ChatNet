@@ -42,7 +42,7 @@ export function useApiRequest({
 
     async function performRequest() {
       const mutation = write && path !== '/api/profile/note' && !/\/(read|translate|presign|subscription|bundle)$/.test(path)
-        && !/^\/api\/conversations\/\d+\/category$/.test(path)
+        && !/^\/api\/conversations\/\d+\/(category|messages)$/.test(path)
       const request = Symbol(path)
       if (mutation) {
         pendingRequests.current.add(request)
