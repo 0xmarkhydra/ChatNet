@@ -110,10 +110,10 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
 .zalo-conversation-list { background: #fff; }
 .zalo-conversation-list .conversation-item {
   box-sizing: border-box;
-  width: calc(100% - 18px); /* A full-width item plus 9px side margins otherwise overflows. */
+  width: calc(100% - 20px); /* Match the 10px side margins at every breakpoint. */
   min-height: 78px;
   border-radius: 16px;
-  margin: 3px 9px;
+  margin: 3px 10px;
   padding: 9px 11px;
   gap: 12px;
 }
