@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"chatnet/internal/authx"
 	"chatnet/internal/httpx"
 	"chatnet/internal/onesignalx"
+	"github.com/jackc/pgx/v5"
 )
 
 type groupMember struct {
@@ -155,6 +157,31 @@ func (s *server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// groupMemberInvitationEligible locks the accepted friendship for the duration
+// of the membership transaction so an invite cannot race with an unfriend.
+func groupMemberInvitationEligible(ctx context.Context, tx pgx.Tx, actorID, candidateID int64) (bool, error) {
+	if actorID == candidateID {
+		return false, nil
+	}
+	var allowed bool
+	err := tx.QueryRow(ctx, `
+		SELECT NOT EXISTS (
+			SELECT 1 FROM user_blocks b
+			WHERE (b.blocker_id=$1 AND b.blocked_id=$2)
+			   OR (b.blocker_id=$2 AND b.blocked_id=$1)
+		)
+		FROM friend_connections f
+		WHERE f.user_low=LEAST($1,$2)
+		  AND f.user_high=GREATEST($1,$2)
+		  AND f.status='accepted'
+		FOR SHARE
+	`, actorID, candidateID).Scan(&allowed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return allowed, err
+}
+
 func (s *server) addGroupMembers(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
@@ -222,6 +249,19 @@ func (s *server) addGroupMembers(w http.ResponseWriter, r *http.Request) {
 	if err != nil || !groupPermission(currentRole, currentSettings, "invite") {
 		httpx.Error(w, http.StatusForbidden, "group invitation permission required")
 		return
+	}
+	// Validate the entire batch before inserting anyone. A username cannot
+	// bypass the friend-only invitation rule or add only part of a batch.
+	for _, candidate := range candidates {
+		allowed, err := groupMemberInvitationEligible(r.Context(), tx, claims.UserID, candidate.id)
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot verify friendship")
+			return
+		}
+		if !allowed {
+			httpx.Error(w, http.StatusForbidden, "chỉ có thể thêm bạn bè đã kết bạn vào nhóm: @"+candidate.username)
+			return
+		}
 	}
 	addedIDs := []int64{}
 	for _, candidate := range candidates {

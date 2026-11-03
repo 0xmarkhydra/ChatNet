@@ -13,6 +13,8 @@ import './features/chat/conversation-content.css'
 import './styles/soco-theme.css'
 import './styles/soco-screens.css'
 import './styles/soco-layout-v2.css'
+import './features/chat/group-settings-sidebar.css'
+import './features/chat/group-room-header.css'
 import './design-system/motion.css'
 import './features/profile/personal-timeline.css'
 

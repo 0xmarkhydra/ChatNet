@@ -736,6 +736,23 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
+	// Direct group creation can include only the creator's accepted friends.
+	// Validate before creating the group, preventing partial membership writes.
+	for _, candidateID := range userIDs {
+		if candidateID == claims.UserID {
+			continue
+		}
+		allowed, err := groupMemberInvitationEligible(r.Context(), tx, claims.UserID, candidateID)
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot verify friendship")
+			return
+		}
+		if !allowed {
+			httpx.Error(w, http.StatusForbidden, "chỉ có thể tạo nhóm với bạn bè đã kết bạn")
+			return
+		}
+	}
+
 	var id int64
 	var createdAt time.Time
 	if err := tx.QueryRow(r.Context(), `
