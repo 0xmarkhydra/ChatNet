@@ -42,6 +42,8 @@ import MessageSearchPanel from '../features/chat/MessageSearchPanel'
 import ProfileIdentityForm from '../features/profile/ProfileIdentityForm'
 import BottomNavigation from './BottomNavigation'
 import GroupSettingsPanel from '../features/chat/GroupSettingsPanel'
+import GroupRenameDialog from '../features/chat/GroupRenameDialog'
+import GroupInviteJoinDialog from '../features/chat/GroupInviteJoinDialog'
 import ContactsView from '../features/contacts/ContactsView'
 import PrivacyControls from '../features/profile/PrivacyControls'
 import AccountSessionsPanel from '../features/auth/AccountSessionsPanel'
@@ -137,6 +139,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [quickCreateOpen])
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
+  const [groupNameEditing, setGroupNameEditing] = useState(false)
+  const [groupMemberViewOpen, setGroupMemberViewOpen] = useState(false)
   const activeConversationIdRef = useRef<number | null>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
   const messageScrollAtBottom = useRef(true)
@@ -595,8 +599,6 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setGroupMembers,
     groupNameDraft,
     setGroupNameDraft,
-    groupInviteDraft,
-    setGroupInviteDraft,
     groupInviteSearch,
     setGroupInviteSearch,
     groupInviteSelection,
@@ -605,6 +607,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setGroupBusy,
     activeGroupMember,
     canManageActiveGroup,
+    canInviteActiveGroup,
+    canEditActiveGroup,
     groupInviteCandidates,
     openGroupSettings,
     launchGroupCall,
@@ -618,6 +622,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     sessionRef,
     tab,
     activeConversationId,
+    activeConversationType: conversations.find((conversation) => conversation.id === activeConversationId)?.type,
     activeConversationIdRef,
     friends,
     apiFetch,
@@ -627,6 +632,19 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setNotice,
     actionLocks,
   })
+
+  useEffect(() => {
+    if (!groupSettingsOpen) setGroupMemberViewOpen(false)
+  }, [groupSettingsOpen])
+
+  useEffect(() => {
+    if (!groupSettingsOpen) return
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !groupNameEditing && !document.querySelector('dialog[open]')) setGroupSettingsOpen(false)
+    }
+    window.addEventListener('keydown', onEscape)
+    return () => window.removeEventListener('keydown', onEscape)
+  }, [groupSettingsOpen, groupNameEditing, setGroupSettingsOpen])
 
   const conversationSearching = tab === 'chat' && globalSearch.trim().length > 0
   const chatQuickSearch = useChatQuickSearch({
@@ -839,9 +857,10 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     messagesPagingBusy.current = false
     setReplyingTo(null)
     setGroupSettingsOpen(false)
+    setGroupNameEditing(false)
+    setGroupMemberViewOpen(false)
     setSharedContentOpen(false)
     setGroupMembers([])
-    setGroupInviteDraft('')
     setGroupInviteSearch('')
     setGroupInviteSelection([])
   }, [activeConversationId])
@@ -2135,7 +2154,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   }, [session?.token, tab, newChatMode, chatFriend?.id])
 
   useEffect(() => {
-    const friendSurfaceOpen = newChatMode === 'friends' || newChatMode === 'group' || tab === 'contacts'
+    const friendSurfaceOpen = newChatMode === 'friends' || tab === 'contacts'
     if (!session?.token || !friendSurfaceOpen) {
       setFriendResults([])
       setFriendSearching(false)
@@ -3184,6 +3203,20 @@ export default function App({ initialSession }: { initialSession?: Session | nul
           <button type="button" onClick={() => mediaUploadAbort.current?.abort()}>Hủy tải</button>
         </div>
       )}
+      {groupNameEditing && activeConversation?.type === 'group' && canEditActiveGroup && (
+        <GroupRenameDialog
+          key={activeConversation.id}
+          currentName={activeConversation.name}
+          draft={groupNameDraft}
+          onDraftChange={setGroupNameDraft}
+          onConfirm={renameActiveGroup}
+          onClose={() => {
+            setGroupNameEditing(false)
+            setGroupNameDraft(activeConversation.name)
+          }}
+          busy={groupBusy}
+        />
+      )}
       {visitorUsername && <VisitorProfile key={session.sessionId+':'+visitorUsername}
         username={visitorUsername} request={apiFetch} currentUser={name} token={session.token}
         targetLanguage={translationPreferencesLoaded?targetLanguage:''} relationship={friendRelationship}
@@ -3191,8 +3224,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         onClose={()=>setVisitorUsername(null)} onPostOpen={post=>{setPosts(current=>[post,...current.filter(item=>item.id!==post.id)]);setActivePostId(post.id)}}
         onUpdated={syncFeedPost} updates={posts} onDeleted={removeFeedPost} feedback={setNotice} />}
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
-        friends={friends.filter((friend) => friend.status === 'accepted')} results={friendResults}
-        searching={friendSearching} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
+        friends={friends.filter((friend) => friend.status === 'accepted')} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
       {tab !== 'profile' && tab !== 'discover' && tab !== 'market' && (
       <header className="chatnet-appbar">
@@ -3384,7 +3416,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
       <section className={`phone-frame modern-frame ${tab === 'chat' && activeConversation ? 'mobile-conversation-open' : ''}`}>
         {tab === 'chat' && (
-          <div className={`messenger-layout modern-messenger ${activeConversation ? 'has-active' : ''}`}>
+          <div className={`messenger-layout modern-messenger ${activeConversation ? 'has-active' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
             <aside className="conversation-sidebar">
               {newChatMode === 'friends' && (
                 <div className="connect-modal-layer">
@@ -3582,9 +3614,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 if (mediaUploading || messageSending) { setNotice('Hãy hoàn tất hoặc hủy tác vụ hiện tại trước khi thả thêm tệp.', 'warning'); return }
                 void addChatFiles(Array.from(event.dataTransfer.files))
               }}
-              className={activeConversation?.type === 'group'
-                ? `conversation-panel group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}`
-                : 'conversation-panel'}>
+              className={activeConversation?.type === 'group' ? 'conversation-panel group-chat-panel' : 'conversation-panel'}>
               {!activeConversation ? (
                 <div className="conversation-empty">
                   <SocoEmptyState kind="chat" title="Kết nối không biên giới"
@@ -3603,16 +3633,52 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                         group={activeConversation.type === 'group'}
                         online={activeConversation.type === 'direct' && activeConversation.online}
                       />
-                      <div>
-                        <strong>{activeConversation.type === 'direct' && activeConversation.otherUsername
-                          ? <button type="button" className="visitor-name-link" onClick={() => openVisitor(activeConversation.otherUsername!)} aria-label="Xem trang cá nhân">{activeConversation.name}</button>
-                          : activeConversation.name}</strong>
-                        <small className="room-subtitle">
-                          {activeConversation.type === 'group'
-                            ? `${activeConversation.memberCount} thành viên`
-                            : activeConversation.online ? '● Đang online' : 'Chat riêng'}
-                          <CategoryAssignment model={conversationCategories} conversationId={activeConversation.id} categoryId={activeConversation.categoryId} />
-                        </small>
+                      <div className={activeConversation.type === 'group' ? 'group-room-details' : ''}>
+                        {activeConversation.type === 'group' ? (
+                          <>
+                            <div className="group-room-title">
+                                <strong title={activeConversation.name}>{activeConversation.name}</strong>
+                                {canEditActiveGroup && (
+                                  <button type="button" className="group-room-edit"
+                                    aria-label="Chỉnh sửa tên nhóm" title="Chỉnh sửa tên nhóm"
+                                    onClick={() => {
+                                      setGroupNameDraft(activeConversation.name)
+                                      setGroupNameEditing(true)
+                                    }}>
+                                    <PencilLine size={16} aria-hidden="true" />
+                                  </button>
+                                )}
+                            </div>
+                            <div className="room-subtitle group-room-subtitle">
+                              <button type="button" className="group-room-member-count"
+                                aria-label={`Xem danh sách ${activeConversation.memberCount} thành viên nhóm`}
+                                onClick={() => {
+                                  if (!groupSettingsOpen) openGroupSettings(activeConversation)
+                                  setGroupMemberViewOpen(true)
+                                }}>
+                                <Users size={15} aria-hidden="true" />
+                                <span>{activeConversation.memberCount} thành viên</span>
+                              </button>
+                              <CategoryAssignment model={conversationCategories}
+                                conversationId={activeConversation.id}
+                                categoryId={activeConversation.categoryId} />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <strong>{activeConversation.otherUsername
+                              ? <button type="button" className="visitor-name-link"
+                                onClick={() => openVisitor(activeConversation.otherUsername!)}
+                                aria-label="Xem trang cá nhân">{activeConversation.name}</button>
+                              : activeConversation.name}</strong>
+                            <small className="room-subtitle">
+                              {activeConversation.online ? '● Đang online' : 'Chat riêng'}
+                              <CategoryAssignment model={conversationCategories}
+                                conversationId={activeConversation.id}
+                                categoryId={activeConversation.categoryId} />
+                            </small>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -3802,32 +3868,6 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                         </div>
                       )}
                     </div>
-                  )}
-
-                  {groupSettingsOpen && activeConversation.type === 'group' && (
-            <GroupSettingsPanel
-              activeGroupMember={activeGroupMember}
-              setGroupSettingsOpen={setGroupSettingsOpen}
-              canManageActiveGroup={canManageActiveGroup}
-              groupNameDraft={groupNameDraft}
-              setGroupNameDraft={setGroupNameDraft}
-              renameActiveGroup={renameActiveGroup}
-              groupBusy={groupBusy}
-              activeConversation={activeConversation}
-              groupInviteSelection={groupInviteSelection}
-              groupInviteSearch={groupInviteSearch}
-              setGroupInviteSearch={setGroupInviteSearch}
-              groupInviteCandidates={groupInviteCandidates}
-              friends={friends}
-              setGroupInviteSelection={setGroupInviteSelection}
-              groupInviteDraft={groupInviteDraft}
-              setGroupInviteDraft={setGroupInviteDraft}
-              inviteGroupMembers={inviteGroupMembers}
-              groupMembers={groupMembers}
-              userId={session.user.id}
-              changeGroupMemberRole={changeGroupMemberRole}
-              removeGroupMember={removeGroupMember}
-            />
                   )}
 
                   {sharedContentOpen && (
@@ -4062,6 +4102,57 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 </>
               )}
             </section>
+            {groupSettingsOpen && activeConversation?.type === 'group' && (
+              <>
+                <button type="button" className="group-sidebar-scrim"
+                  aria-label="Đóng thanh quản lý nhóm"
+                  onClick={() => setGroupSettingsOpen(false)} />
+                <aside className="group-settings-sidebar" aria-label="Thanh bên quản lý nhóm">
+                  <GroupSettingsPanel
+                    activeGroupMember={activeGroupMember}
+                    setGroupSettingsOpen={setGroupSettingsOpen}
+                    canManageActiveGroup={canManageActiveGroup}
+                    canInviteActiveGroup={canInviteActiveGroup}
+                    canEditActiveGroup={canEditActiveGroup}
+                    onRenameRequest={() => {
+                      setGroupNameDraft(activeConversation.name)
+                      setGroupNameEditing(true)
+                    }}
+                    onOpenMemberProfile={(username) => {
+                      setGroupMemberViewOpen(false)
+                      setGroupSettingsOpen(false)
+                      openVisitor(username)
+                    }}
+                    memberFriendRelationship={friendRelationship}
+                    onMemberFriendAction={(member) => actOnFriend({
+                      id: member.id,
+                      username: member.username,
+                      displayName: member.displayName,
+                      online: member.online,
+                    })}
+                    friendBusyIds={friendBusyIds}
+                    memberViewOpen={groupMemberViewOpen}
+                    setMemberViewOpen={setGroupMemberViewOpen}
+                    groupBusy={groupBusy}
+                    activeConversation={activeConversation}
+                    groupInviteSelection={groupInviteSelection}
+                    groupInviteSearch={groupInviteSearch}
+                    setGroupInviteSearch={setGroupInviteSearch}
+                    groupInviteCandidates={groupInviteCandidates}
+                    friends={friends}
+                    setGroupInviteSelection={setGroupInviteSelection}
+                    inviteGroupMembers={inviteGroupMembers}
+                    groupMembers={groupMembers}
+                    userId={session.user.id}
+                    changeGroupMemberRole={changeGroupMemberRole}
+                    removeGroupMember={removeGroupMember}
+                    request={apiFetch}
+                    notify={(message) => setNotice(message)}
+                    onMembersChanged={() => refreshGroupMembers(activeConversation.id)}
+                  />
+                </aside>
+              </>
+            )}
           </div>
         )}
 
@@ -4753,6 +4844,16 @@ export default function App({ initialSession }: { initialSession?: Session | nul
           </section>
         </ProfileOverlay>
       )}
+
+      <GroupInviteJoinDialog
+        request={apiFetch}
+        notify={(message) => setNotice(message)}
+        onJoined={async (id) => {
+          await refreshConversations()
+          setActiveConversationId(id)
+          setTab('chat')
+        }}
+      />
 
       <CallManager
         request={apiFetch}

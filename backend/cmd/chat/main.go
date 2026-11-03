@@ -174,6 +174,16 @@ func main() {
 	mux.Handle("POST /api/conversations/{id}/members", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.addGroupMembers)))
 	mux.Handle("PATCH /api/conversations/{id}/members/{userId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupMemberRole)))
 	mux.Handle("DELETE /api/conversations/{id}/members/{userId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.removeGroupMember)))
+	mux.Handle("GET /api/conversations/{id}/group-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getGroupSettings)))
+	mux.Handle("PATCH /api/conversations/{id}/group-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.patchGroupSettings)))
+	mux.Handle("POST /api/conversations/{id}/invites", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupInvite)))
+	mux.Handle("GET /api/conversations/{id}/invites", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupInvites)))
+	mux.Handle("DELETE /api/conversations/{id}/invites/{inviteId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.revokeGroupInvite)))
+	mux.Handle("GET /api/group-invites/{token}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.previewGroupInvite)))
+	mux.Handle("POST /api/group-invites/{token}/join", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.joinGroupInvite)))
+	mux.Handle("GET /api/conversations/{id}/join-requests", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupJoinRequests)))
+	mux.Handle("POST /api/conversations/{id}/join-requests/{requestId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reviewGroupJoinRequest)))
+	mux.Handle("GET /api/conversations/{id}/admin-audit", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupAudit)))
 	mux.Handle("GET /api/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.events)))
 
 	port := config.Env("PORT", "8082")
@@ -753,6 +763,23 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+
+	// Direct group creation can include only the creator's accepted friends.
+	// Validate before creating the group, preventing partial membership writes.
+	for _, candidateID := range userIDs {
+		if candidateID == claims.UserID {
+			continue
+		}
+		allowed, err := groupMemberInvitationEligible(r.Context(), tx, claims.UserID, candidateID)
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot verify friendship")
+			return
+		}
+		if !allowed {
+			httpx.Error(w, http.StatusForbidden, "chỉ có thể tạo nhóm với bạn bè đã kết bạn")
+			return
+		}
+	}
 
 	var id int64
 	var createdAt time.Time

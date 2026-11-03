@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"chatnet/internal/authx"
 	"chatnet/internal/httpx"
 	"chatnet/internal/onesignalx"
+	"github.com/jackc/pgx/v5"
 )
 
 type groupMember struct {
@@ -91,9 +93,9 @@ func (s *server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	role, err := s.groupRole(r.Context(), conversationID, claims.UserID)
-	if err != nil || (role != "owner" && role != "admin") {
-		httpx.Error(w, http.StatusForbidden, "group admin permission required")
+	role, settings, err := s.groupGovernance(r.Context(), conversationID, claims.UserID)
+	if err != nil || !groupPermission(role, settings, "edit") {
+		httpx.Error(w, http.StatusForbidden, "group edit permission required")
 		return
 	}
 
@@ -110,17 +112,37 @@ func (s *server) updateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := s.db.Exec(r.Context(), `
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update group")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	var oldName string
+	if err := tx.QueryRow(r.Context(), `SELECT COALESCE(name,'') FROM conversations WHERE id=$1 AND type='group' FOR UPDATE`, conversationID).Scan(&oldName); err != nil {
+		httpx.Error(w, http.StatusNotFound, "group not found")
+		return
+	}
+	tag, err := tx.Exec(r.Context(), `
 		UPDATE conversations c
 		SET name=$1
 		WHERE c.id=$2 AND c.type='group'
 		  AND EXISTS (
 		    SELECT 1 FROM conversation_members cm
-		    WHERE cm.conversation_id=c.id AND cm.user_id=$3 AND cm.role IN ('owner','admin')
+		    WHERE cm.conversation_id=c.id AND cm.user_id=$3
+		      AND (cm.role='owner' OR (cm.role='admin' AND COALESCE((SELECT gs.admin_can_edit_info FROM group_settings gs WHERE gs.conversation_id=c.id),TRUE)))
 		  )
 	`, name, conversationID, claims.UserID)
 	if err != nil || tag.RowsAffected() == 0 {
-		httpx.Error(w, http.StatusNotFound, "group not found")
+		httpx.Error(w, http.StatusForbidden, "group edit permission required")
+		return
+	}
+	if err := writeGroupAudit(r.Context(), tx, conversationID, claims.UserID, "group.renamed", nil, map[string]any{"before": oldName, "after": name}); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update group")
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update group")
 		return
 	}
 
@@ -135,15 +157,40 @@ func (s *server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// groupMemberInvitationEligible locks the accepted friendship for the duration
+// of the membership transaction so an invite cannot race with an unfriend.
+func groupMemberInvitationEligible(ctx context.Context, tx pgx.Tx, actorID, candidateID int64) (bool, error) {
+	if actorID == candidateID {
+		return false, nil
+	}
+	var allowed bool
+	err := tx.QueryRow(ctx, `
+		SELECT NOT EXISTS (
+			SELECT 1 FROM user_blocks b
+			WHERE (b.blocker_id=$1 AND b.blocked_id=$2)
+			   OR (b.blocker_id=$2 AND b.blocked_id=$1)
+		)
+		FROM friend_connections f
+		WHERE f.user_low=LEAST($1,$2)
+		  AND f.user_high=GREATEST($1,$2)
+		  AND f.status='accepted'
+		FOR SHARE
+	`, actorID, candidateID).Scan(&allowed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return allowed, err
+}
+
 func (s *server) addGroupMembers(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
 	if !ok {
 		return
 	}
-	role, err := s.groupRole(r.Context(), conversationID, claims.UserID)
-	if err != nil || (role != "owner" && role != "admin") {
-		httpx.Error(w, http.StatusForbidden, "group admin permission required")
+	role, settings, err := s.groupGovernance(r.Context(), conversationID, claims.UserID)
+	if err != nil || !groupPermission(role, settings, "invite") {
+		httpx.Error(w, http.StatusForbidden, "group invitation permission required")
 		return
 	}
 
@@ -198,16 +245,23 @@ func (s *server) addGroupMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	var currentRole string
-	err = tx.QueryRow(r.Context(), `
-		SELECT cm.role FROM conversation_members cm
-		WHERE cm.conversation_id=$1 AND cm.user_id=$2
-		  AND EXISTS (SELECT 1 FROM conversations c WHERE c.id=cm.conversation_id AND c.type='group')
-		FOR UPDATE
-	`, conversationID, claims.UserID).Scan(&currentRole)
-	if err != nil || (currentRole != "owner" && currentRole != "admin") {
-		httpx.Error(w, http.StatusForbidden, "group admin permission required")
+	currentRole, currentSettings, err := groupGovernanceTx(r.Context(), tx, conversationID, claims.UserID, true)
+	if err != nil || !groupPermission(currentRole, currentSettings, "invite") {
+		httpx.Error(w, http.StatusForbidden, "group invitation permission required")
 		return
+	}
+	// Validate the entire batch before inserting anyone. A username cannot
+	// bypass the friend-only invitation rule or add only part of a batch.
+	for _, candidate := range candidates {
+		allowed, err := groupMemberInvitationEligible(r.Context(), tx, claims.UserID, candidate.id)
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot verify friendship")
+			return
+		}
+		if !allowed {
+			httpx.Error(w, http.StatusForbidden, "chỉ có thể thêm bạn bè đã kết bạn vào nhóm: @"+candidate.username)
+			return
+		}
 	}
 	addedIDs := []int64{}
 	for _, candidate := range candidates {
@@ -222,6 +276,12 @@ func (s *server) addGroupMembers(w http.ResponseWriter, r *http.Request) {
 		}
 		if tag.RowsAffected() > 0 {
 			addedIDs = append(addedIDs, candidate.id)
+		}
+	}
+	if len(addedIDs) > 0 {
+		if err := writeGroupAudit(r.Context(), tx, conversationID, claims.UserID, "member.added", nil, map[string]any{"userIds": addedIDs}); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot record member changes")
+			return
 		}
 	}
 	if err := tx.Commit(r.Context()); err != nil {
@@ -329,6 +389,10 @@ func (s *server) updateGroupMemberRole(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot update member role")
 		return
 	}
+	if err := writeGroupAudit(r.Context(), tx, conversationID, claims.UserID, "member.role.updated", &targetID, map[string]any{"before": targetRole, "after": body.Role}); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot record role change")
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot update member role")
 		return
@@ -396,7 +460,13 @@ func (s *server) removeGroupMember(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tag, err := s.db.Exec(r.Context(), `
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot remove group member")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	tag, err := tx.Exec(r.Context(), `
 		DELETE FROM conversation_members target
 		USING conversation_members actor
 		WHERE target.conversation_id=$1 AND target.user_id=$2
@@ -415,6 +485,18 @@ func (s *server) removeGroupMember(w http.ResponseWriter, r *http.Request) {
 	}
 	if tag.RowsAffected() == 0 {
 		httpx.Error(w, http.StatusForbidden, "group permission changed; try again")
+		return
+	}
+	action := "member.removed"
+	if targetID == claims.UserID {
+		action = "member.left"
+	}
+	if err := writeGroupAudit(r.Context(), tx, conversationID, claims.UserID, action, &targetID, map[string]any{"username": targetUsername}); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot record member change")
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot remove group member")
 		return
 	}
 
