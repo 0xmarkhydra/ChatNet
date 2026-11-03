@@ -20,6 +20,9 @@ var defaultConversationCategoriesSQL string
 //go:embed migrations/003_profile_notes.sql
 var profileNotesSQL string
 
+//go:embed migrations/004_group_governance.sql
+var groupGovernanceSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -45,6 +48,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, profileNotesSQL); err != nil {
 		return fmt.Errorf("apply profile notes migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, groupGovernanceSQL); err != nil {
+		return fmt.Errorf("apply group governance migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)
