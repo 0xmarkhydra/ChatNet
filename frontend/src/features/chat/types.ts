@@ -28,6 +28,8 @@ export type Message = {
   createdAt: string
 }
 
+export type PinnedMessage = { message: Message; pinnedAt: string }
+
 export type MessageDraft = { text: string; attachments: MediaAttachment[] }
 export const emptyDraft: MessageDraft = { text: '', attachments: [] }
 export const CHAT_LIST_PAGE_SIZE = 25
@@ -35,6 +37,7 @@ export const MESSAGE_PAGE_SIZE = 40
 
 export type Conversation = {
   categoryId?: number
+  pinnedAt?: string
   id: number
   type: 'direct' | 'group'
   name: string
@@ -50,7 +53,7 @@ export type Conversation = {
 
 export type RealtimeEvent = {
   categoryId?: number | null
-  type: 'category.updated' | 'privacy.updated' | 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
+  type: 'category.updated' | 'privacy.updated' | 'message' | 'message.updated' | 'pins.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
   conversationId: number
   message?: Message
   conversation?: Conversation

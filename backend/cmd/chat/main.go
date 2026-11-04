@@ -58,6 +58,7 @@ type messageReaction struct {
 
 type conversation struct {
 	CategoryID    *int64     `json:"categoryId,omitempty"`
+	PinnedAt      *time.Time `json:"pinnedAt,omitempty"`
 	ID            int64      `json:"id"`
 	Type          string     `json:"type"`
 	Name          string     `json:"name"`
@@ -157,6 +158,9 @@ func main() {
 	mux.Handle("DELETE /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteCategory)))
 	mux.Handle("PUT /api/conversations/{id}/category", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.assignCategory)))
 	mux.Handle("GET /api/conversations", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversations)))
+	mux.Handle("PUT /api/conversations/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setConversationPin)))
+	mux.Handle("DELETE /api/conversations/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setConversationPin)))
+	mux.Handle("GET /api/conversations/{id}/pins", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPinnedMessages)))
 	mux.Handle("GET /api/chat/search", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.quickChatSearch)))
 	mux.Handle("GET /api/conversations/unread", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.unreadSummary)))
 	mux.Handle("GET /api/conversations/memberships", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversationMemberships)))
@@ -168,6 +172,8 @@ func main() {
 	mux.Handle("PATCH /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editMessage)))
 	mux.Handle("DELETE /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteMessage)))
 	mux.Handle("POST /api/messages/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.toggleMessageReaction)))
+	mux.Handle("PUT /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
+	mux.Handle("DELETE /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
 	mux.Handle("POST /api/conversations/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markRead)))
 	mux.Handle("PATCH /api/conversations/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroup)))
 	mux.Handle("GET /api/conversations/{id}/members", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupMembers)))
@@ -558,7 +564,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	rows, err := s.db.Query(r.Context(), `
-		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,
+		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,cm.pinned_at,
 		       COALESCE((SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id=c.id),0),
 		       COALESCE((
 		           SELECT CASE
@@ -608,7 +614,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
 		    WHERE other.conversation_id=c.id AND other.user_id<>$1
 		  ))
-		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		ORDER BY (cm.pinned_at IS NOT NULL) DESC,cm.pinned_at DESC,COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
 		claims.UserID, limit, offset, categoryID, conversationID, keyword)
@@ -623,7 +629,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		var c conversation
 		var lastRead, memberCount, unreadCount int64
 		var lastMessageAt time.Time
-		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount); err != nil {
+		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount); err != nil {
 			continue
 		}
 		c.MemberCount = int(memberCount)
@@ -1356,6 +1362,7 @@ func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be recalled")
 		return
 	}
+	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_pins WHERE message_id=$1`, messageID)
 	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_attachments WHERE message_id=$1`, messageID)
 	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_translations WHERE message_id=$1`, messageID)
 
@@ -1366,6 +1373,9 @@ func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
 		Type: "message.updated", ConversationID: conversationID, Message: &m,
+	})
+	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
+		Type: "pins.updated", ConversationID: conversationID,
 	})
 	httpx.JSON(w, http.StatusOK, m)
 }
@@ -1646,6 +1656,9 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 				if err != nil || blocked {
 					continue
 				} // Also cover in-flight messages after a block.
+			}
+			if event.Type == "pins.updated" && !s.isMember(r.Context(), event.ConversationID, claims.UserID) {
+				continue
 			}
 			// Reload in the recipient's privacy scope. C replying to B
 			// must not expose B's quoted text or reaction identities to A.
