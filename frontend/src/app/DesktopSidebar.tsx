@@ -1,4 +1,4 @@
-import { Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings2, ShoppingBag, UsersRound } from 'lucide-react'
+import { Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings, ShoppingBag, UserRoundCheck, Users } from 'lucide-react'
 import type { Tab } from './types'
 import UserAvatar from '../shared/ui/UserAvatar'
 
@@ -24,8 +24,8 @@ export default function DesktopSidebar({
     { label: 'Bảng tin', Icon: Newspaper, active: tab === 'feed' && !feedSaved, action: () => onNavigate('feed') },
     { label: 'Tin nhắn', Icon: MessageCircle, active: tab === 'chat' && section === null, action: () => onNavigate('chat'), count: unreadTotal },
     { label: 'Khám phá', Icon: Compass, active: tab === 'discover', action: () => onNavigate('discover') },
-    { label: 'Bạn bè', Icon: UsersRound, active: tab === 'contacts' || tab === 'profile', action: () => onNavigate('contacts') },
-    { label: 'Nhóm & cộng đồng', Icon: UsersRound, active: section === 'groups', action: onGroups },
+    { label: 'Bạn bè', Icon: UserRoundCheck, active: tab === 'contacts' || tab === 'profile', action: () => onNavigate('contacts') },
+    { label: 'Nhóm & cộng đồng', Icon: Users, active: section === 'groups', action: onGroups },
     { label: 'Cuộc gọi', Icon: Phone, active: section === 'calls', action: onCalls },
     { label: 'Marketplace', Icon: ShoppingBag, active: tab === 'market', action: () => onNavigate('market') },
   ]
@@ -57,7 +57,7 @@ export default function DesktopSidebar({
           <Bookmark size={22} strokeWidth={1.8} aria-hidden="true" /><span>Đã lưu</span>
         </button>
         <button type="button" className="penpot-sidebar-link" aria-label="Cài đặt" onClick={onSettings}>
-          <Settings2 size={22} strokeWidth={1.8} aria-hidden="true" /><span>Cài đặt</span>
+          <Settings size={22} strokeWidth={1.8} aria-hidden="true" /><span>Cài đặt</span>
         </button>
       </div>
       <button type="button" className="penpot-sidebar-account" onClick={() => onNavigate('profile')} aria-label="Cá nhân">
