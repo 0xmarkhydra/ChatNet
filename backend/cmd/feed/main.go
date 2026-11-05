@@ -143,7 +143,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	// Treat LIKE metacharacters as literal input, not as user-supplied wildcards.
 	query = strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(query)
 	scope := r.URL.Query().Get("scope")
-	if scope != "" && scope != "saved" && scope != "mine" {
+	if scope != "" && scope != "saved" && scope != "mine" && scope != "following" {
 		httpx.Error(w, http.StatusBadRequest, "invalid scope")
 		return
 	}
@@ -166,7 +166,11 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND `+feedAccessSQL+`
 		  AND ($4='all' OR ($4='mine' AND p.user_id=$2)
-		       OR ($4='saved' AND EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)))
+		       OR ($4='saved' AND EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2))
+		       OR ($4='following' AND (p.user_id=$2 OR EXISTS (
+		         SELECT 1 FROM friend_connections f WHERE f.status='accepted'
+		         AND ((f.user_low=$2 AND f.user_high=p.user_id) OR (f.user_high=$2 AND f.user_low=p.user_id))
+		       ))))
 		  AND ($6='' OR `+searchx.FoldSQL("p.content")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%'
 		       OR `+searchx.FoldSQL("u.username")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%'
 		       OR `+searchx.FoldSQL("u.display_name")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%')

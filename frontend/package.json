@@ -25,6 +25,7 @@
     "check:chat-copy-image-proxy": "node --experimental-strip-types scripts/chat-copy-image-proxy-check.mjs",
     "check:voice": "node --experimental-strip-types scripts/voice-media-check.mjs",
     "check:ui": "node scripts/run-ui-layout.mjs",
+    "check:penpot": "node scripts/check-penpot-desktop.mjs",
     "check:call-ux": "node scripts/call-ux-check.mjs",
     "check:call-translation": "node --experimental-strip-types scripts/call-translation-check.mjs",
     "check:call-live": "node scripts/call-live-check.mjs",
