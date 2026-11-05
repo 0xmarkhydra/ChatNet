@@ -111,6 +111,7 @@ func main() {
 		storage:   objectstore.NewFromEnv(),
 	}
 	go s.expireNearby(ctx)
+	go s.cleanupOrphanChatMedia(ctx)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
@@ -120,6 +121,7 @@ func main() {
 	mux.Handle("DELETE /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deletePushSubscription)))
 	mux.Handle("POST /api/push/test", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.testPushNotification)))
 	mux.Handle("POST /api/media/presign", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.presignMedia)))
+	mux.HandleFunc("GET /api/media/chat/{id}", s.serveChatMedia)
 	mux.Handle("GET /api/users/{username}/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getUserProfile)))
 	mux.Handle("GET /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfileNote)))
 	mux.Handle("POST /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveProfileNote)))
@@ -978,7 +980,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
 		items[i], items[j] = items[j], items[i]
 	}
-	if err := s.attachMessageMedia(r.Context(), items); err != nil {
+	if err := s.attachMessageMedia(r.Context(), items, claims.UserID); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load message attachments")
 		return
 	}
@@ -1186,10 +1188,11 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for position, attachment := range attachments {
-		if _, err := tx.Exec(r.Context(), `
+		var savedID int64
+		if err := tx.QueryRow(r.Context(), `
 			INSERT INTO message_attachments(
 				message_id,storage_ref,original_name,content_type,size_bytes,kind,position
-			) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+			) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
 			m.ID,
 			attachment.StorageRef,
 			attachment.Name,
@@ -1197,10 +1200,11 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 			attachment.SizeBytes,
 			attachment.Kind,
 			position,
-		); err != nil {
+		).Scan(&savedID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot save message attachment")
 			return
 		}
+		m.Attachments[position].ID = savedID
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
@@ -1222,6 +1226,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		log.Printf("cannot filter message recipients: %v", visibilityErr)
 		visibleIDs = []int64{claims.UserID} // Message persisted; never notify blocked peers on failure.
 	}
+	s.signChatAttachments(&m, claims.UserID)
 	s.publishConversationEvent(r.Context(), visibleIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
 
 	recipients := make([]int64, 0, len(visibleIDs))
@@ -1279,7 +1284,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		m.Text = ""
 	}
 	items := []message{m}
-	if err := s.attachMessageMedia(ctx, items); err != nil {
+	if err := s.attachMessageMedia(ctx, items, viewerID); err != nil {
 		return message{}, err
 	}
 	if err := s.attachMessageReactions(ctx, viewerID, items); err != nil {
@@ -1443,7 +1448,7 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, m)
 }
 
-func (s *server) attachMessageMedia(ctx context.Context, items []message) error {
+func (s *server) attachMessageMedia(ctx context.Context, items []message, viewerID int64) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -1479,7 +1484,7 @@ func (s *server) attachMessageMedia(ctx context.Context, items []message) error 
 		); err != nil {
 			return err
 		}
-		mediax.SignAttachment(s.storage, &attachment)
+		attachment.URL = s.mediaTicket(attachment.ID, viewerID)
 		if idx, ok := indexByID[messageID]; ok {
 			items[idx].Attachments = append(items[idx].Attachments, attachment)
 		}
@@ -1795,8 +1800,15 @@ func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, 
 		}
 		userIDs = visible
 	}
-	data, _ := json.Marshal(event)
 	for _, userID := range userIDs {
+		outgoing := event
+		if event.Message != nil {
+			copyMessage := *event.Message
+			copyMessage.Attachments = append([]mediax.Attachment(nil), event.Message.Attachments...)
+			s.signChatAttachments(&copyMessage, userID)
+			outgoing.Message = &copyMessage
+		}
+		data, _ := json.Marshal(outgoing)
 		_ = s.redis.Publish(ctx, userChannel(userID), data).Err()
 	}
 }
