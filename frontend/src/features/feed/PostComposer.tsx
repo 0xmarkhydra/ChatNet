@@ -125,7 +125,7 @@ export default function PostComposer({
         }}
       />
       {popup && checkInOpen && setCheckInLocation && (
-        <label className="penpot-feed-checkin-field">
+        <label className="social-feed-checkin-field">
           <strong>Địa điểm check-in</strong>
           <input type="text" aria-label="Địa điểm check-in" value={checkInLocation} maxLength={120}
             onChange={event => setCheckInLocation(event.target.value)}

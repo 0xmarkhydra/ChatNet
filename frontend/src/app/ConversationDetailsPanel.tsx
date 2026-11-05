@@ -25,27 +25,27 @@ export default function ConversationDetailsPanel({
     { label: 'Tìm tin nhắn', Icon: Search, action: onSearch },
   ]
   return (
-    <aside className="penpot-chat-details" aria-label="Thông tin hội thoại">
+    <aside className="conversation-info-panel" aria-label="Thông tin hội thoại">
       <h2>Thông tin hội thoại</h2>
-      <div className="penpot-chat-details-identity">
+      <div className="conversation-info-panel-identity">
         <UserAvatar
           username={conversation.otherUsername}
           name={conversation.name}
-          className="penpot-chat-details-avatar"
+          className="conversation-info-panel-avatar"
           group={isGroup}
           online={!isGroup && conversation.online}
         />
         <strong title={conversation.name}>{conversation.name}</strong>
         <span>{isGroup ? `${conversation.memberCount} thành viên` : conversation.online ? '● Đang hoạt động' : 'Chat riêng'}</span>
       </div>
-      <div className="penpot-chat-details-actions">
+      <div className="conversation-info-panel-actions">
         <CallHeaderActions conversationId={conversation.id} />
         <button type="button" onClick={onProfile}>
           <Users size={20} aria-hidden="true" />
           <span>{isGroup ? 'Quản lý nhóm' : 'Hồ sơ'}</span>
         </button>
       </div>
-      <nav className="penpot-chat-details-links" aria-label="Tùy chọn hội thoại">
+      <nav className="conversation-info-panel-links" aria-label="Tùy chọn hội thoại">
         {options.map(({ label, Icon, action }) => (
           <button type="button" key={label} onClick={action}>
             <Icon size={19} aria-hidden="true" />
@@ -54,7 +54,7 @@ export default function ConversationDetailsPanel({
           </button>
         ))}
       </nav>
-      <p className="penpot-chat-details-privacy"><ShieldCheck size={19} aria-hidden="true" /> Nội dung được hiển thị theo quyền truy cập hội thoại của bạn.</p>
+      <p className="conversation-info-panel-privacy"><ShieldCheck size={19} aria-hidden="true" /> Nội dung được hiển thị theo quyền truy cập hội thoại của bạn.</p>
     </aside>
   )
 }

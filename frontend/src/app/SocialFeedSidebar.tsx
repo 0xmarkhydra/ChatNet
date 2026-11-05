@@ -34,7 +34,7 @@ export function extractFeedTopics(posts: Post[]) {
   return [...counts.values()].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'vi')).slice(0, 3)
 }
 
-export default function DesktopSocialFeedSidebar({
+export default function SocialFeedSidebar({
   username, sessionId, posts, friends, friendRequests, friendBusyIds,
   request, onFriend, onViewUser, onViewContacts, onSearchTag, onOpenChat,
 }: Props) {
@@ -66,33 +66,33 @@ export default function DesktopSocialFeedSidebar({
   }, [sessionId, revision])
 
   return (
-    <aside className="penpot-feed-side" aria-label="Khám phá và gợi ý trên bảng tin">
-      <section className="penpot-feed-side-card penpot-feed-suggestions" aria-label="Gợi ý kết nối">
+    <aside className="social-feed-side" aria-label="Khám phá và gợi ý trên bảng tin">
+      <section className="social-feed-side-card social-feed-suggestions" aria-label="Gợi ý kết nối">
         <header><h2>Gợi ý kết nối</h2><button type="button" onClick={onViewContacts}>Xem tất cả <ArrowRight size={16} aria-hidden="true" /></button></header>
-        {suggestionsBusy && <p className="penpot-feed-side-status" role="status">Đang tải gợi ý...</p>}
-        {!suggestionsBusy && suggestionsError && <div className="penpot-feed-side-status" role="alert">Không tải được gợi ý.
+        {suggestionsBusy && <p className="social-feed-side-status" role="status">Đang tải gợi ý...</p>}
+        {!suggestionsBusy && suggestionsError && <div className="social-feed-side-status" role="alert">Không tải được gợi ý.
           <button type="button" onClick={() => setRevision(value => value + 1)}>Thử lại</button>
         </div>}
         {!suggestionsBusy && !suggestionsError && visible.length === 0 && (
-          <div className="penpot-feed-side-empty"><UsersRound size={23} aria-hidden="true" />
+          <div className="social-feed-side-empty"><UsersRound size={23} aria-hidden="true" />
             <p>Chưa có đề xuất kết nối phù hợp.</p>
             <button type="button" onClick={onViewContacts}>Tìm thêm bạn bè</button>
           </div>
         )}
-        <div className="penpot-feed-suggestion-list">
+        <div className="social-feed-suggestion-list">
           {visible.map(user => (
-            <article key={user.id} className="penpot-feed-suggestion-row">
-              <button type="button" className="penpot-feed-suggestion-person" onClick={() => onViewUser(user.username)}
+            <article key={user.id} className="social-feed-suggestion-row">
+              <button type="button" className="social-feed-suggestion-person" onClick={() => onViewUser(user.username)}
                 aria-label={`Xem hồ sơ ${user.displayName || user.username}`}>
-                <UserAvatar username={user.username} name={user.displayName || user.username} className="penpot-feed-suggestion-avatar" online={user.online} />
-                <span className="penpot-feed-suggestion-info">
+                <UserAvatar username={user.username} name={user.displayName || user.username} className="social-feed-suggestion-avatar" online={user.online} />
+                <span className="social-feed-suggestion-info">
                   <strong>{user.displayName || user.username}</strong>
                   <small>{typeof user.mutualGroups === 'number' && user.mutualGroups > 0
                     ? `${user.mutualGroups} nhóm chung`
                     : user.online ? 'Đang hoạt động' : '@' + user.username}</small>
                 </span>
               </button>
-              <button type="button" className="penpot-feed-connect"
+              <button type="button" className="social-feed-connect"
                 disabled={friendBusyIds.has(user.id)}
                 onClick={() => onFriend(user)}><UserPlus size={15} aria-hidden="true" /> Kết bạn</button>
             </article>
@@ -100,25 +100,25 @@ export default function DesktopSocialFeedSidebar({
         </div>
       </section>
 
-      <section className="penpot-feed-side-card penpot-feed-trending" aria-label="Chủ đề nổi bật">
+      <section className="social-feed-side-card social-feed-trending" aria-label="Chủ đề nổi bật">
         <header><h2>Chủ đề nổi bật</h2><TrendingUp size={20} aria-hidden="true" /></header>
-        {topics.length ? <div className="penpot-feed-trend-list">
+        {topics.length ? <div className="social-feed-trend-list">
           {topics.map(topic => (
             <button key={topic.tag.toLocaleLowerCase('vi-VN')} type="button" onClick={() => onSearchTag(topic.tag)}
-              className="penpot-feed-trend">
+              className="social-feed-trend">
               <strong>{topic.tag}</strong>
               <span>{topic.count.toLocaleString('vi-VN')} bài viết đã tải</span>
             </button>
           ))}
-        </div> : <div className="penpot-feed-side-empty penpot-feed-topic-empty">
+        </div> : <div className="social-feed-side-empty social-feed-topic-empty">
           <TrendingUp size={22} aria-hidden="true" />
           <p>Chủ đề sẽ xuất hiện khi bài viết có hashtag.</p>
         </div>}
       </section>
 
-      <section className="penpot-feed-translation" aria-label="Dịch AI, kết nối toàn cầu">
-        <span className="penpot-feed-translation-icon"><Languages size={26} aria-hidden="true" /></span>
-        <div className="penpot-feed-translation-copy">
+      <section className="social-feed-translation" aria-label="Dịch AI, kết nối toàn cầu">
+        <span className="social-feed-translation-icon"><Languages size={26} aria-hidden="true" /></span>
+        <div className="social-feed-translation-copy">
           <h2>Dịch AI, kết nối toàn cầu</h2>
           <p>Trò chuyện không giới hạn ngôn ngữ.</p>
         </div>
