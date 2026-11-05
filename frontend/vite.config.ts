@@ -2,10 +2,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+import { chatCopyImageDevProxy } from './dev/chatCopyImageProxy'
 
 export default defineConfig({
   plugins: [
     react(),
+    chatCopyImageDevProxy(),
     {
       name: 'version-service-worker',
       apply: 'build',
@@ -20,6 +22,11 @@ export default defineConfig({
     },
   ],
   server: {
+    host: '127.0.0.1',
     port: 5173,
+    strictPort: true,
+    proxy: process.env.VITE_API_URL?.startsWith('https://') ? {
+      '/api': { target: process.env.VITE_API_URL, changeOrigin: true },
+    } : undefined,
   },
 })

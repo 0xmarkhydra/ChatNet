@@ -38,6 +38,8 @@ import PostComposer from '../features/feed/PostComposer'
 import FeedPostCard from '../features/feed/FeedPostCard'
 import StoryViewer from '../features/feed/StoryViewer'
 import MessageActions from '../features/chat/MessageActions'
+import { copyChatImage, messageLinkHref, messageTextParts } from '../features/chat/messageClipboard'
+import { resolveMessageCopyTarget, type MessageCopyTarget } from '../features/chat/messageCopyTarget'
 import MessageSearchPanel from '../features/chat/MessageSearchPanel'
 import ProfileIdentityForm from '../features/profile/ProfileIdentityForm'
 import BottomNavigation from './BottomNavigation'
@@ -59,6 +61,7 @@ import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend
 import { restoreChatOutbox } from '../features/chat/outboxRecovery'
 import { clearChatOutbox, confirmChatMessage, enqueueChatMessage, persistChatOutboxChange, retryableChatMessages, type QueuedChatMessage } from '../chatOutbox'
 import { uploadPresignedFile } from '../features/chat/mediaUpload'
+import { chatFilesFromClipboard, transferHasFiles } from '../features/chat/chatFileTransfer'
 import { canMarkConversationRead } from '../features/chat/conversationRead'
 import { mergeById, toggleCount } from '../shared/lib/optimistic'
 import CallManager, { CallHeaderActions } from '../features/calls/CallManager'
@@ -143,6 +146,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const ownSendScrollConversation = useRef<number | null>(null)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
+  const [messageCopyTarget, setMessageCopyTarget] = useState<MessageCopyTarget | null>(null)
   const messageLongPressTimer = useRef<number | null>(null)
   const messageLongPressStart = useRef<{ x: number; y: number; messageId: number } | null>(null)
 
@@ -390,11 +394,17 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const bottomRef = useRef<HTMLDivElement>(null)
   const postComposerRef = useRef<HTMLTextAreaElement>(null)
   const messageInputRef = useRef<HTMLInputElement>(null)
+  const chatDragDepth = useRef(0)
+  const [chatDragActive, setChatDragActive] = useState(false)
+  useEffect(() => {
+    chatDragDepth.current = 0
+    setChatDragActive(false)
+  }, [activeConversationId, tab])
 
   useEffect(() => {
-    if (!isDesktopBuild) return
     const preventFileNavigation = (event: DragEvent) => {
-      if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
+      // Never navigate away from the chat when a file is dropped outside it.
+      if (transferHasFiles(event.dataTransfer)) event.preventDefault()
     }
     const keyboard = (event: KeyboardEvent) => {
       if (!sessionRef.current || event.isComposing || event.altKey || !(event.ctrlKey || event.metaKey) ||
@@ -410,11 +420,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     }
     document.addEventListener('dragover', preventFileNavigation)
     document.addEventListener('drop', preventFileNavigation)
-    window.addEventListener('keydown', keyboard)
+    if (isDesktopBuild) window.addEventListener('keydown', keyboard)
     return () => {
       document.removeEventListener('dragover', preventFileNavigation)
       document.removeEventListener('drop', preventFileNavigation)
-      window.removeEventListener('keydown', keyboard)
+      if (isDesktopBuild) window.removeEventListener('keydown', keyboard)
     }
   }, [])
   const chatFileInputRef = useRef<HTMLInputElement>(null)
@@ -765,20 +775,27 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     messageLongPressStart.current = null
   }
 
-  function openMessageActions(message: Message) {
+  function openMessageActions(message: Message, target: EventTarget | null = null) {
     if (message.deleted) return
     cancelMessageLongPress()
+    const element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null
+    setMessageCopyTarget(resolveMessageCopyTarget(message, element))
     setMessageActionId(message.id)
     navigator.vibrate?.(24)
   }
 
   function beginMessageLongPress(message: Message, x: number, y: number, button: number, target: EventTarget | null) {
     if (message.deleted || button !== 0) return
-    if (target instanceof Element && target.closest('button,a,input,textarea,select,video,audio,.message-selectable-text')) return
+    const element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null
+    if (element?.closest('button,input,textarea,select,video,audio')) return
+    // Long-press on a link or an image should offer the same chat copy action.
+    if (element?.closest('a') && !element.closest('a.message-inline-link, .media-item')) return
+    // Keep native selection when long-pressing ordinary message text.
+    if (element?.closest('.message-selectable-text') && !element.closest('a.message-inline-link')) return
     cancelMessageLongPress()
     messageLongPressStart.current = { x, y, messageId: message.id }
     messageLongPressTimer.current = window.setTimeout(() => {
-      if (messageLongPressStart.current?.messageId === message.id) openMessageActions(message)
+      if (messageLongPressStart.current?.messageId === message.id) openMessageActions(message, target)
     }, 500)
   }
 
@@ -798,6 +815,53 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     } catch {
       setNotice('Không sao chép được tin nhắn trên trình duyệt này.', 'error')
     }
+  }
+
+  async function copyMessageImage(attachment: MediaAttachment) {
+    setMessageActionId(null)
+    if (!attachment.url) return
+    try {
+      await copyChatImage(attachment.url)
+      setNotice('Đã sao chép ảnh. Bạn có thể dán bằng Cmd/Ctrl+V.', 'success')
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Trình duyệt không cho phép đọc hoặc sao chép ảnh.'
+      setNotice(`Không sao chép được ảnh. ${reason}`, 'error')
+    }
+  }
+
+  async function copyMessageLink(link: string) {
+    setMessageActionId(null)
+    try {
+      await navigator.clipboard.writeText(link)
+      setNotice('Đã sao chép liên kết.', 'success')
+    } catch {
+      setNotice('Không sao chép được liên kết trên trình duyệt này.', 'error')
+    }
+  }
+
+  async function copyMessageContent(message: Message, target: MessageCopyTarget) {
+    if (target.kind === 'image') return copyMessageImage(target.attachment)
+    if (target.kind === 'unavailable-link') {
+      setMessageActionId(null)
+      setNotice(`Tệp "${target.name}" hiện không có liên kết tải xuống.`, 'warning')
+      return
+    }
+    if (target.kind === 'file-name') {
+      setMessageActionId(null)
+      try {
+        await navigator.clipboard.writeText(target.name)
+        setNotice('Đã sao chép tên tệp.', 'success')
+      } catch {
+        setNotice('Không sao chép được tên tệp.', 'error')
+      }
+      return
+    }
+    if (target.kind === 'link') {
+      await copyMessageLink(target.url)
+      if (target.temporary) setNotice('Đã sao chép liên kết tải tệp. Liên kết này có thời hạn.', 'success')
+      return
+    }
+    return copyMessage(message)
   }
 
   useEffect(() => {
@@ -1235,7 +1299,15 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   }
 
   async function addChatFiles(files: File[]) {
-    if (!files.length || mediaUploading || messageSending || !activeConversationId) return
+    if (!files.length) return
+    if (!activeConversationId) {
+      setNotice('Chọn hội thoại trước khi đính kèm tệp.', 'warning')
+      return
+    }
+    if (mediaUploading || messageSending || mediaUploadAbort.current) {
+      setNotice('Hãy hoàn tất hoặc hủy tác vụ hiện tại trước khi thêm tệp.', 'warning')
+      return
+    }
     const conversationId = activeConversationId
     const sessionId = session?.sessionId
     const remaining = Math.max(0, 10 - messageAttachments.length)
@@ -3572,19 +3644,42 @@ export default function App({ initialSession }: { initialSession?: Session | nul
             </aside>
 
             <section
+              onDragEnter={(event) => {
+                if (!transferHasFiles(event.dataTransfer)) return
+                event.preventDefault()
+                chatDragDepth.current += 1
+                if (!chatDragActive) setChatDragActive(true)
+              }}
               onDragOver={(event) => {
-                if (isDesktopBuild && event.dataTransfer.types.includes('Files')) event.preventDefault()
+                if (!transferHasFiles(event.dataTransfer)) return
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'copy'
+              }}
+              onDragLeave={(event) => {
+                if (chatDragDepth.current === 0) return
+                event.preventDefault()
+                chatDragDepth.current = Math.max(0, chatDragDepth.current - 1)
+                if (chatDragDepth.current === 0) setChatDragActive(false)
               }}
               onDrop={(event) => {
-                if (!isDesktopBuild || !event.dataTransfer.types.includes('Files')) return
+                if (!transferHasFiles(event.dataTransfer)) return
                 event.preventDefault()
-                if (!activeConversationId) { setNotice('Chọn hội thoại trước khi thả tệp.', 'warning'); return }
-                if (mediaUploading || messageSending) { setNotice('Hãy hoàn tất hoặc hủy tác vụ hiện tại trước khi thả thêm tệp.', 'warning'); return }
+                chatDragDepth.current = 0
+                setChatDragActive(false)
                 void addChatFiles(Array.from(event.dataTransfer.files))
               }}
-              className={activeConversation?.type === 'group'
-                ? `conversation-panel group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}`
-                : 'conversation-panel'}>
+              className={`conversation-panel${activeConversation?.type === 'group'
+                ? ` group-chat-panel${groupSettingsOpen ? ' group-settings-visible' : ''}`
+                : ''}${chatDragActive ? ' chat-file-drag-active' : ''}`}>
+              {chatDragActive && activeConversationId && (
+                <div className="chat-file-drop-overlay" role="status" aria-live="polite">
+                  <div className="chat-file-drop-card">
+                    <Images size={32} aria-hidden="true" />
+                    <strong>Thả ảnh hoặc tệp vào đây</strong>
+                    <span>Tệp sẽ được thêm vào tin nhắn, chưa gửi ngay · Tối đa 10 tệp</span>
+                  </div>
+                </div>
+              )}
               {!activeConversation ? (
                 <div className="conversation-empty">
                   <SocoEmptyState kind="chat" title="Kết nối không biên giới"
@@ -3890,9 +3985,16 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                           onPointerLeave={cancelMessageLongPress}
                           onContextMenu={(event) => {
                             if (message.deleted) return
-                            if (event.target instanceof Element && event.target.closest('.message-selectable-text')) return
+                            // Keep native context-copy for text selected inside this message.
+                            const selection = window.getSelection()
+                            if (event.target instanceof Element &&
+                                event.target.closest('.message-selectable-text') &&
+                                !event.target.closest('a.message-inline-link') &&
+                                selection && !selection.isCollapsed &&
+                                event.currentTarget.contains(selection.anchorNode) &&
+                                event.currentTarget.contains(selection.focusNode)) return
                             event.preventDefault()
-                            openMessageActions(message)
+                            openMessageActions(message, event.target)
                           }}
                         >
                           {!mine && <div className="message-meta">{userLabel(message.senderDisplayName, message.sender)}</div>}
@@ -3912,9 +4014,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                                     key={translatedText ? `${message.id}-${originalVisible ? 'original' : 'translated'}` : `${message.id}-plain`}
                                     className="translation-flip-content message-selectable-text"
                                   >
-                                    {translatedText
+                                    {messageTextParts(translatedText
                                       ? originalVisible ? message.text : translatedText
-                                      : message.text}
+                                      : message.text).map((part, index) => part.kind === 'link'
+                                      ? <a key={index} className="message-inline-link" href={messageLinkHref(part.text)} target="_blank" rel="noopener noreferrer">{part.text}</a>
+                                      : <Fragment key={index}>{part.text}</Fragment>)}
                                   </span>
                                 </div>
                               )}
@@ -4053,6 +4157,13 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                       placeholder={mediaUploading === 'chat' ? 'Đang tải file lên...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
                       value={messageText}
                       onChange={(event) => setMessageText(event.target.value)}
+                      onPaste={(event) => {
+                        const files = chatFilesFromClipboard(event.clipboardData)
+                        if (files.length === 0) return // Preserve normal text paste (Cmd/Ctrl+V).
+                        event.preventDefault()
+                        void addChatFiles(files)
+                      }}
+                      title="Dán ảnh/tệp bằng Cmd/Ctrl+V hoặc kéo thả vào cuộc trò chuyện"
                       maxLength={4000}
                     />
                     <button className="send-button polished-send" disabled={!canSend} aria-label="Gửi tin nhắn">
@@ -4254,7 +4365,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
           </div>
         )}
 
-        {activeMessageAction && <MessageActions activeMessageAction={activeMessageAction} userId={session.user.id} setMessageActionId={setMessageActionId} toggleReaction={toggleReaction} setReplyingTo={setReplyingTo} copyMessage={copyMessage} translateMessage={translateMessage} editOwnMessage={editOwnMessage} recallOwnMessage={recallOwnMessage} />}
+        {activeMessageAction && <MessageActions activeMessageAction={activeMessageAction} userId={session.user.id} setMessageActionId={setMessageActionId} toggleReaction={toggleReaction} setReplyingTo={setReplyingTo} copyTarget={messageCopyTarget} copyMessageContent={copyMessageContent} translateMessage={translateMessage} editOwnMessage={editOwnMessage} recallOwnMessage={recallOwnMessage} />}
 
         {activePost && (
           <div

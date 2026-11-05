@@ -1,6 +1,7 @@
 import { userLabel } from '../../shared/lib/userLabel'
 import type { Message } from './types'
 import { attachmentLabel, formatTime } from '../../shared/lib/format'
+import type { MessageCopyTarget } from './messageCopyTarget'
 
 type Props = {
   activeMessageAction: Message
@@ -8,7 +9,8 @@ type Props = {
   setMessageActionId: (id: number | null) => void
   toggleReaction: (message: Message, emoji: string) => Promise<void>
   setReplyingTo: (message: Message) => void
-  copyMessage: (message: Message) => Promise<void>
+  copyTarget: MessageCopyTarget | null
+  copyMessageContent: (message: Message, target: MessageCopyTarget) => Promise<void>
   translateMessage: (message: Message) => Promise<void>
   editOwnMessage: (message: Message) => Promise<void>
   recallOwnMessage: (message: Message) => Promise<void>
@@ -20,7 +22,8 @@ export default function MessageActions({
   setMessageActionId,
   toggleReaction,
   setReplyingTo,
-  copyMessage,
+  copyTarget,
+  copyMessageContent,
   translateMessage,
   editOwnMessage,
   recallOwnMessage,
@@ -73,8 +76,8 @@ export default function MessageActions({
             <b>Trả lời</b>
           </button>
 
-          {Boolean(activeMessageAction.text.trim()) && (
-            <button type="button" onClick={() => void copyMessage(activeMessageAction)}>
+          {copyTarget && (
+            <button type="button" onClick={() => void copyMessageContent(activeMessageAction, copyTarget)}>
               <span aria-hidden="true">▣</span>
               <b>Sao chép</b>
             </button>
