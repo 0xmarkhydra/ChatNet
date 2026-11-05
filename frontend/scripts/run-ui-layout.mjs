@@ -377,13 +377,17 @@ try {
       const navLabel = desktopSidebar.getByRole('button', { name: 'Tin nhắn' }).locator('span').first()
       check(await navLabel.evaluate(node => getComputedStyle(node).opacity === '1'),
         'Desktop sidebar labels must be revealed on hover at ' + width)
-      // The flyout is visual only: moving into the content area must close it,
-      // not trap clicks within the 250px expanded background.
+      // The entire 250px flyout stays interactive until the pointer actually leaves it.
       await page.mouse.move(180, 180)
+      await page.waitForTimeout(280)
+      const retainedWidth = await desktopSidebar.boundingBox()
+      check(retainedWidth && Math.abs(retainedWidth.width - 250) <= 1,
+        'Sidebar must remain open when pointer moves from icon to label at ' + width)
+      await page.mouse.move(270, 180)
       await page.waitForTimeout(280)
       const collapsedOverlayWidth = await desktopSidebar.evaluate(node => parseFloat(getComputedStyle(node, '::before').width))
       check(Math.abs(collapsedOverlayWidth - 76) <= 1,
-        'Expanded sidebar must not capture the first 174px of main content at ' + width)
+        'Sidebar must collapse after the pointer exits the 250px flyout at ' + width)
       await page.mouse.move(width - 5, 5)
     } else {
       check(!(await desktopSidebar.isVisible()), 'Desktop sidebar must be hidden on mobile at ' + width)

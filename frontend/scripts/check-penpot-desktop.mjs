@@ -145,6 +145,34 @@ try {
   assert(await chatList.evaluate(node => getComputedStyle(node).overflowX === 'hidden'),
     'Conversation list must not show an accidental horizontal scrollbar')
 
+  // Hover must stay open across the entire 250px flyout, not just the 76px icon rail.
+  const mainBeforeHover = await page.locator('.modern-frame').boundingBox()
+  const firstNavButton = sidebar.getByRole('button', { name: 'Bảng tin' })
+  const firstNavBounds = await firstNavButton.boundingBox()
+  const navY = firstNavBounds.y + firstNavBounds.height / 2
+  await page.mouse.move(45, navY)
+  await page.waitForTimeout(300)
+  for (const x of [120, 190, 240]) {
+    await page.mouse.move(x, navY)
+    await page.waitForTimeout(80)
+    const bounds = await sidebar.boundingBox()
+    assert(bounds && Math.abs(bounds.width - 250) < 2,
+      'Sidebar must remain expanded throughout its full hover area at x=' + x)
+    assert(await firstNavButton.locator('span').evaluate(node => getComputedStyle(node).opacity === '1'),
+      'Sidebar label must stay visible across the flyout at x=' + x)
+  }
+  const mainDuringHover = await page.locator('.modern-frame').boundingBox()
+  assert(mainBeforeHover && mainDuringHover &&
+    Math.abs(mainBeforeHover.x - mainDuringHover.x) < 1 &&
+    Math.abs(mainBeforeHover.width - mainDuringHover.width) < 1,
+    'Hover flyout must not move or resize the main page')
+  await page.mouse.click(170, navY)
+  await page.locator('.penpot-social-feed').waitFor({ state: 'visible' })
+  await page.mouse.move(270, navY)
+  await page.waitForTimeout(100)
+  assert(Math.abs((await sidebar.boundingBox()).width - 76) < 2,
+    'Sidebar must collapse only after the pointer leaves the 250px flyout')
+
   // Penpot Social Flows / S00 · Bảng tin • Social V4.
   await sidebar.getByRole('button', { name: 'Bảng tin' }).click()
   const feed = page.locator('.penpot-social-feed')
