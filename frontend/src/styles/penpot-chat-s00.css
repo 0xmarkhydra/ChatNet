@@ -1,0 +1,402 @@
+/*
+ * Penpot / SocCo Desktop • Social Flows / S00 · Tin nhắn • Social V4.
+ * Scoped to the desktop chat so mobile, feed and other social pages retain their layouts.
+ * Reference board: 1586x992 / 250px navigation / 86px header / 347+605+292 chat panes.
+ */
+.penpot-chat-list-header,
+.penpot-chat-ai-banner { display: none; }
+
+@media (min-width: 761px) {
+  .modern-shell.penpot-layout .modern-messenger.penpot-social-chat {
+    grid-template-columns: minmax(285px, 347px) minmax(0, 1fr);
+    gap: 18px;
+    padding: 22px 34px 42px 22px;
+  }
+
+  .modern-shell.penpot-layout .penpot-social-chat > .conversation-sidebar,
+  .modern-shell.penpot-layout .penpot-social-chat > .conversation-panel {
+    border: 1px solid #e8ecf5;
+    border-radius: 16px;
+    box-shadow: none;
+  }
+
+  .modern-shell.penpot-layout .penpot-social-chat .penpot-chat-list {
+    position: relative;
+    background: #fff;
+  }
+
+  .modern-shell.penpot-layout .penpot-chat-list-header {
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    padding: 19px 16px 15px;
+    background: #fff;
+  }
+
+  .penpot-chat-list-title {
+    display: flex;
+    height: 47px;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-inline: 9px 0;
+    margin-bottom: 15px;
+  }
+
+  .penpot-chat-list-title h2 {
+    margin: 0;
+    padding-top: 1px;
+    color: #1b2d4e;
+    font-size: 18px;
+    font-weight: 760;
+    line-height: 25px;
+    letter-spacing: -.35px;
+    white-space: nowrap;
+  }
+
+  .penpot-chat-new {
+    display: grid;
+    flex: 0 0 37px;
+    width: 37px;
+    height: 37px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 11px;
+    background: #eff3ff;
+    color: #2563eb;
+    cursor: pointer;
+  }
+
+  .penpot-chat-new:hover { background: #e2eaff; }
+
+  .penpot-chat-list-search {
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 0 46px;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 46px;
+    border: 1px solid #eef1f8;
+    border-radius: 12px;
+    padding: 0 14px;
+    background: #f8fafe;
+    color: #8b9ab3;
+  }
+
+  .penpot-chat-list-search:focus-within {
+    border-color: #9db9f5;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+  }
+
+  .penpot-chat-list-search input {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #243651;
+    font: inherit;
+    font-size: 12px;
+  }
+
+  .penpot-chat-list-search input::placeholder { color: #8c9ab0; }
+  .penpot-chat-list-search input::-webkit-search-cancel-button { cursor: pointer; }
+
+  .penpot-chat-list-filters {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    margin-top: 16px;
+    padding-left: 1px;
+  }
+
+  .penpot-chat-list-filters button {
+    box-sizing: border-box;
+    min-height: 35px;
+    padding: 0 13px;
+    border: 1px solid #edf0f8;
+    border-radius: 9px;
+    background: #fff;
+    color: #657793;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .penpot-chat-list-filters button:hover { background: #f4f7fe; }
+  .penpot-chat-list-filters button.is-active {
+    border-color: #e3eafd;
+    background: #eff3ff;
+    color: #2563eb;
+  }
+
+  /* Preserve category filtering, tucked beside the list heading rather than taking an extra row. */
+  .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories {
+    position: absolute;
+    z-index: 4;
+    top: 22px;
+    right: 62px;
+    width: auto;
+    min-height: 37px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories .category-toolbar {
+    min-height: 37px;
+    gap: 3px;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories .category-filter-trigger {
+    box-sizing: border-box;
+    justify-content: center;
+    width: 36px;
+    min-width: 36px;
+    min-height: 37px;
+    padding: 0;
+    border-radius: 10px;
+  }
+  .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories .category-filter-trigger span,
+  .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories .category-filter-trigger svg:last-child {
+    display: none;
+  }
+  .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories .category-manage-trigger {
+    display: none;
+  }
+  .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories .category-clear {
+    position: absolute;
+    top: 25px;
+    left: 11px;
+    z-index: 1;
+    padding: 2px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #e9edff;
+  }
+
+  .modern-shell.penpot-layout .penpot-chat-list > .zalo-conversation-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 10px 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .modern-shell.penpot-layout .penpot-chat-list .zalo-conversation-list .conversation-item {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 79px;
+    margin: 0 0 9px;
+    padding: 11px 12px;
+    gap: 12px;
+    border: 0;
+    border-radius: 12px;
+    box-shadow: none;
+    background: #fff;
+  }
+
+  .modern-shell.penpot-layout .penpot-chat-list .zalo-conversation-list .conversation-item.active {
+    box-shadow: none;
+    background: #eff3ff;
+  }
+
+  .modern-shell.penpot-layout .penpot-chat-list .zalo-conversation-list .conversation-item:hover:not(.active) {
+    background: #f4f7fe;
+  }
+
+  .modern-shell.penpot-layout .penpot-chat-list .zalo-conversation-list .conversation-avatar {
+    width: 51px;
+    height: 51px;
+    flex: 0 0 51px;
+    border: 0;
+    border-radius: 50%;
+    box-shadow: none;
+  }
+
+  .modern-shell.penpot-layout .penpot-chat-list .conversation-copy {
+    gap: 7px;
+    border-bottom: none;
+  }
+  .modern-shell.penpot-layout .penpot-chat-list .conversation-copy strong {
+    font-size: 13px;
+    font-weight: 750;
+    color: #243750;
+  }
+  .modern-shell.penpot-layout .penpot-chat-list .conversation-copy span {
+    font-size: 11px;
+    color: #8795ac;
+  }
+  .modern-shell.penpot-layout .penpot-chat-list .conversation-copy time {
+    font-size: 10px;
+    color: #97a5b9;
+  }
+  .modern-shell.penpot-layout .penpot-chat-list .conversation-copy b {
+    box-shadow: none;
+    background: #2563eb;
+  }
+
+  .modern-shell.penpot-layout .penpot-social-chat .conversation-panel {
+    display: flex;
+    flex-direction: column;
+    background: #f8fafe;
+  }
+
+  .modern-shell.penpot-layout .penpot-social-chat .conversation-panel > .chat-head {
+    min-height: 79px;
+    flex: 0 0 79px;
+    padding: 11px 14px;
+    border-bottom: 1px solid #e8ecf5;
+    box-shadow: none;
+    background: #fff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .modern-shell.penpot-layout .penpot-social-chat .chat-head .room-avatar {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    border-radius: 50%;
+    border: none;
+    box-shadow: none;
+  }
+  .modern-shell.penpot-layout .penpot-social-chat .chat-head .room-info strong { font-size: 17px; }
+  .modern-shell.penpot-layout .penpot-social-chat .chat-head .room-subtitle { font-size: 11px; }
+
+  .modern-shell.penpot-layout .penpot-social-chat .chat-head .translate-controls {
+    gap: 5px;
+    min-width: 0;
+  }
+  .modern-shell.penpot-layout .penpot-social-chat .chat-head .translate-controls .call-header-actions button,
+  .modern-shell.penpot-layout .penpot-social-chat .chat-head .group-settings-toggle {
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #687d9e;
+  }
+  .modern-shell.penpot-layout .penpot-social-chat .chat-head .translate-controls button:hover { background: #eff3ff; }
+
+  .modern-shell.penpot-layout .penpot-social-chat .messages {
+    min-height: 0;
+    background: #f8fafe;
+    padding: 20px 16px 18px;
+  }
+  .modern-shell.penpot-layout .penpot-social-chat .message .bubble {
+    border: 1px solid #e8edf6;
+    border-radius: 14px 14px 14px 5px;
+    background: #fff;
+    box-shadow: 0 3px 8px rgba(29,50,88,.04);
+  }
+  .modern-shell.penpot-layout .penpot-social-chat .message.mine .bubble {
+    border: none;
+    border-radius: 14px 14px 5px 14px;
+    background: linear-gradient(110deg, #2763e9, #8757ec);
+    box-shadow: none;
+    color: #fff;
+  }
+
+  .modern-shell.penpot-layout .penpot-social-chat .penpot-chat-ai-banner {
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 0 42px;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 42px;
+    margin: 0 15px 0;
+    padding: 0 12px;
+    border: 1px solid #e5ecff;
+    border-radius: 10px;
+    background: #eff3ff;
+    color: #637ba9;
+    font-size: 11px;
+  }
+  .penpot-chat-ai-banner.is-enabled > svg { color: #366bdb; }
+  .penpot-chat-ai-banner > span {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .penpot-chat-ai-banner button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 6px 2px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #3768bd;
+    font-size: 11px;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .penpot-chat-ai-banner button:hover { color: #18479b; }
+
+  .modern-shell.penpot-layout .penpot-social-chat .media-composer.composer {
+    box-sizing: border-box;
+    min-height: 90px;
+    flex: 0 0 auto;
+    gap: 10px;
+    padding: 10px 15px 15px;
+    border-top: none;
+    background: #f8fafe;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .modern-shell.penpot-layout .penpot-social-chat .media-composer > input:not(.hidden-media-input) {
+    min-height: 44px;
+    border: 1px solid #edf1f8;
+    border-radius: 12px;
+    background: #f8fafe;
+  }
+  .modern-shell.penpot-layout .penpot-social-chat .media-composer .send-button {
+    min-width: 65px;
+    border-radius: 12px;
+    background: linear-gradient(110deg, #2763e9, #8757ec);
+    box-shadow: none;
+  }
+
+  .modern-shell.penpot-layout .penpot-social-chat :is(.penpot-chat-new,.penpot-chat-list-filters button,.penpot-chat-ai-banner button):focus-visible {
+    outline: 3px solid #a8c0fa;
+    outline-offset: 2px;
+  }
+}
+
+@media (min-width: 1420px) {
+  .modern-shell.penpot-layout .modern-messenger.penpot-social-chat.has-active:not(.group-sidebar-open) {
+    grid-template-columns: minmax(285px, 347px) minmax(0, 1fr) 292px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .modern-shell.penpot-layout .modern-messenger.penpot-social-chat {
+    grid-template-columns: minmax(205px, 250px) minmax(0, 1fr);
+    padding: 8px;
+    gap: 8px;
+  }
+  .penpot-chat-list-title { padding-inline: 0; }
+  .penpot-chat-list-title h2 { font-size: 15px; }
+  .modern-shell.penpot-layout .penpot-chat-list-header { padding-inline: 10px; }
+  .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories { right: 56px; }
+  .penpot-chat-list-filters { gap: 3px; }
+  .penpot-chat-list-filters button { font-size: 10px; padding-inline: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .penpot-social-chat .message { animation: none; }
+}

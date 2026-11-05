@@ -26,6 +26,7 @@ import './styles/penpot-sidebar.css'
 import './styles/penpot-profile.css'
 import './styles/penpot-profile-editor.css'
 import './styles/penpot-social-feed.css'
+import './styles/penpot-chat-s00.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)

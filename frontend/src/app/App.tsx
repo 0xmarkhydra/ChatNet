@@ -66,7 +66,7 @@ import FeedModeration from '../features/feed/FeedModeration'
 import ProfileOverlay from '../features/profile/ProfileOverlay'
 import type { NearbyUser } from '../features/discover/NearbyExplorer'
 import GroupCreator from '../features/chat/GroupCreator'
-import { Bell, Check, Images, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
+import { Bell, Check, Images, Languages, ChevronDown, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../features/notifications/incomingSound'
 import { createSessionClient, loadSession, type Session } from '../features/auth/session'
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts } from '../features/chat/chatPersistence'
@@ -125,6 +125,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const tabRef = useRef(tab)
   tabRef.current = tab
   const [globalSearch, setGlobalSearch] = useState('')
+  const [chatListQuery, setChatListQuery] = useState('')
+  const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'groups'>('all')
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
   const quickSearchAnchorRef = useRef<HTMLDivElement>(null)
   const [chatSearchJump, setChatSearchJump] = useState<{ conversationId: number; messageId: number; revision: number } | null>(null)
@@ -3211,6 +3213,14 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     conversationCategories.items.map(item => displayConversations.find(c => c.id === item.id) || item)
       .filter(item => !revokedConversationIds.current.has(item.id) &&
         (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
+  // S00 filters operate on already-loaded conversations; global search still searches messages/users on the server.
+  const chatListSearch = chatListQuery.trim().toLocaleLowerCase('vi-VN')
+  const chatListConversations = visibleConversations.filter((conversation) => {
+    if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
+    if (chatListFilter === 'groups' && conversation.type !== 'group') return false
+    return !chatListSearch || [conversation.name, conversation.lastMessage, conversation.otherUsername]
+      .some((value) => value?.toLocaleLowerCase('vi-VN').includes(chatListSearch))
+  })
   const searchedPosts = feedSearchActive ? postSearch.posts.map(post => likePreviews[post.id] === undefined ? post : {
     ...post,
     liked: likePreviews[post.id],
@@ -3624,8 +3634,29 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
       <section className={`phone-frame modern-frame ${tab === 'chat' && activeConversation ? 'mobile-conversation-open' : ''}`}>
         {tab === 'chat' && desktopSection === null && (
-          <div className={`messenger-layout modern-messenger ${activeConversation ? 'has-active' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
-            <aside className="conversation-sidebar">
+          <div className={`messenger-layout modern-messenger penpot-social-chat ${activeConversation ? 'has-active' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
+            <aside className="conversation-sidebar penpot-chat-list" aria-label="Danh sách cuộc trò chuyện">
+              <div className="penpot-chat-list-header">
+                <div className="penpot-chat-list-title">
+                  <h2>Cuộc trò chuyện</h2>
+                  <button type="button" className="penpot-chat-new" aria-label="Tạo cuộc trò chuyện mới"
+                    title="Tạo cuộc trò chuyện" onClick={() => { setChatCreateError(''); setNewChatMode('direct') }}>
+                    <PencilLine size={19} aria-hidden="true" />
+                  </button>
+                </div>
+                <label className="penpot-chat-list-search">
+                  <Search size={19} aria-hidden="true" />
+                  <input type="search" value={chatListQuery} onChange={(event) => setChatListQuery(event.target.value)}
+                    placeholder="Tìm kiếm tin nhắn..." aria-label="Lọc danh sách cuộc trò chuyện" />
+                </label>
+                <div className="penpot-chat-list-filters" role="group" aria-label="Lọc cuộc trò chuyện">
+                  {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
+                    <button key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
+                      className={chatListFilter === filter.key ? 'is-active' : ''}
+                      onClick={() => setChatListFilter(filter.key)}>{filter.label}</button>
+                  ))}
+                </div>
+              </div>
               {newChatMode === 'friends' && (
                 <div className="connect-modal-layer">
                   <button
@@ -3755,18 +3786,20 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 {conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
                   {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>Thử lại</button>
                 </div>}
-                {visibleConversations.length === 0 && !conversationCategories.loading && !conversationCategories.listError && (
+                {chatListConversations.length === 0 && !conversationCategories.loading && !conversationCategories.listError && (
                   <div className="conversation-list-empty">
                     <SocoEmptyState
                       kind="chat"
-                      title="Chưa có cuộc trò chuyện"
-                      description="Tìm bạn bè để bắt đầu kết nối và trò chuyện."
-                      action={<SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
+                      title={visibleConversations.length ? 'Không có hội thoại phù hợp' : 'Chưa có cuộc trò chuyện'}
+                      description={visibleConversations.length ? 'Thử thay đổi từ khóa hoặc chọn bộ lọc khác.' : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
+                      action={visibleConversations.length
+                        ? <SocoTextAction onClick={() => { setChatListQuery(''); setChatListFilter('all') }}>Xóa bộ lọc</SocoTextAction>
+                        : <SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
                     />
                   </div>
                 )}
 
-                {visibleConversations.map((conversation) => (
+                {chatListConversations.map((conversation) => (
                   <button
                     key={conversation.id}
                     className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''}`}
@@ -3905,7 +3938,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                                 aria-label="Xem trang cá nhân">{activeConversation.name}</button>
                               : activeConversation.name}</strong>
                             <small className="room-subtitle">
-                              {activeConversation.online ? '● Đang online' : 'Chat riêng'}
+                              {activeConversation.online ? '● Đang hoạt động' : 'Chat riêng'}
                               <CategoryAssignment model={conversationCategories}
                                 conversationId={activeConversation.id}
                                 categoryId={activeConversation.categoryId} />
@@ -4278,6 +4311,17 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                       </article>
                     ))}
                     <div ref={bottomRef} />
+                  </div>
+
+                  <div className={`penpot-chat-ai-banner${autoTranslate ? ' is-enabled' : ''}`} role="status">
+                    <Languages size={18} aria-hidden="true" />
+                    <span>{autoTranslate
+                      ? `Dịch tự động đang bật · ${selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()}`
+                      : 'Dịch tự động đang tắt'}</span>
+                    <button type="button" aria-label="Cài đặt dịch AI" aria-expanded={translationMenuOpen}
+                      onClick={() => { setLanguageSearch(''); setTranslationMenuOpen((open) => !open) }}>
+                      <span>Cài đặt</span><ChevronDown size={15} aria-hidden="true" />
+                    </button>
                   </div>
 
                   <form className="composer media-composer" onSubmit={(event) => {
