@@ -132,6 +132,18 @@ try {
   await page.goto(origin)
   const sidebar = page.locator('.penpot-sidebar')
   await sidebar.waitFor()
+  // A compact sidebar must not draw a vertical scrollbar over the chat content.
+  const navScrollbars = await sidebar.locator('.penpot-sidebar-nav').evaluate(node => ({
+    scrollbarWidth: getComputedStyle(node).scrollbarWidth,
+    overflowY: getComputedStyle(node).overflowY,
+  }))
+  assert(navScrollbars.scrollbarWidth === 'none' && navScrollbars.overflowY === 'auto',
+    'Navigation should remain scrollable without a visible scrollbar: ' + JSON.stringify(navScrollbars))
+  await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
+  const chatList = page.locator('.conversation-list.zalo-conversation-list')
+  await chatList.waitFor({ state: 'visible' })
+  assert(await chatList.evaluate(node => getComputedStyle(node).overflowX === 'hidden'),
+    'Conversation list must not show an accidental horizontal scrollbar')
 
   // Penpot Social Flows / S00 · Bảng tin • Social V4.
   await sidebar.getByRole('button', { name: 'Bảng tin' }).click()

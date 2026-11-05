@@ -111,8 +111,10 @@
     pointer-events: none;
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-width: thin;
+    /* The expanded navigation overlaps the content: never show a scrollbar there. */
+    scrollbar-width: none;
   }
+  .penpot-sidebar-nav::-webkit-scrollbar { display: none; }
 
   .penpot-sidebar-link {
     position: relative;
@@ -273,6 +275,12 @@
   .modern-shell.penpot-layout .conversation-sidebar {
     display: flex;
     flex-direction: column;
+  }
+  /* Chat list scrolls vertically only; long previews are truncated in their rows. */
+  .modern-shell.penpot-layout .conversation-list.zalo-conversation-list {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
   }
   .modern-shell.penpot-layout .bottom-navigation { display: none; }
 }
