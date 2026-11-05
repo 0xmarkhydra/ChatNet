@@ -87,15 +87,15 @@ import {
 import MessageSearchPanel from "../features/chat/MessageSearchPanel";
 import ProfileIdentityForm from "../features/profile/ProfileIdentityForm";
 import BottomNavigation from "./BottomNavigation";
-import DesktopSidebar from "./DesktopSidebar";
+import AppSidebar from "./AppSidebar";
 import NotificationsPanel from "./NotificationsPanel";
 import ConversationDetailsPanel from "./ConversationDetailsPanel";
-import DesktopProfilePage from "./DesktopProfilePage";
-import DesktopProfileEditor from "./DesktopProfileEditor";
-import DesktopSocialFeedComposer from "./DesktopSocialFeedComposer";
-import DesktopSocialFeedSidebar from "./DesktopSocialFeedSidebar";
-import DesktopSocialFeedStories from "./DesktopSocialFeedStories";
-import DesktopCommunicationHub from "./DesktopCommunicationHub";
+import ProfilePage from "./ProfilePage";
+import ProfileEditorPage from "./ProfileEditorPage";
+import SocialFeedComposer from "./SocialFeedComposer";
+import SocialFeedSidebar from "./SocialFeedSidebar";
+import SocialFeedStories from "./SocialFeedStories";
+import CommunicationHub from "./CommunicationHub";
 import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
 import GroupRenameDialog from "../features/chat/GroupRenameDialog";
 import GroupInviteJoinDialog from "../features/chat/GroupInviteJoinDialog";
@@ -4576,9 +4576,9 @@ export default function App({
 
   return (
     <main
-      className={`app-shell modern-shell penpot-layout ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
+      className={`app-shell modern-shell app-layout ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
     >
-      <DesktopSidebar
+      <AppSidebar
         tab={tab}
         section={tab === "chat" ? desktopSection : null}
         username={session.user.username}
@@ -4727,9 +4727,9 @@ export default function App({
         />
       )}
       <header
-        className={`chatnet-appbar ${tab === "profile" ? "penpot-desktop-only-header" : tab === "discover" || tab === "market" ? "penpot-desktop-only-header penpot-header-no-search" : ""}`}
+        className={`chatnet-appbar ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
       >
-        <div className="penpot-page-heading">
+        <div className="app-page-heading">
           <strong>
             {tab === "chat" && desktopSection === "groups"
               ? "Nhóm & cộng đồng"
@@ -4941,7 +4941,7 @@ export default function App({
           {tab === "feed" && (
             <>
               <button
-                className="appbar-icon-button penpot-feed-header-new"
+                className="appbar-icon-button social-feed-header-new"
                 type="button"
                 aria-label="Tạo bài viết"
                 onClick={() => {
@@ -4972,7 +4972,7 @@ export default function App({
                   )) && <span className="appbar-badge">!</span>}
               </button>
               <button
-                className="penpot-feed-header-account"
+                className="social-feed-header-account"
                 type="button"
                 aria-label="Mở trang cá nhân"
                 onClick={() => switchTab("profile")}
@@ -4983,7 +4983,7 @@ export default function App({
                     profileMedia?.displayName || session.user.displayName,
                     name,
                   )}
-                  className="penpot-feed-header-avatar"
+                  className="social-feed-header-avatar"
                 />
               </button>
             </>
@@ -5004,7 +5004,7 @@ export default function App({
                   )) && <span className="appbar-badge">!</span>}
               </button>
               <button
-                className="appbar-icon-button penpot-profile-header-new"
+                className="appbar-icon-button profile-page-header-new"
                 type="button"
                 aria-label="Tạo bài viết"
                 onClick={() => {
@@ -5015,7 +5015,7 @@ export default function App({
                 <PencilLine size={21} aria-hidden="true" />
               </button>
               <button
-                className="penpot-profile-header-account"
+                className="profile-page-header-account"
                 type="button"
                 aria-label="Mở cài đặt tài khoản"
                 onClick={() => {
@@ -5029,7 +5029,7 @@ export default function App({
                     profileMedia?.displayName || session.user.displayName,
                     name,
                   )}
-                  className="penpot-profile-header-avatar"
+                  className="profile-page-header-avatar"
                 />
               </button>
             </>
@@ -6563,7 +6563,7 @@ export default function App({
         )}
 
         {tab === "chat" && desktopSection && (
-          <DesktopCommunicationHub
+          <CommunicationHub
             kind={desktopSection}
             conversations={conversations}
             hasMore={hasMoreConversations}
@@ -6668,7 +6668,7 @@ export default function App({
 
         {tab === "feed" && (
           <div
-            className="feed-view zalo-feed-view penpot-social-feed"
+            className="feed-view zalo-feed-view social-feed"
             ref={feedViewRef}
             onScroll={(event) => {
               if (feedSearchActive && event.currentTarget.scrollTop > 0)
@@ -6709,10 +6709,10 @@ export default function App({
                 void createStory(file);
               }}
             />
-            <div className="penpot-feed-grid">
-              <div className="penpot-feed-center">
+            <div className="social-feed-grid">
+              <div className="social-feed-center">
                 {isProfileDesktop ? (
-                  <DesktopSocialFeedStories
+                  <SocialFeedStories
                     username={name}
                     displayName={userLabel(
                       profileMedia?.displayName || session.user.displayName,
@@ -6795,7 +6795,7 @@ export default function App({
                 )}
 
                 {isProfileDesktop ? (
-                  <DesktopSocialFeedComposer
+                  <SocialFeedComposer
                     username={name}
                     displayName={userLabel(
                       profileMedia?.displayName || session.user.displayName,
@@ -6824,11 +6824,11 @@ export default function App({
 
                 {isProfileDesktop ? (
                   <div
-                    className="penpot-feed-filter-bar"
+                    className="social-feed-filter-bar"
                     role="group"
                     aria-label="Lọc bảng tin"
                   >
-                    <div className="penpot-feed-filter-options">
+                    <div className="social-feed-filter-options">
                       <button
                         type="button"
                         aria-pressed={feedFilter === "all"}
@@ -6857,7 +6857,7 @@ export default function App({
                       )}
                     </div>
                     <button
-                      className="penpot-feed-refresh"
+                      className="social-feed-refresh"
                       type="button"
                       onClick={() => {
                         if (feedFilter === "following") followingFeed.refresh();
@@ -7025,7 +7025,7 @@ export default function App({
                 </div>
               </div>
               {isProfileDesktop && (
-                <DesktopSocialFeedSidebar
+                <SocialFeedSidebar
                   username={name}
                   sessionId={session.sessionId}
                   posts={posts}
@@ -7232,7 +7232,7 @@ export default function App({
               }}
             />
             {profileEditorOpen ? (
-              <DesktopProfileEditor
+              <ProfileEditorPage
                 username={name}
                 displayName={
                   profileMedia?.displayName || session.user.displayName || name
@@ -7265,7 +7265,7 @@ export default function App({
                 onChangeCover={() => coverFileInputRef.current?.click()}
               />
             ) : (
-              <DesktopProfilePage
+              <ProfilePage
                 username={name}
                 displayName={
                   profileMedia?.displayName || session.user.displayName || name
@@ -7590,7 +7590,7 @@ export default function App({
             ) : (
               <>
                 {isProfileDesktop && desktopProfileSettings ? (
-                  <section className="penpot-edit-settings-entry">
+                  <section className="profile-editor-settings-entry">
                     <div>
                       <strong>Thông tin hồ sơ</strong>
                       <p>

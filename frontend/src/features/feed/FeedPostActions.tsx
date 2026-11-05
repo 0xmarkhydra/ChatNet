@@ -50,7 +50,7 @@ async function sharePost(id: number, feedback: Feedback, copyOnly = false) {
   }
 }
 
-/** Save/unsave is a first-class footer action in the Penpot Social V4 feed. */
+/** Save/unsave is a first-class footer action in the Social UI Social V4 feed. */
 export function FeedSaveAction<P extends FeedActionPost>({
   post, request, onUpdated, onFeedback,
 }: Pick<Props<P>, 'post' | 'request' | 'onUpdated' | 'onFeedback'>) {

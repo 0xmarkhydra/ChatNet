@@ -354,7 +354,7 @@ try {
   }
   for (const width of widths) {
     await page.setViewportSize({ width, height: width <= 375 ? 667 : width <= 430 ? 844 : 900 })
-    const desktopSidebar = page.locator('.penpot-sidebar')
+    const desktopSidebar = page.locator('.app-sidebar')
     if (width > 760) {
       check(await desktopSidebar.isVisible(), 'Desktop sidebar must be visible at ' + width)
       await page.mouse.move(width - 5, 5)
@@ -440,7 +440,7 @@ try {
     }
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, width > 760
-      ? ['.modern-frame', '.feed-view', '.penpot-feed-grid', '.penpot-feed-launcher', '.penpot-feed-filter-bar']
+      ? ['.modern-frame', '.feed-view', '.social-feed-grid', '.social-feed-launcher', '.social-feed-filter-bar']
       : ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
     if (width === 390) {
       const scroller = page.locator('.feed-view.zalo-feed-view')
@@ -515,11 +515,11 @@ try {
     }
     await page.getByRole('button', { name: /Cá nhân/ }).click()
     if (width > 760) {
-      await geometry('profile', width, ['.modern-frame', '.penpot-profile-page', '.penpot-profile-hero'])
-      const hero = await page.locator('.penpot-profile-hero').boundingBox()
-      const main = await page.locator('.penpot-profile-main').boundingBox()
-      const aside = await page.locator('.penpot-profile-aside').boundingBox()
-      check(hero && main && aside, 'Desktop Penpot profile blocks missing: ' + width)
+      await geometry('profile', width, ['.modern-frame', '.profile-page', '.profile-page-hero'])
+      const hero = await page.locator('.profile-page-hero').boundingBox()
+      const main = await page.locator('.profile-page-main').boundingBox()
+      const aside = await page.locator('.profile-page-aside').boundingBox()
+      check(hero && main && aside, 'Desktop Desktop profile blocks missing: ' + width)
       if (width >= 1201) {
         check(aside.x > main.x + main.width - 3 && Math.abs(aside.y - main.y) < 10,
           'Desktop profile columns not aligned: ' + JSON.stringify({ width, hero, main, aside }))
@@ -558,6 +558,8 @@ try {
     await page.getByRole('button', { name: /^(Quanh đây|Khám phá)$/ }).click()
     await geometry('discover', width, ['.modern-frame'])
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
+    // Leave the expanded navigation before clicking content underneath its flyout.
+    if (width > 760) { await page.mouse.move(width - 5, 5); await page.waitForTimeout(280) }
     await page.locator('.conversation-item').first().click()
     await geometry('chat-room', width, ['.modern-frame', '.conversation-panel', '.chat-head'])
     if ([390, 1440].includes(width)) {
@@ -854,7 +856,7 @@ try {
   // Logout must be one full-width settings row, not a detached right-aligned button.
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 320 ? 667 : width === 390 ? 844 : 900 })
-    if (width > 760) await page.locator('.penpot-sidebar').getByRole('button', { name: 'Cài đặt' }).click()
+    if (width > 760) await page.locator('.app-sidebar').getByRole('button', { name: 'Cài đặt' }).click()
     else await page.getByRole('button', { name: /Cá nhân/ }).click()
     const signout = page.locator('.settings-card .settings-logout-row')
     await signout.waitFor()
