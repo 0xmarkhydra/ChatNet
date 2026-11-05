@@ -170,7 +170,14 @@
     display: none;
   }
   .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories .category-manage-trigger {
-    display: none;
+    display: inline-flex;
+    flex: 0 0 36px;
+    box-sizing: border-box;
+    width: 36px;
+    height: 37px;
+    margin-left: 0;
+    padding: 0;
+    color: #637a9f;
   }
   .modern-shell.penpot-layout .penpot-chat-list > .conversation-categories .category-clear {
     position: absolute;
