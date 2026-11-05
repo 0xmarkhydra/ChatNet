@@ -22,7 +22,7 @@
     gap: 18px;
     width: 100%;
     min-width: 0;
-    padding: 21px 33px 40px;
+    padding: var(--app-page-padding, 16px);
   }
   .modern-shell.app-layout .social-feed-center,
   .modern-shell.app-layout .social-feed-side {
@@ -511,7 +511,7 @@
 @media (min-width: 761px) and (max-width: 1330px) {
   .modern-shell.app-layout .social-feed-grid {
     grid-template-columns: minmax(0,1fr);
-    padding: 17px;
+    padding: var(--app-page-padding, 16px);
   }
   .modern-shell.app-layout .social-feed-side {
     display: grid;
