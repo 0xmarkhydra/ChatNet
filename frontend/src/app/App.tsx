@@ -2717,7 +2717,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     [activeConversationId, messageText, messageAttachments.length, mediaUploading, messageSending],
   )
 
-  async function openDirectByUsername(username: string) {
+  async function openDirectByUsername(username: string, callAfterOpen = false) {
     setChatCreateError('')
     const normalized = username.trim().toLowerCase()
     if (!normalized || actionLocks.current.has('chat:create')) return
@@ -2744,6 +2744,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       setConversations((current) => [created, ...current.filter((item) => item.id !== created.id)])
       setActiveConversationId(created.id)
       setTab('chat')
+      if (callAfterOpen) {
+        window.setTimeout(() => window.dispatchEvent(new CustomEvent('chatnet:start-call', {
+          detail: { conversationId: created.id, mediaType: 'audio' },
+        })), 0)
+      }
       setGlobalSearch('')
       setDirectUsername('')
       setFriendQuery('')
@@ -3406,8 +3411,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
       <header className={`chatnet-appbar ${tab === 'profile' ? 'penpot-desktop-only-header' : tab === 'discover' || tab === 'market' ? 'penpot-desktop-only-header penpot-header-no-search' : ''}`}>
         <div className="penpot-page-heading">
-          <strong>{tab === 'chat' && desktopSection === 'groups' ? 'Nhóm & cộng đồng' : tab === 'chat' && desktopSection === 'calls' ? 'Cuộc gọi' : ({ chat: 'Tin nhắn', contacts: 'Bạn bè', discover: 'Khám phá', market: 'Marketplace', feed: 'Bảng tin', profile: desktopProfileOverview && profileEditorOpen ? 'Chỉnh sửa hồ sơ' : 'Hồ sơ cá nhân' } as Record<Tab, string>)[tab]}</strong>
-          <small>{({ chat: 'Trò chuyện gần đây và kết nối bạn bè', contacts: 'Kết nối với những người bạn quan tâm', discover: 'Khám phá và kết nối cộng đồng', market: 'Khám phá sản phẩm và cửa hàng', feed: 'Khoảnh khắc và cộng đồng dành cho bạn', profile: desktopProfileSettings ? 'Cài đặt tài khoản và quyền riêng tư' : desktopProfileOverview && profileEditorOpen ? 'Thông tin cá nhân và quyền hiển thị' : 'Trang cá nhân, bài viết và thông tin của bạn' } as Record<Tab, string>)[tab]}</small>
+          <strong>{tab === 'chat' && desktopSection === 'groups' ? 'Nhóm & cộng đồng' : tab === 'chat' && desktopSection === 'calls' ? 'Cuộc gọi' : ({ chat: 'Tin nhắn', contacts: 'Danh bạ', discover: 'Khám phá', market: 'Marketplace', feed: 'Bảng tin', profile: desktopProfileOverview && profileEditorOpen ? 'Chỉnh sửa hồ sơ' : 'Hồ sơ cá nhân' } as Record<Tab, string>)[tab]}</strong>
+          <small>{({ chat: 'Trò chuyện gần đây và kết nối bạn bè', contacts: 'Tìm kiếm và kết nối với bạn bè', discover: 'Khám phá và kết nối cộng đồng', market: 'Khám phá sản phẩm và cửa hàng', feed: 'Khoảnh khắc và cộng đồng dành cho bạn', profile: desktopProfileSettings ? 'Cài đặt tài khoản và quyền riêng tư' : desktopProfileOverview && profileEditorOpen ? 'Thông tin cá nhân và quyền hiển thị' : 'Trang cá nhân, bài viết và thông tin của bạn' } as Record<Tab, string>)[tab]}</small>
         </div>
         <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SocCO</strong></div>
           <div className="appbar-search-anchor" ref={quickSearchAnchorRef}>
@@ -4460,6 +4465,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
               friends={friends}
               contactMetadata={contactMetadata}
               openDirectByUsername={openDirectByUsername}
+              onVoiceCall={(username) => openDirectByUsername(username, true)}
               setFriendPreview={setFriendPreview}
               changePersonalContact={changePersonalContact}
               removeAcceptedFriend={removeAcceptedFriend}

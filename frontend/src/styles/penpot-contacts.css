@@ -1,0 +1,543 @@
+/* Penpot: SocCo Desktop • Social Flows / S01 · Danh bạ & tìm bạn.
+   Keep this entire redesign scoped to the contacts surface. */
+.modern-shell .penpot-contacts {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 24px 28px 28px;
+  gap: 22px;
+  overflow: hidden;
+  background: #f7f9fd;
+  color: #192a46;
+}
+.penpot-contacts * { box-sizing: border-box; }
+.penpot-contacts button { font: inherit; cursor: pointer; }
+.penpot-contacts button:disabled { opacity: .5; cursor: not-allowed; }
+.penpot-contacts button:focus-visible,
+.penpot-contact-popup button:focus-visible {
+  outline: 3px solid rgba(37,99,235,.45);
+  outline-offset: 2px;
+}
+.penpot-contacts-find {
+  display: flex;
+  flex: 0 0 88px;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+  padding: 16px 24px;
+  border: 1px solid #edf0f7;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 3px 18px rgba(28,48,91,.028);
+}
+.penpot-contacts-find-input {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  color: #7e8da6;
+}
+.penpot-contacts-find-input input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+  color: #203450;
+  font-size: 14px;
+}
+.penpot-contacts-find-input input::placeholder { color: #98a3b6; }
+.penpot-contacts-find-input > button {
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: #eef2fa;
+  color: #617391;
+}
+.penpot-contacts-add,
+.penpot-contacts-profile-empty > button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 201px;
+  height: 46px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.penpot-contacts-add:hover,
+.penpot-contacts-profile-empty > button:hover,
+.penpot-contact-message:hover { background: #1d55d5; }
+.penpot-contacts-grid {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1.43fr) minmax(325px, 1fr);
+  gap: 22px;
+  min-width: 0;
+  min-height: 0;
+}
+.penpot-contacts-directory,
+.penpot-contacts-profile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid #edf0f7;
+  border-radius: 19px;
+  background: #fff;
+  box-shadow: 0 3px 20px rgba(28,48,91,.028);
+}
+.penpot-contacts-directory { overflow: hidden; }
+.penpot-contacts-profile {
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 18px 18px 28px;
+  scrollbar-width: thin;
+}
+.penpot-contacts-list-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 26px 10px;
+}
+.penpot-contacts-list-header h2 {
+  min-width: 0;
+  margin: 0;
+  color: #1b2c4b;
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: -.35px;
+}
+.penpot-contacts-list-header > span {
+  flex: 0 0 auto;
+  color: #8794a9;
+  font-size: 13px;
+}
+.penpot-contacts-filters {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 24px 16px;
+}
+.penpot-contacts-filters button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 35px;
+  min-width: 91px;
+  padding: 0 13px;
+  border: 1px solid #e8edf7;
+  border-radius: 12px;
+  background: #fff;
+  color: #71809b;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.penpot-contacts-filters button.is-active {
+  background: #eff3ff;
+  border-color: #e9efff;
+  color: #2563eb;
+}
+.penpot-contacts-filters button:hover { border-color: #c5d5f8; color: #2563eb; }
+.penpot-online-indicator,
+.penpot-profile-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  display: inline-block;
+  border-radius: 50%;
+  background: #3bbf84;
+}
+.penpot-profile-status-dot.is-offline { background: #a6b0c1; }
+.penpot-contacts-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 17px 22px;
+  scrollbar-width: thin;
+}
+.penpot-contacts-group { min-width: 0; }
+.penpot-contacts-group + .penpot-contacts-group {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #edf0f7;
+}
+.penpot-contacts-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 8px 10px;
+  color: #61728d;
+  font-size: 12px;
+  font-weight: 750;
+}
+.penpot-contacts-group h3 span { color: #2563eb; }
+.penpot-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 86px;
+  margin: 0 0 9px;
+  padding: 10px 13px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: #fff;
+  transition: background-color .14s ease, border-color .14s ease;
+}
+.penpot-contact-row:hover { background: #f7f9fe; }
+.penpot-contact-row.is-selected { background: #eff3ff; }
+.penpot-contact-row-identity,
+.penpot-contact-person-identity {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 17px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.penpot-contact-avatar {
+  display: grid;
+  flex: 0 0 57px;
+  place-items: center;
+  width: 57px;
+  height: 57px;
+  border-radius: 50%;
+  font-weight: 750;
+}
+.penpot-contact-avatar .presence-dot { right: 1px; bottom: 2px; }
+.penpot-contact-row-copy,
+.penpot-contact-person-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.penpot-contact-row-copy strong,
+.penpot-contact-person-copy strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: #1d2f4e;
+  font-size: 15px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.penpot-contact-row-copy small,
+.penpot-contact-person-copy small {
+  overflow: hidden;
+  color: #8b99ad;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.penpot-contact-favorite { color: #ef7e91; flex: 0 0 auto; }
+.penpot-contact-row-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 5px;
+  align-items: center;
+}
+.penpot-contact-row-actions button,
+.penpot-contact-icon-button {
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  width: 34px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #6881b1;
+}
+.penpot-contact-row-actions button:hover,
+.penpot-contact-icon-button:hover,
+.penpot-contact-row-actions button[aria-expanded="true"] {
+  background: #dfe9ff;
+  color: #2563eb;
+}
+.penpot-contact-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 74px;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+.penpot-contact-person:hover { background: #f7f9fe; }
+.penpot-contact-person-identity { gap: 13px; }
+.penpot-contact-person .penpot-contact-avatar { width: 46px; height: 46px; flex-basis: 46px; }
+.penpot-contact-person-copy { gap: 4px; }
+.penpot-contact-mini-action {
+  flex: 0 0 auto;
+  min-height: 35px;
+  padding: 0 12px;
+  border: 1px solid #dce7ff;
+  border-radius: 10px;
+  background: #eef3ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.penpot-contact-mini-action:hover { background: #e1ebff; }
+.penpot-contact-cover {
+  flex: 0 0 153px;
+  width: 100%;
+  min-height: 153px;
+  border-radius: 14px;
+  background: linear-gradient(140deg, rgba(48,92,143,.12), rgba(73,111,122,.08)),
+    url('/penpot-contacts-cover.jpg') center 54% / cover no-repeat,
+    linear-gradient(135deg, #aac1d2 0%, #b0cad7 45%, #e0d5bb 100%);
+}
+.penpot-contact-profile-avatar-wrap {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  height: 62px;
+  margin-top: -56px;
+}
+.penpot-contact-profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 110px;
+  height: 110px;
+  flex: 0 0 110px;
+  border: 5px solid #fff;
+  border-radius: 50%;
+  font-size: 35px;
+  box-shadow: 0 3px 12px rgba(39,60,98,.1);
+}
+.penpot-contact-profile-avatar .presence-dot { right: 7px; bottom: 8px; }
+.penpot-contact-profile-identity { margin-top: 63px; text-align: center; }
+.penpot-contact-profile-identity h2 {
+  margin: 0;
+  color: #192c4b;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -.45px;
+}
+.penpot-contact-profile-identity p {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 8px 0 0;
+  color: #8491a6;
+  font-size: 13px;
+}
+.penpot-contact-profile-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 29px 22px 28px;
+}
+.penpot-contact-profile-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  min-width: 0;
+  height: 45px;
+  border: 0;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 750;
+}
+.penpot-contact-message { color: #fff; background: #2563eb; }
+.penpot-contact-voice { color: #2563eb; background: #eff3ff; }
+.penpot-contact-voice:hover { background: #e3ebff; }
+.penpot-contact-profile-details {
+  margin: 0 12px;
+  padding: 22px 8px 15px;
+  border-top: 1px solid #e9edf5;
+}
+.penpot-contact-profile-details h3 {
+  margin: 0 0 20px;
+  color: #1b2d4a;
+  font-size: 17px;
+  font-weight: 800;
+}
+.penpot-contact-info-row,
+.penpot-contact-info-link {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 44px;
+  color: #7d8ca7;
+  font-size: 13px;
+}
+.penpot-contact-info-row svg,
+.penpot-contact-info-link svg { flex: 0 0 20px; color: #7b93c6; }
+.penpot-contact-info-row span,
+.penpot-contact-info-link span { overflow: hidden; text-overflow: ellipsis; }
+.penpot-contact-info-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.penpot-contact-info-link:hover { color: #2563eb; }
+.penpot-contact-info-link svg:last-child { margin-left: auto; }
+.penpot-contact-profile-more {
+  margin: auto 22px 0;
+  padding: 17px 18px;
+  border: 1px solid #f0f2f8;
+  border-radius: 12px;
+  background: #f8fafe;
+}
+.penpot-contact-profile-more > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #243655;
+  font-size: 13px;
+  font-weight: 750;
+  text-align: left;
+}
+.penpot-contact-profile-more > button svg { color: #798fb5; }
+.penpot-contact-profile-more > button svg:last-child { margin-left: auto; }
+.penpot-contact-profile-more > small {
+  display: block;
+  margin-top: 11px;
+  color: #8997ad;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.penpot-contacts-profile-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 26px;
+  color: #7e90af;
+  text-align: center;
+}
+.penpot-contacts-profile-empty h3 { margin: 18px 0 6px; color: #1f3150; font-size: 18px; }
+.penpot-contacts-profile-empty p { margin: 0 0 22px; line-height: 1.5; font-size: 13px; }
+.penpot-contacts-profile-empty > button { min-width: 180px; }
+.penpot-contact-popup {
+  position: fixed;
+  z-index: 1000;
+  width: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 7px;
+  border: 1px solid #e1e8f4;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgba(20,37,72,.17);
+}
+.penpot-contact-popup button {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #293958;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.penpot-contact-popup button:hover { background: #f0f4ff; color: #2563eb; }
+.penpot-contact-popup button.is-danger { color: #cc4657; }
+.penpot-contact-popup button.is-danger:hover { background: #fff1f3; }
+.penpot-contact-popup button:disabled { opacity: .45; cursor: not-allowed; }
+@media (max-width: 1150px) and (min-width: 761px) {
+  .modern-shell .penpot-contacts { padding: 16px; gap: 15px; }
+  .penpot-contacts-grid { grid-template-columns: minmax(0, 1.15fr) minmax(290px, 1fr); gap: 14px; }
+  .penpot-contacts-find { padding-inline: 18px; }
+  .penpot-contacts-add { min-width: 156px; }
+  .penpot-contacts-scroll { padding-inline: 9px; }
+  .penpot-contact-row { padding-inline: 9px; }
+  .penpot-contact-row-identity { gap: 10px; }
+  .penpot-contact-row-actions { gap: 0; }
+  .penpot-contact-profile-actions { margin-inline: 0; gap: 8px; }
+}
+@media (max-width: 930px) and (min-width: 761px) {
+  .modern-shell .penpot-contacts { overflow-y: auto; height: 100%; }
+  .penpot-contacts-grid { display: flex; flex-direction: column; overflow: visible; flex: 0 0 auto; }
+  .penpot-contacts-directory { max-height: 550px; min-height: 450px; }
+  .penpot-contacts-profile { min-height: 480px; max-height: none; overflow: visible; }
+}
+@media (max-width: 760px) {
+  .modern-shell .penpot-contacts {
+    height: auto;
+    min-height: 100%;
+    gap: 12px;
+    padding: 14px 12px calc(20px + env(safe-area-inset-bottom));
+    overflow: visible;
+  }
+  .penpot-contacts-find { flex-basis: auto; gap: 9px; min-height: 70px; padding: 12px; }
+  .penpot-contacts-find-input { gap: 8px; }
+  .penpot-contacts-find-input input { height: 43px; font-size: 13px; }
+  .penpot-contacts-add { min-width: auto; height: 42px; padding-inline: 12px; font-size: 0; gap: 0; }
+  .penpot-contacts-add svg { width: 21px; height: 21px; }
+  .penpot-contacts-grid { display: flex; flex-direction: column; flex: 0 0 auto; gap: 12px; }
+  .penpot-contacts-directory { min-height: 340px; max-height: 58dvh; }
+  .penpot-contacts-list-header { padding: 18px 16px 7px; }
+  .penpot-contacts-list-header h2 { font-size: 18px; }
+  .penpot-contacts-filters { padding-inline: 13px; gap: 6px; }
+  .penpot-contacts-filters button { min-width: 0; padding: 0 10px; font-size: 11px; }
+  .penpot-contacts-scroll { padding-inline: 8px; }
+  .penpot-contact-row { min-height: 74px; gap: 3px; padding: 7px 8px; }
+  .penpot-contact-avatar { width: 45px; height: 45px; flex-basis: 45px; }
+  .penpot-contact-row-identity { gap: 10px; }
+  .penpot-contact-row-copy { gap: 5px; }
+  .penpot-contact-row-copy strong { font-size: 13px; }
+  .penpot-contact-row-copy small { font-size: 11px; }
+  .penpot-contact-row-actions { gap: 0; }
+  .penpot-contact-row-actions button { flex-basis: 29px; width: 29px; }
+  .penpot-contacts-profile { min-height: 510px; overflow: visible; }
+  .penpot-contact-profile-actions { margin: 26px 5px 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .penpot-contact-row { transition: none; }
+}
