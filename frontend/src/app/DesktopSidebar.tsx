@@ -1,4 +1,4 @@
-import { Bell, Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings2, ShoppingBag, UsersRound } from 'lucide-react'
+import { Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings2, ShoppingBag, UsersRound } from 'lucide-react'
 import type { Tab } from './types'
 import UserAvatar from '../shared/ui/UserAvatar'
 
@@ -14,12 +14,11 @@ type Props = {
   onCalls: () => void
   onSaved: () => void
   onSettings: () => void
-  onNotifications: () => void
 }
 
 export default function DesktopSidebar({
   tab, section, username, displayName, unreadTotal, feedSaved,
-  onNavigate, onGroups, onCalls, onSaved, onSettings, onNotifications,
+  onNavigate, onGroups, onCalls, onSaved, onSettings,
 }: Props) {
   const mainItems = [
     { label: 'Bảng tin', Icon: Newspaper, active: tab === 'feed' && !feedSaved, action: () => onNavigate('feed') },
@@ -42,7 +41,6 @@ export default function DesktopSidebar({
           <button
             type="button"
             key={label}
-            title={label}
             aria-label={label}
             className={active ? 'penpot-sidebar-link is-active' : 'penpot-sidebar-link'}
             aria-current={active ? 'page' : undefined}
@@ -55,9 +53,6 @@ export default function DesktopSidebar({
         ))}
       </nav>
       <div className="penpot-sidebar-secondary">
-        <button type="button" className="penpot-sidebar-link" aria-label="Thông báo" onClick={onNotifications}>
-          <Bell size={22} strokeWidth={1.8} aria-hidden="true" /><span>Thông báo</span>
-        </button>
         <button type="button" className={tab === 'feed' && feedSaved ? 'penpot-sidebar-link is-active' : 'penpot-sidebar-link'} aria-label="Đã lưu" aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
           <Bookmark size={22} strokeWidth={1.8} aria-hidden="true" /><span>Đã lưu</span>
         </button>
@@ -65,7 +60,7 @@ export default function DesktopSidebar({
           <Settings2 size={22} strokeWidth={1.8} aria-hidden="true" /><span>Cài đặt</span>
         </button>
       </div>
-      <button type="button" className="penpot-sidebar-account" onClick={() => onNavigate('profile')} aria-label="Cá nhân" title="Hồ sơ cá nhân">
+      <button type="button" className="penpot-sidebar-account" onClick={() => onNavigate('profile')} aria-label="Cá nhân">
         <UserAvatar username={username} name={displayName} className="penpot-sidebar-avatar" online />
         <span className="penpot-sidebar-account-copy"><strong>{displayName}</strong><small>Đang hoạt động</small></span>
       </button>

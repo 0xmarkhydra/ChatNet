@@ -1,4 +1,4 @@
-/* Penpot SocCo Desktop • Social V4: 250px sidebar and 86px header. */
+/* Compact desktop navigation: a 76px fixed rail expands over (never shifts) page content. */
 .penpot-sidebar,
 .penpot-page-heading,
 .penpot-desktop-only-header {
@@ -13,7 +13,7 @@
     height: 100dvh;
     min-height: 0;
     margin: 0;
-    padding: 0 0 0 250px;
+    padding: 0 0 0 76px;
     overflow: hidden;
     background: #f7f9fd;
   }
@@ -25,11 +25,35 @@
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    width: 250px;
-    padding: 24px 13px 22px;
+    width: 76px;
+    padding: 20px 9px 15px;
+    overflow: visible;
+    pointer-events: none;
+    background: transparent;
+    color: #192a46;
+  }
+
+  /* The expanded visual surface is click-through outside the 76px icon rail. */
+  .penpot-sidebar::before,
+  .penpot-sidebar::after {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 76px;
+  }
+  .penpot-sidebar::before {
+    z-index: 0;
+    box-sizing: border-box;
     border-right: 1px solid #e8ecf5;
     background: #fff;
-    color: #192a46;
+    pointer-events: none;
+    transition: width .24s cubic-bezier(.2, .8, .2, 1), box-shadow .24s ease;
+  }
+  .penpot-sidebar::after { z-index: 0; pointer-events: auto; }
+  .penpot-sidebar > * { position: relative; z-index: 1; }
+  .penpot-sidebar:is(:hover, :focus-within)::before {
+    width: 250px;
+    box-shadow: 12px 0 30px rgba(26, 48, 89, .12);
   }
 
   .penpot-sidebar-brand {
@@ -38,8 +62,9 @@
     align-items: center;
     gap: 11px;
     min-height: 61px;
-    padding: 0 12px;
-    margin-bottom: 30px;
+    width: 232px;
+    padding: 0 4px;
+    margin-bottom: 20px;
   }
 
   .penpot-sidebar-logo {
@@ -56,6 +81,23 @@
   .penpot-sidebar-logo img { width: 38px; height: 38px; object-fit: contain; }
   .penpot-sidebar-brand-copy,
   .penpot-sidebar-account-copy { display: flex; flex-direction: column; min-width: 0; }
+
+  .penpot-sidebar-brand-copy,
+  .penpot-sidebar-account-copy,
+  .penpot-sidebar-link > span {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-16px);
+    transition: opacity .19s ease, transform .24s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .24s;
+  }
+  .penpot-sidebar:is(:hover, :focus-within) .penpot-sidebar-brand-copy,
+  .penpot-sidebar:is(:hover, :focus-within) .penpot-sidebar-account-copy,
+  .penpot-sidebar:is(:hover, :focus-within) .penpot-sidebar-link > span {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    transition-delay: .07s, .07s, 0s;
+  }
   .penpot-sidebar-brand-copy strong { color: #1b2d50; font-size: 24px; line-height: 1.1; font-weight: 800; letter-spacing: -.75px; }
   .penpot-sidebar-brand-copy small { margin-top: 5px; color: #8793aa; font-size: 10px; white-space: nowrap; }
 
@@ -64,8 +106,11 @@
     flex: 1 1 auto;
     flex-direction: column;
     gap: 7px;
+    width: 232px;
     min-height: 0;
+    pointer-events: none;
     overflow-y: auto;
+    overflow-x: hidden;
     scrollbar-width: thin;
   }
 
@@ -75,7 +120,9 @@
     display: flex;
     align-items: center;
     gap: 16px;
-    width: 100%;
+    box-sizing: border-box;
+    width: 58px;
+    pointer-events: auto;
     min-height: 51px;
     padding: 0 18px;
     border: none;
@@ -91,7 +138,15 @@
     transition: background-color .15s ease, color .15s ease;
   }
 
-  .penpot-sidebar-link > span { flex: 1 1 auto; min-width: 0; }
+  .penpot-sidebar-link > span {
+    position: absolute;
+    top: 0;
+    left: 58px;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    pointer-events: none;
+  }
   .penpot-sidebar-link svg { flex: 0 0 auto; }
   .penpot-sidebar-link:hover { background: #f4f7fd; color: #315cc2; }
   .penpot-sidebar-link.is-active { background: #eff3ff; color: #2563eb; font-weight: 750; }
@@ -99,6 +154,9 @@
   .penpot-sidebar-account:focus-visible { outline: 3px solid rgba(37, 99, 235, .4); outline-offset: 2px; }
 
   .penpot-sidebar-count {
+    position: absolute;
+    top: 3px;
+    left: 32px;
     min-width: 19px;
     height: 19px;
     display: grid;
@@ -117,11 +175,14 @@
     flex: 0 0 auto;
     flex-direction: column;
     gap: 2px;
-    margin: 11px 15px 18px;
-    padding-top: 21px;
+    width: 58px;
+    pointer-events: none;
+    margin: 11px 0 12px;
+    padding-top: 12px;
     border-top: 1px solid #e8ecf5;
   }
-  .penpot-sidebar-secondary .penpot-sidebar-link { min-height: 44px; padding-inline: 5px; font-size: 13px; }
+  .penpot-sidebar-secondary .penpot-sidebar-link { min-height: 44px; padding-inline: 18px; font-size: 13px; }
+  .penpot-sidebar:is(:hover, :focus-within) .penpot-sidebar-secondary { width: 232px; }
 
   .penpot-sidebar-account {
     box-sizing: border-box;
@@ -131,10 +192,11 @@
     gap: 11px;
     min-width: 0;
     min-height: 66px;
-    width: 100%;
+    width: 58px;
+    pointer-events: auto;
     border: none;
     border-radius: 13px;
-    padding: 8px 10px;
+    padding: 8px 6px;
     background: #f8fafe;
     color: #223350;
     text-align: left;
@@ -144,6 +206,7 @@
   .penpot-sidebar-avatar { position: relative; flex: 0 0 43px; width: 43px; height: 43px; border-radius: 50%; overflow: visible; }
   .penpot-sidebar-avatar .avatar-photo { border-radius: inherit; }
   .penpot-sidebar-avatar .presence-dot { position: absolute; right: 0; bottom: 0; }
+  .penpot-sidebar-account-copy { position: absolute; left: 60px; top: 18px; width: 155px; pointer-events: none; }
   .penpot-sidebar-account-copy strong { max-width: 135px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 750; }
   .penpot-sidebar-account-copy small { margin-top: 4px; color: #3eaf7e; font-size: 11px; }
 
@@ -215,15 +278,6 @@
 }
 
 @media (min-width: 761px) and (max-width: 1100px) {
-  .modern-shell.penpot-layout { padding-left: 76px; }
-  .penpot-sidebar { width: 76px; padding: 20px 9px 15px; }
-  .penpot-sidebar-brand { justify-content: center; padding: 0; margin-bottom: 20px; }
-  .penpot-sidebar-brand-copy, .penpot-sidebar-link > span, .penpot-sidebar-account-copy { display: none; }
-  .penpot-sidebar-link { justify-content: center; min-height: 50px; padding: 0; }
-  .penpot-sidebar-count { position: absolute; top: 1px; right: 2px; font-size: 9px; }
-  .penpot-sidebar-secondary { margin: 6px 0 12px; padding-top: 12px; }
-  .penpot-sidebar-secondary .penpot-sidebar-link { padding: 0; }
-  .penpot-sidebar-account { justify-content: center; padding: 7px 3px; }
   .modern-shell.penpot-layout .modern-messenger { grid-template-columns: minmax(205px, 250px) minmax(0, 1fr); gap: 8px; padding: 8px; }
   .modern-shell.penpot-layout > .chatnet-appbar { padding-inline: 21px; }
   .penpot-page-heading strong { font-size: 21px; }
@@ -408,7 +462,11 @@
   .penpot-notifications-header h2 { font-size: 23px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .penpot-sidebar-link { transition: none; }
+  .penpot-sidebar::before,
+  .penpot-sidebar-link,
+  .penpot-sidebar-link > span,
+  .penpot-sidebar-brand-copy,
+  .penpot-sidebar-account-copy { transition: none; }
 }
 
 /* Social V4 chat: third pane is a responsive enhancement; original chat survives at narrow widths. */

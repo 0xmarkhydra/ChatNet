@@ -149,13 +149,13 @@ try {
   })
   const approx = (actual, expected, tolerance=8) => Math.abs(actual - expected) <= tolerance
   for (const [selector, x, y] of [
-    ['.penpot-feed-stories-card', 283, 107],
-    ['.penpot-feed-launcher', 283, 286],
-    ['.penpot-feed-filter-bar', 283, 410],
-    ['.penpot-feed-center .post.zalo-post', 283, 474],
-    ['.penpot-feed-suggestions', 1132, 107],
-    ['.penpot-feed-trending', 1132, 425],
-    ['.penpot-feed-translation', 1132, 702],
+    ['.penpot-feed-stories-card', 109, 107],
+    ['.penpot-feed-launcher', 109, 286],
+    ['.penpot-feed-filter-bar', 109, 410],
+    ['.penpot-feed-center .post.zalo-post', 109, 474],
+    ['.penpot-feed-suggestions', 1073, 107],
+    ['.penpot-feed-trending', 1073, 425],
+    ['.penpot-feed-translation', 1073, 702],
   ]) {
     const rect = socialGeometry[selector]
     assert(rect && approx(rect.x, x) && approx(rect.y, y),
@@ -265,7 +265,7 @@ try {
       return [key, rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null]
     }))
   })
-  assert(Math.abs(geometry['.penpot-profile-hero'].x - 281) < 5 &&
+  assert(Math.abs(geometry['.penpot-profile-hero'].x - 107) < 5 &&
     Math.abs(geometry['.penpot-profile-hero'].y - 108) < 5,
     'Profile hero must match Penpot desktop placement: ' + JSON.stringify(geometry))
   assert(Math.abs(geometry['.penpot-profile-main'].y - 424) < 8 &&
@@ -294,9 +294,9 @@ try {
       return [key, rect ? {x:rect.x,y:rect.y,width:rect.width,height:rect.height} : null]
     }))
   })
-  assert(Math.abs(editGeometry['.penpot-edit-form-card'].x - 282) < 5 &&
+  assert(Math.abs(editGeometry['.penpot-edit-form-card'].x - 108) < 5 &&
     Math.abs(editGeometry['.penpot-edit-form-card'].y - 111) < 5 &&
-    Math.abs(editGeometry['.penpot-edit-preview-card'].x - 1160) < 8 &&
+    Math.abs(editGeometry['.penpot-edit-preview-card'].x - 1105) < 8 &&
     Math.abs(editGeometry['.penpot-edit-privacy-card'].y - 563) < 6,
     'S03 card positions should match Penpot frame: ' + JSON.stringify(editGeometry))
   mkdirSync('output/playwright/layout', { recursive: true })

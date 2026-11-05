@@ -357,9 +357,34 @@ try {
     const desktopSidebar = page.locator('.penpot-sidebar')
     if (width > 760) {
       check(await desktopSidebar.isVisible(), 'Desktop sidebar must be visible at ' + width)
+      await page.mouse.move(width - 5, 5)
+      await page.waitForTimeout(280)
       const sidebarBounds = await desktopSidebar.boundingBox()
-      check(sidebarBounds && Math.abs(sidebarBounds.width - (width <= 1100 ? 76 : 250)) <= 1,
-        'Desktop sidebar width does not match design at ' + width + ': ' + JSON.stringify(sidebarBounds))
+      check(sidebarBounds && Math.abs(sidebarBounds.width - 76) <= 1,
+        'Desktop sidebar must be a 76px icon rail at ' + width + ': ' + JSON.stringify(sidebarBounds))
+      check(await desktopSidebar.getByRole('button', { name: 'Thông báo' }).count() === 0,
+        'Notifications must not be present in the desktop sidebar')
+      const contentBefore = await page.locator('.modern-frame').boundingBox()
+      await desktopSidebar.hover()
+      await page.waitForTimeout(300)
+      const expandedWidth = await desktopSidebar.evaluate(node => parseFloat(getComputedStyle(node, '::before').width))
+      const contentAfter = await page.locator('.modern-frame').boundingBox()
+      check(Math.abs(expandedWidth - 250) <= 1,
+        'Desktop sidebar visual overlay must expand to 250px at ' + width + ': ' + expandedWidth)
+      check(contentBefore && contentAfter && Math.abs(contentAfter.x - contentBefore.x) <= 1 &&
+        Math.abs(contentAfter.width - contentBefore.width) <= 1,
+        'Sidebar hover must not move or resize main content at ' + width)
+      const navLabel = desktopSidebar.getByRole('button', { name: 'Tin nhắn' }).locator('span').first()
+      check(await navLabel.evaluate(node => getComputedStyle(node).opacity === '1'),
+        'Desktop sidebar labels must be revealed on hover at ' + width)
+      // The flyout is visual only: moving into the content area must close it,
+      // not trap clicks within the 250px expanded background.
+      await page.mouse.move(180, 180)
+      await page.waitForTimeout(280)
+      const collapsedOverlayWidth = await desktopSidebar.evaluate(node => parseFloat(getComputedStyle(node, '::before').width))
+      check(Math.abs(collapsedOverlayWidth - 76) <= 1,
+        'Expanded sidebar must not capture the first 174px of main content at ' + width)
+      await page.mouse.move(width - 5, 5)
     } else {
       check(!(await desktopSidebar.isVisible()), 'Desktop sidebar must be hidden on mobile at ' + width)
     }

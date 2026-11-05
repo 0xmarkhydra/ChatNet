@@ -3355,7 +3355,6 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         onCalls={() => { switchTab('chat'); setDesktopSection('calls') }}
         onSaved={() => { switchTab('feed'); setFeedFilter('saved'); void loadSavedPosts() }}
         onSettings={() => { switchTab('profile'); setDesktopProfileSettings(true); setProfileTimelineOpen(false) }}
-        onNotifications={() => setNotificationsOpen(true)}
       />
       {notificationsOpen && (
         <NotificationsPanel
