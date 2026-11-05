@@ -115,6 +115,8 @@ try {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
     if (path === '/api/events') return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: ': connected\n\n' })
     if (path === '/api/conversation-categories') return json([])
+    if (/\/api\/conversations\/\d+\/group-settings$/.test(path)) return json({ requireApproval: false, adminCanInvite: true, adminCanApprove: true, adminCanEditInfo: true })
+    if (/\/api\/conversations\/\d+\/(invites|join-requests|admin-audit)$/.test(path)) return json([])
     if (path === '/api/conversations') return json(pagedConversations.slice(offset, offset + limit))
     if (path === '/api/chat/search') return json({
       contacts: [{ id: 2, username: 'minhanh', name: 'Minh Anh' }],
@@ -257,6 +259,7 @@ try {
   await missingMiddle.waitFor({ timeout: 7000 })
   await missingMiddle.click()
   await missingMiddle.waitFor({ state: 'hidden', timeout: 7000 })
+  await page.waitForFunction(() => document.querySelectorAll('.message-press-target').length === 265, undefined, { timeout: 10000 })
   check(await page.locator('.message-press-target').count() === 265,
     'Long conversation search must allow loading the missing middle pages')
   await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
@@ -351,10 +354,19 @@ try {
   }
   for (const width of widths) {
     await page.setViewportSize({ width, height: width <= 375 ? 667 : width <= 430 ? 844 : 900 })
+    const desktopSidebar = page.locator('.penpot-sidebar')
+    if (width > 760) {
+      check(await desktopSidebar.isVisible(), 'Desktop sidebar must be visible at ' + width)
+      const sidebarBounds = await desktopSidebar.boundingBox()
+      check(sidebarBounds && Math.abs(sidebarBounds.width - (width <= 1100 ? 76 : 250)) <= 1,
+        'Desktop sidebar width does not match design at ' + width + ': ' + JSON.stringify(sidebarBounds))
+    } else {
+      check(!(await desktopSidebar.isVisible()), 'Desktop sidebar must be hidden on mobile at ' + width)
+    }
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
     await geometry('chat-list', width, ['.modern-frame', '.conversation-sidebar', '.conversation-list'])
     check(await page.locator('.soco-chat-list-heading').count() === 0, 'Removed Chat banner reappeared: ' + width)
-    await page.getByRole('button', { name: 'Danh bạ', exact: true }).click()
+    await page.getByRole('button', { name: /^(Danh bạ|Bạn bè)$/ }).click()
     await geometry('contacts', width, ['.modern-frame', '.contacts-view', '.contact-shortcuts'])
     check(await page.locator('.contacts-view > .soco-section-heading').count() === 0, 'Removed Contacts banner reappeared: ' + width)
     // Regression: the friend menu must escape the rounded card and its Block action must be clickable.
@@ -398,7 +410,9 @@ try {
       await contactSearch.fill('')
     }
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
-    await geometry('feed', width, ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
+    await geometry('feed', width, width > 760
+      ? ['.modern-frame', '.feed-view', '.penpot-feed-grid', '.penpot-feed-launcher', '.penpot-feed-filter-bar']
+      : ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
     if (width === 390) {
       const scroller = page.locator('.feed-view.zalo-feed-view')
       await scroller.evaluate(element => { element.scrollTop = element.scrollHeight })
@@ -471,33 +485,48 @@ try {
       check(await page.getByRole('dialog').count() === 0, 'Escape should dismiss menu: ' + width)
     }
     await page.getByRole('button', { name: /Cá nhân/ }).click()
-    await geometry('profile', width, ['.modern-frame', '.profile-view', '.profile-hero'])
-    check(await page.locator('.profile-view > .soco-section-heading').count() === 0, 'Removed Profile banner reappeared: ' + width)
-    const cover = await page.locator('.profile-cover-art').boundingBox()
-    const name = await page.locator('.profile-identity-copy > strong').boundingBox()
-    if (width <= 430) {
-      const hero = await page.locator('.profile-view > .profile-hero').boundingBox()
-      const edit = await page.locator('.profile-view > .profile-edit-card').boundingBox()
-      const settings = await page.locator('.profile-view > .settings-card').boundingBox()
-      const avatar = await page.locator('.profile-avatar-editor').boundingBox()
-      check(hero && edit && settings && avatar &&
-        hero.height <= 250 && edit.height <= 350 &&
-        edit.y >= hero.y + hero.height - 1 &&
-        settings.y >= edit.y + edit.height - 1 &&
-        name && name.x >= avatar.x + avatar.width - 2,
-        'Profile cards must be compact, ordered and not overlap on iPhone: ' +
-        JSON.stringify({ width, hero, edit, settings, avatar, name }))
+    if (width > 760) {
+      await geometry('profile', width, ['.modern-frame', '.penpot-profile-page', '.penpot-profile-hero'])
+      const hero = await page.locator('.penpot-profile-hero').boundingBox()
+      const main = await page.locator('.penpot-profile-main').boundingBox()
+      const aside = await page.locator('.penpot-profile-aside').boundingBox()
+      check(hero && main && aside, 'Desktop Penpot profile blocks missing: ' + width)
+      if (width >= 1201) {
+        check(aside.x > main.x + main.width - 3 && Math.abs(aside.y - main.y) < 10,
+          'Desktop profile columns not aligned: ' + JSON.stringify({ width, hero, main, aside }))
+      } else {
+        check(aside.y >= main.y + main.height - 2,
+          'Compact profile side rail must stack below content: ' + JSON.stringify({ width, hero, main, aside }))
+      }
+    } else {
+      await geometry('profile', width, ['.modern-frame', '.profile-view', '.profile-hero'])
+      check(await page.locator('.profile-view > .soco-section-heading').count() === 0, 'Removed Profile banner reappeared: ' + width)
+      const cover = await page.locator('.profile-cover-art').boundingBox()
+      const name = await page.locator('.profile-identity-copy > strong').boundingBox()
+      if (width <= 430) {
+        const hero = await page.locator('.profile-view > .profile-hero').boundingBox()
+        const edit = await page.locator('.profile-view > .profile-edit-card').boundingBox()
+        const settings = await page.locator('.profile-view > .settings-card').boundingBox()
+        const avatar = await page.locator('.profile-avatar-editor').boundingBox()
+        check(hero && edit && settings && avatar &&
+          hero.height <= 250 && edit.height <= 350 &&
+          edit.y >= hero.y + hero.height - 1 &&
+          settings.y >= edit.y + edit.height - 1 &&
+          name && name.x >= avatar.x + avatar.width - 2,
+          'Profile cards must be compact, ordered and not overlap on iPhone: ' +
+          JSON.stringify({ width, hero, edit, settings, avatar, name }))
+      }
+      check(cover && name && name.y >= cover.y + cover.height - 3, 'Profile ' + width + 'px identity overlaps cover: ' + JSON.stringify({ cover, name }))
+      if (width >= 900) {
+        const hero = await page.locator('.profile-view > .profile-hero').boundingBox()
+        const edit = await page.locator('.profile-view > .profile-edit-card').boundingBox()
+        const settings = await page.locator('.profile-view > .settings-card').boundingBox()
+        check(hero && edit && settings, 'Profile blocks absent at ' + width)
+        check(edit.y >= hero.y + hero.height - 1, 'Profile edit overlaps hero at ' + width)
+        check(settings.y >= edit.y + edit.height - 1, 'Profile settings overlap edit at ' + width)
+      }
     }
-    check(cover && name && name.y >= cover.y + cover.height - 3, 'Profile ' + width + 'px identity overlaps cover: ' + JSON.stringify({ cover, name }))
-    if (width >= 900) {
-      const hero = await page.locator('.profile-view > .profile-hero').boundingBox()
-      const edit = await page.locator('.profile-view > .profile-edit-card').boundingBox()
-      const settings = await page.locator('.profile-view > .settings-card').boundingBox()
-      check(hero && edit && settings, 'Profile blocks absent at ' + width)
-      check(edit.y >= hero.y + hero.height - 1, 'Profile edit overlaps hero at ' + width)
-      check(settings.y >= edit.y + edit.height - 1, 'Profile settings overlap edit at ' + width)
-    }
-    await page.getByRole('button', { name: 'Quanh đây', exact: true }).click()
+    await page.getByRole('button', { name: /^(Quanh đây|Khám phá)$/ }).click()
     await geometry('discover', width, ['.modern-frame'])
     await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
     await page.locator('.conversation-item').first().click()
@@ -723,7 +752,7 @@ try {
     await group.getByText('Bạn là chủ nhóm').waitFor()
     const geometry = await group.evaluate(node => {
       const panel = node.getBoundingClientRect()
-      const frame = node.closest('.conversation-panel').getBoundingClientRect()
+      const frame = (node.closest('.conversation-panel') || node.closest('.messenger-layout')?.querySelector('.conversation-panel')).getBoundingClientRect()
       const header = node.querySelector('.group-settings-heading').getBoundingClientRect()
       return {
         panelHeight: panel.height, frameHeight: frame.height,
@@ -735,10 +764,11 @@ try {
     check(Math.abs(geometry.panelHeight - geometry.frameHeight) < 3 && Math.abs(geometry.panelTop - geometry.frameTop) < 3,
       'Group management must fill the entire chat region: ' + JSON.stringify({ width, geometry }))
     check(geometry.scrollHeight > geometry.clientHeight, 'Long member lists must scroll independently: ' + width)
-    check(await page.locator('.conversation-panel > .messages').isVisible() === false,
-      'Chat messages must not render behind group management: ' + width)
-    check(await page.locator('.conversation-panel > .media-composer').isVisible() === false,
-      'Composer must not render behind group management: ' + width)
+    const scrimVisible = await page.locator('.group-sidebar-scrim').isVisible()
+    check(await page.locator('.conversation-panel > .messages').isVisible() === false || scrimVisible,
+      'Chat messages must be hidden or covered by the group-management scrim: ' + width)
+    check(await page.locator('.conversation-panel > .media-composer').isVisible() === false || scrimVisible,
+      'Composer must be hidden or covered by the group-management scrim: ' + width)
     await group.evaluate(node => { node.scrollTop = node.scrollHeight })
     await page.waitForTimeout(80)
     const sticky = await group.evaluate(node => {
@@ -749,7 +779,7 @@ try {
     check(Math.abs(sticky.top - sticky.panelTop) < 3, 'Group header must remain sticky while scrolling: ' + width)
     await group.evaluate(node => { node.scrollTop = 0 })
     if (width === 390) await page.screenshot({ path: 'output/playwright/layout/group-settings-390.png' })
-    await group.getByRole('button', { name: 'Quay lại cuộc trò chuyện' }).click()
+    await group.getByRole('button', { name: 'Đóng thanh quản lý nhóm' }).click()
     check(await page.locator('.group-settings-panel').count() === 0 && await page.locator('.messages').isVisible(),
       'Closing group management must restore messages: ' + width)
     check(await page.locator('.media-composer').isVisible(), 'Closing group management must restore the composer: ' + width)
@@ -795,7 +825,8 @@ try {
   // Logout must be one full-width settings row, not a detached right-aligned button.
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 320 ? 667 : width === 390 ? 844 : 900 })
-    await page.getByRole('button', { name: /Cá nhân/ }).click()
+    if (width > 760) await page.locator('.penpot-sidebar').getByRole('button', { name: 'Cài đặt' }).click()
+    else await page.getByRole('button', { name: /Cá nhân/ }).click()
     const signout = page.locator('.settings-card .settings-logout-row')
     await signout.waitFor()
     check(await page.locator('.profile-actions').count() === 0,

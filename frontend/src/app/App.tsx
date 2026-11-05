@@ -14,6 +14,7 @@ import ChatQuickSearch from '../features/chat/ChatQuickSearch'
 import { useContactData } from '../features/contacts/useContactData'
 import { useFeedData } from '../features/feed/useFeedData'
 import { usePostSearch } from '../features/feed/usePostSearch'
+import { useFollowingPosts } from '../features/feed/useFollowingPosts'
 import { useFeedInfiniteScroll } from '../features/feed/useFeedInfiniteScroll'
 
 import { useGroupManagement } from '../features/chat/useGroupManagement'
@@ -41,6 +42,15 @@ import MessageActions from '../features/chat/MessageActions'
 import MessageSearchPanel from '../features/chat/MessageSearchPanel'
 import ProfileIdentityForm from '../features/profile/ProfileIdentityForm'
 import BottomNavigation from './BottomNavigation'
+import DesktopSidebar from './DesktopSidebar'
+import NotificationsPanel from './NotificationsPanel'
+import ConversationDetailsPanel from './ConversationDetailsPanel'
+import DesktopProfilePage from './DesktopProfilePage'
+import DesktopProfileEditor from './DesktopProfileEditor'
+import DesktopSocialFeedComposer from './DesktopSocialFeedComposer'
+import DesktopSocialFeedSidebar from './DesktopSocialFeedSidebar'
+import DesktopSocialFeedStories from './DesktopSocialFeedStories'
+import DesktopCommunicationHub from './DesktopCommunicationHub'
 import GroupSettingsPanel from '../features/chat/GroupSettingsPanel'
 import GroupRenameDialog from '../features/chat/GroupRenameDialog'
 import GroupInviteJoinDialog from '../features/chat/GroupInviteJoinDialog'
@@ -225,7 +235,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const [friendMenuId, setFriendMenuId] = useState<number | null>(null)
   const [visitorUsername,setVisitorUsername]=useState<string|null>(null)
   function openVisitor(username:string) {
-    if(username===sessionRef.current?.user.username){setTab('profile');setProfileTimelineOpen(true);return}
+    if(username===sessionRef.current?.user.username){setTab('profile');setDesktopProfileSettings(false);setProfileTimelineOpen(true);return}
     setVisitorUsername(username)
   }
   function setFriendPreview(friend:FriendSearchResult|null){if(friend)openVisitor(friend.username);else setVisitorUsername(null)}
@@ -235,6 +245,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const [blockedError, setBlockedError] = useState('')
   const [directUsername, setDirectUsername] = useState('')
   const [qrOpen, setQrOpen] = useState<'mine' | 'scan' | null>(null)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [desktopSection, setDesktopSection] = useState<'groups' | 'calls' | null>(null)
   const [chatCreateError, setChatCreateError] = useState('')
   const [nearbyUsers, setNearbyUsers] = useState<FriendSearchResult[]>([])
   const [nearbyBusy, setNearbyBusy] = useState(false)
@@ -245,15 +257,24 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const nearbyRequest = useRef(0)
 
   const [profileTimelineOpen, setProfileTimelineOpen] = useState(false)
+  const [desktopProfileSettings, setDesktopProfileSettings] = useState(false)
+  const [isProfileDesktop, setIsProfileDesktop] = useState(() => window.matchMedia('(min-width: 761px)').matches)
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 761px)')
+    const onResize = (event: MediaQueryListEvent) => setIsProfileDesktop(event.matches)
+    query.addEventListener('change', onResize)
+    return () => query.removeEventListener('change', onResize)
+  }, [])
+  const desktopProfileOverview = isProfileDesktop && !desktopProfileSettings
   const [profileComposerOpen, setProfileComposerOpen] = useState(false)
   const [profileEditorOpen, setProfileEditorOpen] = useState(false)
   const [postSubmitError, setPostSubmitError] = useState('')
   useEffect(() => {
-    if (tab !== 'profile' || !profileTimelineOpen) {
+    if (tab !== 'profile' || (!profileTimelineOpen && !desktopProfileOverview)) {
       setProfileComposerOpen(false)
       setProfileEditorOpen(false)
     }
-  }, [tab, profileTimelineOpen])
+  }, [tab, profileTimelineOpen, desktopProfileOverview])
   const [profilePosts, setProfilePosts] = useState<Post[]>([])
   const [profilePostsBusy, setProfilePostsBusy] = useState(false)
   const [profilePostsError, setProfilePostsError] = useState('')
@@ -263,13 +284,23 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const profileIdentityRef = useRef<HTMLButtonElement>(null)
   const profileHeadingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
-    if (!profileTimelineOpen || tab !== 'profile' || !session?.sessionId) return
+    if ((!profileTimelineOpen && !desktopProfileOverview) || tab !== 'profile' || !session?.sessionId) return
     void loadProfilePosts()
     profileHeadingRef.current?.focus()
     return () => { ++profileLoadSequence.current; profilePagingBusy.current = false }
-  }, [profileTimelineOpen, tab, session?.sessionId, session?.user.username])
+  }, [profileTimelineOpen, desktopProfileOverview, tab, session?.sessionId, session?.user.username])
 
-  const [feedFilter, setFeedFilter] = useState<'all' | 'saved'>('all')
+  const [feedFilter, setFeedFilter] = useState<'all' | 'following' | 'latest' | 'saved'>('all')
+  const [feedComposerOpen, setFeedComposerOpen] = useState(false)
+  const [feedCheckInOpen, setFeedCheckInOpen] = useState(false)
+  const [feedCheckInLocation, setFeedCheckInLocation] = useState('')
+  useEffect(() => {
+    if (tab !== 'feed') {
+      setFeedComposerOpen(false)
+      setFeedCheckInOpen(false)
+      setFeedCheckInLocation('')
+    }
+  }, [tab])
   const feedViewRef = useRef<HTMLDivElement>(null)
   const [searchHasScrolled, setSearchHasScrolled] = useState(false)
   useLayoutEffect(() => {
@@ -313,6 +344,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const [profileBusy, setProfileBusy] = useState<'avatar' | 'cover' | null>(null)
   const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState('')
   const [profileUsernameDraft, setProfileUsernameDraft] = useState('')
+  const [profileBioDraft, setProfileBioDraft] = useState('')
+  const [profileCityDraft, setProfileCityDraft] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
   const [privacy, setPrivacy] = useState<UserPrivacy | null>(null)
   const [privacyBusy, setPrivacyBusy] = useState(false)
@@ -535,6 +568,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setActivePostId,
   })
 
+  const followingFeed = useFollowingPosts({
+    sessionId: session?.sessionId,
+    enabled: tab === 'feed' && feedFilter === 'following',
+    request: apiFetch,
+  })
   const feedSearchActive = tab === 'feed' && globalSearch.trim().length > 0
   const postSearch = usePostSearch({
     query: globalSearch,
@@ -543,16 +581,17 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     sessionId: session?.sessionId,
     request: apiFetch,
   })
-  const feedLoadingMore = feedSearchActive ? postSearch.loadingMore : feedFilter === 'saved' ? savedPostsBusy : postsLoadingMore
-  const feedPagingError = feedSearchActive ? Boolean(postSearch.error) : feedFilter === 'saved' ? savedPagingError : postsPagingError
+  const feedLoadingMore = feedSearchActive ? postSearch.loadingMore : feedFilter === 'saved' ? savedPostsBusy : feedFilter === 'following' ? followingFeed.loadingMore : postsLoadingMore
+  const feedPagingError = feedSearchActive ? Boolean(postSearch.error) : feedFilter === 'saved' ? savedPagingError : feedFilter === 'following' ? Boolean(followingFeed.error) : postsPagingError
   const feedInfiniteScrollRef = useFeedInfiniteScroll({
     enabled: tab === 'feed' && (!feedSearchActive || searchHasScrolled),
-    hasMore: feedSearchActive ? postSearch.hasMore : feedFilter === 'saved' ? hasMoreSavedPosts : hasMorePosts,
-    loading: (feedSearchActive && postSearch.loading) || feedLoadingMore,
+    hasMore: feedSearchActive ? postSearch.hasMore : feedFilter === 'saved' ? hasMoreSavedPosts : feedFilter === 'following' ? followingFeed.hasMore : hasMorePosts,
+    loading: (feedSearchActive && postSearch.loading) || (feedFilter === 'following' && followingFeed.loading) || feedLoadingMore,
     error: feedPagingError,
     onLoadMore: () => {
       if (feedSearchActive) void postSearch.loadMore()
       else if (feedFilter === 'saved') void loadSavedPosts(true)
+      else if (feedFilter === 'following') void followingFeed.loadMore()
       else void loadMorePosts()
     },
   })
@@ -955,6 +994,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setProfileMedia(profile)
     setProfileDisplayNameDraft(profile.displayName)
     setProfileUsernameDraft(profile.username)
+    setProfileBioDraft(profile.bio ?? '')
+    setProfileCityDraft(profile.city ?? '')
   }
 
   async function saveProfileIdentity(event: FormEvent) {
@@ -963,6 +1004,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
     const displayName = profileDisplayNameDraft.trim()
     const username = profileUsernameDraft.trim().toLowerCase()
+    const bio = profileBioDraft.trim()
+    const city = profileCityDraft.trim()
     if (!displayName || !username) {
       setNotice('Tên hiển thị và username không được để trống.', 'error')
       return
@@ -973,7 +1016,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       const response = await apiFetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName, username }),
+        body: JSON.stringify({ displayName, username, bio, city }),
       })
       const result = await response.json().catch(() => null) as (ProfileUpdateResponse & { error?: string }) | null
       if (sessionRef.current?.sessionId !== session.sessionId) return
@@ -987,12 +1030,16 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       setProfileMedia({
         username: result.username,
         displayName: result.displayName,
+        bio: result.bio ?? '',
+        city: result.city ?? '',
         avatarSet: result.avatarSet,
         coverSet: result.coverSet,
         updatedAt: result.updatedAt,
       })
       setProfileDisplayNameDraft(result.displayName)
       setProfileUsernameDraft(result.username)
+      setProfileBioDraft(result.bio ?? '')
+      setProfileCityDraft(result.city ?? '')
 
       const nextSession: Session = {
         ...sessionRef.current,
@@ -1004,7 +1051,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         },
       }
       saveSession(nextSession)
-      setNotice('Đã cập nhật tên và username.', 'success')
+      setNotice('Đã lưu thông tin hồ sơ.', 'success')
+      if (isProfileDesktop) setProfileEditorOpen(false)
     } catch (error) {
       if (sessionRef.current?.sessionId === session.sessionId) setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông tin cá nhân.', 'error')
     } finally {
@@ -2247,6 +2295,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     ++feedRevision.current
     setProfilePosts(current => current.map(p => p.id === updated.id ? updated : p))
     syncFeedDataPost(updated)
+    followingFeed.syncPost(updated)
     postSearch.syncPost(updated)
   }
 
@@ -2254,6 +2303,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     ++feedRevision.current
     setProfilePosts(current => current.filter(p => p.id !== id))
     removeFeedDataPost(id)
+    followingFeed.removePost(id)
     postSearch.removePost(id)
   }
 
@@ -2402,6 +2452,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     profilePagingBusy.current = false
     setProfileTimelineOpen(false)
     setProfileComposerOpen(false)
+    setFeedComposerOpen(false)
     setProfileEditorOpen(false)
     setPostSubmitError('')
     setProfilePosts([])
@@ -2948,10 +2999,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
   async function createPost(event: FormEvent) {
     event.preventDefault()
-    if (!session || actionLocks.current.has('feed:create') || mediaUploading || (!postText.trim() && postAttachments.length === 0)) return
+    if (!session || actionLocks.current.has('feed:create') || mediaUploading || (!postText.trim() && postAttachments.length === 0 && !(feedCheckInOpen && feedCheckInLocation.trim()))) return
 
     setPostSubmitError('')
-    const content = postText.trim()
+    const locationText = feedCheckInOpen ? feedCheckInLocation.trim() : ''
+    const content = [locationText ? `📍 ${locationText}` : '', postText.trim()].filter(Boolean).join('\n')
     const attachments = postAttachments
     const visibility = postVisibility
     const background = postBackground
@@ -2974,6 +3026,9 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       setPostBackground('')
       setShowPostBackgrounds(false)
       setProfileComposerOpen(false)
+      setFeedComposerOpen(false)
+      setFeedCheckInOpen(false)
+      setFeedCheckInLocation('')
       setNotice('Đã đăng bài viết.', 'success')
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) {
@@ -3007,6 +3062,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       setPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
       setSavedPosts((current) => current.map((item) => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
       setProfilePosts(current => current.map(item => item.id === updated.id ? { ...item, liked: updated.liked, likes: updated.likes } : item))
+      followingFeed.syncPost({ ...post, liked: updated.liked, likes: updated.likes })
       postSearch.syncPost({ ...post, liked: updated.liked, likes: updated.likes })
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) void refreshPosts()
@@ -3087,7 +3143,13 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     ...post,
     liked: likePreviews[post.id],
     likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
-  }) : feedFilter === 'saved' ? savedPosts : visiblePosts
+  }) : feedFilter === 'saved' ? savedPosts
+    : feedFilter === 'following' ? followingFeed.posts.map(post => likePreviews[post.id] === undefined ? post : {
+      ...post, liked: likePreviews[post.id],
+      likes: Math.max(0, post.likes + (likePreviews[post.id] === post.liked ? 0 : likePreviews[post.id] ? 1 : -1)),
+    })
+    : feedFilter === 'latest' ? [...visiblePosts].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id - a.id)
+    : visiblePosts
   const openChatQuickContact = (contact: ChatQuickContact) => {
     setQuickSearchOpen(false)
     setGlobalSearch('')
@@ -3113,12 +3175,26 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     setTranslationOriginals({})
   }
   const switchTab = (nextTab: Tab) => {
+    setDesktopSection(null)
+    if (nextTab === 'profile') {
+      setDesktopProfileSettings(false)
+      setProfileEditorOpen(false)
+    }
+    if (nextTab === 'feed') setFeedFilter('all')
     setQuickSearchOpen(false)
     setTab(nextTab)
     setQuickCreateOpen(false)
     setGlobalSearch('')
     if (nextTab !== 'chat') setActiveConversationId(null)
     if (nextTab !== 'contacts') setFriendQuery('')
+  }
+
+  const discardDesktopProfileEdits = () => {
+    setProfileDisplayNameDraft(profileMedia?.displayName ?? session.user.displayName ?? name)
+    setProfileUsernameDraft(profileMedia?.username ?? name)
+    setProfileBioDraft(profileMedia?.bio ?? '')
+    setProfileCityDraft(profileMedia?.city ?? '')
+    setProfileEditorOpen(false)
   }
 
   const profileIdentityForm = (
@@ -3164,12 +3240,15 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       postVisibility={postVisibility}
       setPostVisibility={setPostVisibility}
       setPostBackground={setPostBackground}
-      popup={profileComposerOpen}
+      popup={profileComposerOpen || feedComposerOpen}
       displayName={profileMedia?.displayName || session.user.displayName || name}
       submitError={postSubmitError}
+      checkInOpen={feedComposerOpen && feedCheckInOpen}
+      checkInLocation={feedCheckInLocation}
+      setCheckInLocation={setFeedCheckInLocation}
     />
   )
-  const renderPosts = (items: Post[]) => items.map(post => (
+  const renderPosts = (items: Post[], showSave = false) => items.map(post => (
     <FeedPostCard
       key={post.id}
       post={post}
@@ -3184,13 +3263,40 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       translationPreferencesLoaded={translationPreferencesLoaded}
       targetLanguage={targetLanguage}
       setActivePostId={setActivePostId}
+      showSave={showSave}
       likePreviews={likePreviews}
       like={like}
     />
   ))
 
   return (
-    <main className={`app-shell modern-shell ${tab === 'chat' && activeConversation ? 'conversation-open' : ''}`}>
+    <main className={`app-shell modern-shell penpot-layout ${tab === 'chat' && activeConversation && !desktopSection ? 'conversation-open' : ''}`}>
+      <DesktopSidebar
+        tab={tab}
+        section={tab === 'chat' ? desktopSection : null}
+        username={session.user.username}
+        displayName={profileMedia?.displayName || session.user.displayName || session.user.username}
+        unreadTotal={unreadTotal}
+        feedSaved={feedFilter === 'saved'}
+        onNavigate={switchTab}
+        onGroups={() => { switchTab('chat'); setDesktopSection('groups') }}
+        onCalls={() => { switchTab('chat'); setDesktopSection('calls') }}
+        onSaved={() => { switchTab('feed'); setFeedFilter('saved'); void loadSavedPosts() }}
+        onSettings={() => { switchTab('profile'); setDesktopProfileSettings(true); setProfileTimelineOpen(false) }}
+        onNotifications={() => setNotificationsOpen(true)}
+      />
+      {notificationsOpen && (
+        <NotificationsPanel
+          requests={friendRequests}
+          unreadTotal={unreadTotal}
+          pushEnabled={pushEnabled}
+          onAccept={(request) => void actOnFriend(request)}
+          onOpenContacts={() => { setNotificationsOpen(false); switchTab('contacts') }}
+          onOpenChat={() => { setNotificationsOpen(false); switchTab('chat') }}
+          onEnableNotifications={() => void togglePush()}
+          onClose={() => setNotificationsOpen(false)}
+        />
+      )}
       {qrOpen && <Suspense fallback={<div role="status">Đang mở QR...</div>}>
         <ProfileQr username={session.user.username} displayName={session.user.displayName || session.user.username}
           url={connectUrl()} initialMode={qrOpen} onClose={() => setQrOpen(null)}
@@ -3226,8 +3332,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
         friends={friends.filter((friend) => friend.status === 'accepted')} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
-      {tab !== 'profile' && tab !== 'discover' && tab !== 'market' && (
-      <header className="chatnet-appbar">
+      <header className={`chatnet-appbar ${tab === 'profile' ? 'penpot-desktop-only-header' : tab === 'discover' || tab === 'market' ? 'penpot-desktop-only-header penpot-header-no-search' : ''}`}>
+        <div className="penpot-page-heading">
+          <strong>{tab === 'chat' && desktopSection === 'groups' ? 'Nhóm & cộng đồng' : tab === 'chat' && desktopSection === 'calls' ? 'Cuộc gọi' : ({ chat: 'Tin nhắn', contacts: 'Bạn bè', discover: 'Khám phá', market: 'Marketplace', feed: 'Bảng tin', profile: desktopProfileOverview && profileEditorOpen ? 'Chỉnh sửa hồ sơ' : 'Hồ sơ cá nhân' } as Record<Tab, string>)[tab]}</strong>
+          <small>{({ chat: 'Trò chuyện gần đây và kết nối bạn bè', contacts: 'Kết nối với những người bạn quan tâm', discover: 'Khám phá và kết nối cộng đồng', market: 'Khám phá sản phẩm và cửa hàng', feed: 'Khoảnh khắc và cộng đồng dành cho bạn', profile: desktopProfileSettings ? 'Cài đặt tài khoản và quyền riêng tư' : desktopProfileOverview && profileEditorOpen ? 'Thông tin cá nhân và quyền hiển thị' : 'Trang cá nhân, bài viết và thông tin của bạn' } as Record<Tab, string>)[tab]}</small>
+        </div>
         <div className="appbar-brand"><img src="/soco-mark.svg" width="32" height="32" alt="" /><strong>SocCO</strong></div>
           <div className="appbar-search-anchor" ref={quickSearchAnchorRef}>
           <label className="appbar-search">
@@ -3249,6 +3358,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
               onClick={() => { if (tab === 'chat' && globalSearch.trim()) setQuickSearchOpen(true) }}
               onChange={(event) => {
                 if (tab === 'contacts') setFriendQuery(event.target.value)
+                else if (tab === 'profile') {
+                  setFeedFilter('all')
+                  setGlobalSearch(event.target.value)
+                  setTab('feed')
+                }
                 else {
                   setGlobalSearch(event.target.value)
                   if (tab === 'chat') setQuickSearchOpen(Boolean(event.target.value.trim()))
@@ -3256,11 +3370,13 @@ export default function App({ initialSession }: { initialSession?: Session | nul
               }}
               placeholder={
                 tab === 'contacts' ? 'Tên, @username hoặc email'
+                  : tab === 'profile' ? 'Tìm kiếm trên SocCo...'
                   : tab === 'feed' ? 'Tìm tác giả hoặc nội dung bài viết'
                     : 'Tìm liên hệ, tin nhắn, file'
               }
               aria-label={
                 tab === 'contacts' ? 'Tìm bạn bằng tên, username hoặc email'
+                  : tab === 'profile' ? 'Tìm bài viết trên SocCo'
                   : tab === 'feed' ? 'Tìm bài viết'
                     : 'Tìm cuộc trò chuyện'
               }
@@ -3332,25 +3448,46 @@ export default function App({ initialSession }: { initialSession?: Session | nul
           {tab === 'feed' && (
             <>
               <button
-                className="appbar-icon-button"
+                className="appbar-icon-button penpot-feed-header-new"
                 type="button"
                 aria-label="Tạo bài viết"
                 onClick={() => {
-                  postComposerRef.current?.focus()
-                  postComposerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  if (isProfileDesktop) { setFeedCheckInOpen(false); setFeedComposerOpen(true) }
+                  else {
+                    postComposerRef.current?.focus()
+                    postComposerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  }
                 }}
               >
-                <UiIcon name="compose" size={27} />
+                <UiIcon name="compose" size={24} />
               </button>
               <button
                 className="appbar-icon-button notification-appbar"
                 type="button"
-                aria-label={pushEnabled ? 'Tắt thông báo' : 'Bật thông báo'}
-                onClick={() => void togglePush()}
-                disabled={pushBusy}
+                aria-label="Mở thông báo"
+                onClick={() => setNotificationsOpen(true)}
               >
                 <UiIcon name="bell" size={27} />
-                {!pushEnabled && <span className="appbar-badge">!</span>}
+                {(unreadTotal > 0 || friendRequests.some(request => request.direction === 'incoming')) && <span className="appbar-badge">!</span>}
+              </button>
+              <button className="penpot-feed-header-account" type="button" aria-label="Mở trang cá nhân"
+                onClick={() => switchTab('profile')}>
+                <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="penpot-feed-header-avatar" />
+              </button>
+            </>
+          )}
+
+          {tab === 'profile' && (
+            <>
+              <button className="appbar-icon-button notification-appbar" type="button" aria-label="Mở thông báo" onClick={() => setNotificationsOpen(true)}>
+                <Bell size={21} aria-hidden="true" />
+                {(unreadTotal > 0 || friendRequests.some(request => request.direction === 'incoming')) && <span className="appbar-badge">!</span>}
+              </button>
+              <button className="appbar-icon-button penpot-profile-header-new" type="button" aria-label="Tạo bài viết" onClick={() => { setDesktopProfileSettings(false); setProfileComposerOpen(true) }}>
+                <PencilLine size={21} aria-hidden="true" />
+              </button>
+              <button className="penpot-profile-header-account" type="button" aria-label="Mở cài đặt tài khoản" onClick={() => { setDesktopProfileSettings(true); setProfileTimelineOpen(false) }}>
+                <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="penpot-profile-header-avatar" />
               </button>
             </>
           )}
@@ -3372,7 +3509,6 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
         </div>
       </header>
-      )}
 
       {pushPrompt && !pushPromptDismissed && !pushEnabled && (
         <section className="push-onboarding" aria-label="Thông báo tin nhắn" aria-live="polite">
@@ -3415,7 +3551,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       )}
 
       <section className={`phone-frame modern-frame ${tab === 'chat' && activeConversation ? 'mobile-conversation-open' : ''}`}>
-        {tab === 'chat' && (
+        {tab === 'chat' && desktopSection === null && (
           <div className={`messenger-layout modern-messenger ${activeConversation ? 'has-active' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
             <aside className="conversation-sidebar">
               {newChatMode === 'friends' && (
@@ -3829,7 +3965,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                       onClose={() => setGroupActionsOpen(false)}
                       onCall={(mediaType) => launchGroupCall(activeConversation.id, mediaType)}
                       onSharedContent={() => setSharedContentOpen(true)}
-                      onManageGroup={() => openGroupSettings(activeConversation)}
+                      onManageGroup={() => { setGroupMemberViewOpen(false); openGroupSettings(activeConversation) }}
                       onToggleAutoTranslate={() => changeAutoTranslate(!autoTranslate)}
                       onChangeLanguage={(language) => changeTargetLanguage(language)}
                     />
@@ -4102,6 +4238,20 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 </>
               )}
             </section>
+            {activeConversation && (
+              <ConversationDetailsPanel
+                conversation={activeConversation}
+                onProfile={() => {
+                  if (activeConversation.type === 'group') { setGroupMemberViewOpen(false); openGroupSettings(activeConversation) }
+                  else if (activeConversation.otherUsername) openVisitor(activeConversation.otherUsername)
+                  else setNotice('Không thể mở hồ sơ từ cuộc trò chuyện này.', 'warning')
+                }}
+                onSearch={() => setMessageSearchOpen(true)}
+                onShared={() => setSharedContentOpen(true)}
+                onTranslate={() => setTranslationMenuOpen(true)}
+                onNotifications={() => setNotificationsOpen(true)}
+              />
+            )}
             {groupSettingsOpen && activeConversation?.type === 'group' && (
               <>
                 <button type="button" className="group-sidebar-scrim"
@@ -4154,6 +4304,24 @@ export default function App({ initialSession }: { initialSession?: Session | nul
               </>
             )}
           </div>
+        )}
+
+        {tab === 'chat' && desktopSection && (
+          <DesktopCommunicationHub
+            kind={desktopSection}
+            conversations={conversations}
+            hasMore={hasMoreConversations}
+            loadingMore={conversationLoadingMore}
+            onLoadMore={() => void loadMoreConversations()}
+            onOpenChat={(id) => {
+              setDesktopSection(null)
+              setActiveConversationId(id ?? null)
+            }}
+            onCreateGroup={() => {
+              setChatCreateError('')
+              setNewChatMode('group')
+            }}
+          />
         )}
 
         {tab === 'contacts' && (
@@ -4234,7 +4402,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         )}
 
         {tab === 'feed' && (
-          <div className="feed-view zalo-feed-view" ref={feedViewRef}
+          <div className="feed-view zalo-feed-view penpot-social-feed" ref={feedViewRef}
             onScroll={(event) => {
               if (feedSearchActive && event.currentTarget.scrollTop > 0) setSearchHasScrolled(true)
             }}>
@@ -4263,6 +4431,18 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 void createStory(file)
               }}
             />
+            <div className="penpot-feed-grid">
+              <div className="penpot-feed-center">
+                {isProfileDesktop ? (
+                  <DesktopSocialFeedStories
+                    username={name}
+                    displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
+                    stories={stories}
+                    busy={storyBusy || mediaUploading === 'story'}
+                    onCreate={() => storyFileInputRef.current?.click()}
+                    onOpen={setActiveStoryId}
+                  />
+                ) : (<>
             <div className="soco-feed-section-label"><strong>Khoảnh khắc</strong><small>Story trong 24 giờ</small></div>
             <div className="stories-row">
               <button
@@ -4297,9 +4477,42 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 </button>
               ))}
             </div>
+                </>)}
 
-            {postComposer}
+                {isProfileDesktop ? (
+                  <DesktopSocialFeedComposer
+                    username={name}
+                    displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
+                    draft={postText}
+                    pending={Boolean(pendingPost)}
+                    storyBusy={storyBusy || mediaUploading === 'story'}
+                    onCreatePost={() => { setFeedCheckInOpen(false); setFeedComposerOpen(true) }}
+                    onCreateMediaPost={() => { setFeedCheckInOpen(false); setFeedComposerOpen(true) }}
+                    onCreateStory={() => storyFileInputRef.current?.click()}
+                    onCheckIn={() => {
+                      setFeedCheckInOpen(true)
+                      setFeedComposerOpen(true)
+                    }}
+                  />
+                ) : postComposer}
 
+            {isProfileDesktop ? (
+              <div className="penpot-feed-filter-bar" role="group" aria-label="Lọc bảng tin">
+                <div className="penpot-feed-filter-options">
+                  <button type="button" aria-pressed={feedFilter === 'all'} onClick={() => setFeedFilter('all')}>Dành cho bạn</button>
+                  <button type="button" aria-pressed={feedFilter === 'following'} onClick={() => setFeedFilter('following')}>Đang theo dõi</button>
+                  <button type="button" aria-pressed={feedFilter === 'latest'} onClick={() => setFeedFilter('latest')}>Mới nhất</button>
+                  {feedFilter === 'saved' && (
+                    <button type="button" aria-pressed={true}>Đã lưu</button>
+                  )}
+                </div>
+                <button className="penpot-feed-refresh" type="button" onClick={() => {
+                  if (feedFilter === 'following') followingFeed.refresh()
+                  else if (feedFilter === 'saved') void loadSavedPosts()
+                  else void refreshPosts()
+                }}><RefreshCw size={15} aria-hidden="true" />{feedFilter === 'saved' ? 'Bài đã lưu' : 'Bài viết mới'}</button>
+              </div>
+            ) : (<>
             <div className="soco-feed-section-label soco-feed-posts-label">
               <strong>{feedFilter === 'saved' ? 'Bài viết đã lưu' : 'Bài viết mới'}</strong>
               <div className="feed-filter-tabs" role="group" aria-label="Lọc bảng tin">
@@ -4307,6 +4520,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 <button type="button" aria-pressed={feedFilter === 'saved'} onClick={() => { setFeedFilter('saved'); void loadSavedPosts() }}>Đã lưu</button>
               </div>
             </div>
+
+            </>)}
             <div className="feed zalo-feed">
               {pendingPost && (
                 <article className="post zalo-post outgoing-preview" aria-busy="true">
@@ -4319,27 +4534,47 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 </article>
               )}
               {feedSearchActive && postSearch.loading && <p role="status" className="soco-feed-load-more">Đang tìm bài viết...</p>}
-              {renderPosts(searchedPosts)}
+              {!feedSearchActive && feedFilter === 'following' && followingFeed.loading && <p role="status" className="soco-feed-load-more">Đang tải bài viết của bạn bè...</p>}
+              {renderPosts(searchedPosts, isProfileDesktop)}
               {feedLoadingMore && <p role="status" className="soco-feed-load-more">Đang tải thêm bài viết...</p>}
               {feedPagingError && (
                 <div role="alert" className="soco-feed-load-more">
-                  <span>{feedSearchActive ? postSearch.error : 'Không thể tải bài viết.'}</span>
+                  <span>{feedSearchActive ? postSearch.error : feedFilter === 'following' ? followingFeed.error : 'Không thể tải bài viết.'}</span>
                   <button type="button" onClick={() => {
                     if (feedSearchActive) postSearch.retry()
                     else if (feedFilter === 'saved') void loadSavedPosts(savedPosts.length > 0)
+                    else if (feedFilter === 'following') followingFeed.refresh()
                     else if (posts.length === 0) void refreshPosts()
                     else void loadMorePosts()
                   }}>Thử lại</button>
                 </div>
               )}
               <div ref={feedInfiniteScrollRef} aria-hidden="true" style={{ height: 1 }} />
-              {searchedPosts.length === 0 && !feedLoadingMore && !(feedSearchActive && postSearch.loading) && !feedPagingError && (
+              {searchedPosts.length === 0 && !feedLoadingMore && !(feedSearchActive && postSearch.loading) && !(feedFilter === 'following' && followingFeed.loading) && !feedPagingError && (
                 <div className="feed-empty">
-                  <SocoEmptyState title={normalizedSearch ? 'Không tìm thấy bài viết' : 'Chưa có bài viết'}
-                    description={normalizedSearch ? 'Thử một từ khóa khác nhé.' : 'Hãy chia sẻ khoảnh khắc đầu tiên của bạn.'}
-                    action={!normalizedSearch && <SocoTextAction onClick={() => postComposerRef.current?.focus()}>Tạo bài viết</SocoTextAction>}
+                  <SocoEmptyState title={normalizedSearch ? 'Không tìm thấy bài viết' : feedFilter === 'following' ? 'Chưa có bài viết từ bạn bè' : 'Chưa có bài viết'}
+                    description={normalizedSearch ? 'Thử một từ khóa khác nhé.' : feedFilter === 'following' ? 'Kết bạn để xem các bài viết được chia sẻ với bạn.' : 'Hãy chia sẻ khoảnh khắc đầu tiên của bạn.'}
+                    action={!normalizedSearch && <SocoTextAction onClick={() => feedFilter === 'following' ? switchTab('contacts') : isProfileDesktop ? (setFeedCheckInOpen(false), setFeedComposerOpen(true)) : postComposerRef.current?.focus()}>{feedFilter === 'following' ? 'Tìm bạn bè' : 'Tạo bài viết'}</SocoTextAction>}
                   />
                 </div>
+              )}
+            </div>
+              </div>
+              {isProfileDesktop && (
+                <DesktopSocialFeedSidebar
+                  username={name}
+                  sessionId={session.sessionId}
+                  posts={posts}
+                  friends={friends}
+                  friendRequests={friendRequests}
+                  friendBusyIds={friendBusyIds}
+                  request={apiFetch}
+                  onFriend={(friend) => { void actOnFriend(friend) }}
+                  onViewUser={openVisitor}
+                  onViewContacts={() => switchTab('contacts')}
+                  onSearchTag={(tag) => { setFeedFilter('all'); setGlobalSearch(tag) }}
+                  onOpenChat={() => switchTab('chat')}
+                />
               )}
             </div>
           </div>
@@ -4419,7 +4654,76 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
         {activeStory && <StoryViewer activeStory={activeStory} name={name} storyBusy={storyBusy} deleteStory={deleteStory} setActiveStoryId={setActiveStoryId} nextStory={nextStory} previousStory={previousStory} activeStoryIndex={activeStoryIndex} />}
 
-        {tab === 'profile' && (
+        {tab === 'profile' && desktopProfileOverview && (
+          <>
+            <input ref={avatarFileInputRef} className="hidden-media-input" type="file" accept="image/*" aria-label="Chọn ảnh đại diện"
+              onChange={event => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                void updateProfileImage('avatar', file)
+              }} />
+            <input ref={coverFileInputRef} className="hidden-media-input" type="file" accept="image/*" aria-label="Chọn ảnh bìa"
+              onChange={event => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                void updateProfileImage('cover', file)
+              }} />
+            {profileEditorOpen ? <DesktopProfileEditor
+              username={name}
+              displayName={profileMedia?.displayName || session.user.displayName || name}
+              profile={profileMedia}
+              coverUrl={profileMedia?.coverSet ? profileAssetUrl(name, 'cover', profileMedia.updatedAt) : undefined}
+              displayNameDraft={profileDisplayNameDraft}
+              setDisplayNameDraft={setProfileDisplayNameDraft}
+              usernameDraft={profileUsernameDraft}
+              setUsernameDraft={setProfileUsernameDraft}
+              bioDraft={profileBioDraft}
+              setBioDraft={setProfileBioDraft}
+              cityDraft={profileCityDraft}
+              setCityDraft={setProfileCityDraft}
+              profileSaving={profileSaving}
+              mediaBusy={profileBusy !== null || mediaUploading === 'profile'}
+              privacy={privacy}
+              privacyBusy={privacyBusy}
+              privacyLoading={privacyLoading}
+              privacyError={privacyError}
+              retryPrivacy={() => setPrivacyRetry(n => n + 1)}
+              changePrivacy={changePrivacy}
+              onSave={saveProfileIdentity}
+              onDiscard={discardDesktopProfileEdits}
+              onChangeAvatar={() => avatarFileInputRef.current?.click()}
+              onChangeCover={() => coverFileInputRef.current?.click()}
+            /> : <DesktopProfilePage
+              username={name}
+              displayName={profileMedia?.displayName || session.user.displayName || name}
+              email={session.user.email}
+              bio={profileMedia?.bio}
+              city={profileMedia?.city}
+              coverUrl={profileMedia?.coverSet ? profileAssetUrl(name, 'cover', profileMedia.updatedAt) : undefined}
+              coverSet={Boolean(profileMedia?.coverSet)}
+              editBusy={profileBusy !== null || mediaUploading === 'profile'}
+              friends={friends}
+              posts={profilePosts}
+              pendingPost={pendingPost}
+              postsBusy={profilePostsBusy}
+              postsError={profilePostsError}
+              hasMorePosts={profileHasMore}
+              postCards={renderPosts(visibleProfilePosts)}
+              profileNote={<ProfileNote key={session.sessionId+':desktop-note'} username={name} owner request={apiFetch} />}
+              onEditProfile={() => setProfileEditorOpen(true)}
+              onChangeAvatar={() => avatarFileInputRef.current?.click()}
+              onChangeCover={() => coverFileInputRef.current?.click()}
+              onCreatePost={() => setProfileComposerOpen(true)}
+              onReloadPosts={() => void loadProfilePosts(false, true)}
+              onLoadMorePosts={() => void loadProfilePosts(true)}
+              onViewFriend={openVisitor}
+              onOpenContacts={() => switchTab('contacts')}
+              onOpenPost={setActivePostId}
+            />}
+          </>
+        )}
+
+        {tab === 'profile' && !desktopProfileOverview && (
           <div className={`simple-view profile-view ${profileTimelineOpen ? 'personal-timeline-view' : ''}`}>
             <input
               ref={avatarFileInputRef}
@@ -4554,7 +4858,12 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 </button>}
               </section>
             ) : (<>
-            {profileIdentityForm}
+            {isProfileDesktop && desktopProfileSettings ? (
+              <section className="penpot-edit-settings-entry">
+                <div><strong>Thông tin hồ sơ</strong><p>Thay đổi tên, tên người dùng, tiểu sử, thành phố và ảnh hồ sơ trong trang chỉnh sửa.</p></div>
+                <button type="button" onClick={() => { setDesktopProfileSettings(false); setProfileEditorOpen(true) }}>Chỉnh sửa hồ sơ</button>
+              </section>
+            ) : profileIdentityForm}
 
             <div className="soco-profile-section-label">TÙY CHỌN & CÀI ĐẶT</div>
             <section className="settings-card">
@@ -4830,12 +5139,17 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         )}
       </section>
 
-      {profileComposerOpen && tab === 'profile' && profileTimelineOpen && (
+      {feedComposerOpen && tab === 'feed' && isProfileDesktop && (
+        <ProfileOverlay title="Tạo bài viết" busy={!!pendingPost || mediaUploading === 'feed'} onClose={() => { setFeedComposerOpen(false); setFeedCheckInOpen(false) }}>
+          {postComposer}
+        </ProfileOverlay>
+      )}
+      {profileComposerOpen && tab === 'profile' && (profileTimelineOpen || desktopProfileOverview) && (
         <ProfileOverlay title="Tạo bài viết" busy={!!pendingPost || mediaUploading === 'feed'} onClose={() => setProfileComposerOpen(false)}>
           {postComposer}
         </ProfileOverlay>
       )}
-      {profileEditorOpen && tab === 'profile' && profileTimelineOpen && (
+      {profileEditorOpen && !isProfileDesktop && tab === 'profile' && profileTimelineOpen && (
         <ProfileOverlay title="Chỉnh sửa hồ sơ" drawer busy={profileSaving || privacyBusy} onClose={() => setProfileEditorOpen(false)}>
           {profileIdentityForm}
           <section className="settings-card profile-field-permissions" aria-label="Quyền trường thông tin">

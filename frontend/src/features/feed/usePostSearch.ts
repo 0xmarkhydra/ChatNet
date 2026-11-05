@@ -33,7 +33,7 @@ export function usePostSearch({
   request,
 }: {
   query: string;
-  scope: "all" | "saved";
+  scope: "all" | "saved" | "following" | "latest";
   enabled: boolean;
   sessionId?: string;
   request: ApiRequest;
@@ -56,7 +56,7 @@ export function usePostSearch({
   const baseUrl =
     "/api/posts?limit=" +
     SEARCH_PAGE_SIZE +
-    (scope === "saved" ? "&scope=saved" : "") +
+    (scope === "saved" ? "&scope=saved" : scope === "following" ? "&scope=following" : "") +
     "&q=" +
     encodeURIComponent(normalizedQuery);
 

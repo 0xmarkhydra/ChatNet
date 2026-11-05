@@ -1,0 +1,301 @@
+/* Penpot SocCo Desktop • Social Flows / S03 · Chỉnh sửa hồ sơ.
+   Desktop is a full editor page, not a dialog. */
+@media (min-width: 761px) {
+  .modern-shell.penpot-layout .penpot-edit-page {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 854fr) minmax(300px, 391fr);
+    align-content: start;
+    align-items: start;
+    gap: 24px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 25px 35px 30px 32px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: #f7f9fd;
+    color: #263956;
+    scrollbar-gutter: auto;
+  }
+  .penpot-edit-form-card,
+  .penpot-edit-preview-card,
+  .penpot-edit-privacy-card {
+    box-sizing: border-box;
+    min-width: 0;
+    border: 1px solid #e8ecf5;
+    border-radius: 17px;
+    background: #fff;
+    box-shadow: 0 3px 18px rgba(30,51,96,.035);
+  }
+  .penpot-edit-form-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 836px;
+    margin: 0;
+    padding: 20px 27px 28px;
+  }
+  .penpot-edit-form-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    min-height: 77px;
+  }
+  .penpot-edit-form-heading > div { flex: 1 1 auto; min-width: 0; }
+  .penpot-edit-form-heading h1 {
+    margin: 0;
+    color: #192c4c;
+    font-size: 22px;
+    font-weight: 780;
+    letter-spacing: -.3px;
+    line-height: 30px;
+  }
+  .penpot-edit-form-heading p { margin: 5px 0 0; color: #8492aa; font-size: 13px; line-height: 20px; }
+  .penpot-edit-back {
+    display: none;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 35px;
+    height: 35px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: #eef3ff;
+    color: #3562cc;
+    cursor: pointer;
+  }
+  .penpot-edit-cover-slot { flex: 0 0 auto; margin: 3px 0 0; }
+  .penpot-edit-cover {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    height: 171px;
+    border-radius: 13px;
+    background: linear-gradient(135deg,#bed4eb,#e2d3b2);
+    background-image: url('/penpot-profile-cover.jpg');
+    background-position: center 51%;
+    background-size: cover;
+  }
+  .penpot-edit-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .penpot-edit-cover-button {
+    position: absolute;
+    right: 21px;
+    bottom: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 158px;
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid #e4eaf4;
+    border-radius: 10px;
+    color: #2563eb;
+    background: #fff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px #152c5040;
+  }
+  .penpot-edit-avatar-ring {
+    position: relative;
+    z-index: 1;
+    flex: 0 0 auto;
+    width: 115px;
+    height: 115px;
+    padding: 6px;
+    margin: -43px 0 0 16px;
+    border-radius: 50%;
+    background: #fff;
+  }
+  .penpot-edit-avatar { width: 103px; height: 103px; border-radius: 50%; font-size: 28px; }
+  .penpot-edit-avatar-button {
+    position: absolute;
+    z-index: 2;
+    right: -6px;
+    bottom: -2px;
+    display: grid;
+    place-items: center;
+    width: 33px;
+    height: 33px;
+    padding: 0;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #fff;
+    cursor: pointer;
+  }
+  .penpot-edit-fields { display: grid; gap: 15px; margin: 27px 6px 30px 14px; }
+  .penpot-edit-field { display: grid; gap: 11px; min-width: 0; }
+  .penpot-edit-field > span { color: #495d7d; font-size: 13px; font-weight: 690; line-height: 16px; }
+  .penpot-edit-field input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 45px;
+    min-width: 0;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 0 15px;
+    background: #f8fafe;
+    color: #344561;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 510;
+    outline: none;
+  }
+  .penpot-edit-field input:focus-visible { border-color: #9ab9ff; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  .penpot-edit-field input::placeholder { color: #a1adc0; }
+  .penpot-edit-form-footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 13px;
+    min-height: 67px;
+    margin-top: auto;
+    padding: 21px 7px 0 0;
+    border-top: 1px solid #e8ecf5;
+  }
+  .penpot-edit-save-hint {
+    flex: 1 1 150px;
+    align-self: center;
+    max-width: 260px;
+    margin-right: auto;
+    color: #8291aa;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .penpot-edit-discard,
+  .penpot-edit-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 43px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 11px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 725;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .penpot-edit-discard { min-width: 154px; background: #eff3ff; color: #2563eb; }
+  .penpot-edit-submit { min-width: 172px; background: #2563eb; color: #fff; }
+  .penpot-edit-submit:not(:disabled):hover { background: #1a52d4; }
+  .penpot-edit-discard:not(:disabled):hover { background: #e4ebff; }
+  .penpot-edit-side { display: grid; gap: 24px; min-width: 0; align-content: start; }
+  .penpot-edit-preview-card { height: 428px; padding: 22px 16px 17px; }
+  .penpot-edit-preview-card > h2,
+  .penpot-edit-privacy-heading h2 {
+    margin: 0;
+    color: #1b2d4b;
+    font-size: 18px;
+    font-weight: 790;
+    line-height: 26px;
+  }
+  .penpot-edit-preview-card > h2 { margin-left: 7px; }
+  .penpot-edit-preview-cover { height: 133px; margin-top: 18px; border-radius: 11px; }
+  .penpot-edit-preview-identity { display: flex; align-items: center; gap: 15px; padding-left: 20px; }
+  .penpot-edit-preview-avatar {
+    z-index: 2;
+    flex: 0 0 82px;
+    display: block;
+    width: 82px;
+    height: 82px;
+    margin-top: -36px;
+    border: 5px solid #fff;
+    border-radius: 50%;
+  }
+  .penpot-edit-preview-name { display: flex; flex: 1 1 auto; flex-direction: column; gap: 6px; min-width: 0; padding-top: 10px; }
+  .penpot-edit-preview-name strong { overflow-wrap: anywhere; color: #223451; font-size: 18px; font-weight: 750; }
+  .penpot-edit-preview-name span { color: #8390aa; font-size: 12px; overflow-wrap: anywhere; }
+  .penpot-edit-preview-about { padding: 11px 11px 0; color: #58708e; font-size: 13px; overflow-wrap: anywhere; }
+  .penpot-edit-preview-about p { margin: 0 0 9px; line-height: 1.6; }
+  .penpot-edit-preview-about > div { display: flex; align-items: center; gap: 7px; color: #7c8ba8; font-size: 12px; }
+  .penpot-edit-preview-message { display: flex; gap: 6px; align-items: center; margin: 15px 11px 0; color: #9aa6ba; font-size: 11px; }
+  .penpot-edit-privacy-card { min-height: 384px; padding: 18px 18px 25px; }
+  .penpot-edit-privacy-heading { display: flex; align-items: center; gap: 10px; margin: 0 5px; min-height: 31px; }
+  .penpot-edit-privacy-heading > svg { flex: 0 0 auto; color: #2563eb; }
+  .penpot-edit-privacy-card > p:not(.penpot-edit-privacy-foot) { margin: 17px 6px 18px; color: #8694ac; font-size: 13px; }
+  .penpot-edit-privacy-rows { display: grid; gap: 12px; }
+  .penpot-edit-privacy-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 51px; padding: 7px 12px; border-radius: 10px; background: #f8fafe; }
+  .penpot-edit-privacy-row > div { display: flex; flex: 1 1 auto; flex-direction: column; gap: 4px; min-width: 0; }
+  .penpot-edit-privacy-row strong { color: #435879; font-size: 12px; font-weight: 690; line-height: 1.3; }
+  .penpot-edit-privacy-row small { color: #95a2b7; font-size: 10px; line-height: 1.25; }
+  .penpot-edit-privacy-row button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    min-width: 58px;
+    padding: 5px 7px;
+    border: 1px solid #dce5f5;
+    border-radius: 9px;
+    background: #e9edf5;
+    color: #607491;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 680;
+    cursor: pointer;
+  }
+  .penpot-edit-privacy-row button.is-on { color: #2360d0; background: #e8efff; border-color: #d2e0ff; }
+  .penpot-edit-privacy-row button i { display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #c7cfdf; color: transparent; }
+  .penpot-edit-privacy-row button.is-on i { color: #fff; background: #2563eb; }
+  .penpot-edit-privacy-foot { display: flex; gap: 7px; align-items: flex-start; margin: 14px 3px 0; color: #9aa5b6; font-size: 10px; line-height: 1.35; }
+  .penpot-edit-privacy-foot svg { flex-shrink: 0; }
+  .penpot-edit-privacy-note { padding: 14px; color: #64748b; font-size: 12px; }
+  .penpot-edit-privacy-error { margin-bottom: 9px; padding: 10px; border-radius: 9px; color: #af3535; background: #fff0f0; font-size: 12px; }
+  .penpot-edit-privacy-error button { margin-left: 10px; border: 0; color: #a11c1c; background: transparent; cursor: pointer; }
+  .modern-shell.penpot-layout .penpot-edit-page button:focus-visible { outline: 3px solid #9db9f4; outline-offset: 2px; }
+  .modern-shell.penpot-layout .penpot-edit-page button:disabled { opacity: .58; cursor: not-allowed; }
+}
+@media (min-width: 761px) and (max-width: 1380px) {
+  .modern-shell.penpot-layout .penpot-edit-page { display: flex; flex-direction: column; align-items: stretch; padding: 20px; }
+  .penpot-edit-form-card { flex: 0 0 auto; width: 100%; min-height: 785px; }
+  .penpot-edit-side { flex: 0 0 auto; width: 100%; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 15px; }
+  .penpot-edit-preview-card { min-width: 0; }
+  .penpot-edit-form-heading .penpot-edit-back { display: grid; }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .penpot-edit-side { grid-template-columns: minmax(0,1fr); }
+  .penpot-edit-preview-card { max-width: none; }
+  .penpot-edit-fields { margin-inline: 0; }
+  .penpot-edit-save-hint { max-width: none; flex-basis: 100%; }
+}
+
+@media (min-width: 761px) {
+  .modern-shell .penpot-edit-settings-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    min-height: 112px;
+    padding: 22px 24px;
+    margin: 0 0 22px;
+    border: 1px solid #e8ecf5;
+    border-radius: 16px;
+    background: #fff;
+  }
+  .penpot-edit-settings-entry > div { flex: 1 1 auto; min-width: 0; }
+  .penpot-edit-settings-entry strong { color: #213b5c; font-size: 17px; }
+  .penpot-edit-settings-entry p { margin: 7px 0 0; color: #7b8ca8; font-size: 12px; line-height: 1.5; }
+  .penpot-edit-settings-entry button {
+    flex: 0 0 auto;
+    padding: 11px 17px;
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    background: #2563eb;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .penpot-edit-page * { scroll-behavior: auto; transition: none; }
+}

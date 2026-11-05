@@ -3,7 +3,7 @@ import type { Post } from './types'
 import type { ToastKind } from '../notifications/toast'
 import { API } from '../../shared/lib/config'
 import { FeedText } from './FeedDiscussion'
-import FeedPostActions, { FeedShareAction } from './FeedPostActions'
+import FeedPostActions, { FeedSaveAction, FeedShareAction } from './FeedPostActions'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../shared/ui/MediaAttachmentsView'
 import UiIcon from '../../shared/ui/UiIcon'
@@ -23,6 +23,7 @@ type Props = {
   setActivePostId: (id: number) => void
   likePreviews: Record<number, boolean>
   like: (post: Post) => Promise<void>
+  showSave?: boolean
 }
 
 export default function FeedPostCard({
@@ -40,6 +41,7 @@ export default function FeedPostCard({
   setActivePostId,
   likePreviews,
   like,
+  showSave = false,
 }: Props) {
   const authorLabel = userLabel(post.author === name ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
   return (
@@ -82,6 +84,8 @@ export default function FeedPostCard({
           </button>
           <FeedShareAction postId={post.id}
             onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
+          {showSave && <FeedSaveAction post={post} request={apiFetch} onUpdated={syncFeedPost}
+            onFeedback={(text, kind) => setNotice(text, kind || 'success')} />}
         </div>
       </div>
     </article>
