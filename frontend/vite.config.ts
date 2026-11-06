@@ -25,7 +25,9 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
-    proxy: process.env.VITE_API_URL?.startsWith('https://') ? {
+    proxy: process.env.CHATNET_API_PROXY_TARGET ? {
+      '/api': { target: process.env.CHATNET_API_PROXY_TARGET, changeOrigin: true, secure: true },
+    } : process.env.VITE_API_URL?.startsWith('https://') ? {
       '/api': { target: process.env.VITE_API_URL, changeOrigin: true },
     } : undefined,
   },

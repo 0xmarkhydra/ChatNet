@@ -88,7 +88,8 @@ import MessageSearchPanel from "../features/chat/MessageSearchPanel";
 import ProfileIdentityForm from "../features/profile/ProfileIdentityForm";
 import BottomNavigation from "./BottomNavigation";
 import AppSidebar from "./AppSidebar";
-import NotificationsPanel from "./NotificationsPanel";
+import { countNotificationItems, formatNotificationBadge } from "./notification-count";
+import NotificationsPage from "./NotificationsPage";
 import ConversationDetailsPanel from "./ConversationDetailsPanel";
 import ProfilePage from "./ProfilePage";
 import ProfileEditorPage from "./ProfileEditorPage";
@@ -99,7 +100,7 @@ import CommunicationHub from "./CommunicationHub";
 import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
 import GroupRenameDialog from "../features/chat/GroupRenameDialog";
 import GroupInviteJoinDialog from "../features/chat/GroupInviteJoinDialog";
-import ContactsView from "../features/contacts/ContactsView";
+import ContactsView, { type FriendsScreen } from "../features/contacts/ContactsView";
 import PrivacyControls from "../features/profile/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/BlockedUsersPanel";
@@ -403,6 +404,7 @@ export default function App({
   const preferenceRevision = useRef(0);
   const [newChatMode, setNewChatMode] = useState<NewChatMode>("none");
   const [friendQuery, setFriendQuery] = useState("");
+  const [contactsScreen, setContactsScreen] = useState<FriendsScreen>("directory");
   const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([]);
   const [friendSearching, setFriendSearching] = useState(false);
   const [friendSearchError, setFriendSearchError] = useState(false);
@@ -435,7 +437,6 @@ export default function App({
   const [blockedError, setBlockedError] = useState("");
   const [directUsername, setDirectUsername] = useState("");
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [desktopSection, setDesktopSection] = useState<
     "groups" | "calls" | null
   >(null);
@@ -3595,7 +3596,7 @@ export default function App({
     ],
   );
 
-  async function openDirectByUsername(username: string) {
+  async function openDirectByUsername(username: string, mediaType?: "audio" | "video") {
     setChatCreateError("");
     const normalized = username.trim().toLowerCase();
     if (!normalized || actionLocks.current.has("chat:create")) return;
@@ -3632,6 +3633,9 @@ export default function App({
       setNewChatMode("none");
       setTranslations({});
       void refreshConversations();
+      if (mediaType) window.dispatchEvent(new CustomEvent("chatnet:start-call", {
+        detail: { conversationId: created.id, mediaType },
+      }));
     } catch {
       if (sessionRef.current?.sessionId === sessionId)
         setNotice(
@@ -4378,6 +4382,8 @@ export default function App({
     (sum, conversation) => sum + conversation.unreadCount,
     0,
   );
+  const notificationItemCount = countNotificationItems(friendRequests, conversations);
+  const notificationBadgeText = formatNotificationBadge(notificationItemCount);
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase("vi-VN");
   // The conversation sidebar is independent of the keyword. Only the dropdown searches.
   const visibleConversations =
@@ -4474,6 +4480,7 @@ export default function App({
   };
   const switchTab = (nextTab: Tab) => {
     setDesktopSection(null);
+    if (nextTab === "contacts") setContactsScreen("directory");
     if (nextTab === "profile") {
       setDesktopProfileSettings(false);
       setProfileEditorOpen(false);
@@ -4576,7 +4583,7 @@ export default function App({
 
   return (
     <main
-      className={`app-shell modern-shell app-layout ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
+      className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
     >
       <AppSidebar
         tab={tab}
@@ -4609,24 +4616,6 @@ export default function App({
           setProfileTimelineOpen(false);
         }}
       />
-      {notificationsOpen && (
-        <NotificationsPanel
-          requests={friendRequests}
-          unreadTotal={unreadTotal}
-          pushEnabled={pushEnabled}
-          onAccept={(request) => void actOnFriend(request)}
-          onOpenContacts={() => {
-            setNotificationsOpen(false);
-            switchTab("contacts");
-          }}
-          onOpenChat={() => {
-            setNotificationsOpen(false);
-            switchTab("chat");
-          }}
-          onEnableNotifications={() => void togglePush()}
-          onClose={() => setNotificationsOpen(false)}
-        />
-      )}
       {qrOpen && (
         <Suspense fallback={<div role="status">Đang mở QR...</div>}>
           <ProfileQr
@@ -4738,7 +4727,8 @@ export default function App({
                 : (
                     {
                       chat: "Tin nhắn",
-                      contacts: "Bạn bè",
+                      contacts: contactsScreen === "directory" ? "Danh bạ" : "Lời mời kết bạn",
+                      notifications: "Thông báo",
                       discover: "Khám phá",
                       market: "Marketplace",
                       feed: "Bảng tin",
@@ -4754,7 +4744,8 @@ export default function App({
               (
                 {
                   chat: "Trò chuyện gần đây và kết nối bạn bè",
-                  contacts: "Kết nối với những người bạn quan tâm",
+                  contacts: contactsScreen === "directory" ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
+                  notifications: "Cập nhật những hoạt động quan trọng",
                   discover: "Khám phá và kết nối cộng đồng",
                   market: "Khám phá sản phẩm và cửa hàng",
                   feed: "Khoảnh khắc và cộng đồng dành cho bạn",
@@ -4813,7 +4804,9 @@ export default function App({
                 }
               }}
               placeholder={
-                tab === "contacts"
+                tab === "notifications"
+                  ? "Tìm kiếm thông báo..."
+                  : tab === "contacts"
                   ? "Tên, @username hoặc email"
                   : tab === "profile"
                     ? "Tìm kiếm trên SocCo..."
@@ -4822,7 +4815,9 @@ export default function App({
                       : "Tìm liên hệ, tin nhắn, file"
               }
               aria-label={
-                tab === "contacts"
+                tab === "notifications"
+                  ? "Tìm thông báo..."
+                  : tab === "contacts"
                   ? "Tìm bạn bằng tên, username hoặc email"
                   : tab === "profile"
                     ? "Tìm bài viết trên SocCo"
@@ -4963,13 +4958,12 @@ export default function App({
                 className="appbar-icon-button notification-appbar"
                 type="button"
                 aria-label="Mở thông báo"
-                onClick={() => setNotificationsOpen(true)}
+                onClick={() => switchTab("notifications")}
               >
                 <UiIcon name="bell" size={27} />
-                {(unreadTotal > 0 ||
-                  friendRequests.some(
-                    (request) => request.direction === "incoming",
-                  )) && <span className="appbar-badge">!</span>}
+                {notificationItemCount > 0 && (
+                  <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>
+                )}
               </button>
               <button
                 className="social-feed-header-account"
@@ -4995,13 +4989,12 @@ export default function App({
                 className="appbar-icon-button notification-appbar"
                 type="button"
                 aria-label="Mở thông báo"
-                onClick={() => setNotificationsOpen(true)}
+                onClick={() => switchTab("notifications")}
               >
                 <Bell size={21} aria-hidden="true" />
-                {(unreadTotal > 0 ||
-                  friendRequests.some(
-                    (request) => request.direction === "incoming",
-                  )) && <span className="appbar-badge">!</span>}
+                {notificationItemCount > 0 && (
+                  <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>
+                )}
               </button>
               <button
                 className="appbar-icon-button profile-page-header-new"
@@ -5035,18 +5028,69 @@ export default function App({
             </>
           )}
 
+          {tab === "notifications" && (
+            <>
+              <button
+                className="appbar-icon-button notification-appbar"
+                type="button"
+                aria-label="Trang Thông báo"
+                aria-current="page"
+              >
+                <Bell size={22} aria-hidden="true" />
+                {notificationItemCount > 0 && (
+                  <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>
+                )}
+              </button>
+              <button
+                className="appbar-icon-button"
+                type="button"
+                aria-label="Tạo bài viết mới"
+                onClick={() => {
+                  switchTab("feed");
+                  setFeedComposerOpen(true);
+                }}
+              >
+                <UiIcon name="plus" size={31} />
+              </button>
+              <button
+                className="social-feed-header-account"
+                type="button"
+                aria-label="Mở trang cá nhân"
+                onClick={() => switchTab("profile")}
+              >
+                <UserAvatar username={name}
+                  name={userLabel(profileMedia?.displayName || session.user.displayName, name)}
+                  className="social-feed-header-avatar" />
+              </button>
+            </>
+          )}
+
           {tab === "contacts" && (
-            <button
-              className="appbar-icon-button"
-              type="button"
-              aria-label="Thêm bạn"
-              onClick={() => {
-                setTab("chat");
-                setNewChatMode("friends");
-              }}
-            >
-              <UiIcon name="plus" size={31} />
-            </button>
+            <>
+              <button
+                className="appbar-icon-button notification-appbar"
+                type="button"
+                aria-label="Mở trang Thông báo"
+                title="Thông báo"
+                onClick={() => switchTab("notifications")}
+              >
+                <Bell size={22} aria-hidden="true" />
+                {notificationItemCount > 0 && (
+                  <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>
+                )}
+              </button>
+              <button
+                className="appbar-icon-button"
+                type="button"
+                aria-label="Thêm bạn"
+                onClick={() => {
+                  setTab("chat");
+                  setNewChatMode("friends");
+                }}
+              >
+                <UiIcon name="plus" size={31} />
+              </button>
+            </>
           )}
         </div>
       </header>
@@ -6495,7 +6539,7 @@ export default function App({
                 onSearch={() => setMessageSearchOpen(true)}
                 onShared={() => setSharedContentOpen(true)}
                 onTranslate={() => setTranslationMenuOpen(true)}
-                onNotifications={() => setNotificationsOpen(true)}
+                onNotifications={() => switchTab("notifications")}
               />
             )}
             {groupSettingsOpen && activeConversation?.type === "group" && (
@@ -6580,8 +6624,35 @@ export default function App({
           />
         )}
 
+        {tab === "notifications" && (
+          <NotificationsPage
+            requests={friendRequests}
+            conversations={conversations}
+            search={globalSearch}
+            busyFriendIds={friendBusyIds}
+            onAccept={(friend) => void actOnFriend(friend)}
+            onDecline={(friend) => void declineFriendRequest(friend)}
+            onOpenConversation={(id) => {
+              switchTab("chat");
+              setActiveConversationId(id);
+            }}
+            onOpenInvitations={() => {
+              switchTab("contacts");
+              setContactsScreen("invitations");
+            }}
+            onOpenFriend={openVisitor}
+            onSettings={() => {
+              switchTab("profile");
+              setDesktopProfileSettings(true);
+              setProfileTimelineOpen(false);
+            }}
+          />
+        )}
+
         {tab === "contacts" && (
           <ContactsView
+            screen={contactsScreen}
+            onScreenChange={setContactsScreen}
             friendQuery={friendQuery}
             setFriendQuery={setFriendQuery}
             friendSearching={friendSearching}
@@ -6595,9 +6666,6 @@ export default function App({
             friendMenuId={friendMenuId}
             blockContact={blockContact}
             reportContact={reportContact}
-            setTab={setTab}
-            setNewChatMode={setNewChatMode}
-            setChatCreateError={setChatCreateError}
             friendRequests={friendRequests}
             declineFriendRequest={declineFriendRequest}
             friends={friends}
@@ -6606,7 +6674,8 @@ export default function App({
             setFriendPreview={setFriendPreview}
             changePersonalContact={changePersonalContact}
             removeAcceptedFriend={removeAcceptedFriend}
-            friendResults={friendResults}
+            connectionUrl={connectUrl()}
+            onScanQr={() => setQrOpen("scan")}
           />
         )}
 
