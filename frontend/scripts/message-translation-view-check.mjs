@@ -33,4 +33,13 @@ assert.equal(getMessageTranslationView({
 assert.equal(getMessageTranslationView({
   originalText: 'hi', translatedText: 'hi', enabled: true,
 }).mode, 'original', 'Do not show a meaningless duplicate translation')
-console.log('PASS: 99, 100, 101 characters, original/translated switch, off, unchanged and Unicode')
+assert.equal(getMessageTranslationView({
+  originalText: longText, translatedText: 'Text translated', enabled: true, display: 'bilingual',
+}).mode, 'dual', 'Bilingual mode must show both texts even for long messages')
+assert.equal(getMessageTranslationView({
+  originalText: 'hi', translatedText: 'Xin chào', enabled: true, display: 'translated',
+}).mode, 'translated', 'Translated-only mode must show one text even for short messages')
+assert.equal(getMessageTranslationView({
+  originalText: 'hi', translatedText: 'Xin chào', enabled: true, display: 'translated', showOriginal: true,
+}).primaryText, 'hi', 'Original toggle must work with translated-only mode')
+console.log('PASS: 99, 100, 101 characters, display modes, original/translated switch, off, unchanged and Unicode')

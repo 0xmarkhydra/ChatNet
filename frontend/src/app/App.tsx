@@ -92,6 +92,13 @@ import AppSidebar from "./AppSidebar";
 import { countNotificationItems, formatNotificationBadge } from "./notification-count";
 import NotificationsPage from "./NotificationsPage";
 import ConversationDetailsPanel from "./ConversationDetailsPanel";
+import ChatTranslationSettingsPage from './ChatTranslationSettingsPage';
+import {
+  readConversationTranslationSettings,
+  persistConversationTranslationSettings,
+  type ChatTranslationSettings,
+  type ConversationTranslationSettingsMap,
+} from '../features/chat/conversationTranslationSettings';
 import ProfilePage from "./ProfilePage";
 import ProfileEditorPage from "./ProfileEditorPage";
 import SocialFeedComposer from "./SocialFeedComposer";
@@ -452,6 +459,13 @@ export default function App({
   const [desktopSection, setDesktopSection] = useState<
     "groups" | "calls" | null
   >(null);
+  const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);
+  useEffect(() => {
+    if (translationSettingsConversationId !== null &&
+        translationSettingsConversationId !== activeConversationId) {
+      setTranslationSettingsConversationId(null);
+    }
+  }, [translationSettingsConversationId, activeConversationId]);
   const [chatCreateError, setChatCreateError] = useState("");
   const [nearbyUsers, setNearbyUsers] = useState<FriendSearchResult[]>([]);
   const [nearbyBusy, setNearbyBusy] = useState(false);
@@ -675,7 +689,7 @@ export default function App({
     useState("");
   const [targetLanguage, setTargetLanguage] = useState("en");
   const translationLanguageRef = useRef(targetLanguage);
-  translationLanguageRef.current = targetLanguage;
+
   useEffect(() => {
     translationAttempted.current.clear();
     setManuallyTranslated({});
@@ -684,6 +698,20 @@ export default function App({
     setTranslationOriginals({});
   }, [session?.sessionId, targetLanguage]);
   const [autoTranslate, setAutoTranslate] = useState(true);
+  const [conversationTranslationOverrides, setConversationTranslationOverrides] = useState<ConversationTranslationSettingsMap>(
+    () => session?.user.id ? readConversationTranslationSettings(session.user.id) : {},
+  );
+  useEffect(() => {
+    setConversationTranslationOverrides(
+      session?.user.id ? readConversationTranslationSettings(session.user.id) : {},
+    );
+    setTranslationSettingsConversationId(null);
+  }, [session?.user.id]);
+  const activeChatTranslationSettings = activeConversationId === null
+    ? undefined : conversationTranslationOverrides[activeConversationId];
+  const effectiveAutoTranslate = activeChatTranslationSettings?.enabled ?? autoTranslate;
+  const effectiveTargetLanguage = activeChatTranslationSettings?.targetLanguage ?? targetLanguage;
+  translationLanguageRef.current = effectiveTargetLanguage;
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] =
     useState(false);
   const [status, setStatus] = useState("Đang kết nối...");
@@ -980,7 +1008,7 @@ export default function App({
     activeConversationId,
     activeConversationIdRef,
     translationPreferencesLoaded,
-    targetLanguage,
+    targetLanguage: effectiveTargetLanguage,
     setTranslations,
     messageChanges,
     pendingSend,
@@ -1183,6 +1211,8 @@ export default function App({
   const selectedLanguage =
     languageOptions.find((language) => language.value === targetLanguage) ||
     languageOptions[0];
+  const selectedConversationLanguage =
+    languageOptions.find(language => language.value === effectiveTargetLanguage) || selectedLanguage;
   const visibleLanguageOptions = useMemo(
     () => filterLanguageOptions(languageOptions, languageSearch),
     [languageOptions, languageSearch],
@@ -3627,7 +3657,7 @@ export default function App({
   useEffect(() => {
     if (
       !translationPreferencesLoaded ||
-      !autoTranslate ||
+      !effectiveAutoTranslate ||
       !session ||
       !activeConversationId
     )
@@ -3638,25 +3668,52 @@ export default function App({
         message.senderId !== session.user.id &&
         Boolean(message.text.trim()) &&
         !translations[message.id] &&
-        !translationAttempted.current.has(`${session.sessionId}:${targetLanguage}:${message.id}:${message.editedAt ?? ""}`),
+        !translationAttempted.current.has(`${session.sessionId}:${effectiveTargetLanguage}:${message.id}:${message.editedAt ?? ""}`),
     );
     missing.forEach((message) => void translateMessage(message, false));
   }, [
-    autoTranslate,
+    effectiveAutoTranslate,
     translationPreferencesLoaded,
     messages,
-    targetLanguage,
+    effectiveTargetLanguage,
     session?.user.id,
     session?.sessionId,
     activeConversationId,
   ]);
 
+  function saveConversationTranslationSettings(conversationId: number, settings: ChatTranslationSettings) {
+    if (!session?.user.id || !Number.isSafeInteger(conversationId)) return false;
+    const updated = { ...conversationTranslationOverrides, [conversationId]: settings };
+    if (!persistConversationTranslationSettings(session.user.id, updated)) {
+      setNotice('Không lưu được cài đặt dịch trên thiết bị này.', 'error');
+      return false;
+    }
+    setConversationTranslationOverrides(updated);
+    setTranslations({});
+    setTranslationOriginals({});
+    setManuallyTranslated({});
+    setTranslationPending({});
+    setTranslationFailures({});
+    translationAttempted.current.clear();
+    return true;
+  }
+
   function changeAutoTranslate(next: boolean) {
+    if (activeConversationId !== null && activeChatTranslationSettings) {
+      saveConversationTranslationSettings(activeConversationId, { ...activeChatTranslationSettings, enabled: next });
+      return;
+    }
     setAutoTranslate(next);
     void saveTranslationPreferences(targetLanguage, next);
   }
 
   function changeTargetLanguage(next: string) {
+    if (activeConversationId !== null && activeChatTranslationSettings) {
+      saveConversationTranslationSettings(activeConversationId, { ...activeChatTranslationSettings, targetLanguage: next });
+      setTranslationMenuOpen(false);
+      setLanguageSearch('');
+      return;
+    }
     setTargetLanguage(next);
     setTranslations({});
     setTranslationOriginals({});
@@ -4173,7 +4230,7 @@ export default function App({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text,
-        target: targetLanguage,
+        target: effectiveTargetLanguage,
         ...(messageId ? { messageId } : {}),
       }),
     });
@@ -4190,7 +4247,7 @@ export default function App({
     if (message.deleted || !message.text.trim()) return;
     const sessionId = sessionRef.current?.sessionId;
     if (!sessionId) return;
-    const language = targetLanguage;
+    const language = effectiveTargetLanguage;
     const conversationId = activeConversationIdRef.current;
     const requestKey = `${sessionId}:${language}:${message.id}:${message.editedAt ?? ""}`;
     if (reveal) {
@@ -4617,6 +4674,7 @@ export default function App({
   };
   const switchTab = (nextTab: Tab) => {
     setDesktopSection(null);
+    setTranslationSettingsConversationId(null);
     if (nextTab === "contacts") setContactsScreen("directory");
     if (nextTab === "profile") {
       setDesktopProfileSettings(false);
@@ -4935,7 +4993,9 @@ export default function App({
       >
         <div className="app-page-heading">
           <strong>
-            {tab === "chat" && desktopSection === "groups"
+            {tab === "chat" && translationSettingsConversationId !== null
+              ? "Ngôn ngữ & dịch AI"
+              : tab === "chat" && desktopSection === "groups"
               ? "Nhóm & cộng đồng"
               : tab === "chat" && desktopSection === "calls"
                 ? "Cuộc gọi"
@@ -4960,7 +5020,9 @@ export default function App({
             {
               (
                 {
-                  chat: "Trò chuyện gần đây và kết nối bạn bè",
+                  chat: translationSettingsConversationId !== null
+                    ? "Chọn ngôn ngữ và quyền dịch của cuộc trò chuyện"
+                    : "Trò chuyện gần đây và kết nối bạn bè",
                   contacts: contactsScreen === "directory" ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
                   notifications: "Cập nhật những hoạt động quan trọng",
                   discover: "Khám phá và kết nối cộng đồng",
@@ -5388,7 +5450,7 @@ export default function App({
       <section
         className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
       >
-        {tab === 'chat' && desktopSection === null && (
+        {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <div className={`messenger-layout modern-messenger social-chat-layout ${activeConversation ? 'has-active' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
             <aside className="conversation-sidebar social-chat-list" aria-label="Danh sách cuộc trò chuyện">
               <div className="social-chat-list-header">
@@ -5769,11 +5831,11 @@ export default function App({
                                 <div className="translation-dialog-actions">
                                   <button
                                     type="button"
-                                    className={autoTranslate ? 'translation-hub-switch active' : 'translation-hub-switch'}
+                                    className={effectiveAutoTranslate ? 'translation-hub-switch active' : 'translation-hub-switch'}
                                     aria-label="Tự động dịch tin nhắn"
                                     role="switch"
-                                    aria-checked={autoTranslate}
-                                    onClick={() => changeAutoTranslate(!autoTranslate)}
+                                    aria-checked={effectiveAutoTranslate}
+                                    onClick={() => changeAutoTranslate(!effectiveAutoTranslate)}
                                   >
                                     <span />
                                   </button>
@@ -5811,7 +5873,7 @@ export default function App({
                                   <button
                                     key={language.value}
                                     type="button"
-                                    className={targetLanguage === language.value ? 'active' : ''}
+                                    className={effectiveTargetLanguage === language.value ? 'active' : ''}
                                     onClick={() => changeTargetLanguage(language.value)}
                                   >
                                     <span className="translation-language-flag" aria-hidden="true">{language.flag}</span>
@@ -5821,7 +5883,7 @@ export default function App({
                                       <em>{language.localizedRegion} · {language.nativeRegion}</em>
                                     </span>
                                     <b>{language.code}</b>
-                                    {targetLanguage === language.value && <i aria-hidden="true">✓</i>}
+                                    {effectiveTargetLanguage === language.value && <i aria-hidden="true">✓</i>}
                                   </button>
                                 ))}
                                 {visibleLanguageOptions.length === 0 && (
@@ -5842,14 +5904,14 @@ export default function App({
                     <GroupActionsSheet
                       groupName={activeConversation.name}
                       memberCount={activeConversation.memberCount}
-                      autoTranslate={autoTranslate}
-                      targetLanguage={targetLanguage}
+                      autoTranslate={effectiveAutoTranslate}
+                      targetLanguage={effectiveTargetLanguage}
                       languages={languageOptions}
                       onClose={() => setGroupActionsOpen(false)}
                       onCall={(mediaType) => launchGroupCall(activeConversation.id, mediaType)}
                       onSharedContent={() => setSharedContentOpen(true)}
                       onManageGroup={() => { setGroupMemberViewOpen(false); openGroupSettings(activeConversation) }}
-                      onToggleAutoTranslate={() => changeAutoTranslate(!autoTranslate)}
+                      onToggleAutoTranslate={() => changeAutoTranslate(!effectiveAutoTranslate)}
                       onChangeLanguage={(language) => changeTargetLanguage(language)}
                     />
                   )}
@@ -5936,16 +5998,18 @@ export default function App({
                       const translatedText = !message.deleted ? translations[message.id] : ''
                       const photoOnly = !message.deleted && !message.text && message.attachments?.length === 1 && message.attachments[0].kind === 'image' && Boolean(message.attachments[0].url)
                       const originalVisible = Boolean(translationOriginals[message.id])
-                      const translatedLanguage = selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()
-                      const translationEnabled = autoTranslate || Boolean(manuallyTranslated[message.id])
+                      const translatedLanguage = languageOptions.find(option => option.value === effectiveTargetLanguage)?.localizedLanguage || effectiveTargetLanguage.toUpperCase()
+                      const translationEnabled = effectiveAutoTranslate || Boolean(manuallyTranslated[message.id])
                       const translationView = getMessageTranslationView({
                         originalText: message.text,
                         translatedText,
                         enabled: translationEnabled,
                         showOriginal: originalVisible,
+                        display: activeChatTranslationSettings?.display,
                       })
                       const hasTranslation = Boolean(translatedText?.trim() && translatedText.trim() !== message.text.trim())
-                      const longTranslation = Array.from(message.text).length > 100 && hasTranslation && translationEnabled
+                      const longTranslation = hasTranslation && translationEnabled && (activeChatTranslationSettings?.display === 'translated' ||
+                        (activeChatTranslationSettings?.display !== 'bilingual' && Array.from(message.text).length > 100))
                       const isTranslating = Boolean(translationPending[message.id])
                       const translationFailed = Boolean(translationFailures[message.id])
                       return (
@@ -6038,13 +6102,13 @@ export default function App({
                                   Đang dịch tin nhắn…
                                 </span>
                               )}
-                              {!isTranslating && !autoTranslate && translationView.mode === 'dual' && (
+                              {!isTranslating && !effectiveAutoTranslate && translationView.mode === 'dual' && (
                                 <button type="button" className="chat-translation-action"
                                   onClick={() => setManuallyTranslated((current) => ({ ...current, [message.id]: false }))}>
                                   <Languages size={15} aria-hidden="true" /> Ẩn dịch
                                 </button>
                               )}
-                              {!isTranslating && !autoTranslate &&
+                              {!isTranslating && !effectiveAutoTranslate &&
                                 (!manuallyTranslated[message.id] || !hasTranslation) && (
                                 <button type="button" className="chat-translation-action"
                                   onClick={() => void translateMessage(message)}>
@@ -6052,7 +6116,7 @@ export default function App({
                                   {translationFailed ? 'Thử dịch lại' : 'Dịch'}
                                 </button>
                               )}
-                              {!isTranslating && autoTranslate && translationFailed && !hasTranslation && (
+                              {!isTranslating && effectiveAutoTranslate && translationFailed && !hasTranslation && (
                                 <button type="button" className="chat-translation-action"
                                   onClick={() => void translateMessage(message)}>
                                   <Languages size={15} aria-hidden="true" /> Thử dịch lại
@@ -6127,10 +6191,10 @@ export default function App({
                     <div ref={bottomRef} />
                   </div>
 
-                  <div className={`social-chat-ai-banner${autoTranslate ? ' is-enabled' : ''}`} role="status">
+                  <div className={`social-chat-ai-banner${effectiveAutoTranslate ? ' is-enabled' : ''}`} role="status">
                     <Languages size={18} aria-hidden="true" />
-                    <span>{autoTranslate
-                      ? `Dịch tự động đang bật · ${selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()}`
+                    <span>{effectiveAutoTranslate
+                      ? `Dịch tự động đang bật · ${selectedConversationLanguage?.localizedLanguage || effectiveTargetLanguage.toUpperCase()}`
                       : 'Dịch tự động đang tắt'}</span>
                     <button type="button" aria-label="Cài đặt dịch AI" aria-expanded={translationMenuOpen}
                       onClick={() => { setLanguageSearch(''); setTranslationMenuOpen((open) => !open) }}>
@@ -6239,7 +6303,11 @@ export default function App({
                 }}
                 onSearch={() => { setConversationDetailsOpen(false); setMessageSearchOpen(true) }}
                 onShared={() => { setConversationDetailsOpen(false); setSharedContentOpen(true) }}
-                onTranslate={() => { setConversationDetailsOpen(false); setTranslationMenuOpen(true) }}
+                onTranslate={() => {
+                  setConversationDetailsOpen(false);
+                  setTranslationMenuOpen(false);
+                  setTranslationSettingsConversationId(activeConversation.id);
+                }}
                 onNotifications={() => { setConversationDetailsOpen(false); switchTab('notifications') }}
               />
             )}
@@ -6295,6 +6363,28 @@ export default function App({
               </>
             )}
           </div>
+        )}
+
+        {tab === 'chat' && translationSettingsConversationId !== null &&
+          activeConversation?.id === translationSettingsConversationId && (
+          <ChatTranslationSettingsPage
+            key={`${session.user.id}:${translationSettingsConversationId}`}
+            conversation={activeConversation}
+            languages={languageOptions}
+            initial={activeChatTranslationSettings ?? {
+              enabled: autoTranslate,
+              targetLanguage,
+              sourceLanguage: targetLanguage === 'en' ? 'vi' : 'en',
+              display: 'adaptive',
+            }}
+            onCancel={() => setTranslationSettingsConversationId(null)}
+            onSave={settings => {
+              if (saveConversationTranslationSettings(translationSettingsConversationId, settings)) {
+                setTranslationSettingsConversationId(null);
+                setNotice('Đã lưu cài đặt dịch cho cuộc trò chuyện.', 'success');
+              }
+            }}
+          />
         )}
 
         {tab === "chat" && desktopSection && (

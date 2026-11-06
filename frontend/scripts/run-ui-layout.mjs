@@ -561,47 +561,73 @@ try {
     await page.locator('.conversation-item').first().click()
     await geometry('chat-room', width, ['.modern-frame', '.conversation-panel', '.chat-head'])
     if ([390, 1440].includes(width)) {
-      const translationMenu = page.getByRole('dialog', { name: 'Cài đặt dịch AI' })
-      const openTranslationFromDetails = async () => {
-        await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
-        await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
+      await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      const settingsPage = page.locator('.chat-translation-settings-page')
+      await settingsPage.waitFor()
+      check(await page.getByRole('heading', { name: 'Dịch tin nhắn tự động' }).isVisible(),
+        'Conversation details must navigate to the S21 translation settings page: ' + width)
+      check(await page.getByLabel('Ngôn ngữ của bạn').count() === 1 &&
+        await page.getByLabel('Ngôn ngữ người kia').count() === 1 &&
+        await page.getByLabel('Chế độ hiển thị').count() === 1 &&
+        await page.getByRole('button', { name: 'Lưu thay đổi' }).count() === 1,
+        'S21 controls missing: ' + width)
+      const autoSwitch = page.getByRole('checkbox', { name: 'Bật dịch cho cuộc trò chuyện này' })
+      const initialAuto = await autoSwitch.isChecked()
+      const initialTarget = await page.getByLabel('Ngôn ngữ của bạn').inputValue()
+      await autoSwitch.setChecked(!initialAuto)
+      await page.getByLabel('Ngôn ngữ của bạn').selectOption('vi')
+      await page.getByLabel('Ngôn ngữ người kia').selectOption('en')
+      await page.getByLabel('Chế độ hiển thị').selectOption('bilingual')
+      const bounds = await settingsPage.boundingBox()
+      const form = await settingsPage.locator('.chat-translation-settings-form').boundingBox()
+      const preview = await settingsPage.locator('.chat-translation-settings-preview').boundingBox()
+      check(bounds && form && preview && form.width > 0 && preview.width > 0,
+        'S21 content is not visible at ' + width)
+      if (width > 830) check(preview.x > form.x + form.width,
+        'S21 preview must be in the right column at ' + width)
+      else check(preview.y >= form.y + form.height - 1,
+        'S21 preview must be below the form on mobile: ' + width)
+      await page.getByRole('button', { name: 'Hủy' }).click()
+      await settingsPage.waitFor({ state: 'hidden' })
+      await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
+      await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      await settingsPage.waitFor()
+      check(await autoSwitch.isChecked() === initialAuto, 'Cancel must discard unsaved auto translation: ' + width)
+      check(await page.getByLabel('Ngôn ngữ của bạn').inputValue() === initialTarget,
+        'Cancel must discard language changes: ' + width)
+      await autoSwitch.check()
+      await page.getByLabel('Ngôn ngữ của bạn').selectOption('vi')
+      await page.getByLabel('Chế độ hiển thị').selectOption('bilingual')
+      await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
+      await settingsPage.waitFor({ state: 'hidden' })
+      const stored = await page.evaluate(() => JSON.parse(
+        localStorage.getItem('chatnet-conversation-translations:1') || '{}'))
+      check(stored[1]?.enabled && stored[1]?.targetLanguage === 'vi' &&
+        stored[1]?.display === 'bilingual',
+        'Saved S21 settings must persist only for the active conversation: ' + JSON.stringify(stored))
+      await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
+      await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      await settingsPage.waitFor()
+      check(await autoSwitch.isChecked() && await page.getByLabel('Ngôn ngữ của bạn').inputValue() === 'vi',
+        'S21 must restore saved settings on reopening: ' + width)
+      await page.getByRole('button', { name: 'Hủy' }).click()
+      await settingsPage.waitFor({ state: 'hidden' })
+      if (width === 1440) {
+        await page.locator('.social-chat-ai-banner button[aria-label="Cài đặt dịch AI"]').click()
+        const translationMenu = page.getByRole('dialog', { name: 'Cài đặt dịch AI' })
+        await translationMenu.waitFor()
+        const modalBounds = await translationMenu.boundingBox()
+        const viewport = page.viewportSize()
+        check(modalBounds && viewport &&
+          Math.abs(modalBounds.x + modalBounds.width / 2 - viewport.width / 2) < 3 &&
+          Math.abs(modalBounds.y + modalBounds.height / 2 - viewport.height / 2) < 3,
+          'Translation dialog must be centered in viewport: ' + JSON.stringify({ width, modalBounds, viewport }))
+        await translationMenu.locator('.translation-language-search input').fill('en')
+        check(await translationMenu.isVisible(), 'Dialog closed while typing: ' + width)
+        await page.keyboard.press('Escape')
+        await translationMenu.waitFor({ state: 'hidden' })
       }
-      await openTranslationFromDetails()
-      await translationMenu.waitFor()
-      const modalBounds = await translationMenu.boundingBox()
-      const viewport = page.viewportSize()
-      check(modalBounds && viewport &&
-        Math.abs(modalBounds.x + modalBounds.width / 2 - viewport.width / 2) < 3 &&
-        Math.abs(modalBounds.y + modalBounds.height / 2 - viewport.height / 2) < 3,
-        'Translation dialog must be centered in viewport: ' + JSON.stringify({ width, modalBounds, viewport }))
-      const contrast = await translationMenu.evaluate(dialog => {
-        const getColor = (selector) => getComputedStyle(dialog.querySelector(selector)).color
-        return {
-          background: getComputedStyle(dialog).backgroundColor,
-          title: getColor('.translation-hub-heading strong'),
-          subtitle: getColor('.translation-hub-heading small'),
-          language: getColor('.translation-language-copy strong'),
-          native: getColor('.translation-language-copy small'),
-          region: getColor('.translation-language-copy em'),
-          placeholder: getComputedStyle(dialog.querySelector('.translation-language-search input'), '::placeholder').color,
-        }
-      })
-      check(contrast.background === 'rgb(255, 255, 255)' &&
-        contrast.title === 'rgb(23, 47, 84)' &&
-        contrast.language === 'rgb(23, 47, 84)' &&
-        contrast.subtitle === 'rgb(81, 101, 130)' &&
-        contrast.native === 'rgb(67, 89, 120)' &&
-        contrast.region === 'rgb(98, 117, 147)' &&
-        contrast.placeholder === 'rgb(100, 120, 147)',
-        'Dialog text and language rows must have readable contrast: ' + JSON.stringify(contrast))
-      await translationMenu.locator('.translation-language-search input').fill('en')
-      check(await translationMenu.isVisible(), 'Translation dialog closed while interacting inside: ' + width)
-      await page.locator('.translation-hub-scrim').click({ position: { x: 5, y: 5 } })
-      await translationMenu.waitFor({ state: 'hidden' })
-      await openTranslationFromDetails()
-      await translationMenu.waitFor()
-      await page.keyboard.press('Escape')
-      await translationMenu.waitFor({ state: 'hidden' })
     }
     if (width <= 760) await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
   }
