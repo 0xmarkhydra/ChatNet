@@ -163,6 +163,7 @@ func main() {
 	mux.Handle("POST /api/conversations/direct", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createDirect)))
 	mux.Handle("POST /api/conversations/groups", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroup)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessages)))
+	mux.Handle("DELETE /api/conversations/{id}/history", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.clearConversationHistory)))
 	mux.Handle("GET /api/conversations/{id}/shared", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listSharedContent)))
 	mux.Handle("POST /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createMessage)))
 	mux.Handle("PATCH /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editMessage)))
@@ -577,12 +578,12 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		               ), '')
 		           END
 		           FROM messages m
-		           WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		           WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		             (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))
 		           ORDER BY m.id DESC
 		           LIMIT 1
 		       ),''),
-		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)) ORDER BY m.id DESC LIMIT 1),c.created_at),
 		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0)
@@ -597,7 +598,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		       JOIN users u ON u.id=other.user_id
 		       WHERE other.conversation_id=c.id AND other.user_id<>$1
 		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$6")+`)>0))
-		    OR EXISTS (SELECT 1 FROM messages msg WHERE msg.conversation_id=c.id
+		    OR EXISTS (SELECT 1 FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>cm.cleared_through_message_id
 		       AND msg.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$6")+`)>0
 		       AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id))))
@@ -608,7 +609,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
 		    WHERE other.conversation_id=c.id AND other.user_id<>$1
 		  ))
-		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
 		claims.UserID, limit, offset, categoryID, conversationID, keyword)
@@ -940,12 +941,13 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		JOIN conversation_members viewer ON viewer.conversation_id=m.conversation_id AND viewer.user_id=$5
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND rm.id>viewer.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		  (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id))
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
-		WHERE m.conversation_id=$1 AND ($3::bigint=0 OR m.id<$3)
+		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id AND ($3::bigint=0 OR m.id<$3)
 		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
 		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("m.text")+`, `+searchx.FoldSQL("$6")+`)>0))

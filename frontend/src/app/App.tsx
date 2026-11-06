@@ -168,7 +168,9 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
   const [sharedContentOpen, setSharedContentOpen] = useState(false)
   const [messageSearchOpen, setMessageSearchOpen] = useState(false)
-  useEffect(() => { setMessageSearchOpen(false) }, [activeConversationId])
+  const [conversationDetailsOpen, setConversationDetailsOpen] = useState(false)
+  const [historyActionBusy, setHistoryActionBusy] = useState(false)
+  useEffect(() => { setMessageSearchOpen(false); setConversationDetailsOpen(false) }, [activeConversationId])
 
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
   const [messageDrafts, setMessageDrafts] = useState<Record<number, MessageDraft>>(() => {
@@ -2108,10 +2110,10 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     }
   }
 
-  async function blockContact(friend: FriendSearchResult | FriendConnection) {
+  async function blockContact(friend: Pick<FriendSearchResult, 'id' | 'username' | 'displayName'>) {
     const sid = session?.sessionId
     if (!sid || friendBusyIds.has(friend.id)) return
-    if (!window.confirm(`Chặn @${friend.username}? Người này sẽ không thể nhắn tin trực tiếp hoặc kết bạn với bạn.`)) return
+    if (!window.confirm(`Chặn @${friend.username}? Hai bạn sẽ không thể nhắn tin, gọi điện hoặc kết bạn với nhau.`)) return
     setFriendBusyIds((old) => new Set(old).add(friend.id))
     setFriendMenuId(null)
     try {
@@ -2143,6 +2145,39 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         next.delete(friend.id)
         return next
       })
+    }
+  }
+
+  async function clearActiveConversationHistory() {
+    const current = conversations.find((item) => item.id === activeConversationId)
+    const sessionId = sessionRef.current?.sessionId
+    if (!current || !sessionId || historyActionBusy) return
+    if (!window.confirm(`Xóa lịch sử trò chuyện với ${current.name} trên tài khoản của bạn?\nNgười khác vẫn giữ lịch sử của họ. Bạn không thể khôi phục các tin nhắn cũ sau thao tác này.`)) return
+    setHistoryActionBusy(true)
+    try {
+      const response = await apiFetch(`/api/conversations/${current.id}/history`, { method: 'DELETE' })
+      if (!response.ok) {
+        const data = await response.json().catch(() => null) as { error?: string } | null
+        throw new Error(data?.error || 'Không xóa được lịch sử trò chuyện.')
+      }
+      if (sessionRef.current?.sessionId !== sessionId) return
+      responseCache.current.invalidate(['conversations', 'messages'])
+      if (activeConversationIdRef.current === current.id) {
+        setActiveConversationId(null)
+        setMessages([])
+        setHasMoreMessages(false)
+        setTranslations({})
+        setReplyingTo(null)
+        setSharedContentOpen(false)
+        setMessageSearchOpen(false)
+        setConversationDetailsOpen(false)
+      }
+      setNotice('Đã xóa lịch sử trò chuyện khỏi tài khoản của bạn.', 'success')
+      void refreshConversations()
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không xóa được lịch sử trò chuyện.', 'error')
+    } finally {
+      setHistoryActionBusy(false)
     }
   }
 
@@ -3634,7 +3669,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
       <section className={`phone-frame modern-frame ${tab === 'chat' && activeConversation ? 'mobile-conversation-open' : ''}`}>
         {tab === 'chat' && desktopSection === null && (
-          <div className={`messenger-layout modern-messenger penpot-social-chat ${activeConversation ? 'has-active' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
+          <div className={`messenger-layout modern-messenger penpot-social-chat ${activeConversation ? 'has-active' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
             <aside className="conversation-sidebar penpot-chat-list" aria-label="Danh sách cuộc trò chuyện">
               <div className="penpot-chat-list-header">
                 <div className="penpot-chat-list-title">
@@ -3952,9 +3987,14 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                       <div className="group-mobile-actions">
                         <CallHeaderActions conversationId={activeConversation.id} />
                         <button type="button" className="group-more-trigger"
-                          aria-label="Tùy chọn nhóm" aria-haspopup="dialog"
-                          aria-expanded={groupActionsOpen}
-                          onClick={() => setGroupActionsOpen((open) => !open)}>
+                          aria-label="Tìm tin nhắn trong cuộc trò chuyện"
+                          onClick={() => setMessageSearchOpen(true)}>
+                          <Search size={20} aria-hidden="true" />
+                        </button>
+                        <button type="button" className="group-more-trigger"
+                          aria-label="Thông tin hội thoại" aria-controls="conversation-details-panel"
+                          aria-expanded={conversationDetailsOpen}
+                          onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}>
                           <MoreHorizontal size={23} aria-hidden="true" />
                         </button>
                       </div>
@@ -3963,28 +4003,12 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                     <div className="translate-controls">
                       <CallHeaderActions conversationId={activeConversation.id} />
                       <button type="button" className="group-settings-toggle" onClick={() => setMessageSearchOpen(true)} title="Tìm trong cuộc trò chuyện" aria-label="Tìm tin nhắn trong cuộc trò chuyện"><Search size={19} /></button>
-                      <button
-                        type="button"
-                        className="group-settings-toggle shared-content-trigger"
-                        onClick={() => setSharedContentOpen(true)}
-                        aria-label="Xem ảnh, tệp và liên kết đã chia sẻ"
-                        title="Nội dung đã chia sẻ"
-                      >
-                        <Images size={19} strokeWidth={2.1} aria-hidden="true" />
-                        <span className="shared-content-label">Nội dung</span>
+                      <button type="button" className={conversationDetailsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
+                        onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}
+                        title="Thông tin hội thoại" aria-label="Thông tin hội thoại"
+                        aria-controls="conversation-details-panel" aria-expanded={conversationDetailsOpen}>
+                        <MoreHorizontal size={22} aria-hidden="true" />
                       </button>
-                      {activeConversation.type === 'group' && (
-                        <button
-                          type="button"
-                          className={groupSettingsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
-                          onClick={() => {
-                            if (groupSettingsOpen) setGroupSettingsOpen(false)
-                            else openGroupSettings(activeConversation)
-                          }}
-                        >
-                          👥 Nhóm
-                        </button>
-                      )}
                       <div className="translation-hub">
                         <button
                           type="button"
@@ -4395,9 +4419,22 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 </>
               )}
             </section>
-            {activeConversation && (
+            {activeConversation && conversationDetailsOpen && (
               <ConversationDetailsPanel
                 conversation={activeConversation}
+                busy={historyActionBusy}
+                onClose={() => setConversationDetailsOpen(false)}
+                onBlock={() => {
+                  if (activeConversation.otherUserId && activeConversation.otherUsername) {
+                    void blockContact({
+                      id: activeConversation.otherUserId,
+                      username: activeConversation.otherUsername,
+                      displayName: activeConversation.name,
+                    })
+                  }
+                }}
+                onClearHistory={() => { void clearActiveConversationHistory() }}
+                onGroupOptions={() => { setConversationDetailsOpen(false); setGroupActionsOpen(true) }}
                 onProfile={() => {
                   if (activeConversation.type === 'group') { setGroupMemberViewOpen(false); openGroupSettings(activeConversation) }
                   else if (activeConversation.otherUsername) openVisitor(activeConversation.otherUsername)

@@ -404,6 +404,94 @@
   .penpot-chat-list-filters button { font-size: 10px; padding-inline: 9px; }
 }
 
+
+/* Conversation header: the AI language picker is still available from details and the translation bar. */
+.modern-shell.penpot-layout .penpot-social-chat .chat-head .translation-hub-trigger {
+  display: none;
+}
+.modern-shell.penpot-layout .penpot-social-chat {
+  position: relative;
+}
+.conversation-details-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.conversation-details-heading h2 {
+  margin: 0;
+}
+.conversation-details-heading > button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 9px;
+  background: #f0f4fd;
+  color: #536b90;
+  cursor: pointer;
+}
+.penpot-chat-details-links .conversation-options-danger,
+.penpot-chat-details-links .conversation-options-danger span {
+  color: #b83b4d;
+}
+.penpot-chat-details-links button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+@media (min-width: 1420px) {
+  .modern-shell.penpot-layout .modern-messenger.penpot-social-chat.has-active:not(.details-open):not(.group-sidebar-open) {
+    grid-template-columns: minmax(285px, 347px) minmax(0, 1fr);
+  }
+}
+@media (min-width: 761px) and (max-width: 1419px) {
+  .modern-shell.penpot-layout .penpot-social-chat.details-open > .penpot-chat-details {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    z-index: 60;
+    right: 8px;
+    top: 8px;
+    bottom: 8px;
+    width: min(304px, 55%);
+    padding: 20px 17px;
+    border: 1px solid #e4eaf4;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 10px 40px rgba(27,46,82,.18);
+    overflow-y: auto;
+  }
+}
+@media (max-width: 760px) {
+  .modern-shell .penpot-social-chat .group-mobile-actions .call-header-actions > button:nth-child(2) {
+    display: grid;
+    place-items: center;
+    width: 39px;
+    min-width: 39px;
+    height: 43px;
+  }
+  .modern-shell .penpot-social-chat .group-mobile-actions { gap: 3px; }
+  .modern-shell .penpot-social-chat .group-mobile-actions .group-more-trigger {
+    width: 39px;
+    min-width: 39px;
+    flex-basis: 39px;
+  }
+  .penpot-social-chat.details-open > .penpot-chat-details {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    z-index: 250;
+    inset: 0 0 0 auto;
+    width: min(350px, 100vw);
+    padding: 22px 16px max(20px, env(safe-area-inset-bottom));
+    background: #fff;
+    box-shadow: -12px 0 48px rgba(26,42,70,.22);
+    overflow-y: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .penpot-social-chat .message { animation: none; }
 }
