@@ -12,6 +12,7 @@ import { useApiRequest } from "./useApiRequest";
 import { useAppRealtime } from "./useAppRealtime";
 import { useDesktopNotifications } from "../platform/useDesktopNotifications";
 import { useConversationData } from "../features/chat/useConversationData";
+import { useConversationListSearch } from "../features/chat/useConversationListSearch";
 import {
   useChatQuickSearch,
   type ChatQuickContact,
@@ -1038,6 +1039,14 @@ export default function App({
     return () => window.removeEventListener("keydown", onEscape);
   }, [groupSettingsOpen, groupNameEditing, setGroupSettingsOpen]);
 
+  const conversationListSearch = useConversationListSearch({
+    query: chatListQuery,
+    filter: chatListFilter,
+    categoryId: conversationCategories.selected,
+    sessionId: session?.sessionId,
+    enabled: tab === 'chat',
+    request: apiFetch,
+  });
   const conversationSearching =
     tab === "chat" && globalSearch.trim().length > 0;
   const chatQuickSearch = useChatQuickSearch({
@@ -4464,13 +4473,22 @@ export default function App({
               (!membershipSnapshot.current ||
                 membershipSnapshot.current.has(item.id)),
           );
-  const chatListSearch = chatListQuery.trim().toLocaleLowerCase('vi-VN')
-  const chatListConversations = visibleConversations.filter((conversation) => {
-    if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
-    if (chatListFilter === 'groups' && conversation.type !== 'group') return false
-    return !chatListSearch || [conversation.name, conversation.lastMessage, conversation.otherUsername]
-      .some((value) => value?.toLocaleLowerCase('vi-VN').includes(chatListSearch))
-  })
+  // Search uses the backend's authorized, accent-insensitive full-history query.
+  // Keep the normal paginated list intact when the search is cleared.
+  const chatListConversations = conversationListSearch.active
+    ? conversationListSearch.items
+        .filter((conversation) => !revokedConversationIds.current.has(conversation.id))
+        .map((conversation) => ({
+          ...conversation,
+          name: conversation.type === 'direct' && conversation.otherUserId
+            ? contactMetadata[conversation.otherUserId]?.nickname || conversation.name
+            : conversation.name,
+        }))
+    : visibleConversations.filter((conversation) => {
+        if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
+        if (chatListFilter === 'groups' && conversation.type !== 'group') return false
+        return true
+      })
 
   const searchedPosts = feedSearchActive
     ? postSearch.posts.map((post) =>
@@ -5335,7 +5353,8 @@ export default function App({
                 <label className="social-chat-list-search">
                   <Search size={19} aria-hidden="true" />
                   <input type="search" value={chatListQuery} onChange={(event) => setChatListQuery(event.target.value)}
-                    placeholder="Tìm kiếm tin nhắn..." aria-label="Lọc danh sách cuộc trò chuyện" />
+                    maxLength={120} placeholder="Tìm cuộc trò chuyện hoặc tin nhắn..."
+                    aria-label="Tìm kiếm toàn bộ cuộc trò chuyện" />
                 </label>
                 <div className="social-chat-list-filters" role="group" aria-label="Lọc cuộc trò chuyện">
                   {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
@@ -5469,18 +5488,32 @@ export default function App({
               {chatCreateError && newChatMode !== 'group' && <div className="inline-error">{chatCreateError}</div>}
 
               <ConversationCategories key={session.sessionId} model={conversationCategories} />
-              <div className="conversation-list zalo-conversation-list">
-                {conversationCategories.selected !== null && conversationCategories.loading && <p role="status">Đang tải phân loại…</p>}
-                {conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
+              <div className="conversation-list zalo-conversation-list" aria-busy={conversationListSearch.active && conversationListSearch.loading}>
+                {!conversationListSearch.active && conversationCategories.selected !== null && conversationCategories.loading && <p role="status">Đang tải phân loại…</p>}
+                {!conversationListSearch.active && conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
                   {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>Thử lại</button>
                 </div>}
-                {chatListConversations.length === 0 && !conversationCategories.loading && !conversationCategories.listError && (
+                {conversationListSearch.active && conversationListSearch.loading && (
+                  <p className="conversation-search-status" role="status">Đang tìm trong tất cả cuộc trò chuyện…</p>
+                )}
+                {conversationListSearch.active && conversationListSearch.error && (
+                  <p className="conversation-search-status" role="alert">
+                    {conversationListSearch.error}
+                    <button type="button" onClick={conversationListSearch.retry}>Thử lại</button>
+                  </p>
+                )}
+                {chatListConversations.length === 0 &&
+                  !conversationListSearch.loading && !conversationListSearch.error &&
+                  (conversationListSearch.active || (!conversationCategories.loading && !conversationCategories.listError)) && (
                   <div className="conversation-list-empty">
                     <SocoEmptyState
                       kind="chat"
-                      title={visibleConversations.length ? 'Không có hội thoại phù hợp' : 'Chưa có cuộc trò chuyện'}
-                      description={visibleConversations.length ? 'Thử thay đổi từ khóa hoặc chọn bộ lọc khác.' : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
-                      action={visibleConversations.length
+                      title={conversationListSearch.active ? 'Không tìm thấy cuộc trò chuyện'
+                        : visibleConversations.length ? 'Không có hội thoại phù hợp' : 'Chưa có cuộc trò chuyện'}
+                      description={conversationListSearch.active || visibleConversations.length
+                        ? 'Thử thay đổi từ khóa hoặc chọn bộ lọc khác.'
+                        : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
+                      action={conversationListSearch.active || visibleConversations.length
                         ? <SocoTextAction onClick={() => { setChatListQuery(''); setChatListFilter('all') }}>Xóa bộ lọc</SocoTextAction>
                         : <SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
                     />
@@ -5492,6 +5525,11 @@ export default function App({
                     key={conversation.id}
                     className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''}`}
                     onClick={() => {
+                      if (conversationListSearch.active) {
+                        // Opening an older search hit must not discard the existing sidebar cache.
+                        setConversations((current) => current.some((item) => item.id === conversation.id)
+                          ? current : [...current, conversation])
+                      }
                       setChatSearchJump(null)
                       setQuickSearchOpen(false)
                       setActiveConversationId(conversation.id)
@@ -5520,13 +5558,17 @@ export default function App({
                     </div>
                   </button>
                 ))}
-                {(conversationCategories.selected === null ? hasMoreConversations : conversationCategories.hasMore) && (
+                {(conversationListSearch.active ? conversationListSearch.hasMore
+                  : conversationCategories.selected === null ? hasMoreConversations : conversationCategories.hasMore) && (
                   <button type="button" className="soco-load-more soco-conversation-load-more"
-                    onClick={() => void (conversationCategories.selected === null ? loadMoreConversations() : conversationCategories.load(true))}
-                    disabled={conversationLoadingMore || conversationCategories.loading}
-                    aria-busy={conversationLoadingMore || conversationCategories.loading}>
+                    onClick={() => void (conversationListSearch.active ? conversationListSearch.loadMore()
+                      : conversationCategories.selected === null ? loadMoreConversations() : conversationCategories.load(true))}
+                    disabled={conversationListSearch.active ? conversationListSearch.loadingMore || Boolean(conversationListSearch.error)
+                      : conversationLoadingMore || conversationCategories.loading}
+                    aria-busy={conversationListSearch.active ? conversationListSearch.loadingMore : conversationLoadingMore || conversationCategories.loading}>
                     <RefreshCw size={15} aria-hidden="true" />
-                    {conversationLoadingMore || conversationCategories.loading ? 'Đang tải...' : 'Tải thêm hội thoại'}
+                    {(conversationListSearch.active ? conversationListSearch.loadingMore : conversationLoadingMore || conversationCategories.loading)
+                      ? 'Đang tải...' : 'Tải thêm hội thoại'}
                   </button>
                 )}
               </div>

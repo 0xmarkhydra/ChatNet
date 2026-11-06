@@ -105,6 +105,24 @@
   .social-chat-list-search input::placeholder { color: #8c9ab0; }
   .social-chat-list-search input::-webkit-search-cancel-button { cursor: pointer; }
 
+  .social-chat-list .conversation-search-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 12px;
+    color: #657793;
+    font-size: 12px;
+  }
+  .social-chat-list .conversation-search-status button {
+    border: 0;
+    background: transparent;
+    color: #2563eb;
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+  }
+
   .social-chat-list-filters {
     display: flex;
     flex: 0 0 auto;
