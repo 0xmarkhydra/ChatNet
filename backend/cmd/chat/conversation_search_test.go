@@ -27,6 +27,17 @@ func TestConversationSearchRejectsLongQuery(t *testing.T) {
 	}
 }
 
+func TestConversationSearchRejectsInvalidFilters(t *testing.T) {
+	for _, query := range []string{"unread=not-a-boolean", "type=channel"} {
+		w := httptest.NewRecorder()
+		(&server{}).listConversations(w, httptest.NewRequest("GET",
+			"/api/conversations?limit=5&"+query, nil))
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("%s: got %d, want 400", query, w.Code)
+		}
+	}
+}
+
 // Uses an isolated/disposable database provided by the test runner.
 func TestConversationSearchGlobalIntegration(t *testing.T) {
 	uri := os.Getenv("CHATNET_TEST_DATABASE_URL")
@@ -98,9 +109,12 @@ func TestConversationSearchGlobalIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	list := func(q string, offset int) []conversation {
+	list := func(q string, offset int, filters ...string) []conversation {
 		t.Helper()
 		path := fmt.Sprintf("/api/conversations?limit=5&q=%s&offset=%d", url.QueryEscape(q), offset)
+		for _, filter := range filters {
+			path += "&" + filter
+		}
 		req := httptest.NewRequest("GET", path, nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
@@ -139,5 +153,17 @@ func TestConversationSearchGlobalIntegration(t *testing.T) {
 	second := list("unrelated_", 5)
 	if len(first) != 5 || len(second) != 5 || first[4].ID == second[0].ID {
 		t.Fatalf("pagination repeated or truncated: first=%+v second=%+v", first, second)
+	}
+	if result := list("historic_"+prefix, 0, "unread=true"); len(result) != 1 || result[0].ID != old {
+		t.Fatalf("unread search should include matching unread conversation: %+v", result)
+	}
+	if result := list("unrelated_", 0, "unread=true"); len(result) != 0 {
+		t.Fatalf("unread filter should be applied before pagination: %+v", result)
+	}
+	if result := list("historic_"+prefix, 0, "type=group"); len(result) != 0 {
+		t.Fatalf("group filter returned direct conversation: %+v", result)
+	}
+	if result := list("unrelated_", 0, "type=group"); len(result) != 5 {
+		t.Fatalf("group search pagination failed: %+v", result)
 	}
 }

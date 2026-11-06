@@ -26,6 +26,12 @@ var groupGovernanceSQL string
 //go:embed migrations/005_community_channels.sql
 var communityChannelsSQL string
 
+//go:embed migrations/004_single_message_reaction.sql
+var singleMessageReactionSQL string
+
+//go:embed migrations/005_post_reactions.sql
+var postReactionsSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -57,6 +63,12 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, communityChannelsSQL); err != nil {
 		return fmt.Errorf("apply community channels migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, singleMessageReactionSQL); err != nil {
+		return fmt.Errorf("apply message reaction migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, postReactionsSQL); err != nil {
+		return fmt.Errorf("apply post reaction migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)

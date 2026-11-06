@@ -569,6 +569,20 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	unreadOnly := false
+	if raw := r.URL.Query().Get("unread"); raw != "" {
+		var err error
+		unreadOnly, err = strconv.ParseBool(raw)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid unread filter")
+			return
+		}
+	}
+	conversationType := r.URL.Query().Get("type")
+	if conversationType != "" && conversationType != "direct" && conversationType != "group" {
+		httpx.Error(w, http.StatusBadRequest, "invalid conversation type")
+		return
+	}
 	rows, err := s.db.Query(r.Context(), `
 		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,
 		       COALESCE((SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id=c.id),0),
@@ -604,11 +618,19 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
         WHERE cm.user_id=$1
           AND ($5::bigint=0 OR c.id=$5)
           AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
+		  AND ($8::text='' OR c.type=$8)
+		  AND ($7::boolean=FALSE OR EXISTS (
+		    SELECT 1 FROM messages unread
+		    WHERE unread.conversation_id=c.id AND unread.id>cm.last_read_message_id AND unread.user_id<>$1
+		      AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		        (b.blocker_id=$1 AND b.blocked_id=unread.user_id) OR (b.blocked_id=$1 AND b.blocker_id=unread.user_id))
+		  ))
 		  AND ($6::text='' OR strpos(`+searchx.FoldSQL("COALESCE(c.name,'')")+`, `+searchx.FoldSQL("$6")+`)>0
 		    OR EXISTS (SELECT 1 FROM conversation_members other
 		       JOIN users u ON u.id=other.user_id
+		       LEFT JOIN friend_contact_metadata meta ON meta.owner_id=$1 AND meta.contact_id=other.user_id
 		       WHERE other.conversation_id=c.id AND other.user_id<>$1
-		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$6")+`)>0))
+		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("meta.nickname")+`, `+searchx.FoldSQL("$6")+`)>0))
 		    OR EXISTS (SELECT 1 FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>cm.cleared_through_message_id
 		       AND msg.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$6")+`)>0
 		       AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
@@ -623,7 +645,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
-		claims.UserID, limit, offset, categoryID, conversationID, keyword)
+		claims.UserID, limit, offset, categoryID, conversationID, keyword, unreadOnly, conversationType)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
@@ -1449,7 +1471,8 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	allowed := map[string]bool{
-		"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "🙏": true,
+		"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "😡": true,
+		"🙏": true, // Legacy reaction remains removable on existing messages.
 	}
 	if !allowed[body.Emoji] {
 		httpx.Error(w, http.StatusBadRequest, "unsupported reaction")
@@ -1470,30 +1493,52 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var exists bool
-	_ = s.db.QueryRow(r.Context(), `
-		SELECT EXISTS(
-			SELECT 1 FROM message_reactions
-			WHERE message_id=$1 AND user_id=$2 AND emoji=$3
-		)`, messageID, claims.UserID, body.Emoji).Scan(&exists)
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
+		return
+	}
 
-	if exists {
-		if _, err := s.db.Exec(r.Context(), `
-			DELETE FROM message_reactions
-			WHERE message_id=$1 AND user_id=$2 AND emoji=$3
-		`, messageID, claims.UserID, body.Emoji); err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot remove reaction")
-			return
-		}
-	} else {
-		if _, err := s.db.Exec(r.Context(), `
-			INSERT INTO message_reactions(message_id,user_id,emoji)
-			VALUES($1,$2,$3)
-			ON CONFLICT DO NOTHING
+	// Serialize changes to the same message, including requests from multiple tabs.
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot update reaction")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var lockedID int64
+	if err := tx.QueryRow(r.Context(), `
+		SELECT id FROM messages WHERE id=$1 AND deleted_at IS NULL FOR UPDATE
+	`, messageID).Scan(&lockedID); err != nil {
+		httpx.Error(w, http.StatusNotFound, "message not found")
+		return
+	}
+	var previous string
+	err = tx.QueryRow(r.Context(), `
+		SELECT emoji FROM message_reactions
+		WHERE message_id=$1 AND user_id=$2 ORDER BY created_at DESC, emoji DESC LIMIT 1
+	`, messageID, claims.UserID).Scan(&previous)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, http.StatusInternalServerError, "cannot read reaction")
+		return
+	}
+	// Also works before the one-per-user index is installed, during a rolling deploy.
+	if _, err := tx.Exec(r.Context(), `
+		DELETE FROM message_reactions WHERE message_id=$1 AND user_id=$2
+	`, messageID, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update reaction")
+		return
+	}
+	if previous != body.Emoji {
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO message_reactions(message_id,user_id,emoji) VALUES($1,$2,$3)
 		`, messageID, claims.UserID, body.Emoji); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot save reaction")
 			return
 		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot save reaction")
+		return
 	}
 
 	m, err := s.loadMessage(r.Context(), messageID, claims.UserID)
@@ -1859,8 +1904,21 @@ func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, 
 		}
 		userIDs = visible
 	}
-	data, _ := json.Marshal(event)
 	for _, userID := range userIDs {
+		outgoing := event
+		if event.Type == "message.updated" && event.Message != nil {
+			// "mine" and blocked-user counts depend on the recipient.
+			personalized, err := s.loadMessage(ctx, event.Message.ID, userID)
+			if err != nil {
+				log.Printf("cannot personalize message update for recipient: %v", err)
+				continue
+			}
+			outgoing.Message = &personalized
+		}
+		data, err := json.Marshal(outgoing)
+		if err != nil {
+			continue
+		}
 		_ = s.redis.Publish(ctx, userChannel(userID), data).Err()
 	}
 }
