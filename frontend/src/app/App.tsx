@@ -130,6 +130,9 @@ import {
   Bell,
   Check,
   Images,
+  Languages,
+  ChevronDown,
+  Plus,
   LogOut,
   MessageCircle,
   MoreHorizontal,
@@ -249,6 +252,8 @@ export default function App({
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const [globalSearch, setGlobalSearch] = useState("");
+  const [chatListQuery, setChatListQuery] = useState('');
+  const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'groups'>('all');
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const quickSearchAnchorRef = useRef<HTMLDivElement>(null);
   const [chatSearchJump, setChatSearchJump] = useState<{
@@ -308,8 +313,11 @@ export default function App({
 
   const [sharedContentOpen, setSharedContentOpen] = useState(false);
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
+  const [conversationDetailsOpen, setConversationDetailsOpen] = useState(false);
+  const [historyActionBusy, setHistoryActionBusy] = useState(false);
   useEffect(() => {
     setMessageSearchOpen(false);
+    setConversationDetailsOpen(false);
   }, [activeConversationId]);
 
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
@@ -2805,12 +2813,12 @@ export default function App({
     }
   }
 
-  async function blockContact(friend: FriendSearchResult | FriendConnection) {
+  async function blockContact(friend: Pick<FriendSearchResult, 'id' | 'username' | 'displayName'>) {
     const sid = session?.sessionId;
     if (!sid || friendBusyIds.has(friend.id)) return;
     if (
       !window.confirm(
-        `Chặn @${friend.username}? Người này sẽ không thể nhắn tin trực tiếp hoặc kết bạn với bạn.`,
+        `Chặn @${friend.username}? Hai bạn sẽ không thể nhắn tin, gọi điện hoặc kết bạn với nhau.`,
       )
     )
       return;
@@ -2862,6 +2870,40 @@ export default function App({
       });
     }
   }
+
+  async function clearActiveConversationHistory() {
+    const current = conversations.find((item) => item.id === activeConversationId)
+    const sessionId = sessionRef.current?.sessionId
+    if (!current || !sessionId || historyActionBusy) return
+    if (!window.confirm(`Xóa lịch sử trò chuyện với ${current.name} trên tài khoản của bạn?\nNgười khác vẫn giữ lịch sử của họ. Bạn không thể khôi phục các tin nhắn cũ sau thao tác này.`)) return
+    setHistoryActionBusy(true)
+    try {
+      const response = await apiFetch(`/api/conversations/${current.id}/history`, { method: 'DELETE' })
+      if (!response.ok) {
+        const data = await response.json().catch(() => null) as { error?: string } | null
+        throw new Error(data?.error || 'Không xóa được lịch sử trò chuyện.')
+      }
+      if (sessionRef.current?.sessionId !== sessionId) return
+      responseCache.current.invalidate(['conversations', 'messages'])
+      if (activeConversationIdRef.current === current.id) {
+        setActiveConversationId(null)
+        setMessages([])
+        setHasMoreMessages(false)
+        setTranslations({})
+        setReplyingTo(null)
+        setSharedContentOpen(false)
+        setMessageSearchOpen(false)
+        setConversationDetailsOpen(false)
+      }
+      setNotice('Đã xóa lịch sử trò chuyện khỏi tài khoản của bạn.', 'success')
+      void refreshConversations()
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không xóa được lịch sử trò chuyện.', 'error')
+    } finally {
+      setHistoryActionBusy(false)
+    }
+  }
+
 
   async function reportContact(friend: FriendSearchResult | FriendConnection) {
     const sid = session?.sessionId;
@@ -4400,6 +4442,14 @@ export default function App({
               (!membershipSnapshot.current ||
                 membershipSnapshot.current.has(item.id)),
           );
+  const chatListSearch = chatListQuery.trim().toLocaleLowerCase('vi-VN')
+  const chatListConversations = visibleConversations.filter((conversation) => {
+    if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
+    if (chatListFilter === 'groups' && conversation.type !== 'group') return false
+    return !chatListSearch || [conversation.name, conversation.lastMessage, conversation.otherUsername]
+      .some((value) => value?.toLocaleLowerCase('vi-VN').includes(chatListSearch))
+  })
+
   const searchedPosts = feedSearchActive
     ? postSearch.posts.map((post) =>
         likePreviews[post.id] === undefined
@@ -5171,22 +5221,37 @@ export default function App({
       <section
         className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
       >
-        {tab === "chat" && desktopSection === null && (
-          <div
-            className={`messenger-layout modern-messenger ${activeConversation ? "has-active" : ""}${groupSettingsOpen && activeConversation?.type === "group" ? " group-sidebar-open" : ""}`}
-          >
-            <aside className="conversation-sidebar">
-              {newChatMode === "friends" && (
+        {tab === 'chat' && desktopSection === null && (
+          <div className={`messenger-layout modern-messenger social-chat-layout ${activeConversation ? 'has-active' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
+            <aside className="conversation-sidebar social-chat-list" aria-label="Danh sách cuộc trò chuyện">
+              <div className="social-chat-list-header">
+                <div className="social-chat-list-title">
+                  <h2>Cuộc trò chuyện</h2>
+                  <button type="button" className="social-chat-new" aria-label="Tạo cuộc trò chuyện mới"
+                    title="Tạo cuộc trò chuyện" onClick={() => { setChatCreateError(''); setNewChatMode('direct') }}>
+                    <Plus size={20} aria-hidden="true" />
+                  </button>
+                </div>
+                <label className="social-chat-list-search">
+                  <Search size={19} aria-hidden="true" />
+                  <input type="search" value={chatListQuery} onChange={(event) => setChatListQuery(event.target.value)}
+                    placeholder="Tìm kiếm tin nhắn..." aria-label="Lọc danh sách cuộc trò chuyện" />
+                </label>
+                <div className="social-chat-list-filters" role="group" aria-label="Lọc cuộc trò chuyện">
+                  {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
+                    <button key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
+                      className={chatListFilter === filter.key ? 'is-active' : ''}
+                      onClick={() => setChatListFilter(filter.key)}>{filter.label}</button>
+                  ))}
+                </div>
+              </div>
+              {newChatMode === 'friends' && (
                 <div className="connect-modal-layer">
                   <button
                     type="button"
                     className="connect-modal-scrim"
                     aria-label="Đóng tìm và kết nối"
-                    onClick={() => {
-                      setNewChatMode("none");
-                      setFriendQuery("");
-                      setFriendResults([]);
-                    }}
+                    onClick={() => { setNewChatMode('none'); setFriendQuery(''); setFriendResults([]) }}
                   />
                   <section
                     className="friend-search-panel connect-modal"
@@ -5203,15 +5268,9 @@ export default function App({
                       <button
                         type="button"
                         className="friend-search-close"
-                        onClick={() => {
-                          setNewChatMode("none");
-                          setFriendQuery("");
-                          setFriendResults([]);
-                        }}
+                        onClick={() => { setNewChatMode('none'); setFriendQuery(''); setFriendResults([]) }}
                         aria-label="Đóng tìm và kết nối"
-                      >
-                        ×
-                      </button>
+                      >×</button>
                     </div>
 
                     <label className="friend-search-input-wrap connect-search-input">
@@ -5227,110 +5286,51 @@ export default function App({
                         maxLength={254}
                       />
                       {friendQuery && (
-                        <button
-                          type="button"
-                          aria-label="Xóa tìm kiếm"
-                          onClick={() => setFriendQuery("")}
-                        >
-                          ×
-                        </button>
+                        <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setFriendQuery('')}>×</button>
                       )}
                     </label>
 
                     <div className="connect-identity-card">
-                      <UserAvatar
-                        username={session.user.username}
-                        name={userLabel(
-                          session.user.displayName,
-                          session.user.username,
-                        )}
-                        className="connect-identity-avatar"
-                        online
-                      />
+                      <UserAvatar username={session.user.username} name={userLabel(session.user.displayName, session.user.username)} className="connect-identity-avatar" online />
                       <div className="connect-identity-copy">
-                        <strong>
-                          {session.user.displayName || session.user.username}
-                        </strong>
+                        <strong>{session.user.displayName || session.user.username}</strong>
                         <span>@{session.user.username}</span>
                       </div>
-                      <div
-                        className="connect-identity-actions"
-                        aria-label="Chia sẻ hồ sơ"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setQrOpen("mine")}
-                          aria-label="QR của tôi"
-                          title="QR của tôi"
-                        >
-                          <UiIcon name="qr" size={20} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void shareMyProfile()}
-                          aria-label="Chia sẻ hồ sơ của tôi"
-                          title="Chia sẻ"
-                        >
-                          ↗
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void copyInviteLink()}
-                          aria-label="Sao chép link hồ sơ"
-                          title="Sao chép link"
-                        >
-                          ⧉
-                        </button>
+                      <div className="connect-identity-actions" aria-label="Chia sẻ hồ sơ">
+                        <button type="button" onClick={() => setQrOpen('mine')} aria-label="QR của tôi" title="QR của tôi"><UiIcon name="qr" size={20} /></button>
+                        <button type="button" onClick={() => void shareMyProfile()} aria-label="Chia sẻ hồ sơ của tôi" title="Chia sẻ">↗</button>
+                        <button type="button" onClick={() => void copyInviteLink()} aria-label="Sao chép link hồ sơ" title="Sao chép link">⧉</button>
                       </div>
                     </div>
 
                     <div className="friend-search-results connect-results">
                       {friendSearching && (
                         <div className="connect-loading" aria-label="Đang tìm">
-                          <span />
-                          <span />
-                          <span />
+                          <span /><span /><span />
                         </div>
                       )}
-                      {!friendSearching &&
-                        !friendQuery.trim() &&
-                        friendResults.length > 0 && (
-                          <div className="friend-suggestion-label">
-                            Người bạn có thể biết
-                          </div>
-                        )}
+                      {!friendSearching && !friendQuery.trim() && friendResults.length > 0 && (
+                        <div className="friend-suggestion-label">Người bạn có thể biết</div>
+                      )}
                       {friendSearchError && !friendSearching && (
-                        <div className="friend-search-state" role="alert">
-                          Không tải được kết quả.{" "}
-                          <button
-                            type="button"
-                            onClick={() => setFriendSearchRetry((n) => n + 1)}
-                          >
-                            Thử lại
-                          </button>
+                        <div className="friend-search-state" role="alert">Không tải được kết quả. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button></div>
+                      )}
+                      {!friendSearching && !friendSearchError && friendQuery.trim() && friendResults.length === 0 && (
+                        <div className="friend-search-state">
+                          <strong>Không tìm thấy người phù hợp</strong>
+                          <span>Thử tên khác, @username hoặc email chính xác.</span>
                         </div>
                       )}
-                      {!friendSearching &&
-                        !friendSearchError &&
-                        friendQuery.trim() &&
-                        friendResults.length === 0 && (
-                          <div className="friend-search-state">
-                            <strong>Không tìm thấy người phù hợp</strong>
-                            <span>
-                              Thử tên khác, @username hoặc email chính xác.
-                            </span>
-                          </div>
-                        )}
                       {friendResults.map((friend) => {
-                        const relationship = friendRelationship(friend.id);
+                        const relationship = friendRelationship(friend.id)
                         const actionLabel =
-                          relationship === "accepted"
-                            ? "Nhắn tin"
-                            : relationship === "incoming"
-                              ? "Chấp nhận"
-                              : relationship === "outgoing"
-                                ? "Hủy lời mời"
-                                : "Kết bạn";
+                          relationship === 'accepted'
+                            ? 'Nhắn tin'
+                            : relationship === 'incoming'
+                              ? 'Chấp nhận'
+                              : relationship === 'outgoing'
+                                ? 'Hủy lời mời'
+                                : 'Kết bạn'
                         return (
                           <button
                             type="button"
@@ -5339,188 +5339,94 @@ export default function App({
                             onClick={() => void actOnFriend(friend)}
                             disabled={friendBusyIds.has(friend.id)}
                           >
-                            <UserAvatar
-                              username={friend.username}
-                              name={userLabel(
-                                friend.displayName,
-                                friend.username,
-                              )}
-                              className="friend-avatar"
-                              online={friend.online}
-                            />
+                            <UserAvatar username={friend.username} name={userLabel(friend.displayName, friend.username)} className="friend-avatar" online={friend.online} />
                             <div className="friend-result-copy">
-                              <strong>
-                                {friend.displayName || friend.username}
-                              </strong>
+                              <strong>{friend.displayName || friend.username}</strong>
                               <span>
                                 @{friend.username}
-                                {friend.reason
-                                  ? ` · ${friend.reason}`
-                                  : friend.online
-                                    ? " · Đang hoạt động"
-                                    : ""}
+                                {friend.reason ? ` · ${friend.reason}` : friend.online ? ' · Đang hoạt động' : ''}
                               </span>
                             </div>
-                            <div
-                              className={`friend-result-action relationship-${relationship}`}
-                            >
-                              <small>{actionLabel}</small>
-                              <span>
-                                {relationship === "none" ? "＋" : "›"}
-                              </span>
+                            <div className={`friend-result-action relationship-${relationship}`}>
+                              <small>{actionLabel}</small><span>{relationship === 'none' ? '＋' : '›'}</span>
                             </div>
                           </button>
-                        );
+                        )
                       })}
                     </div>
                   </section>
                 </div>
               )}
 
-              {newChatMode === "direct" && (
+              {newChatMode === 'direct' && (
                 <form className="new-chat-panel" onSubmit={createDirect}>
-                  <div className="panel-line">
-                    <strong>Tạo chat riêng</strong>
-                    <button
-                      type="button"
-                      onClick={() => setNewChatMode("none")}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <input
-                    value={directUsername}
-                    onChange={(event) => setDirectUsername(event.target.value)}
-                    placeholder="Username người muốn chat"
-                    maxLength={64}
-                    autoFocus
-                  />
+                  <div className="panel-line"><strong>Tạo chat riêng</strong><button type="button" onClick={() => setNewChatMode('none')}>×</button></div>
+                  <input value={directUsername} onChange={(event) => setDirectUsername(event.target.value)} placeholder="Username người muốn chat" maxLength={64} autoFocus />
                   <button>Tạo cuộc trò chuyện</button>
                 </form>
               )}
 
-              {chatCreateError && newChatMode !== "group" && (
-                <div className="inline-error">{chatCreateError}</div>
-              )}
+              {chatCreateError && newChatMode !== 'group' && <div className="inline-error">{chatCreateError}</div>}
 
-              <ConversationCategories
-                key={session.sessionId}
-                model={conversationCategories}
-              />
+              <ConversationCategories key={session.sessionId} model={conversationCategories} />
               <div className="conversation-list zalo-conversation-list">
-                {conversationCategories.selected !== null &&
-                  conversationCategories.loading && (
-                    <p role="status">Đang tải phân loại…</p>
-                  )}
-                {conversationCategories.selected !== null &&
-                  conversationCategories.listError && (
-                    <div role="alert" className="category-error">
-                      {conversationCategories.listError}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void conversationCategories.load(false, true)
-                        }
-                      >
-                        Thử lại
-                      </button>
-                    </div>
-                  )}
-                {visibleConversations.length === 0 &&
-                  !conversationCategories.loading &&
-                  !conversationCategories.listError && (
-                    <div className="conversation-list-empty">
-                      <SocoEmptyState
-                        kind="chat"
-                        title="Chưa có cuộc trò chuyện"
-                        description="Tìm bạn bè để bắt đầu kết nối và trò chuyện."
-                        action={
-                          <SocoTextAction onClick={() => openConnectSurface()}>
-                            Tìm bạn bè
-                          </SocoTextAction>
-                        }
-                      />
-                    </div>
-                  )}
+                {conversationCategories.selected !== null && conversationCategories.loading && <p role="status">Đang tải phân loại…</p>}
+                {conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
+                  {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>Thử lại</button>
+                </div>}
+                {chatListConversations.length === 0 && !conversationCategories.loading && !conversationCategories.listError && (
+                  <div className="conversation-list-empty">
+                    <SocoEmptyState
+                      kind="chat"
+                      title={visibleConversations.length ? 'Không có hội thoại phù hợp' : 'Chưa có cuộc trò chuyện'}
+                      description={visibleConversations.length ? 'Thử thay đổi từ khóa hoặc chọn bộ lọc khác.' : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
+                      action={visibleConversations.length
+                        ? <SocoTextAction onClick={() => { setChatListQuery(''); setChatListFilter('all') }}>Xóa bộ lọc</SocoTextAction>
+                        : <SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
+                    />
+                  </div>
+                )}
 
-                {visibleConversations.map((conversation) => (
+                {chatListConversations.map((conversation) => (
                   <button
                     key={conversation.id}
-                    className={`conversation-item ${activeConversationId === conversation.id ? "active" : ""}`}
+                    className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''}`}
                     onClick={() => {
-                      setChatSearchJump(null);
-                      setQuickSearchOpen(false);
-                      setActiveConversationId(conversation.id);
-                      setTranslations({});
-                      setTranslationOriginals({});
-                      setTranslationMenuOpen(false);
+                      setChatSearchJump(null)
+                      setQuickSearchOpen(false)
+                      setActiveConversationId(conversation.id)
+                      setTranslations({})
+                      setTranslationOriginals({})
+                      setTranslationMenuOpen(false)
                     }}
                   >
                     <UserAvatar
-                      username={conversation.otherUsername}
-                      name={conversation.name}
+                      username={conversation.otherUsername} name={conversation.name}
                       className="conversation-avatar"
-                      group={conversation.type === "group"}
-                      online={
-                        conversation.type === "direct" && conversation.online
-                      }
+                      group={conversation.type === 'group'}
+                      online={conversation.type === 'direct' && conversation.online}
                     />
                     <div className="conversation-copy">
                       <div>
-                        <span className="conversation-title">
-                          <strong>{conversation.name}</strong>
-                          <CategoryBadge
-                            iconOnly
-                            category={conversationCategories.categories.find(
-                              (c) => c.id === conversation.categoryId,
-                            )}
-                          />
+                        <span className="conversation-title"><strong>{conversation.name}</strong>
+                          <CategoryBadge iconOnly category={conversationCategories.categories.find(c => c.id === conversation.categoryId)} />
                         </span>
-                        <time>
-                          {formatTime(conversation.lastMessageAt) ||
-                            (conversation.online ? "online" : "")}
-                        </time>
+                        <time>{formatTime(conversation.lastMessageAt) || (conversation.online ? 'online' : '')}</time>
                       </div>
                       <div>
-                        <span>
-                          {conversation.lastMessage ||
-                            (conversation.type === "group"
-                              ? `${conversation.memberCount} thành viên`
-                              : "Bắt đầu trò chuyện")}
-                        </span>
-                        {conversation.unreadCount > 0 && (
-                          <b>
-                            {conversation.unreadCount > 99
-                              ? "99+"
-                              : conversation.unreadCount}
-                          </b>
-                        )}
+                        <span>{conversation.lastMessage || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
+                        {conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</b>}
                       </div>
                     </div>
                   </button>
                 ))}
-                {(conversationCategories.selected === null
-                  ? hasMoreConversations
-                  : conversationCategories.hasMore) && (
-                  <button
-                    type="button"
-                    className="soco-load-more soco-conversation-load-more"
-                    onClick={() =>
-                      void (conversationCategories.selected === null
-                        ? loadMoreConversations()
-                        : conversationCategories.load(true))
-                    }
-                    disabled={
-                      conversationLoadingMore || conversationCategories.loading
-                    }
-                    aria-busy={
-                      conversationLoadingMore || conversationCategories.loading
-                    }
-                  >
+                {(conversationCategories.selected === null ? hasMoreConversations : conversationCategories.hasMore) && (
+                  <button type="button" className="soco-load-more soco-conversation-load-more"
+                    onClick={() => void (conversationCategories.selected === null ? loadMoreConversations() : conversationCategories.load(true))}
+                    disabled={conversationLoadingMore || conversationCategories.loading}
+                    aria-busy={conversationLoadingMore || conversationCategories.loading}>
                     <RefreshCw size={15} aria-hidden="true" />
-                    {conversationLoadingMore || conversationCategories.loading
-                      ? "Đang tải..."
-                      : "Tải thêm hội thoại"}
+                    {conversationLoadingMore || conversationCategories.loading ? 'Đang tải...' : 'Tải thêm hội thoại'}
                   </button>
                 )}
               </div>
@@ -5528,278 +5434,154 @@ export default function App({
 
             <section
               onDragEnter={(event) => {
-                if (!transferHasFiles(event.dataTransfer)) return;
-                event.preventDefault();
-                chatDragDepth.current += 1;
-                if (!chatDragActive) setChatDragActive(true);
+                if (!transferHasFiles(event.dataTransfer)) return
+                event.preventDefault()
+                chatDragDepth.current += 1
+                if (!chatDragActive) setChatDragActive(true)
               }}
               onDragOver={(event) => {
-                if (!transferHasFiles(event.dataTransfer)) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "copy";
+                if (!transferHasFiles(event.dataTransfer)) return
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'copy'
               }}
               onDragLeave={(event) => {
-                if (chatDragDepth.current === 0) return;
-                event.preventDefault();
-                chatDragDepth.current = Math.max(0, chatDragDepth.current - 1);
-                if (chatDragDepth.current === 0) setChatDragActive(false);
+                if (chatDragDepth.current === 0) return
+                event.preventDefault()
+                chatDragDepth.current = Math.max(0, chatDragDepth.current - 1)
+                if (chatDragDepth.current === 0) setChatDragActive(false)
               }}
               onDrop={(event) => {
-                if (!transferHasFiles(event.dataTransfer)) return;
-                event.preventDefault();
-                chatDragDepth.current = 0;
-                setChatDragActive(false);
-                void addChatFiles(Array.from(event.dataTransfer.files));
+                if (!transferHasFiles(event.dataTransfer)) return
+                event.preventDefault()
+                chatDragDepth.current = 0
+                setChatDragActive(false)
+                void addChatFiles(Array.from(event.dataTransfer.files))
               }}
-              className={`conversation-panel${
-                activeConversation?.type === "group" ? " group-chat-panel" : ""
-              }${chatDragActive ? " chat-file-drag-active" : ""}`}
-            >
+              className={`conversation-panel${activeConversation?.type === 'group'
+                ? ' group-chat-panel'
+                : ''}${chatDragActive ? ' chat-file-drag-active' : ''}`}>
               {chatDragActive && activeConversationId && (
-                <div
-                  className="chat-file-drop-overlay"
-                  role="status"
-                  aria-live="polite"
-                >
+                <div className="chat-file-drop-overlay" role="status" aria-live="polite">
                   <div className="chat-file-drop-card">
                     <Images size={32} aria-hidden="true" />
                     <strong>Thả ảnh hoặc tệp vào đây</strong>
-                    <span>
-                      Tệp sẽ được thêm vào tin nhắn, chưa gửi ngay · Tối đa 10
-                      tệp
-                    </span>
+                    <span>Tệp sẽ được thêm vào tin nhắn, chưa gửi ngay · Tối đa 10 tệp</span>
                   </div>
                 </div>
               )}
               {!activeConversation ? (
                 <div className="conversation-empty">
-                  <SocoEmptyState
-                    kind="chat"
-                    title="Kết nối không biên giới"
+                  <SocoEmptyState kind="chat" title="Kết nối không biên giới"
                     description="Chọn một cuộc trò chuyện để bắt đầu nhắn tin và dịch AI tự động."
-                    action={
-                      <SocoTextAction onClick={() => openConnectSurface()}>
-                        Tìm bạn mới
-                      </SocoTextAction>
-                    }
+                    action={<SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn mới</SocoTextAction>}
                   />
                 </div>
               ) : (
                 <>
                   <header className="chat-head">
                     <div className="room-info">
-                      <button
-                        className="mobile-back"
-                        type="button"
-                        aria-label="Quay lại danh sách"
-                        onClick={() => setActiveConversationId(null)}
-                      >
-                        ‹
-                      </button>
+                      <button className="mobile-back" type="button" aria-label="Quay lại danh sách" onClick={() => setActiveConversationId(null)}>‹</button>
                       <UserAvatar
-                        username={activeConversation.otherUsername}
-                        name={activeConversation.name}
+                        username={activeConversation.otherUsername} name={activeConversation.name}
                         className="room-avatar"
-                        group={activeConversation.type === "group"}
-                        online={
-                          activeConversation.type === "direct" &&
-                          activeConversation.online
-                        }
+                        group={activeConversation.type === 'group'}
+                        online={activeConversation.type === 'direct' && activeConversation.online}
                       />
-                      <div
-                        className={
-                          activeConversation.type === "group"
-                            ? "group-room-details"
-                            : ""
-                        }
-                      >
-                        {activeConversation.type === "group" ? (
+                      <div className={activeConversation.type === 'group' ? 'group-room-details' : ''}>
+                        {activeConversation.type === 'group' ? (
                           <>
                             <div className="group-room-title">
-                              <strong title={activeConversation.name}>
-                                {activeConversation.name}
-                              </strong>
-                              {canEditActiveGroup && (
-                                <button
-                                  type="button"
-                                  className="group-room-edit"
-                                  aria-label="Chỉnh sửa tên nhóm"
-                                  title="Chỉnh sửa tên nhóm"
-                                  onClick={() => {
-                                    setGroupNameDraft(activeConversation.name);
-                                    setGroupNameEditing(true);
-                                  }}
-                                >
-                                  <PencilLine size={16} aria-hidden="true" />
-                                </button>
-                              )}
+                                <strong title={activeConversation.name}>{activeConversation.name}</strong>
+                                {canEditActiveGroup && (
+                                  <button type="button" className="group-room-edit"
+                                    aria-label="Chỉnh sửa tên nhóm" title="Chỉnh sửa tên nhóm"
+                                    onClick={() => {
+                                      setGroupNameDraft(activeConversation.name)
+                                      setGroupNameEditing(true)
+                                    }}>
+                                    <PencilLine size={16} aria-hidden="true" />
+                                  </button>
+                                )}
                             </div>
                             <div className="room-subtitle group-room-subtitle">
-                              <button
-                                type="button"
-                                className="group-room-member-count"
+                              <button type="button" className="group-room-member-count"
                                 aria-label={`Xem danh sách ${activeConversation.memberCount} thành viên nhóm`}
                                 onClick={() => {
-                                  if (!groupSettingsOpen)
-                                    openGroupSettings(activeConversation);
-                                  setGroupMemberViewOpen(true);
-                                }}
-                              >
+                                  if (!groupSettingsOpen) openGroupSettings(activeConversation)
+                                  setGroupMemberViewOpen(true)
+                                }}>
                                 <Users size={15} aria-hidden="true" />
-                                <span>
-                                  {activeConversation.memberCount} thành viên
-                                </span>
+                                <span>{activeConversation.memberCount} thành viên</span>
                               </button>
-                              <CategoryAssignment
-                                model={conversationCategories}
+                              <CategoryAssignment model={conversationCategories}
                                 conversationId={activeConversation.id}
-                                categoryId={activeConversation.categoryId}
-                              />
+                                categoryId={activeConversation.categoryId} />
                             </div>
                           </>
                         ) : (
                           <>
-                            <strong>
-                              {activeConversation.otherUsername ? (
-                                <button
-                                  type="button"
-                                  className="visitor-name-link"
-                                  onClick={() =>
-                                    openVisitor(
-                                      activeConversation.otherUsername!,
-                                    )
-                                  }
-                                  aria-label="Xem trang cá nhân"
-                                >
-                                  {activeConversation.name}
-                                </button>
-                              ) : (
-                                activeConversation.name
-                              )}
-                            </strong>
+                            <strong>{activeConversation.otherUsername
+                              ? <button type="button" className="visitor-name-link"
+                                onClick={() => openVisitor(activeConversation.otherUsername!)}
+                                aria-label="Xem trang cá nhân">{activeConversation.name}</button>
+                              : activeConversation.name}</strong>
                             <small className="room-subtitle">
-                              {activeConversation.online
-                                ? "● Đang online"
-                                : "Chat riêng"}
-                              <CategoryAssignment
-                                model={conversationCategories}
+                              {activeConversation.online ? '● Đang hoạt động' : 'Chat riêng'}
+                              <CategoryAssignment model={conversationCategories}
                                 conversationId={activeConversation.id}
-                                categoryId={activeConversation.categoryId}
-                              />
+                                categoryId={activeConversation.categoryId} />
                             </small>
                           </>
                         )}
                       </div>
                     </div>
 
-                    {activeConversation.type === "group" && (
+                    {activeConversation.type === 'group' && (
                       <div className="group-mobile-actions">
-                        <CallHeaderActions
-                          conversationId={activeConversation.id}
-                        />
-                        <button
-                          type="button"
-                          className="group-more-trigger"
-                          aria-label="Tùy chọn nhóm"
-                          aria-haspopup="dialog"
-                          aria-expanded={groupActionsOpen}
-                          onClick={() => setGroupActionsOpen((open) => !open)}
-                        >
+                        <CallHeaderActions conversationId={activeConversation.id} />
+                        <button type="button" className="group-more-trigger"
+                          aria-label="Tìm tin nhắn trong cuộc trò chuyện"
+                          onClick={() => setMessageSearchOpen(true)}>
+                          <Search size={20} aria-hidden="true" />
+                        </button>
+                        <button type="button" className="group-more-trigger"
+                          aria-label="Thông tin hội thoại" aria-controls="conversation-details-panel"
+                          aria-expanded={conversationDetailsOpen}
+                          onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}>
                           <MoreHorizontal size={23} aria-hidden="true" />
                         </button>
                       </div>
                     )}
 
                     <div className="translate-controls">
-                      <CallHeaderActions
-                        conversationId={activeConversation.id}
-                      />
-                      <button
-                        type="button"
-                        className="group-settings-toggle"
-                        onClick={() => setMessageSearchOpen(true)}
-                        title="Tìm trong cuộc trò chuyện"
-                        aria-label="Tìm tin nhắn trong cuộc trò chuyện"
-                      >
-                        <Search size={19} />
+                      <CallHeaderActions conversationId={activeConversation.id} />
+                      <button type="button" className="group-settings-toggle" onClick={() => setMessageSearchOpen(true)} title="Tìm trong cuộc trò chuyện" aria-label="Tìm tin nhắn trong cuộc trò chuyện"><Search size={19} /></button>
+                      <button type="button" className={conversationDetailsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
+                        onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}
+                        title="Thông tin hội thoại" aria-label="Thông tin hội thoại"
+                        aria-controls="conversation-details-panel" aria-expanded={conversationDetailsOpen}>
+                        <MoreHorizontal size={22} aria-hidden="true" />
                       </button>
-                      <button
-                        type="button"
-                        className="group-settings-toggle shared-content-trigger"
-                        onClick={() => setSharedContentOpen(true)}
-                        aria-label="Xem ảnh, tệp và liên kết đã chia sẻ"
-                        title="Nội dung đã chia sẻ"
-                      >
-                        <Images
-                          size={19}
-                          strokeWidth={2.1}
-                          aria-hidden="true"
-                        />
-                        <span className="shared-content-label">Nội dung</span>
-                      </button>
-                      {activeConversation.type === "group" && (
-                        <button
-                          type="button"
-                          className={
-                            groupSettingsOpen
-                              ? "group-settings-toggle active"
-                              : "group-settings-toggle"
-                          }
-                          onClick={() => {
-                            if (groupSettingsOpen) setGroupSettingsOpen(false);
-                            else openGroupSettings(activeConversation);
-                          }}
-                        >
-                          👥 Nhóm
-                        </button>
-                      )}
                       <div className="translation-hub">
                         <button
                           type="button"
-                          className={
-                            autoTranslate
-                              ? "translation-hub-trigger active"
-                              : "translation-hub-trigger"
-                          }
+                          className={autoTranslate ? 'translation-hub-trigger active' : 'translation-hub-trigger'}
                           aria-expanded={translationMenuOpen}
                           aria-label="Cài đặt dịch AI"
                           onClick={() => {
                             setTranslationMenuOpen((current) => {
-                              const next = !current;
-                              if (next) setLanguageSearch("");
-                              return next;
-                            });
+                              const next = !current
+                              if (next) setLanguageSearch('')
+                              return next
+                            })
                           }}
                         >
-                          <span
-                            className="translation-hub-flag"
-                            aria-hidden="true"
-                          >
-                            {selectedLanguage?.flag || "🌐"}
-                          </span>
-                          <span
-                            className="translation-hub-spark"
-                            aria-hidden="true"
-                          >
-                            ✦
-                          </span>
+                          <span className="translation-hub-flag" aria-hidden="true">{selectedLanguage?.flag || '🌐'}</span>
+                          <span className="translation-hub-spark" aria-hidden="true">✦</span>
                           <b>AI</b>
-                          <span
-                            className="translation-hub-dot"
-                            aria-hidden="true"
-                          >
-                            ·
-                          </span>
-                          <strong>
-                            {selectedLanguage?.code ||
-                              targetLanguage.toUpperCase()}
-                          </strong>
-                          <span
-                            className="translation-hub-chevron"
-                            aria-hidden="true"
-                          >
-                            {translationMenuOpen ? "⌃" : "⌄"}
-                          </span>
+                          <span className="translation-hub-dot" aria-hidden="true">·</span>
+                          <strong>{selectedLanguage?.code || targetLanguage.toUpperCase()}</strong>
+                          <span className="translation-hub-chevron" aria-hidden="true">{translationMenuOpen ? '⌃' : '⌄'}</span>
                         </button>
 
                         {translationMenuOpen && (
@@ -5810,28 +5592,18 @@ export default function App({
                               aria-label="Đóng cài đặt dịch"
                               onClick={() => setTranslationMenuOpen(false)}
                             />
-                            <div
-                              className="translation-hub-popover"
-                              role="dialog"
-                              aria-label="Cài đặt dịch AI"
-                            >
+                            <div className="translation-hub-popover" role="dialog" aria-label="Cài đặt dịch AI">
                               <div className="translation-hub-heading">
                                 <div>
-                                  <strong>{t("translation.title")}</strong>
-                                  <small>{t("translation.subtitle")}</small>
+                                  <strong>{t('translation.title')}</strong>
+                                  <small>{t('translation.subtitle')}</small>
                                 </div>
                                 <button
                                   type="button"
-                                  className={
-                                    autoTranslate
-                                      ? "translation-hub-switch active"
-                                      : "translation-hub-switch"
-                                  }
+                                  className={autoTranslate ? 'translation-hub-switch active' : 'translation-hub-switch'}
                                   role="switch"
                                   aria-checked={autoTranslate}
-                                  onClick={() =>
-                                    changeAutoTranslate(!autoTranslate)
-                                  }
+                                  onClick={() => changeAutoTranslate(!autoTranslate)}
                                 >
                                   <span />
                                 </button>
@@ -5842,77 +5614,43 @@ export default function App({
                                 <input
                                   type="search"
                                   value={languageSearch}
-                                  onChange={(event) =>
-                                    setLanguageSearch(event.target.value)
-                                  }
-                                  placeholder={t(
-                                    "translation.searchPlaceholder",
-                                  )}
+                                  onChange={(event) => setLanguageSearch(event.target.value)}
+                                  placeholder={t('translation.searchPlaceholder')}
                                   autoComplete="off"
                                   autoCapitalize="none"
                                   spellCheck={false}
                                 />
                                 {languageSearch && (
-                                  <button
-                                    type="button"
-                                    aria-label="Xóa tìm kiếm"
-                                    onClick={() => setLanguageSearch("")}
-                                  >
-                                    ×
-                                  </button>
+                                  <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setLanguageSearch('')}>×</button>
                                 )}
                               </label>
 
                               <div className="translation-language-count">
-                                <span>
-                                  {visibleLanguageOptions.length}{" "}
-                                  {t("translation.languageCount")}
-                                </span>
-                                <small>{t("translation.languageHint")}</small>
+                                <span>{visibleLanguageOptions.length} {t('translation.languageCount')}</span>
+                                <small>{t('translation.languageHint')}</small>
                               </div>
 
-                              <div
-                                className="translation-language-list"
-                                aria-label="Chọn ngôn ngữ dịch"
-                              >
+                              <div className="translation-language-list" aria-label="Chọn ngôn ngữ dịch">
                                 {visibleLanguageOptions.map((language) => (
                                   <button
                                     key={language.value}
                                     type="button"
-                                    className={
-                                      targetLanguage === language.value
-                                        ? "active"
-                                        : ""
-                                    }
-                                    onClick={() =>
-                                      changeTargetLanguage(language.value)
-                                    }
+                                    className={targetLanguage === language.value ? 'active' : ''}
+                                    onClick={() => changeTargetLanguage(language.value)}
                                   >
-                                    <span
-                                      className="translation-language-flag"
-                                      aria-hidden="true"
-                                    >
-                                      {language.flag}
-                                    </span>
+                                    <span className="translation-language-flag" aria-hidden="true">{language.flag}</span>
                                     <span className="translation-language-copy">
-                                      <strong>
-                                        {language.localizedLanguage}
-                                      </strong>
+                                      <strong>{language.localizedLanguage}</strong>
                                       <small>{language.nativeLanguage}</small>
-                                      <em>
-                                        {language.localizedRegion} ·{" "}
-                                        {language.nativeRegion}
-                                      </em>
+                                      <em>{language.localizedRegion} · {language.nativeRegion}</em>
                                     </span>
                                     <b>{language.code}</b>
-                                    {targetLanguage === language.value && (
-                                      <i aria-hidden="true">✓</i>
-                                    )}
+                                    {targetLanguage === language.value && <i aria-hidden="true">✓</i>}
                                   </button>
                                 ))}
                                 {visibleLanguageOptions.length === 0 && (
                                   <div className="translation-language-empty">
-                                    {t("translation.noResults")}
+                                    {t('translation.noResults')}
                                   </div>
                                 )}
                               </div>
@@ -5923,103 +5661,53 @@ export default function App({
                     </div>
                   </header>
 
-                  {groupActionsOpen &&
-                    activeConversation.type === "group" &&
-                    !groupSettingsOpen && (
-                      <GroupActionsSheet
-                        groupName={activeConversation.name}
-                        memberCount={activeConversation.memberCount}
-                        autoTranslate={autoTranslate}
-                        targetLanguage={targetLanguage}
-                        languages={languageOptions}
-                        onClose={() => setGroupActionsOpen(false)}
-                        onCall={(mediaType) =>
-                          launchGroupCall(activeConversation.id, mediaType)
-                        }
-                        onSharedContent={() => setSharedContentOpen(true)}
-                        onManageGroup={() => {
-                          setGroupMemberViewOpen(false);
-                          openGroupSettings(activeConversation);
-                        }}
-                        onToggleAutoTranslate={() =>
-                          changeAutoTranslate(!autoTranslate)
-                        }
-                        onChangeLanguage={(language) =>
-                          changeTargetLanguage(language)
-                        }
-                      />
-                    )}
 
-                  {chatFriend && (
-                    <div
-                      className={`chat-friend-bar relationship-${chatFriendRelationship}`}
-                      aria-label="Kết bạn trong cuộc trò chuyện"
-                    >
+                  {groupActionsOpen && activeConversation.type === 'group' && !groupSettingsOpen && (
+                    <GroupActionsSheet
+                      groupName={activeConversation.name}
+                      memberCount={activeConversation.memberCount}
+                      autoTranslate={autoTranslate}
+                      targetLanguage={targetLanguage}
+                      languages={languageOptions}
+                      onClose={() => setGroupActionsOpen(false)}
+                      onCall={(mediaType) => launchGroupCall(activeConversation.id, mediaType)}
+                      onSharedContent={() => setSharedContentOpen(true)}
+                      onManageGroup={() => { setGroupMemberViewOpen(false); openGroupSettings(activeConversation) }}
+                      onToggleAutoTranslate={() => changeAutoTranslate(!autoTranslate)}
+                      onChangeLanguage={(language) => changeTargetLanguage(language)}
+                    />
+                  )}
+
+                  {chatFriend && chatFriendRelationship !== 'accepted' && (friendSyncError || friendSyncSessionId === session?.sessionId) && (
+                    <div className={`chat-friend-bar relationship-${chatFriendRelationship}`} aria-label="Kết bạn trong cuộc trò chuyện">
                       <span role="status">
-                        {chatFriendRelationship === "accepted" ? (
-                          <UserCheck size={18} aria-hidden="true" />
-                        ) : (
-                          <UserPlus size={18} aria-hidden="true" />
-                        )}
-                        {friendSyncError ||
-                          (friendSyncSessionId !== session?.sessionId
-                            ? "Đang tải trạng thái kết bạn..."
-                            : chatFriendRelationship === "accepted"
-                              ? "Hai bạn đã là bạn bè"
-                              : chatFriendRelationship === "incoming"
-                                ? "Bạn nhận được lời mời kết bạn"
-                                : chatFriendRelationship === "outgoing"
-                                  ? "Đã gửi lời mời kết bạn"
-                                  : "Hai bạn chưa kết bạn")}
+                        <UserPlus size={18} aria-hidden="true" />
+                        {friendSyncError || (friendSyncSessionId !== session?.sessionId ? 'Đang tải trạng thái kết bạn...' :
+                          chatFriendRelationship === 'incoming' ? 'Bạn nhận được lời mời kết bạn' :
+                          chatFriendRelationship === 'outgoing' ? 'Đã gửi lời mời kết bạn' : 'Hai bạn chưa kết bạn')}
                       </span>
                       {friendSyncError ? (
-                        <button
-                          type="button"
-                          disabled={friendSyncBusy}
-                          onClick={() => void refreshFriendConnections()}
-                        >
+                        <button type="button" disabled={friendSyncBusy} onClick={() => void refreshFriendConnections()}>
                           <RefreshCw size={16} aria-hidden="true" /> Thử lại
                         </button>
-                      ) : (
-                        friendSyncSessionId === session?.sessionId &&
-                        chatFriendRelationship !== "accepted" && (
-                          <div className="chat-friend-actions">
-                            <button
-                              type="button"
-                              className={
-                                chatFriendRelationship === "outgoing"
-                                  ? ""
-                                  : "primary"
-                              }
-                              disabled={friendBusyIds.has(chatFriend.id)}
-                              onClick={() => void actOnFriend(chatFriend)}
-                            >
-                              {chatFriendRelationship === "incoming" ? (
-                                <Check size={16} aria-hidden="true" />
-                              ) : chatFriendRelationship === "outgoing" ? (
-                                <X size={16} aria-hidden="true" />
-                              ) : (
-                                <UserPlus size={16} aria-hidden="true" />
-                              )}
-                              {chatFriendRelationship === "incoming"
-                                ? "Chấp nhận"
-                                : chatFriendRelationship === "outgoing"
-                                  ? "Hủy lời mời"
-                                  : "Gửi lời mời kết bạn"}
+                      ) : friendSyncSessionId === session?.sessionId && (
+                        <div className="chat-friend-actions">
+                          <button
+                            type="button"
+                            className={chatFriendRelationship === 'outgoing' ? '' : 'primary'}
+                            disabled={friendBusyIds.has(chatFriend.id)}
+                            onClick={() => void actOnFriend(chatFriend)}
+                          >
+                            {chatFriendRelationship === 'incoming' ? <Check size={16} aria-hidden="true" /> :
+                              chatFriendRelationship === 'outgoing' ? <X size={16} aria-hidden="true" /> : <UserPlus size={16} aria-hidden="true" />}
+                            {chatFriendRelationship === 'incoming' ? 'Chấp nhận' : chatFriendRelationship === 'outgoing' ? 'Hủy lời mời' : 'Gửi lời mời kết bạn'}
+                          </button>
+                          {chatFriendRelationship === 'incoming' && (
+                            <button type="button" disabled={friendBusyIds.has(chatFriend.id)} onClick={() => void actOnFriend(chatFriend, true)}>
+                              <X size={16} aria-hidden="true" /> Từ chối
                             </button>
-                            {chatFriendRelationship === "incoming" && (
-                              <button
-                                type="button"
-                                disabled={friendBusyIds.has(chatFriend.id)}
-                                onClick={() =>
-                                  void actOnFriend(chatFriend, true)
-                                }
-                              >
-                                <X size={16} aria-hidden="true" /> Từ chối
-                              </button>
-                            )}
-                          </div>
-                        )
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -6033,378 +5721,218 @@ export default function App({
                   )}
 
                   {messageSearchOpen && (
-                    <MessageSearchPanel
-                      conversationId={activeConversation.id}
-                      request={apiFetch}
+                    <MessageSearchPanel conversationId={activeConversation.id} request={apiFetch}
                       onClose={() => setMessageSearchOpen(false)}
                       onJump={async (result) => {
-                        if (
-                          activeConversationIdRef.current !==
-                          activeConversation.id
-                        )
-                          return;
+                        if (activeConversationIdRef.current !== activeConversation.id) return
                         // Both search entry points use the same history loader; never replace the current timeline.
                         setChatSearchJump({
                           conversationId: activeConversation.id,
                           messageId: result.id,
                           revision: ++chatSearchJumpRevision.current,
-                        });
+                        })
                       }}
                     />
                   )}
-                  <div
-                    className="messages"
-                    ref={messagesScrollRef}
-                    onScroll={(event) => {
-                      const element = event.currentTarget;
-                      messageScrollAtBottom.current =
-                        element.scrollHeight -
-                          element.scrollTop -
-                          element.clientHeight <
-                        100;
-                    }}
-                  >
+                  <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
+                    const element = event.currentTarget
+                    messageScrollAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100
+                  }}>
                     {hasMoreMessages && (
-                      <button
-                        type="button"
-                        className="soco-load-more soco-older-messages"
-                        onClick={() => void loadOlderMessages()}
-                        disabled={messagesLoadingMore}
-                        aria-busy={messagesLoadingMore}
-                      >
+                      <button type="button" className="soco-load-more soco-older-messages"
+                        onClick={() => void loadOlderMessages()} disabled={messagesLoadingMore}
+                        aria-busy={messagesLoadingMore}>
                         <RefreshCw size={16} aria-hidden="true" />
-                        {messagesLoadingMore
-                          ? "Đang tải..."
-                          : "Tải thêm tin nhắn cũ"}
+                        {messagesLoadingMore ? 'Đang tải...' : 'Tải thêm tin nhắn cũ'}
                       </button>
                     )}
-                    <div className="day-divider">
-                      <span>Cuộc trò chuyện</span>
-                    </div>
-                    {visibleMessages.map((message) => {
-                      const mine = message.senderId === session.user.id;
-                      const translatedText = !message.deleted
-                        ? translations[message.id]
-                        : "";
-                      const originalVisible = Boolean(
-                        translationOriginals[message.id],
-                      );
-                      const translatedLanguage =
-                        selectedLanguage?.localizedLanguage ||
-                        targetLanguage.toUpperCase();
+                    {visibleMessages.map((message, index) => {
+                      const messageDay = new Date(message.createdAt)
+                      const previousDay = index > 0 ? new Date(visibleMessages[index - 1].createdAt) : null
+                      const displayDay = !previousDay || messageDay.toDateString() !== previousDay.toDateString()
+                      const today = new Date()
+                      const yesterday = new Date(today)
+                      yesterday.setDate(yesterday.getDate() - 1)
+                      const dayLabel = messageDay.toDateString() === today.toDateString() ? 'Hôm nay'
+                        : messageDay.toDateString() === yesterday.toDateString() ? 'Hôm qua'
+                          : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(messageDay)
+                      const mine = message.senderId === session.user.id
+                      const translatedText = !message.deleted ? translations[message.id] : ''
+                      const photoOnly = !message.deleted && !message.text && message.attachments?.length === 1 && message.attachments[0].kind === 'image' && Boolean(message.attachments[0].url)
+                      const originalVisible = Boolean(translationOriginals[message.id])
+                      const translatedLanguage = selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()
                       return (
                         <Fragment key={message.id}>
+                          {displayDay && <div className="day-divider"><span>{dayLabel}</span></div>}
                           {messageGapBefore === message.id && (
-                            <button
-                              type="button"
-                              className="soco-load-more soco-middle-messages"
-                              onClick={() => void loadMissingMessages()}
-                              disabled={messageGapLoading}
-                              aria-busy={messageGapLoading}
-                            >
+                            <button type="button" className="soco-load-more soco-middle-messages"
+                              onClick={() => void loadMissingMessages()} disabled={messageGapLoading}
+                              aria-busy={messageGapLoading}>
                               <RefreshCw size={15} aria-hidden="true" />
-                              {messageGapLoading
-                                ? "Đang tải..."
-                                : "Tải tin nhắn ở giữa"}
+                              {messageGapLoading ? 'Đang tải...' : 'Tải tin nhắn ở giữa'}
                             </button>
                           )}
-                          <article
-                            data-message-id={message.id}
-                            className={
-                              mine
-                                ? "message mine message-press-target"
-                                : "message message-press-target"
-                            }
-                            onPointerDown={(event) =>
-                              beginMessageLongPress(
-                                message,
-                                event.clientX,
-                                event.clientY,
-                                event.button,
-                                event.target,
-                              )
-                            }
-                            onPointerMove={(event) =>
-                              moveMessageLongPress(event.clientX, event.clientY)
-                            }
-                            onPointerUp={cancelMessageLongPress}
-                            onPointerCancel={cancelMessageLongPress}
-                            onPointerLeave={cancelMessageLongPress}
-                            onContextMenu={(event) => {
-                              if (message.deleted) return;
-                              // Keep native context-copy for text selected inside this message.
-                              const selection = window.getSelection();
-                              if (
-                                event.target instanceof Element &&
-                                event.target.closest(
-                                  ".message-selectable-text",
-                                ) &&
-                                !event.target.closest(
-                                  "a.message-inline-link",
-                                ) &&
-                                selection &&
-                                !selection.isCollapsed &&
-                                event.currentTarget.contains(
-                                  selection.anchorNode,
-                                ) &&
-                                event.currentTarget.contains(
-                                  selection.focusNode,
-                                )
-                              )
-                                return;
-                              event.preventDefault();
-                              openMessageActions(message, event.target);
-                            }}
-                          >
-                            {!mine && (
-                              <div className="message-meta">
-                                {userLabel(
-                                  message.senderDisplayName,
-                                  message.sender,
-                                )}
-                              </div>
-                            )}
-                            {message.replyToMessageId && (
-                              <div className="message-reply-quote">
-                                <strong>
-                                  {userLabel(
-                                    message.replyToDisplayName,
-                                    message.replyToSender,
-                                  )}
-                                </strong>
-                                <span>
-                                  {message.replyToText || "Tin nhắn đã thu hồi"}
-                                </span>
-                              </div>
-                            )}
-                            {message.deleted ? (
-                              <div className="bubble recalled-message">
-                                Tin nhắn đã được thu hồi
-                              </div>
-                            ) : (
-                              <>
-                                {message.text && (
-                                  <div
-                                    className={
-                                      translatedText
-                                        ? "bubble translated-bubble translation-flip-bubble"
-                                        : "bubble"
-                                    }
-                                  >
-                                    <span
-                                      key={
-                                        translatedText
-                                          ? `${message.id}-${originalVisible ? "original" : "translated"}`
-                                          : `${message.id}-plain`
-                                      }
-                                      className="translation-flip-content message-selectable-text"
-                                    >
-                                      {messageTextParts(
-                                        translatedText
-                                          ? originalVisible
-                                            ? message.text
-                                            : translatedText
-                                          : message.text,
-                                      ).map((part, index) =>
-                                        part.kind === "link" ? (
-                                          <a
-                                            key={index}
-                                            className="message-inline-link"
-                                            href={messageLinkHref(part.text)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                          >
-                                            {part.text}
-                                          </a>
-                                        ) : (
-                                          <Fragment key={index}>
-                                            {part.text}
-                                          </Fragment>
-                                        ),
-                                      )}
-                                    </span>
-                                  </div>
-                                )}
-                                {translatedText && message.text && (
-                                  <button
-                                    type="button"
-                                    className={
-                                      originalVisible
-                                        ? "translation-flip-pill original"
-                                        : "translation-flip-pill translated"
-                                    }
-                                    aria-label={
-                                      originalVisible
-                                        ? `Hiện bản dịch ${translatedLanguage}`
-                                        : "Hiện bản gốc"
-                                    }
-                                    onClick={() =>
-                                      setTranslationOriginals((current) => ({
-                                        ...current,
-                                        [message.id]: !current[message.id],
-                                      }))
-                                    }
-                                  >
-                                    <span
-                                      className="translation-flip-icon"
-                                      aria-hidden="true"
-                                    >
-                                      {originalVisible ? "↔" : "✦"}
-                                    </span>
-                                    <b>
-                                      {originalVisible
-                                        ? t("translation.original")
-                                        : targetLanguage
-                                            .split("-")[0]
-                                            .toUpperCase()}
-                                    </b>
-                                    <small>
-                                      {originalVisible
-                                        ? t("translation.originalText")
-                                        : "AI"}
-                                    </small>
-                                    <span
-                                      className="translation-flip-swap"
-                                      aria-hidden="true"
-                                    >
-                                      ↔
-                                    </span>
-                                  </button>
-                                )}
-                                <MediaAttachmentsView
-                                  items={message.attachments}
-                                />
-                              </>
-                            )}
-                            <div className="message-stamp">
-                              {formatTime(message.createdAt)}
-                              {message.editedAt && !message.deleted
-                                ? " · đã sửa"
-                                : ""}
-                              {mine && (message.readByUserIds?.length || 0) > 0
-                                ? activeConversation.type === "group"
-                                  ? ` · ${message.readByUserIds?.length} đã xem`
-                                  : " · Đã xem"
-                                : ""}
-                            </div>
-                            {!message.deleted && (
-                              <>
-                                <div className="message-reactions">
-                                  {(message.reactions || []).map((reaction) => (
-                                    <button
-                                      key={reaction.emoji}
-                                      type="button"
-                                      disabled={
-                                        reactionPreviews[message.id] !==
-                                        undefined
-                                      }
-                                      aria-pressed={reaction.mine}
-                                      className={
-                                        reaction.mine
-                                          ? "reaction-chip active"
-                                          : "reaction-chip"
-                                      }
-                                      onClick={() =>
-                                        void toggleReaction(
-                                          message,
-                                          reaction.emoji,
-                                        )
-                                      }
-                                      aria-label={`Thả cảm xúc ${reaction.emoji}`}
-                                    >
-                                      {reaction.emoji} {reaction.count}
-                                    </button>
-                                  ))}
-                                </div>
-                              </>
-                            )}
-                          </article>
-                        </Fragment>
-                      );
-                    })}
-                    {chatOutbox
-                      .filter(
-                        (item) => item.conversationId === activeConversationId,
-                      )
-                      .map((item) => (
                         <article
-                          className="message mine outgoing-preview chat-outbox-message"
-                          key={item.clientId}
-                          aria-busy={item.status !== "failed"}
+                          data-message-id={message.id}
+                          className={mine ? 'message mine message-press-target' : 'message message-press-target'}
+                          onPointerDown={(event) => beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)}
+                          onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
+                          onPointerUp={cancelMessageLongPress}
+                          onPointerCancel={cancelMessageLongPress}
+                          onPointerLeave={cancelMessageLongPress}
+                          onContextMenu={(event) => {
+                            if (message.deleted) return
+                            // Keep native context-copy for text selected inside this message.
+                            const selection = window.getSelection()
+                            if (event.target instanceof Element &&
+                                event.target.closest('.message-selectable-text') &&
+                                !event.target.closest('a.message-inline-link') &&
+                                selection && !selection.isCollapsed &&
+                                event.currentTarget.contains(selection.anchorNode) &&
+                                event.currentTarget.contains(selection.focusNode)) return
+                            event.preventDefault()
+                            openMessageActions(message, event.target)
+                          }}
                         >
-                          {item.replyToMessageId && (
+                          {!mine && (
+                            <>
+                              <UserAvatar username={message.sender} name={userLabel(message.senderDisplayName, message.sender)}
+                                className="chat-message-sender-avatar" online={false} />
+                              <div className={activeConversation.type === 'group' ? 'message-meta' : 'message-meta chat-message-meta-direct'}>{userLabel(message.senderDisplayName, message.sender)}</div>
+                            </>
+                          )}
+                          {message.replyToMessageId && (
                             <div className="message-reply-quote">
-                              <strong>{item.replyToSender || "Trả lời"}</strong>
-                              <span>{item.replyToText}</span>
+                              <strong>{userLabel(message.replyToDisplayName, message.replyToSender)}</strong>
+                              <span>{message.replyToText || 'Tin nhắn đã thu hồi'}</span>
                             </div>
                           )}
-                          {item.text && (
-                            <div className="bubble">
-                              <span className="message-selectable-text">
-                                {item.text}
-                              </span>
-                            </div>
+                          {message.deleted ? (
+                            <div className="bubble recalled-message">Tin nhắn đã được thu hồi</div>
+                          ) : (
+                            <>
+                              {message.text && (
+                                <div className={translatedText && !mine ? 'bubble chat-translated-card' : translatedText ? 'bubble translated-bubble translation-flip-bubble' : 'bubble'}>
+                                  <span
+                                    key={translatedText && mine ? `${message.id}-${originalVisible ? 'original' : 'translated'}` : `${message.id}-plain`}
+                                    className="translation-flip-content message-selectable-text"
+                                  >
+                                    {messageTextParts(translatedText && mine && !originalVisible ? translatedText : message.text).map((part, index) => part.kind === 'link'
+                                      ? <a key={index} className="message-inline-link" href={messageLinkHref(part.text)} target="_blank" rel="noopener noreferrer">{part.text}</a>
+                                      : <Fragment key={index}>{part.text}</Fragment>)}
+                                  </span>
+                                  {translatedText && !mine && (
+                                    <button type="button" className="chat-translation-inline"
+                                      aria-expanded={!originalVisible} aria-label={originalVisible ? `Hiện bản dịch ${translatedLanguage}` : 'Ẩn bản dịch'}
+                                      onClick={() => setTranslationOriginals((current) => ({
+                                        ...current, [message.id]: !current[message.id],
+                                      }))}>
+                                      <Languages size={18} aria-hidden="true" />
+                                      <span>{originalVisible ? 'Hiện bản dịch' : `Bản dịch: ${translatedText}`}</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {translatedText && message.text && mine && (
+                                <button
+                                  type="button"
+                                  className={originalVisible ? 'translation-flip-pill original' : 'translation-flip-pill translated'}
+                                  aria-label={originalVisible ? `Hiện bản dịch ${translatedLanguage}` : 'Hiện bản gốc'}
+                                  onClick={() => setTranslationOriginals((current) => ({
+                                    ...current,
+                                    [message.id]: !current[message.id],
+                                  }))}
+                                >
+                                  <span className="translation-flip-icon" aria-hidden="true">{originalVisible ? '↔' : '✦'}</span>
+                                  <b>{originalVisible ? t('translation.original') : targetLanguage.split('-')[0].toUpperCase()}</b>
+                                  <small>{originalVisible ? t('translation.originalText') : 'AI'}</small>
+                                  <span className="translation-flip-swap" aria-hidden="true">↔</span>
+                                </button>
+                              )}
+                              {Boolean(message.attachments?.length) && (
+                                <div className={photoOnly ? 'chat-message-media chat-message-photo' : 'chat-message-media'}>
+                                  <MediaAttachmentsView items={message.attachments} />
+                                  {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt)}</span>}
+                                </div>
+                              )}
+                            </>
                           )}
-                          <MediaAttachmentsView items={item.attachments} />
-                          <div className="chat-outbox-footer">
-                            <span
-                              className={
-                                item.status === "failed"
-                                  ? "message-stamp chat-outbox-error"
-                                  : "message-stamp"
-                              }
-                              role="status"
-                            >
-                              {item.status === "failed"
-                                ? item.error || "Không gửi được"
-                                : !chatOnline
-                                  ? "Chờ có mạng"
-                                  : item.status === "unconfirmed"
-                                    ? "Đang xác nhận..."
-                                    : "Đang gửi..."}
-                            </span>
-                            {(item.status === "failed" ||
-                              (item.status === "unconfirmed" &&
-                                chatOnline)) && (
-                              <button
-                                type="button"
-                                className="chat-outbox-retry"
-                                aria-label={
-                                  item.status === "failed"
-                                    ? "Gửi lại tin nhắn bị lỗi"
-                                    : "Gửi lại tin nhắn đang chờ"
-                                }
-                                onClick={() => {
-                                  updateChatOutbox((items) =>
-                                    items.map((old) =>
-                                      old.clientId === item.clientId
-                                        ? {
-                                            ...old,
-                                            status: "queued",
-                                            error: undefined,
-                                          }
-                                        : old,
-                                    ),
-                                  );
-                                  void retryQueuedChatMessages();
-                                }}
-                              >
-                                <RefreshCw size={14} /> Gửi lại
-                              </button>
-                            )}
+                          <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
+                            {formatTime(message.createdAt)}
+                            {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
+                            {mine && (message.readByUserIds?.length || 0) > 0
+                              ? activeConversation.type === 'group'
+                                ? ` · ${message.readByUserIds?.length} đã xem`
+                                : ' · Đã xem'
+                              : ''}
                           </div>
+                          {!message.deleted && (
+                            <>
+                              <div className="message-reactions">
+                                {(message.reactions || []).map((reaction) => (
+                                  <button
+                                    key={reaction.emoji}
+                                    type="button"
+                                    disabled={reactionPreviews[message.id] !== undefined}
+                                    aria-pressed={reaction.mine}
+                                    className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
+                                    onClick={() => void toggleReaction(message, reaction.emoji)}
+                                    aria-label={`Thả cảm xúc ${reaction.emoji}`}
+                                  >
+                                    {reaction.emoji} {reaction.count}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </article>
-                      ))}
+                        </Fragment>
+                      )
+                    })}
+                    {chatOutbox.filter((item) => item.conversationId === activeConversationId).map((item) => (
+                      <article className="message mine outgoing-preview chat-outbox-message" key={item.clientId} aria-busy={item.status !== 'failed'}>
+                        {item.replyToMessageId && (
+                          <div className="message-reply-quote">
+                            <strong>{item.replyToSender || 'Trả lời'}</strong><span>{item.replyToText}</span>
+                          </div>
+                        )}
+                        {item.text && <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>}
+                        <MediaAttachmentsView items={item.attachments} />
+                        <div className="chat-outbox-footer">
+                          <span className={item.status === 'failed' ? 'message-stamp chat-outbox-error' : 'message-stamp'} role="status">
+                            {item.status === 'failed' ? item.error || 'Không gửi được' :
+                              !chatOnline ? 'Chờ có mạng' : item.status === 'unconfirmed' ? 'Đang xác nhận...' : 'Đang gửi...'}
+                          </span>
+                          {(item.status === 'failed' || (item.status === 'unconfirmed' && chatOnline)) && (
+                            <button type="button" className="chat-outbox-retry"
+                              aria-label={item.status === 'failed' ? 'Gửi lại tin nhắn bị lỗi' : 'Gửi lại tin nhắn đang chờ'}
+                              onClick={() => {
+                              updateChatOutbox((items) => items.map((old) =>
+                                old.clientId === item.clientId ? { ...old, status: 'queued', error: undefined } : old))
+                              void retryQueuedChatMessages()
+                            }}><RefreshCw size={14} /> Gửi lại</button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
                     <div ref={bottomRef} />
                   </div>
 
-                  <form
-                    className="composer media-composer"
-                    onSubmit={(event) => {
-                      void sendMessage(event);
-                      if (isDesktopBuild) messageInputRef.current?.focus();
-                    }}
-                  >
+                  <div className={`social-chat-ai-banner${autoTranslate ? ' is-enabled' : ''}`} role="status">
+                    <Languages size={18} aria-hidden="true" />
+                    <span>{autoTranslate
+                      ? `Dịch tự động đang bật · ${selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()}`
+                      : 'Dịch tự động đang tắt'}</span>
+                    <button type="button" aria-label="Cài đặt dịch AI" aria-expanded={translationMenuOpen}
+                      onClick={() => { setLanguageSearch(''); setTranslationMenuOpen((open) => !open) }}>
+                      <span>Cài đặt</span><ChevronDown size={15} aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <form className="composer media-composer" onSubmit={(event) => {
+                    void sendMessage(event)
+                    if (isDesktopBuild) messageInputRef.current?.focus()
+                  }}>
                     <input
                       ref={chatFileInputRef}
                       className="hidden-media-input"
@@ -6412,37 +5940,18 @@ export default function App({
                       multiple
                       accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
                       onChange={(event) => {
-                        const files = Array.from(
-                          event.currentTarget.files || [],
-                        );
-                        event.currentTarget.value = "";
-                        void addChatFiles(files);
+                        const files = Array.from(event.currentTarget.files || [])
+                        event.currentTarget.value = ''
+                        void addChatFiles(files)
                       }}
                     />
                     {replyingTo && (
                       <div className="composer-reply-preview">
                         <div>
-                          <strong>
-                            Đang trả lời{" "}
-                            {userLabel(
-                              replyingTo.senderDisplayName,
-                              replyingTo.sender,
-                            )}
-                          </strong>
-                          <span>
-                            {replyingTo.deleted
-                              ? "Tin nhắn đã thu hồi"
-                              : replyingTo.text ||
-                                attachmentLabel(replyingTo.attachments)}
-                          </span>
+                          <strong>Đang trả lời {userLabel(replyingTo.senderDisplayName, replyingTo.sender)}</strong>
+                          <span>{replyingTo.deleted ? 'Tin nhắn đã thu hồi' : (replyingTo.text || attachmentLabel(replyingTo.attachments))}</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setReplyingTo(null)}
-                          aria-label="Hủy trả lời"
-                        >
-                          ×
-                        </button>
+                        <button type="button" onClick={() => setReplyingTo(null)} aria-label="Hủy trả lời">×</button>
                       </div>
                     )}
                     {messageAttachments.length > 0 && (
@@ -6450,16 +5959,7 @@ export default function App({
                         <MediaAttachmentsView
                           items={messageAttachments}
                           pending
-                          onRemove={
-                            messageSending
-                              ? undefined
-                              : (index) =>
-                                  setMessageAttachments((current) =>
-                                    current.filter(
-                                      (_, itemIndex) => itemIndex !== index,
-                                    ),
-                                  )
-                          }
+                          onRemove={messageSending ? undefined : (index) => setMessageAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
                         />
                       </div>
                     )}
@@ -6471,89 +5971,75 @@ export default function App({
                       aria-label="Đính kèm file"
                     >
                       <UiIcon name="attach" size={22} />
+                      <Plus className="chat-composer-plus" size={21} aria-hidden="true" />
                     </button>
-                    <VoiceRecorder
-                      key={`${session.sessionId}:${activeConversationId}`}
-                      disabled={Boolean(mediaUploading) || messageSending}
-                      onRecorded={(file) => {
-                        void addChatFiles([file]);
-                      }}
-                      onError={(message) => setNotice(message, "error")}
-                    />
                     <input
                       ref={messageInputRef}
                       aria-label="Tin nhắn"
-                      placeholder={
-                        mediaUploading === "chat"
-                          ? "Đang tải file lên..."
-                          : activeConversation.type === "group"
-                            ? `Nhắn vào ${activeConversation.name}...`
-                            : `Nhắn ${activeConversation.name}...`
-                      }
+                      placeholder={mediaUploading === 'chat' ? 'Đang tải file lên...' : isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
                       value={messageText}
                       onChange={(event) => setMessageText(event.target.value)}
                       onPaste={(event) => {
-                        const files = chatFilesFromClipboard(
-                          event.clipboardData,
-                        );
-                        if (files.length === 0) return; // Preserve normal text paste (Cmd/Ctrl+V).
-                        event.preventDefault();
-                        void addChatFiles(files);
+                        const files = chatFilesFromClipboard(event.clipboardData)
+                        if (files.length === 0) return // Preserve normal text paste (Cmd/Ctrl+V).
+                        event.preventDefault()
+                        void addChatFiles(files)
                       }}
                       title="Dán ảnh/tệp bằng Cmd/Ctrl+V hoặc kéo thả vào cuộc trò chuyện"
                       maxLength={4000}
                     />
-                    <button
-                      className="send-button polished-send"
-                      disabled={!canSend}
-                      aria-label="Gửi tin nhắn"
-                    >
-                      {messageSending || mediaUploading === "chat" ? (
-                        <RefreshCw size={19} aria-label="Đang gửi" />
-                      ) : (
-                        <>
-                          <span className="send-label">Gửi</span>
-                          <UiIcon name="send" size={19} />
-                        </>
-                      )}
+                    <button className="ghost-action chat-composer-image" type="button"
+                      onClick={() => chatFileInputRef.current?.click()}
+                      disabled={Boolean(mediaUploading) || messageSending}
+                      aria-label="Đính kèm ảnh hoặc video" title="Chọn ảnh hoặc video">
+                      <Images size={19} aria-hidden="true" />
+                    </button>
+                    <VoiceRecorder
+                      key={`${session.sessionId}:${activeConversationId}`}
+                      disabled={Boolean(mediaUploading) || messageSending}
+                      onRecorded={(file) => { void addChatFiles([file]) }}
+                      onError={(message) => setNotice(message, 'error')}
+                    />
+                    <button className="send-button polished-send" disabled={!canSend} aria-label="Gửi tin nhắn">
+                      {messageSending || mediaUploading === 'chat' ? <RefreshCw size={19} aria-label="Đang gửi" /> : <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>}
                     </button>
                   </form>
                 </>
               )}
             </section>
-            {activeConversation && (
+            {activeConversation && conversationDetailsOpen && (
               <ConversationDetailsPanel
                 conversation={activeConversation}
-                onProfile={() => {
-                  if (activeConversation.type === "group") {
-                    setGroupMemberViewOpen(false);
-                    openGroupSettings(activeConversation);
-                  } else if (activeConversation.otherUsername)
-                    openVisitor(activeConversation.otherUsername);
-                  else
-                    setNotice(
-                      "Không thể mở hồ sơ từ cuộc trò chuyện này.",
-                      "warning",
-                    );
+                busy={historyActionBusy}
+                onClose={() => setConversationDetailsOpen(false)}
+                onBlock={() => {
+                  if (activeConversation.otherUserId && activeConversation.otherUsername) {
+                    void blockContact({
+                      id: activeConversation.otherUserId,
+                      username: activeConversation.otherUsername,
+                      displayName: activeConversation.name,
+                    })
+                  }
                 }}
-                onSearch={() => setMessageSearchOpen(true)}
-                onShared={() => setSharedContentOpen(true)}
-                onTranslate={() => setTranslationMenuOpen(true)}
-                onNotifications={() => switchTab("notifications")}
+                onClearHistory={() => { void clearActiveConversationHistory() }}
+                onGroupOptions={() => { setConversationDetailsOpen(false); setGroupActionsOpen(true) }}
+                onProfile={() => {
+                  if (activeConversation.type === 'group') { setGroupMemberViewOpen(false); openGroupSettings(activeConversation) }
+                  else if (activeConversation.otherUsername) openVisitor(activeConversation.otherUsername)
+                  else setNotice('Không thể mở hồ sơ từ cuộc trò chuyện này.', 'warning')
+                }}
+                onSearch={() => { setConversationDetailsOpen(false); setMessageSearchOpen(true) }}
+                onShared={() => { setConversationDetailsOpen(false); setSharedContentOpen(true) }}
+                onTranslate={() => { setConversationDetailsOpen(false); setTranslationMenuOpen(true) }}
+                onNotifications={() => { setConversationDetailsOpen(false); switchTab('notifications') }}
               />
             )}
-            {groupSettingsOpen && activeConversation?.type === "group" && (
+            {groupSettingsOpen && activeConversation?.type === 'group' && (
               <>
-                <button
-                  type="button"
-                  className="group-sidebar-scrim"
+                <button type="button" className="group-sidebar-scrim"
                   aria-label="Đóng thanh quản lý nhóm"
-                  onClick={() => setGroupSettingsOpen(false)}
-                />
-                <aside
-                  className="group-settings-sidebar"
-                  aria-label="Thanh bên quản lý nhóm"
-                >
+                  onClick={() => setGroupSettingsOpen(false)} />
+                <aside className="group-settings-sidebar" aria-label="Thanh bên quản lý nhóm">
                   <GroupSettingsPanel
                     activeGroupMember={activeGroupMember}
                     setGroupSettingsOpen={setGroupSettingsOpen}
@@ -6561,23 +6047,21 @@ export default function App({
                     canInviteActiveGroup={canInviteActiveGroup}
                     canEditActiveGroup={canEditActiveGroup}
                     onRenameRequest={() => {
-                      setGroupNameDraft(activeConversation.name);
-                      setGroupNameEditing(true);
+                      setGroupNameDraft(activeConversation.name)
+                      setGroupNameEditing(true)
                     }}
                     onOpenMemberProfile={(username) => {
-                      setGroupMemberViewOpen(false);
-                      setGroupSettingsOpen(false);
-                      openVisitor(username);
+                      setGroupMemberViewOpen(false)
+                      setGroupSettingsOpen(false)
+                      openVisitor(username)
                     }}
                     memberFriendRelationship={friendRelationship}
-                    onMemberFriendAction={(member) =>
-                      actOnFriend({
-                        id: member.id,
-                        username: member.username,
-                        displayName: member.displayName,
-                        online: member.online,
-                      })
-                    }
+                    onMemberFriendAction={(member) => actOnFriend({
+                      id: member.id,
+                      username: member.username,
+                      displayName: member.displayName,
+                      online: member.online,
+                    })}
                     friendBusyIds={friendBusyIds}
                     memberViewOpen={groupMemberViewOpen}
                     setMemberViewOpen={setGroupMemberViewOpen}
@@ -6596,9 +6080,7 @@ export default function App({
                     removeGroupMember={removeGroupMember}
                     request={apiFetch}
                     notify={(message) => setNotice(message)}
-                    onMembersChanged={() =>
-                      refreshGroupMembers(activeConversation.id)
-                    }
+                    onMembersChanged={() => refreshGroupMembers(activeConversation.id)}
                   />
                 </aside>
               </>

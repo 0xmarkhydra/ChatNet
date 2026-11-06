@@ -2,13 +2,22 @@ import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { mkdir } from 'node:fs/promises'
+import { createServer as createNetServer } from 'node:net'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const port = await new Promise((resolvePort, reject) => {
+  const probe = createNetServer()
+  probe.once('error', reject)
+  probe.listen(0, '127.0.0.1', () => {
+    const available = probe.address().port
+    probe.close(() => resolvePort(available))
+  })
+})
 const vite = await createServer({
   root, configFile: resolve(root, 'vite.config.ts'), logLevel: 'error',
-  server: { host: '127.0.0.1', port: 0 },
+  server: { host: '127.0.0.1', port, strictPort: true },
 })
 let browser
 try {
@@ -23,7 +32,7 @@ try {
   assert.equal(formatNotificationBadge(251), '99+')
   console.log('PASS badge count: 0, incoming + unread conversation, 99, 99+')
   const origin = 'http://127.0.0.1:' + vite.httpServer.address().port
-  browser = await chromium.launch({ channel: 'chrome', headless: true })
+  browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({ viewport: { width: 1478, height: 927 }, serviceWorkers: 'block' })
   const session = {
     token: 'mock.' + Buffer.from(JSON.stringify({ exp: 4102444800 })).toString('base64url') + '.signed',
@@ -43,7 +52,7 @@ try {
   const targetUser = { id: 7, username: 'newfriend', displayName: 'Bạn mới', online: true }
   const requests = []
   const json = data => ({ status: 200, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }, contentType: 'application/json', body: JSON.stringify(data) })
-  await context.route('http://localhost:8080/**', async route => {
+  await context.route('**/api/**', async route => {
     const req = route.request()
     const path = new URL(req.url()).pathname
     const method = req.method()

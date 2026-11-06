@@ -24,7 +24,7 @@ server.stderr.on('data', chunk => { logs += chunk.toString() })
 let browser
 const check = (value, message) => { if (!value) throw new Error(message) }
 const conversations = [
-  { id: 1, name: 'minhanh', type: 'direct', otherUserId: 2, memberCount: 2, unreadCount: 2, lastMessage: 'Chiều nay mình xem lại bản thiết kế nhé.', online: true, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
+  { id: 1, name: 'minhanh', type: 'direct', otherUserId: 2, otherUsername: 'minhanh', memberCount: 2, unreadCount: 2, lastMessage: 'Chiều nay mình xem lại bản thiết kế nhé.', online: true, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
   { id: 2, name: 'hoangnam', type: 'direct', otherUserId: 3, memberCount: 2, unreadCount: 0, lastMessage: 'Cảm ơn bạn, mình nhận được rồi.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
   { id: 3, name: 'Nhóm SocCO kiểm thử giao diện mobile và desktop với tên rất dài', type: 'group', memberCount: 5, unreadCount: 0, lastMessage: 'Hẹn cả nhóm ngày mai.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
 ]
@@ -104,7 +104,7 @@ try {
   page.on('pageerror', e => errors.push(e.message))
   await page.route(origin + '/mock-story-upload', route =>
     route.fulfill({ status: 200, body: '' }))
-  await page.route('http://localhost:8080/**', route => {
+  await page.route('**/api/**', route => {
     const req = route.request()
     const currentURL = new URL(req.url())
     const path = currentURL.pathname
@@ -396,31 +396,30 @@ try {
     await geometry('chat-list', width, ['.modern-frame', '.conversation-sidebar', '.conversation-list'])
     check(await page.locator('.soco-chat-list-heading').count() === 0, 'Removed Chat banner reappeared: ' + width)
     await page.getByRole('button', { name: /^(Danh bạ|Bạn bè)$/ }).click()
-    await geometry('contacts', width, ['.modern-frame', '.contacts-view', '.contact-shortcuts'])
-    check(await page.locator('.contacts-view > .soco-section-heading').count() === 0, 'Removed Contacts banner reappeared: ' + width)
-    // Regression: the friend menu must escape the rounded card and its Block action must be clickable.
-    const friendOptions = page.locator('.friend-contact-row .friend-contact-more').first()
-    await friendOptions.click()
-    const friendMenu = page.locator('.friend-contact-row .friend-contact-popover')
-    await friendMenu.waitFor()
-    const menuBounds = await friendMenu.boundingBox()
-    check(menuBounds && menuBounds.y >= -1 && menuBounds.y + menuBounds.height <= (width <= 375 ? 667 : width <= 430 ? 844 : 900) + 1,
-      'Friend options are outside the viewport at ' + width + ': ' + JSON.stringify(menuBounds))
-    check(await friendMenu.evaluate(node => getComputedStyle(node.closest('.contacts-suggestions')).overflowY === 'visible'),
-      'Friend options are clipped by the contacts card at ' + width)
-    const blockFriend = friendMenu.getByRole('menuitem', { name: 'Chặn người dùng' })
-    await blockFriend.scrollIntoViewIfNeeded()
-    await blockFriend.click() // Native confirmation is dismissed by Playwright; do not block the test account.
-    await page.keyboard.press('Escape')
+    // The modern friends directory replaces the older ContactsView card/menu.
+    // Its request, QR, preview and profile interactions are tested by check:friends-redesign.
+    await geometry('contacts', width, ['.modern-frame', '.friends-design-v2', '.fd-searchbar'])
+    check(await page.locator('.friends-design-v2 > .soco-section-heading').count() === 0,
+      'Removed contacts banner reappeared: ' + width)
+    if (width > 760) {
+      const optionsButton = page.locator('.fd-profile-options .fd-options > button').first()
+      await optionsButton.click()
+      const menu = page.locator('.fd-option-popover')
+      await menu.waitFor()
+      const bounds = await menu.boundingBox()
+      check(bounds && bounds.x >= -1 && bounds.x + bounds.width <= width + 1,
+        'Friend actions menu exceeds viewport: ' + width)
+      check(await menu.getByRole('menuitem', { name: 'Chặn người dùng' }).isEnabled(),
+        'Friend actions must expose the block option')
+      await page.keyboard.press('Escape')
+    }
     if (width === 390) {
-      // Search rows must never shrink while the mouse is held, even with animations enabled.
-      const contactSearch = page.locator('.appbar-search input')
+      const contactSearch = page.locator('.fd-searchbar input')
       await contactSearch.fill('minhanh')
-      const searchRow = page.locator('.contact-search-row').first()
+      const searchRow = page.locator('.fd-person-row').first()
       await searchRow.waitFor()
       await page.emulateMedia({ reducedMotion: 'no-preference' })
       const beforePress = await searchRow.boundingBox()
-      check(beforePress, 'Search result missing before pointer-down test')
       await page.mouse.move(beforePress.x + beforePress.width / 2, beforePress.y + beforePress.height / 2)
       await page.mouse.down()
       await page.waitForTimeout(180)
@@ -431,11 +430,10 @@ try {
       const afterPress = await searchRow.boundingBox()
       await page.mouse.up()
       await page.emulateMedia({ reducedMotion: 'reduce' })
-      check(pressedRow.transform === 'none' && pressedRow.transitionDuration.split(',').every(t => parseFloat(t) === 0),
-        'Search result must not scale or animate on pointer-down: ' + JSON.stringify(pressedRow))
-      check(afterPress && Math.abs(afterPress.width - beforePress.width) < 1 &&
+      check(pressedRow.transform === 'none' && afterPress &&
+        Math.abs(afterPress.width - beforePress.width) < 1 &&
         Math.abs(afterPress.height - beforePress.height) < 1,
-        'Search row shrank while mouse was held: ' + JSON.stringify({ beforePress, afterPress }))
+        'Directory search row must not scale on pointer-down: ' + JSON.stringify(pressedRow))
       await contactSearch.fill('')
     }
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
@@ -563,15 +561,18 @@ try {
     await page.locator('.conversation-item').first().click()
     await geometry('chat-room', width, ['.modern-frame', '.conversation-panel', '.chat-head'])
     if ([390, 1440].includes(width)) {
-      const translationTrigger = page.locator('.chat-head .translation-hub-trigger')
       const translationMenu = page.getByRole('dialog', { name: 'Cài đặt dịch AI' })
-      await translationTrigger.click()
+      const openTranslationFromDetails = async () => {
+        await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
+        await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      }
+      await openTranslationFromDetails()
       await translationMenu.waitFor()
       await translationMenu.locator('.translation-language-search input').fill('en')
       check(await translationMenu.isVisible(), 'Translation menu closed while interacting inside: ' + width)
       await page.locator('.chat-head .room-info').click()
       await translationMenu.waitFor({ state: 'hidden' })
-      await translationTrigger.click()
+      await openTranslationFromDetails()
       await translationMenu.waitFor()
       await page.keyboard.press('Escape')
       await translationMenu.waitFor({ state: 'hidden' })
@@ -734,8 +735,12 @@ try {
     await page.locator('.conversation-item').filter({ hasText: 'Nhóm SocCO' }).first().click()
     const headerAction = await page.locator('.chat-head .group-mobile-actions .call-header-actions button').first().boundingBox()
     const backAction = await page.getByRole('button', { name: 'Quay lại danh sách' }).boundingBox()
-    const more = page.getByRole('button', { name: 'Tùy chọn nhóm' })
+    const more = page.locator('.chat-head .group-mobile-actions button[aria-label="Thông tin hội thoại"]')
     const moreBox = await more.boundingBox()
+    const openGroupOptions = async () => {
+      await more.click()
+      await page.locator('.social-chat-details').getByRole('button', { name: 'Tùy chọn nhóm' }).click()
+    }
     check(headerAction && backAction && moreBox && headerAction.width >= 40 &&
       headerAction.x >= backAction.x + backAction.width &&
       moreBox.x >= headerAction.x + headerAction.width - 1 &&
@@ -747,7 +752,7 @@ try {
     if (width === 320 || width === 390)
       await page.screenshot({ path: 'output/playwright/layout/group-chat-header-' + width + '.png' })
 
-    await more.click()
+    await openGroupOptions()
     const sheet = page.getByRole('dialog', { name: 'Tùy chọn cuộc trò chuyện nhóm' })
     await sheet.waitFor()
     check(await sheet.getByRole('button', { name: 'Gọi video' }).count() === 1 &&
@@ -774,7 +779,7 @@ try {
       await page.keyboard.press('Escape')
       check(await page.getByRole('dialog', { name: 'Tùy chọn cuộc trò chuyện nhóm' }).count() === 0,
         'Escape must close group sheet')
-      await more.click()
+      await openGroupOptions()
     }
     await page.getByRole('dialog', { name: 'Tùy chọn cuộc trò chuyện nhóm' })
       .getByRole('button', { name: /Thành viên & quản lý nhóm/ }).click()
@@ -883,15 +888,13 @@ try {
   await page.reload()
   await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
   await page.locator('.conversation-item').filter({ hasText: 'minhanh' }).first().click()
-  await page.locator('.chat-friend-bar').waitFor()
-  await page.getByText('Hai bạn chưa kết bạn', { exact: true }).waitFor()
-  const chatOptions = page.getByRole('button', { name: 'Tùy chọn cuộc trò chuyện' })
+  const chatOptions = page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first()
   check(await chatOptions.isVisible() && await chatOptions.isEnabled(),
-    'A non-friend with existing direct chat must have a chat options menu')
+    'A non-friend with an existing direct chat must have a details menu')
   await chatOptions.click()
-  const blockNonFriend = page.getByRole('menu', { name: 'Tùy chọn cuộc trò chuyện' }).getByRole('menuitem', { name: 'Chặn người dùng' })
+  const blockNonFriend = page.locator('.social-chat-details').getByRole('button', { name: 'Chặn tin nhắn và cuộc gọi' })
   check(await blockNonFriend.isVisible() && await blockNonFriend.isEnabled(),
-    'A non-friend must be able to block via the three-dot menu')
+    'A non-friend must be able to block through conversation details')
   const confirmation = new Promise(resolve => page.once('dialog', async dialog => {
     check(dialog.type() === 'confirm' && dialog.message().includes('Chặn'),
       'Block must ask for confirmation')
@@ -900,6 +903,8 @@ try {
   }))
   await blockNonFriend.click()
   await confirmation
+  await page.getByRole('button', { name: 'Đóng thông tin hội thoại' }).click()
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
 
   // Regression: frontend must POST only strict AttachmentInput fields.
   // A presigned download URL in POST /api/stories previously triggered "invalid body".

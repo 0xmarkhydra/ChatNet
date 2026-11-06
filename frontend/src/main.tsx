@@ -27,6 +27,7 @@ import './styles/profile-page.css'
 import './styles/profile-editor.css'
 import './styles/social-feed.css'
 import './features/contacts/friends-design-v2.css'
+import './styles/social-chat.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)

@@ -153,7 +153,7 @@ func (s *server) quickChatSearch(w http.ResponseWriter, r *http.Request) {
                 LIMIT 1
             ) other ON c.type='direct'
         ` + attachmentJoin + `
-            WHERE m.deleted_at IS NULL AND ` + match + `
+            WHERE m.deleted_at IS NULL AND m.id>viewer.cleared_through_message_id AND ` + match + `
               AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
                     (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))
               AND (c.type<>'direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
