@@ -580,6 +580,9 @@
   .modern-shell.app-layout .social-chat-layout .message.mine .bubble {
     background: linear-gradient(120deg, #2563eb, #8955f6);
   }
+  .modern-shell.app-layout .social-chat-layout .message .message-content > .bubble:has(+ .message-reactions) {
+    padding-bottom: 22px;
+  }
   .modern-shell.app-layout .social-chat-layout .message-stamp {
     margin-top: 8px;
     color: #8796ad;
@@ -643,7 +646,8 @@
   }
   .modern-shell.app-layout .social-chat-layout .chat-message-photo .chat-image-time {
     position: absolute;
-    right: 12px;
+    right: auto;
+    left: 12px;
     bottom: 7px;
     z-index: 1;
     box-sizing: border-box;
