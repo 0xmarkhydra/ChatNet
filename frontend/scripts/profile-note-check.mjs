@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 process.chdir(fileURLToPath(new URL('..',import.meta.url)))
 const port=await new Promise(resolvePort=>{const server=createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>resolvePort(port))})})
 const origin='http://127.0.0.1:'+port
-const vite=spawn(process.execPath,[resolve('node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port',String(port),'--strictPort'],{stdio:'ignore'})
+const vite=spawn(process.execPath,[resolve('node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port',String(port),'--strictPort'],{stdio:'ignore',env:{...process.env,VITE_API_URL:'http://localhost:8080'}})
 let browser
 try{
  for(let i=0;i<60;i++){try{if((await fetch(origin)).ok)break}catch{};await delay(100)}

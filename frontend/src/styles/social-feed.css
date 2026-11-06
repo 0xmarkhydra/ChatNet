@@ -1,6 +1,5 @@
-/* Social UI / SocCo Desktop • Social Flows / S00 · Bảng tin • Social V4
- * Desktop scene geometry: left nav 250px, app header 86px,
- * 831px content / 18px gutter / 421px discovery at 1586 × 992. */
+/* Desktop social feed: a compact navigation rail, responsive post column, and
+ * a narrower discovery sidebar that leaves more room for feed content. */
 @media (min-width: 761px) {
   .modern-shell.app-layout .feed-view.zalo-feed-view.social-feed {
     box-sizing: border-box;
@@ -17,7 +16,7 @@
   .modern-shell.app-layout .social-feed-grid {
     box-sizing: border-box;
     display: grid;
-    grid-template-columns: minmax(0, 831fr) minmax(285px, 421fr);
+    grid-template-columns: minmax(0, 915fr) minmax(260px, 337fr);
     align-items: start;
     gap: 18px;
     width: 100%;

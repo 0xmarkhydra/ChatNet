@@ -1,7 +1,8 @@
 import { userLabel } from '../../shared/lib/userLabel'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Ellipsis } from 'lucide-react'
+import { Ellipsis, SendHorizontal } from 'lucide-react'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 export type FeedComment = {
   id: number
@@ -16,6 +17,16 @@ export type FeedComment = {
 type TranslationProps = { api: string; token: string; target: string }
 export type DiscussionDraft = { replyTo: FeedComment | null; drafts: Record<number, string>; sending?: boolean; error?: string }
 const translationCache = new Map<string, string>()
+
+function commentRelativeTime(value: string) {
+  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000))
+  if (!Number.isFinite(minutes)) return new Date(value).toLocaleDateString('vi-VN')
+  if (minutes < 1) return 'Vừa xong'
+  if (minutes < 60) return `${minutes} phút trước`
+  if (minutes < 1440) return `${Math.floor(minutes / 60)} giờ trước`
+  if (minutes < 10080) return `${Math.floor(minutes / 1440)} ngày trước`
+  return new Date(value).toLocaleDateString('vi-VN')
+}
 
 export function FeedText({ text, api, token, target, maxLines, onExpand }: TranslationProps & {
   text: string
@@ -114,7 +125,7 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
   )
 }
 
-export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, ...translation }: TranslationProps & {
+export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, variant = 'default', sortOrder = 'oldest', ...translation }: TranslationProps & {
   comments: FeedComment[]
   pending?: FeedComment
   submit: (content: string, parentId?: number) => Promise<void>
@@ -124,9 +135,13 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   onEdit: (id: number, content: string) => Promise<void>
   onDelete: (id: number) => Promise<void>
   onReport: (id: number, reason: string) => Promise<void>
+  variant?: 'default' | 'post-page'
+  sortOrder?: 'oldest' | 'newest'
 }) {
   const { replyTo, drafts } = editor
   const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
+  // Comment likes are a visual preview until the feed service exposes a persisted like API.
+  const [previewLikes, setPreviewLikes] = useState<Set<number>>(new Set())
   const [editingComment, setEditingComment] = useState<number | null>(null)
   const [commentOptionsId, setCommentOptionsId] = useState<number | null>(null)
   const optionsTrigger = useRef<HTMLButtonElement | null>(null)
@@ -194,6 +209,11 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
     threads.get(root)!.push(comment)
   }
 
+  const orderedThreads = [...threads].sort(([a, aComments], [b, bComments]) => {
+    const dateDiff = Date.parse(aComments[0]?.createdAt || '') - Date.parse(bComments[0]?.createdAt || '')
+    return (sortOrder === 'newest' ? -1 : 1) * (Number.isFinite(dateDiff) && dateDiff !== 0 ? dateDiff : a - b)
+  })
+
   function reply(comment: FeedComment) {
     updateEditor({ drafts, replyTo: comment })
     input.current?.focus()
@@ -220,7 +240,9 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
     const parent = comment.parentId ? byID.get(comment.parentId) : undefined
     return (
       <div className="feed-comment-row">
-        <span className="feed-comment-avatar" aria-hidden="true">{userLabel(comment.authorDisplayName, comment.author).slice(0, 2).toUpperCase()}</span>
+        {variant === 'post-page'
+          ? <UserAvatar username={comment.author} name={userLabel(comment.authorDisplayName, comment.author)} className="feed-comment-avatar" />
+          : <span className="feed-comment-avatar" aria-hidden="true">{userLabel(comment.authorDisplayName, comment.author).slice(0, 2).toUpperCase()}</span>}
         <div className="feed-comment-body">
           <div className="feed-comment-bubble">
             <strong>{userLabel(comment.authorDisplayName, comment.author)}</strong>
@@ -238,8 +260,18 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
             ) : <FeedText {...translation} text={comment.content} maxLines={3} />}
           </div>
           <div className="feed-comment-actions">
-            <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
+            {variant === 'default' && <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}
+            {variant === 'post-page' && <>
+              <button type="button" className={previewLikes.has(comment.id) ? 'feed-comment-liked' : ''}
+                aria-pressed={previewLikes.has(comment.id)} title="Lượt thích bình luận chưa được đồng bộ lên máy chủ"
+                onClick={() => setPreviewLikes(current => { const next = new Set(current); if (next.has(comment.id)) next.delete(comment.id); else next.add(comment.id); return next })}>
+                {previewLikes.has(comment.id) ? 'Đã thích' : 'Thích'}
+              </button>
+              <span aria-hidden="true">·</span>
+            </>}
             <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời ${userLabel(comment.authorDisplayName, comment.author)}`}>Trả lời</button>
+            {variant === 'post-page' && <span aria-hidden="true">·</span>}
+            {variant === 'post-page' && <time dateTime={comment.createdAt}>{commentRelativeTime(comment.createdAt)}</time>}
             <div className="feed-comment-menu">
               <button type="button" aria-label="Tùy chọn bình luận" aria-expanded={commentOptionsId === comment.id}
                 onClick={event => { optionsTrigger.current = event.currentTarget; setCommentOptionsId(current => current === comment.id ? null : comment.id) }}>
@@ -281,7 +313,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   return (
     <section className="feed-discussion" aria-label="Bình luận">
       <ul className="feed-comment-threads">
-        {[...threads].map(([root, [first, ...replies]]) => (
+        {orderedThreads.map(([root, [first, ...replies]]) => (
           <li key={root}>
             {renderComment(first)}
             {replies.length > 0 && (
@@ -308,7 +340,9 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
       {commentActionError && <p role="alert" className="feed-comment-error">{commentActionError}</p>}
       {pending && (
         <div className="feed-comment-row outgoing-preview" aria-busy="true">
-          <span className="feed-comment-avatar" aria-hidden="true">{userLabel(pending.authorDisplayName, pending.author).slice(0, 2).toUpperCase()}</span>
+          {variant === 'post-page'
+            ? <UserAvatar username={pending.author} name={userLabel(pending.authorDisplayName, pending.author)} className="feed-comment-avatar" />
+            : <span className="feed-comment-avatar" aria-hidden="true">{userLabel(pending.authorDisplayName, pending.author).slice(0, 2).toUpperCase()}</span>}
           <div className="feed-comment-body">
             <div className="feed-comment-bubble">
               <strong>{userLabel(pending.authorDisplayName, pending.author)}</strong>
@@ -327,7 +361,8 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
           </div>
         )}
         <div className="feed-comment-compose">
-          <textarea ref={input} rows={2} maxLength={1000} disabled={sending}
+          {variant === 'post-page' && <UserAvatar username={currentUser} name={currentUser} className="feed-comment-composer-avatar" />}
+          <textarea ref={input} rows={variant === 'post-page' ? 1 : 2} maxLength={1000} disabled={sending}
             aria-label={replyTo ? `Phản hồi ${userLabel(replyTo.authorDisplayName, replyTo.author)}` : 'Viết bình luận'}
             placeholder={replyTo ? `Trả lời ${userLabel(replyTo.authorDisplayName, replyTo.author)}...` : 'Viết bình luận...'}
             value={draft} onChange={(event) => updateEditor({ replyTo, drafts: { ...drafts, [draftKey]: event.target.value } })}
@@ -338,7 +373,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
               }
             }} />
           <button type="submit" disabled={sending || !draft.trim()} aria-label={sending ? 'Đang gửi bình luận' : 'Gửi bình luận'}>
-            {sending ? '…' : 'Gửi'}
+            {variant === 'post-page' ? <SendHorizontal size={21} aria-hidden="true" /> : sending ? '…' : 'Gửi'}
           </button>
         </div>
         {error && <p role="alert" className="feed-comment-error">{error}</p>}
