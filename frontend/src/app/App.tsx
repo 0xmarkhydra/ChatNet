@@ -249,7 +249,10 @@ export default function App({
       isDesktopBuild ? desktopBridge().auth : undefined,
     ),
   );
-  const auth = useAuthFlow(saveSession);
+  const auth = useAuthFlow((next) => {
+    setAppLocale(loadAppLocalePreference());
+    saveSession(next);
+  });
 
   const [tab, setTab] = useState<Tab>("chat");
   const tabRef = useRef(tab);
@@ -2125,32 +2128,59 @@ export default function App({
           appLocale: string;
         }>;
       })
-      .then((preferences) => {
-        if (cancelled || revision !== preferenceRevision.current) return;
-        if (preferences) {
-          const nextTarget = isSupportedLanguageCode(preferences.targetLanguage)
-            ? preferences.targetLanguage
-            : "en";
-          const nextAuto = preferences.autoTranslate !== false;
-          const nextLocale =
-            preferences.appLocale === "auto" ||
-            isSupportedLanguageCode(preferences.appLocale)
-              ? preferences.appLocale
-              : "auto";
+      .then(async (preferences) => {
+        if (cancelled || revision !== preferenceRevision.current || !preferences) return;
+        const nextTarget = isSupportedLanguageCode(preferences.targetLanguage)
+          ? preferences.targetLanguage
+          : "en";
+        const nextAuto = preferences.autoTranslate !== false;
+        const serverLocale =
+          preferences.appLocale === "auto" ||
+          isSupportedLanguageCode(preferences.appLocale)
+            ? preferences.appLocale
+            : "auto";
 
-          setTargetLanguage(nextTarget);
-          setAutoTranslate(nextAuto);
-          setAppLocale(nextLocale);
-          saveAppLocalePreference(nextLocale);
-          localStorage.setItem(
-            preferenceKey,
-            JSON.stringify({
-              targetLanguage: nextTarget,
-              autoTranslate: nextAuto,
-              appLocale: nextLocale,
-            }),
-          );
+        // First-use language selection takes priority over the default server value.
+        const setupLocaleKey = `chatnet-setup-locale:${session.user.id}`;
+        const pendingLocale = localStorage.getItem(setupLocaleKey);
+        const validPendingLocale = pendingLocale === "auto" ||
+          (pendingLocale !== null && isSupportedLanguageCode(pendingLocale));
+        const nextLocale = validPendingLocale && pendingLocale ? pendingLocale : serverLocale;
+
+        if (validPendingLocale && pendingLocale) {
+          if (serverLocale === pendingLocale) {
+            localStorage.removeItem(setupLocaleKey);
+          } else {
+            try {
+              const response = await apiFetch("/api/preferences", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  targetLanguage: nextTarget,
+                  autoTranslate: nextAuto,
+                  appLocale: nextLocale,
+                }),
+              });
+              if (!response.ok) throw new Error("preference sync failed");
+              localStorage.removeItem(setupLocaleKey);
+            } catch {
+              // Keep the chosen language locally and retry sync on the next login.
+            }
+          }
         }
+        if (cancelled || revision !== preferenceRevision.current) return;
+        setTargetLanguage(nextTarget);
+        setAutoTranslate(nextAuto);
+        setAppLocale(nextLocale);
+        saveAppLocalePreference(nextLocale);
+        localStorage.setItem(
+          preferenceKey,
+          JSON.stringify({
+            targetLanguage: nextTarget,
+            autoTranslate: nextAuto,
+            appLocale: nextLocale,
+          }),
+        );
       })
       .catch(() => {
         // Keep local/device preferences when the network is unavailable.

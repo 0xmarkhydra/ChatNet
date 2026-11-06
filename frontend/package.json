@@ -30,6 +30,7 @@
     "check:social-ui": "node scripts/check-social-ui.mjs",
     "check:friends-redesign": "node scripts/check-friends-redesign.mjs",
     "check:groups-redesign": "node scripts/check-groups-redesign.mjs",
+    "check:auth-redesign": "node scripts/check-auth-redesign.mjs",
     "check:call-ux": "node scripts/call-ux-check.mjs",
     "check:call-translation": "node --experimental-strip-types scripts/call-translation-check.mjs",
     "check:call-live": "node scripts/call-live-check.mjs",
