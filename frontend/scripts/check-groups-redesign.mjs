@@ -82,6 +82,20 @@ try {
   await page.goto(origin,{waitUntil:'domcontentloaded'})
   await page.locator('.app-sidebar').getByRole('button',{name:'Nhóm & cộng đồng'}).click()
   await page.getByRole('heading',{name:'Nhóm của bạn'}).waitFor()
+  // Group navigation must behave like every other desktop sidebar item.
+  for (const width of [768, 1024, 1478]) {
+    await page.setViewportSize({ width, height: 850 })
+    await page.mouse.move(width - 4, 200)
+    await page.waitForFunction(() => Math.round(document.querySelector('.app-sidebar')?.getBoundingClientRect().width || 0) === 76)
+    const sidebar = page.locator('.app-sidebar')
+    await sidebar.getByRole('button', { name: 'Nhóm & cộng đồng' }).hover()
+    await page.waitForFunction(() => Math.round(document.querySelector('.app-sidebar')?.getBoundingClientRect().width || 0) === 250)
+    await sidebar.getByRole('button', { name: 'Nhóm & cộng đồng' }).click()
+    await page.mouse.move(width - 4, 200)
+    await page.waitForFunction(() => Math.round(document.querySelector('.app-sidebar')?.getBoundingClientRect().width || 0) === 76)
+    assert.ok(await page.getByRole('heading', { name: 'Nhóm của bạn' }).isVisible())
+    console.log('PASS Groups sidebar hover-expand and mouseleave-collapse at ' + width + 'px')
+  }
   assert.match(await page.locator('.cg-group-list').innerText(),/Team ChatNet/)
   await Promise.all([page.waitForResponse(r=>r.url().includes('/api/groups/150/join')&&r.request().method()==='POST'),page.getByRole('button',{name:'Tham gia',exact:true}).click()])
   assert.ok(calls.includes('POST /api/groups/150/join'))
