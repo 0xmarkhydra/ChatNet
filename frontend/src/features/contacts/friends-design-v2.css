@@ -134,36 +134,6 @@
 .fd-scan-feature{min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:15px;border-radius:15px;background:#f7f9ff;color:#3e6cdb;padding:25px}
 .fd-scan-feature h3{color:#1c2c49}
 .fd-scan-feature p{font-size:12px;color:#7d8eac;max-width:300px}
-@media(min-width:761px){
- .modern-shell.app-layout.friends-layout-active{padding-left:235px}
- .friends-layout-active .app-sidebar,
- .friends-layout-active .app-sidebar:is(:hover,:has(:focus-visible)){
-  width:235px;max-width:235px;box-sizing:border-box;background:#fff;overflow:hidden;
- }
- .friends-layout-active .app-sidebar::before,
- .friends-layout-active .app-sidebar:is(:hover,:has(:focus-visible))::before{
-  width:100%;box-shadow:none;
- }
- .friends-layout-active .app-sidebar-brand,
- .friends-layout-active .app-sidebar-nav,
- .friends-layout-active .app-sidebar-secondary,
- .friends-layout-active .app-sidebar-account,
- .friends-layout-active .app-sidebar-link,
- .friends-layout-active .app-sidebar:is(:hover,:has(:focus-visible)) .app-sidebar-secondary,
- .friends-layout-active .app-sidebar:is(:hover,:has(:focus-visible)) .app-sidebar-account,
- .friends-layout-active .app-sidebar:is(:hover,:has(:focus-visible)) .app-sidebar-link{
-  box-sizing:border-box;width:100%;max-width:100%;min-width:0;
- }
- .friends-layout-active .app-sidebar-brand-copy,
- .friends-layout-active .app-sidebar-account-copy,
- .friends-layout-active .app-sidebar-link>span{
-  opacity:1;visibility:visible;transform:none;transition:none;
- }
- .friends-layout-active .app-sidebar-link>span{
-  max-width:calc(100% - 62px);overflow:hidden;text-overflow:ellipsis;
- }
- .friends-layout-active .app-sidebar-nav{pointer-events:auto}
-}
 @media(min-width:761px) and (max-width:1120px){
  .friends-design-v2{padding:16px;gap:14px}
  .fd-directory-layout{grid-template-columns:minmax(0,1.2fr) minmax(245px,1fr);gap:12px}
