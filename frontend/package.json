@@ -17,6 +17,7 @@
     "check:chat": "node --experimental-strip-types scripts/chat-persistence-check.mjs",
     "check:chat-layout": "node scripts/chat-layout-check.mjs",
     "check:message-search": "node --experimental-strip-types scripts/message-search-check.mjs",
+    "check:message-search-ui": "node scripts/message-search-zalo-ui-check.mjs",
     "check:outbox": "node --experimental-strip-types scripts/chat-outbox-check.mjs",
     "check:offline-browser": "node scripts/p0-02-offline-browser-check.mjs",
     "check:media": "node --experimental-strip-types scripts/media-upload-check.mjs",
