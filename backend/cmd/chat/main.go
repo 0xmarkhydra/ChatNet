@@ -32,6 +32,7 @@ type message struct {
 	ID                  int64               `json:"id"`
 	ClientID            string              `json:"clientId,omitempty"`
 	ConversationID      int64               `json:"conversationId"`
+	ChannelID           int64               `json:"channelId,omitempty"`
 	SenderID            int64               `json:"senderId"`
 	Sender              string              `json:"sender"`
 	SenderDisplayName   string              `json:"senderDisplayName,omitempty"`
@@ -162,6 +163,16 @@ func main() {
 	mux.Handle("GET /api/conversations/memberships", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversationMemberships)))
 	mux.Handle("POST /api/conversations/direct", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createDirect)))
 	mux.Handle("POST /api/conversations/groups", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroup)))
+	mux.Handle("GET /api/groups/public", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPublicCommunities)))
+	mux.Handle("POST /api/groups/{id}/join", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.joinPublicCommunity)))
+	mux.Handle("GET /api/conversations/{id}/community", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getCommunityProfile)))
+	mux.Handle("PATCH /api/conversations/{id}/community", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.patchCommunityProfile)))
+	mux.Handle("GET /api/conversations/{id}/notification-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getGroupNotificationPreferences)))
+	mux.Handle("PUT /api/conversations/{id}/notification-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.putGroupNotificationPreferences)))
+	mux.Handle("GET /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupChannels)))
+	mux.Handle("POST /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupChannel)))
+	mux.Handle("PATCH /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupChannel)))
+	mux.Handle("DELETE /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteGroupChannel)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessages)))
 	mux.Handle("GET /api/conversations/{id}/shared", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listSharedContent)))
 	mux.Handle("POST /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createMessage)))
@@ -734,10 +745,14 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	var body struct {
-		Name      string   `json:"name"`
-		Usernames []string `json:"usernames"`
+		Name        string   `json:"name"`
+		Usernames   []string `json:"usernames"`
+		Description string   `json:"description"`
+		Topic       string   `json:"topic"`
+		Rules       string   `json:"rules"`
+		Visibility  string   `json:"visibility"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body) != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -746,14 +761,25 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "group name is required and must be <= 120 characters")
 		return
 	}
+	if body.Visibility == "" {
+		body.Visibility = "private"
+	}
+	if !validCommunityFields(communityFields{body.Description, body.Topic, body.Rules, body.Visibility}) {
+		httpx.Error(w, http.StatusBadRequest, "invalid community fields")
+		return
+	}
+	if len(body.Usernames) > 50 {
+		httpx.Error(w, 400, "maximum 50 invited members")
+		return
+	}
 
 	userIDs, missing := s.resolveGroupMembers(r.Context(), claims.UserID, claims.Username, body.Usernames)
 	if len(missing) > 0 {
 		httpx.Error(w, http.StatusBadRequest, "users not found: "+strings.Join(missing, ", "))
 		return
 	}
-	if len(userIDs) < 2 {
-		httpx.Error(w, http.StatusBadRequest, "group needs at least 2 members")
+	if len(userIDs) < 1 {
+		httpx.Error(w, http.StatusBadRequest, "group owner is required")
 		return
 	}
 
@@ -784,9 +810,9 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 	var id int64
 	var createdAt time.Time
 	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO conversations(type,name,created_by)
-		VALUES('group',$1,$2) RETURNING id,created_at`,
-		name, claims.UserID).Scan(&id, &createdAt); err != nil {
+		INSERT INTO conversations(type,name,created_by,group_description,group_topic,group_rules,group_visibility)
+		VALUES('group',$1,$2,$3,$4,$5,$6) RETURNING id,created_at`,
+		name, claims.UserID, strings.TrimSpace(body.Description), strings.TrimSpace(body.Topic), strings.TrimSpace(body.Rules), body.Visibility).Scan(&id, &createdAt); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create group")
 		return
 	}
@@ -858,6 +884,19 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	channelID := int64(0)
+	if raw := r.URL.Query().Get("channelId"); raw != "" {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || value < 0 {
+			httpx.Error(w, 400, "invalid channel id")
+			return
+		}
+		channelID = value
+	}
+	if channelID > 0 && !s.groupChannelExists(r.Context(), conversationID, channelID) {
+		httpx.Error(w, 404, "channel not found")
+		return
+	}
 	target := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("target")))
 	if target != "" && !validTranslationTarget(target) {
 		httpx.Error(w, http.StatusBadRequest, "unsupported translation language")
@@ -924,7 +963,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	from, to := searchDateBounds(fromDate, toDate, tzOffset)
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
+		SELECT m.id,m.conversation_id,COALESCE(m.channel_id,0),m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
 		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
@@ -945,14 +984,14 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
-		WHERE m.conversation_id=$1 AND ($3::bigint=0 OR m.id<$3)
+		WHERE m.conversation_id=$1 AND COALESCE(m.channel_id,0)=$10 AND ($3::bigint=0 OR m.id<$3)
 		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
 		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("m.text")+`, `+searchx.FoldSQL("$6")+`)>0))
 		  AND ($7::text='' OR lower(u.username)=lower($7))
 		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)
 		  AND ($9::timestamptz IS NULL OR m.created_at < $9)
-		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to))
+		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to), channelID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return
@@ -963,7 +1002,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m message
 		if rows.Scan(
-			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
+			&m.ID, &m.ConversationID, &m.ChannelID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 			&m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
 			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
@@ -997,22 +1036,34 @@ func validClientID(id string) bool {
 
 // messageRequestFingerprint is computed from the *original* validated request,
 // not the mutable message row. An edit/recall cannot turn a valid retry into 409.
-func messageRequestFingerprint(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) string {
+func messageRequestFingerprint(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput, channelIDs ...int64) string {
 	refs := make([]string, 0, len(attachments))
 	for _, attachment := range attachments {
 		refs = append(refs, strings.TrimSpace(attachment.StorageRef))
+	}
+	var channelID int64
+	if len(channelIDs) > 0 {
+		channelID = channelIDs[0]
 	}
 	payload, _ := json.Marshal(struct {
 		ConversationID int64    `json:"conversationId"`
 		Text           string   `json:"text"`
 		ReplyTo        *int64   `json:"replyTo"`
 		StorageRefs    []string `json:"storageRefs"`
-	}{conversationID, text, replyTo, refs})
+		ChannelID      int64    `json:"channelId,omitempty"`
+	}{conversationID, text, replyTo, refs, channelID})
 	digest := sha256.Sum256(payload)
 	return hex.EncodeToString(digest[:])
 }
 
-func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput, channelIDs ...int64) bool {
+	var channelID int64
+	if len(channelIDs) > 0 {
+		channelID = channelIDs[0]
+	}
+	if m.ChannelID != channelID {
+		return false
+	}
 	if m.ConversationID != conversationID || m.Text != text || len(m.Attachments) != len(attachments) {
 		return false
 	}
@@ -1031,7 +1082,11 @@ func sameMessageRequest(m message, conversationID int64, text string, replyTo *i
 }
 
 // replyExistingMessage returns true once it wrote a response for an existing client ID.
-func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput, channelIDs ...int64) bool {
+	var channelID int64
+	if len(channelIDs) > 0 {
+		channelID = channelIDs[0]
+	}
 	var messageID int64
 	var fingerprint *string
 	err := s.db.QueryRow(r.Context(), `
@@ -1050,11 +1105,11 @@ func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, se
 		return true
 	}
 	if fingerprint != nil {
-		if *fingerprint != messageRequestFingerprint(conversationID, text, replyTo, attachments) {
+		if *fingerprint != messageRequestFingerprint(conversationID, text, replyTo, attachments, channelID) {
 			httpx.Error(w, http.StatusConflict, "client id was already used for another message")
 			return true
 		}
-	} else if !sameMessageRequest(m, conversationID, text, replyTo, attachments) {
+	} else if !sameMessageRequest(m, conversationID, text, replyTo, attachments, channelID) {
 		// Compatibility for rows created before the additive fingerprint migration.
 		httpx.Error(w, http.StatusConflict, "client id was already used for another message")
 		return true
@@ -1080,6 +1135,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		Text             string                   `json:"text"`
 		ClientID         string                   `json:"clientId"`
 		ReplyToMessageID *int64                   `json:"replyToMessageId"`
+		ChannelID        int64                    `json:"channelId"`
 		Attachments      []mediax.AttachmentInput `json:"attachments"`
 	}
 	if json.NewDecoder(r.Body).Decode(&body) != nil {
@@ -1087,6 +1143,10 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Text = strings.TrimSpace(body.Text)
+	if body.ChannelID < 0 || (body.ChannelID > 0 && !s.groupChannelExists(r.Context(), conversationID, body.ChannelID)) {
+		httpx.Error(w, 404, "channel not found")
+		return
+	}
 	if !validClientID(body.ClientID) {
 		httpx.Error(w, http.StatusBadRequest, "invalid client id")
 		return
@@ -1095,7 +1155,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "text must be <= 4000 characters")
 		return
 	}
-	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
+	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments, body.ChannelID) {
 		return
 	}
 
@@ -1118,9 +1178,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	if body.ReplyToMessageID != nil {
 		var replyConversationID int64
 		if err := s.db.QueryRow(r.Context(), `
-			SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+			SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND COALESCE(m.channel_id,0)=$3 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 			  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))
-		`, *body.ReplyToMessageID, claims.UserID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
+		`, *body.ReplyToMessageID, claims.UserID, body.ChannelID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
 			httpx.Error(w, http.StatusBadRequest, "invalid reply message")
 			return
 		}
@@ -1151,6 +1211,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	m := message{
 		ClientID:         body.ClientID,
 		ConversationID:   conversationID,
+		ChannelID:        body.ChannelID,
 		SenderID:         claims.UserID,
 		Sender:           claims.Username,
 		ReplyToMessageID: body.ReplyToMessageID,
@@ -1159,7 +1220,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	fingerprint := ""
 	if body.ClientID != "" {
-		fingerprint = messageRequestFingerprint(conversationID, body.Text, body.ReplyToMessageID, body.Attachments)
+		fingerprint = messageRequestFingerprint(conversationID, body.Text, body.ReplyToMessageID, body.Attachments, body.ChannelID)
 	}
 	if err := tx.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&m.Sender, &m.SenderDisplayName); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load message sender")
@@ -1167,15 +1228,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint)
-		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''))
+		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint,channel_id)
+		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''),NULLIF($7,0))
 		ON CONFLICT (user_id,client_id) WHERE client_id IS NOT NULL DO NOTHING
 		RETURNING id,text,created_at`,
-		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint,
+		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint, body.ChannelID,
 	).Scan(&m.ID, &m.Text, &m.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = tx.Rollback(r.Context())
-		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
+		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments, body.ChannelID) {
 			httpx.Error(w, http.StatusConflict, "message retry could not be resolved")
 		}
 		return
@@ -1230,6 +1291,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 			recipients = append(recipients, uid)
 		}
 	}
+	recipients = s.groupPushRecipients(r.Context(), conversationID, recipients, body.Text)
 	notificationBody := "Bạn có một tin nhắn mới."
 	if body.Text == "" && len(attachments) > 0 {
 		notificationBody = "Bạn nhận được " + mediax.PreviewLabel(attachments[0].Kind) + "."
@@ -1247,7 +1309,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (message, error) {
 	var m message
 	err := s.db.QueryRow(ctx, `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
+		SELECT m.id,m.conversation_id,COALESCE(m.channel_id,0),m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
 		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
 		       m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
@@ -1268,7 +1330,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))`, messageID, viewerID).Scan(
-		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
+		&m.ID, &m.ConversationID, &m.ChannelID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
 	)

@@ -43,6 +43,7 @@ type Props = {
   request: (path: string, init?: RequestInit) => Promise<Response>;
   notify: (text: string) => void;
   onMembersChanged: () => Promise<void>;
+  section?: 'permissions' | 'requests' | 'activity';
 };
 
 const defaultSettings: Settings = {
@@ -73,6 +74,7 @@ export default function GroupGovernancePanel({
   request,
   notify,
   onMembersChanged,
+  section,
 }: Props) {
   const requestRef = useRef(request);
   requestRef.current = request;
@@ -309,7 +311,7 @@ export default function GroupGovernancePanel({
   if (role === "member") return null;
 
   return (
-    <div className="group-governance">
+    <div className="group-governance" data-section={section}>
       <h3>
         <ShieldCheck size={18} /> Thiết lập &amp; quyền nhóm
       </h3>
