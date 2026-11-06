@@ -1,7 +1,7 @@
 /* Social UI SocCo Desktop • Social Flows / S03 · Chỉnh sửa hồ sơ.
    Desktop is a full editor page, not a dialog. */
 @media (min-width: 761px) {
-  .modern-shell.social-app-layout .profile-editor-page {
+  .modern-shell.app-layout .profile-editor-page {
     box-sizing: border-box;
     display: grid;
     grid-template-columns: minmax(0, 854fr) minmax(300px, 391fr);
@@ -72,7 +72,7 @@
     height: 171px;
     border-radius: 13px;
     background: linear-gradient(135deg,#bed4eb,#e2d3b2);
-    background-image: linear-gradient(135deg, #bed4eb, #e2d3b2);
+    background-image: url('/default-profile-cover.jpg');
     background-position: center 51%;
     background-size: cover;
   }
@@ -249,11 +249,11 @@
   .profile-editor-privacy-note { padding: 14px; color: #64748b; font-size: 12px; }
   .profile-editor-privacy-error { margin-bottom: 9px; padding: 10px; border-radius: 9px; color: #af3535; background: #fff0f0; font-size: 12px; }
   .profile-editor-privacy-error button { margin-left: 10px; border: 0; color: #a11c1c; background: transparent; cursor: pointer; }
-  .modern-shell.social-app-layout .profile-editor-page button:focus-visible { outline: 3px solid #9db9f4; outline-offset: 2px; }
-  .modern-shell.social-app-layout .profile-editor-page button:disabled { opacity: .58; cursor: not-allowed; }
+  .modern-shell.app-layout .profile-editor-page button:focus-visible { outline: 3px solid #9db9f4; outline-offset: 2px; }
+  .modern-shell.app-layout .profile-editor-page button:disabled { opacity: .58; cursor: not-allowed; }
 }
 @media (min-width: 761px) and (max-width: 1380px) {
-  .modern-shell.social-app-layout .profile-editor-page { display: flex; flex-direction: column; align-items: stretch; padding: 20px; }
+  .modern-shell.app-layout .profile-editor-page { display: flex; flex-direction: column; align-items: stretch; padding: 20px; }
   .profile-editor-form-card { flex: 0 0 auto; width: 100%; min-height: 785px; }
   .profile-editor-side { flex: 0 0 auto; width: 100%; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 15px; }
   .profile-editor-preview-card { min-width: 0; }

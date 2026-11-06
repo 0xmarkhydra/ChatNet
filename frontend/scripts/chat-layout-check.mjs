@@ -115,12 +115,23 @@ try {
       if (width === 1586) {
         const scroll = await page.locator('.social-chat-layout .messages').evaluate(el => ({top:el.scrollTop,height:el.clientHeight,total:el.scrollHeight}))
         assert.equal(scroll.top, 0, 'reference message timeline must fit without forced scroll')
+        // Main uses a hover-expand navigation rail. Both compact and expanded positions
+        // must preserve the S00 column dimensions, padding and component spacing.
+        const sidebarShift = rects.list.x - 272
+        assert.ok(sidebarShift === 0 || sidebarShift === -174, 'unexpected navigation width: ' + sidebarShift)
         const target = {
-          list:[272,108,347,842], stage:[637,108,605,842], details:[1260,108,292,842],
-          listSearch:[289,190,312,46], firstRow:[282,302,325,79],
-          stageHeader:[638,109,604,79], composer:[652,860,574,74], banner:[653,802,574,42],
-          date:[877,209,121,29], avatar:[652,273,32,32],
-          composerSend:[1140,874,69,44], detailsAvatar:[1359,193,93,93],
+          list:[272 + sidebarShift,108,347,842],
+          stage:[637 + sidebarShift,108,605 - sidebarShift,842],
+          details:[1260,108,292,842],
+          listSearch:[289 + sidebarShift,190,312,46],
+          firstRow:[282 + sidebarShift,302,325,79],
+          stageHeader:[638 + sidebarShift,109,604 - sidebarShift,79],
+          composer:[652 + sidebarShift,860,574 - sidebarShift,74],
+          banner:[653 + sidebarShift,802,574 - sidebarShift,42],
+          date:[877 + sidebarShift / 2,209,121,29],
+          avatar:[652 + sidebarShift,273,32,32],
+          composerSend:[1140,874,69,44],
+          detailsAvatar:[1359,193,93,93],
         }
         for (const [name,expected] of Object.entries(target)) {
           const actual = rects[name]

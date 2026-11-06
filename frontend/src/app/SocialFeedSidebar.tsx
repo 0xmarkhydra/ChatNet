@@ -34,7 +34,7 @@ export function extractFeedTopics(posts: Post[]) {
   return [...counts.values()].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, 'vi')).slice(0, 3)
 }
 
-export default function DesktopSocialFeedSidebar({
+export default function SocialFeedSidebar({
   username, sessionId, posts, friends, friendRequests, friendBusyIds,
   request, onFriend, onViewUser, onViewContacts, onSearchTag, onOpenChat,
 }: Props) {

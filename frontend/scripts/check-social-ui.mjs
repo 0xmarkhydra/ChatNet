@@ -27,7 +27,7 @@ const conversations = [
 ]
 const session = {
   token: 'mock.' + Buffer.from(JSON.stringify({ exp: 4102444800 })).toString('base64url') + '.signed',
-  refreshToken: 'm'.repeat(43), sessionId: 'social-app-layout-smoke',
+  refreshToken: 'm'.repeat(43), sessionId: 'app-layout-smoke',
   user: { id: 1, username: 'soco_user', displayName: 'SocCO Tester', email: 'test@example.com' },
 }
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization, Content-Type', 'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS' }
@@ -39,7 +39,7 @@ const fixturePost = {
   content: 'Câu chuyện đẹp tại Đà Lạt #DuLichVietNam #SocCoMoments',
   likes: 12, liked: false, saved: false, comments: [], visibility: 'public',
   attachments: [{ storageRef: 'test/feed.jpg', name: 'Đà Lạt', sizeBytes: 104093,
-    contentType: 'image/jpeg', kind: 'image', url: origin + '/social-profile-cover.jpg' }],
+    contentType: 'image/jpeg', kind: 'image', url: origin + '/default-profile-cover.jpg' }],
   createdAt: '2026-11-05T06:30:00Z',
 }
 const feedPosts = [fixturePost]
@@ -99,7 +99,7 @@ try {
         likes: 3, liked: false, comments: [], visibility: 'public',
         attachments: [{
           storageRef: 'test/profile.jpg', name: 'Ảnh kiểm thử', sizeBytes: 104093,
-          contentType: 'image/jpeg', kind: 'image', url: origin + '/social-profile-cover.jpg',
+          contentType: 'image/jpeg', kind: 'image', url: origin + '/default-profile-cover.jpg',
         }],
         createdAt: '2026-11-05T07:00:00Z',
       }])
@@ -108,7 +108,7 @@ try {
     if (path === '/api/stories') return json([{
       id: 29, author: 'minhanh', authorDisplayName: 'Minh Anh',
       attachment: { storageRef: 'test/story.jpg', kind: 'image', name: 'Tin mới', sizeBytes: 104093,
-        contentType: 'image/jpeg', url: origin + '/social-profile-cover.jpg' },
+        contentType: 'image/jpeg', url: origin + '/default-profile-cover.jpg' },
       createdAt: '2026-11-05T08:00:00Z', expiresAt: '2099-01-01T00:00:00Z',
     }])
     if (path === '/api/calls') return json([])
@@ -130,12 +130,52 @@ try {
     return json({})
   })
   await page.goto(origin)
-  const sidebar = page.locator('.app-navigation-sidebar')
+  const sidebar = page.locator('.app-sidebar')
   await sidebar.waitFor()
+  // A compact sidebar must not draw a vertical scrollbar over the chat content.
+  const navScrollbars = await sidebar.locator('.app-sidebar-nav').evaluate(node => ({
+    scrollbarWidth: getComputedStyle(node).scrollbarWidth,
+    overflowY: getComputedStyle(node).overflowY,
+  }))
+  assert(navScrollbars.scrollbarWidth === 'none' && navScrollbars.overflowY === 'auto',
+    'Navigation should remain scrollable without a visible scrollbar: ' + JSON.stringify(navScrollbars))
+  await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
+  const chatList = page.locator('.conversation-list.zalo-conversation-list')
+  await chatList.waitFor({ state: 'visible' })
+  assert(await chatList.evaluate(node => getComputedStyle(node).overflowX === 'hidden'),
+    'Conversation list must not show an accidental horizontal scrollbar')
 
-  // Social UI Social Flows / S00 · Bảng tin • Social V4.
+  // Hover must stay open across the entire 250px flyout, not just the 76px icon rail.
+  const mainBeforeHover = await page.locator('.modern-frame').boundingBox()
+  const firstNavButton = sidebar.getByRole('button', { name: 'Bảng tin' })
+  const firstNavBounds = await firstNavButton.boundingBox()
+  const navY = firstNavBounds.y + firstNavBounds.height / 2
+  await page.mouse.move(45, navY)
+  await page.waitForTimeout(300)
+  for (const x of [120, 190, 240]) {
+    await page.mouse.move(x, navY)
+    await page.waitForTimeout(80)
+    const bounds = await sidebar.boundingBox()
+    assert(bounds && Math.abs(bounds.width - 250) < 2,
+      'Sidebar must remain expanded throughout its full hover area at x=' + x)
+    assert(await firstNavButton.locator('span').evaluate(node => getComputedStyle(node).opacity === '1'),
+      'Sidebar label must stay visible across the flyout at x=' + x)
+  }
+  const mainDuringHover = await page.locator('.modern-frame').boundingBox()
+  assert(mainBeforeHover && mainDuringHover &&
+    Math.abs(mainBeforeHover.x - mainDuringHover.x) < 1 &&
+    Math.abs(mainBeforeHover.width - mainDuringHover.width) < 1,
+    'Hover flyout must not move or resize the main page')
+  await page.mouse.click(170, navY)
+  await page.locator('.social-feed').waitFor({ state: 'visible' })
+  await page.mouse.move(270, navY)
+  await page.waitForTimeout(100)
+  assert(Math.abs((await sidebar.boundingBox()).width - 76) < 2,
+    'Sidebar must collapse only after the pointer leaves the 250px flyout')
+
+  // Social UI flows / S00 · Bảng tin • Social V4.
   await sidebar.getByRole('button', { name: 'Bảng tin' }).click()
-  const feed = page.locator('.social-feed-layout')
+  const feed = page.locator('.social-feed')
   await feed.waitFor({ state: 'visible' })
   const feedCards = feed.locator('.social-feed-center .post.zalo-post')
   await feedCards.first().waitFor({ state: 'visible' })
@@ -149,13 +189,13 @@ try {
   })
   const approx = (actual, expected, tolerance=8) => Math.abs(actual - expected) <= tolerance
   for (const [selector, x, y] of [
-    ['.social-feed-stories-card', 283, 107],
-    ['.social-feed-launcher', 283, 286],
-    ['.social-feed-filter-bar', 283, 410],
-    ['.social-feed-center .post.zalo-post', 283, 474],
-    ['.social-feed-suggestions', 1132, 107],
-    ['.social-feed-trending', 1132, 425],
-    ['.social-feed-translation', 1132, 702],
+    ['.social-feed-stories-card', 109, 107],
+    ['.social-feed-launcher', 109, 286],
+    ['.social-feed-filter-bar', 109, 410],
+    ['.social-feed-center .post.zalo-post', 109, 474],
+    ['.social-feed-suggestions', 1073, 107],
+    ['.social-feed-trending', 1073, 425],
+    ['.social-feed-translation', 1073, 702],
   ]) {
     const rect = socialGeometry[selector]
     assert(rect && approx(rect.x, x) && approx(rect.y, y),
@@ -236,9 +276,9 @@ try {
   assert(await page.locator('.communication-hub-row').count() === 1, 'Groups must filter real group conversations')
   await page.locator('.communication-hub-row').getByRole('button', { name: 'Mở nhóm' }).click()
   await page.locator('.chat-head .translate-controls button[aria-label="Thông tin hội thoại"]').click()
-  await page.locator('.social-chat-details').waitFor({ state: 'visible' })
-  assert(await page.locator('.social-chat-details').getByText('Nhóm SocCO').count() > 0, 'Chat details missing active group')
-  await page.locator('.social-chat-details').getByRole('button', { name: 'Quản lý nhóm' }).click()
+  await page.locator('.conversation-info-panel').waitFor({ state: 'visible' })
+  assert(await page.locator('.conversation-info-panel').getByText('Nhóm SocCO').count() > 0, 'Chat details missing active group')
+  await page.locator('.conversation-info-panel').getByRole('button', { name: 'Quản lý nhóm' }).click()
   await page.locator('.group-settings-panel').waitFor({ state: 'visible' })
   await page.locator('.group-settings-panel').getByText('Bạn là chủ nhóm').waitFor({ timeout: 5000 })
   await page.getByRole('button', { name: 'Đóng thanh quản lý nhóm' }).click()
@@ -248,43 +288,43 @@ try {
   await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
   await page.locator('.conversation-item').filter({ hasText: 'Minh Anh' }).click()
   await page.locator('.chat-head .translate-controls button[aria-label="Thông tin hội thoại"]').click()
-  await page.locator('.social-chat-details').waitFor({ state: 'visible' })
-  await page.locator('.social-chat-details').getByRole('button', { name: 'Tìm tin nhắn' }).click()
+  await page.locator('.conversation-info-panel').waitFor({ state: 'visible' })
+  await page.locator('.conversation-info-panel').getByRole('button', { name: 'Tìm tin nhắn' }).click()
   await page.getByRole('dialog', { name: 'Tìm trong hội thoại' }).waitFor()
   await page.keyboard.press('Escape')
 
-  // Social UI BA & Modules V3 / 03 · Hồ sơ cá nhân.
+  // Desktop BA & Modules V3 / 03 · Hồ sơ cá nhân.
   await sidebar.getByRole('button', { name: 'Cá nhân' }).click()
-  const profile = page.locator('.social-profile-page')
+  const profile = page.locator('.profile-page')
   await profile.waitFor({ state: 'visible' })
-  await page.locator('.social-profile-post-feed .post').first().waitFor({ state: 'visible' })
+  await page.locator('.profile-page-post-feed .post').first().waitFor({ state: 'visible' })
   mkdirSync('output/playwright/layout', { recursive: true })
-  await page.screenshot({ path: 'output/playwright/layout/social-profile-1586.png' })
+  await page.screenshot({ path: 'output/playwright/layout/profile-page-1586.png' })
   const geometry = await page.evaluate(() => {
-    const keys = ['.social-profile-hero', '.social-profile-main', '.social-profile-about', '.social-profile-recent']
+    const keys = ['.profile-page-hero', '.profile-page-main', '.profile-page-about', '.profile-page-recent']
     return Object.fromEntries(keys.map(key => {
       const rect = document.querySelector(key)?.getBoundingClientRect()
       return [key, rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null]
     }))
   })
-  assert(Math.abs(geometry['.social-profile-hero'].x - 281) < 5 &&
-    Math.abs(geometry['.social-profile-hero'].y - 108) < 5,
-    'Profile hero must match Social UI desktop placement: ' + JSON.stringify(geometry))
-  assert(Math.abs(geometry['.social-profile-main'].y - 424) < 8 &&
-    geometry['.social-profile-about'].x > geometry['.social-profile-main'].x + 400,
+  assert(Math.abs(geometry['.profile-page-hero'].x - 107) < 5 &&
+    Math.abs(geometry['.profile-page-hero'].y - 108) < 5,
+    'Profile hero must match social UI placement: ' + JSON.stringify(geometry))
+  assert(Math.abs(geometry['.profile-page-main'].y - 424) < 8 &&
+    geometry['.profile-page-about'].x > geometry['.profile-page-main'].x + 400,
     'Profile main/about two-column layout mismatch: ' + JSON.stringify(geometry))
-  assert(await profile.getByRole('tab').count() === 4, 'Profile requires 4 Social UI tabs')
-  await page.locator('.social-profile-post-feed .post').first().waitFor({ state: 'visible' })
+  assert(await profile.getByRole('tab').count() === 4, 'Profile requires 4 Desktop tabs')
+  await page.locator('.profile-page-post-feed .post').first().waitFor({ state: 'visible' })
   await profile.getByRole('tab', { name: 'Giới thiệu' }).click()
   assert(await profile.getByText('@soco_user').count() > 0, 'Profile intro should show actual username')
   await profile.getByRole('tab', { name: 'Bạn bè' }).click()
   await profile.getByRole('tab', { name: 'Ảnh & video' }).click()
-  assert(await page.locator('.social-profile-media-item').count() === 1, 'Profile media tab must use actual loaded post attachments')
-  await page.locator('.social-profile-media-item').first().click()
+  assert(await page.locator('.profile-page-media-item').count() === 1, 'Profile media tab must use actual loaded post attachments')
+  await page.locator('.profile-page-media-item').first().click()
   await page.getByRole('dialog', { name: /Chi tiết bài viết/ }).waitFor()
   await page.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
   await profile.getByRole('tab', { name: 'Bài viết' }).click()
-  // Social UI Social Flows / S03 · Chỉnh sửa hồ sơ is a full page, not a drawer.
+  // Social UI flows / S03 · Chỉnh sửa hồ sơ is a full page, not a drawer.
   await profile.getByRole('button', { name: 'Chỉnh sửa hồ sơ' }).click()
   const editor = page.locator('.profile-editor-page')
   await editor.waitFor({ state: 'visible' })
@@ -296,13 +336,13 @@ try {
       return [key, rect ? {x:rect.x,y:rect.y,width:rect.width,height:rect.height} : null]
     }))
   })
-  assert(Math.abs(editGeometry['.profile-editor-form-card'].x - 282) < 5 &&
+  assert(Math.abs(editGeometry['.profile-editor-form-card'].x - 108) < 5 &&
     Math.abs(editGeometry['.profile-editor-form-card'].y - 111) < 5 &&
-    Math.abs(editGeometry['.profile-editor-preview-card'].x - 1160) < 8 &&
+    Math.abs(editGeometry['.profile-editor-preview-card'].x - 1105) < 8 &&
     Math.abs(editGeometry['.profile-editor-privacy-card'].y - 563) < 6,
-    'S03 card positions should match Social UI frame: ' + JSON.stringify(editGeometry))
+    'S03 card positions should match Desktop frame: ' + JSON.stringify(editGeometry))
   mkdirSync('output/playwright/layout', { recursive: true })
-  await page.screenshot({ path: 'output/playwright/layout/social-profile-edit-s03.png' })
+  await page.screenshot({ path: 'output/playwright/layout/profile-page-edit-s03.png' })
   await editor.getByRole('textbox', { name: 'Tên hiển thị' }).fill('Bản nháp cần hủy')
   await editor.getByRole('textbox', { name: 'Tiểu sử' }).fill('Giới thiệu đang thử')
   await editor.getByRole('textbox', { name: 'Thành phố' }).fill('Đà Nẵng')
@@ -359,7 +399,7 @@ try {
   assert(overflow <= 2, 'Responsive profile causes horizontal overflow at 1000px: ' + overflow)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.locator('.profile-view').waitFor({ state: 'visible' })
-  assert(await page.locator('.social-profile-page').count() === 0, 'Mobile must keep existing profile layout')
+  assert(await page.locator('.profile-page').count() === 0, 'Mobile must keep existing profile layout')
   await page.getByRole('button', { name: 'Mở trang cá nhân' }).click()
   await page.getByRole('button', { name: 'Chỉnh sửa', exact: true }).click()
   await page.getByRole('dialog', { name: 'Chỉnh sửa hồ sơ' }).waitFor({ state: 'visible' })
@@ -367,7 +407,7 @@ try {
   await page.setViewportSize({ width: 1586, height: 992 })
   await profile.waitFor({ state: 'visible' })
   assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
-  console.log('PASS: Social UI desktop groups/calls/chat, profile, S03 full-page editor, live preview, discard, privacy, save bio/city and responsive')
+  console.log('PASS: social UI groups/calls/chat, profile, S03 full-page editor, live preview, discard, privacy, save bio/city and responsive')
 } catch (error) {
   console.error(error)
   process.exitCode = 1

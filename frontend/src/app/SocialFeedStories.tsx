@@ -12,7 +12,7 @@ type Props = {
   onOpen: (id: number) => void
 }
 
-export default function DesktopSocialFeedStories({
+export default function SocialFeedStories({
   username, displayName, stories, busy, onCreate, onOpen,
 }: Props) {
   const [expanded, setExpanded] = useState(false)

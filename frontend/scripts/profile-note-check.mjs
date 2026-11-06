@@ -55,8 +55,10 @@ try{
    else await page.getByRole('button',{name:'Cá nhân',exact:true}).click()
    const publish=page.getByRole('button',{name:'Đăng ghi chú',exact:true})
    await publish.waitFor()
-   const bubbleBounds=await publish.boundingBox(),heroBounds=await page.locator(width<=760?'.profile-hero':'.social-profile-hero').boundingBox()
+   const bubbleBounds=await publish.boundingBox(),heroBounds=await page.locator(width<=760?'.profile-hero':'.profile-page-hero').boundingBox()
    assert.ok(bubbleBounds.x>=heroBounds.x && bubbleBounds.x+bubbleBounds.width<=heroBounds.x+heroBounds.width,'Note bubble must fit the profile card')
+   // Leave the expanded app sidebar before clicking an underlying profile action.
+   if(width>760) { await page.mouse.move(width-5, 5); await page.waitForTimeout(280) }
    await publish.click()
    let dialog=page.getByRole('dialog',{name:'Đăng ghi chú',exact:true})
    await dialog.waitFor()

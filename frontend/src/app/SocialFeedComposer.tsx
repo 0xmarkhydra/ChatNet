@@ -13,7 +13,7 @@ type Props = {
   onCheckIn: () => void
 }
 
-export default function DesktopSocialFeedComposer({
+export default function SocialFeedComposer({
   username, displayName, draft, pending, storyBusy,
   onCreatePost, onCreateStory, onCreateMediaPost, onCheckIn,
 }: Props) {

@@ -14,7 +14,7 @@ type Props = {
   onCreateGroup: () => void
 }
 
-export default function DesktopCommunicationHub({
+export default function CommunicationHub({
   kind, conversations, hasMore, loadingMore, onLoadMore, onOpenChat, onCreateGroup,
 }: Props) {
   const [query, setQuery] = useState('')
@@ -25,7 +25,7 @@ export default function DesktopCommunicationHub({
   ), [conversations, groups, query])
 
   return (
-    <section className="communication-hub-panel" aria-label={groups ? 'Nhóm và cộng đồng' : 'Cuộc gọi'}>
+    <section className="communication-hub" aria-label={groups ? 'Nhóm và cộng đồng' : 'Cuộc gọi'}>
       <header className="communication-hub-heading">
         <div>
           <span className="communication-hub-eyebrow">{groups ? 'CỘNG ĐỒNG SOC​​CO' : 'KẾT NỐI TRỰC TIẾP'}</span>

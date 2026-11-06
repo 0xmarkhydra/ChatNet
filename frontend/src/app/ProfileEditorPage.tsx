@@ -37,7 +37,7 @@ const accessRows = [
   { key: 'showOnlineStatus', title: 'Trạng thái trực tuyến', subtitle: 'Hiển thị khi đang hoạt động' },
 ] as const
 
-export default function DesktopProfileEditor({
+export default function ProfileEditorPage({
   profile, username, displayName, coverUrl,
   displayNameDraft, setDisplayNameDraft, usernameDraft, setUsernameDraft,
   bioDraft, setBioDraft, cityDraft, setCityDraft, profileSaving, mediaBusy,
