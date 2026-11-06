@@ -175,6 +175,19 @@ try {
         assert.ok(item.borderFree && item.transparent,
           `Nested input style found in ${item.name}: ${JSON.stringify(item)}`)
       }
+      const inputTypography = await page.locator('.media-composer input[aria-label="Tin nhắn"]').evaluate(
+        input => parseFloat(getComputedStyle(input).fontSize))
+      assert.ok(inputTypography >= (width > 760 ? 15 : 16),
+        `Chat input font too small at ${width}px: ${inputTypography}px`)
+      if (width > 760) {
+        assert.ok(rects.composer.height <= 62, `Desktop composer too tall at ${width}px: ${rects.composer.height}px`)
+        const gap = rects.composer.y - (rects.banner.y + rects.banner.height)
+        assert.ok(gap >= 0 && gap <= 8,
+          `AI translation settings are too far above composer at ${width}px: ${gap}px`)
+      } else {
+        assert.ok(rects.composer.height <= 60,
+          `Mobile composer too tall at ${width}px: ${rects.composer.height}px`)
+      }
       if (width === 1586) {
         const scroll = await page.locator('.social-chat-layout .messages').evaluate(el => ({top:el.scrollTop,height:el.clientHeight,total:el.scrollHeight}))
         assert.equal(scroll.top, 0, 'geometry measured from the start of the conversation')
@@ -189,11 +202,11 @@ try {
           listSearch:[289 + sidebarShift,190,312,46],
           firstRow:[282 + sidebarShift,302,325,79],
           stageHeader:[638 + sidebarShift,109,604 - sidebarShift,79],
-          composer:[652 + sidebarShift,860,574 - sidebarShift,74],
-          banner:[653 + sidebarShift,802,574 - sidebarShift,42],
+          composer:[652 + sidebarShift,879,574 - sidebarShift,60],
+          banner:[653 + sidebarShift,832,574 - sidebarShift,42],
           date:[877 + sidebarShift / 2,209,121,29],
           avatar:[652 + sidebarShift,273,32,32],
-          composerSend:[1140,874,69,44],
+          composerSend:[1144,887,69,44],
           detailsAvatar:[1359,193,93,93],
         }
         for (const [name,expected] of Object.entries(target)) {

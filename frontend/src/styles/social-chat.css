@@ -645,10 +645,10 @@
     flex: 0 0 auto;
     flex-wrap: wrap;
     width: auto;
-    min-height: 74px;
+    min-height: 60px;
     height: auto;
-    margin: 16px 15px 15px 14px;
-    padding: 14px 17px 15px 13px;
+    margin: 5px 15px 10px 14px;
+    padding: 7px 12px;
     gap: 5px;
     border: 1px solid #dae4f3;
     border-radius: 16px;
@@ -696,7 +696,8 @@
     background: transparent;
     box-shadow: none;
     color: #243651;
-    font-size: 12px;
+    font-size: 15px;
+    line-height: 22px;
   }
   .modern-shell.app-layout .social-chat-layout .media-composer > .send-button {
     display: grid;
@@ -1082,4 +1083,22 @@
   margin: 0;
   line-height: 18px;
   white-space: nowrap;
+}
+/* Keep the mobile composer compact while preserving 44px touch targets. */
+@media (max-width: 760px) {
+  .social-chat-layout .media-composer.composer {
+    min-height: 56px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .social-chat-layout .media-composer > input:not(.hidden-media-input) {
+    min-height: 44px;
+    height: 44px;
+    font-size: 16px;
+    line-height: 22px;
+  }
+  .social-chat-layout .media-composer > .send-button {
+    min-height: 44px;
+    height: 44px;
+  }
 }
