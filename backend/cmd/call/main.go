@@ -158,6 +158,7 @@ func main() {
 	mux.HandleFunc("GET /health", s.health)
 	mux.Handle("POST /api/calls", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createCall)))
 	mux.Handle("GET /api/calls/current", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.currentCalls)))
+	mux.Handle("GET /api/calls/history", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.callHistory)))
 	mux.Handle("GET /api/calls/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getCall)))
 	mux.Handle("GET /api/calls/{id}/participants", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listParticipants)))
 	mux.Handle("POST /api/calls/{id}/join", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.joinCall)))
@@ -391,6 +392,57 @@ func (s *server) currentCalls(w http.ResponseWriter, r *http.Request) {
 			E2EEReady:  s.redis.Exists(r.Context(), publicKeyRedisKey(call.ID, claims.UserID)).Val() > 0,
 			Configured: s.liveKitConfigured(),
 		})
+	}
+	httpx.JSON(w, http.StatusOK, items)
+}
+
+// callHistory exposes finished calls only within conversations the user can still access.
+func (s *server) callHistory(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	rows, err := s.db.Query(r.Context(), `
+		SELECT cs.id,cs.conversation_id,cs.created_by,cs.media_type,cs.status,
+		       cs.created_at,cs.started_at,cs.ended_at,
+		       cp.joined_at IS NOT NULL,cp.declined_at IS NOT NULL,c.type='group',
+		       (SELECT COUNT(*) FROM call_participants other
+		        WHERE other.call_id=cs.id AND other.joined_at IS NOT NULL)
+		FROM call_sessions cs
+		JOIN call_participants cp ON cp.call_id=cs.id AND cp.user_id=$1
+		JOIN conversations c ON c.id=cs.conversation_id
+		JOIN conversation_members cm ON cm.conversation_id=c.id AND cm.user_id=$1
+		WHERE cs.status IN ('ended','cancelled')
+		  AND (c.type <> 'direct' OR NOT EXISTS (
+		    SELECT 1 FROM conversation_members other
+		    JOIN user_blocks b ON (b.blocker_id=$1 AND b.blocked_id=other.user_id)
+		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
+		    WHERE other.conversation_id=c.id AND other.user_id<>$1))
+		ORDER BY cs.created_at DESC,cs.id DESC
+		LIMIT 100`, claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load call history")
+		return
+	}
+	defer rows.Close()
+	type historyEntry struct {
+		callSession
+		Joined           bool  `json:"joined"`
+		Declined         bool  `json:"declined"`
+		IsGroup          bool  `json:"isGroup"`
+		ParticipantCount int64 `json:"participantCount"`
+	}
+	items := []historyEntry{}
+	for rows.Next() {
+		var item historyEntry
+		if err := rows.Scan(&item.ID,&item.ConversationID,&item.CreatedBy,
+			&item.MediaType,&item.Status,&item.CreatedAt,&item.StartedAt,&item.EndedAt,
+			&item.Joined,&item.Declined,&item.IsGroup,&item.ParticipantCount); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot load call history")
+			return
+		}
+		items = append(items, item)
+	}
+	if rows.Err() != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load call history")
+		return
 	}
 	httpx.JSON(w, http.StatusOK, items)
 }
