@@ -177,15 +177,20 @@ try {
     assert.ok(actual.pageWidth <= actual.viewport + 3, 'Overflow at ' + width + 'px: ' + JSON.stringify(actual))
     if (width > 760) {
       const sidebar = page.locator('.app-sidebar')
-      const before = await sidebar.boundingBox()
-      await sidebar.getByRole('button', { name: 'Bạn bè' }).click()
-      const after = await sidebar.boundingBox()
-      assert.ok(Math.abs(after.width - before.width) <= 1, 'Sidebar expands after clicking Friends at ' + width + 'px')
+      await page.mouse.move(width - 4, 200)
+      await page.waitForFunction(() => document.querySelector('.app-sidebar')?.getBoundingClientRect().width === 76)
+      await sidebar.getByRole('button', { name: 'Bạn bè' }).hover()
+      await page.waitForFunction(() => document.querySelector('.app-sidebar')?.getBoundingClientRect().width === 250)
+      const expanded = await sidebar.boundingBox()
       for (const selector of ['.app-sidebar-nav', '.app-sidebar-link.is-active', '.app-sidebar-account']) {
         const box = await page.locator(selector).first().boundingBox()
-        assert.ok(box.x + box.width <= after.x + after.width + 1,
+        assert.ok(box.x + box.width <= expanded.x + expanded.width + 1,
           'Sidebar child protrudes at ' + width + 'px: ' + selector)
       }
+      await sidebar.getByRole('button', { name: 'Bạn bè' }).click()
+      await page.mouse.move(width - 4, 200)
+      await page.waitForFunction(() => document.querySelector('.app-sidebar')?.getBoundingClientRect().width === 76)
+      console.log('PASS sidebar Friends hover-expand and mouseleave-collapse at ' + width + 'px')
     }
     if (width === 390) await page.screenshot({ path: resolve(dir, 'directory-mobile-390.png'), fullPage: true })
     console.log('PASS responsive ' + width + 'px')
