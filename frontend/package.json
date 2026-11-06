@@ -15,6 +15,7 @@
     "check:app-notifications": "node scripts/check-friends-redesign.mjs",
     "check:optimistic": "node --experimental-strip-types scripts/optimistic-check.mjs",
     "check:chat": "node --experimental-strip-types scripts/chat-persistence-check.mjs",
+    "check:message-translation": "node --experimental-strip-types scripts/message-translation-view-check.mjs && node scripts/chat-translation-ui-check.mjs",
     "check:chat-layout": "node scripts/chat-layout-check.mjs",
     "check:message-search": "node --experimental-strip-types scripts/message-search-check.mjs",
     "check:outbox": "node --experimental-strip-types scripts/chat-outbox-check.mjs",

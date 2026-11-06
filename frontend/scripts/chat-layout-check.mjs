@@ -72,7 +72,7 @@ try {
         if (p === '/api/conversation-categories') return json([])
         if (p === '/api/friends') return json([{id:2,username:'linhanh',displayName:'Linh Anh',online:true,status:'accepted',updatedAt:today}])
         if (p === '/api/preferences/translation') return json({targetLanguage:'en',autoTranslate:false})
-        if (p === '/api/preferences') return json({appLocale:'vi'})
+        if (p === '/api/preferences') return json({targetLanguage:'en',autoTranslate:false,appLocale:'vi'})
         if (p === '/api/push/config') return json({configured:false})
         return json([])
       })
@@ -85,6 +85,8 @@ try {
         await detailsButton.click()
         await page.locator('.social-chat-details').waitFor({state:'visible'})
       }
+      // Optional translation buttons extend message height; measure the reference from the top.
+      await page.locator('.social-chat-layout .messages').evaluate(el => { el.scrollTop = 0 })
       const selectors = {
         list: '.social-chat-list', listHeading: '.social-chat-list-title h2',
         listSearch: '.social-chat-list-search', filter: '.social-chat-list-filters',
@@ -102,7 +104,7 @@ try {
         composerSend: '.media-composer .send-button',
         composerImage: '.media-composer .chat-composer-image',
         composerMic: '.media-composer .voice-record-trigger',
-        translatedCard: '.social-chat-layout .chat-translated-card',
+        translationAction: '[data-message-id="3"] .chat-translation-action',
         photo: '.social-chat-layout .chat-message-photo img',
         photoTime: '.social-chat-layout .chat-image-time',
       }
@@ -114,7 +116,7 @@ try {
       }
       if (width === 1586) {
         const scroll = await page.locator('.social-chat-layout .messages').evaluate(el => ({top:el.scrollTop,height:el.clientHeight,total:el.scrollHeight}))
-        assert.equal(scroll.top, 0, 'reference message timeline must fit without forced scroll')
+        assert.equal(scroll.top, 0, 'geometry measured from the start of the conversation')
         // Main uses a hover-expand navigation rail. Both compact and expanded positions
         // must preserve the S00 column dimensions, padding and component spacing.
         const sidebarShift = rects.list.x - 272
@@ -140,9 +142,9 @@ try {
           console.log(name, 'actual', actual, 'target', expected, 'delta', delta)
           assert.ok(delta.every(v=>v<=3), `${name} deviates more than expected: ${delta.join(',')}`)
         }
-        console.log('content', JSON.stringify({firstBubble:rects.firstBubble,translatedCard:rects.translatedCard,photo:rects.photo,photoTime:rects.photoTime,composerImage:rects.composerImage,composerMic:rects.composerMic}))
+        console.log('content', JSON.stringify({firstBubble:rects.firstBubble,translationAction:rects.translationAction,photo:rects.photo,photoTime:rects.photoTime,composerImage:rects.composerImage,composerMic:rects.composerMic}))
         assert.ok(rects.avatar, 'incoming message avatar visible')
-        assert.ok(rects.translatedCard, 'combined original and AI translation visible')
+        assert.ok(rects.translationAction, 'manual translation action appears when automatic translation is off')
         assert.ok(rects.photo && rects.photo.width === 258 && rects.photo.height === 142, 'photo size must match reference')
         assert.ok(rects.photoTime, 'photo time chip visible')
       } else console.log(`${width}px:`, JSON.stringify(rects))

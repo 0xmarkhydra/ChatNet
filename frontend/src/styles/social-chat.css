@@ -544,7 +544,7 @@
   .modern-shell.app-layout .social-chat-layout .messages .message:first-of-type {
     margin-bottom: 26px;
   }
-  .modern-shell.app-layout .social-chat-layout .messages .message:has(.chat-translated-card) {
+  .modern-shell.app-layout .social-chat-layout .messages .message:has(.chat-translation-dual) {
     margin-bottom: 12px;
   }
   .modern-shell.app-layout .social-chat-layout .messages .message:last-of-type {
@@ -585,39 +585,14 @@
     color: #8796ad;
     font-size: 10px;
   }
-  .modern-shell.app-layout .social-chat-layout .chat-translated-card {
+  .modern-shell.app-layout .social-chat-layout .chat-translation-dual {
     box-sizing: border-box;
     width: 405px;
     max-width: 100%;
-    min-height: 126px;
-    padding-bottom: 18px;
   }
-  .modern-shell.app-layout .social-chat-layout .chat-translated-card > .message-selectable-text {
-    display: block;
+  .modern-shell.app-layout .social-chat-layout .chat-translation-dual > .translation-flip-content {
     font-size: 14px;
     font-weight: 600;
-  }
-  .modern-shell.app-layout .social-chat-layout .chat-translation-inline {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    margin-top: 20px;
-    padding: 14px 0 3px;
-    border: 0;
-    border-top: 1px solid #e8ecf5;
-    background: transparent;
-    color: #3769d5;
-    font: inherit;
-    font-size: 12px;
-    text-align: left;
-    cursor: pointer;
-  }
-  .modern-shell.app-layout .social-chat-layout .chat-translation-inline svg {
-    flex: 0 0 18px;
-  }
-  .modern-shell.app-layout .social-chat-layout .chat-translation-inline:hover {
-    color: #194fbe;
   }
   .modern-shell.app-layout .social-chat-layout .messages .message:has(.chat-message-photo) {
     width: min(258px, calc(100% - 46px));
@@ -771,25 +746,83 @@
   .social-chat-layout .chat-composer-image { display: none; }
   .social-chat-layout .chat-message-sender-avatar,
   .social-chat-layout .chat-image-time { display: none; }
-  .social-chat-layout .chat-translation-inline {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    width: 100%;
-    margin-top: 8px;
-    padding: 9px 0 0;
-    border: 0;
-    border-top: 1px solid #e8ecf5;
-    background: transparent;
-    color: #3769d5;
-    font: inherit;
-    font-size: 12px;
-    text-align: left;
-    cursor: pointer;
-  }
-  .social-chat-layout .chat-translation-inline svg { flex: 0 0 18px; }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
   .social-chat-layout .message { animation: none; }
+}
+/* Translation stays next to its message; short texts show translation first,
+   long texts use a compact reversible original/translation switch. */
+.social-chat-layout .chat-translation-dual .chat-translation-original {
+  display: block;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid #e7ebf3;
+  color: #62748f;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.social-chat-layout .chat-translation-action,
+.social-chat-layout .chat-translation-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  margin-top: 7px;
+  padding: 5px 9px;
+  border: 1px solid #e5ecfb;
+  border-radius: 11px;
+  background: #f1f5ff;
+  color: #416bc3;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  width: fit-content;
+  max-width: 100%;
+}
+.social-chat-layout .chat-translation-action { cursor: pointer; }
+.social-chat-layout .chat-translation-action:hover { background: #e8efff; }
+.social-chat-layout .chat-translation-action:focus-visible,
+.social-chat-layout .translation-flip-pill:focus-visible {
+  outline: 2px solid #8daff7;
+  outline-offset: 2px;
+}
+.social-chat-layout .chat-translation-loading {
+  background: #f7f9ff;
+  color: #6c80a0;
+  border-color: transparent;
+}
+.social-chat-layout .chat-translation-loading svg { animation: chat-translation-spin .85s linear infinite; }
+@keyframes chat-translation-spin {
+  to { transform: rotate(360deg); }
+}
+.social-chat-layout .translation-flip-pill {
+  gap: 6px;
+  margin-top: 7px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border-color: #dddafb;
+  background: #f8f9fe;
+  color: #8891a1;
+}
+.social-chat-layout .translation-flip-pill b {
+  color: #637088;
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+.social-chat-layout .translation-flip-pill small {
+  color: #8e98a6;
+  font-size: 11px;
+}
+.social-chat-layout .translation-flip-pill .translation-flip-icon,
+.social-chat-layout .translation-flip-pill .translation-flip-swap {
+  color: #8a95a7;
+  font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .social-chat-layout .chat-translation-loading svg { animation-duration: 2s; }
 }

@@ -8,6 +8,7 @@ import { SessionResponseCache } from "../shared/lib/sessionCache";
 import VisitorProfile from "../features/profile/VisitorProfile";
 import { userLabel } from "../shared/lib/userLabel";
 import { useMessageData } from "../features/chat/useMessageData";
+import { getMessageTranslationView } from "../features/chat/messageTranslationPresentation";
 import { useApiRequest } from "./useApiRequest";
 import { useAppRealtime } from "./useAppRealtime";
 import { useDesktopNotifications } from "../platform/useDesktopNotifications";
@@ -93,6 +94,7 @@ import NotificationsPage from "./NotificationsPage";
 import ConversationDetailsPanel from "./ConversationDetailsPanel";
 import ProfilePage from "./ProfilePage";
 import ProfileEditorPage from "./ProfileEditorPage";
+import SettingsWorkspace from "./SettingsWorkspace";
 import SocialFeedComposer from "./SocialFeedComposer";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import SocialFeedStories from "./SocialFeedStories";
@@ -132,6 +134,7 @@ import {
   Check,
   Images,
   Languages,
+  LoaderCircle,
   ChevronDown,
   Plus,
   LogOut,
@@ -635,6 +638,11 @@ export default function App({
   const [translationOriginals, setTranslationOriginals] = useState<
     Record<number, boolean>
   >({});
+  const [manuallyTranslated, setManuallyTranslated] = useState<Record<number, boolean>>({});
+  const [translationPending, setTranslationPending] = useState<Record<number, boolean>>({});
+  const [translationFailures, setTranslationFailures] = useState<Record<number, boolean>>({});
+  const translationInFlight = useRef(new Set<string>());
+  const translationAttempted = useRef(new Set<string>());
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false);
   useEffect(() => {
     if (!translationMenuOpen) return;
@@ -666,6 +674,15 @@ export default function App({
   const [translationSettingsSearch, setTranslationSettingsSearch] =
     useState("");
   const [targetLanguage, setTargetLanguage] = useState("en");
+  const translationLanguageRef = useRef(targetLanguage);
+  translationLanguageRef.current = targetLanguage;
+  useEffect(() => {
+    translationAttempted.current.clear();
+    setManuallyTranslated({});
+    setTranslationPending({});
+    setTranslationFailures({});
+    setTranslationOriginals({});
+  }, [session?.sessionId, targetLanguage]);
   const [autoTranslate, setAutoTranslate] = useState(true);
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] =
     useState(false);
@@ -2526,9 +2543,13 @@ export default function App({
   }, [session?.sessionId, privacyRetry]);
 
   async function changePrivacy(key: keyof UserPrivacy) {
+    if (!privacy || privacyBusy) return;
+    await savePrivacy({ ...privacy, [key]: !privacy[key] });
+  }
+
+  async function savePrivacy(next: UserPrivacy) {
     if (!privacy || privacyBusy || !session?.sessionId) return;
     const sessionId = session.sessionId;
-    const next = { ...privacy, [key]: !privacy[key] };
     setPrivacyBusy(true);
     try {
       const response = await apiFetch("/api/privacy", {
@@ -3613,16 +3634,20 @@ export default function App({
       return;
     const missing = messages.filter(
       (message) =>
+        !message.deleted &&
         message.senderId !== session.user.id &&
         Boolean(message.text.trim()) &&
-        !translations[message.id],
+        !translations[message.id] &&
+        !translationAttempted.current.has(`${session.sessionId}:${targetLanguage}:${message.id}:${message.editedAt ?? ""}`),
     );
-    missing.forEach((message) => void translateMessage(message));
+    missing.forEach((message) => void translateMessage(message, false));
   }, [
     autoTranslate,
+    translationPreferencesLoaded,
     messages,
     targetLanguage,
     session?.user.id,
+    session?.sessionId,
     activeConversationId,
   ]);
 
@@ -3635,6 +3660,10 @@ export default function App({
     setTargetLanguage(next);
     setTranslations({});
     setTranslationOriginals({});
+    setManuallyTranslated({});
+    setTranslationPending({});
+    setTranslationFailures({});
+    translationAttempted.current.clear();
     setTranslationMenuOpen(false);
     setTranslationPickerOpen(false);
     setLanguageSearch("");
@@ -4157,14 +4186,50 @@ export default function App({
     return result as { translatedText: string };
   }
 
-  async function translateMessage(message: Message) {
-    if (!message.text.trim()) return;
-    const result = await requestTranslation(message.text, message.id);
-    if (!result) return;
-    setTranslations((current) => ({
-      ...current,
-      [message.id]: result.translatedText,
-    }));
+  async function translateMessage(message: Message, reveal = true) {
+    if (message.deleted || !message.text.trim()) return;
+    const sessionId = sessionRef.current?.sessionId;
+    if (!sessionId) return;
+    const language = targetLanguage;
+    const conversationId = activeConversationIdRef.current;
+    const requestKey = `${sessionId}:${language}:${message.id}:${message.editedAt ?? ""}`;
+    if (reveal) {
+      setManuallyTranslated((current) => ({ ...current, [message.id]: true }));
+    }
+    if (translations[message.id] && !translationFailures[message.id]) return;
+    if (translationInFlight.current.has(requestKey)) return;
+    // An automatic failure must not re-trigger for every incoming event.
+    // A manual retry remains available when translation fails.
+    if (!reveal && translationAttempted.current.has(requestKey)) return;
+    translationAttempted.current.add(requestKey);
+    translationInFlight.current.add(requestKey);
+    setTranslationPending((current) => ({ ...current, [message.id]: true }));
+    setTranslationFailures((current) => ({ ...current, [message.id]: false }));
+    try {
+      const result = await requestTranslation(message.text, message.id);
+      if (sessionRef.current?.sessionId !== sessionId ||
+          translationLanguageRef.current !== language ||
+          activeConversationIdRef.current !== conversationId) return;
+      if (!result?.translatedText.trim()) {
+        setTranslationFailures((current) => ({ ...current, [message.id]: true }));
+        return;
+      }
+      setTranslations((current) => ({ ...current, [message.id]: result.translatedText }));
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId &&
+          translationLanguageRef.current === language &&
+          activeConversationIdRef.current === conversationId) {
+        setTranslationFailures((current) => ({ ...current, [message.id]: true }));
+        setNotice(error instanceof Error ? error.message : "Không dịch được tin nhắn", "error");
+      }
+    } finally {
+      translationInFlight.current.delete(requestKey);
+      if (sessionRef.current?.sessionId === sessionId &&
+          translationLanguageRef.current === language &&
+          activeConversationIdRef.current === conversationId) {
+        setTranslationPending((current) => ({ ...current, [message.id]: false }));
+      }
+    }
   }
 
   async function createPost(event: FormEvent) {
@@ -4883,9 +4948,11 @@ export default function App({
                       market: "Marketplace",
                       feed: isProfileDesktop && activePost ? "Bình luận" : "Bảng tin",
                       profile:
-                        desktopProfileOverview && profileEditorOpen
-                          ? "Chỉnh sửa hồ sơ"
-                          : "Hồ sơ cá nhân",
+                        desktopProfileSettings && isProfileDesktop
+                          ? "Cài đặt"
+                          : desktopProfileOverview && profileEditorOpen
+                            ? "Chỉnh sửa hồ sơ"
+                            : "Hồ sơ cá nhân",
                     } as Record<Tab, string>
                   )[tab]}
           </strong>
@@ -5861,6 +5928,17 @@ export default function App({
                       const photoOnly = !message.deleted && !message.text && message.attachments?.length === 1 && message.attachments[0].kind === 'image' && Boolean(message.attachments[0].url)
                       const originalVisible = Boolean(translationOriginals[message.id])
                       const translatedLanguage = selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()
+                      const translationEnabled = autoTranslate || Boolean(manuallyTranslated[message.id])
+                      const translationView = getMessageTranslationView({
+                        originalText: message.text,
+                        translatedText,
+                        enabled: translationEnabled,
+                        showOriginal: originalVisible,
+                      })
+                      const hasTranslation = Boolean(translatedText?.trim() && translatedText.trim() !== message.text.trim())
+                      const longTranslation = Array.from(message.text).length > 100 && hasTranslation && translationEnabled
+                      const isTranslating = Boolean(translationPending[message.id])
+                      const translationFailed = Boolean(translationFailures[message.id])
                       return (
                         <Fragment key={message.id}>
                           {displayDay && <div className="day-divider"><span>{dayLabel}</span></div>}
@@ -5912,41 +5990,63 @@ export default function App({
                           ) : (
                             <>
                               {message.text && (
-                                <div className={translatedText && !mine ? 'bubble chat-translated-card' : translatedText ? 'bubble translated-bubble translation-flip-bubble' : 'bubble'}>
+                                <div className={`bubble${translationView.mode === 'dual' ? ' chat-translation-dual' : ''}${translationView.mode === 'translated' ? ' translated-bubble translation-flip-bubble' : ''}`}>
                                   <span
-                                    key={translatedText && mine ? `${message.id}-${originalVisible ? 'original' : 'translated'}` : `${message.id}-plain`}
+                                    key={`${message.id}-${translationView.mode}-${originalVisible ? 'original' : 'translated'}`}
                                     className="translation-flip-content message-selectable-text"
                                   >
-                                    {messageTextParts(translatedText && mine && !originalVisible ? translatedText : message.text).map((part, index) => part.kind === 'link'
+                                    {messageTextParts(translationView.primaryText).map((part, index) => part.kind === 'link'
                                       ? <a key={index} className="message-inline-link" href={messageLinkHref(part.text)} target="_blank" rel="noopener noreferrer">{part.text}</a>
                                       : <Fragment key={index}>{part.text}</Fragment>)}
                                   </span>
-                                  {translatedText && !mine && (
-                                    <button type="button" className="chat-translation-inline"
-                                      aria-expanded={!originalVisible} aria-label={originalVisible ? `Hiện bản dịch ${translatedLanguage}` : 'Ẩn bản dịch'}
-                                      onClick={() => setTranslationOriginals((current) => ({
-                                        ...current, [message.id]: !current[message.id],
-                                      }))}>
-                                      <Languages size={18} aria-hidden="true" />
-                                      <span>{originalVisible ? 'Hiện bản dịch' : `Bản dịch: ${translatedText}`}</span>
-                                    </button>
+                                  {translationView.secondaryText !== null && (
+                                    <span className="chat-translation-original message-selectable-text">
+                                      {messageTextParts(translationView.secondaryText).map((part, index) => part.kind === 'link'
+                                        ? <a key={index} className="message-inline-link" href={messageLinkHref(part.text)} target="_blank" rel="noopener noreferrer">{part.text}</a>
+                                        : <Fragment key={index}>{part.text}</Fragment>)}
+                                    </span>
                                   )}
                                 </div>
                               )}
-                              {translatedText && message.text && mine && (
+                              {longTranslation && (
                                 <button
                                   type="button"
                                   className={originalVisible ? 'translation-flip-pill original' : 'translation-flip-pill translated'}
-                                  aria-label={originalVisible ? `Hiện bản dịch ${translatedLanguage}` : 'Hiện bản gốc'}
+                                  aria-label={originalVisible ? 'Hiện nội dung đã dịch' : 'Hiện tin nhắn gốc'}
                                   onClick={() => setTranslationOriginals((current) => ({
-                                    ...current,
-                                    [message.id]: !current[message.id],
+                                    ...current, [message.id]: !current[message.id],
                                   }))}
                                 >
-                                  <span className="translation-flip-icon" aria-hidden="true">{originalVisible ? '↔' : '✦'}</span>
-                                  <b>{originalVisible ? t('translation.original') : targetLanguage.split('-')[0].toUpperCase()}</b>
-                                  <small>{originalVisible ? t('translation.originalText') : 'AI'}</small>
+                                  <span className="translation-flip-icon" aria-hidden="true">↔</span>
+                                  <b>{originalVisible ? 'DỊCH' : 'GỐC'}</b>
+                                  <small>{originalVisible ? translatedLanguage : 'Nguyên văn'}</small>
                                   <span className="translation-flip-swap" aria-hidden="true">↔</span>
+                                </button>
+                              )}
+                              {isTranslating && (
+                                <span className="chat-translation-loading" role="status" aria-live="polite">
+                                  <LoaderCircle size={15} aria-hidden="true" />
+                                  Đang dịch tin nhắn…
+                                </span>
+                              )}
+                              {!isTranslating && !autoTranslate && translationView.mode === 'dual' && (
+                                <button type="button" className="chat-translation-action"
+                                  onClick={() => setManuallyTranslated((current) => ({ ...current, [message.id]: false }))}>
+                                  <Languages size={15} aria-hidden="true" /> Ẩn dịch
+                                </button>
+                              )}
+                              {!isTranslating && !autoTranslate &&
+                                (!manuallyTranslated[message.id] || !hasTranslation) && (
+                                <button type="button" className="chat-translation-action"
+                                  onClick={() => void translateMessage(message)}>
+                                  <Languages size={15} aria-hidden="true" />
+                                  {translationFailed ? 'Thử dịch lại' : 'Dịch'}
+                                </button>
+                              )}
+                              {!isTranslating && autoTranslate && translationFailed && !hasTranslation && (
+                                <button type="button" className="chat-translation-action"
+                                  onClick={() => void translateMessage(message)}>
+                                  <Languages size={15} aria-hidden="true" /> Thử dịch lại
                                 </button>
                               )}
                               {Boolean(message.attachments?.length) && (
@@ -6943,7 +7043,7 @@ export default function App({
 
         {tab === "profile" && !desktopProfileOverview && (
           <div
-            className={`simple-view profile-view ${profileTimelineOpen ? "personal-timeline-view" : ""}`}
+            className={`simple-view profile-view ${profileTimelineOpen ? "personal-timeline-view" : ""} ${isProfileDesktop && desktopProfileSettings ? "settings-workspace-open" : ""}`}
           >
             <input
               ref={avatarFileInputRef}
