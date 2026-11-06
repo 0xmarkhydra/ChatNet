@@ -24,7 +24,7 @@ server.stderr.on('data', chunk => { logs += chunk.toString() })
 let browser
 const check = (value, message) => { if (!value) throw new Error(message) }
 const conversations = [
-  { id: 1, name: 'minhanh', type: 'direct', otherUserId: 2, memberCount: 2, unreadCount: 2, lastMessage: 'Chiều nay mình xem lại bản thiết kế nhé.', online: true, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
+  { id: 1, name: 'minhanh', type: 'direct', otherUserId: 2, otherUsername: 'minhanh', memberCount: 2, unreadCount: 2, lastMessage: 'Chiều nay mình xem lại bản thiết kế nhé.', online: true, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
   { id: 2, name: 'hoangnam', type: 'direct', otherUserId: 3, memberCount: 2, unreadCount: 0, lastMessage: 'Cảm ơn bạn, mình nhận được rồi.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
   { id: 3, name: 'Nhóm SocCO kiểm thử giao diện mobile và desktop với tên rất dài', type: 'group', memberCount: 5, unreadCount: 0, lastMessage: 'Hẹn cả nhóm ngày mai.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
 ]
@@ -888,15 +888,13 @@ try {
   await page.reload()
   await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
   await page.locator('.conversation-item').filter({ hasText: 'minhanh' }).first().click()
-  await page.locator('.chat-friend-bar').waitFor()
-  await page.getByText('Hai bạn chưa kết bạn', { exact: true }).waitFor()
-  const chatOptions = page.getByRole('button', { name: 'Tùy chọn cuộc trò chuyện' })
+  const chatOptions = page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first()
   check(await chatOptions.isVisible() && await chatOptions.isEnabled(),
-    'A non-friend with existing direct chat must have a chat options menu')
+    'A non-friend with an existing direct chat must have a details menu')
   await chatOptions.click()
-  const blockNonFriend = page.getByRole('menu', { name: 'Tùy chọn cuộc trò chuyện' }).getByRole('menuitem', { name: 'Chặn người dùng' })
+  const blockNonFriend = page.locator('.social-chat-details').getByRole('button', { name: 'Chặn tin nhắn và cuộc gọi' })
   check(await blockNonFriend.isVisible() && await blockNonFriend.isEnabled(),
-    'A non-friend must be able to block via the three-dot menu')
+    'A non-friend must be able to block through conversation details')
   const confirmation = new Promise(resolve => page.once('dialog', async dialog => {
     check(dialog.type() === 'confirm' && dialog.message().includes('Chặn'),
       'Block must ask for confirmation')
@@ -905,6 +903,8 @@ try {
   }))
   await blockNonFriend.click()
   await confirmation
+  await page.getByRole('button', { name: 'Đóng thông tin hội thoại' }).click()
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
 
   // Regression: frontend must POST only strict AttachmentInput fields.
   // A presigned download URL in POST /api/stories previously triggered "invalid body".
