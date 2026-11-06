@@ -94,7 +94,6 @@ import NotificationsPage from "./NotificationsPage";
 import ConversationDetailsPanel from "./ConversationDetailsPanel";
 import ProfilePage from "./ProfilePage";
 import ProfileEditorPage from "./ProfileEditorPage";
-import SettingsWorkspace from "./SettingsWorkspace";
 import SocialFeedComposer from "./SocialFeedComposer";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import SocialFeedStories from "./SocialFeedStories";
@@ -119,6 +118,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   FeedDiscussion,
   FeedText,
@@ -649,7 +649,7 @@ export default function App({
     const onOutsidePointer = (event: PointerEvent) => {
       if (
         event.target instanceof Element &&
-        !event.target.closest(".translation-hub")
+        !event.target.closest(".translation-hub, .translation-dialog-modal, .translation-hub-scrim")
       ) {
         setTranslationMenuOpen(false);
       }
@@ -5734,6 +5734,7 @@ export default function App({
                           type="button"
                           className={autoTranslate ? 'translation-hub-trigger active' : 'translation-hub-trigger'}
                           aria-expanded={translationMenuOpen}
+                          aria-controls="chat-translation-dialog"
                           aria-label="Cài đặt dịch AI"
                           onClick={() => {
                             setTranslationMenuOpen((current) => {
@@ -5751,7 +5752,7 @@ export default function App({
                           <span className="translation-hub-chevron" aria-hidden="true">{translationMenuOpen ? '⌃' : '⌄'}</span>
                         </button>
 
-                        {translationMenuOpen && (
+                        {translationMenuOpen && createPortal(
                           <>
                             <button
                               type="button"
@@ -5759,21 +5760,28 @@ export default function App({
                               aria-label="Đóng cài đặt dịch"
                               onClick={() => setTranslationMenuOpen(false)}
                             />
-                            <div className="translation-hub-popover" role="dialog" aria-label="Cài đặt dịch AI">
+                            <div id="chat-translation-dialog" className="translation-hub-popover translation-dialog-modal" role="dialog" aria-modal="true" aria-label="Cài đặt dịch AI">
                               <div className="translation-hub-heading">
                                 <div>
                                   <strong>{t('translation.title')}</strong>
                                   <small>{t('translation.subtitle')}</small>
                                 </div>
-                                <button
-                                  type="button"
-                                  className={autoTranslate ? 'translation-hub-switch active' : 'translation-hub-switch'}
-                                  role="switch"
-                                  aria-checked={autoTranslate}
-                                  onClick={() => changeAutoTranslate(!autoTranslate)}
-                                >
-                                  <span />
-                                </button>
+                                <div className="translation-dialog-actions">
+                                  <button
+                                    type="button"
+                                    className={autoTranslate ? 'translation-hub-switch active' : 'translation-hub-switch'}
+                                    aria-label="Tự động dịch tin nhắn"
+                                    role="switch"
+                                    aria-checked={autoTranslate}
+                                    onClick={() => changeAutoTranslate(!autoTranslate)}
+                                  >
+                                    <span />
+                                  </button>
+                                  <button type="button" className="translation-dialog-close"
+                                    aria-label="Đóng cài đặt dịch" onClick={() => setTranslationMenuOpen(false)}>
+                                    <X size={19} aria-hidden="true" />
+                                  </button>
+                                </div>
                               </div>
 
                               <label className="translation-language-search">
@@ -5786,6 +5794,7 @@ export default function App({
                                   autoComplete="off"
                                   autoCapitalize="none"
                                   spellCheck={false}
+                                  autoFocus
                                 />
                                 {languageSearch && (
                                   <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setLanguageSearch('')}>×</button>
@@ -5822,7 +5831,7 @@ export default function App({
                                 )}
                               </div>
                             </div>
-                          </>
+                          </>, document.body
                         )}
                       </div>
                     </div>

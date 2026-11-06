@@ -568,9 +568,35 @@ try {
       }
       await openTranslationFromDetails()
       await translationMenu.waitFor()
+      const modalBounds = await translationMenu.boundingBox()
+      const viewport = page.viewportSize()
+      check(modalBounds && viewport &&
+        Math.abs(modalBounds.x + modalBounds.width / 2 - viewport.width / 2) < 3 &&
+        Math.abs(modalBounds.y + modalBounds.height / 2 - viewport.height / 2) < 3,
+        'Translation dialog must be centered in viewport: ' + JSON.stringify({ width, modalBounds, viewport }))
+      const contrast = await translationMenu.evaluate(dialog => {
+        const getColor = (selector) => getComputedStyle(dialog.querySelector(selector)).color
+        return {
+          background: getComputedStyle(dialog).backgroundColor,
+          title: getColor('.translation-hub-heading strong'),
+          subtitle: getColor('.translation-hub-heading small'),
+          language: getColor('.translation-language-copy strong'),
+          native: getColor('.translation-language-copy small'),
+          region: getColor('.translation-language-copy em'),
+          placeholder: getComputedStyle(dialog.querySelector('.translation-language-search input'), '::placeholder').color,
+        }
+      })
+      check(contrast.background === 'rgb(255, 255, 255)' &&
+        contrast.title === 'rgb(23, 47, 84)' &&
+        contrast.language === 'rgb(23, 47, 84)' &&
+        contrast.subtitle === 'rgb(81, 101, 130)' &&
+        contrast.native === 'rgb(67, 89, 120)' &&
+        contrast.region === 'rgb(98, 117, 147)' &&
+        contrast.placeholder === 'rgb(100, 120, 147)',
+        'Dialog text and language rows must have readable contrast: ' + JSON.stringify(contrast))
       await translationMenu.locator('.translation-language-search input').fill('en')
-      check(await translationMenu.isVisible(), 'Translation menu closed while interacting inside: ' + width)
-      await page.locator('.chat-head .room-info').click()
+      check(await translationMenu.isVisible(), 'Translation dialog closed while interacting inside: ' + width)
+      await page.locator('.translation-hub-scrim').click({ position: { x: 5, y: 5 } })
       await translationMenu.waitFor({ state: 'hidden' })
       await openTranslationFromDetails()
       await translationMenu.waitFor()

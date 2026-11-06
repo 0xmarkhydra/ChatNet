@@ -854,4 +854,209 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .social-chat-layout .chat-translation-loading svg { animation-duration: 2s; }
+
+}
+
+
+/* AI translation settings: a centered, high-contrast dialog above all chat panels.
+   Rendered through a portal so transformed/scrolling chat ancestors cannot clip it. */
+.translation-hub-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  padding: 0;
+  border: 0;
+  background: rgba(14, 28, 55, .54);
+  cursor: default;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.translation-hub-popover.translation-dialog-modal {
+  position: fixed;
+  z-index: 5001;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+  box-sizing: border-box;
+  width: min(490px, calc(100vw - 32px));
+  min-width: 0;
+  max-height: min(700px, calc(100dvh - 40px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid #dbe5f4;
+  border-radius: 22px;
+  background: #ffffff;
+  color: #203351;
+  box-shadow: 0 25px 75px rgba(18, 36, 72, .32);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: chat-translation-dialog-in .16s ease-out both;
+}
+@keyframes chat-translation-dialog-in {
+  from { opacity: 0; transform: translate(-50%, -49%) scale(.985); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.translation-dialog-modal .translation-hub-heading {
+  padding: 0 0 6px;
+  gap: 14px;
+}
+.translation-dialog-modal .translation-hub-heading strong {
+  color: #172f54;
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.3;
+}
+.translation-dialog-modal .translation-hub-heading small {
+  color: #516582;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.translation-dialog-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+.translation-dialog-modal .translation-hub-switch {
+  background: #8999ae;
+}
+.translation-dialog-modal .translation-hub-switch.active {
+  background: #2563eb;
+}
+.translation-dialog-modal .translation-dialog-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: #f1f5fb;
+  color: #526780;
+  cursor: pointer;
+}
+.translation-dialog-modal .translation-dialog-close:hover {
+  background: #e6edfa;
+  color: #1e40af;
+}
+.translation-dialog-modal .translation-language-search {
+  flex: 0 0 auto;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 13px;
+  border: 1px solid #ccd9ec;
+  border-radius: 13px;
+  background: #f6f8fd;
+  color: #516989;
+}
+.translation-dialog-modal .translation-language-search:focus-within {
+  border-color: #6088ed;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+.translation-dialog-modal .translation-language-search input {
+  height: 46px;
+  min-width: 0;
+  color: #1f3558;
+  caret-color: #2563eb;
+  font-size: 14px;
+}
+.translation-dialog-modal .translation-language-search input::placeholder {
+  color: #647893;
+  opacity: 1;
+}
+.translation-dialog-modal .translation-language-search button {
+  color: #445c7a;
+  background: #e8eef8;
+}
+.translation-dialog-modal .translation-language-count {
+  padding: 0 2px 0;
+  color: #385276;
+  gap: 10px;
+}
+.translation-dialog-modal .translation-language-count span {
+  font-size: 12px;
+  font-weight: 700;
+}
+.translation-dialog-modal .translation-language-count small {
+  color: #647894;
+  font-size: 10px;
+}
+.translation-dialog-modal .translation-language-list {
+  flex: 1 1 auto;
+  min-height: 75px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  gap: 7px;
+  padding: 2px 4px 2px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  scrollbar-width: thin;
+  scrollbar-color: #b8c9e5 transparent;
+}
+.translation-dialog-modal .translation-language-list > button {
+  min-height: 73px;
+  border: 1px solid #e0e7f3;
+  border-radius: 14px;
+  background: #fff;
+  color: #1e3557;
+  box-shadow: none;
+}
+.translation-dialog-modal .translation-language-list > button:hover,
+.translation-dialog-modal .translation-language-list > button:focus-visible {
+  background: #f3f7ff;
+  border-color: #99b7f8;
+  transform: none;
+  outline: none;
+}
+.translation-dialog-modal .translation-language-list > button.active {
+  background: #eaf1ff;
+  border-color: #4a7ee9;
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+.translation-dialog-modal .translation-language-copy strong {
+  color: #172f54;
+  font-size: 13px;
+}
+.translation-dialog-modal .translation-language-copy small {
+  color: #435978;
+  font-size: 12px;
+}
+.translation-dialog-modal .translation-language-copy em {
+  color: #627593;
+  font-size: 10px;
+}
+.translation-dialog-modal .translation-language-list > button > b {
+  color: #285cce;
+  font-size: 10px;
+}
+.translation-dialog-modal .translation-language-list > button > i {
+  color: #164bb4;
+  background: #cbdcff;
+}
+.translation-dialog-modal .translation-language-empty {
+  color: #526784;
+}
+.translation-dialog-modal :is(button, input):focus-visible {
+  outline: 3px solid rgba(37, 99, 235, .33);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .translation-hub-popover.translation-dialog-modal {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+    border-radius: 18px;
+  }
+  .translation-dialog-modal .translation-hub-heading strong { font-size: 16px; }
+  .translation-dialog-modal .translation-language-count small { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .translation-hub-popover.translation-dialog-modal { animation: none; }
 }
