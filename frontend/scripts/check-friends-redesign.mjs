@@ -32,7 +32,7 @@ try {
   assert.equal(formatNotificationBadge(251), '99+')
   console.log('PASS badge count: 0, incoming + unread conversation, 99, 99+')
   const origin = 'http://127.0.0.1:' + vite.httpServer.address().port
-  browser = await chromium.launch({ headless: true })
+  browser = await chromium.launch({ channel: 'chrome', headless: true })
   const context = await browser.newContext({ viewport: { width: 1478, height: 927 }, serviceWorkers: 'block' })
   const session = {
     token: 'mock.' + Buffer.from(JSON.stringify({ exp: 4102444800 })).toString('base64url') + '.signed',
