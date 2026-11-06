@@ -96,6 +96,7 @@ import ProfileEditorPage from "./ProfileEditorPage";
 import SocialFeedComposer from "./SocialFeedComposer";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import SocialFeedStories from "./SocialFeedStories";
+import PostCommentsPage from "./PostCommentsPage";
 import CommunicationHub from "./CommunicationHub";
 import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
 import GroupRenameDialog from "../features/chat/GroupRenameDialog";
@@ -532,6 +533,25 @@ export default function App({
     setSearchHasScrolled(false);
   }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN"), feedFilter]);
   const [activePostId, setActivePostId] = useState<number | null>(null);
+  const [commentSortOrder, setCommentSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const feedScrollBeforeComments = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (tab === "feed" && activePostId === null && feedScrollBeforeComments.current !== null && feedViewRef.current) {
+      feedViewRef.current.scrollTop = feedScrollBeforeComments.current;
+      feedScrollBeforeComments.current = null;
+    }
+  }, [activePostId, tab]);
+  // The desktop comments view is a real in-app page with a shareable post URL.
+  // Popstate keeps the browser Back button in sync with the SPA.
+  useEffect(() => {
+    const onPopState = () => {
+      if (tabRef.current !== "feed") return;
+      const id = Number(new URLSearchParams(window.location.search).get("post"));
+      setActivePostId(Number.isSafeInteger(id) && id > 0 ? id : null);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   useEffect(() => {
     if (!session?.token) return;
     const params = new URLSearchParams(window.location.search);
@@ -1124,6 +1144,7 @@ export default function App({
         ...visiblePosts,
         ...savedPosts,
         ...postSearch.posts,
+        ...followingFeed.posts,
       ].find((item) => item.id === activePostId) || null
     : null;
   const activeMessageAction = messageActionId
@@ -4404,6 +4425,7 @@ export default function App({
             : item,
         ),
       );
+      followingFeed.syncPost({ ...post, comments: updated.comments });
       postSearch.syncPost({ ...post, comments: updated.comments });
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
@@ -4535,6 +4557,15 @@ export default function App({
       setDesktopProfileSettings(false);
       setProfileEditorOpen(false);
     }
+    if (activePostId !== null) {
+      setActivePostId(null);
+      feedScrollBeforeComments.current = null;
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("post")) {
+        url.searchParams.delete("post");
+        window.history.replaceState(window.history.state, "", url);
+      }
+    }
     if (nextTab === "feed") setFeedFilter("all");
     setQuickSearchOpen(false);
     setTab(nextTab);
@@ -4607,6 +4638,75 @@ export default function App({
       setCheckInLocation={setFeedCheckInLocation}
     />
   );
+  function openFeedPostDetails(id: number) {
+    if (tab === "feed" && isProfileDesktop) {
+      feedScrollBeforeComments.current = feedViewRef.current?.scrollTop ?? 0;
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("post") !== String(id)) {
+        url.searchParams.set("tab", "feed");
+        url.searchParams.set("post", String(id));
+        window.history.pushState({ ...window.history.state, postId: id }, "", url);
+      }
+    }
+    setActivePostId(id);
+  }
+
+  function closeFeedPostDetails() {
+    setActivePostId(null);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("post")) {
+      url.searchParams.delete("post");
+      window.history.replaceState(window.history.state, "", url);
+    }
+  }
+
+  const postDiscussion = activePost ? (
+                    <FeedDiscussion
+                      key={activePost.id}
+                      variant={tab === 'feed' && isProfileDesktop ? 'post-page' : 'default'}
+                      sortOrder={commentSortOrder}
+                      pending={pendingComments[activePost.id]}
+                      comments={activePost.comments || []}
+                      editor={
+                        commentEditors[activePost.id] || {
+                          replyTo: null,
+                          drafts: {},
+                        }
+                      }
+                      updateEditor={(editor) => {
+                        if (
+                          sessionRef.current?.sessionId === session.sessionId
+                        ) {
+                          setCommentEditors((current) => ({
+                            ...current,
+                            [activePost.id]: editor,
+                          }));
+                        }
+                      }}
+                      api={API}
+                      token={session.token}
+                      target={
+                        translationPreferencesLoaded ? targetLanguage : ""
+                      }
+                      submit={(content, parentId) =>
+                        addComment(activePost, content, parentId)
+                      }
+                      currentUser={name}
+                      onEdit={(commentId, content) =>
+                        manageFeedComment(
+                          activePost,
+                          commentId,
+                          "PATCH",
+                          content,
+                        )
+                      }
+                      onDelete={(commentId) =>
+                        manageFeedComment(activePost, commentId, "DELETE")
+                      }
+                      onReport={reportFeedComment}
+                    />
+  ) : null;
+
   const renderPosts = (items: Post[], showSave = false) =>
     items.map((post) => (
       <FeedPostCard
@@ -4624,7 +4724,7 @@ export default function App({
         token={session.token}
         translationPreferencesLoaded={translationPreferencesLoaded}
         targetLanguage={targetLanguage}
-        setActivePostId={setActivePostId}
+        setActivePostId={openFeedPostDetails}
         showSave={showSave}
         likePreviews={likePreviews}
         like={like}
@@ -4781,7 +4881,7 @@ export default function App({
                       notifications: "Thông báo",
                       discover: "Khám phá",
                       market: "Marketplace",
-                      feed: "Bảng tin",
+                      feed: isProfileDesktop && activePost ? "Bình luận" : "Bảng tin",
                       profile:
                         desktopProfileOverview && profileEditorOpen
                           ? "Chỉnh sửa hồ sơ"
@@ -4798,7 +4898,7 @@ export default function App({
                   notifications: "Cập nhật những hoạt động quan trọng",
                   discover: "Khám phá và kết nối cộng đồng",
                   market: "Khám phá sản phẩm và cửa hàng",
-                  feed: "Khoảnh khắc và cộng đồng dành cho bạn",
+                  feed: isProfileDesktop && activePost ? "Tương tác với mọi người trong cộng đồng" : "Khoảnh khắc và cộng đồng dành cho bạn",
                   profile: desktopProfileSettings
                     ? "Cài đặt tài khoản và quyền riêng tư"
                     : desktopProfileOverview && profileEditorOpen
@@ -6217,7 +6317,29 @@ export default function App({
           </Suspense>
         )}
 
-        {tab === "feed" && (
+        {tab === "feed" && isProfileDesktop && activePost && (
+          <PostCommentsPage
+            key={activePost.id}
+            post={activePost}
+            username={name}
+            ownDisplayName={profileMedia?.displayName || session.user.displayName || name}
+            token={session.token}
+            targetLanguage={translationPreferencesLoaded ? targetLanguage : ""}
+            request={apiFetch}
+            sortOrder={commentSortOrder}
+            onSortChange={setCommentSortOrder}
+            onDeleted={(id) => { removeFeedPost(id); closeFeedPostDetails(); }}
+            onAuthorOpen={openVisitor}
+            likeBusy={likePreviews[activePost.id] !== undefined}
+            onLike={(post) => void like(post)}
+            onUpdated={syncFeedPost}
+            onFeedback={(message, kind) => setNotice(message, kind)}
+          >
+            {postDiscussion}
+          </PostCommentsPage>
+        )}
+
+        {tab === "feed" && (!isProfileDesktop || !activePost) && (
           <div
             className="feed-view zalo-feed-view social-feed"
             ref={feedViewRef}
@@ -6615,7 +6737,7 @@ export default function App({
           />
         )}
 
-        {activePost && (
+        {activePost && !(tab === "feed" && isProfileDesktop) && (
           <div
             className="post-detail-backdrop"
             role="dialog"
@@ -6694,48 +6816,7 @@ export default function App({
                         {activePost.comments?.length || 0} bình luận
                       </span>
                     </div>
-                    <FeedDiscussion
-                      key={activePost.id}
-                      pending={pendingComments[activePost.id]}
-                      comments={activePost.comments || []}
-                      editor={
-                        commentEditors[activePost.id] || {
-                          replyTo: null,
-                          drafts: {},
-                        }
-                      }
-                      updateEditor={(editor) => {
-                        if (
-                          sessionRef.current?.sessionId === session.sessionId
-                        ) {
-                          setCommentEditors((current) => ({
-                            ...current,
-                            [activePost.id]: editor,
-                          }));
-                        }
-                      }}
-                      api={API}
-                      token={session.token}
-                      target={
-                        translationPreferencesLoaded ? targetLanguage : ""
-                      }
-                      submit={(content, parentId) =>
-                        addComment(activePost, content, parentId)
-                      }
-                      currentUser={name}
-                      onEdit={(commentId, content) =>
-                        manageFeedComment(
-                          activePost,
-                          commentId,
-                          "PATCH",
-                          content,
-                        )
-                      }
-                      onDelete={(commentId) =>
-                        manageFeedComment(activePost, commentId, "DELETE")
-                      }
-                      onReport={reportFeedComment}
-                    />
+                    {postDiscussion}
                   </div>
                 </article>
               </div>
