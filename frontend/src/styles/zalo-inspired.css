@@ -3742,11 +3742,44 @@ select:focus-visible {
   cursor: text;
 }
 
-.message-reactions {
+.message-content {
+  position: relative;
+  max-width: 100%;
+  margin-bottom: 13px;
+}
+
+.message.mine .message-content {
+  margin-left: auto;
+}
+
+/* The reaction button sits in the bubble's lower-right corner. */
+.message-content > .bubble:has(+ .message-reactions) {
+  padding-bottom: 22px;
+}
+
+.message-content .message-reactions {
+  position: absolute;
+  z-index: 2;
+  right: -8px;
+  bottom: -10px;
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 5px;
+  justify-content: flex-end;
+  align-items: center;
+  width: max-content;
+  max-width: min(230px, 78vw);
+  gap: 4px;
+  margin: 0;
+}
+
+.message-content .reaction-chip,
+.message-content .reaction-add {
+  box-shadow: 0 3px 10px rgba(26, 43, 72, .14);
+}
+
+.message-content:has(> .chat-message-photo) .chat-image-time {
+  right: auto;
+  left: 12px;
 }
 
 .reaction-chip {
@@ -3776,7 +3809,30 @@ select:focus-visible {
   background: rgba(255, 255, 255, .82);
   color: var(--chatnet-muted);
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity .15s ease, transform .15s ease;
 }
+
+/* Keep existing reaction counts visible; reveal the add icon on bubble hover. */
+.message-content:has(> .bubble:hover) .reaction-add,
+.message-content:has(> .chat-message-media:hover) .reaction-add,
+.message-content .message-reactions:hover .reaction-add,
+.message-content:focus-within .reaction-add {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+@media (hover: none) {
+  .message-content .reaction-add {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}
+
 .reaction-add:hover, .reaction-add:focus-visible {
   border-color: var(--chatnet-accent);
   background: var(--chatnet-accent-soft);

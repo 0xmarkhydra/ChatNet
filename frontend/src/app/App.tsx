@@ -5965,7 +5965,7 @@ export default function App({
                           {message.deleted ? (
                             <div className="bubble recalled-message">Tin nhắn đã được thu hồi</div>
                           ) : (
-                            <>
+                            <div className="message-content">
                               {message.text && (
                                 <div className={translatedText && !mine ? 'bubble chat-translated-card' : translatedText ? 'bubble translated-bubble translation-flip-bubble' : 'bubble'}>
                                   <span
@@ -6010,19 +6010,6 @@ export default function App({
                                   {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt)}</span>}
                                 </div>
                               )}
-                            </>
-                          )}
-                          <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
-                            {formatTime(message.createdAt)}
-                            {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
-                            {mine && (message.readByUserIds?.length || 0) > 0
-                              ? activeConversation.type === 'group'
-                                ? ` · ${message.readByUserIds?.length} đã xem`
-                                : ' · Đã xem'
-                              : ''}
-                          </div>
-                          {!message.deleted && (
-                            <>
                               <div className="message-reactions">
                                 {(message.reactions || []).map((reaction) => (
                                   <button
@@ -6044,8 +6031,17 @@ export default function App({
                                   <SmilePlus size={16} aria-hidden="true" />
                                 </button>
                               </div>
-                            </>
+                            </div>
                           )}
+                          <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
+                            {formatTime(message.createdAt)}
+                            {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
+                            {mine && (message.readByUserIds?.length || 0) > 0
+                              ? activeConversation.type === 'group'
+                                ? ` · ${message.readByUserIds?.length} đã xem`
+                                : ' · Đã xem'
+                              : ''}
+                          </div>
                         </article>
                         </Fragment>
                       )
