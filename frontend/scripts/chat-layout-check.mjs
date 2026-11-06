@@ -114,6 +114,67 @@ try {
         const rect = await first.count() ? await first.boundingBox() : null
         if (rect) rects[name] = Object.fromEntries(['x','y','width','height'].map(key=>[key,Math.round(rect[key])]))
       }
+      // One outlined shell for each input: no nested shape or pseudo-element.
+      const surfaceAudit = await page.evaluate(() => {
+        const form = document.querySelector('.social-chat-layout .media-composer')
+        const field = form?.querySelector('input[aria-label="Tin nhắn"]')
+        if (!form || !field) throw new Error('Chat composer input not found')
+        const sty = el => getComputedStyle(el)
+        const borderFree = el => parseFloat(sty(el).borderTopWidth) === 0 &&
+          parseFloat(sty(el).borderRightWidth) === 0 &&
+          parseFloat(sty(el).borderBottomWidth) === 0 &&
+          parseFloat(sty(el).borderLeftWidth) === 0
+        const clearBackground = el => ['transparent', 'rgba(0, 0, 0, 0)'].includes(sty(el).backgroundColor)
+        const values = {
+          composerBorder: sty(form).borderTopWidth,
+          inputBorderFree: borderFree(field),
+          inputTransparent: clearBackground(field),
+          pseudoContent: getComputedStyle(form, '::before').content,
+          bannerAligned: true,
+        }
+        const banner = document.querySelector('.social-chat-ai-banner')
+        const button = banner?.querySelector('button[aria-label="Cài đặt dịch AI"]')
+        if (banner && button && banner.getBoundingClientRect().height) {
+          const a = banner.getBoundingClientRect()
+          const b = button.getBoundingClientRect()
+          values.bannerAligned = Math.abs(a.y + a.height / 2 - b.y - b.height / 2) < 3
+        }
+        const classes = [
+          'appbar-search', 'social-chat-list-search', 'communication-hub-search',
+          'friend-search-input-wrap', 'connect-search-input', 'nearby-search',
+          'locale-picker-search', 'translation-language-search',
+          'profile-username-input', 'social-feed-checkin-field',
+        ]
+        const fixture = document.createElement('div')
+        fixture.style.cssText = 'position:absolute;left:-2000px;top:0;width:280px'
+        for (const cls of classes) {
+          const wrap = document.createElement('div')
+          wrap.className = cls
+          wrap.appendChild(document.createElement('input'))
+          fixture.appendChild(wrap)
+        }
+        const post = document.createElement('div')
+        post.className = 'post-box'
+        post.appendChild(document.createElement('textarea'))
+        fixture.appendChild(post)
+        document.body.appendChild(fixture)
+        values.wrapped = [...fixture.children].map(el => ({
+          name:el.className,
+          borderFree:borderFree(el.firstElementChild),
+          transparent:clearBackground(el.firstElementChild),
+        }))
+        fixture.remove()
+        return values
+      })
+      assert.equal(surfaceAudit.composerBorder, '1px', 'Only the outside composer border is visible')
+      assert.ok(surfaceAudit.inputBorderFree && surfaceAudit.inputTransparent,
+        'Composer field must not draw its own rectangle')
+      assert.equal(surfaceAudit.pseudoContent, 'none', 'Composer must not draw an inner pseudo-element')
+      assert.ok(surfaceAudit.bannerAligned, 'AI translation settings button must be centered in its banner')
+      for (const item of surfaceAudit.wrapped) {
+        assert.ok(item.borderFree && item.transparent,
+          `Nested input style found in ${item.name}: ${JSON.stringify(item)}`)
+      }
       if (width === 1586) {
         const scroll = await page.locator('.social-chat-layout .messages').evaluate(el => ({top:el.scrollTop,height:el.clientHeight,total:el.scrollHeight}))
         assert.equal(scroll.top, 0, 'geometry measured from the start of the conversation')

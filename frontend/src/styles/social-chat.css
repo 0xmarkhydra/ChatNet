@@ -650,21 +650,10 @@
     margin: 16px 15px 15px 14px;
     padding: 14px 17px 15px 13px;
     gap: 5px;
-    border: 0;
+    border: 1px solid #dae4f3;
     border-radius: 16px;
     background: #fff;
     box-shadow: none;
-  }
-  .modern-shell.app-layout .social-chat-layout .media-composer.composer::before {
-    position: absolute;
-    right: 94px;
-    bottom: 15px;
-    left: 13px;
-    height: 43px;
-    border-radius: 16px;
-    background: #f8fafe;
-    content: '';
-    pointer-events: none;
   }
   .modern-shell.app-layout .social-chat-layout .media-composer > :is(.attach-button, .chat-composer-image, .voice-record-trigger, .send-button),
   .modern-shell.app-layout .social-chat-layout .media-composer > input:not(.hidden-media-input) {
@@ -1059,4 +1048,38 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .translation-hub-popover.translation-dialog-modal { animation: none; }
+}
+
+/* The composer is one field container: its children do not create
+   additional rectangular surfaces, including on narrow screens. */
+.modern-shell.app-layout .social-chat-layout .media-composer.composer {
+  border: 1px solid #dbe5f3;
+  background: #fff;
+}
+.modern-shell.app-layout .social-chat-layout .media-composer.composer:focus-within {
+  border-color: #89aef5;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .10);
+}
+.modern-shell.app-layout .social-chat-layout .media-composer.composer::before {
+  content: none;
+  display: none;
+}
+.modern-shell.app-layout .social-chat-layout .media-composer > input:not(.hidden-media-input),
+.modern-shell.app-layout .social-chat-layout .media-composer > input:not(.hidden-media-input):focus,
+.modern-shell.app-layout .social-chat-layout .media-composer > input:not(.hidden-media-input):focus-visible {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}
+.modern-shell.app-layout .social-chat-layout .social-chat-ai-banner > button {
+  position: static;
+  align-self: center;
+  justify-content: center;
+  min-height: 32px;
+  margin: 0;
+  line-height: 18px;
+  white-space: nowrap;
 }
