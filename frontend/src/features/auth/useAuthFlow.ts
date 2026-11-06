@@ -6,6 +6,14 @@ import { desktopBridge, isDesktopBuild } from '../../platform/desktop'
 type AuthMode = 'login' | 'register'
 type RegisterStep = 'details' | 'otp'
 
+function describeOtpSendError(error: unknown, fallback: string): string {
+  if (typeof error !== 'string' || !error.trim()) return fallback
+  if (error === 'we could not send the verification email' || error === 'we could not resend the verification email') {
+    return 'Không thể gửi email xác minh. Vui lòng thử lại hoặc liên hệ quản trị viên để kiểm tra dịch vụ gửi email.'
+  }
+  return error
+}
+
 export function useAuthFlow(saveSession: (next: Session) => void) {
   const [authMode, setAuthMode] = useState<AuthMode>('register')
   const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
@@ -32,7 +40,7 @@ export function useAuthFlow(saveSession: (next: Session) => void) {
       })
       const result = await response.json()
       if (!response.ok) {
-        setAuthError(result.error || 'Không thể gửi mã xác minh')
+        setAuthError(describeOtpSendError(result.error, 'Không thể gửi mã xác minh'))
         return
       }
 
@@ -106,7 +114,7 @@ export function useAuthFlow(saveSession: (next: Session) => void) {
       })
       const result = await response.json()
       if (!response.ok) {
-        setAuthError(result.error || 'Không thể gửi lại mã')
+        setAuthError(describeOtpSendError(result.error, 'Không thể gửi lại mã'))
         return
       }
       const payload = result as {
