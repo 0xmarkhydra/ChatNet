@@ -29,6 +29,7 @@ import './styles/social-feed.css'
 import './styles/post-comments-page.css'
 import './features/contacts/friends-design-v2.css'
 import './styles/social-chat.css'
+import './styles/settings-workspace.css'
 import './features/auth/auth-screen.css'
 
 if (window.location.search.includes('pwa=')) {
