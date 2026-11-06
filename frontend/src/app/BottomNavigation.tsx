@@ -1,6 +1,7 @@
 import type { Tab } from './types'
 import type { UI_MESSAGES } from '../features/i18n/i18n'
 import UiIcon from '../shared/ui/UiIcon'
+import { PhoneCall } from 'lucide-react'
 
 type Props = {
   tab: Tab
@@ -8,6 +9,8 @@ type Props = {
   switchTab: (tab: Tab) => void
   unreadTotal: number
   pushEnabled: boolean
+  onCalls: () => void
+  callsActive: boolean
 }
 
 export default function BottomNavigation({
@@ -16,6 +19,8 @@ export default function BottomNavigation({
   switchTab,
   unreadTotal,
   pushEnabled,
+  onCalls,
+  callsActive,
 }: Props) {
   return (
     <nav className="bottom-navigation" aria-label="Điều hướng chính">
@@ -23,10 +28,13 @@ export default function BottomNavigation({
         type="button"
         aria-label={t('nav.chat')}
         title={t('nav.chat')}
-        className={tab === 'chat' ? 'active' : ''}
+        className={tab === 'chat' && !callsActive ? 'active' : ''}
         onClick={() => switchTab('chat')}
       >
         <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b>{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
+      </button>
+      <button type="button" aria-label="Cuộc gọi" title="Cuộc gọi" className={callsActive ? 'active' : ''} onClick={onCalls}>
+        <span className="nav-icon"><PhoneCall size={24} /></span>
       </button>
       <button
         type="button"

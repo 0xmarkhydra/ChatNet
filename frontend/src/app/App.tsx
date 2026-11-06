@@ -102,6 +102,7 @@ import SocialFeedSidebar from "./SocialFeedSidebar";
 import SocialFeedStories from "./SocialFeedStories";
 import PostCommentsPage from "./PostCommentsPage";
 import CommunicationHub from "./CommunicationHub";
+import CallCenter from "../features/calls/CallCenter";
 import CommunityGroupsPage, { type GroupWorkspaceMode } from "./CommunityGroupsPage";
 import CommunityGroupWizard, { type CommunityCreationExtras } from "./CommunityGroupWizard";
 import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
@@ -6369,20 +6370,15 @@ export default function App({
         )}
 
         {tab === "chat" && desktopSection === "calls" && (
-          <CommunicationHub
-            kind="calls"
-            conversations={conversations}
-            hasMore={hasMoreConversations}
-            loadingMore={conversationLoadingMore}
-            onLoadMore={() => void loadMoreConversations()}
-            onOpenChat={(id) => {
-              setDesktopSection(null);
-              setActiveConversationId(id ?? null);
-            }}
-            onCreateGroup={() => {
-              setChatCreateError("");
-              setNewChatMode("group");
-            }}
+          <CallCenter
+            embedded
+            request={apiFetch}
+            userId={session.user.id}
+            token={session.token}
+            conversations={displayConversations}
+            targetLanguage={targetLanguage}
+            onNavigate={(destination) => { switchTab(destination); setDesktopSection(null); }}
+            onOpenChat={(id) => { setDesktopSection(null); setActiveConversationId(id); }}
           />
         )}
 
@@ -8056,10 +8052,11 @@ export default function App({
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}
-        conversations={displayConversations.map(({ id, name, type }) => ({
+        conversations={displayConversations.map(({ id, name, type, otherUsername }) => ({
           id,
           name,
           type,
+          otherUsername,
         }))}
       />
 
@@ -8067,6 +8064,8 @@ export default function App({
         tab={tab}
         t={t}
         switchTab={switchTab}
+        onCalls={() => { switchTab("chat"); setDesktopSection("calls"); }}
+        callsActive={tab === "chat" && desktopSection === "calls"}
         unreadTotal={unreadTotal}
         pushEnabled={pushEnabled}
       />
