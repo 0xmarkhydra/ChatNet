@@ -875,6 +875,8 @@ try {
   }))
   await blockNonFriend.click()
   await confirmation
+  await page.getByRole('button', { name: 'Đóng thông tin hội thoại' }).click()
+  await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
 
   // Regression: frontend must POST only strict AttachmentInput fields.
   // A presigned download URL in POST /api/stories previously triggered "invalid body".
