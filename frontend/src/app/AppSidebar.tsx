@@ -21,7 +21,7 @@ export default function AppSidebar({
   onNavigate, onGroups, onCalls, onSaved, onSettings,
 }: Props) {
   const mainItems = [
-    { label: 'Bảng tin', Icon: Newspaper, active: tab === 'feed' && !feedSaved, action: () => onNavigate('feed') },
+    { label: 'Bảng tin', Icon: Newspaper, active: (tab === 'feed' && !feedSaved) || tab === 'notifications', action: () => onNavigate('feed') },
     { label: 'Tin nhắn', Icon: MessageCircle, active: tab === 'chat' && section === null, action: () => onNavigate('chat'), count: unreadTotal },
     { label: 'Khám phá', Icon: Compass, active: tab === 'discover', action: () => onNavigate('discover') },
     { label: 'Bạn bè', Icon: UserRoundCheck, active: tab === 'contacts' || tab === 'profile', action: () => onNavigate('contacts') },

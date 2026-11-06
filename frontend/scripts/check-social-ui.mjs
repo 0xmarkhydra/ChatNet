@@ -65,7 +65,7 @@ try {
   const errors = []
   page.on('pageerror', err => errors.push(err.message))
   await page.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
-  await page.route('http://localhost:8080/**', route => {
+  await page.route('**/api/**', route => {
     const req = route.request(), path = new URL(req.url()).pathname
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(body) })
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
@@ -417,6 +417,7 @@ try {
   await page.locator('.communication-hub-row').filter({ hasText: 'Nhóm SocCO' }).waitFor()
   assert(await page.locator('.communication-hub-row').count() === 1, 'Groups must filter real group conversations')
   await page.locator('.communication-hub-row').getByRole('button', { name: 'Mở nhóm' }).click()
+  await page.locator('.chat-head .translate-controls button[aria-label="Thông tin hội thoại"]').click()
   await page.locator('.conversation-info-panel').waitFor({ state: 'visible' })
   assert(await page.locator('.conversation-info-panel').getByText('Nhóm SocCO').count() > 0, 'Chat details missing active group')
   await page.locator('.conversation-info-panel').getByRole('button', { name: 'Quản lý nhóm' }).click()
@@ -428,6 +429,7 @@ try {
   assert(await page.locator('.communication-hub-row').count() === 2, 'Calls must show loaded conversations')
   await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
   await page.locator('.conversation-item').filter({ hasText: 'Minh Anh' }).click()
+  await page.locator('.chat-head .translate-controls button[aria-label="Thông tin hội thoại"]').click()
   await page.locator('.conversation-info-panel').waitFor({ state: 'visible' })
   await page.locator('.conversation-info-panel').getByRole('button', { name: 'Tìm tin nhắn' }).click()
   await page.getByRole('dialog', { name: 'Tìm trong hội thoại' }).waitFor()

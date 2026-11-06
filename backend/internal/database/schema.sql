@@ -67,9 +67,12 @@ CREATE TABLE IF NOT EXISTS conversation_members (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role VARCHAR(16) NOT NULL DEFAULT 'member',
     last_read_message_id BIGINT NOT NULL DEFAULT 0,
+    cleared_through_message_id BIGINT NOT NULL DEFAULT 0,
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (conversation_id, user_id)
 );
+
+ALTER TABLE conversation_members ADD COLUMN IF NOT EXISTS cleared_through_message_id BIGINT NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_conversation_members_user
 ON conversation_members(user_id, conversation_id);

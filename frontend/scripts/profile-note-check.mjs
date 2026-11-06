@@ -26,7 +26,7 @@ try{
    page.on('pageerror',e=>errors.push(e.message))
    let note=null,fail=false
    const foreign={content:'Chúc bạn một ngày tốt lành 🌿',visibility:'public',version:'foreign',createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()}
-   await page.route('http://localhost:8080/**',route=>{
+   await page.route('**/api/**',route=>{
     const req=route.request(),u=new URL(req.url()),p=u.pathname,method=req.method()
     if(method==='GET')counts.set(p,(counts.get(p)||0)+1)
     const json=(data,status=200)=>route.fulfill({status,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},contentType:'application/json',body:JSON.stringify(data)})
