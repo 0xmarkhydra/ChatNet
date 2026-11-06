@@ -105,6 +105,24 @@
   .social-chat-list-search input::placeholder { color: #8c9ab0; }
   .social-chat-list-search input::-webkit-search-cancel-button { cursor: pointer; }
 
+  .social-chat-list .conversation-search-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 12px;
+    color: #657793;
+    font-size: 12px;
+  }
+  .social-chat-list .conversation-search-status button {
+    border: 0;
+    background: transparent;
+    color: #2563eb;
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+  }
+
   .social-chat-list-filters {
     display: flex;
     flex: 0 0 auto;
@@ -580,6 +598,9 @@
   .modern-shell.app-layout .social-chat-layout .message.mine .bubble {
     background: linear-gradient(120deg, #2563eb, #8955f6);
   }
+  .modern-shell.app-layout .social-chat-layout .message .message-content > .bubble:has(+ .message-reactions) {
+    padding-bottom: 22px;
+  }
   .modern-shell.app-layout .social-chat-layout .message-stamp {
     margin-top: 8px;
     color: #8796ad;
@@ -618,7 +639,8 @@
   }
   .modern-shell.app-layout .social-chat-layout .chat-message-photo .chat-image-time {
     position: absolute;
-    right: 12px;
+    right: auto;
+    left: 12px;
     bottom: 7px;
     z-index: 1;
     box-sizing: border-box;
@@ -744,16 +766,24 @@
 }
 /* Keep a short bubble sized to its text, even when the loading row below
    is wider than the bubble itself. Anchoring sent bubbles prevents jumping. */
-.social-chat-layout .messages .message > .bubble {
+.social-chat-layout .messages .message > .bubble,
+.social-chat-layout .messages .message-content > .bubble {
   box-sizing: border-box;
   width: fit-content;
   max-width: 100%;
 }
-.social-chat-layout .messages .message.mine > .bubble {
+.social-chat-layout .messages .message-content {
+  width: fit-content;
+  max-width: 100%;
+}
+.social-chat-layout .messages .message.mine > .bubble,
+.social-chat-layout .messages .message.mine .message-content > .bubble {
   margin-left: auto;
 }
 .modern-shell.app-layout .social-chat-layout .message.mine > .bubble,
-.social-chat-layout .messages .message.mine > .bubble {
+.modern-shell.app-layout .social-chat-layout .message.mine .message-content > .bubble,
+.social-chat-layout .messages .message.mine > .bubble,
+.social-chat-layout .messages .message.mine .message-content > .bubble {
   color: #fff;
   background: linear-gradient(115deg, #1d4ed8, #6538d6);
 }

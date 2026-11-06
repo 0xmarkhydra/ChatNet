@@ -4,6 +4,7 @@ import type { ToastKind } from '../notifications/toast'
 import { API } from '../../shared/lib/config'
 import { FeedText } from './FeedDiscussion'
 import FeedPostActions, { FeedSaveAction, FeedShareAction } from './FeedPostActions'
+import FeedReactionControl from './FeedReactionControl'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../shared/ui/MediaAttachmentsView'
 import UiIcon from '../../shared/ui/UiIcon'
@@ -22,7 +23,7 @@ type Props = {
   targetLanguage: string
   setActivePostId: (id: number) => void
   likePreviews: Record<number, boolean>
-  like: (post: Post) => Promise<void>
+  like: (post: Post, emoji?: string) => Promise<void>
   showSave?: boolean
 }
 
@@ -69,15 +70,12 @@ export default function FeedPostCard({
         </div>
         {(post.likes > 0 || (post.comments?.length || 0) > 0) && (
           <div className="post-engagement-summary">
-            {post.likes > 0 && <span>{post.likes} lượt thích</span>}
+            {post.likes > 0 && <span>{(post.reactions || []).slice(0, 3).map((reaction) => reaction.emoji).join(' ')} {post.likes} lượt cảm xúc</span>}
             {(post.comments?.length || 0) > 0 && <span>{post.comments.length} bình luận</span>}
           </div>
         )}
         <div className="post-toolbar">
-          <button type="button" className={post.liked ? 'liked' : ''} disabled={likePreviews[post.id] !== undefined}
-            aria-pressed={post.liked} aria-busy={likePreviews[post.id] !== undefined} onClick={() => void like(post)}>
-            <UiIcon name="heart" size={21} /><span>Thích</span>
-          </button>
+          <FeedReactionControl post={post} busy={likePreviews[post.id] !== undefined} react={like} />
           <button type="button" className="post-stat post-detail-trigger" onClick={() => setActivePostId(post.id)}>
             <UiIcon name="comment" size={21} />
             <span>Bình luận</span>

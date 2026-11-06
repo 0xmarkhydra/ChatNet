@@ -153,6 +153,7 @@ export function useAppRealtime({
 
       if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
         responseCache.current.invalidate(['conversations','messages'])
+        window.dispatchEvent(new CustomEvent('chatnet:group-community-updated',{detail:{conversationId:update.conversationId}}))
         revokedConversationIds.current.delete(update.conversationId)
         membershipSnapshot.current?.add(update.conversationId)
         membershipEventSequence.current += 1
@@ -190,20 +191,16 @@ export function useAppRealtime({
       if (update.type === 'message.updated' && update.message) {
         responseCache.current.invalidate(['messages','conversations'])
         const changed = update.message
+        if (changed.channelId) window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'updated',message:changed}}))
         messageChanges.current.add(changed.id)
-        if (activeConversationIdRef.current === update.conversationId) {
+        if (!changed.channelId && activeConversationIdRef.current === update.conversationId) {
           setMessages((current) => {
             const item = current.find((message) => message.id === changed.id)
-            const mineByEmoji = new Map(
-              (item?.reactions || []).map((reaction) => [reaction.emoji, reaction.mine]),
-            )
             return mergeById(current, {
               ...changed,
               readByUserIds: [...new Set([...(item?.readByUserIds || []), ...(changed.readByUserIds || [])])],
-              reactions: (changed.reactions || []).map((reaction) => ({
-                ...reaction,
-                mine: mineByEmoji.get(reaction.emoji) ?? false,
-              })),
+              // The backend now personalizes "mine" for each realtime recipient.
+              reactions: changed.reactions || [],
             }).sort((a, b) => a.id - b.id)
           })
           setTranslations((current) => {
@@ -220,6 +217,7 @@ export function useAppRealtime({
       if (update.type === 'message' && update.message) {
         responseCache.current.invalidate(['messages','conversations'])
         const incoming = update.message
+        if (incoming.channelId) window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'message',message:incoming}}))
         // Only genuine, recent messages from other users make a sound. Loading
         // history, updating reactions and our own sends never trigger one.
         const viewingDesktopChat = isDesktopBuild && document.hasFocus() && document.visibilityState === 'visible' &&
@@ -281,7 +279,7 @@ export function useAppRealtime({
         void refreshConversations()
         refreshCategoryConversations()
 
-        if (currentId === update.conversationId) {
+        if (!incoming.channelId && currentId === update.conversationId) {
           setMessages((current) =>
             current.some((item) => item.id === incoming.id)
               ? current

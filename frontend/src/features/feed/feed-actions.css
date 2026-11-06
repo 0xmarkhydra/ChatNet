@@ -34,6 +34,21 @@
 .post-toolbar button span {font-size:12px;line-height:1.25}
 .post-toolbar button svg {flex-shrink:0}
 .feed-share-action {display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;flex:1 1 0;min-width:0}
+.post-toolbar > .feed-reaction-control {display:flex;flex:1 1 0;min-width:0;position:relative;align-items:center}
+.feed-reaction-control > button {border:0;background:transparent;color:#627394;cursor:pointer}
+.feed-reaction-control > .feed-reaction-primary {flex:1;min-width:0;min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:5px;font:inherit;font-size:12px;font-weight:650;white-space:nowrap;padding:7px 2px}
+.feed-reaction-control > .feed-reaction-primary > span:first-child {font-size:20px}
+.feed-reaction-control > .feed-reaction-primary.liked {color:var(--chatnet-accent-ink)}
+.feed-reaction-control > .feed-reaction-expand {display:grid;place-items:center;min-width:25px;min-height:42px;padding:0 3px;border-radius:10px}
+.feed-reaction-control > .feed-reaction-expand:hover,.feed-reaction-control > .feed-reaction-expand[aria-expanded=true] {background:#edf1ff;color:#3457c9}
+.feed-reaction-control button:focus-visible {outline:2px solid var(--chatnet-accent);outline-offset:2px}
+.feed-reaction-control button:disabled {opacity:.55;cursor:wait}
+.feed-reaction-picker {position:absolute;z-index:40;bottom:calc(100% + 9px);left:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;width:min(390px,calc(100vw - 36px));padding:7px;border:1px solid #e3e8f6;border-radius:17px;background:#fff;box-shadow:0 12px 36px #202f5a30}
+.post-toolbar .feed-reaction-picker button {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:53px;padding:4px 1px;border:0;border-radius:12px;background:transparent;cursor:pointer}
+.post-toolbar .feed-reaction-picker button:hover,.post-toolbar .feed-reaction-picker button[aria-pressed=true] {background:#eef2ff}
+.post-toolbar .feed-reaction-picker button span {font-size:25px;line-height:1}
+.post-toolbar .feed-reaction-picker button small {font-size:10px;color:#64748b;font-weight:650}
+
 
 .feed-composer-settings {display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 4px}
 .feed-composer-settings label {display:flex;gap:8px;align-items:center;color:#65748e;font-size:12px}

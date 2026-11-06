@@ -13,6 +13,7 @@ import { useApiRequest } from "./useApiRequest";
 import { useAppRealtime } from "./useAppRealtime";
 import { useDesktopNotifications } from "../platform/useDesktopNotifications";
 import { useConversationData } from "../features/chat/useConversationData";
+import { useConversationListSearch } from "../features/chat/useConversationListSearch";
 import {
   useChatQuickSearch,
   type ChatQuickContact,
@@ -74,8 +75,10 @@ import AuthScreen from "../features/auth/AuthScreen";
 import { useAuthFlow } from "../features/auth/useAuthFlow";
 import PostComposer from "../features/feed/PostComposer";
 import FeedPostCard from "../features/feed/FeedPostCard";
+import FeedReactionControl from "../features/feed/FeedReactionControl";
 import StoryViewer from "../features/feed/StoryViewer";
 import MessageActions from "../features/chat/MessageActions";
+import { messageReactionLabel } from "../features/chat/messageReactions";
 import {
   copyChatImage,
   messageLinkHref,
@@ -101,11 +104,15 @@ import {
 } from '../features/chat/conversationTranslationSettings';
 import ProfilePage from "./ProfilePage";
 import ProfileEditorPage from "./ProfileEditorPage";
+import SettingsWorkspace from "./SettingsWorkspace";
 import SocialFeedComposer from "./SocialFeedComposer";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import SocialFeedStories from "./SocialFeedStories";
 import PostCommentsPage from "./PostCommentsPage";
 import CommunicationHub from "./CommunicationHub";
+import CallCenter from "../features/calls/CallCenter";
+import CommunityGroupsPage, { type GroupWorkspaceMode } from "./CommunityGroupsPage";
+import CommunityGroupWizard, { type CommunityCreationExtras } from "./CommunityGroupWizard";
 import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
 import GroupRenameDialog from "../features/chat/GroupRenameDialog";
 import GroupInviteJoinDialog from "../features/chat/GroupInviteJoinDialog";
@@ -152,6 +159,7 @@ import {
   PencilLine,
   RefreshCw,
   Search,
+  SmilePlus,
   UserCheck,
   UserPlus,
   Users,
@@ -192,7 +200,7 @@ import {
   transferHasFiles,
 } from "../features/chat/chatFileTransfer";
 import { canMarkConversationRead } from "../features/chat/conversationRead";
-import { mergeById, toggleCount } from "../shared/lib/optimistic";
+import { mergeById, toggleMessageReactionCount } from "../shared/lib/optimistic";
 import CallManager, { CallHeaderActions } from "../features/calls/CallManager";
 import GroupActionsSheet from "../features/chat/GroupActionsSheet";
 import SharedContent from "../features/chat/SharedContent";
@@ -257,7 +265,10 @@ export default function App({
       isDesktopBuild ? desktopBridge().auth : undefined,
     ),
   );
-  const auth = useAuthFlow(saveSession);
+  const auth = useAuthFlow((next) => {
+    setAppLocale(loadAppLocalePreference());
+    saveSession(next);
+  });
 
   const [tab, setTab] = useState<Tab>("chat");
   const tabRef = useRef(tab);
@@ -466,6 +477,8 @@ export default function App({
       setTranslationSettingsConversationId(null);
     }
   }, [translationSettingsConversationId, activeConversationId]);
+  const [groupWorkspaceMode, setGroupWorkspaceMode] = useState<GroupWorkspaceMode>("list");
+  const [groupCreateStep, setGroupCreateStep] = useState<1 | 2 | 3>(1);
   const [chatCreateError, setChatCreateError] = useState("");
   const [nearbyUsers, setNearbyUsers] = useState<FriendSearchResult[]>([]);
   const [nearbyBusy, setNearbyBusy] = useState(false);
@@ -1083,6 +1096,14 @@ export default function App({
     return () => window.removeEventListener("keydown", onEscape);
   }, [groupSettingsOpen, groupNameEditing, setGroupSettingsOpen]);
 
+  const conversationListSearch = useConversationListSearch({
+    query: chatListQuery,
+    filter: chatListFilter,
+    categoryId: conversationCategories.selected,
+    sessionId: session?.sessionId,
+    enabled: tab === 'chat',
+    request: apiFetch,
+  });
   const conversationSearching =
     tab === "chat" && globalSearch.trim().length > 0;
   const chatQuickSearch = useChatQuickSearch({
@@ -2168,32 +2189,59 @@ export default function App({
           appLocale: string;
         }>;
       })
-      .then((preferences) => {
-        if (cancelled || revision !== preferenceRevision.current) return;
-        if (preferences) {
-          const nextTarget = isSupportedLanguageCode(preferences.targetLanguage)
-            ? preferences.targetLanguage
-            : "en";
-          const nextAuto = preferences.autoTranslate !== false;
-          const nextLocale =
-            preferences.appLocale === "auto" ||
-            isSupportedLanguageCode(preferences.appLocale)
-              ? preferences.appLocale
-              : "auto";
+      .then(async (preferences) => {
+        if (cancelled || revision !== preferenceRevision.current || !preferences) return;
+        const nextTarget = isSupportedLanguageCode(preferences.targetLanguage)
+          ? preferences.targetLanguage
+          : "en";
+        const nextAuto = preferences.autoTranslate !== false;
+        const serverLocale =
+          preferences.appLocale === "auto" ||
+          isSupportedLanguageCode(preferences.appLocale)
+            ? preferences.appLocale
+            : "auto";
 
-          setTargetLanguage(nextTarget);
-          setAutoTranslate(nextAuto);
-          setAppLocale(nextLocale);
-          saveAppLocalePreference(nextLocale);
-          localStorage.setItem(
-            preferenceKey,
-            JSON.stringify({
-              targetLanguage: nextTarget,
-              autoTranslate: nextAuto,
-              appLocale: nextLocale,
-            }),
-          );
+        // First-use language selection takes priority over the default server value.
+        const setupLocaleKey = `chatnet-setup-locale:${session.user.id}`;
+        const pendingLocale = localStorage.getItem(setupLocaleKey);
+        const validPendingLocale = pendingLocale === "auto" ||
+          (pendingLocale !== null && isSupportedLanguageCode(pendingLocale));
+        const nextLocale = validPendingLocale && pendingLocale ? pendingLocale : serverLocale;
+
+        if (validPendingLocale && pendingLocale) {
+          if (serverLocale === pendingLocale) {
+            localStorage.removeItem(setupLocaleKey);
+          } else {
+            try {
+              const response = await apiFetch("/api/preferences", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  targetLanguage: nextTarget,
+                  autoTranslate: nextAuto,
+                  appLocale: nextLocale,
+                }),
+              });
+              if (!response.ok) throw new Error("preference sync failed");
+              localStorage.removeItem(setupLocaleKey);
+            } catch {
+              // Keep the chosen language locally and retry sync on the next login.
+            }
+          }
         }
+        if (cancelled || revision !== preferenceRevision.current) return;
+        setTargetLanguage(nextTarget);
+        setAutoTranslate(nextAuto);
+        setAppLocale(nextLocale);
+        saveAppLocalePreference(nextLocale);
+        localStorage.setItem(
+          preferenceKey,
+          JSON.stringify({
+            targetLanguage: nextTarget,
+            autoTranslate: nextAuto,
+            appLocale: nextLocale,
+          }),
+        );
       })
       .catch(() => {
         // Keep local/device preferences when the network is unavailable.
@@ -3801,8 +3849,8 @@ export default function App({
     await openDirectByUsername(directUsername);
   }
 
-  async function createGroup(name: string, usernames: string[]) {
-    if (actionLocks.current.has("chat:create")) return;
+  async function createGroup(name: string, usernames: string[], extras?: CommunityCreationExtras): Promise<number | null> {
+    if (actionLocks.current.has("chat:create")) return null;
     actionLocks.current.add("chat:create");
     setChatCreateError("");
     const sessionId = session?.sessionId;
@@ -3810,13 +3858,13 @@ export default function App({
       const response = await apiFetch("/api/conversations/groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, usernames }),
+        body: JSON.stringify({ name, usernames, ...extras }),
       });
       const result = await response.json();
-      if (sessionRef.current?.sessionId !== sessionId) return;
+      if (sessionRef.current?.sessionId !== sessionId) return null;
       if (!response.ok || !Number.isSafeInteger(result?.id) || result.id <= 0) {
         setChatCreateError(result?.error || "Không thể tạo nhóm");
-        return;
+        return null;
       }
       const created = result as Conversation;
       membershipSnapshot.current?.add(created.id);
@@ -3828,12 +3876,17 @@ export default function App({
       ]);
       setActiveConversationId(created.id);
       setTab("chat");
+      if (desktopSection === "groups" && groupWorkspaceMode === "create") {
+        setGroupWorkspaceMode("channel");
+      }
       setFriendQuery("");
       setNewChatMode("none");
       void refreshConversations();
+      return created.id;
     } catch {
       if (sessionRef.current?.sessionId === sessionId)
         setChatCreateError("Không thể tạo nhóm. Kiểm tra kết nối rồi thử lại.");
+      return null;
     } finally {
       if (sessionRef.current?.sessionId === sessionId)
         actionLocks.current.delete("chat:create");
@@ -4184,7 +4237,7 @@ export default function App({
     actionLocks.current.add(key);
     setReactionPreviews((current) => ({
       ...current,
-      [message.id]: toggleCount(message.reactions || [], emoji),
+      [message.id]: toggleMessageReactionCount(message.reactions || [], emoji),
     }));
     try {
       const response = await apiFetch(`/api/messages/${message.id}/reactions`, {
@@ -4375,16 +4428,17 @@ export default function App({
     }
   }
 
-  async function like(post: Post) {
+  async function like(post: Post, emoji = "👍") {
     const key = `feed:like:${post.id}`;
     if (actionLocks.current.has(key)) return;
     const sessionId = session?.sessionId;
     actionLocks.current.add(key);
     ++feedRevision.current;
-    setLikePreviews((current) => ({ ...current, [post.id]: !post.liked }));
+    setLikePreviews((current) => ({ ...current, [post.id]: (post.myReaction || (post.liked ? "👍" : "")) !== emoji }));
     try {
-      const response = await apiFetch(`/api/posts/${post.id}/like`, {
+      const response = await apiFetch(`/api/posts/${post.id}/${emoji === "👍" ? "like" : "reactions"}`, {
         method: "POST",
+        ...(emoji !== "👍" ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji }) } : {}),
       });
       const updated = (await response.json()) as Post & { error?: string };
       if (sessionRef.current?.sessionId !== sessionId) return;
@@ -4399,21 +4453,21 @@ export default function App({
       setPosts((current) =>
         current.map((item) =>
           item.id === updated.id
-            ? { ...item, liked: updated.liked, likes: updated.likes }
+            ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions }
             : item,
         ),
       );
       setSavedPosts((current) =>
         current.map((item) =>
           item.id === updated.id
-            ? { ...item, liked: updated.liked, likes: updated.likes }
+            ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions }
             : item,
         ),
       );
       setProfilePosts((current) =>
         current.map((item) =>
           item.id === updated.id
-            ? { ...item, liked: updated.liked, likes: updated.likes }
+            ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions }
             : item,
         ),
       );
@@ -4421,11 +4475,15 @@ export default function App({
         ...post,
         liked: updated.liked,
         likes: updated.likes,
+        myReaction: updated.myReaction,
+        reactions: updated.reactions,
       });
       postSearch.syncPost({
         ...post,
         liked: updated.liked,
         likes: updated.likes,
+        myReaction: updated.myReaction,
+        reactions: updated.reactions,
       });
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) void refreshPosts();
@@ -4586,13 +4644,22 @@ export default function App({
               (!membershipSnapshot.current ||
                 membershipSnapshot.current.has(item.id)),
           );
-  const chatListSearch = chatListQuery.trim().toLocaleLowerCase('vi-VN')
-  const chatListConversations = visibleConversations.filter((conversation) => {
-    if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
-    if (chatListFilter === 'groups' && conversation.type !== 'group') return false
-    return !chatListSearch || [conversation.name, conversation.lastMessage, conversation.otherUsername]
-      .some((value) => value?.toLocaleLowerCase('vi-VN').includes(chatListSearch))
-  })
+  // Search uses the backend's authorized, accent-insensitive full-history query.
+  // Keep the normal paginated list intact when the search is cleared.
+  const chatListConversations = conversationListSearch.active
+    ? conversationListSearch.items
+        .filter((conversation) => !revokedConversationIds.current.has(conversation.id))
+        .map((conversation) => ({
+          ...conversation,
+          name: conversation.type === 'direct' && conversation.otherUserId
+            ? contactMetadata[conversation.otherUserId]?.nickname || conversation.name
+            : conversation.name,
+        }))
+    : visibleConversations.filter((conversation) => {
+        if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
+        if (chatListFilter === 'groups' && conversation.type !== 'group') return false
+        return true
+      })
 
   const searchedPosts = feedSearchActive
     ? postSearch.posts.map((post) =>
@@ -4856,7 +4923,7 @@ export default function App({
 
   return (
     <main
-      className={`app-shell modern-shell app-layout ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
+      className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
     >
       <AppSidebar
         tab={tab}
@@ -4873,6 +4940,7 @@ export default function App({
         onGroups={() => {
           switchTab("chat");
           setDesktopSection("groups");
+          setGroupWorkspaceMode("list");
         }}
         onCalls={() => {
           switchTab("chat");
@@ -4979,7 +5047,7 @@ export default function App({
           friends={friends.filter((friend) => friend.status === "accepted")}
           query={friendQuery}
           onQuery={setFriendQuery}
-          onCreate={createGroup}
+          onCreate={async (groupName, usernames) => { await createGroup(groupName, usernames); }}
           error={chatCreateError}
           onClose={() => {
             setNewChatMode("none");
@@ -4996,7 +5064,7 @@ export default function App({
             {tab === "chat" && translationSettingsConversationId !== null
               ? "Ngôn ngữ & dịch AI"
               : tab === "chat" && desktopSection === "groups"
-              ? "Nhóm & cộng đồng"
+                ? groupWorkspaceMode === "create" ? groupCreateStep === 1 ? "Tạo cộng đồng mới" : "Tạo nhóm mới" : groupWorkspaceMode === "manage" ? "Quản trị nhóm" : groupWorkspaceMode === "channel" ? activeConversation?.name || "Kênh trò chuyện nhóm" : "Nhóm & cộng đồng"
               : tab === "chat" && desktopSection === "calls"
                 ? "Cuộc gọi"
                 : (
@@ -5022,7 +5090,7 @@ export default function App({
                 {
                   chat: translationSettingsConversationId !== null
                     ? "Chọn ngôn ngữ và quyền dịch của cuộc trò chuyện"
-                    : "Trò chuyện gần đây và kết nối bạn bè",
+                    : desktopSection === "groups" ? (groupWorkspaceMode === "create" ? groupCreateStep === 1 ? "Thiết lập không gian riêng cho nhóm" : "Bước " + groupCreateStep + "/3 · Chọn thành viên và xác nhận" : groupWorkspaceMode === "manage" ? "Phân quyền, thành viên và cài đặt cộng đồng" : groupWorkspaceMode === "channel" ? "Kênh và trò chuyện nhóm" : "Quản lý các nhóm của bạn") : "Trò chuyện gần đây và kết nối bạn bè",
                   contacts: contactsScreen === "directory" ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
                   notifications: "Cập nhật những hoạt động quan trọng",
                   discover: "Khám phá và kết nối cộng đồng",
@@ -5121,14 +5189,18 @@ export default function App({
         <div className="appbar-actions">
           {tab === "chat" && (
             <>
-              <button
+              {desktopSection === "groups" && <button type="button" className="appbar-icon-button notification-appbar" aria-label="Mở thông báo" onClick={() => switchTab("notifications")}>
+                <Bell size={22} aria-hidden="true" />
+                {notificationItemCount > 0 && <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>}
+              </button>}
+              {desktopSection !== "groups" && <button
                 className="appbar-icon-button"
                 type="button"
                 aria-label="Quét QR"
                 onClick={() => setQrOpen("scan")}
               >
                 <UiIcon name="qr" size={28} />
-              </button>
+              </button>}
               <div className="appbar-create-anchor">
                 <button
                   className={
@@ -5137,14 +5209,14 @@ export default function App({
                       : "appbar-icon-button appbar-create-trigger"
                   }
                   type="button"
-                  aria-label="Tạo mới"
-                  aria-expanded={quickCreateOpen}
-                  aria-haspopup="menu"
-                  onClick={() => setQuickCreateOpen((current) => !current)}
+                  aria-label={desktopSection === "groups" ? "Tạo cộng đồng mới" : "Tạo mới"}
+                  aria-expanded={desktopSection === "groups" ? false : quickCreateOpen}
+                  aria-haspopup={desktopSection === "groups" ? undefined : "menu"}
+                  onClick={() => { if (desktopSection === "groups") { setChatCreateError(""); setGroupCreateStep(1); setGroupWorkspaceMode("create"); setQuickCreateOpen(false); } else setQuickCreateOpen((current) => !current); }}
                 >
                   <UiIcon name="plus" size={29} />
                 </button>
-                {quickCreateOpen && (
+                {quickCreateOpen && desktopSection !== "groups" && (
                   <>
                     <button
                       type="button"
@@ -5209,6 +5281,9 @@ export default function App({
                   </>
                 )}
               </div>
+              {desktopSection === "groups" && <button type="button" className="social-feed-header-account" aria-label="Mở trang cá nhân" onClick={() => switchTab("profile")}>
+                <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="social-feed-header-avatar"/>
+              </button>}
             </>
           )}
 
@@ -5464,7 +5539,8 @@ export default function App({
                 <label className="social-chat-list-search">
                   <Search size={19} aria-hidden="true" />
                   <input type="search" value={chatListQuery} onChange={(event) => setChatListQuery(event.target.value)}
-                    placeholder="Tìm kiếm tin nhắn..." aria-label="Lọc danh sách cuộc trò chuyện" />
+                    maxLength={120} placeholder="Tìm cuộc trò chuyện hoặc tin nhắn..."
+                    aria-label="Tìm kiếm toàn bộ cuộc trò chuyện" />
                 </label>
                 <div className="social-chat-list-filters" role="group" aria-label="Lọc cuộc trò chuyện">
                   {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
@@ -5598,18 +5674,32 @@ export default function App({
               {chatCreateError && newChatMode !== 'group' && <div className="inline-error">{chatCreateError}</div>}
 
               <ConversationCategories key={session.sessionId} model={conversationCategories} />
-              <div className="conversation-list zalo-conversation-list">
-                {conversationCategories.selected !== null && conversationCategories.loading && <p role="status">Đang tải phân loại…</p>}
-                {conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
+              <div className="conversation-list zalo-conversation-list" aria-busy={conversationListSearch.active && conversationListSearch.loading}>
+                {!conversationListSearch.active && conversationCategories.selected !== null && conversationCategories.loading && <p role="status">Đang tải phân loại…</p>}
+                {!conversationListSearch.active && conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
                   {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>Thử lại</button>
                 </div>}
-                {chatListConversations.length === 0 && !conversationCategories.loading && !conversationCategories.listError && (
+                {conversationListSearch.active && conversationListSearch.loading && (
+                  <p className="conversation-search-status" role="status">Đang tìm trong tất cả cuộc trò chuyện…</p>
+                )}
+                {conversationListSearch.active && conversationListSearch.error && (
+                  <p className="conversation-search-status" role="alert">
+                    {conversationListSearch.error}
+                    <button type="button" onClick={conversationListSearch.retry}>Thử lại</button>
+                  </p>
+                )}
+                {chatListConversations.length === 0 &&
+                  !conversationListSearch.loading && !conversationListSearch.error &&
+                  (conversationListSearch.active || (!conversationCategories.loading && !conversationCategories.listError)) && (
                   <div className="conversation-list-empty">
                     <SocoEmptyState
                       kind="chat"
-                      title={visibleConversations.length ? 'Không có hội thoại phù hợp' : 'Chưa có cuộc trò chuyện'}
-                      description={visibleConversations.length ? 'Thử thay đổi từ khóa hoặc chọn bộ lọc khác.' : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
-                      action={visibleConversations.length
+                      title={conversationListSearch.active ? 'Không tìm thấy cuộc trò chuyện'
+                        : visibleConversations.length ? 'Không có hội thoại phù hợp' : 'Chưa có cuộc trò chuyện'}
+                      description={conversationListSearch.active || visibleConversations.length
+                        ? 'Thử thay đổi từ khóa hoặc chọn bộ lọc khác.'
+                        : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
+                      action={conversationListSearch.active || visibleConversations.length
                         ? <SocoTextAction onClick={() => { setChatListQuery(''); setChatListFilter('all') }}>Xóa bộ lọc</SocoTextAction>
                         : <SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
                     />
@@ -5621,6 +5711,11 @@ export default function App({
                     key={conversation.id}
                     className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''}`}
                     onClick={() => {
+                      if (conversationListSearch.active) {
+                        // Opening an older search hit must not discard the existing sidebar cache.
+                        setConversations((current) => current.some((item) => item.id === conversation.id)
+                          ? current : [...current, conversation])
+                      }
                       setChatSearchJump(null)
                       setQuickSearchOpen(false)
                       setActiveConversationId(conversation.id)
@@ -5649,13 +5744,17 @@ export default function App({
                     </div>
                   </button>
                 ))}
-                {(conversationCategories.selected === null ? hasMoreConversations : conversationCategories.hasMore) && (
+                {(conversationListSearch.active ? conversationListSearch.hasMore
+                  : conversationCategories.selected === null ? hasMoreConversations : conversationCategories.hasMore) && (
                   <button type="button" className="soco-load-more soco-conversation-load-more"
-                    onClick={() => void (conversationCategories.selected === null ? loadMoreConversations() : conversationCategories.load(true))}
-                    disabled={conversationLoadingMore || conversationCategories.loading}
-                    aria-busy={conversationLoadingMore || conversationCategories.loading}>
+                    onClick={() => void (conversationListSearch.active ? conversationListSearch.loadMore()
+                      : conversationCategories.selected === null ? loadMoreConversations() : conversationCategories.load(true))}
+                    disabled={conversationListSearch.active ? conversationListSearch.loadingMore || Boolean(conversationListSearch.error)
+                      : conversationLoadingMore || conversationCategories.loading}
+                    aria-busy={conversationListSearch.active ? conversationListSearch.loadingMore : conversationLoadingMore || conversationCategories.loading}>
                     <RefreshCw size={15} aria-hidden="true" />
-                    {conversationLoadingMore || conversationCategories.loading ? 'Đang tải...' : 'Tải thêm hội thoại'}
+                    {(conversationListSearch.active ? conversationListSearch.loadingMore : conversationLoadingMore || conversationCategories.loading)
+                      ? 'Đang tải...' : 'Tải thêm hội thoại'}
                   </button>
                 )}
               </div>
@@ -6061,7 +6160,7 @@ export default function App({
                           {message.deleted ? (
                             <div className="bubble recalled-message">Tin nhắn đã được thu hồi</div>
                           ) : (
-                            <>
+                            <div className="message-content">
                               {message.text && (
                                 <div className={`bubble${translationView.mode === 'dual' ? ' chat-translation-dual' : ''}${translationView.mode === 'translated' ? ' translated-bubble translation-flip-bubble' : ''}`}>
                                   <span
@@ -6128,7 +6227,28 @@ export default function App({
                                   {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt)}</span>}
                                 </div>
                               )}
-                            </>
+                              <div className="message-reactions">
+                                {(message.reactions || []).map((reaction) => (
+                                  <button
+                                    key={reaction.emoji}
+                                    type="button"
+                                    disabled={reactionPreviews[message.id] !== undefined}
+                                    aria-pressed={reaction.mine}
+                                    className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
+                                    onClick={() => void toggleReaction(message, reaction.emoji)}
+                                    aria-label={`${messageReactionLabel(reaction.emoji)}: ${reaction.count} lượt`}
+                                  >
+                                    {reaction.emoji} {reaction.count}
+                                  </button>
+                                ))}
+                                <button type="button" className="reaction-add"
+                                  aria-label="Chọn cảm xúc cho tin nhắn"
+                                  title="Thả cảm xúc"
+                                  onClick={() => openMessageActions(message)}>
+                                  <SmilePlus size={16} aria-hidden="true" />
+                                </button>
+                              </div>
+                            </div>
                           )}
                           <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
                             {formatTime(message.createdAt)}
@@ -6139,25 +6259,6 @@ export default function App({
                                 : ' · Đã xem'
                               : ''}
                           </div>
-                          {!message.deleted && (
-                            <>
-                              <div className="message-reactions">
-                                {(message.reactions || []).map((reaction) => (
-                                  <button
-                                    key={reaction.emoji}
-                                    type="button"
-                                    disabled={reactionPreviews[message.id] !== undefined}
-                                    aria-pressed={reaction.mine}
-                                    className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
-                                    onClick={() => void toggleReaction(message, reaction.emoji)}
-                                    aria-label={`Thả cảm xúc ${reaction.emoji}`}
-                                  >
-                                    {reaction.emoji} {reaction.count}
-                                  </button>
-                                ))}
-                              </div>
-                            </>
-                          )}
                         </article>
                         </Fragment>
                       )
@@ -6365,6 +6466,7 @@ export default function App({
           </div>
         )}
 
+
         {tab === 'chat' && translationSettingsConversationId !== null &&
           activeConversation?.id === translationSettingsConversationId && (
           <ChatTranslationSettingsPage
@@ -6387,21 +6489,92 @@ export default function App({
           />
         )}
 
-        {tab === "chat" && desktopSection && (
-          <CommunicationHub
-            kind={desktopSection}
-            conversations={conversations}
-            hasMore={hasMoreConversations}
-            loadingMore={conversationLoadingMore}
-            onLoadMore={() => void loadMoreConversations()}
-            onOpenChat={(id) => {
-              setDesktopSection(null);
-              setActiveConversationId(id ?? null);
-            }}
-            onCreateGroup={() => {
-              setChatCreateError("");
-              setNewChatMode("group");
-            }}
+
+        {tab === "chat" && desktopSection === "groups" && (
+          groupWorkspaceMode === "create" ? (
+            <CommunityGroupWizard
+              key={session.sessionId + ":group-wizard"}
+              friends={friends}
+              userId={session.user.id}
+              myName={session.user.displayName || session.user.username}
+              step={groupCreateStep}
+              onStep={setGroupCreateStep}
+              onCancel={() => setGroupWorkspaceMode("list")}
+              onCreate={createGroup}
+              error={chatCreateError}
+            />
+          ) : (
+            <CommunityGroupsPage
+              mode={groupWorkspaceMode}
+              onMode={setGroupWorkspaceMode}
+              groups={conversations}
+              userId={session.user.id}
+              myName={session.user.displayName || session.user.username}
+              selectedGroup={activeConversation?.type === "group" ? activeConversation : null}
+              onSelectGroup={(id, mode) => {
+                setActiveConversationId(id);
+                setGroupWorkspaceMode(mode);
+              }}
+              onOpenFullChat={() => setDesktopSection(null)}
+              onCreate={() => {
+                setChatCreateError("");
+                setGroupCreateStep(1);
+                setGroupWorkspaceMode("create");
+              }}
+              onJoinedGroup={async (id) => {
+                await refreshConversations();
+                setActiveConversationId(id);
+                setGroupWorkspaceMode("channel");
+              }}
+              members={groupMembers}
+              groupBusy={groupBusy}
+              activeMember={activeGroupMember}
+              canManage={Boolean(canManageActiveGroup)}
+              canInvite={Boolean(canInviteActiveGroup)}
+              canEdit={Boolean(canEditActiveGroup)}
+              onRename={() => {
+                if (activeConversation) setGroupNameDraft(activeConversation.name);
+                setGroupNameEditing(true);
+              }}
+              onInvite={() => void inviteGroupMembers()}
+              inviteCandidates={groupInviteCandidates}
+              inviteSelection={groupInviteSelection}
+              setInviteSelection={setGroupInviteSelection}
+              inviteSearch={groupInviteSearch}
+              setInviteSearch={setGroupInviteSearch}
+              onChangeRole={changeGroupMemberRole}
+              onRemoveMember={removeGroupMember}
+              onOpenMember={openVisitor}
+              onMembersChanged={() => refreshGroupMembers(activeConversationId || undefined)}
+              request={apiFetch}
+              notify={setNotice}
+              messages={messages}
+              pendingMessages={chatOutbox}
+              chatOnline={chatOnline}
+              onRetryPending={() => void retryQueuedChatMessages()}
+              messageText={messageText}
+              onMessageText={setMessageText}
+              onSend={sendMessage}
+              canSend={canSend}
+              onCall={(id) => launchGroupCall(id, "video")}
+              hasMore={hasMoreConversations}
+              loadingMore={conversationLoadingMore}
+              onLoadMore={() => void loadMoreConversations()}
+            />
+          )
+        )}
+
+        {tab === "chat" && desktopSection === "calls" && (
+          <CallCenter
+            embedded
+            request={apiFetch}
+            userId={session.user.id}
+            token={session.token}
+            conversations={displayConversations}
+            targetLanguage={targetLanguage}
+            onNavigate={(destination) => { switchTab(destination); setDesktopSection(null); }}
+            onOpenChat={(id) => { setDesktopSection(null); setActiveConversationId(id); }}
+
           />
         )}
 
@@ -6998,18 +7171,12 @@ export default function App({
                     )}
                     <MediaAttachmentsView items={activePost.attachments} />
                     <div className="post-toolbar">
-                      <button
-                        type="button"
-                        className={activePost.liked ? "liked" : ""}
-                        disabled={likePreviews[activePost.id] !== undefined}
-                        aria-pressed={activePost.liked}
-                        aria-busy={likePreviews[activePost.id] !== undefined}
-                        onClick={() => void like(activePost)}
-                      >
-                        <UiIcon name="heart" size={21} />
-                        <span>Thích</span>
-                        {activePost.likes > 0 && <b>{activePost.likes}</b>}
-                      </button>
+                      <FeedReactionControl
+                        post={activePost}
+                        busy={likePreviews[activePost.id] !== undefined}
+                        react={like}
+                        showCount
+                      />
                       <span className="post-stat">
                         <UiIcon name="comment" size={21} />
                         {activePost.comments?.length || 0} bình luận
@@ -7144,6 +7311,159 @@ export default function App({
           <div
             className={`simple-view profile-view ${profileTimelineOpen ? "personal-timeline-view" : ""} ${isProfileDesktop && desktopProfileSettings ? "settings-workspace-open" : ""}`}
           >
+            {isProfileDesktop && desktopProfileSettings && (
+              <SettingsWorkspace
+                privacy={privacy}
+                privacyLoading={privacyLoading}
+                privacyBusy={privacyBusy}
+                privacyError={privacyError}
+                onPrivacyRetry={() => setPrivacyRetry((value) => value + 1)}
+                onSavePrivacy={savePrivacy}
+                account={
+                  <div className="settings-workspace-account">
+                    <div className="settings-workspace-account-details">
+                      <strong>{profileMedia?.displayName || session.user.displayName || name}</strong>
+                      <span>@{session.user.username}</span>
+                      <span>{session.user.email}</span>
+                    </div>
+                    <button type="button" className="settings-workspace-action" onClick={() => {
+                      setDesktopProfileSettings(false);
+                      setProfileEditorOpen(true);
+                    }}>
+                      <PencilLine size={16} aria-hidden="true" /> Chỉnh sửa hồ sơ
+                    </button>
+                    {!isStandalone && (
+                      <button type="button" className="settings-workspace-action" onClick={() => void installApp()}>
+                        <Download size={16} aria-hidden="true" /> {t("profile.install")}
+                      </button>
+                    )}
+                    <button type="button" className="settings-workspace-action" onClick={() => logout()}>
+                      <LogOut size={16} aria-hidden="true" /> {t("profile.logout")}
+                    </button>
+                  </div>
+                }
+                security={
+                  <div className="settings-card">
+                    <BlockedUsersPanel
+                      blockedBusy={blockedBusy}
+                      blockedOpen={blockedOpen}
+                      setBlockedOpen={setBlockedOpen}
+                      loadBlockedUsers={loadBlockedUsers}
+                      blockedError={blockedError}
+                      blockedUsers={blockedUsers}
+                      unblockContact={unblockContact}
+                    />
+                  </div>
+                }
+                notifications={
+                  <div className="settings-card">
+                    <div className="settings-row">
+                      <div>
+                        <strong>{isDesktopBuild ? "Thông báo Desktop" : t("profile.notifications")}</strong>
+                        <small>{isDesktopBuild
+                          ? "Nhận thông báo khi SocCo còn đang chạy."
+                          : t("profile.notificationsHint")}</small>
+                      </div>
+                      <button type="button" role="switch"
+                        className={"switch-button" + ((isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? " on" : "")}
+                        aria-checked={isDesktopBuild ? nativeNotifications.enabled : pushEnabled}
+                        aria-label={isDesktopBuild ? "Thông báo Desktop" : t("profile.notifications")}
+                        disabled={!isDesktopBuild && pushBusy}
+                        onClick={() => isDesktopBuild ? nativeNotifications.toggle() : void togglePush()}
+                      ><span /></button>
+                    </div>
+                    {isDesktopBuild && nativeNotifications.warning && (
+                      <div className="settings-row" role="status"><small>{nativeNotifications.warning}</small></div>
+                    )}
+                    {!isDesktopBuild && (
+                      <div className="settings-row">
+                        <div><strong>{t("profile.testNotification")}</strong><small>{t("profile.testNotificationHint")}</small></div>
+                        <button type="button" className="settings-action"
+                          disabled={pushBusy || !pushEnabled} onClick={() => void sendTestPush()}>
+                          {t("common.test")}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                }
+                language={
+                  <div className="settings-card">
+                    <button type="button" className="settings-row settings-row-button app-locale-row"
+                      onClick={() => { setLocaleSearch(""); setLocalePickerOpen(true); }}>
+                      <div><strong>{t("profile.appLanguage")}</strong><small>{t("profile.appLanguageHint")}</small></div>
+                      <span className="settings-current-locale">
+                        <span>{appLocale === "auto" ? t("common.auto") : selectedAppLanguage?.localizedLanguage}</span>
+                        <ChevronDown size={16} aria-hidden="true" />
+                      </span>
+                    </button>
+                    <div className="settings-row">
+                      <div><strong>{t("profile.autoTranslate")}</strong></div>
+                      <button type="button" role="switch" aria-checked={autoTranslate}
+                        aria-label={t("profile.autoTranslate")}
+                        className={"switch-button" + (autoTranslate ? " on" : "")}
+                        onClick={() => changeAutoTranslate(!autoTranslate)}><span /></button>
+                    </div>
+                    <button type="button" className="settings-row settings-row-button translation-locale-row"
+                      onClick={() => { setTranslationSettingsSearch(""); setTranslationPickerOpen(true); }}>
+                      <div><strong>{t("profile.translationLanguage")}</strong><small>{t("profile.translationLanguageHint")}</small></div>
+                      <span className="settings-current-locale">
+                        <span>{selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()}</span>
+                        <ChevronDown size={16} aria-hidden="true" />
+                      </span>
+                    </button>
+                  </div>
+                }
+                messages={
+                  <div className="settings-card">
+                    <div className="settings-row message-sound-row">
+                      <div><strong>{t("profile.messageSound")}</strong><small>{t("profile.messageSoundHint")}</small></div>
+                      <button type="button" role="switch" aria-checked={messageSoundEnabled}
+                        aria-label={t("profile.messageSound")}
+                        className={"switch-button" + (messageSoundEnabled ? " on" : "")}
+                        onClick={toggleMessageSound}><span /></button>
+                    </div>
+                    {messageSoundEnabled && (
+                      <div className="settings-row message-sound-preview-row">
+                        <div><strong>{t("profile.soundPreview")}</strong><small>{t("profile.soundPreviewHint")}</small></div>
+                        <button type="button" className="settings-action message-sound-preview-button"
+                          onClick={() => void previewMessageSound()}>
+                          <Volume2 size={17} aria-hidden="true" /> {t("profile.soundPreview")}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                }
+                appearance={
+                  <p className="settings-workspace-empty-note">
+                    Giao diện SocCo hiện sử dụng bộ màu sáng thống nhất trên web và desktop.
+                  </p>
+                }
+                storage={
+                  <div className="settings-workspace-account">
+                    <p className="settings-workspace-empty-note">
+                      Bạn có thể quản lý ảnh, video và tệp đã chia sẻ trong từng cuộc trò chuyện.
+                    </p>
+                    <button type="button" className="settings-workspace-action" onClick={() => switchTab("chat")}>
+                      Mở tin nhắn
+                    </button>
+                  </div>
+                }
+                devices={
+                  <div className="settings-card">
+                    <AccountSessionsPanel
+                      sessionsBusy={sessionsBusy}
+                      canManageSessions={isDesktopBuild || Boolean(session.refreshToken)}
+                      sessionsOpen={sessionsOpen}
+                      setSessionsOpen={setSessionsOpen}
+                      fetchAccountSessions={fetchAccountSessions}
+                      sessionsError={sessionsError}
+                      managedSessions={managedSessions}
+                      revokeAccountSessions={revokeAccountSessions}
+                    />
+                  </div>
+                }
+              />
+            )}
             <input
               ref={avatarFileInputRef}
               className="hidden-media-input"
@@ -7928,10 +8248,11 @@ export default function App({
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}
-        conversations={displayConversations.map(({ id, name, type }) => ({
+        conversations={displayConversations.map(({ id, name, type, otherUsername }) => ({
           id,
           name,
           type,
+          otherUsername,
         }))}
       />
 
@@ -7939,6 +8260,8 @@ export default function App({
         tab={tab}
         t={t}
         switchTab={switchTab}
+        onCalls={() => { switchTab("chat"); setDesktopSection("calls"); }}
+        callsActive={tab === "chat" && desktopSection === "calls"}
         unreadTotal={unreadTotal}
         pushEnabled={pushEnabled}
       />

@@ -10,6 +10,8 @@ export type Post = {
   content: string
   likes: number
   liked: boolean
+  myReaction?: string
+  reactions?: { emoji: string; count: number }[]
   comments: FeedComment[]
   attachments?: MediaAttachment[]
   visibility?: 'public' | 'friends' | 'private'

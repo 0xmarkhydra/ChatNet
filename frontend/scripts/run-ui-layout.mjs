@@ -268,9 +268,10 @@ try {
   await page.locator('.conversation-item').first().click()
   await page.locator('.message-press-target').last().waitFor()
   await page.getByRole('button', { name: 'Tìm tin nhắn trong cuộc trò chuyện' }).click()
-  const localSearch = page.getByRole('dialog', { name: 'Tìm trong hội thoại' })
+  const localSearch = page.getByRole('dialog', { name: 'Tìm kiếm trong trò chuyện' })
   await localSearch.locator('input[aria-label="Từ khóa tin nhắn"]').fill('Lịch sử tin nhắn 2')
-  await localSearch.getByText('Lịch sử tin nhắn 2', { exact: true }).click()
+  await localSearch.locator('.message-search-section').first().getByRole('button', { name: 'Xem thêm' }).click()
+  await localSearch.getByRole('button', { name: /Lịch sử tin nhắn 2$/ }).click()
   await localSearch.waitFor({ state: 'hidden' })
   await page.locator('[data-message-id="2"]').waitFor()
   check(await page.locator('.message-press-target').count() === 45,
@@ -910,26 +911,42 @@ try {
       'Tapping outside must close create menu')
   }
 
-  // Logout must be one full-width settings row, not a detached right-aligned button.
+  // The desktop settings redesign uses a sectioned workspace, while mobile
+  // retains the full-width account row. Neither layout may hide logout.
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 320 ? 667 : width === 390 ? 844 : 900 })
-    if (width > 760) await page.locator('.app-sidebar').getByRole('button', { name: 'Cài đặt' }).click()
-    else await page.getByRole('button', { name: /Cá nhân/ }).click()
-    const signout = page.locator('.settings-card .settings-logout-row')
-    await signout.waitFor()
-    check(await page.locator('.profile-actions').count() === 0,
-      'Detached account actions footer must be removed')
-    const placement = await page.evaluate(() => {
-      const button = document.querySelector('.settings-logout-row').getBoundingClientRect()
-      const card = document.querySelector('.profile-view .settings-card').getBoundingClientRect()
-      return { button: { x: button.x, right: button.right, width: button.width, y: button.y },
-        card: { x: card.x, right: card.right, width: card.width } }
-    })
-    check(Math.abs(placement.button.x - placement.card.x) < 2 &&
-      Math.abs(placement.button.right - placement.card.right) < 2 &&
-      placement.button.width > 250,
-      'Sign-out row must fill settings card: ' + JSON.stringify({ width, placement }))
-    await signout.scrollIntoViewIfNeeded()
+    if (width > 760) {
+      await page.locator('.app-sidebar').getByRole('button', { name: 'Cài đặt' }).click()
+      const workspace = page.locator('.settings-workspace')
+      await workspace.waitFor({ state: 'visible' })
+      await workspace.getByRole('button', { name: 'Thông tin tài khoản' }).click()
+      const account = workspace.locator('.settings-workspace-account')
+      const signout = account.locator('button').last()
+      await signout.waitFor({ state: 'visible' })
+      const rects = await page.evaluate(() => {
+        const account = document.querySelector('.settings-workspace-account').getBoundingClientRect()
+        const button = document.querySelector('.settings-workspace-account button:last-of-type').getBoundingClientRect()
+        return { account: { x:account.x, right:account.right }, button: { x:button.x, right:button.right, width:button.width } }
+      })
+      check(rects.button.width > 90 && rects.button.x >= rects.account.x - 2 &&
+        rects.button.right <= rects.account.right + 2,
+        'Desktop logout must stay within the settings account card: ' + JSON.stringify({ width, rects }))
+    } else {
+      await page.getByRole('button', { name: /Cá nhân/ }).click()
+      const signout = page.locator('.settings-card .settings-logout-row')
+      await signout.waitFor({ state: 'visible' })
+      check(await page.locator('.profile-actions').count() === 0,
+        'Detached account actions footer must be removed')
+      const rects = await page.evaluate(() => {
+        const button = document.querySelector('.settings-logout-row').getBoundingClientRect()
+        const card = document.querySelector('.profile-view .settings-card').getBoundingClientRect()
+        return { button: { x: button.x, right: button.right, width: button.width }, card: { x: card.x, right: card.right } }
+      })
+      check(Math.abs(rects.button.x - rects.card.x) < 2 &&
+        Math.abs(rects.button.right - rects.card.right) < 2 &&
+        rects.button.width > 250, 'Mobile logout row must fill settings card: ' + JSON.stringify({ width, rects }))
+      await signout.scrollIntoViewIfNeeded()
+    }
     if (width === 390 || width === 1440)
       await page.screenshot({ path: 'output/playwright/layout/profile-actions-' + width + '.png' })
   }
