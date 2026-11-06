@@ -9,6 +9,7 @@ const { registerScreenCapture } = require('./screen-capture.cjs')
 const { Notification } = require('electron')
 const { createNativeNotifications, registerNotificationIPC } = require('./notifications.cjs')
 const { createWindowLifecycle } = require('./window-lifecycle.cjs')
+const { createDesktopUpdates } = require('./updates.cjs')
 const { join, isAbsolute } = require('node:path')
 const { pathToFileURL } = require('node:url')
 const { trustedRendererURL, safeExternalURL, isSafeAssetPath } = require('./ipc-policy.cjs')
@@ -33,7 +34,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
 ])
 
-let mainWindow, windowLifecycle, authBroker, mediaPermissions, screenCapture, nativeNotifications
+let mainWindow, windowLifecycle, authBroker, mediaPermissions, screenCapture, nativeNotifications, updates
 const hasLock = app.requestSingleInstanceLock()
 if (!hasLock) app.quit()
 const trustedURL = (url) => trustedRendererURL(url, dev)
@@ -70,6 +71,10 @@ function attachHandlers() {
   nativeNotifications = createNativeNotifications({ Notification, getScope, getWindow: () => mainWindow,
     showWindow: showMainWindow, setBadge: (count) => windowLifecycle?.setUnread(count) })
   registerNotificationIPC(ipcMain, nativeNotifications, isTrustedFrame)
+  updates = createDesktopUpdates({
+    app, ipcMain, dialog, getWindow: () => mainWindow, trusted: isTrustedFrame,
+    getUpdater: () => require('electron-updater').autoUpdater,
+  })
   ipcMain.handle('soco:platform-info', (event) => {
     if (!isTrustedFrame(event)) throw new Error('Forbidden IPC origin')
     return { platform: process.platform, version: app.getVersion(), packaged: app.isPackaged, apiOrigin: API_ORIGIN }
@@ -154,6 +159,7 @@ function createMainWindow() {
   mainWindow.webContents.on('did-start-navigation', resetNativeGrants)
   windowLifecycle.attach(mainWindow)
   mainWindow.on('closed', () => { resetNativeGrants(); mainWindow = undefined })
+  mainWindow.on('focus', () => updates?.checkOnFocus())
   void mainWindow.loadURL(dev ? DEV_URL : APP_URL)
 }
 
@@ -163,9 +169,23 @@ if (hasLock) {
     await registerAppProtocol()
     attachHandlers()
     configureSecurity()
-    windowLifecycle = createWindowLifecycle(() => mainWindow, showMainWindow)
+    windowLifecycle = createWindowLifecycle(() => mainWindow, showMainWindow, async () => {
+      const current = await updates?.check()
+      if (!current || current.status === 'disabled') {
+        await dialog.showMessageBox({ type: 'info', title: 'Cập nhật SocCO',
+          message: 'Bản ứng dụng này chưa được cấu hình cập nhật tự động.', buttons: ['Đóng'] })
+      } else if (current.status === 'idle') {
+        await dialog.showMessageBox({ type: 'info', title: 'Cập nhật SocCO',
+          message: 'Bạn đang sử dụng phiên bản mới nhất.', buttons: ['Đóng'] })
+      } else if (current.status === 'error') {
+        await dialog.showMessageBox({ type: 'warning', title: 'Cập nhật SocCO',
+          message: 'Không kiểm tra được cập nhật. Vui lòng kiểm tra kết nối.', buttons: ['Đóng'] })
+      }
+    })
     createMainWindow()
+    updates?.start()
     app.on('activate', showMainWindow)
   }).catch(() => { console.error('SocCO desktop startup failed'); app.quit() })
 }
+app.on('before-quit', () => updates?.stop())
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

@@ -11,7 +11,21 @@ export type DesktopPlatformInfo = {
 export type DesktopScreenRequest = { requestId: string; sources: { index: number; name: string; thumbnail: string }[] }
 export type MediaPermissionStatus = 'not-determined' | 'granted' | 'denied' | 'restricted' | 'unknown'
 
+export type DesktopUpdateState = {
+  status: 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error'
+  version: string
+  currentVersion: string
+  progress: number
+}
+
 export type DesktopBridge = {
+  updates: {
+    state: () => Promise<DesktopUpdateState>
+    check: () => Promise<DesktopUpdateState>
+    download: () => Promise<DesktopUpdateState>
+    install: (input: { hasPendingWork: boolean }) => Promise<boolean>
+    onStatus: (callback: (state: DesktopUpdateState) => void) => () => void
+  }
   getPlatformInfo: () => Promise<DesktopPlatformInfo>
   openExternal: (url: string) => Promise<boolean>
   notifications: {

@@ -59,6 +59,7 @@ jobs:
         run: |
           npm run check:session --prefix frontend
           npm run check:desktop-session --prefix frontend
+          npm run check:desktop-updates --prefix frontend
           npm run check:chat --prefix frontend
           npm run check:outbox --prefix frontend
           npm run check:desktop-notifications --prefix frontend

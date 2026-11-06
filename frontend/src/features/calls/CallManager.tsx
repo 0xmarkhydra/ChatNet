@@ -27,6 +27,7 @@ import {
 import { startCallMediaInterpreter, type InterpreterSession, type InterpreterUpdate } from './callMediaInterpreter'
 import { buildLanguageOptions } from '../i18n/languages'
 import { isDesktopBuild } from '../../platform/desktop'
+import { setDesktopCallInProgress } from '../../platform/desktopUpdateSafety'
 import { requireDesktopMedia } from '../../platform/desktopMedia'
 import CallDeviceSettings from './CallDeviceSettings'
 import { notifyDesktopCall, dismissDesktopCall } from '../../platform/useDesktopNotifications'
@@ -83,6 +84,12 @@ export default function CallManager({
   const requestRef = useRef(request)
   requestRef.current = request
   const callRequest = useCallback<CallRequest>((path, init) => requestRef.current(path, init), [])
+
+  useEffect(() => {
+    if (!isDesktopBuild) return
+    setDesktopCallInProgress(Boolean(active) || Boolean(incoming) || busy)
+    return () => setDesktopCallInProgress(false)
+  }, [active, incoming, busy])
 
   useEffect(() => {
     if (!isDesktopBuild || !sessionId || !incoming) return

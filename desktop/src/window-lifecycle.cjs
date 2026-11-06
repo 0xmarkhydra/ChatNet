@@ -5,7 +5,7 @@ const { join } = require('node:path')
 const { normalizeWindowState, readWindowState, writeWindowState } = require('./window-state.cjs')
 const trayIcon = require('./tray-icon.cjs')
 
-function createWindowLifecycle(getWindow, showWindow) {
+function createWindowLifecycle(getWindow, showWindow, checkUpdates) {
   const file = join(app.getPath('userData'), 'settings', 'window.json')
   const areas = () => [screen.getPrimaryDisplay(), ...screen.getAllDisplays().filter((d) => d.id !== screen.getPrimaryDisplay().id)].map((d) => d.workArea)
   let state = readWindowState(file, areas())
@@ -60,6 +60,7 @@ function createWindowLifecycle(getWindow, showWindow) {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : [{ label: 'SocCO', submenu: [{ label: 'Thoát SocCO', accelerator: 'CmdOrCtrl+Q', click: quit }] }]),
     { role: 'editMenu' },
+    { label: 'Trợ giúp', submenu: [{ label: 'Kiểm tra bản cập nhật', click: () => void checkUpdates?.() }] },
     { label: 'Cửa sổ', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { label: 'Mở SocCO', click: showWindow }, { role: 'close' }] },
   ]))
 

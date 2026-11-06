@@ -5,6 +5,18 @@ const { contextBridge, ipcRenderer } = require('electron')
 // Explicit, narrow bridge. Never expose ipcRenderer, Node, filesystem or refresh credentials.
 contextBridge.exposeInMainWorld('socoDesktop', Object.freeze({
   getPlatformInfo: () => ipcRenderer.invoke('soco:platform-info'),
+  updates: Object.freeze({
+    state: () => ipcRenderer.invoke('soco:update:state'),
+    check: () => ipcRenderer.invoke('soco:update:check'),
+    download: () => ipcRenderer.invoke('soco:update:download'),
+    install: (input) => ipcRenderer.invoke('soco:update:install', input),
+    onStatus: (callback) => {
+      if (typeof callback !== 'function') throw new TypeError('Callback required')
+      const listener = (_event, value) => callback(value)
+      ipcRenderer.on('soco:update:status', listener)
+      return () => ipcRenderer.removeListener('soco:update:status', listener)
+    },
+  }),
   openExternal: (url) => ipcRenderer.invoke('soco:open-external', url),
   notifications: Object.freeze({
     sync: (input) => ipcRenderer.invoke('soco:notification:sync', input),

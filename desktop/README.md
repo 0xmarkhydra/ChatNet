@@ -1,6 +1,6 @@
 # SocCO Desktop — native shell and shared React integration
 
-Branch `feat/chatnet-desktop-electron`. **Not approved for beta, dev/main integration or production release.**
+Desktop core originated on `feat/chatnet-desktop-electron`. Auto-update development is on `feat/desktop-auto-update` (version 0.2.0). **Not approved for beta or production release.**
 Read `docs/desktop/07_BATCH_02_STATUS.md` through `10_BATCH_05_STATUS.md` for actual tests, artifacts and remaining acceptance gates. B03/B04 implementation was pushed as `2330cc3` / `76b56f1`; the B05 report accompanies its packaging commit.
 
 ## Development
@@ -52,7 +52,7 @@ node frontend/scripts/desktop-dmg-smoke.mjs
 
 Artifacts are under `desktop/release/`: `SocCO-<version>-mac-arm64.dmg`, `SocCO-<version>-mac-x64.dmg`, matching ZIPs, and `SocCO-<version>-win-x64.exe`. The internal inventory records hashes and explicitly does not claim signatures or release approval. Builds on Mac do not prove Windows installation works.
 
-`dist:mac` and `dist:win` require code signing (`forceCodeSigning=true`). Missing identities must fail the build. Every command has `--publish never`; there is no automatic release workflow. Successful signing alone would still not prove Apple notarization/stapling, clean install, update/rollback, UAT or release approval.
+`dist:mac` and `dist:win` require code signing (`forceCodeSigning=true`) **and** a build-time `SOCO_DESKTOP_UPDATE_URL` HTTPS release-feed URL. Both use `electron-builder.release.cjs` to generate `app-update.yml` and release metadata; `--publish never` means the release operator must manually publish approved signed artifacts. An absent feed or signing identity must fail the build. Internal unsigned test builds are excluded from auto-update. See `docs/desktop/11_AUTO_UPDATE_IMPLEMENTATION.md` for the release process. Apple notarization/stapling, installation, N→N+1/rollback UAT and release approval are still required.
 
 The installer icon derives from `frontend/public/soco-mark.svg`. To regenerate after an approved brand asset change, run `node frontend/scripts/desktop-icons.mjs` and review the new asset/provenance hashes.
 
@@ -69,7 +69,7 @@ The installer icon derives from `frontend/public/soco-mark.svg`. To regenerate a
 
 ## Remaining release blockers
 
-GitHub Actions jobs are blocked by an account billing lock (details and job IDs in B05 report); local tests are not CI approval. Signing/notarization credentials and an approved update channel are not available. **A runtime auto-updater has not been implemented**; ZIP/blockmap generation is not updater functionality.
+GitHub Actions jobs are blocked by an account billing lock (details and job IDs in B05 report); local tests are not CI approval. Signing/notarization credentials and an approved update channel are not available. A runtime Electron updater (opt-in install, background version checks, authenticated IPC and user-visible progress) is now implemented on `feat/desktop-auto-update`, but a **signed, notarized N→N+1 update has not been verified or published**. Existing 0.1.x desktop installs without an updater need a one-time manual installer upgrade.
 
 Real packaged login/revoke, Desktop↔Web parity, two-device LiveKit/Gemini consent/media, Windows/Intel UAT, signed notifications, signed update/rollback and full security review remain open. B01 queue migration, unsent attachment/reply drafts, private disk cache purge, broad media/connect CSP and SSE query-token review are explicit outstanding engineering work. Marketplace/payment rules are unchanged.
 

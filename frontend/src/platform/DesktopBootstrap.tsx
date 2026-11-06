@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import App from '../app/App'
 import DesktopScreenPicker from './DesktopScreenPicker'
+import DesktopUpdateNotice from './DesktopUpdateNotice'
 import { parseSession, type Session } from '../features/auth/session'
 import { clearChatPersistence, configureChatPersistenceStore } from '../features/chat/chatPersistence'
 import { clearChatOutbox } from '../chatOutbox'
@@ -50,14 +51,17 @@ export default function DesktopBootstrap() {
     return () => { active = false; unsubscribe?.() }
   }, [attempt])
 
-  if (startup.phase === 'ready') return <><App initialSession={startup.session} /><DesktopScreenPicker /></>
+  if (startup.phase === 'ready') return <><App initialSession={startup.session} /><DesktopScreenPicker /><DesktopUpdateNotice /></>
   return (
-    <main className="desktop-startup" aria-live="polite">
+    <>
+      <main className="desktop-startup" aria-live="polite">
       <h1>SocCO</h1>
       {startup.phase === 'loading' ? <p role="status">Đang khôi phục phiên an toàn…</p> : <>
         <p role="alert">{startup.message}</p>
         <button type="button" onClick={() => setAttempt((value) => value + 1)}>Thử lại</button>
       </>}
-    </main>
+      </main>
+      <DesktopUpdateNotice />
+    </>
   )
 }
