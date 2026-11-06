@@ -73,8 +73,10 @@ import AuthScreen from "../features/auth/AuthScreen";
 import { useAuthFlow } from "../features/auth/useAuthFlow";
 import PostComposer from "../features/feed/PostComposer";
 import FeedPostCard from "../features/feed/FeedPostCard";
+import FeedReactionControl from "../features/feed/FeedReactionControl";
 import StoryViewer from "../features/feed/StoryViewer";
 import MessageActions from "../features/chat/MessageActions";
+import { messageReactionLabel } from "../features/chat/messageReactions";
 import {
   copyChatImage,
   messageLinkHref,
@@ -145,6 +147,7 @@ import {
   PencilLine,
   RefreshCw,
   Search,
+  SmilePlus,
   UserCheck,
   UserPlus,
   Users,
@@ -185,7 +188,7 @@ import {
   transferHasFiles,
 } from "../features/chat/chatFileTransfer";
 import { canMarkConversationRead } from "../features/chat/conversationRead";
-import { mergeById, toggleCount } from "../shared/lib/optimistic";
+import { mergeById, toggleMessageReactionCount } from "../shared/lib/optimistic";
 import CallManager, { CallHeaderActions } from "../features/calls/CallManager";
 import GroupActionsSheet from "../features/chat/GroupActionsSheet";
 import SharedContent from "../features/chat/SharedContent";
@@ -4142,7 +4145,7 @@ export default function App({
     actionLocks.current.add(key);
     setReactionPreviews((current) => ({
       ...current,
-      [message.id]: toggleCount(message.reactions || [], emoji),
+      [message.id]: toggleMessageReactionCount(message.reactions || [], emoji),
     }));
     try {
       const response = await apiFetch(`/api/messages/${message.id}/reactions`, {
@@ -4297,16 +4300,17 @@ export default function App({
     }
   }
 
-  async function like(post: Post) {
+  async function like(post: Post, emoji = "👍") {
     const key = `feed:like:${post.id}`;
     if (actionLocks.current.has(key)) return;
     const sessionId = session?.sessionId;
     actionLocks.current.add(key);
     ++feedRevision.current;
-    setLikePreviews((current) => ({ ...current, [post.id]: !post.liked }));
+    setLikePreviews((current) => ({ ...current, [post.id]: (post.myReaction || (post.liked ? "👍" : "")) !== emoji }));
     try {
-      const response = await apiFetch(`/api/posts/${post.id}/like`, {
+      const response = await apiFetch(`/api/posts/${post.id}/${emoji === "👍" ? "like" : "reactions"}`, {
         method: "POST",
+        ...(emoji !== "👍" ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji }) } : {}),
       });
       const updated = (await response.json()) as Post & { error?: string };
       if (sessionRef.current?.sessionId !== sessionId) return;
@@ -4321,21 +4325,21 @@ export default function App({
       setPosts((current) =>
         current.map((item) =>
           item.id === updated.id
-            ? { ...item, liked: updated.liked, likes: updated.likes }
+            ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions }
             : item,
         ),
       );
       setSavedPosts((current) =>
         current.map((item) =>
           item.id === updated.id
-            ? { ...item, liked: updated.liked, likes: updated.likes }
+            ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions }
             : item,
         ),
       );
       setProfilePosts((current) =>
         current.map((item) =>
           item.id === updated.id
-            ? { ...item, liked: updated.liked, likes: updated.likes }
+            ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions }
             : item,
         ),
       );
@@ -4343,11 +4347,15 @@ export default function App({
         ...post,
         liked: updated.liked,
         likes: updated.likes,
+        myReaction: updated.myReaction,
+        reactions: updated.reactions,
       });
       postSearch.syncPost({
         ...post,
         liked: updated.liked,
         likes: updated.likes,
+        myReaction: updated.myReaction,
+        reactions: updated.reactions,
       });
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) void refreshPosts();
@@ -6031,11 +6039,17 @@ export default function App({
                                     aria-pressed={reaction.mine}
                                     className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
                                     onClick={() => void toggleReaction(message, reaction.emoji)}
-                                    aria-label={`Thả cảm xúc ${reaction.emoji}`}
+                                    aria-label={`${messageReactionLabel(reaction.emoji)}: ${reaction.count} lượt`}
                                   >
                                     {reaction.emoji} {reaction.count}
                                   </button>
                                 ))}
+                                <button type="button" className="reaction-add"
+                                  aria-label="Chọn cảm xúc cho tin nhắn"
+                                  title="Thả cảm xúc"
+                                  onClick={() => openMessageActions(message)}>
+                                  <SmilePlus size={16} aria-hidden="true" />
+                                </button>
                               </div>
                             </>
                           )}
@@ -6927,18 +6941,12 @@ export default function App({
                     )}
                     <MediaAttachmentsView items={activePost.attachments} />
                     <div className="post-toolbar">
-                      <button
-                        type="button"
-                        className={activePost.liked ? "liked" : ""}
-                        disabled={likePreviews[activePost.id] !== undefined}
-                        aria-pressed={activePost.liked}
-                        aria-busy={likePreviews[activePost.id] !== undefined}
-                        onClick={() => void like(activePost)}
-                      >
-                        <UiIcon name="heart" size={21} />
-                        <span>Thích</span>
-                        {activePost.likes > 0 && <b>{activePost.likes}</b>}
-                      </button>
+                      <FeedReactionControl
+                        post={activePost}
+                        busy={likePreviews[activePost.id] !== undefined}
+                        react={like}
+                        showCount
+                      />
                       <span className="post-stat">
                         <UiIcon name="comment" size={21} />
                         {activePost.comments?.length || 0} bình luận

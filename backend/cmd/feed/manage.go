@@ -55,6 +55,10 @@ func (s *server) respondPost(w http.ResponseWriter, r *http.Request, id, uid int
 		httpx.Error(w, 404, "post not found")
 		return
 	}
+	if err := s.attachPostReactions(r.Context(), &p, uid); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load post reactions")
+		return
+	}
 	p.Comments = s.comments(r, p.ID, uid)
 	p.Attachments = s.postAttachments(r.Context(), p.ID)
 	httpx.JSON(w, status, p)

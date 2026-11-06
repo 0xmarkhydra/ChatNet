@@ -196,16 +196,11 @@ export function useAppRealtime({
         if (!changed.channelId && activeConversationIdRef.current === update.conversationId) {
           setMessages((current) => {
             const item = current.find((message) => message.id === changed.id)
-            const mineByEmoji = new Map(
-              (item?.reactions || []).map((reaction) => [reaction.emoji, reaction.mine]),
-            )
             return mergeById(current, {
               ...changed,
               readByUserIds: [...new Set([...(item?.readByUserIds || []), ...(changed.readByUserIds || [])])],
-              reactions: (changed.reactions || []).map((reaction) => ({
-                ...reaction,
-                mine: mineByEmoji.get(reaction.emoji) ?? false,
-              })),
+              // The backend now personalizes "mine" for each realtime recipient.
+              reactions: changed.reactions || [],
             }).sort((a, b) => a.id - b.id)
           })
           setTranslations((current) => {
