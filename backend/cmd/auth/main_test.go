@@ -47,6 +47,29 @@ func TestAuthBodiesRejectExtraOrOversizedJSON(t *testing.T) {
 	}
 }
 
+func TestOTPConfigurationMissingDoesNotCreatePendingRequest(t *testing.T) {
+	for _, path := range []string{"/api/auth/email/start", "/api/auth/register/start"} {
+		s := &server{}
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"email":"test@example.com"}`))
+		response := httptest.NewRecorder()
+		s.registerStart(response, request)
+		if response.Code != http.StatusServiceUnavailable {
+			t.Fatalf("%s: got %d, want 503: %s", path, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestResendOTPConfigurationMissing(t *testing.T) {
+	s := &server{}
+	token := strings.Repeat("a", 40)
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/email/resend", strings.NewReader(fmt.Sprintf(`{"token":%q}`, token)))
+	response := httptest.NewRecorder()
+	s.registerResend(response, request)
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("got %d, want 503: %s", response.Code, response.Body.String())
+	}
+}
+
 func TestGeneratedUsername(t *testing.T) {
 	seen := map[string]bool{}
 	for i := 0; i < 100; i++ {
