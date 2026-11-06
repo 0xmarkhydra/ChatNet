@@ -1,4 +1,4 @@
-# ChatNet / SOCO — Agent 2 handoff (2026-10-19)
+# ChatNet / SocCo — Agent 2 handoff (2026-10-19)
 
 **Owner:** Agent 2 · Messaging / Realtime / Media · Web/PWA only
 **Working branch:** `feat/chatnet-a2-messaging-media` (worktree `.worktrees/chatnet-a2-messaging-media`)

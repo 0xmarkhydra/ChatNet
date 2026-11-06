@@ -1,4 +1,4 @@
-# SOCO Desktop — Technical Architecture v1
+# SocCO Desktop — Technical Architecture v1
 
 **Kiến trúc dự kiến — chưa có mã Electron.** Quyết định runtime: [ADR 0001](adr/0001-electron-vs-tauri.md).
 

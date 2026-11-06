@@ -1,9 +1,9 @@
-# SOCO UI 1.0 — Full application styling integration
+# SocCo UI 1.0 — Full application styling integration
 
 Branch: `feat/soco-mobile-ui-20261014`
 
 ## Design direction
-SOCO visual identity follows the customer brand board for review: blue `#2563EB`, violet `#8B5CF6`, orange `#FF9F0E`, teal `#14B8A6`, navy `#0F172A`. Premium, restrained iOS-inspired rounded cards and blue-violet gradient highlights. Reuse actual business flows; do **not** replace established APIs.
+SocCo visual identity follows the customer brand board for review: blue `#2563EB`, violet `#8B5CF6`, orange `#FF9F0E`, teal `#14B8A6`, navy `#0F172A`. Premium, restrained iOS-inspired rounded cards and blue-violet gradient highlights. Reuse actual business flows; do **not** replace established APIs.
 
 **Brand asset status:** `frontend/public/soco-mark.svg` and `soco-maskable.svg` are original temporary vector marks, not final official customer artwork. The existing ChatNet domain and social OG metadata remain as-is until the customer confirms the brand migration.
 
@@ -21,7 +21,7 @@ SOCO visual identity follows the customer brand board for review: blue `#2563EB`
 | Discover / nearby map | tabs, search, map, pins, discovery cards | location permissions and map loading |
 | Feed and stories | composer, posts, comments, story chrome | posts, story uploads & like/comment flows |
 | Profile, settings and notification | hero/cover, settings controls, action buttons | saved locales and OneSignal push |
-| PWA/app identity | SOCO visible label, icon and theme colors | install on iOS & Android; final asset review |
+| PWA/app identity | SocCo visible label, icon and theme colors | install on iOS & Android; final asset review |
 
 ## Layout principles
 - All main navigations remain functional; no new backend calls were introduced.
@@ -40,13 +40,13 @@ SOCO visual identity follows the customer brand board for review: blue `#2563EB`
 - Initial unauthenticated browser render — passed with 0 JavaScript console errors.
 
 ## Release and QA follow-ups
-1. Replace temporary SOCO mark with approved original vector logo and generate validated platform icon assets; align OG metadata if brand rollout approved.
+1. Replace temporary SocCo mark with approved original vector logo and generate validated platform icon assets; align OG metadata if brand rollout approved.
 2. Test authenticated flows on iPhone 375 / 390 / 430px, tablet and desktop: chat, OTP, QR, upload, translation, notifications, group actions, story, location and calling.
 3. Check accessibility (contrast, touch targets, screen readers) and safe areas in genuine mobile browsers.
 4. Consider splitting the large JS bundle in a subsequent performance pass.
 5. **Merge does not imply release validation or Railway deployment.** Retest once combined with uncommitted Live Project work, particularly call translation.
 
-## SOCO UI 1.1 — Semantic layout & component refinement (2026-10-14)
+## SocCo UI 1.1 — Semantic layout & component refinement (2026-10-14)
 
 - Added reusable `SocoSectionHeading`, `SocoEmptyState` and `SocoTextAction` presentation components in `frontend/src/SocoUI.tsx`.
 - Added `frontend/src/soco-layout-v2.css` after all existing styles to unify section hierarchy, typography, brand accents, empty states, grouped cards, mobile safe areas and desktop reading widths.
@@ -62,9 +62,9 @@ SOCO visual identity follows the customer brand board for review: blue `#2563EB`
 - Local browser: unauthenticated signup screen rendered, 0 console errors.
 - **Still required**: browser/device validation of authenticated page flows and screenshots at narrow viewport sizes. Do not claim pixel-perfect 18 mockups yet.
 
-## SOCO layout stabilization — 2026-10-15
+## SocCo layout stabilization — 2026-10-15
 
-The production UI regression stems from legacy grid/flex styles conflicting with the SOCO responsive layer, plus percentage-width elements with extra horizontal margins. These changes retain ChatNet business logic.
+The production UI regression stems from legacy grid/flex styles conflicting with the SocCo responsive layer, plus percentage-width elements with extra horizontal margins. These changes retain ChatNet business logic.
 
 Confirmed fixes:
 - Desktop profile: use a stacked page layout instead of legacy two-column grid, with independently scrollable cards.
@@ -84,12 +84,12 @@ Caveat: these mocked UI tests do not verify live uploads, push notifications or 
 
 Deployment gate: run build, PWA, session, optimistic/notification checks and UI layout checks; only merge reviewed paths into main while preserving existing uncommitted Live Project changes.
 
-## SOCO UI Refinement 2.0 — 2026-10-15
+## SocCo UI Refinement 2.0 — 2026-10-15
 
-This pass focuses on visual density and readability on iPhone while retaining the SOCO Brand DNA 1.0 palette and all existing operations.
+This pass focuses on visual density and readability on iPhone while retaining the SocCo Brand DNA 1.0 palette and all existing operations.
 
 - Language selection: removed leftover dark-theme white-on-white typography, updated all selection rows and search input to an accessible light palette, and added an iOS-style focus-within ring. Close target is 44x44px.
-- Conversation on mobile: the global SOCO brand/search header is hidden only while a conversation is open, making room for messages. At narrow phone widths the recipient avatar is omitted in the compact header so the full name can fit without removing call/media/translation controls.
+- Conversation on mobile: the global SocCo brand/search header is hidden only while a conversation is open, making room for messages. At narrow phone widths the recipient avatar is omitted in the compact header so the full name can fit without removing call/media/translation controls.
 - Feed: removed the edge-to-edge white story shelf, reduced story cards, and fitted the four post media actions into one compact row on modern iPhones (two rows on very narrow screens).
 - Profile: removed the duplicate section caption before the profile edit card.
 - Desktop: bottom navigation becomes a compact centered dock rather than a full-width tab strip.
@@ -102,7 +102,7 @@ Verification: frontend build, check:ui (42 viewport × screen combinations, fixe
 
 This is web/PWA UI refinement. It does not certify Flutter/TestFlight parity or the unmocked call, upload, notification or language catalog workflows; those need real-device integration verification.
 
-## SOCO iOS Motion System — 2026-10-15
+## SocCo iOS Motion System — 2026-10-15
 
 A single reusable motion layer is loaded last in `frontend/src/main.tsx`:
 `frontend/src/design-system/motion.css`. It adds touch press-down scale (.965),
@@ -125,7 +125,7 @@ Hover elevation only appears on fine-pointer devices.
 The motion layer is for the Web/PWA app. The Flutter native app needs a separate
 motion audit and real iOS device verification.
 
-## SOCO Feed & Chat Pagination — 2026-10-15
+## SocCo Feed & Chat Pagination — 2026-10-15
 
 Requested on production screenshot:
 - Removed the redundant “CỘNG ĐỒNG / Bảng tin” introduction block from the Feed.
@@ -158,7 +158,7 @@ visible underneath. Fixed as a **dedicated group management view** on mobile:
 
 Live device validation is still required for keyboard, iOS Safari/PWA safe area, real membership and API responses.
 
-## SOCO quick-create and profile settings polish — 2026-10-15
+## SocCo quick-create and profile settings polish — 2026-10-15
 
 Two customer screenshot regressions were corrected:
 - The global plus (+) action used to render its menu inside the conversation sidebar with a fixed 60px top position, covering the conversation heading and first chats. The menu is now anchored to the actual appbar plus button on desktop (right-aligned popover); on iPhone it opens as a compact bottom action sheet, retaining chat-list visibility. It includes typed Lucide icons, accessible menuitem roles, aria-expanded, click-outside dismissal and Escape dismissal. Disabling appbar backdrop blur while the sheet is open avoids mispositioning fixed descendants.
@@ -168,7 +168,7 @@ Automated Chromium regression checks validate popup placement, three menu action
 
 Existing auth, notifications, translation, messaging, profile APIs and other business flows have not been changed. Production real-user verification should follow the Railway deployment.
 
-## SOCO compact headers and account/create menu — 2026-10-15
+## SocCo compact headers and account/create menu — 2026-10-15
 
 Mobile screenshots approved removal of the three redundant full-width banner headings and their subtitles:
 - Chat sidebar: removed the `TIN NHẮN / Trò chuyện` intro and its `Kết nối` action; search, QR and "+" remain in the app bar, and find/connect remains accessible through "+" or empty state.
@@ -235,7 +235,7 @@ remain final device/integration acceptance checks.
 
 ## Realtime incoming-message sound — 2026-10-15
 
-SOCO Web/PWA has a short, low-volume two-tone notification, generated locally
+SocCo Web/PWA has a short, low-volume two-tone notification, generated locally
 with Web Audio (no licensed audio assets or additional external services).
 It is triggered ONLY by the SSE `type: "message"` event when the sender is
 not the current user. It never plays for the initial message-history fetch,

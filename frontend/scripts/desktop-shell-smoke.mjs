@@ -8,8 +8,8 @@ import { _electron } from 'playwright'
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const release = resolve(scriptsDir, '../../desktop/release')
 const executablePath = process.env.SOCO_TEST_EXECUTABLE || (process.platform === 'darwin'
-  ? join(release, process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'SOCO.app/Contents/MacOS/SOCO')
-  : join(release, 'win-unpacked/SOCO.exe'))
+  ? join(release, process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'SocCO.app/Contents/MacOS/SocCO')
+  : join(release, 'win-unpacked/SocCO.exe'))
 await access(executablePath)
 const output = resolve(scriptsDir, '../output/desktop-smoke')
 await mkdir(output, { recursive: true })
@@ -66,7 +66,7 @@ try {
   assert.equal(state.invalidRejected, true)
   assert.equal(state.rendererAuthBlocked, true)
   assert.equal(state.popup, true)
-  assert.match(state.title, /SOCO/)
+  assert.match(state.title, /SocCO/)
   evidence.checks.push('packaged UI, sandbox, native auth bridge, no plaintext session, blocked renderer auth HTTP, unsafe URL and popup denial')
 
   const mediaBoundary = await page.evaluate(async () => {

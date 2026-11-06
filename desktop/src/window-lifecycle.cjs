@@ -23,7 +23,7 @@ function createWindowLifecycle(getWindow, showWindow) {
       window.setOverlayIcon(label ? nativeImage.createFromDataURL(trayIcon).resize({ width: 32, height: 32 }) : null,
         label ? `${label} tin nhắn chưa đọc` : '')
     }
-    tray?.setToolTip(count === null ? 'SOCO — chưa đồng bộ số tin chưa đọc' : label ? `SOCO — ${label} tin chưa đọc` : 'SOCO')
+    tray?.setToolTip(count === null ? 'SocCO — chưa đồng bộ số tin chưa đọc' : label ? `SocCO — ${label} tin chưa đọc` : 'SocCO')
     if (process.platform === 'darwin') tray?.setTitle(label)
   }
 
@@ -33,34 +33,34 @@ function createWindowLifecycle(getWindow, showWindow) {
     if (window && !window.isDestroyed()) {
       state = normalizeWindowState({ ...state, bounds: window.getNormalBounds(), maximized: window.isMaximized() }, areas())
     }
-    try { writeWindowState(file, state) } catch { console.warn('SOCO could not save window settings') }
+    try { writeWindowState(file, state) } catch { console.warn('SocCO could not save window settings') }
   }
   function quit() { quitting = true; save(); app.quit() }
   function refreshTrayMenu() {
     tray?.setContextMenu(Menu.buildFromTemplate([
-      { label: 'Mở SOCO', click: showWindow },
+      { label: 'Mở SocCO', click: showWindow },
       { label: 'Thu nhỏ', click: () => getWindow()?.minimize() },
       { label: 'Đóng cửa sổ xuống khay', type: 'checkbox', checked: state.closeToTray === true,
         click: (item) => { state.closeToTray = item.checked; save(); refreshTrayMenu() } },
       { type: 'separator' },
-      { label: 'Thoát SOCO', click: quit },
+      { label: 'Thoát SocCO', click: quit },
     ]))
   }
   try {
     const image = nativeImage.createFromDataURL(trayIcon).resize({ width: 18, height: 18 })
     if (!image.isEmpty()) {
       tray = new Tray(image)
-      tray.setToolTip('SOCO')
+      tray.setToolTip('SocCO')
       tray.on('click', showWindow)
       tray.on('double-click', showWindow)
       refreshTrayMenu()
     }
-  } catch { console.warn('SOCO tray unavailable; close-to-tray disabled') }
+  } catch { console.warn('SocCO tray unavailable; close-to-tray disabled') }
 
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : [{ label: 'SOCO', submenu: [{ label: 'Thoát SOCO', accelerator: 'CmdOrCtrl+Q', click: quit }] }]),
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : [{ label: 'SocCO', submenu: [{ label: 'Thoát SocCO', accelerator: 'CmdOrCtrl+Q', click: quit }] }]),
     { role: 'editMenu' },
-    { label: 'Cửa sổ', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { label: 'Mở SOCO', click: showWindow }, { role: 'close' }] },
+    { label: 'Cửa sổ', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { label: 'Mở SocCO', click: showWindow }, { role: 'close' }] },
   ]))
 
   function visibleBounds() {
@@ -77,10 +77,10 @@ function createWindowLifecycle(getWindow, showWindow) {
       if (quitting) return
       if (tray && state.closeToTray === null) {
         const answer = dialog.showMessageBoxSync(window, {
-          type: 'question', title: 'Đóng SOCO',
-          message: 'Thu nhỏ SOCO xuống khay để tiếp tục nhận tin và cuộc gọi?',
-          detail: 'Thoát hẳn sẽ dừng nhận tin realtime. Có thể đổi lựa chọn từ menu biểu tượng SOCO ở khay hệ thống.',
-          buttons: ['Thu nhỏ xuống khay', 'Thoát SOCO'], defaultId: 0, cancelId: 1,
+          type: 'question', title: 'Đóng SocCO',
+          message: 'Thu nhỏ SocCO xuống khay để tiếp tục nhận tin và cuộc gọi?',
+          detail: 'Thoát hẳn sẽ dừng nhận tin realtime. Có thể đổi lựa chọn từ menu biểu tượng SocCO ở khay hệ thống.',
+          buttons: ['Thu nhỏ xuống khay', 'Thoát SocCO'], defaultId: 0, cancelId: 1,
         })
         state.closeToTray = answer === 0
         save(); refreshTrayMenu()

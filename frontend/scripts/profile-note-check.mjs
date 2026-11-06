@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 process.chdir(fileURLToPath(new URL('..',import.meta.url)))
 const port=await new Promise(resolvePort=>{const server=createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>resolvePort(port))})})
 const origin='http://127.0.0.1:'+port
-const vite=spawn(process.execPath,[resolve('node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port',String(port),'--strictPort'],{stdio:'ignore'})
+const vite=spawn(process.execPath,[resolve('node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port',String(port),'--strictPort'],{stdio:'ignore',env:{...process.env,VITE_API_URL:'http://localhost:8080'}})
 let browser
 try{
  for(let i=0;i<60;i++){try{if((await fetch(origin)).ok)break}catch{};await delay(100)}
@@ -26,7 +26,7 @@ try{
    page.on('pageerror',e=>errors.push(e.message))
    let note=null,fail=false
    const foreign={content:'Chúc bạn một ngày tốt lành 🌿',visibility:'public',version:'foreign',createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()}
-   await page.route('http://localhost:8080/**',route=>{
+   await page.route('**/api/**',route=>{
     const req=route.request(),u=new URL(req.url()),p=u.pathname,method=req.method()
     if(method==='GET')counts.set(p,(counts.get(p)||0)+1)
     const json=(data,status=200)=>route.fulfill({status,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},contentType:'application/json',body:JSON.stringify(data)})
@@ -51,11 +51,14 @@ try{
     return json([])
    })
    await page.goto(origin)
-   await page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button').last().click()
+   if(width<=760) await page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button').last().click()
+   else await page.getByRole('button',{name:'Cá nhân',exact:true}).click()
    const publish=page.getByRole('button',{name:'Đăng ghi chú',exact:true})
    await publish.waitFor()
-   const bubbleBounds=await publish.boundingBox(),heroBounds=await page.locator('.profile-hero').boundingBox()
+   const bubbleBounds=await publish.boundingBox(),heroBounds=await page.locator(width<=760?'.profile-hero':'.profile-page-hero').boundingBox()
    assert.ok(bubbleBounds.x>=heroBounds.x && bubbleBounds.x+bubbleBounds.width<=heroBounds.x+heroBounds.width,'Note bubble must fit the profile card')
+   // Leave the expanded app sidebar before clicking an underlying profile action.
+   if(width>760) { await page.mouse.move(width-5, 5); await page.waitForTimeout(280) }
    await publish.click()
    let dialog=page.getByRole('dialog',{name:'Đăng ghi chú',exact:true})
    await dialog.waitFor()

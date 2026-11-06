@@ -18,6 +18,19 @@ server {
         proxy_send_timeout 3600s;
     }
 
+    # Presigned chat images need same-origin readback for clipboard PNG copy.
+    # The gateway validates the signed object URL, host, MIME and size.
+    # Disable access logs because URL query contains temporary S3 signatures.
+    location = /__chatnet_copy_image {
+        access_log off;
+        proxy_pass ${BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache off;
+        add_header Cache-Control "private, no-store" always;
+    }
+
     location = /sw.js {
         add_header Cache-Control "no-cache, no-store, must-revalidate";
         try_files $uri =404;

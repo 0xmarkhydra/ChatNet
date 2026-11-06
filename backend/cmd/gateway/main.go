@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"chatnet/internal/config"
+	"chatnet/internal/mediax"
 )
 
 func main() {
@@ -52,6 +53,7 @@ func main() {
 			"components": components,
 		})
 	})
+	mux.Handle("GET /__chatnet_copy_image", mediax.ClipboardImageHandler(nil))
 	mux.Handle("/api/auth/", authProxy)
 	mux.Handle("/api/messages", chatProxy)
 	mux.Handle("/api/messages/", chatProxy)
@@ -74,6 +76,9 @@ func main() {
 	mux.Handle("/api/conversation-categories/", chatProxy)
 	mux.Handle("/api/conversations", chatProxy)
 	mux.Handle("/api/conversations/", chatProxy)
+	mux.Handle("/api/group-invites/", chatProxy)
+	mux.Handle("/api/groups/", chatProxy)
+	mux.Handle("/api/chat/", chatProxy)
 	mux.Handle("/api/calls", callProxy)
 	mux.Handle("/api/calls/", callProxy)
 	mux.Handle("/api/translate", translateProxy)

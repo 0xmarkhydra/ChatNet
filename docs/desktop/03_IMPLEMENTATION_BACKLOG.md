@@ -1,4 +1,4 @@
-# SOCO Desktop — Implementation Backlog v1
+# SocCO Desktop — Implementation Backlog v1
 
 **Cập nhật B05 — 31/10/2026:** DSK-023 = IN_REVIEW: EXE Windows x64 và DMG/ZIP macOS arm64/x64 đã build thật; DMG arm64 copy-install smoke PASS. DSK-024/025/027/028 = BLOCKED (chứng chỉ/notarization, updater chưa triển khai với feed ký được duyệt, GitHub billing lock, UAT máy thật). DSK-026 = IN_PROGRESS, 62/62 native tests và audit 0 reported vulnerabilities chưa thay full security review. Xem `10_BATCH_05_STATUS.md` cho artifact SHA-256, bằng chứng và phần còn thiếu. Không task mới DONE, không merge/release.
 

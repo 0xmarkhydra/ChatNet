@@ -1,5 +1,5 @@
 /*
- * SOCO Brand DNA 1.0 — mobile-first visual layer for ChatNet.
+ * SocCO Brand DNA 1.0 — mobile-first visual layer for ChatNet.
  * Presentation branding only: existing API, routes, notifications and storage stay unchanged.
  * Loaded last so design tokens and screen refinements can evolve without rewriting feature CSS.
  */
@@ -91,6 +91,7 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   border-color: #aec6ff;
   box-shadow: 0 0 0 3px rgba(37,99,235,.08);
 }
+.appbar-search input:focus-visible { outline: none; }
 .appbar-search input { font-size: 15px; color: var(--soco-text); }
 .appbar-search input::placeholder { color: #8995ad; }
 .appbar-icon-button {
@@ -401,6 +402,7 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
     #f8faff;
 }
 .auth-copy { text-align: center; }
+.auth-copy h1, .auth-copy p { margin-inline: auto; }
 .auth-copy img { width: 76px; height: 76px; border-radius: 22px; box-shadow: 0 12px 28px rgba(37,99,235,.14); }
 .auth-copy h1 {
   font-size: 38px;
@@ -411,6 +413,8 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
 }
 .auth-copy p { color: #657491; }
 .auth-card {
+  width: min(100%, 436px);
+  justify-self: center;
   border: 1px solid rgba(224,230,246,.95);
   border-radius: 28px;
   background: rgba(255,255,255,.95);

@@ -1,4 +1,4 @@
-# SOCO Desktop — QA / Security / Release Gates
+# SocCO Desktop — QA / Security / Release Gates
 
 **QA status tại 30/10/2026:** B02 có 32 unit tests và packaged macOS native/vault/lifecycle smoke PASS; backend PostgreSQL/Redis integration PASS. Xem `07_BATCH_02_STATUS.md` để biết phạm vi chính xác. Login/chat/call hai thiết bị, Windows physical UAT, signed install/update/rollback vẫn NOT RUN/BLOCKED. Không suy rộng các kết quả này thành PASS toàn bộ QA-ID hoặc quyền phát hành.
 **Release owner:** Integration Owner / Agent 5.
@@ -99,7 +99,7 @@ Phát hành beta cần changelog, installer links, SHA256, ký/notarization, rel
 |---|---|
 | QA-ID | QA-006 |
 | Branch / commit | `feat/chatnet-desktop-electron@<sha>` |
-| Build | `SOCO-0.x.y-beta.n` + hash |
+| Build | `SocCO-0.x.y-beta.n` + hash |
 | Platform | `Windows x64 / macOS arm64` |
 | Session / API env | staging, không chứa user/token thật |
 | Steps | offline, gửi, mất ACK, reconnect |

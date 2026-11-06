@@ -10,6 +10,7 @@ export type Message = {
   id: number
   clientId?: string
   conversationId: number
+  channelId?: number
   senderId: number
   sender: string
   senderDisplayName?: string

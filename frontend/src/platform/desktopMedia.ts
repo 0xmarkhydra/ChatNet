@@ -12,5 +12,5 @@ export async function requireDesktopMedia(kind: 'microphone' | 'camera'): Promis
   const settings = document.documentElement.dataset.desktopOS === 'darwin'
     ? 'System Settings → Privacy & Security'
     : 'Windows Settings → Privacy & security'
-  throw new Error(`Chưa có quyền ${label}. Cho phép SOCO tại ${settings}, mở lại ứng dụng nếu cần rồi thử lại.`)
+  throw new Error(`Chưa có quyền ${label}. Cho phép SocCO tại ${settings}, mở lại ứng dụng nếu cần rồi thử lại.`)
 }

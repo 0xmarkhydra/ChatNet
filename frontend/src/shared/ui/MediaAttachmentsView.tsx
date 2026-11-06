@@ -15,7 +15,7 @@ export default function MediaAttachmentsView({
   return (
     <div className={`media-attachments ${pending ? 'pending-media' : ''} ${items.length > 1 ? 'media-grid' : ''} media-count-${Math.min(items.length, 4)}`}>
       {items.map((item, index) => (
-        <div className={`media-item media-${item.kind}`} key={`${item.storageRef}:${index}`}>
+        <div className={`media-item media-${item.kind}`} data-attachment-index={index} key={`${item.storageRef}:${index}`}>
           {item.kind === 'image' && item.url ? (
             <a href={item.url} target="_blank" rel="noreferrer">
               <img

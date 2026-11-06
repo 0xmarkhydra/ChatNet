@@ -23,7 +23,7 @@ test('distribution commands fail closed without signing and never publish automa
   assert.ok(pkg.build.mac.extendInfo.NSCameraUsageDescription)
 })
 
-test('installer icon matches the existing SOCO SVG and recorded PNG hash', async () => {
+test('installer icon matches the existing SocCO SVG and recorded PNG hash', async () => {
   const root = resolve(__dirname, '..', '..'), asset = join(root, 'desktop/assets')
   const provenance = JSON.parse(await fs.readFile(join(asset, 'icon-provenance.json'), 'utf8'))
   const png = await fs.readFile(join(asset, 'icon.png'))
@@ -39,16 +39,16 @@ test('internal inventory records hashes without claiming signature or release ap
   t.after(() => fs.rm(directory, { recursive: true, force: true }))
   await assert.rejects(internalManifest(directory, '0.1.0'), /No internal installers/)
   // Manifest fixture bytes are deliberately not described as a real installer.
-  await fs.writeFile(join(directory, 'SOCO-0.1.0-mac-arm64.dmg'), 'manifest-fixture')
-  await fs.writeFile(join(directory, 'SOCO-0.0.9-win-x64.exe'), 'old fixture')
+  await fs.writeFile(join(directory, 'SocCO-0.1.0-mac-arm64.dmg'), 'manifest-fixture')
+  await fs.writeFile(join(directory, 'SocCO-0.0.9-win-x64.exe'), 'old fixture')
   const result = await internalManifest(directory, '0.1.0')
   assert.equal(result.artifacts.length, 1)
   assert.equal(result.artifacts[0].sha256, sha('manifest-fixture'))
   assert.equal(result.artifacts[0].signatureVerified, false)
   assert.equal(result.internalOnly, true)
   assert.equal(result.releaseApproved, false)
-  await fs.writeFile(join(directory, 'SOCO-0.1.0-mac-arm64.dmg'), 'changed-fixture')
+  await fs.writeFile(join(directory, 'SocCO-0.1.0-mac-arm64.dmg'), 'changed-fixture')
   assert.notEqual((await internalManifest(directory, '0.1.0')).artifacts[0].sha256, result.artifacts[0].sha256)
-  await fs.writeFile(join(directory, 'SOCO-0.1.0-win-arm64.exe'), 'invalid target fixture')
+  await fs.writeFile(join(directory, 'SocCO-0.1.0-win-arm64.exe'), 'invalid target fixture')
   await assert.rejects(internalManifest(directory, '0.1.0'), /Invalid installer target/)
 })

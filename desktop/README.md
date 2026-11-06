@@ -1,4 +1,4 @@
-# SOCO Desktop — native shell and shared React integration
+# SocCO Desktop — native shell and shared React integration
 
 Branch `feat/chatnet-desktop-electron`. **Not approved for beta, dev/main integration or production release.**
 Read `docs/desktop/07_BATCH_02_STATUS.md` through `10_BATCH_05_STATUS.md` for actual tests, artifacts and remaining acceptance gates. B03/B04 implementation was pushed as `2330cc3` / `76b56f1`; the B05 report accompanies its packaging commit.
@@ -50,7 +50,7 @@ npm --prefix desktop run manifest:internal
 node frontend/scripts/desktop-dmg-smoke.mjs
 ```
 
-Artifacts are under `desktop/release/`: `SOCO-<version>-mac-arm64.dmg`, `SOCO-<version>-mac-x64.dmg`, matching ZIPs, and `SOCO-<version>-win-x64.exe`. The internal inventory records hashes and explicitly does not claim signatures or release approval. Builds on Mac do not prove Windows installation works.
+Artifacts are under `desktop/release/`: `SocCO-<version>-mac-arm64.dmg`, `SocCO-<version>-mac-x64.dmg`, matching ZIPs, and `SocCO-<version>-win-x64.exe`. The internal inventory records hashes and explicitly does not claim signatures or release approval. Builds on Mac do not prove Windows installation works.
 
 `dist:mac` and `dist:win` require code signing (`forceCodeSigning=true`). Missing identities must fail the build. Every command has `--publish never`; there is no automatic release workflow. Successful signing alone would still not prove Apple notarization/stapling, clean install, update/rollback, UAT or release approval.
 

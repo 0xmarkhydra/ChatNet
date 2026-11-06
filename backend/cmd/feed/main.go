@@ -19,6 +19,7 @@ import (
 	"chatnet/internal/objectstore"
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
+	"chatnet/internal/searchx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -136,8 +137,16 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 400, "invalid author")
 		return
 	}
+	// Search the complete authorized feed, not just posts already fetched by a client.
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if utf8.RuneCountInString(query) > 120 {
+		httpx.Error(w, http.StatusBadRequest, "invalid search query (max 120 characters)")
+		return
+	}
+	// Treat LIKE metacharacters as literal input, not as user-supplied wildcards.
+	query = strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(query)
 	scope := r.URL.Query().Get("scope")
-	if scope != "" && scope != "saved" && scope != "mine" {
+	if scope != "" && scope != "saved" && scope != "mine" && scope != "following" {
 		httpx.Error(w, http.StatusBadRequest, "invalid scope")
 		return
 	}
@@ -160,8 +169,15 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND `+feedAccessSQL+`
 		  AND ($4='all' OR ($4='mine' AND p.user_id=$2)
-		       OR ($4='saved' AND EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)))
-		ORDER BY p.id DESC LIMIT $3`, before, claims.UserID, limit, scope, author)
+		       OR ($4='saved' AND EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2))
+		       OR ($4='following' AND (p.user_id=$2 OR EXISTS (
+		         SELECT 1 FROM friend_connections f WHERE f.status='accepted'
+		         AND ((f.user_low=$2 AND f.user_high=p.user_id) OR (f.user_high=$2 AND f.user_low=p.user_id))
+		       ))))
+		  AND ($6='' OR `+searchx.FoldSQL("p.content")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%'
+		       OR `+searchx.FoldSQL("u.username")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%'
+		       OR `+searchx.FoldSQL("u.display_name")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%')
+		ORDER BY p.id DESC LIMIT $3`, before, claims.UserID, limit, scope, author, query)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")
 		return

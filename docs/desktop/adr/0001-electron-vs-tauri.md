@@ -1,4 +1,4 @@
-# ADR 0001 — Electron cho phiên bản SOCO Desktop đầu tiên
+# ADR 0001 — Electron cho phiên bản SocCO Desktop đầu tiên
 
 **Ngày:** 30/10/2026
 **Trạng thái:** ACCEPTED FOR INITIAL SPIKE (được chọn cho kế hoạch, cần xác minh bằng packaged app)

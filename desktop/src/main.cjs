@@ -16,7 +16,7 @@ const { trustedRendererURL, safeExternalURL, isSafeAssetPath } = require('./ipc-
 // Explicit launcher-only profile selection keeps QA separate from the user's session and queue.
 const profile = app.commandLine.getSwitchValue('user-data-dir')
 if (profile) {
-  if (!isAbsolute(profile)) throw new Error('SOCO profile path must be absolute')
+  if (!isAbsolute(profile)) throw new Error('SocCO profile path must be absolute')
   app.setPath('userData', profile)
 }
 const dev = !app.isPackaged && process.argv.includes('--dev')
@@ -54,7 +54,7 @@ function resetNativeGrants() { mediaPermissions?.reset(); screenCapture?.reset()
 function attachHandlers() {
   const vault = createCredentialVault(join(app.getPath('userData'), 'credentials'), safeStorage)
   authBroker = createAuthBroker({
-    vault, baseURL: API_ORIGIN, userAgent: `SOCO Desktop/${app.getVersion()} (${process.platform})`,
+    vault, baseURL: API_ORIGIN, userAgent: `SocCO Desktop/${app.getVersion()} (${process.platform})`,
     onExpired: (sessionId, userId) => {
       resetNativeGrants()
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('soco:auth:expired', sessionId, userId)
@@ -140,7 +140,7 @@ function createMainWindow() {
   const bounds = windowLifecycle.visibleBounds()
   mainWindow = new BrowserWindow({
     ...bounds, minWidth: Math.min(880, bounds.width), minHeight: Math.min(580, bounds.height),
-    backgroundColor: '#F8FAFF', title: 'SOCO — Understand. Connect. Together.', autoHideMenuBar: true,
+    backgroundColor: '#F8FAFF', title: 'SocCO — Understand. Connect. Together.', autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true,
       nodeIntegration: false, webSecurity: true, allowRunningInsecureContent: false,
@@ -166,6 +166,6 @@ if (hasLock) {
     windowLifecycle = createWindowLifecycle(() => mainWindow, showMainWindow)
     createMainWindow()
     app.on('activate', showMainWindow)
-  }).catch(() => { console.error('SOCO desktop startup failed'); app.quit() })
+  }).catch(() => { console.error('SocCO desktop startup failed'); app.quit() })
 }
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

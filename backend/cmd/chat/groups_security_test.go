@@ -74,6 +74,7 @@ func TestGroupRolesThreeAccountsIntegration(t *testing.T) {
 	mux := http.NewServeMux()
 	mw := func(fn http.HandlerFunc) http.Handler { return authx.Middleware(secret, fn) }
 	mux.Handle("PATCH /api/conversations/{id}", mw(s.updateGroup))
+	mux.Handle("POST /api/conversations/groups", mw(s.createGroup))
 	mux.Handle("GET /api/conversations/{id}/members", mw(s.listGroupMembers))
 	mux.Handle("GET /api/conversations/memberships", mw(s.listConversationMemberships))
 	mux.Handle("POST /api/conversations/{id}/members", mw(s.addGroupMembers))
@@ -181,7 +182,34 @@ func TestGroupRolesThreeAccountsIntegration(t *testing.T) {
 		t.Fatalf("kicked account retained membership snapshot: %+v", page)
 	}
 	req(2, "PATCH", base, `{"name":"kicked"}`, 403)
-	// A later re-invitation must appear in the next authoritative snapshot.
+	// Direct addition and group creation must reject non-friends, even when
+	// a caller bypasses the friend-only picker and submits a username directly.
+	req(1, "POST", base+"/members", fmt.Sprintf(`{"usernames":["%s_2"]}`, prefix), 403)
+	req(1, "POST", "/api/conversations/groups", fmt.Sprintf(`{"name":"Not friends","usernames":["%s_2"]}`, prefix), 403)
+
+	low, high := ids[1], ids[2]
+	if low > high {
+		low, high = high, low
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO friend_connections(user_low,user_high,requested_by,status)
+		VALUES($1,$2,$3,'pending')
+	`, low, high, ids[1]); err != nil {
+		t.Fatal(err)
+	}
+	// Pending invitations and blocked users are not eligible for direct addition.
+	req(1, "POST", base+"/members", fmt.Sprintf(`{"usernames":["%s_2"]}`, prefix), 403)
+	if _, err := db.Exec(ctx, `UPDATE friend_connections SET status='accepted' WHERE user_low=$1 AND user_high=$2`, low, high); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `INSERT INTO user_blocks(blocker_id,blocked_id) VALUES($1,$2)`, ids[2], ids[1]); err != nil {
+		t.Fatal(err)
+	}
+	req(1, "POST", base+"/members", fmt.Sprintf(`{"usernames":["%s_2"]}`, prefix), 403)
+	if _, err := db.Exec(ctx, `DELETE FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2`, ids[2], ids[1]); err != nil {
+		t.Fatal(err)
+	}
+	// A later re-invitation by a friend must appear in the snapshot.
 	req(1, "POST", base+"/members", fmt.Sprintf(`{"usernames":["%s_2"]}`, prefix), 200)
 	if page := snapshot(2, ""); len(page.IDs) != 1 || page.IDs[0] != groupID {
 		t.Fatalf("re-invited user missing from membership snapshot: %+v", page)

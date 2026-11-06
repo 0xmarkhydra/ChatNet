@@ -11,6 +11,9 @@ type Props = {
   popup?: boolean
   displayName?: string
   submitError?: string
+  checkInOpen?: boolean
+  checkInLocation?: string
+  setCheckInLocation?: (location: string) => void
   createPost: (event: FormEvent) => void
   postComposerRef: RefObject<HTMLTextAreaElement | null>
   postBackground: string
@@ -36,6 +39,9 @@ export default function PostComposer({
   popup = false,
   displayName,
   submitError,
+  checkInOpen = false,
+  checkInLocation = '',
+  setCheckInLocation,
   createPost,
   postComposerRef,
   postBackground,
@@ -118,6 +124,15 @@ export default function PostComposer({
           void addFeedFiles(files)
         }}
       />
+      {popup && checkInOpen && setCheckInLocation && (
+        <label className="social-feed-checkin-field">
+          <strong>Địa điểm check-in</strong>
+          <input type="text" aria-label="Địa điểm check-in" value={checkInLocation} maxLength={120}
+            onChange={event => setCheckInLocation(event.target.value)}
+            placeholder="Ví dụ: Đà Lạt, Việt Nam" disabled={!!pendingPost} />
+          <small>Địa điểm sẽ được ghi vào nội dung bài viết; không chia sẻ GPS.</small>
+        </label>
+      )}
       {postAttachments.length > 0 && (
         <div className="feed-pending-media">
           <MediaAttachmentsView
@@ -147,7 +162,7 @@ export default function PostComposer({
       {mediaUploading === 'feed' && <div className="media-uploading-note">Đang tải media thẳng lên kho lưu trữ…</div>}
       {popup && submitError && <p className="profile-post-error" role="alert">{submitError}</p>}
       {(popup || postText.trim() || postAttachments.length > 0) && (
-        <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading || (!postText.trim() && postAttachments.length === 0)}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
+        <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading || (!postText.trim() && postAttachments.length === 0 && !(checkInOpen && checkInLocation.trim()))}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
       )}
     </form>
   )

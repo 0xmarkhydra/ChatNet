@@ -31,8 +31,8 @@ function createMediaPermissions({ preferences, dialog, platform, getScope, getWi
       const initial = status(kind)
       if (initial !== 'granted' && initial !== 'not-determined') return { granted: false, status: initial }
       const answer = await dialog.showMessageBox(window, {
-        type: 'question', title: 'Quyền thiết bị SOCO',
-        message: kind === 'microphone' ? 'Cho phép SOCO sử dụng microphone?' : 'Cho phép SOCO sử dụng camera?',
+        type: 'question', title: 'Quyền thiết bị SocCO',
+        message: kind === 'microphone' ? 'Cho phép SocCO sử dụng microphone?' : 'Cho phép SocCO sử dụng camera?',
         detail: 'Chỉ bật khi bạn ghi âm, quét mã hoặc tham gia cuộc gọi. Quyền này không cho phép AI dịch giọng nói; dịch cần sự đồng ý riêng trong cuộc gọi.',
         buttons: ['Không cho phép', 'Cho phép'], defaultId: 0, cancelId: 0, noLink: true,
       })

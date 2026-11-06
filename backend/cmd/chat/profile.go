@@ -19,6 +19,8 @@ import (
 type profileState struct {
 	Username    string    `json:"username"`
 	DisplayName string    `json:"displayName"`
+	Bio         string    `json:"bio"`
+	City        string    `json:"city"`
 	AvatarSet   bool      `json:"avatarSet"`
 	CoverSet    bool      `json:"coverSet"`
 	UpdatedAt   time.Time `json:"updatedAt"`
@@ -58,15 +60,30 @@ func normalizeProfileDisplayName(value string) (string, error) {
 	return displayName, nil
 }
 
+func normalizeProfileShortText(value string, max int, label string) (string, error) {
+	value = strings.TrimSpace(value)
+	if !utf8.ValidString(value) || strings.ContainsAny(value, "\r\n\t") || utf8.RuneCountInString(value) > max {
+		return "", errors.New(label + " không hợp lệ hoặc quá dài")
+	}
+	for _, r := range value {
+		if r < 32 || r == 127 {
+			return "", errors.New(label + " chứa ký tự không hợp lệ")
+		}
+	}
+	return value, nil
+}
+
 func (s *server) profileForUserID(r *http.Request, userID int64) (profileState, error) {
 	var profile profileState
 	var avatarRef, coverRef string
 	err := s.db.QueryRow(r.Context(), `
-		SELECT username,display_name,COALESCE(avatar_ref,''),COALESCE(cover_ref,''),profile_updated_at
+		SELECT username,display_name,COALESCE(bio,''),COALESCE(city,''),COALESCE(avatar_ref,''),COALESCE(cover_ref,''),profile_updated_at
 		FROM users WHERE id=$1
 	`, userID).Scan(
 		&profile.Username,
 		&profile.DisplayName,
+		&profile.Bio,
+		&profile.City,
 		&avatarRef,
 		&coverRef,
 		&profile.UpdatedAt,
@@ -94,8 +111,10 @@ func (s *server) updateProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	var body struct {
-		Username    string `json:"username"`
-		DisplayName string `json:"displayName"`
+		Username    string  `json:"username"`
+		DisplayName string  `json:"displayName"`
+		Bio         *string `json:"bio"`
+		City        *string `json:"city"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
 	decoder.DisallowUnknownFields()
@@ -115,11 +134,29 @@ func (s *server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var bio, city any
+	if body.Bio != nil {
+		value, err := normalizeProfileShortText(*body.Bio, 160, "tiểu sử")
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		bio = value
+	}
+	if body.City != nil {
+		value, err := normalizeProfileShortText(*body.City, 100, "thành phố")
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		city = value
+	}
+
 	_, err = s.db.Exec(r.Context(), `
 		UPDATE users
-		SET username=$1, display_name=$2, profile_updated_at=NOW()
-		WHERE id=$3
-	`, username, displayName, claims.UserID)
+		SET username=$1, display_name=$2, bio=COALESCE($3,bio), city=COALESCE($4,city), profile_updated_at=NOW()
+		WHERE id=$5
+	`, username, displayName, bio, city, claims.UserID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -260,11 +297,11 @@ func (s *server) getUserProfile(w http.ResponseWriter, r *http.Request) {
 		AllowFriendRequests bool  `json:"allowFriendRequests"`
 	}
 	err = s.db.QueryRow(r.Context(), `
- SELECT u.id,u.username,u.display_name,COALESCE(u.avatar_ref,'')<>'',COALESCE(u.cover_ref,'')<>'',
+ SELECT u.id,u.username,u.display_name,COALESCE(u.bio,''),COALESCE(u.city,''),COALESCE(u.avatar_ref,'')<>'',COALESCE(u.cover_ref,'')<>'',
  u.profile_updated_at,u.allow_friend_requests FROM users u WHERE u.username=$1
  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
  (b.blocker_id=$2 AND b.blocked_id=u.id) OR (b.blocker_id=u.id AND b.blocked_id=$2))
- `, username, claims.UserID).Scan(&result.ID, &result.Username, &result.DisplayName, &result.AvatarSet, &result.CoverSet, &result.UpdatedAt, &result.AllowFriendRequests)
+ `, username, claims.UserID).Scan(&result.ID, &result.Username, &result.DisplayName, &result.Bio, &result.City, &result.AvatarSet, &result.CoverSet, &result.UpdatedAt, &result.AllowFriendRequests)
 	if err != nil {
 		httpx.Error(w, 404, "profile not found")
 		return

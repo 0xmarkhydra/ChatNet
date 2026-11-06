@@ -1,4 +1,4 @@
-# ChatNet / SOCO — AI-FIRST MARKETPLACE (ĐẶC TẢ ĐỀ XUẤT)
+# ChatNet / SocCO — AI-FIRST MARKETPLACE (ĐẶC TẢ ĐỀ XUẤT)
 
 **Ngày:** 27/10/2026
 **Phạm vi:** Web/PWA giai đoạn 1. Đây là đặc tả và backlog để triển khai, **không phải tính năng đã chạy**.
@@ -94,7 +94,7 @@ Tận dụng frontend React/Vite, backend Go, auth, media/object storage, cơ s�
 **Đã code bước nền tảng, CHƯA hoàn thiện Marketplace production:**
 - `backend/internal/database/schema.sql`: bảng sản phẩm, giỏ hàng theo tài khoản, yêu cầu đơn và snapshot mặt hàng; không tạo bảng hay số dư tiền thật.
 - `backend/cmd/feed/marketplace.go` cùng route gateway: API tạo bản nháp/xác nhận đăng, danh sách sản phẩm, giỏ hàng, tạo yêu cầu đơn theo từng người bán và lịch sử đơn của người mua. Các API được bảo vệ bằng JWT và giới hạn đầu vào; idempotency key áp dụng cho yêu cầu đơn.
-- `frontend/src/Marketplace.tsx`, `marketplace.css`, `App.tsx`: màn SOCO Market truy cập từ Khám phá, xem sản phẩm, giỏ, lịch sử yêu cầu đơn, bản nháp do người bán tự nhập.
+- `frontend/src/Marketplace.tsx`, `marketplace.css`, `App.tsx`: màn SocCO Market truy cập từ Khám phá, xem sản phẩm, giỏ, lịch sử yêu cầu đơn, bản nháp do người bán tự nhập.
 - **Mọi yêu cầu đơn đang ở `awaiting_payment_configuration`**: KHÔNG đặt thành công về mặt thương mại, KHÔNG giữ tồn kho, KHÔNG trừ Coin, KHÔNG thu/đối soát VNĐ, KHÔNG thông báo đơn mới cho người bán.
 - Kiểm thử mã: `go test ./...` chạy đạt, frontend `npm run build` đạt. **Chưa** test PostgreSQL thật, nhiều tài khoản, trình duyệt/PWA thực tế hay tải 1.000 người dùng. Không coi đây là hoàn tất các task MKT.
 

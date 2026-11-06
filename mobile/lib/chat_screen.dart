@@ -1061,6 +1061,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       compact: compact,
                       onPressed: () => showCallSurface(
                         context,
+                        api: widget.api,
                         conversation: room,
                         video: false,
                       ),
@@ -1072,6 +1073,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       compact: compact,
                       onPressed: () => showCallSurface(
                         context,
+                        api: widget.api,
                         conversation: room,
                         video: true,
                       ),
