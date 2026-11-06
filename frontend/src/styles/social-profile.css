@@ -1,0 +1,338 @@
+/* Social UI frame 03 · Hồ sơ cá nhân, BA & Modules V3, 1586 × 992.
+ * Desktop only: reuse real profile/media/friend data and existing feature actions. */
+@media (min-width: 761px) {
+  .modern-shell.social-app-layout .social-profile-page {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 22px 16px 34px 31px;
+    background: #f7f9fd;
+    color: #243450;
+    scrollbar-gutter: stable;
+  }
+  .social-profile-hero {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 292px;
+    padding: 16px;
+    border: 1px solid #e8ecf5;
+    border-radius: 20px;
+    background: white;
+    box-shadow: 0 3px 16px rgba(30,51,96,.035);
+  }
+  .social-profile-cover {
+    position: relative;
+    overflow: hidden;
+    height: 177px;
+    border-radius: 16px;
+    background: linear-gradient(120deg,#d6e7f8 0%,#a0bedc 40%,#efd8ac 100%);
+  }
+  .social-profile-cover.has-default-cover {
+    background-image: linear-gradient(180deg, rgba(13,31,63,.04), rgba(13,31,63,.14)), linear-gradient(120deg, #d6e7f8, #a0bedc 40%, #efd8ac);
+    background-position: center 51%;
+    background-size: cover;
+  }
+  .social-profile-cover.has-user-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .social-profile-cover-action {
+    position: absolute;
+    z-index: 1;
+    right: 14px;
+    bottom: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 33px;
+    padding: 0 12px;
+    border: 1px solid rgba(255,255,255,.45);
+    border-radius: 10px;
+    background: rgba(18,31,52,.53);
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(7px);
+  }
+  .social-profile-cover-action:hover { background: rgba(18,31,52,.75); }
+  .social-profile-avatar-wrap {
+    position: absolute;
+    z-index: 2;
+    top: 141px;
+    left: 46px;
+    box-sizing: border-box;
+    width: 126px;
+    height: 126px;
+    padding: 6px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 5px 24px rgba(28,48,88,.10);
+  }
+  .social-profile-avatar {
+    width: 114px;
+    height: 114px;
+    border-radius: 50%;
+    font-size: 32px;
+  }
+  .social-profile-avatar-wrap > .profile-note { position: absolute; z-index: 2; top: -30px; right: -30px; }
+  .social-profile-avatar-action {
+    position: absolute;
+    z-index: 3;
+    bottom: 8px;
+    right: 1px;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+  }
+  .social-profile-hero-bottom {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    min-height: 78px;
+    padding: 12px 12px 2px 182px;
+  }
+  .social-profile-identity-text { min-width: 0; flex: 1 1 auto; }
+  .social-profile-identity-text h1 {
+    margin: 0 0 5px;
+    color: #152441;
+    font-size: 23px;
+    line-height: 1.25;
+    font-weight: 750;
+    letter-spacing: -.45px;
+    overflow-wrap: anywhere;
+  }
+  .social-profile-identity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px 11px;
+    color: #7282a0;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .social-profile-identity-meta > span:not(:first-child)::before { content: '·'; margin-right: 11px; color: #b4bed0; }
+  .social-profile-hero-actions { display: flex; align-items: center; gap: 9px; flex-shrink: 0; margin-bottom: 8px; }
+  .social-profile-primary,
+  .social-profile-more,
+  .social-profile-aside-action,
+  .social-profile-info-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    border: none;
+    border-radius: 12px;
+    padding: 0 15px;
+    color: #fff;
+    background: #2563eb;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .social-profile-primary:hover { background: #1d53cb; }
+  .social-profile-more { width: 37px; padding: 0; border: 1px solid #e3eafb; background: #eff3ff; color: #466ad4; }
+  .social-profile-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1.92fr) minmax(310px, 1fr);
+    gap: 23px;
+    align-items: start;
+    margin-top: 24px;
+  }
+  .social-profile-main,
+  .social-profile-about,
+  .social-profile-recent {
+    box-sizing: border-box;
+    min-width: 0;
+    border: 1px solid #e8ecf5;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 3px 18px rgba(30,51,96,.035);
+  }
+  .social-profile-main { min-height: 531px; padding: 18px 17px 22px; }
+  .social-profile-tabbar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    padding: 0 0 17px;
+    border-bottom: 1px solid #e8ecf5;
+    overflow-x: auto;
+  }
+  .social-profile-tabbar button[role="tab"] {
+    flex: 0 0 auto;
+    min-height: 35px;
+    border: none;
+    border-radius: 13px;
+    padding: 0 14px;
+    background: transparent;
+    color: #657493;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .social-profile-tabbar button[role="tab"].is-active {
+    color: #2563eb;
+    background: #eff3ff;
+    font-weight: 750;
+  }
+  .social-profile-tabbar button[role="tab"]:hover { background: #f3f6ff; }
+  .social-profile-post-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-left: auto;
+    flex: 0 0 auto;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid #e2eafb;
+    border-radius: 10px;
+    color: #3762ca;
+    background: #f5f7fd;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .social-profile-panel { padding-top: 16px; min-width: 0; }
+  .social-profile-post-feed { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .modern-shell .social-profile-post-feed .post.zalo-post {
+    min-width: 0;
+    width: 100%;
+    margin: 0;
+    padding: 12px 7px 18px;
+    border: 0;
+    border-bottom: 1px solid #e8ecf5;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+  }
+  .modern-shell .social-profile-post-feed .post.zalo-post:last-child { border-bottom: 0; }
+  .modern-shell .social-profile-post-feed .post .feed-media,
+  .modern-shell .social-profile-post-feed .post .media-attachment-grid,
+  .modern-shell .social-profile-post-feed .post .media-item { max-width: 100%; }
+  .modern-shell .social-profile-post-feed .post img { max-width: 100%; border-radius: 13px; }
+  .social-profile-aside { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+  .social-profile-about { min-height: 300px; padding: 20px 23px 18px; }
+  .social-profile-about h2, .social-profile-recent h2, .social-profile-subsection h2 {
+    margin: 0;
+    color: #1b2d4b;
+    font-size: 18px;
+    line-height: 1.4;
+    font-weight: 780;
+  }
+  .social-profile-about-description { margin: 15px 0 19px; font-size: 13px; line-height: 1.6; color: #556a88; }
+  .social-profile-about-row { display: flex; align-items: center; gap: 12px; min-height: 43px; color: #63748f; font-size: 13px; }
+  .social-profile-about-row svg { flex-shrink: 0; color: #8191ad; }
+  .social-profile-aside-action { width: 100%; min-height: 36px; justify-content: flex-start; margin-top: 15px; padding: 0 13px; color: #315fd1; background: #eff3ff; }
+  .social-profile-aside-action:hover { background: #e4eaff; }
+  .social-profile-recent { min-height: 216px; padding: 17px 22px 21px; }
+  .social-profile-recent-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 23px; }
+  .social-profile-recent-heading button {
+    display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto;
+    border: none; padding: 3px 0; background: transparent; color: #315bc3; font: inherit; font-size: 12px; cursor: pointer;
+  }
+  .social-profile-recent-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+  .social-profile-recent-grid button {
+    position: relative; aspect-ratio: 1/0.97; overflow: hidden; min-width: 0;
+    padding: 0; border: 0; border-radius: 12px; background: #e8eef9; cursor: pointer;
+  }
+  .social-profile-recent-grid img,
+  .social-profile-recent-grid video { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .social-profile-recent-grid button > svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: white; filter: drop-shadow(0 1px 3px #000a); }
+  .social-profile-recent-empty { min-height: 104px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; color: #8391a9; font-size: 12px; text-align: center; }
+  .social-profile-privacy-note { display: flex; align-items: center; gap: 10px; padding: 2px 10px; color: #8492ad; font-size: 11px; line-height: 1.5; }
+  .social-profile-privacy-note svg { flex-shrink: 0; }
+  .social-profile-pending { padding: 12px; color: #55719d; font-size: 13px; background: #f1f5ff; border-radius: 12px; }
+  .social-profile-pending p { margin-bottom: 0; }
+  .social-profile-hint { color: #8391a9; font-size: 13px; }
+  .social-profile-error { display: flex; gap: 16px; justify-content: space-between; align-items: center; padding: 13px; border-radius: 12px; background: #fff2f2; color: #b43131; font-size: 13px; }
+  .social-profile-error button { border: none; background: transparent; color: #a52626; font-weight: 750; cursor: pointer; }
+  .social-profile-more-posts { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 42px; margin-top: 15px; border: 1px solid #dde7fa; border-radius: 11px; background: #f5f7ff; color: #315fc6; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .social-profile-subsection { min-height: 385px; padding: 14px 9px; }
+  .social-profile-subsection > p { margin: 8px 0 22px; font-size: 13px; color: #8290a9; }
+  .social-profile-blank { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; padding: 54px 20px; text-align: center; color: #8695af; }
+  .social-profile-blank p { margin: 0; font-size: 13px; line-height: 1.5; }
+  .social-profile-blank button { padding: 10px 15px; border: none; border-radius: 10px; color: #3565d3; background: #eff3ff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .social-profile-media-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+  .social-profile-media-item { position: relative; display: block; width: 100%; aspect-ratio: 1.3; overflow: hidden; padding: 0; border: none; border-radius: 13px; background: #ecf0f8; cursor: pointer; }
+  .social-profile-media-item img,.social-profile-media-item video { width: 100%; height: 100%; object-fit: cover; }
+  .social-profile-video-badge { position: absolute; top: 10px; right: 10px; color: white; filter: drop-shadow(0 1px 3px #0008); }
+  .social-profile-info-line { display: flex; flex-wrap: wrap; align-items: center; gap: 11px; padding: 16px 6px; border-bottom: 1px solid #e8ecf5; color: #8391aa; font-size: 13px; }
+  .social-profile-info-line strong { margin-left: auto; min-width: 0; max-width: 70%; overflow-wrap: anywhere; text-align: right; color: #2e415f; }
+  .social-profile-info-edit { margin-top: 24px; color: #315fc6; background: #eff3ff; }
+  .social-profile-friends { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  .social-profile-friend { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 12px; border: 1px solid #e9edf5; border-radius: 12px; background: #fff; text-align: left; cursor: pointer; }
+  .social-profile-friend:hover { background: #f6f8ff; }
+  .social-profile-friend-avatar { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; }
+  .social-profile-friend > span { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; gap: 4px; }
+  .social-profile-friend strong { overflow: hidden; color: #263853; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+  .social-profile-friend small { overflow: hidden; color: #8290a9; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+  .social-profile-friend > svg { flex-shrink: 0; color: #9aabc6; }
+  .modern-shell.social-app-layout .social-profile-page button:focus-visible { outline: 3px solid #a4bafa; outline-offset: 2px; }
+  .modern-shell.social-app-layout .social-profile-page button:disabled { opacity: .55; cursor: not-allowed; }
+}
+
+@media (min-width: 761px) and (max-width: 1200px) {
+  .modern-shell.social-app-layout .social-profile-page { padding: 14px 17px 26px; }
+  .social-profile-columns { grid-template-columns: minmax(0,1fr); gap: 15px; }
+  .social-profile-aside { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .social-profile-about { min-height: 265px; }
+  .social-profile-recent { min-height: 265px; }
+  .social-profile-hero-bottom { padding-left: 172px; }
+  .social-profile-identity-meta { font-size: 11px; }
+}
+@media (min-width: 761px) and (max-width: 940px) {
+  .social-profile-hero-bottom { align-items: flex-start; flex-direction: column; padding-left: 158px; }
+  .social-profile-hero-actions { margin-bottom: 0; }
+  .social-profile-about { padding-inline: 14px; }
+  .social-profile-recent { padding-inline: 13px; }
+}
+
+@media (min-width: 761px) {
+  .modern-shell.social-app-layout .chatnet-appbar.section-view-header .appbar-search-anchor {
+    flex: 0 1 307px;
+    width: min(28vw, 307px);
+  }
+  .modern-shell.social-app-layout .chatnet-appbar.section-view-header .appbar-search {
+    height: 47px;
+    border: 1px solid transparent;
+    background: #f8fafe;
+  }
+  .modern-shell.social-app-layout .chatnet-appbar.section-view-header .appbar-search:focus-within {
+    border-color: #c7d7fc;
+  }
+  .modern-shell.social-app-layout .chatnet-appbar.section-view-header .appbar-actions { gap: 10px; }
+  .modern-shell.social-app-layout .social-profile-header-new { background: #eff3ff; color: #2563eb; }
+  .modern-shell.social-app-layout .social-profile-header-account {
+    display: grid;
+    flex: 0 0 46px;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+  }
+  .modern-shell.social-app-layout .social-profile-header-avatar { display: block; width: 46px; height: 46px; border-radius: 50%; }
+  .modern-shell.social-app-layout .social-profile-header-account:focus-visible { outline: 3px solid #a4bafa; outline-offset: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .social-profile-page * { scroll-behavior: auto; transition: none; }
+}

@@ -32,42 +32,42 @@ export default function DesktopSidebar({
   ]
 
   return (
-    <aside className="penpot-sidebar" aria-label="Điều hướng SocCo">
-      <div className="penpot-sidebar-brand">
-        <span className="penpot-sidebar-logo"><img src="/soco-mark.svg" alt="" width="40" height="40" /></span>
-        <span className="penpot-sidebar-brand-copy"><strong>SocCo</strong><small>ChatNet · Kết nối cộng đồng</small></span>
+    <aside className="app-navigation-sidebar" aria-label="Điều hướng SocCo">
+      <div className="app-navigation-brand">
+        <span className="app-navigation-logo"><img src="/soco-mark.svg" alt="" width="40" height="40" /></span>
+        <span className="app-navigation-brand-copy"><strong>SocCo</strong><small>ChatNet · Kết nối cộng đồng</small></span>
       </div>
-      <nav className="penpot-sidebar-nav" aria-label="Các khu vực">
+      <nav className="app-navigation-nav" aria-label="Các khu vực">
         {mainItems.map(({ label, Icon, active, action, count }) => (
           <button
             type="button"
             key={label}
             title={label}
             aria-label={label}
-            className={active ? 'penpot-sidebar-link is-active' : 'penpot-sidebar-link'}
+            className={active ? 'app-navigation-link is-active' : 'app-navigation-link'}
             aria-current={active ? 'page' : undefined}
             onClick={action}
           >
             <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
             <span>{label}</span>
-            {count ? <b className="penpot-sidebar-count">{count > 99 ? '99+' : count}</b> : null}
+            {count ? <b className="app-navigation-count">{count > 99 ? '99+' : count}</b> : null}
           </button>
         ))}
       </nav>
-      <div className="penpot-sidebar-secondary">
-        <button type="button" className="penpot-sidebar-link" aria-label="Thông báo" onClick={onNotifications}>
+      <div className="app-navigation-secondary">
+        <button type="button" className="app-navigation-link" aria-label="Thông báo" onClick={onNotifications}>
           <Bell size={22} strokeWidth={1.8} aria-hidden="true" /><span>Thông báo</span>
         </button>
-        <button type="button" className={tab === 'feed' && feedSaved ? 'penpot-sidebar-link is-active' : 'penpot-sidebar-link'} aria-label="Đã lưu" aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
+        <button type="button" className={tab === 'feed' && feedSaved ? 'app-navigation-link is-active' : 'app-navigation-link'} aria-label="Đã lưu" aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
           <Bookmark size={22} strokeWidth={1.8} aria-hidden="true" /><span>Đã lưu</span>
         </button>
-        <button type="button" className="penpot-sidebar-link" aria-label="Cài đặt" onClick={onSettings}>
+        <button type="button" className="app-navigation-link" aria-label="Cài đặt" onClick={onSettings}>
           <Settings2 size={22} strokeWidth={1.8} aria-hidden="true" /><span>Cài đặt</span>
         </button>
       </div>
-      <button type="button" className="penpot-sidebar-account" onClick={() => onNavigate('profile')} aria-label="Cá nhân" title="Hồ sơ cá nhân">
-        <UserAvatar username={username} name={displayName} className="penpot-sidebar-avatar" online />
-        <span className="penpot-sidebar-account-copy"><strong>{displayName}</strong><small>Đang hoạt động</small></span>
+      <button type="button" className="app-navigation-account" onClick={() => onNavigate('profile')} aria-label="Cá nhân" title="Hồ sơ cá nhân">
+        <UserAvatar username={username} name={displayName} className="app-navigation-avatar" online />
+        <span className="app-navigation-account-copy"><strong>{displayName}</strong><small>Đang hoạt động</small></span>
       </button>
     </aside>
   )

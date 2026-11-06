@@ -66,7 +66,7 @@ import FeedModeration from '../features/feed/FeedModeration'
 import ProfileOverlay from '../features/profile/ProfileOverlay'
 import type { NearbyUser } from '../features/discover/NearbyExplorer'
 import GroupCreator from '../features/chat/GroupCreator'
-import { Bell, Check, Images, Languages, ChevronDown, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, RefreshCw, Search, UserCheck, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
+import { Bell, Check, Images, Languages, ChevronDown, LogOut, MessageCircle, MoreHorizontal, ArrowLeft, Settings, PencilLine, Plus, RefreshCw, Search, UserPlus, Users, Volume2, X, Download } from 'lucide-react'
 import { IncomingMessageSound, MESSAGE_SOUND_SETTING_KEY, persistMessageSoundEnabled, readMessageSoundEnabled } from '../features/notifications/incomingSound'
 import { createSessionClient, loadSession, type Session } from '../features/auth/session'
 import { clearChatPersistence, clearPendingSend, loadChatDrafts, loadPendingSend, saveChatDrafts } from '../features/chat/chatPersistence'
@@ -3387,7 +3387,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   ))
 
   return (
-    <main className={`app-shell modern-shell penpot-layout ${tab === 'chat' && activeConversation && !desktopSection ? 'conversation-open' : ''}`}>
+    <main className={`app-shell modern-shell social-app-layout ${tab === 'chat' && activeConversation && !desktopSection ? 'conversation-open' : ''}`}>
       <DesktopSidebar
         tab={tab}
         section={tab === 'chat' ? desktopSection : null}
@@ -3449,8 +3449,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
       {newChatMode === 'group' && <GroupCreator ownerId={session.user.id}
         friends={friends.filter((friend) => friend.status === 'accepted')} query={friendQuery} onQuery={setFriendQuery} onCreate={createGroup}
         error={chatCreateError} onClose={() => { setNewChatMode('none'); setFriendQuery(''); setChatCreateError('') }} />}
-      <header className={`chatnet-appbar ${tab === 'profile' ? 'penpot-desktop-only-header' : tab === 'discover' || tab === 'market' ? 'penpot-desktop-only-header penpot-header-no-search' : ''}`}>
-        <div className="penpot-page-heading">
+      <header className={`chatnet-appbar ${tab === 'profile' ? 'section-view-header' : tab === 'discover' || tab === 'market' ? 'section-view-header section-header-no-search' : ''}`}>
+        <div className="page-heading">
           <strong>{tab === 'chat' && desktopSection === 'groups' ? 'Nhóm & cộng đồng' : tab === 'chat' && desktopSection === 'calls' ? 'Cuộc gọi' : ({ chat: 'Tin nhắn', contacts: 'Bạn bè', discover: 'Khám phá', market: 'Marketplace', feed: 'Bảng tin', profile: desktopProfileOverview && profileEditorOpen ? 'Chỉnh sửa hồ sơ' : 'Hồ sơ cá nhân' } as Record<Tab, string>)[tab]}</strong>
           <small>{({ chat: 'Trò chuyện gần đây và kết nối bạn bè', contacts: 'Kết nối với những người bạn quan tâm', discover: 'Khám phá và kết nối cộng đồng', market: 'Khám phá sản phẩm và cửa hàng', feed: 'Khoảnh khắc và cộng đồng dành cho bạn', profile: desktopProfileSettings ? 'Cài đặt tài khoản và quyền riêng tư' : desktopProfileOverview && profileEditorOpen ? 'Thông tin cá nhân và quyền hiển thị' : 'Trang cá nhân, bài viết và thông tin của bạn' } as Record<Tab, string>)[tab]}</small>
         </div>
@@ -3565,7 +3565,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
           {tab === 'feed' && (
             <>
               <button
-                className="appbar-icon-button penpot-feed-header-new"
+                className="appbar-icon-button social-feed-header-new"
                 type="button"
                 aria-label="Tạo bài viết"
                 onClick={() => {
@@ -3587,9 +3587,9 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 <UiIcon name="bell" size={27} />
                 {(unreadTotal > 0 || friendRequests.some(request => request.direction === 'incoming')) && <span className="appbar-badge">!</span>}
               </button>
-              <button className="penpot-feed-header-account" type="button" aria-label="Mở trang cá nhân"
+              <button className="social-feed-header-account" type="button" aria-label="Mở trang cá nhân"
                 onClick={() => switchTab('profile')}>
-                <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="penpot-feed-header-avatar" />
+                <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="social-feed-header-avatar" />
               </button>
             </>
           )}
@@ -3600,11 +3600,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 <Bell size={21} aria-hidden="true" />
                 {(unreadTotal > 0 || friendRequests.some(request => request.direction === 'incoming')) && <span className="appbar-badge">!</span>}
               </button>
-              <button className="appbar-icon-button penpot-profile-header-new" type="button" aria-label="Tạo bài viết" onClick={() => { setDesktopProfileSettings(false); setProfileComposerOpen(true) }}>
+              <button className="appbar-icon-button social-profile-header-new" type="button" aria-label="Tạo bài viết" onClick={() => { setDesktopProfileSettings(false); setProfileComposerOpen(true) }}>
                 <PencilLine size={21} aria-hidden="true" />
               </button>
-              <button className="penpot-profile-header-account" type="button" aria-label="Mở cài đặt tài khoản" onClick={() => { setDesktopProfileSettings(true); setProfileTimelineOpen(false) }}>
-                <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="penpot-profile-header-avatar" />
+              <button className="social-profile-header-account" type="button" aria-label="Mở cài đặt tài khoản" onClick={() => { setDesktopProfileSettings(true); setProfileTimelineOpen(false) }}>
+                <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="social-profile-header-avatar" />
               </button>
             </>
           )}
@@ -3669,22 +3669,22 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
       <section className={`phone-frame modern-frame ${tab === 'chat' && activeConversation ? 'mobile-conversation-open' : ''}`}>
         {tab === 'chat' && desktopSection === null && (
-          <div className={`messenger-layout modern-messenger penpot-social-chat ${activeConversation ? 'has-active' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
-            <aside className="conversation-sidebar penpot-chat-list" aria-label="Danh sách cuộc trò chuyện">
-              <div className="penpot-chat-list-header">
-                <div className="penpot-chat-list-title">
+          <div className={`messenger-layout modern-messenger social-chat-layout ${activeConversation ? 'has-active' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
+            <aside className="conversation-sidebar social-chat-list" aria-label="Danh sách cuộc trò chuyện">
+              <div className="social-chat-list-header">
+                <div className="social-chat-list-title">
                   <h2>Cuộc trò chuyện</h2>
-                  <button type="button" className="penpot-chat-new" aria-label="Tạo cuộc trò chuyện mới"
+                  <button type="button" className="social-chat-new" aria-label="Tạo cuộc trò chuyện mới"
                     title="Tạo cuộc trò chuyện" onClick={() => { setChatCreateError(''); setNewChatMode('direct') }}>
-                    <PencilLine size={19} aria-hidden="true" />
+                    <Plus size={20} aria-hidden="true" />
                   </button>
                 </div>
-                <label className="penpot-chat-list-search">
+                <label className="social-chat-list-search">
                   <Search size={19} aria-hidden="true" />
                   <input type="search" value={chatListQuery} onChange={(event) => setChatListQuery(event.target.value)}
                     placeholder="Tìm kiếm tin nhắn..." aria-label="Lọc danh sách cuộc trò chuyện" />
                 </label>
-                <div className="penpot-chat-list-filters" role="group" aria-label="Lọc cuộc trò chuyện">
+                <div className="social-chat-list-filters" role="group" aria-label="Lọc cuộc trò chuyện">
                   {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
                     <button key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
                       className={chatListFilter === filter.key ? 'is-active' : ''}
@@ -4125,12 +4125,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                     />
                   )}
 
-                  {chatFriend && (
+                  {chatFriend && chatFriendRelationship !== 'accepted' && (friendSyncError || friendSyncSessionId === session?.sessionId) && (
                     <div className={`chat-friend-bar relationship-${chatFriendRelationship}`} aria-label="Kết bạn trong cuộc trò chuyện">
                       <span role="status">
-                        {chatFriendRelationship === 'accepted' ? <UserCheck size={18} aria-hidden="true" /> : <UserPlus size={18} aria-hidden="true" />}
+                        <UserPlus size={18} aria-hidden="true" />
                         {friendSyncError || (friendSyncSessionId !== session?.sessionId ? 'Đang tải trạng thái kết bạn...' :
-                          chatFriendRelationship === 'accepted' ? 'Hai bạn đã là bạn bè' :
                           chatFriendRelationship === 'incoming' ? 'Bạn nhận được lời mời kết bạn' :
                           chatFriendRelationship === 'outgoing' ? 'Đã gửi lời mời kết bạn' : 'Hai bạn chưa kết bạn')}
                       </span>
@@ -4138,7 +4137,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                         <button type="button" disabled={friendSyncBusy} onClick={() => void refreshFriendConnections()}>
                           <RefreshCw size={16} aria-hidden="true" /> Thử lại
                         </button>
-                      ) : friendSyncSessionId === session?.sessionId && chatFriendRelationship !== 'accepted' && (
+                      ) : friendSyncSessionId === session?.sessionId && (
                         <div className="chat-friend-actions">
                           <button
                             type="button"
@@ -4194,14 +4193,24 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                         {messagesLoadingMore ? 'Đang tải...' : 'Tải thêm tin nhắn cũ'}
                       </button>
                     )}
-                    <div className="day-divider"><span>Cuộc trò chuyện</span></div>
-                    {visibleMessages.map((message) => {
+                    {visibleMessages.map((message, index) => {
+                      const messageDay = new Date(message.createdAt)
+                      const previousDay = index > 0 ? new Date(visibleMessages[index - 1].createdAt) : null
+                      const displayDay = !previousDay || messageDay.toDateString() !== previousDay.toDateString()
+                      const today = new Date()
+                      const yesterday = new Date(today)
+                      yesterday.setDate(yesterday.getDate() - 1)
+                      const dayLabel = messageDay.toDateString() === today.toDateString() ? 'Hôm nay'
+                        : messageDay.toDateString() === yesterday.toDateString() ? 'Hôm qua'
+                          : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(messageDay)
                       const mine = message.senderId === session.user.id
                       const translatedText = !message.deleted ? translations[message.id] : ''
+                      const photoOnly = !message.deleted && !message.text && message.attachments?.length === 1 && message.attachments[0].kind === 'image' && Boolean(message.attachments[0].url)
                       const originalVisible = Boolean(translationOriginals[message.id])
                       const translatedLanguage = selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()
                       return (
                         <Fragment key={message.id}>
+                          {displayDay && <div className="day-divider"><span>{dayLabel}</span></div>}
                           {messageGapBefore === message.id && (
                             <button type="button" className="soco-load-more soco-middle-messages"
                               onClick={() => void loadMissingMessages()} disabled={messageGapLoading}
@@ -4232,7 +4241,13 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                             openMessageActions(message, event.target)
                           }}
                         >
-                          {!mine && <div className="message-meta">{userLabel(message.senderDisplayName, message.sender)}</div>}
+                          {!mine && (
+                            <>
+                              <UserAvatar username={message.sender} name={userLabel(message.senderDisplayName, message.sender)}
+                                className="chat-message-sender-avatar" online={false} />
+                              <div className={activeConversation.type === 'group' ? 'message-meta' : 'message-meta chat-message-meta-direct'}>{userLabel(message.senderDisplayName, message.sender)}</div>
+                            </>
+                          )}
                           {message.replyToMessageId && (
                             <div className="message-reply-quote">
                               <strong>{userLabel(message.replyToDisplayName, message.replyToSender)}</strong>
@@ -4244,20 +4259,28 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                           ) : (
                             <>
                               {message.text && (
-                                <div className={translatedText ? 'bubble translated-bubble translation-flip-bubble' : 'bubble'}>
+                                <div className={translatedText && !mine ? 'bubble chat-translated-card' : translatedText ? 'bubble translated-bubble translation-flip-bubble' : 'bubble'}>
                                   <span
-                                    key={translatedText ? `${message.id}-${originalVisible ? 'original' : 'translated'}` : `${message.id}-plain`}
+                                    key={translatedText && mine ? `${message.id}-${originalVisible ? 'original' : 'translated'}` : `${message.id}-plain`}
                                     className="translation-flip-content message-selectable-text"
                                   >
-                                    {messageTextParts(translatedText
-                                      ? originalVisible ? message.text : translatedText
-                                      : message.text).map((part, index) => part.kind === 'link'
+                                    {messageTextParts(translatedText && mine && !originalVisible ? translatedText : message.text).map((part, index) => part.kind === 'link'
                                       ? <a key={index} className="message-inline-link" href={messageLinkHref(part.text)} target="_blank" rel="noopener noreferrer">{part.text}</a>
                                       : <Fragment key={index}>{part.text}</Fragment>)}
                                   </span>
+                                  {translatedText && !mine && (
+                                    <button type="button" className="chat-translation-inline"
+                                      aria-expanded={!originalVisible} aria-label={originalVisible ? `Hiện bản dịch ${translatedLanguage}` : 'Ẩn bản dịch'}
+                                      onClick={() => setTranslationOriginals((current) => ({
+                                        ...current, [message.id]: !current[message.id],
+                                      }))}>
+                                      <Languages size={18} aria-hidden="true" />
+                                      <span>{originalVisible ? 'Hiện bản dịch' : `Bản dịch: ${translatedText}`}</span>
+                                    </button>
+                                  )}
                                 </div>
                               )}
-                              {translatedText && message.text && (
+                              {translatedText && message.text && mine && (
                                 <button
                                   type="button"
                                   className={originalVisible ? 'translation-flip-pill original' : 'translation-flip-pill translated'}
@@ -4273,10 +4296,15 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                                   <span className="translation-flip-swap" aria-hidden="true">↔</span>
                                 </button>
                               )}
-                              <MediaAttachmentsView items={message.attachments} />
+                              {Boolean(message.attachments?.length) && (
+                                <div className={photoOnly ? 'chat-message-media chat-message-photo' : 'chat-message-media'}>
+                                  <MediaAttachmentsView items={message.attachments} />
+                                  {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt)}</span>}
+                                </div>
+                              )}
                             </>
                           )}
-                          <div className="message-stamp">
+                          <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
                             {formatTime(message.createdAt)}
                             {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
                             {mine && (message.readByUserIds?.length || 0) > 0
@@ -4337,7 +4365,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                     <div ref={bottomRef} />
                   </div>
 
-                  <div className={`penpot-chat-ai-banner${autoTranslate ? ' is-enabled' : ''}`} role="status">
+                  <div className={`social-chat-ai-banner${autoTranslate ? ' is-enabled' : ''}`} role="status">
                     <Languages size={18} aria-hidden="true" />
                     <span>{autoTranslate
                       ? `Dịch tự động đang bật · ${selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()}`
@@ -4390,17 +4418,12 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                       aria-label="Đính kèm file"
                     >
                       <UiIcon name="attach" size={22} />
+                      <Plus className="chat-composer-plus" size={21} aria-hidden="true" />
                     </button>
-                    <VoiceRecorder
-                      key={`${session.sessionId}:${activeConversationId}`}
-                      disabled={Boolean(mediaUploading) || messageSending}
-                      onRecorded={(file) => { void addChatFiles([file]) }}
-                      onError={(message) => setNotice(message, 'error')}
-                    />
                     <input
                       ref={messageInputRef}
                       aria-label="Tin nhắn"
-                      placeholder={mediaUploading === 'chat' ? 'Đang tải file lên...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
+                      placeholder={mediaUploading === 'chat' ? 'Đang tải file lên...' : isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
                       value={messageText}
                       onChange={(event) => setMessageText(event.target.value)}
                       onPaste={(event) => {
@@ -4411,6 +4434,18 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                       }}
                       title="Dán ảnh/tệp bằng Cmd/Ctrl+V hoặc kéo thả vào cuộc trò chuyện"
                       maxLength={4000}
+                    />
+                    <button className="ghost-action chat-composer-image" type="button"
+                      onClick={() => chatFileInputRef.current?.click()}
+                      disabled={Boolean(mediaUploading) || messageSending}
+                      aria-label="Đính kèm ảnh hoặc video" title="Chọn ảnh hoặc video">
+                      <Images size={19} aria-hidden="true" />
+                    </button>
+                    <VoiceRecorder
+                      key={`${session.sessionId}:${activeConversationId}`}
+                      disabled={Boolean(mediaUploading) || messageSending}
+                      onRecorded={(file) => { void addChatFiles([file]) }}
+                      onError={(message) => setNotice(message, 'error')}
                     />
                     <button className="send-button polished-send" disabled={!canSend} aria-label="Gửi tin nhắn">
                       {messageSending || mediaUploading === 'chat' ? <RefreshCw size={19} aria-label="Đang gửi" /> : <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>}
@@ -4440,10 +4475,10 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                   else if (activeConversation.otherUsername) openVisitor(activeConversation.otherUsername)
                   else setNotice('Không thể mở hồ sơ từ cuộc trò chuyện này.', 'warning')
                 }}
-                onSearch={() => setMessageSearchOpen(true)}
-                onShared={() => setSharedContentOpen(true)}
-                onTranslate={() => setTranslationMenuOpen(true)}
-                onNotifications={() => setNotificationsOpen(true)}
+                onSearch={() => { setConversationDetailsOpen(false); setMessageSearchOpen(true) }}
+                onShared={() => { setConversationDetailsOpen(false); setSharedContentOpen(true) }}
+                onTranslate={() => { setConversationDetailsOpen(false); setTranslationMenuOpen(true) }}
+                onNotifications={() => { setConversationDetailsOpen(false); setNotificationsOpen(true) }}
               />
             )}
             {groupSettingsOpen && activeConversation?.type === 'group' && (
@@ -4596,7 +4631,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         )}
 
         {tab === 'feed' && (
-          <div className="feed-view zalo-feed-view penpot-social-feed" ref={feedViewRef}
+          <div className="feed-view zalo-feed-view social-feed-layout" ref={feedViewRef}
             onScroll={(event) => {
               if (feedSearchActive && event.currentTarget.scrollTop > 0) setSearchHasScrolled(true)
             }}>
@@ -4625,8 +4660,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 void createStory(file)
               }}
             />
-            <div className="penpot-feed-grid">
-              <div className="penpot-feed-center">
+            <div className="social-feed-grid">
+              <div className="social-feed-center">
                 {isProfileDesktop ? (
                   <DesktopSocialFeedStories
                     username={name}
@@ -4691,8 +4726,8 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                 ) : postComposer}
 
             {isProfileDesktop ? (
-              <div className="penpot-feed-filter-bar" role="group" aria-label="Lọc bảng tin">
-                <div className="penpot-feed-filter-options">
+              <div className="social-feed-filter-bar" role="group" aria-label="Lọc bảng tin">
+                <div className="social-feed-filter-options">
                   <button type="button" aria-pressed={feedFilter === 'all'} onClick={() => setFeedFilter('all')}>Dành cho bạn</button>
                   <button type="button" aria-pressed={feedFilter === 'following'} onClick={() => setFeedFilter('following')}>Đang theo dõi</button>
                   <button type="button" aria-pressed={feedFilter === 'latest'} onClick={() => setFeedFilter('latest')}>Mới nhất</button>
@@ -4700,7 +4735,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                     <button type="button" aria-pressed={true}>Đã lưu</button>
                   )}
                 </div>
-                <button className="penpot-feed-refresh" type="button" onClick={() => {
+                <button className="social-feed-refresh" type="button" onClick={() => {
                   if (feedFilter === 'following') followingFeed.refresh()
                   else if (feedFilter === 'saved') void loadSavedPosts()
                   else void refreshPosts()
@@ -5053,7 +5088,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
               </section>
             ) : (<>
             {isProfileDesktop && desktopProfileSettings ? (
-              <section className="penpot-edit-settings-entry">
+              <section className="profile-editor-settings-entry">
                 <div><strong>Thông tin hồ sơ</strong><p>Thay đổi tên, tên người dùng, tiểu sử, thành phố và ảnh hồ sơ trong trang chỉnh sửa.</p></div>
                 <button type="button" onClick={() => { setDesktopProfileSettings(false); setProfileEditorOpen(true) }}>Chỉnh sửa hồ sơ</button>
               </section>

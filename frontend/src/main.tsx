@@ -22,11 +22,11 @@ import './features/chat/group-room-header.css'
 import './design-system/motion.css'
 import './features/profile/personal-timeline.css'
 import './platform/desktop.css'
-import './styles/penpot-sidebar.css'
-import './styles/penpot-profile.css'
-import './styles/penpot-profile-editor.css'
-import './styles/penpot-social-feed.css'
-import './styles/penpot-chat-s00.css'
+import './styles/social-navigation.css'
+import './styles/social-profile.css'
+import './styles/social-profile-editor.css'
+import './styles/social-feed.css'
+import './styles/social-chat.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)

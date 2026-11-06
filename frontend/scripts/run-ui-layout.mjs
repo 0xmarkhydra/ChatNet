@@ -24,8 +24,8 @@ server.stderr.on('data', chunk => { logs += chunk.toString() })
 let browser
 const check = (value, message) => { if (!value) throw new Error(message) }
 const conversations = [
-  { id: 1, name: 'minhanh', type: 'direct', otherUserId: 2, memberCount: 2, unreadCount: 2, lastMessage: 'Chiều nay mình xem lại bản thiết kế nhé.', online: true, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
-  { id: 2, name: 'hoangnam', type: 'direct', otherUserId: 3, memberCount: 2, unreadCount: 0, lastMessage: 'Cảm ơn bạn, mình nhận được rồi.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
+  { id: 1, name: 'minhanh', type: 'direct', otherUserId: 2, otherUsername: 'minhanh', memberCount: 2, unreadCount: 2, lastMessage: 'Chiều nay mình xem lại bản thiết kế nhé.', online: true, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
+  { id: 2, name: 'hoangnam', type: 'direct', otherUserId: 3, otherUsername: 'hoangnam', memberCount: 2, unreadCount: 0, lastMessage: 'Cảm ơn bạn, mình nhận được rồi.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
   { id: 3, name: 'Nhóm SocCO kiểm thử giao diện mobile và desktop với tên rất dài', type: 'group', memberCount: 5, unreadCount: 0, lastMessage: 'Hẹn cả nhóm ngày mai.', online: false, createdAt: '2026-10-02T07:00:00Z', lastMessageAt: '2026-10-02T07:00:00Z' },
 ]
 const pagedConversations = [...conversations, ...Array.from({ length: 27 }, (_, index) => ({
@@ -104,7 +104,7 @@ try {
   page.on('pageerror', e => errors.push(e.message))
   await page.route(origin + '/mock-story-upload', route =>
     route.fulfill({ status: 200, body: '' }))
-  await page.route('http://localhost:8080/**', route => {
+  await page.route('**/api/**', route => {
     const req = route.request()
     const currentURL = new URL(req.url())
     const path = currentURL.pathname
@@ -354,7 +354,7 @@ try {
   }
   for (const width of widths) {
     await page.setViewportSize({ width, height: width <= 375 ? 667 : width <= 430 ? 844 : 900 })
-    const desktopSidebar = page.locator('.penpot-sidebar')
+    const desktopSidebar = page.locator('.app-navigation-sidebar')
     if (width > 760) {
       check(await desktopSidebar.isVisible(), 'Desktop sidebar must be visible at ' + width)
       const sidebarBounds = await desktopSidebar.boundingBox()
@@ -411,7 +411,7 @@ try {
     }
     await page.getByRole('button', { name: 'Bảng tin', exact: true }).click()
     await geometry('feed', width, width > 760
-      ? ['.modern-frame', '.feed-view', '.penpot-feed-grid', '.penpot-feed-launcher', '.penpot-feed-filter-bar']
+      ? ['.modern-frame', '.feed-view', '.social-feed-grid', '.social-feed-launcher', '.social-feed-filter-bar']
       : ['.modern-frame', '.feed-view', '.post-box', '.soco-feed-section-label'])
     if (width === 390) {
       const scroller = page.locator('.feed-view.zalo-feed-view')
@@ -486,11 +486,11 @@ try {
     }
     await page.getByRole('button', { name: /Cá nhân/ }).click()
     if (width > 760) {
-      await geometry('profile', width, ['.modern-frame', '.penpot-profile-page', '.penpot-profile-hero'])
-      const hero = await page.locator('.penpot-profile-hero').boundingBox()
-      const main = await page.locator('.penpot-profile-main').boundingBox()
-      const aside = await page.locator('.penpot-profile-aside').boundingBox()
-      check(hero && main && aside, 'Desktop Penpot profile blocks missing: ' + width)
+      await geometry('profile', width, ['.modern-frame', '.social-profile-page', '.social-profile-hero'])
+      const hero = await page.locator('.social-profile-hero').boundingBox()
+      const main = await page.locator('.social-profile-main').boundingBox()
+      const aside = await page.locator('.social-profile-aside').boundingBox()
+      check(hero && main && aside, 'Desktop Social UI profile blocks missing: ' + width)
       if (width >= 1201) {
         check(aside.x > main.x + main.width - 3 && Math.abs(aside.y - main.y) < 10,
           'Desktop profile columns not aligned: ' + JSON.stringify({ width, hero, main, aside }))
@@ -532,15 +532,18 @@ try {
     await page.locator('.conversation-item').first().click()
     await geometry('chat-room', width, ['.modern-frame', '.conversation-panel', '.chat-head'])
     if ([390, 1440].includes(width)) {
-      const translationTrigger = page.locator('.chat-head .translation-hub-trigger')
       const translationMenu = page.getByRole('dialog', { name: 'Cài đặt dịch AI' })
-      await translationTrigger.click()
+      const openTranslationFromDetails = async () => {
+        await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
+        await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      }
+      await openTranslationFromDetails()
       await translationMenu.waitFor()
       await translationMenu.locator('.translation-language-search input').fill('en')
       check(await translationMenu.isVisible(), 'Translation menu closed while interacting inside: ' + width)
       await page.locator('.chat-head .room-info').click()
       await translationMenu.waitFor({ state: 'hidden' })
-      await translationTrigger.click()
+      await openTranslationFromDetails()
       await translationMenu.waitFor()
       await page.keyboard.press('Escape')
       await translationMenu.waitFor({ state: 'hidden' })
@@ -703,8 +706,12 @@ try {
     await page.locator('.conversation-item').filter({ hasText: 'Nhóm SocCO' }).first().click()
     const headerAction = await page.locator('.chat-head .group-mobile-actions .call-header-actions button').first().boundingBox()
     const backAction = await page.getByRole('button', { name: 'Quay lại danh sách' }).boundingBox()
-    const more = page.getByRole('button', { name: 'Tùy chọn nhóm' })
+    const more = page.locator('.chat-head .group-mobile-actions button[aria-label="Thông tin hội thoại"]')
     const moreBox = await more.boundingBox()
+    const openGroupOptions = async () => {
+      await more.click()
+      await page.locator('.social-chat-details').getByRole('button', { name: 'Tùy chọn nhóm' }).click()
+    }
     check(headerAction && backAction && moreBox && headerAction.width >= 40 &&
       headerAction.x >= backAction.x + backAction.width &&
       moreBox.x >= headerAction.x + headerAction.width - 1 &&
@@ -716,7 +723,7 @@ try {
     if (width === 320 || width === 390)
       await page.screenshot({ path: 'output/playwright/layout/group-chat-header-' + width + '.png' })
 
-    await more.click()
+    await openGroupOptions()
     const sheet = page.getByRole('dialog', { name: 'Tùy chọn cuộc trò chuyện nhóm' })
     await sheet.waitFor()
     check(await sheet.getByRole('button', { name: 'Gọi video' }).count() === 1 &&
@@ -743,7 +750,7 @@ try {
       await page.keyboard.press('Escape')
       check(await page.getByRole('dialog', { name: 'Tùy chọn cuộc trò chuyện nhóm' }).count() === 0,
         'Escape must close group sheet')
-      await more.click()
+      await openGroupOptions()
     }
     await page.getByRole('dialog', { name: 'Tùy chọn cuộc trò chuyện nhóm' })
       .getByRole('button', { name: /Thành viên & quản lý nhóm/ }).click()
@@ -825,7 +832,7 @@ try {
   // Logout must be one full-width settings row, not a detached right-aligned button.
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 320 ? 667 : width === 390 ? 844 : 900 })
-    if (width > 760) await page.locator('.penpot-sidebar').getByRole('button', { name: 'Cài đặt' }).click()
+    if (width > 760) await page.locator('.app-navigation-sidebar').getByRole('button', { name: 'Cài đặt' }).click()
     else await page.getByRole('button', { name: /Cá nhân/ }).click()
     const signout = page.locator('.settings-card .settings-logout-row')
     await signout.waitFor()
@@ -853,14 +860,13 @@ try {
   await page.getByRole('button', { name: /Tin nhắn/ }).last().click()
   await page.locator('.conversation-item').filter({ hasText: 'minhanh' }).first().click()
   await page.locator('.chat-friend-bar').waitFor()
-  await page.getByText('Hai bạn chưa kết bạn', { exact: true }).waitFor()
-  const chatOptions = page.getByRole('button', { name: 'Tùy chọn cuộc trò chuyện' })
+  const chatOptions = page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first()
   check(await chatOptions.isVisible() && await chatOptions.isEnabled(),
-    'A non-friend with existing direct chat must have a chat options menu')
+    'A non-friend with an existing direct chat must have a details menu')
   await chatOptions.click()
-  const blockNonFriend = page.getByRole('menu', { name: 'Tùy chọn cuộc trò chuyện' }).getByRole('menuitem', { name: 'Chặn người dùng' })
+  const blockNonFriend = page.locator('.social-chat-details').getByRole('button', { name: 'Chặn tin nhắn và cuộc gọi' })
   check(await blockNonFriend.isVisible() && await blockNonFriend.isEnabled(),
-    'A non-friend must be able to block via the three-dot menu')
+    'A non-friend must be able to block through conversation details')
   const confirmation = new Promise(resolve => page.once('dialog', async dialog => {
     check(dialog.type() === 'confirm' && dialog.message().includes('Chặn'),
       'Block must ask for confirmation')

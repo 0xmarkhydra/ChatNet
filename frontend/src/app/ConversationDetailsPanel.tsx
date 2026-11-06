@@ -31,28 +31,28 @@ export default function ConversationDetailsPanel({
     { label: 'Tìm tin nhắn', Icon: Search, action: onSearch },
   ]
   return (
-    <aside className="penpot-chat-details" id="conversation-details-panel" aria-label="Thông tin hội thoại">
+    <aside className="social-chat-details" id="conversation-details-panel" aria-label="Thông tin hội thoại">
       <div className="conversation-details-heading">
         <h2>Thông tin hội thoại</h2>
         <button type="button" onClick={onClose} aria-label="Đóng thông tin hội thoại" title="Đóng">
           <X size={19} aria-hidden="true" />
         </button>
       </div>
-      <div className="penpot-chat-details-identity">
+      <div className="social-chat-details-identity">
         <UserAvatar username={conversation.otherUsername} name={conversation.name}
-          className="penpot-chat-details-avatar" group={isGroup}
+          className="social-chat-details-avatar" group={isGroup}
           online={!isGroup && conversation.online} />
         <strong title={conversation.name}>{conversation.name}</strong>
         <span>{isGroup ? `${conversation.memberCount} thành viên` : conversation.online ? '● Đang hoạt động' : 'Chat riêng'}</span>
       </div>
-      <div className="penpot-chat-details-actions">
+      <div className="social-chat-details-actions">
         <CallHeaderActions conversationId={conversation.id} />
         <button type="button" onClick={onProfile}>
           <Users size={20} aria-hidden="true" />
           <span>{isGroup ? 'Quản lý nhóm' : 'Hồ sơ'}</span>
         </button>
       </div>
-      <nav className="penpot-chat-details-links" aria-label="Tùy chọn hội thoại">
+      <nav className="social-chat-details-links" aria-label="Tùy chọn hội thoại">
         {options.map(({ label, Icon, action }) => (
           <button type="button" key={label} onClick={action}>
             <Icon size={19} aria-hidden="true" />
@@ -80,7 +80,7 @@ export default function ConversationDetailsPanel({
           <ChevronRight size={16} aria-hidden="true" />
         </button>
       </nav>
-      <p className="penpot-chat-details-privacy"><ShieldCheck size={19} aria-hidden="true" /> Nội dung được hiển thị theo quyền truy cập hội thoại của bạn.</p>
+      <p className="social-chat-details-privacy"><ShieldCheck size={19} aria-hidden="true" /> Nội dung được hiển thị theo quyền truy cập hội thoại của bạn.</p>
     </aside>
   )
 }
