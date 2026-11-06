@@ -587,7 +587,7 @@
   }
   .modern-shell.app-layout .social-chat-layout .chat-translation-dual {
     box-sizing: border-box;
-    width: 405px;
+    width: fit-content;
     max-width: 100%;
   }
   .modern-shell.app-layout .social-chat-layout .chat-translation-dual > .translation-flip-content {
@@ -752,6 +752,26 @@
 @media (prefers-reduced-motion: reduce) {
   .social-chat-layout .message { animation: none; }
 }
+/* Keep a short bubble sized to its text, even when the loading row below
+   is wider than the bubble itself. Anchoring sent bubbles prevents jumping. */
+.social-chat-layout .messages .message > .bubble {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+}
+.social-chat-layout .messages .message.mine > .bubble {
+  margin-left: auto;
+}
+.modern-shell.app-layout .social-chat-layout .message.mine > .bubble,
+.social-chat-layout .messages .message.mine > .bubble {
+  color: #fff;
+  background: linear-gradient(115deg, #1d4ed8, #6538d6);
+}
+.social-chat-layout .message.mine .message-inline-link {
+  color: #fff;
+  text-decoration-color: rgba(255,255,255,.82);
+}
+
 /* Translation stays next to its message; short texts show translation first,
    long texts use a compact reversible original/translation switch. */
 .social-chat-layout .chat-translation-dual .chat-translation-original {
@@ -764,6 +784,15 @@
   font-weight: 400;
   line-height: 1.65;
   overflow-wrap: anywhere;
+}
+/* On the sender's darker blue-purple background, the original text and
+   divider must stay legible rather than inheriting muted incoming colors. */
+.social-chat-layout .message.mine .chat-translation-original {
+  color: #f4f7ff;
+  border-top-color: rgba(255,255,255,.4);
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 1;
 }
 .social-chat-layout .chat-translation-action,
 .social-chat-layout .chat-translation-loading {

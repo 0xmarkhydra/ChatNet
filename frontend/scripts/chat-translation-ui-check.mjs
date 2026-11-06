@@ -58,6 +58,16 @@ try {
     messages.push({ id:14,conversationId:21,senderId:1,sender:'viewer',
       senderDisplayName:'Người xem',text:long101,translatedText:'Own translated output',
       translationLanguage:'en',createdAt:now,attachments:[],readByUserIds:[] })
+    messages.push({ id:15,conversationId:21,senderId:1,sender:'viewer',
+      senderDisplayName:'Người xem',text:'tôi test dịch cái',
+      translatedText:'আমি অনুবাদ পরীক্ষা করছি।',
+      translationLanguage:'en',createdAt:now,attachments:[],readByUserIds:[] })
+    messages.push({ id:16,conversationId:21,senderId:1,sender:'viewer',
+      senderDisplayName:'Người xem',text:'không',createdAt:now,
+      attachments:[],readByUserIds:[] })
+    messages.push({ id:17,conversationId:21,senderId:2,sender:'linhanh',
+      senderDisplayName:'Linh Anh',text:'không',createdAt:now,
+      attachments:[],readByUserIds:[] })
     const requests = []
     await ctx.route('**/api/**', async route => {
       const req = route.request(), p = new URL(req.url()).pathname
@@ -68,7 +78,7 @@ try {
       if (p === '/api/translate') {
         const body = JSON.parse(req.postData() || '{}')
         requests.push(body.messageId)
-        await sleep(650)
+        await sleep(body.messageId === 17 ? 1900 : 650)
         return json({ translatedText: 'DỊCH ' + String(body.text).slice(0, 20) })
       }
       if (p === '/api/conversations') return json([conversation])
@@ -90,6 +100,10 @@ try {
     await row(11).locator('.bubble').waitFor({state:'visible'})
     if (autoTranslate) {
       await row(11).locator('.chat-translation-loading').waitFor({state:'visible'})
+      await row(17).locator('.chat-translation-loading').waitFor({state:'visible'})
+      const incomingDuringLoading = await row(17).locator('.bubble').boundingBox()
+      assert.ok(incomingDuringLoading?.width < 120,
+        'Loading must not stretch an incoming 5-character message bubble')
     } else {
       assert.equal(requests.length, 0, 'Do not translate automatically when disabled')
       assert.equal(await row(11).locator('.chat-translation-dual').count(), 0)
@@ -125,12 +139,35 @@ try {
     assert.equal(await row(13).locator('.bubble').innerText(), long101)
     await row(13).getByRole('button', {name:'Hiện nội dung đã dịch'}).click()
     assert.ok((await row(13).locator('.bubble').innerText()).startsWith('DỊCH'))
+    // Own short bilingual text must stay compact and legible on its gradient.
+    if (!autoTranslate) {
+      await row(15).getByRole('button', { name:'Dịch',exact:true }).click()
+    }
+    await row(15).locator('.chat-translation-dual').waitFor({state:'visible'})
+    const ownBubble = row(15).locator('.chat-translation-dual')
+    const ownBox = await ownBubble.boundingBox()
+    assert.ok(ownBox?.width < 290, 'Short sent bilingual messages must shrink-wrap their text')
+    const colors = await row(15).evaluate(el => {
+      const bubble = el.querySelector('.chat-translation-dual')
+      const original = el.querySelector('.chat-translation-original')
+      return {
+        text: getComputedStyle(original).color,
+        divider: getComputedStyle(original).borderTopColor,
+        background: getComputedStyle(bubble).backgroundImage,
+      }
+    })
+    assert.equal(colors.text, 'rgb(244, 247, 255)', 'Own original text must use near-white contrast')
+    assert.ok(colors.divider.startsWith('rgba(255, 255, 255,'),
+      'Own translation divider must contrast against the gradient')
+    assert.ok(colors.background.includes('rgb(29, 78, 216)'),
+      'Own bubble must use the stronger blue-to-purple gradient')
+
     if (autoTranslate) {
       await row(14).locator('.translation-flip-pill').waitFor({state:'visible'})
       assert.equal(await row(14).locator('.bubble').innerText(), 'Own translated output')
       await row(14).getByRole('button', {name:'Hiện tin nhắn gốc'}).click()
       assert.equal(await row(14).locator('.bubble').innerText(), long101)
-      assert.deepEqual([...requests].sort((a,b)=>a-b), [11,12,13],
+      assert.deepEqual([...requests].sort((a,b)=>a-b), [11,12,13,17],
         'Automatic translation must not re-request already translated outgoing messages')
     } else {
       await row(11).getByRole('button', {name:'Ẩn dịch'}).click()
@@ -139,7 +176,19 @@ try {
       await row(14).getByRole('button', {name:'Dịch',exact:true}).click()
       await row(14).locator('.translation-flip-pill').waitFor({state:'visible'})
       assert.equal(await row(14).locator('.bubble').innerText(), 'Own translated output')
-      assert.equal(requests.length,3, 'Manual toggle must reuse an existing outgoing translation')
+      const originalBefore = await row(16).locator('.bubble').boundingBox()
+      await row(16).getByRole('button', {name:'Dịch',exact:true}).click()
+      await row(16).locator('.chat-translation-loading').waitFor({state:'visible'})
+      const originalDuring = await row(16).locator('.bubble').boundingBox()
+      assert.ok(originalBefore && originalDuring &&
+        Math.abs(originalBefore.width - originalDuring.width) < 2 &&
+        Math.abs(originalBefore.x + originalBefore.width -
+                 originalDuring.x - originalDuring.width) < 2,
+        'Loading must not stretch or shift a short sent message bubble')
+      await row(16).locator('.chat-translation-dual').waitFor({state:'visible'})
+      const shortTranslated = await row(16).locator('.chat-translation-dual').boundingBox()
+      assert.ok(shortTranslated?.width < 220, 'Short bilingual message must not stretch to panel width')
+      assert.equal(requests.length,4, 'Manual toggle must reuse existing translations')
     }
     assert.deepEqual(errors, [], 'No uncaught browser exceptions')
     await ctx.close()
