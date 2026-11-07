@@ -15,6 +15,7 @@ type sharedContentPage struct {
 }
 
 func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "private, no-store")
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	conversationID, ok := parseID(w, r.PathValue("id"))
 	if !ok {
@@ -30,10 +31,12 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 
 	kind := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("kind")))
 	if kind == "" {
-		kind = "media"
+		kind = "media" // Preserve existing mobile clients.
 	}
-	if kind != "media" && kind != "files" && kind != "links" {
-		httpx.Error(w, http.StatusBadRequest, "kind must be media, files or links")
+	switch kind {
+	case "media", "images", "videos", "files", "links":
+	default:
+		httpx.Error(w, http.StatusBadRequest, "kind must be media, images, videos, files or links")
 		return
 	}
 
@@ -57,6 +60,7 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 		before = parsed
 	}
 
+	// Fetch one extra message to determine whether another page truly exists.
 	rows, err := s.db.Query(r.Context(), `
 		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,m.text,m.created_at
 		FROM messages m
@@ -73,17 +77,23 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 		      SELECT 1 FROM message_attachments ma
 		      WHERE ma.message_id=m.id AND ma.kind IN ('image','video')
 		    ))
-		    OR
-		    ($3='files' AND EXISTS (
+		    OR ($3='images' AND EXISTS (
+		      SELECT 1 FROM message_attachments ma
+		      WHERE ma.message_id=m.id AND ma.kind='image'
+		    ))
+		    OR ($3='videos' AND EXISTS (
+		      SELECT 1 FROM message_attachments ma
+		      WHERE ma.message_id=m.id AND ma.kind='video'
+		    ))
+		    OR ($3='files' AND EXISTS (
 		      SELECT 1 FROM message_attachments ma
 		      WHERE ma.message_id=m.id AND ma.kind IN ('file','audio')
 		    ))
-		    OR
-		    ($3='links' AND m.text ~* 'https?://')
+		    OR ($3='links' AND m.text ~* 'https?://')
 		  )
 		ORDER BY m.id DESC
 		LIMIT $4
-	`, conversationID, before, kind, limit, claims.UserID)
+	`, conversationID, before, kind, limit+1, claims.UserID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load shared content")
 		return
@@ -94,13 +104,8 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item message
 		if err := rows.Scan(
-			&item.ID,
-			&item.ConversationID,
-			&item.SenderID,
-			&item.Sender,
-			&item.SenderDisplayName,
-			&item.Text,
-			&item.CreatedAt,
+			&item.ID, &item.ConversationID, &item.SenderID,
+			&item.Sender, &item.SenderDisplayName, &item.Text, &item.CreatedAt,
 		); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot read shared content")
 			return
@@ -111,15 +116,17 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load shared content")
 		return
 	}
+
+	page := sharedContentPage{}
+	if len(items) > limit {
+		items = items[:limit]
+		next := items[len(items)-1].ID
+		page.NextBefore = &next
+	}
 	if err := s.attachMessageMedia(r.Context(), items); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load shared attachments")
 		return
 	}
-
-	page := sharedContentPage{Items: items}
-	if len(items) == limit {
-		next := items[len(items)-1].ID
-		page.NextBefore = &next
-	}
+	page.Items = items
 	httpx.JSON(w, http.StatusOK, page)
 }
