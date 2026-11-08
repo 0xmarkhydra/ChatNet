@@ -127,6 +127,10 @@ export function useAppRealtime({
         void reconcileConversationMemberships()
         return
       }
+      if (update.type === 'group.activity') {
+        window.dispatchEvent(new CustomEvent('chatnet:group-activity', { detail: update.conversationId }))
+        return
+      }
       if (update.type === 'category.updated') {
         if (update.conversationId > 0) {
           responseCache.current.invalidate(['conversations'])

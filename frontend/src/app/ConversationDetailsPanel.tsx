@@ -1,4 +1,6 @@
-import { Ban, Bell, ChevronRight, FileText, Images, Languages, Link2, MoreHorizontal, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Ban, Bell, CalendarClock, ChevronDown, ChevronRight, ClipboardList, FileText, Images, Languages, Link2, MoreHorizontal, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
+import type { GroupActivityKind } from '../features/chat/GroupActivities'
 import type { Conversation } from '../features/chat/types'
 import { CallHeaderActions } from '../features/calls/CallManager'
 import UserAvatar from '../shared/ui/UserAvatar'
@@ -12,16 +14,18 @@ type Props = {
   onShared: () => void
   onTranslate: () => void
   onNotifications: () => void
-  onGroupOptions: () => void
+  onCreateGroupActivity: (kind: GroupActivityKind) => void
   onBlock: () => void
   onClearHistory: () => void
 }
 
 export default function ConversationDetailsPanel({
   conversation, busy, onClose, onProfile, onSearch, onShared, onTranslate,
-  onNotifications, onGroupOptions, onBlock, onClearHistory,
+  onNotifications, onCreateGroupActivity, onBlock, onClearHistory,
 }: Props) {
   const isGroup = conversation.type === 'group'
+  const [groupOptionsOpen, setGroupOptionsOpen] = useState(false)
+  useEffect(() => { setGroupOptionsOpen(false) }, [conversation.id])
   const options = [
     { label: 'Thông báo', Icon: Bell, action: onNotifications },
     { label: 'Dịch AI', Icon: Languages, action: onTranslate },
@@ -61,11 +65,40 @@ export default function ConversationDetailsPanel({
           </button>
         ))}
         {isGroup && (
-          <button type="button" onClick={onGroupOptions}>
-            <MoreHorizontal size={19} aria-hidden="true" />
-            <span>Tùy chọn nhóm</span>
-            <ChevronRight size={16} aria-hidden="true" />
-          </button>
+          <div className="conversation-group-options">
+            <button
+              type="button"
+              className="conversation-group-options-trigger"
+              aria-expanded={groupOptionsOpen}
+              aria-controls={`conversation-group-options-${conversation.id}`}
+              onClick={() => setGroupOptionsOpen(open => !open)}
+            >
+              <MoreHorizontal size={19} aria-hidden="true" />
+              <span>Tùy chọn nhóm</span>
+              {groupOptionsOpen ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
+            </button>
+            {groupOptionsOpen && (
+              <div className="conversation-group-options-list" id={`conversation-group-options-${conversation.id}`} role="group" aria-label="Công cụ nhóm">
+                {([
+                  { kind: 'poll', label: 'Bình chọn', Icon: ClipboardList },
+                  { kind: 'note', label: 'Ghi chú', Icon: FileText },
+                  { kind: 'reminder', label: 'Nhắc hẹn', Icon: CalendarClock },
+                ] as const).map(({ kind, label, Icon }) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => {
+                      setGroupOptionsOpen(false)
+                      onCreateGroupActivity(kind)
+                    }}
+                  >
+                    <Icon size={18} aria-hidden="true" />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
         {!isGroup && conversation.otherUserId && (
           <button type="button" className="conversation-options-danger" disabled={busy} onClick={onBlock}>

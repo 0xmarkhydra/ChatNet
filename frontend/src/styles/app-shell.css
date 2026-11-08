@@ -568,8 +568,7 @@
   color: #3769cc;
   cursor: pointer;
 }
-.conversation-info-panel-actions button:hover,
-.conversation-info-panel-links button:hover { background: #e6edff; }
+.conversation-info-panel-actions button:hover { background: #e6edff; }
 .conversation-info-panel-actions button span,
 .conversation-info-panel-actions button::after {
   font-size: 10px;
@@ -596,6 +595,29 @@
 }
 .conversation-info-panel-links button span { flex: 1; color: #344766; font-weight: 600; }
 .conversation-info-panel-links button > svg:last-child { color: #a8b3c6; }
+.conversation-info-panel-links .conversation-group-options {
+  width: 100%;
+}
+.conversation-info-panel-links .conversation-group-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 8px 8px 19px;
+  padding: 3px 0 3px 10px;
+  border-left: 1px solid #e5ebf5;
+}
+.social-chat-details .social-chat-details-links .conversation-group-options-list button {
+  min-height: 44px;
+  padding: 0 10px;
+  color: #60789f;
+}
+.conversation-info-panel-links .conversation-group-options-list button > svg {
+  flex: 0 0 auto;
+  color: #6282bf;
+}
+.conversation-info-panel-links .conversation-group-options-list button:hover {
+  background: transparent;
+}
 .conversation-info-panel-privacy {
   display: flex;
   align-items: flex-start;

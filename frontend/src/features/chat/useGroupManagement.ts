@@ -37,8 +37,6 @@ export function useGroupManagement({
   actionLocks,
 }: Options) {
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
-  const [groupActionsOpen, setGroupActionsOpen] = useState(false)
-  useEffect(() => setGroupActionsOpen(false), [activeConversationId, tab])
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [groupNameDraft, setGroupNameDraft] = useState('')
   const [groupInviteSearch, setGroupInviteSearch] = useState('')
@@ -91,7 +89,6 @@ export function useGroupManagement({
   }, [friends, groupMembers, groupInviteSearch])
 
   function openGroupSettings(conversation: Conversation) {
-    setGroupActionsOpen(false)
     setGroupSettingsOpen(true)
     setGroupNameDraft(conversation.name)
     setGroupInviteSearch('')
@@ -272,8 +269,6 @@ export function useGroupManagement({
   return {
     groupSettingsOpen,
     setGroupSettingsOpen,
-    groupActionsOpen,
-    setGroupActionsOpen,
     groupMembers,
     setGroupMembers,
     groupNameDraft,

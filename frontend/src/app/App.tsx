@@ -78,6 +78,7 @@ import FeedPostCard from "../features/feed/FeedPostCard";
 import FeedReactionControl from "../features/feed/FeedReactionControl";
 import StoryViewer from "../features/feed/StoryViewer";
 import MessageActions from "../features/chat/MessageActions";
+import { GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/GroupActivities";
 import { messageReactionLabel } from "../features/chat/messageReactions";
 import {
   copyChatImage,
@@ -202,7 +203,6 @@ import {
 import { canMarkConversationRead } from "../features/chat/conversationRead";
 import { mergeById, toggleMessageReactionCount } from "../shared/lib/optimistic";
 import CallManager, { CallHeaderActions } from "../features/calls/CallManager";
-import GroupActionsSheet from "../features/chat/GroupActionsSheet";
 import SharedContent from "../features/chat/SharedContent";
 import VoiceRecorder from "../features/chat/VoiceRecorder";
 import { SocoEmptyState, SocoTextAction } from "../shared/ui/SocoUI";
@@ -324,6 +324,12 @@ export default function App({
   const ownSendScrollConversation = useRef<number | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [messageActionId, setMessageActionId] = useState<number | null>(null);
+  const [groupActivityCreateKind, setGroupActivityCreateKind] = useState<GroupActivityKind | null>(null);
+  const [groupActivityViewedId, setGroupActivityViewedId] = useState<number | null>(null);
+  useEffect(() => {
+    setGroupActivityCreateKind(null);
+    setGroupActivityViewedId(null);
+  }, [activeConversationId]);
   const [messageCopyTarget, setMessageCopyTarget] =
     useState<MessageCopyTarget | null>(null);
   const messageLongPressTimer = useRef<number | null>(null);
@@ -1036,8 +1042,6 @@ export default function App({
   const {
     groupSettingsOpen,
     setGroupSettingsOpen,
-    groupActionsOpen,
-    setGroupActionsOpen,
     groupMembers,
     setGroupMembers,
     groupNameDraft,
@@ -1147,6 +1151,9 @@ export default function App({
   const activeConversation =
     displayConversations.find((item) => item.id === activeConversationId) ||
     null;
+  const groupActivities = useGroupActivities(activeConversation?.type === 'group' ? activeConversation.id : null, session?.sessionId, apiFetch);
+  const sortedGroupActivityEvents = groupActivities.events.slice().reverse();
+  const viewedGroupActivity = groupActivities.activities.find(activity => activity.id === groupActivityViewedId) || null;
   const chatFriend =
     activeConversation?.type === "direct" &&
     activeConversation.otherUserId &&
@@ -3288,7 +3295,6 @@ export default function App({
       setHasMoreMessages(false);
       setGroupMembers([]);
       setGroupSettingsOpen(false);
-      setGroupActionsOpen(false);
       setSharedContentOpen(false);
       setTranslations({});
       setReplyingTo(null);
@@ -5999,21 +6005,6 @@ export default function App({
                   </header>
 
 
-                  {groupActionsOpen && activeConversation.type === 'group' && !groupSettingsOpen && (
-                    <GroupActionsSheet
-                      groupName={activeConversation.name}
-                      memberCount={activeConversation.memberCount}
-                      autoTranslate={effectiveAutoTranslate}
-                      targetLanguage={effectiveTargetLanguage}
-                      languages={languageOptions}
-                      onClose={() => setGroupActionsOpen(false)}
-                      onCall={(mediaType) => launchGroupCall(activeConversation.id, mediaType)}
-                      onSharedContent={() => setSharedContentOpen(true)}
-                      onManageGroup={() => { setGroupMemberViewOpen(false); openGroupSettings(activeConversation) }}
-                      onToggleAutoTranslate={() => changeAutoTranslate(!effectiveAutoTranslate)}
-                      onChangeLanguage={(language) => changeTargetLanguage(language)}
-                    />
-                  )}
 
                   {chatFriend && chatFriendRelationship !== 'accepted' && (friendSyncError || friendSyncSessionId === session?.sessionId) && (
                     <div className={`chat-friend-bar relationship-${chatFriendRelationship}`} aria-label="Kết bạn trong cuộc trò chuyện">
@@ -6114,6 +6105,12 @@ export default function App({
                       return (
                         <Fragment key={message.id}>
                           {displayDay && <div className="day-divider"><span>{dayLabel}</span></div>}
+                          {activeConversation.type === 'group' && sortedGroupActivityEvents
+                            .filter(event => event.createdAt <= message.createdAt &&
+                              (index === 0 || event.createdAt > visibleMessages[index - 1].createdAt))
+                            .map(event => <GroupActivityMarker key={`activity-${event.id}`} event={event}
+                              activity={groupActivities.activities.find(item => item.id === event.activityId)}
+                              onOpen={() => setGroupActivityViewedId(event.activityId)} />)}
                           {messageGapBefore === message.id && (
                             <button type="button" className="soco-load-more soco-middle-messages"
                               onClick={() => void loadMissingMessages()} disabled={messageGapLoading}
@@ -6263,6 +6260,16 @@ export default function App({
                         </Fragment>
                       )
                     })}
+                    {activeConversation.type === 'group' && sortedGroupActivityEvents
+                      .filter(event => !visibleMessages.length || event.createdAt > visibleMessages[visibleMessages.length - 1].createdAt)
+                      .map(event => <GroupActivityMarker key={`activity-${event.id}`} event={event}
+                        activity={groupActivities.activities.find(item => item.id === event.activityId)}
+                        onOpen={() => setGroupActivityViewedId(event.activityId)} />)}
+                    {activeConversation.type === 'group' && groupActivities.error && (
+                      <button type="button" className="group-activity-marker" onClick={() => void groupActivities.refresh()}>
+                        Không tải được hoạt động nhóm. Nhấn để thử lại.
+                      </button>
+                    )}
                     {chatOutbox.filter((item) => item.conversationId === activeConversationId).map((item) => (
                       <article className="message mine outgoing-preview chat-outbox-message" key={item.clientId} aria-busy={item.status !== 'failed'}>
                         {item.replyToMessageId && (
@@ -6347,6 +6354,18 @@ export default function App({
                       <UiIcon name="attach" size={22} />
                       <Plus className="chat-composer-plus" size={21} aria-hidden="true" />
                     </button>
+                    <button className="ghost-action chat-composer-image" type="button"
+                      onClick={() => chatFileInputRef.current?.click()}
+                      disabled={Boolean(mediaUploading) || messageSending}
+                      aria-label="Đính kèm ảnh hoặc video" title="Chọn ảnh hoặc video">
+                      <Images size={19} aria-hidden="true" />
+                    </button>
+                    <VoiceRecorder
+                      key={`${session.sessionId}:${activeConversationId}`}
+                      disabled={Boolean(mediaUploading) || messageSending}
+                      onRecorded={(file) => { void addChatFiles([file]) }}
+                      onError={(message) => setNotice(message, 'error')}
+                    />
                     <input
                       ref={messageInputRef}
                       aria-label="Tin nhắn"
@@ -6361,18 +6380,6 @@ export default function App({
                       }}
                       title="Dán ảnh/tệp bằng Cmd/Ctrl+V hoặc kéo thả vào cuộc trò chuyện"
                       maxLength={4000}
-                    />
-                    <button className="ghost-action chat-composer-image" type="button"
-                      onClick={() => chatFileInputRef.current?.click()}
-                      disabled={Boolean(mediaUploading) || messageSending}
-                      aria-label="Đính kèm ảnh hoặc video" title="Chọn ảnh hoặc video">
-                      <Images size={19} aria-hidden="true" />
-                    </button>
-                    <VoiceRecorder
-                      key={`${session.sessionId}:${activeConversationId}`}
-                      disabled={Boolean(mediaUploading) || messageSending}
-                      onRecorded={(file) => { void addChatFiles([file]) }}
-                      onError={(message) => setNotice(message, 'error')}
                     />
                     <button className="send-button polished-send" disabled={!canSend} aria-label="Gửi tin nhắn">
                       {messageSending || mediaUploading === 'chat' ? <RefreshCw size={19} aria-label="Đang gửi" /> : <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>}
@@ -6396,7 +6403,7 @@ export default function App({
                   }
                 }}
                 onClearHistory={() => { void clearActiveConversationHistory() }}
-                onGroupOptions={() => { setConversationDetailsOpen(false); setGroupActionsOpen(true) }}
+                onCreateGroupActivity={setGroupActivityCreateKind}
                 onProfile={() => {
                   if (activeConversation.type === 'group') { setGroupMemberViewOpen(false); openGroupSettings(activeConversation) }
                   else if (activeConversation.otherUsername) openVisitor(activeConversation.otherUsername)
@@ -7094,6 +7101,16 @@ export default function App({
           </div>
         )}
 
+        {activeConversation?.type === 'group' && (groupActivityCreateKind !== null || groupActivityViewedId !== null) && (
+          <GroupActivityDialog
+            key={`${activeConversation.id}-${groupActivityCreateKind || 'view'}-${groupActivityViewedId ?? ''}`}
+            kind={groupActivityCreateKind}
+            activity={viewedGroupActivity}
+            onClose={() => { setGroupActivityCreateKind(null); setGroupActivityViewedId(null) }}
+            onCreate={groupActivities.create}
+            onVote={groupActivities.vote}
+          />
+        )}
         {activeMessageAction && (
           <MessageActions
             activeMessageAction={activeMessageAction}
