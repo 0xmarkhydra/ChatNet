@@ -59,12 +59,25 @@ export default function CallCenter({ request, userId, token, conversations, targ
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([])
   const [savingMessage, setSavingMessage] = useState('')
 
+  // On mobile the app can return from a call or wake from a background tab.
+  // Refresh completed calls when the view becomes visible again.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') setRefreshId((value) => value + 1)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError('')
     getCallHistory(requestRef.current).then((items) => {
-      if (!cancelled) setEntries(items)
+      if (!cancelled) {
+        if (!Array.isArray(items)) throw new Error('Dữ liệu lịch sử cuộc gọi không hợp lệ.')
+        setEntries(items)
+      }
     }).catch((cause) => {
       if (!cancelled) setError(cause instanceof Error ? cause.message : 'Không thể tải lịch sử cuộc gọi.')
     }).finally(() => { if (!cancelled) setLoading(false) })

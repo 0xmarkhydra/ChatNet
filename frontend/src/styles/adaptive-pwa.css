@@ -1,0 +1,416 @@
+/*
+ * Adaptive SocCo PWA.
+ * Keep the existing React screens, data and actions shared across desktop and mobile.
+ * Desktop owns the rail and split chat; phone owns a bottom tab bar and one chat pane.
+ */
+.social-chat-groups-link { display: none; }
+.bottom-navigation .nav-label { display: none; }
+
+@media (min-width: 761px) and (max-width: 1023px) {
+  /* Keep the PC sidebar, but give the conversation list a smaller share. */
+  .modern-shell.app-layout .modern-messenger.social-chat-layout {
+    grid-template-columns: minmax(210px, 32%) minmax(0, 1fr);
+    gap: 9px;
+    padding: 10px;
+  }
+  .modern-shell.app-layout .app-page-heading { min-width: 140px; }
+  .modern-shell.app-layout .app-page-heading strong { font-size: 21px; }
+  .modern-shell.app-layout > .chatnet-appbar { gap: 12px; padding-inline: 18px; }
+  .modern-shell.app-layout .appbar-search-anchor { width: auto; min-width: 0; flex: 0 1 285px; }
+}
+
+@media (max-width: 760px) {
+  .modern-shell.app-layout {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  /* Small, stable SocCo header. Searching all messages is still available
+     from its magnifier and expands without competing with the tab actions. */
+  .modern-shell.app-layout > .mobile-chat-appbar {
+    gap: 8px;
+    min-height: 62px;
+    padding: 9px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+    background: #fff;
+    border-bottom: 1px solid #e9edf5;
+    box-shadow: none;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-brand {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-brand strong {
+    display: inline-block;
+    font-size: 18px;
+    font-weight: 800;
+    color: #2358bd;
+    letter-spacing: -.35px;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-search-anchor {
+    position: relative;
+    flex: 0 0 42px;
+    width: 42px;
+    min-width: 42px;
+    margin-left: auto;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-search {
+    position: relative;
+    display: flex;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+    gap: 0;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: #f3f6fc;
+    box-shadow: none;
+    color: #285bcd;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-search svg {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-search-anchor:not(:focus-within) input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    opacity: 0;
+    cursor: text;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar:has(.appbar-search-anchor:focus-within) .appbar-brand,
+  .modern-shell.app-layout .mobile-chat-appbar:has(.appbar-search-anchor:focus-within) .appbar-actions {
+    display: none;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-search-anchor:focus-within {
+    flex: 1 1 auto;
+    width: auto;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-search-anchor:focus-within .appbar-search {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 9px;
+    padding: 0 11px;
+    border: 1px solid #aec6ff;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-search-anchor:focus-within input {
+    position: static;
+    flex: 1 1 auto;
+    width: 100%;
+    height: auto;
+    opacity: 1;
+    padding: 0;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-actions {
+    flex: 0 0 auto;
+    margin-left: 0;
+    gap: 1px;
+  }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-actions .appbar-icon-button {
+    width: 41px;
+    height: 42px;
+    min-width: 41px;
+    border-radius: 12px;
+  }
+
+  /* Native one-column list/detail behavior: only the selected surface occupies
+     the mobile viewport. The desktop grid remains untouched. */
+  .modern-shell.app-layout .modern-frame > .modern-messenger.social-chat-layout {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    gap: 0;
+    background: #fff;
+  }
+  .modern-shell.app-layout .social-chat-layout > .conversation-sidebar {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout > .conversation-panel { display: none; }
+  .modern-shell.app-layout .social-chat-layout.has-active > .conversation-sidebar { display: none; }
+  .modern-shell.app-layout .social-chat-layout.has-active > .conversation-panel {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.has-active .messages {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Phone conversation list: Zalo density, search and filters are together.
+     Global message/file search remains accessible through the top magnifier. */
+  .modern-shell.app-layout .social-chat-list-header {
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    padding: 13px 14px 10px;
+    background: #fff;
+  }
+  .modern-shell.app-layout .social-chat-list-title {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 7px;
+    height: auto;
+    min-height: 41px;
+    margin: 0 0 11px;
+    padding: 0;
+  }
+  .modern-shell.app-layout .social-chat-list-title h2 {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    color: #1b2d4e;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -.4px;
+  }
+  .modern-shell.app-layout .social-chat-groups-link,
+  .modern-shell.app-layout .social-chat-new {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: #edf3ff;
+    color: #2563eb;
+    cursor: pointer;
+  }
+  .modern-shell.app-layout .social-chat-list-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    flex: 0 0 44px;
+    height: 44px;
+    width: 100%;
+    padding: 0 12px;
+    border: 1px solid #e9eef8;
+    border-radius: 12px;
+    background: #f6f8fc;
+    color: #788ba9;
+  }
+  .modern-shell.app-layout .social-chat-list-search input {
+    min-width: 0;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-size: 16px;
+    color: #243650;
+  }
+  .modern-shell.app-layout .social-chat-list-search:focus-within {
+    border-color: #9cb8f7;
+    box-shadow: 0 0 0 3px #2563eb12;
+  }
+  .modern-shell.app-layout .social-chat-list-filters {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 11px;
+    min-height: 37px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .modern-shell.app-layout .social-chat-list-filters::-webkit-scrollbar { display: none; }
+  .modern-shell.app-layout .social-chat-list-filters button {
+    flex: 0 0 auto;
+    min-height: 35px;
+    padding: 0 14px;
+    border: 1px solid #ebeff8;
+    border-radius: 999px;
+    background: #f7f9fd;
+    color: #687b9c;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .modern-shell.app-layout .social-chat-list-filters button.is-active {
+    border-color: #dce7ff;
+    background: #eaf1ff;
+    color: #2563eb;
+  }
+  .modern-shell.app-layout .social-chat-list > .zalo-conversation-list {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 2px 8px 12px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modern-shell.app-layout .social-chat-list .zalo-conversation-list .conversation-item {
+    min-height: 71px;
+    padding: 9px 10px;
+    gap: 11px;
+    margin: 0;
+    border: 0;
+    border-radius: 12px;
+  }
+  .modern-shell.app-layout .social-chat-list .zalo-conversation-list .conversation-item:active {
+    background: #edf3ff;
+  }
+  .modern-shell.app-layout .social-chat-list > .conversation-categories {
+    min-height: 0;
+    flex: 0 0 auto;
+  }
+
+  /* Stable, labelled six-slot bottom tab bar. The chat detail already hides it. */
+  .modern-shell.app-layout .bottom-navigation {
+    position: relative;
+    z-index: 15;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0;
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: calc(64px + env(safe-area-inset-bottom));
+    margin: 0;
+    padding: 4px max(5px, env(safe-area-inset-right))
+      max(5px, env(safe-area-inset-bottom))
+      max(5px, env(safe-area-inset-left));
+    border: 0;
+    border-top: 1px solid #e8edf6;
+    border-radius: 0;
+    background: rgba(255,255,255,.97);
+    box-shadow: 0 -3px 16px rgba(31,52,92,.04);
+  }
+  .modern-shell.app-layout .bottom-navigation > button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    min-width: 0;
+    min-height: 56px;
+    margin: 0;
+    padding: 3px 1px;
+    border: 0;
+    border-radius: 11px;
+    background: transparent;
+    color: #8390a7;
+  }
+  .modern-shell.app-layout .bottom-navigation > button.active {
+    color: #2563eb;
+    background: transparent;
+    box-shadow: none;
+  }
+  .modern-shell.app-layout .bottom-navigation .nav-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    min-width: 34px;
+    height: 29px;
+    min-height: 29px;
+    color: inherit;
+  }
+  .modern-shell.app-layout .bottom-navigation .nav-label {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    color: inherit;
+    font-size: clamp(9px, 2.7vw, 11px);
+    font-weight: 620;
+    line-height: 1.25;
+    text-align: center;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .modern-shell.app-layout .bottom-navigation > button.active .nav-label {
+    font-weight: 800;
+  }
+  .modern-shell.app-layout .bottom-navigation > button:focus-visible,
+  .modern-shell.app-layout .social-chat-list-header button:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: -2px;
+  }
+
+  .modern-shell.app-layout.conversation-open > .chatnet-appbar,
+  .modern-shell.app-layout.conversation-open > .bottom-navigation {
+    display: none;
+  }
+  .modern-shell.app-layout.conversation-open > .modern-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.has-active .chat-head {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.has-active .media-composer {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+  }
+
+  /* Calls / group hubs become stacked cards, not desktop multi-column grids. */
+  .modern-shell.app-layout .communication-hub { padding: 16px 13px 22px; }
+  .modern-shell.app-layout .communication-hub-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .modern-shell.app-layout .communication-hub-heading h1 { font-size: 22px; }
+  .modern-shell.app-layout .communication-hub-primary { min-height: 42px; }
+  .modern-shell.app-layout .communication-hub-list { width: 100%; padding: 14px 11px; }
+  .modern-shell.app-layout .communication-hub-row { min-height: 72px; gap: 8px; padding: 9px; }
+  .modern-shell.app-layout .communication-hub-row-copy { min-width: 0; }
+  .modern-shell.app-layout .communication-hub-call-actions { flex-shrink: 0; }
+}
+
+@media (max-width: 370px) {
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-brand strong { font-size: 16px; }
+  .modern-shell.app-layout .mobile-chat-appbar .appbar-actions .appbar-icon-button {
+    width: 37px;
+    min-width: 37px;
+  }
+  .modern-shell.app-layout .bottom-navigation .nav-label { font-size: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .bottom-navigation .nav-icon,
+  .modern-shell.app-layout .bottom-navigation > button { transition: none; transform: none; }
+}

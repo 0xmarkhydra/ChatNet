@@ -134,6 +134,32 @@ try {
   console.log('PASS OTP: lỗi, gửi lại, xác minh, thiết lập ba bước, đồng bộ ngôn ngữ')
 
   const mobileContext = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 320, height: 568 } })
+  // Mobile previews opened via http://192.168.x.x are not secure contexts:
+  // randomUUID is absent, but getRandomValues is still available.
+  await mobileContext.addInitScript(() => {
+    Object.defineProperty(Crypto.prototype, 'randomUUID', { configurable: true, value: undefined })
+  })
+  await mobileContext.route('http://localhost:8080/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const json = (data, status = 200) => route.fulfill({
+      status, contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' },
+      body: JSON.stringify(data),
+    })
+    if (request.method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } })
+    }
+    if (path === '/api/auth/email/start') {
+      return json({ verificationToken: 'mobile-otp-token', emailMasked: 'h***@example.com', expiresInSeconds: 600 }, 202)
+    }
+    if (path === '/api/auth/email/verify') {
+      return request.postDataJSON().code === '654321' ? json(session) : json({ error: 'invalid otp' }, 401)
+    }
+    if (path === '/api/events') return route.fulfill({ contentType: 'text/event-stream', headers: { 'access-control-allow-origin': '*' }, body: ': connected\\n\\n' })
+    if (path === '/api/preferences') return json({ appLocale: 'auto', targetLanguage: 'en', autoTranslate: false })
+    return json([])
+  })
   const mobile = await mobileContext.newPage()
   await mobile.goto(origin)
   await mobile.getByRole('heading', { name: /Chào mừng trở lại/ }).waitFor()
@@ -141,6 +167,20 @@ try {
   assert.ok(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
   await mobile.screenshot({ path: resolve(output, 'auth-login-mobile.png'), fullPage: true })
   console.log('PASS responsive 320px; no horizontal overflow')
+  assert.equal(await mobile.evaluate(() => typeof crypto.randomUUID), 'undefined', 'The mobile HTTP/LAN regression must disable secure-context UUID')
+  assert.equal(await mobile.evaluate(() => typeof crypto.getRandomValues), 'function', 'Secure random bytes remain supported on HTTP/LAN')
+  await mobile.getByRole('button', { name: 'Đăng nhập bằng mã OTP qua email' }).click()
+  await mobile.getByLabel('Email', { exact: true }).fill('hello@example.com')
+  await mobile.getByRole('button', { name: 'Gửi mã OTP' }).click()
+  await mobile.getByRole('heading', { name: 'Xác thực email' }).waitFor()
+  await mobile.getByLabel('Nhập mã xác minh 6 chữ số').fill('654321')
+  await mobile.getByRole('button', { name: 'Xác minh và tiếp tục' }).click()
+  await mobile.locator('.auth-layout').waitFor({ state: 'detached', timeout: 7000 })
+  const mobileSession = await mobile.evaluate(() => JSON.parse(localStorage.getItem('chatnet-session') || 'null'))
+  assert.equal(mobileSession.user.id, session.user.id)
+  assert.ok(mobileSession.sessionId && mobileSession.sessionId !== session.sessionId,
+    'HTTP/LAN OTP login must create a fresh session ID without randomUUID')
+  console.log('PASS mobile HTTP/LAN OTP verification without crypto.randomUUID')
   const failingContext = await browser.newContext({ serviceWorkers: 'block' })
   await failingContext.route('http://localhost:8080/**', async (route) => {
     if (route.request().method() === 'OPTIONS') {

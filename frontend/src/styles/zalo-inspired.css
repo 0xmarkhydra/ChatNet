@@ -3752,7 +3752,11 @@ select:focus-visible {
   margin-left: auto;
 }
 
-/* The reaction button sits in the bubble's lower-right corner. */
+/* Keep reactions at the lower-right of the bubble without allowing short
+   messages to push the picker beyond the chat viewport. On incoming messages
+   the reaction row grows RIGHT from the bubble's left edge; on outgoing
+   messages it grows LEFT from the bubble's right edge. A long bubble still
+   right-aligns its reaction row naturally. */
 .message-content > .bubble:has(+ .message-reactions) {
   padding-bottom: 22px;
 }
@@ -3760,20 +3764,30 @@ select:focus-visible {
 .message-content .message-reactions {
   position: absolute;
   z-index: 2;
-  right: -8px;
+  left: 0;
+  right: auto;
   bottom: -10px;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
   width: max-content;
-  max-width: min(230px, 78vw);
+  min-width: 100%;
+  max-width: min(230px, calc(100vw - 28px));
   gap: 4px;
   margin: 0;
 }
 
+.message.mine .message-content .message-reactions {
+  left: auto;
+  right: 0;
+}
+
 .message-content .reaction-chip,
 .message-content .reaction-add {
+  flex: 0 0 auto;
+  white-space: nowrap;
   box-shadow: 0 3px 10px rgba(26, 43, 72, .14);
 }
 

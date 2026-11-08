@@ -30,7 +30,7 @@ export type CallHistoryEntry = CallSession & {
 }
 
 export async function getCallHistory(request: CallRequest): Promise<CallHistoryEntry[]> {
-  return expectJSON<CallHistoryEntry[]>(await request('/api/calls/history'))
+  return expectJSON<CallHistoryEntry[]>(await request('/api/calls/history', { cache: 'no-store' }))
 }
 
 export type CallParticipant = {

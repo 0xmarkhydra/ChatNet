@@ -29,48 +29,59 @@ export default function BottomNavigation({
         aria-label={t('nav.chat')}
         title={t('nav.chat')}
         className={tab === 'chat' && !callsActive ? 'active' : ''}
+        aria-current={tab === 'chat' && !callsActive ? 'page' : undefined}
         onClick={() => switchTab('chat')}
       >
         <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b>{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
+        <span className="nav-label">{t('nav.chat')}</span>
       </button>
-      <button type="button" aria-label="Cuộc gọi" title="Cuộc gọi" className={callsActive ? 'active' : ''} onClick={onCalls}>
+      <button type="button" aria-label="Cuộc gọi" title="Cuộc gọi" className={callsActive ? 'active' : ''} aria-current={callsActive ? 'page' : undefined} onClick={onCalls}>
         <span className="nav-icon"><PhoneCall size={24} /></span>
+        <span className="nav-label">Cuộc gọi</span>
       </button>
       <button
         type="button"
         aria-label={t('nav.contacts')}
         title={t('nav.contacts')}
         className={tab === 'contacts' ? 'active' : ''}
+        aria-current={tab === 'contacts' ? 'page' : undefined}
         onClick={() => switchTab('contacts')}
       >
         <span className="nav-icon"><UiIcon name="contacts" size={25} /></span>
+        <span className="nav-label">{t('nav.contacts')}</span>
       </button>
       <button
         type="button"
         aria-label={t('nav.discover')}
         title={t('nav.discover')}
         className={tab === 'discover' ? 'active' : ''}
+        aria-current={tab === 'discover' ? 'page' : undefined}
         onClick={() => switchTab('discover')}
       >
         <span className="nav-icon"><UiIcon name="discover" size={25} /></span>
+        <span className="nav-label">{t('nav.discover')}</span>
       </button>
       <button
         type="button"
         aria-label={t('nav.feed')}
         title={t('nav.feed')}
         className={tab === 'feed' ? 'active' : ''}
+        aria-current={tab === 'feed' ? 'page' : undefined}
         onClick={() => switchTab('feed')}
       >
         <span className="nav-icon"><UiIcon name="wall" size={25} /></span>
+        <span className="nav-label">{t('nav.feed')}</span>
       </button>
       <button
         type="button"
         aria-label={t('nav.profile')}
         title={t('nav.profile')}
         className={tab === 'profile' ? 'active' : ''}
+        aria-current={tab === 'profile' ? 'page' : undefined}
         onClick={() => switchTab('profile')}
       >
         <span className="nav-icon"><UiIcon name="profile" size={25} />{!pushEnabled && <b>!</b>}</span>
+        <span className="nav-label">{t('nav.profile')}</span>
       </button>
     </nav>
   )
