@@ -5057,7 +5057,7 @@ export default function App({
         />
       )}
       <header
-        className={`chatnet-appbar ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
+        className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
       >
         <div className="app-page-heading">
           <strong>
@@ -5531,6 +5531,9 @@ export default function App({
               <div className="social-chat-list-header">
                 <div className="social-chat-list-title">
                   <h2>Cuộc trò chuyện</h2>
+                  <button type="button" className="social-chat-groups-link" aria-label="Nhóm và cộng đồng" title="Nhóm và cộng đồng" onClick={() => { switchTab("chat"); setDesktopSection("groups"); setGroupWorkspaceMode("list"); }}>
+                    <Users size={20} aria-hidden="true" />
+                  </button>
                   <button type="button" className="social-chat-new" aria-label="Tạo cuộc trò chuyện mới"
                     title="Tạo cuộc trò chuyện" onClick={() => { setChatCreateError(''); setNewChatMode('direct') }}>
                     <Plus size={20} aria-hidden="true" />
@@ -6623,6 +6626,9 @@ export default function App({
             friendRequests={friendRequests}
             declineFriendRequest={declineFriendRequest}
             friends={friends}
+            friendsLoading={friendSyncBusy}
+            friendsError={friendSyncError}
+            onRetryFriends={() => void refreshFriendConnections()}
             contactMetadata={contactMetadata}
             openDirectByUsername={openDirectByUsername}
             setFriendPreview={setFriendPreview}

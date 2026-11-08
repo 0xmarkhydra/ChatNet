@@ -33,6 +33,7 @@ import './styles/chat-translation-settings.css'
 import './styles/form-surfaces.css'
 import './styles/settings-workspace.css'
 import './features/auth/auth-screen.css'
+import './styles/adaptive-pwa.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)

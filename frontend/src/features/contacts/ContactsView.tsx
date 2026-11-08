@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import QRCode from 'qrcode'
-import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Heart, MessageCircle, MoreHorizontal, Phone, Plus, QrCode, Search, ShieldCheck, UserRound, UserRoundPlus, Users, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Heart, MessageCircle, MoreHorizontal, Phone, Plus, QrCode, RefreshCw, Search, ShieldCheck, UserRound, UserRoundPlus, Users, X } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from './types'
 import UserAvatar from '../../shared/ui/UserAvatar'
 
@@ -26,6 +26,9 @@ type Props = {
   friendRequests: FriendConnection[]
   declineFriendRequest: (friend: FriendConnection) => Promise<void>
   friends: FriendConnection[]
+  friendsLoading: boolean
+  friendsError: string
+  onRetryFriends: () => void
   contactMetadata: Record<number, { nickname: string; note: string; favorite: boolean }>
   openDirectByUsername: (username: string, mediaType?: 'audio' | 'video') => Promise<void>
   setFriendPreview: (friend: FriendSearchResult | null) => void
@@ -44,7 +47,7 @@ export default function ContactsView({
   screen, onScreenChange, friendQuery, setFriendQuery, friendSearching, friendSearchError,
   setFriendSearchRetry, contactSearchResults, friendRelationship, friendBusyIds, actOnFriend,
   setFriendMenuId, friendMenuId, blockContact, reportContact, friendRequests, declineFriendRequest,
-  friends, contactMetadata, openDirectByUsername, setFriendPreview, changePersonalContact,
+  friends, friendsLoading, friendsError, onRetryFriends, contactMetadata, openDirectByUsername, setFriendPreview, changePersonalContact,
   removeAcceptedFriend, connectionUrl, onScanQr,
 }: Props) {
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
@@ -146,13 +149,23 @@ export default function ContactsView({
               <button type="button" className="fd-secondary fd-search-action" disabled={friendBusyIds.has(friend.id)} onClick={() => act(friend)}>{actionText(relationshipFor(friend))}</button>
             </div>)}</div>
           </> : <>
-            <div className="fd-list-header"><h2>Tất cả bạn bè</h2><span>{friends.length.toLocaleString('vi-VN')} người</span></div>
+            <div className="fd-list-header"><h2>Tất cả bạn bè</h2>
+              <div className="fd-list-actions">
+                <span>{friends.length.toLocaleString('vi-VN')} người</span>
+                <button type="button" aria-label="Tải lại danh sách bạn bè" title="Tải lại danh sách bạn bè"
+                  disabled={friendsLoading} onClick={onRetryFriends}><RefreshCw size={17} aria-hidden="true"/></button>
+              </div>
+            </div>
             <div className="fd-filters" role="group" aria-label="Lọc danh bạ">
               {([['alphabetical','A – Z'],['online','Đang online'],['favorites','Yêu thích']] as const).map(([filter,label]) =>
                 <button type="button" key={filter} className={directoryFilter === filter ? 'active' : ''}
                   aria-pressed={directoryFilter === filter} onClick={() => setDirectoryFilter(filter)}>{label}</button>)}
             </div>
-            <div className="fd-person-list" aria-label="Danh sách bạn bè">
+            {friendsError && <div className="fd-sync-feedback" role="alert">
+              <span>{friendsError}</span>
+              <button type="button" className="fd-secondary" disabled={friendsLoading} onClick={onRetryFriends}>Thử lại</button>
+            </div>}
+            <div className="fd-person-list" aria-label="Danh sách bạn bè" aria-busy={friendsLoading}>
               {visibleFriends.map(friend => <div className={'fd-person-row' + (selectedFriend?.id === friend.id ? ' selected' : '')} key={friend.id}>
                 <button type="button" className="fd-person-identity" aria-pressed={selectedFriend?.id === friend.id}
                   onClick={() => setSelectedId(friend.id)}>{avatar(friend)}<span>
@@ -165,7 +178,9 @@ export default function ContactsView({
                 <button type="button" className="fd-icon-btn" aria-label={'Gọi thoại cho ' + personName(friend)}
                   onClick={() => startCall(friend)}><Phone size={20}/></button>
               </div>)}
-              {visibleFriends.length === 0 && <p className="fd-empty">{friends.length ? 'Không có bạn bè trong bộ lọc này.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}</p>}
+              {visibleFriends.length === 0 && !friendsError && <p className="fd-empty" role={friendsLoading ? 'status' : undefined}>
+                {friendsLoading ? 'Đang tải danh sách bạn bè...' : friends.length ? 'Không có bạn bè trong bộ lọc này.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}
+              </p>}
             </div>
           </>}
         </section>

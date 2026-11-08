@@ -15,6 +15,14 @@ function describeOtpSendError(error: unknown, fallback: string): string {
   return error
 }
 
+// randomUUID is unavailable in HTTP/LAN mobile previews; getRandomValues
+// remains cryptographically secure without requiring a secure context.
+function newClientSessionId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 const REMEMBERED_EMAIL_KEY = 'chatnet-remembered-email'
 const setupKey = (userId: number) => `chatnet-setup-complete:${userId}`
 
@@ -120,7 +128,7 @@ export function useAuthFlow(saveSession: (next: Session) => void) {
         }
         const parsed = parseSession(result)
         if (!parsed) throw new Error('invalid session response')
-        next = { ...parsed, sessionId: crypto.randomUUID() }
+        next = { ...parsed, sessionId: newClientSessionId() }
       }
 
       rememberAddress()
