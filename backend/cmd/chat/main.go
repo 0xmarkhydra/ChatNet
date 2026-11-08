@@ -97,6 +97,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	if err := database.Migrate(ctx, db); err != nil {
+		log.Fatalf("chat schema migration: %v", err)
+	}
 
 	rdb, err := redisx.Open(ctx)
 	if err != nil {
@@ -173,6 +176,9 @@ func main() {
 	mux.Handle("POST /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupChannel)))
 	mux.Handle("PATCH /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupChannel)))
 	mux.Handle("DELETE /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteGroupChannel)))
+	mux.Handle("GET /api/conversations/{id}/activities", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupActivities)))
+	mux.Handle("POST /api/conversations/{id}/activities", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupActivity)))
+	mux.Handle("POST /api/conversations/{id}/activities/{activityId}/vote", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.voteGroupActivity)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessages)))
 	mux.Handle("DELETE /api/conversations/{id}/history", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.clearConversationHistory)))
 	mux.Handle("GET /api/conversations/{id}/shared", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listSharedContent)))
