@@ -85,6 +85,49 @@
   background: rgba(62, 112, 241, .08);
 }
 
+/* Right click opens a compact menu at the pointer; the ellipsis keeps the touch sheet. */
+.conversation-context-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 191;
+  background: transparent;
+}
+
+.conversation-context-menu {
+  position: fixed;
+  width: min(244px, calc(100vw - 16px));
+  padding: 6px;
+  border: 1px solid var(--chatnet-line, #e6e7e9);
+  border-radius: 12px;
+  background: var(--chatnet-surface, #fff);
+  box-shadow: 0 12px 36px rgba(18, 27, 45, .2);
+}
+
+.conversation-context-actions button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--chatnet-text, #15171a);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.conversation-context-actions button:hover,
+.conversation-context-actions button:focus-visible {
+  background: var(--chatnet-accent-soft, #eff4ff);
+}
+
+.conversation-context-actions button:disabled { opacity: .55; cursor: wait; }
+.conversation-context-actions button > span { display: grid; place-items: center; color: var(--chatnet-accent, #2563eb); }
+.conversation-context-actions button > b { font-size: 13px; font-weight: 600; }
+
 .conversation-pin-dialog-title {
   display: flex;
   flex-direction: column;

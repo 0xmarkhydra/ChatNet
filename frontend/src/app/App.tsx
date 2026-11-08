@@ -150,6 +150,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [messageActionId, setMessageActionId] = useState<number | null>(null)
   const [conversationActionId, setConversationActionId] = useState<number | null>(null)
+  const [conversationMenuPosition, setConversationMenuPosition] = useState<{ x: number; y: number } | null>(null)
   const [pinnedExpanded, setPinnedExpanded] = useState(false)
   const messageLongPressTimer = useRef<number | null>(null)
   const messageLongPressStart = useRef<{ x: number; y: number; messageId: number } | null>(null)
@@ -3580,7 +3581,11 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
                 {visibleConversations.map((conversation) => (
                   <div key={conversation.id} className="conversation-pin-entry"
-                    onContextMenu={(event) => { event.preventDefault(); setConversationActionId(conversation.id) }}>
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      setConversationMenuPosition({ x: event.clientX, y: event.clientY })
+                      setConversationActionId(conversation.id)
+                    }}>
                     <button type="button"
                       className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''} ${conversation.pinnedAt ? 'is-pinned' : ''}`}
                       onClick={() => {
@@ -3616,7 +3621,10 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                     <button type="button" className="conversation-pin-menu-trigger"
                       aria-label={`Tùy chọn cuộc trò chuyện ${conversation.name}`}
                       title="Tùy chọn cuộc trò chuyện"
-                      onClick={() => setConversationActionId(conversation.id)}>
+                      onClick={() => {
+                        setConversationMenuPosition(null)
+                        setConversationActionId(conversation.id)
+                      }}>
                       <MoreHorizontal size={18} aria-hidden="true" />
                     </button>
                   </div>
@@ -3997,7 +4005,12 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                           onPointerLeave={cancelMessageLongPress}
                           onContextMenu={(event) => {
                             if (message.deleted) return
-                            if (event.target instanceof Element && event.target.closest('.message-selectable-text')) return
+                            const selectedText = window.getSelection()
+                            const textTarget = event.target instanceof Element
+                              ? event.target.closest('.message-selectable-text') : null
+                            // Preserve the native Copy menu for selected text; otherwise show chat actions.
+                            if (textTarget && selectedText && !selectedText.isCollapsed &&
+                              (textTarget.contains(selectedText.anchorNode) || textTarget.contains(selectedText.focusNode))) return
                             event.preventDefault()
                             openMessageActions(message)
                           }}
@@ -4413,18 +4426,27 @@ export default function App({ initialSession }: { initialSession?: Session | nul
         )}
 
         {activeConversationAction && (
-          <div className="message-context-backdrop" role="dialog" aria-modal="true"
+          <div className={conversationMenuPosition ? 'conversation-context-backdrop' : 'message-context-backdrop'}
+            role="dialog" aria-modal="true"
             aria-label={`Tùy chọn cuộc trò chuyện ${activeConversationAction.name}`}
             onMouseDown={(event) => {
               if (event.currentTarget === event.target) setConversationActionId(null)
             }}
             onKeyDown={(event) => { if (event.key === 'Escape') setConversationActionId(null) }}>
-            <section className="message-context-sheet">
-              <div className="conversation-pin-dialog-title">
-                <strong>{activeConversationAction.name}</strong>
-                <span>Thiết lập riêng cho tài khoản của bạn</span>
-              </div>
-              <div className="message-context-actions">
+            <section
+              className={conversationMenuPosition ? 'conversation-context-menu' : 'message-context-sheet'}
+              style={conversationMenuPosition ? {
+                left: Math.max(8, Math.min(conversationMenuPosition.x, window.innerWidth - 252)),
+                top: Math.max(8, Math.min(conversationMenuPosition.y, window.innerHeight - 72)),
+              } : undefined}
+            >
+              {!conversationMenuPosition && (
+                <div className="conversation-pin-dialog-title">
+                  <strong>{activeConversationAction.name}</strong>
+                  <span>Thiết lập riêng cho tài khoản của bạn</span>
+                </div>
+              )}
+              <div className={conversationMenuPosition ? 'conversation-context-actions' : 'message-context-actions'}>
                 <button type="button" autoFocus disabled={pinBusy}
                   onClick={() => {
                     setConversationActionId(null)
@@ -4434,8 +4456,10 @@ export default function App({ initialSession }: { initialSession?: Session | nul
                   <b>{activeConversationAction.pinnedAt ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}</b>
                 </button>
               </div>
-              <button type="button" className="message-context-cancel"
-                onClick={() => setConversationActionId(null)}>Đóng</button>
+              {!conversationMenuPosition && (
+                <button type="button" className="message-context-cancel"
+                  onClick={() => setConversationActionId(null)}>Đóng</button>
+              )}
             </section>
           </div>
         )}
