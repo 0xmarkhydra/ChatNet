@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { ChevronDown, Heart, MessageCircle, ThumbsUp } from 'lucide-react'
+import { ChevronDown, MessageCircle, ThumbsUp } from 'lucide-react'
+import FeedReactionControl from '../features/feed/FeedReactionControl'
 import type { Post } from '../features/feed/types'
 import { FeedText } from '../features/feed/FeedDiscussion'
 import FeedPostActions, { FeedShareAction } from '../features/feed/FeedPostActions'
@@ -19,7 +20,7 @@ type Props = {
   targetLanguage: string
   likeBusy: boolean
   request: (path: string, init?: RequestInit) => Promise<Response>
-  onLike: (post: Post) => void
+  onLike: (post: Post, emoji?: string) => Promise<void>
   onUpdated: (post: Post) => void
   onDeleted: (id: number) => void
   onFeedback: (message: string, kind?: ToastKind) => void
@@ -80,14 +81,11 @@ export default function PostCommentsPage({
                 <span><ThumbsUp size={22} fill="#2563eb" color="#2563eb" aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích</span>
                 <span>{commentCount.toLocaleString('vi-VN')} bình luận{sharesLabel}</span>
               </div>
-              <div className="post-comments-post-actions">
-                <button type="button" className={post.liked ? 'is-liked' : ''} onClick={() => onLike(post)}
-                  disabled={likeBusy} aria-pressed={post.liked}>
-                  <Heart size={24} fill={post.liked ? 'currentColor' : 'none'} aria-hidden="true" />
-                  {post.liked ? 'Đã thích' : 'Thích'}
-                </button>
-                <button type="button" onClick={() => document.querySelector<HTMLTextAreaElement>('.post-comments-thread .feed-comment-compose textarea')?.focus()}>
-                  <MessageCircle size={24} aria-hidden="true" />Bình luận
+              <div className="post-comments-post-actions post-toolbar post-toolbar-compact">
+                <FeedReactionControl post={post} busy={likeBusy} react={onLike} showCount />
+                <button type="button" aria-label="Bình luận" title="Bình luận"
+                  onClick={() => document.querySelector<HTMLTextAreaElement>('.post-comments-thread .feed-comment-compose textarea')?.focus()}>
+                  <MessageCircle size={21} aria-hidden="true" /><span>Bình luận</span>
                 </button>
                 <FeedShareAction postId={post.id} onFeedback={onFeedback} />
               </div>
