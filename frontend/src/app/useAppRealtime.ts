@@ -31,6 +31,8 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     groupSettingsOpen: boolean
     activeConversationIdRef: RefObject<number | null>
     refreshGroupMembers: (id: number) => Promise<void>
+    refreshPinnedMessages: (id: number) => Promise<void>
+    clearPinnedMessages: () => void
     setMessages: Dispatch<SetStateAction<Message[]>>
     messageChanges: RefObject<Set<number>>
     setTranslations: Dispatch<SetStateAction<Record<number, string>>>
@@ -70,6 +72,8 @@ export function useAppRealtime({
   groupSettingsOpen,
   activeConversationIdRef,
   refreshGroupMembers,
+  refreshPinnedMessages,
+  clearPinnedMessages,
   setMessages,
   messageChanges,
   setTranslations,
@@ -120,6 +124,8 @@ export function useAppRealtime({
         // Remove potentially forbidden content immediately; refetch using current access rules.
         responseCache.current.invalidate(['messages', 'conversations', 'friends', 'feed', 'stories', 'profiles', 'notes'])
         setMessages([])
+        clearPinnedMessages()
+        if (activeConversationIdRef.current) void refreshPinnedMessages(activeConversationIdRef.current)
         void refreshConversations()
         void refreshFriendConnections()
         void refreshPosts()
@@ -150,8 +156,16 @@ export function useAppRealtime({
 
       if (update.type === 'conversation.removed') {
         responseCache.current.invalidate(['conversations','messages'])
+        if (activeConversationIdRef.current === update.conversationId) clearPinnedMessages()
         purgeConversation(update.conversationId)
         refreshCategoryConversations()
+        return
+      }
+
+      if (update.type === 'pins.updated') {
+        if (activeConversationIdRef.current === update.conversationId) {
+          void refreshPinnedMessages(update.conversationId)
+        }
         return
       }
 
@@ -163,7 +177,7 @@ export function useAppRealtime({
         membershipEventSequence.current += 1
         void refreshConversations()
         refreshCategoryConversations()
-        if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
+        if (activeConversationIdRef.current === update.conversationId) {
           void refreshGroupMembers(update.conversationId)
         }
         return
@@ -212,6 +226,8 @@ export function useAppRealtime({
             delete next[changed.id]
             return next
           })
+          // Edits and recalls must refresh the preview shown in the pinned banner.
+          void refreshPinnedMessages(update.conversationId)
         }
         void refreshConversations()
         refreshCategoryConversations()

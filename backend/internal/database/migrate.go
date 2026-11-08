@@ -35,6 +35,9 @@ var postReactionsSQL string
 //go:embed migrations/006_group_activities.sql
 var groupActivitiesSQL string
 
+//go:embed migrations/005_chat_pins.sql
+var chatPinsSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -72,6 +75,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, postReactionsSQL); err != nil {
 		return fmt.Errorf("apply post reaction migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, chatPinsSQL); err != nil {
+		return fmt.Errorf("apply chat pins migration: %w", err)
 	}
 	if _, err = tx.Exec(ctx, groupActivitiesSQL); err != nil {
 		return fmt.Errorf("apply group activities migration: %w", err)

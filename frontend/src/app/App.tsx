@@ -8,6 +8,8 @@ import { SessionResponseCache } from "../shared/lib/sessionCache";
 import VisitorProfile from "../features/profile/VisitorProfile";
 import { userLabel } from "../shared/lib/userLabel";
 import { useMessageData } from "../features/chat/useMessageData";
+import { useChatPins } from "../features/chat/useChatPins";
+import "../features/chat/chat-pins.css";
 import { getMessageTranslationView } from "../features/chat/messageTranslationPresentation";
 import { useApiRequest } from "./useApiRequest";
 import { useAppRealtime } from "./useAppRealtime";
@@ -155,6 +157,7 @@ import {
   LogOut,
   MessageCircle,
   MoreHorizontal,
+  Pin,
   ArrowLeft,
   Settings,
   PencilLine,
@@ -324,6 +327,9 @@ export default function App({
   const ownSendScrollConversation = useRef<number | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [messageActionId, setMessageActionId] = useState<number | null>(null);
+  const [conversationActionId, setConversationActionId] = useState<number | null>(null);
+  const [conversationMenuPosition, setConversationMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [pinnedExpanded, setPinnedExpanded] = useState(false);
   const [groupActivityCreateKind, setGroupActivityCreateKind] = useState<GroupActivityKind | null>(null);
   const [groupActivityViewedId, setGroupActivityViewedId] = useState<number | null>(null);
   useEffect(() => {
@@ -1082,6 +1088,13 @@ export default function App({
     actionLocks,
   });
 
+  const {
+    pinnedMessages, pinBusy, refreshPinnedMessages, clearPinnedMessages, toggleMessagePin, toggleConversationPin,
+  } = useChatPins({
+    session, sessionRef, activeConversationId, activeConversationIdRef,
+    apiFetch, setConversations, refreshConversations, setNotice,
+  })
+
   useEffect(() => {
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
   }, [groupSettingsOpen]);
@@ -1220,6 +1233,8 @@ export default function App({
         ...followingFeed.posts,
       ].find((item) => item.id === activePostId) || null
     : null;
+  const activeConversationAction = conversationActionId
+    ? displayConversations.find((item) => item.id === conversationActionId) || null : null;
   const activeMessageAction = messageActionId
     ? messages.find((item) => item.id === messageActionId) || null
     : null;
@@ -1496,6 +1511,8 @@ export default function App({
     messageScrollAtBottom.current = true;
     cancelMessageLongPress();
     setMessageActionId(null);
+    setConversationActionId(null);
+    setPinnedExpanded(false);
     setMessages([]);
     setHasMoreMessages(false);
     setMessagesLoadingMore(false);
@@ -3637,6 +3654,8 @@ export default function App({
     groupSettingsOpen,
     activeConversationIdRef,
     refreshGroupMembers,
+    refreshPinnedMessages,
+    clearPinnedMessages,
     setMessages,
     messageChanges,
     setTranslations,
@@ -4712,6 +4731,11 @@ export default function App({
                 b.id - a.id,
             )
           : visiblePosts;
+  const sortedChatListConversations = [...chatListConversations].sort((a, b) =>
+    Number(Boolean(b.pinnedAt)) - Number(Boolean(a.pinnedAt)) ||
+    (b.pinnedAt || '').localeCompare(a.pinnedAt || '') ||
+    (b.lastMessageAt || b.createdAt).localeCompare(a.lastMessageAt || a.createdAt)
+  );
   const openChatQuickContact = (contact: ChatQuickContact) => {
     setQuickSearchOpen(false);
     setGlobalSearch("");
@@ -5715,43 +5739,59 @@ export default function App({
                   </div>
                 )}
 
-                {chatListConversations.map((conversation) => (
-                  <button
-                    key={conversation.id}
-                    className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''}`}
-                    onClick={() => {
-                      if (conversationListSearch.active) {
-                        // Opening an older search hit must not discard the existing sidebar cache.
-                        setConversations((current) => current.some((item) => item.id === conversation.id)
-                          ? current : [...current, conversation])
-                      }
-                      setChatSearchJump(null)
-                      setQuickSearchOpen(false)
-                      setActiveConversationId(conversation.id)
-                      setTranslations({})
-                      setTranslationOriginals({})
-                      setTranslationMenuOpen(false)
-                    }}
-                  >
-                    <UserAvatar
-                      username={conversation.otherUsername} name={conversation.name}
-                      className="conversation-avatar"
-                      group={conversation.type === 'group'}
-                      online={conversation.type === 'direct' && conversation.online}
-                    />
-                    <div className="conversation-copy">
-                      <div>
-                        <span className="conversation-title"><strong>{conversation.name}</strong>
-                          <CategoryBadge iconOnly category={conversationCategories.categories.find(c => c.id === conversation.categoryId)} />
-                        </span>
-                        <time>{formatTime(conversation.lastMessageAt) || (conversation.online ? 'online' : '')}</time>
+                {sortedChatListConversations.map((conversation) => (
+                  <div key={conversation.id} className="conversation-pin-entry"
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      setConversationMenuPosition({ x: event.clientX, y: event.clientY })
+                      setConversationActionId(conversation.id)
+                    }}>
+                    <button type="button"
+                      className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''} ${conversation.pinnedAt ? 'is-pinned' : ''}`}
+                      onClick={() => {
+                        if (conversationListSearch.active) {
+                          setConversations((current) => current.some((item) => item.id === conversation.id)
+                            ? current : [...current, conversation]);
+                        }
+                        setChatSearchJump(null)
+                        setQuickSearchOpen(false)
+                        setActiveConversationId(conversation.id)
+                        setTranslations({})
+                        setTranslationOriginals({})
+                        setTranslationMenuOpen(false)
+                      }}
+                    >
+                      <UserAvatar
+                        username={conversation.otherUsername} name={conversation.name}
+                        className="conversation-avatar"
+                        group={conversation.type === 'group'}
+                        online={conversation.type === 'direct' && conversation.online}
+                      />
+                      <div className="conversation-copy">
+                        <div>
+                          <span className="conversation-title">
+                            {conversation.pinnedAt && <Pin size={13} aria-label="Đã ghim" className="conversation-pin-indicator" />}
+                            <strong>{conversation.name}</strong>
+                            <CategoryBadge iconOnly category={conversationCategories.categories.find(c => c.id === conversation.categoryId)} />
+                          </span>
+                          <time>{formatTime(conversation.lastMessageAt) || (conversation.online ? 'online' : '')}</time>
+                        </div>
+                        <div>
+                          <span>{conversation.lastMessage || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
+                          {conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</b>}
+                        </div>
                       </div>
-                      <div>
-                        <span>{conversation.lastMessage || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
-                        {conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</b>}
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                    <button type="button" className="conversation-pin-menu-trigger"
+                      aria-label={`Tùy chọn cuộc trò chuyện ${conversation.name}`}
+                      title="Tùy chọn cuộc trò chuyện"
+                      onClick={() => {
+                        setConversationMenuPosition(null)
+                        setConversationActionId(conversation.id)
+                      }}>
+                      <MoreHorizontal size={18} aria-hidden="true" />
+                    </button>
+                  </div>
                 ))}
                 {(conversationListSearch.active ? conversationListSearch.hasMore
                   : conversationCategories.selected === null ? hasMoreConversations : conversationCategories.hasMore) && (
@@ -6007,6 +6047,43 @@ export default function App({
                     </div>
                   </header>
 
+                  {pinnedMessages.length > 0 && (
+                    <div className="chat-pinned-panel" role="region" aria-label="Tin nhắn đã ghim">
+                      <div className="chat-pinned-heading">
+                        <Pin size={16} aria-hidden="true" />
+                        <strong>Tin nhắn đã ghim ({pinnedMessages.length})</strong>
+                        {pinnedMessages.length > 1 && (
+                          <button type="button" onClick={() => setPinnedExpanded((value) => !value)}
+                            aria-expanded={pinnedExpanded}>
+                            {pinnedExpanded ? 'Thu gọn' : 'Xem tất cả'}
+                          </button>
+                        )}
+                      </div>
+                      <div className="chat-pinned-items">
+                        {pinnedMessages.slice(0, pinnedExpanded ? 100 : 1).map(({ message }) => (
+                          <div className="chat-pinned-item" key={message.id}>
+                            <button type="button" className="chat-pinned-jump"
+                              title="Đi đến tin nhắn đã ghim"
+                              onClick={() => setChatSearchJump({
+                                conversationId: activeConversation.id,
+                                messageId: message.id,
+                                revision: ++chatSearchJumpRevision.current,
+                              })}>
+                              <strong>{userLabel(message.senderDisplayName, message.sender)}</strong>
+                              <span>{message.text || attachmentLabel(message.attachments) || 'Tin nhắn'}</span>
+                            </button>
+                            {(activeConversation.type === 'direct' || canManageActiveGroup) && (
+                              <button type="button" className="chat-pinned-remove" disabled={pinBusy}
+                                aria-label="Bỏ ghim tin nhắn" title="Bỏ ghim tin nhắn"
+                                onClick={() => void toggleMessagePin(message)}>
+                                <X size={15} aria-hidden="true" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
 
                   {chatFriend && chatFriendRelationship !== 'accepted' && (friendSyncError || friendSyncSessionId === session?.sessionId) && (
@@ -7107,6 +7184,45 @@ export default function App({
           </div>
         )}
 
+        {activeConversationAction && (
+          <div className={conversationMenuPosition ? 'conversation-context-backdrop' : 'message-context-backdrop'}
+            role="dialog" aria-modal="true"
+            aria-label={`Tùy chọn cuộc trò chuyện ${activeConversationAction.name}`}
+            onMouseDown={(event) => {
+              if (event.currentTarget === event.target) setConversationActionId(null)
+            }}
+            onKeyDown={(event) => { if (event.key === 'Escape') setConversationActionId(null) }}>
+            <section
+              className={conversationMenuPosition ? 'conversation-context-menu' : 'message-context-sheet'}
+              style={conversationMenuPosition ? {
+                left: Math.max(8, Math.min(conversationMenuPosition.x, window.innerWidth - 252)),
+                top: Math.max(8, Math.min(conversationMenuPosition.y, window.innerHeight - 72)),
+              } : undefined}
+            >
+              {!conversationMenuPosition && (
+                <div className="conversation-pin-dialog-title">
+                  <strong>{activeConversationAction.name}</strong>
+                  <span>Thiết lập riêng cho tài khoản của bạn</span>
+                </div>
+              )}
+              <div className={conversationMenuPosition ? 'conversation-context-actions' : 'message-context-actions'}>
+                <button type="button" autoFocus disabled={pinBusy}
+                  onClick={() => {
+                    setConversationActionId(null)
+                    void toggleConversationPin(activeConversationAction)
+                  }}>
+                  <span aria-hidden="true"><Pin size={19} /></span>
+                  <b>{activeConversationAction.pinnedAt ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}</b>
+                </button>
+              </div>
+              {!conversationMenuPosition && (
+                <button type="button" className="message-context-cancel"
+                  onClick={() => setConversationActionId(null)}>Đóng</button>
+              )}
+            </section>
+          </div>
+        )}
+
         {activeConversation?.type === 'group' && (groupActivityCreateKind !== null || groupActivityViewedId !== null) && (
           <GroupActivityDialog
             key={`${activeConversation.id}-${groupActivityCreateKind || 'view'}-${groupActivityViewedId ?? ''}`}
@@ -7121,6 +7237,9 @@ export default function App({
           <MessageActions
             activeMessageAction={activeMessageAction}
             userId={session.user.id}
+            canPin={activeConversation?.type === 'direct' || Boolean(canManageActiveGroup)}
+            isPinned={pinnedMessages.some((pin) => pin.message.id === activeMessageAction.id)}
+            toggleMessagePin={toggleMessagePin}
             setMessageActionId={setMessageActionId}
             toggleReaction={toggleReaction}
             setReplyingTo={setReplyingTo}

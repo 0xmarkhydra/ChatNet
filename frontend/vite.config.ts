@@ -5,6 +5,9 @@ import { randomUUID } from 'node:crypto'
 import { chatCopyImageDevProxy } from './dev/chatCopyImageProxy'
 
 export default defineConfig({
+  // Ignore nested frontend/output snapshots when discovering app dependencies.
+  resolve: { dedupe: ['react', 'react-dom'] },
+  optimizeDeps: { entries: ['index.html'] },
   plugins: [
     react(),
     chatCopyImageDevProxy(),

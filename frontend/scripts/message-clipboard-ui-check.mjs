@@ -13,10 +13,11 @@ const server = await createServer({
 try {
   const { default: MessageActions } = await server.ssrLoadModule('/src/features/chat/MessageActions.tsx')
   const { resolveMessageCopyTarget } = await server.ssrLoadModule('/src/features/chat/messageCopyTarget.ts')
-  const render = (message, target = resolveMessageCopyTarget(message, null)) =>
+  const render = (message, target = resolveMessageCopyTarget(message, null), pin = {}) =>
     renderToStaticMarkup(React.createElement(MessageActions, {
       activeMessageAction: message, userId: 1, setMessageActionId() {},
       toggleReaction: async () => {}, setReplyingTo() {},
+      canPin: false, isPinned: false, toggleMessagePin: async () => {}, ...pin,
       copyTarget: target, copyMessageContent: async () => {},
       translateMessage: async () => {}, editOwnMessage: async () => {}, recallOwnMessage: async () => {},
     }))
@@ -34,7 +35,7 @@ try {
     const buttons = html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? []
     const copyButtons = buttons.filter((button) => button.includes('>Sao chép</b>'))
     assert.equal(copyButtons.length, 1, description + ': expected exactly one copy button')
-    assert.match(copyButtons[0], /aria-hidden="true">▣<\/span>/)
+    assert.match(copyButtons[0], /class="lucide lucide-copy"/)
     assert.doesNotMatch(html, /Sao chép (ảnh|liên kết|link|tệp)/i, description + ': no special copy buttons')
     return html
   }
@@ -83,7 +84,10 @@ try {
   assertSingleCopy(mixed, resolveMessageCopyTarget(mixed, fileElement), 'mixed message file')
 
   assert.doesNotMatch(render(message), />Sao chép<\/b>/)
-  console.log('PASS: exactly one Sao chép button for text, links, images, files, mixed targets and missing URLs')
+  assert.doesNotMatch(render({ ...message, text: 'Lời chào' }), /Ghim tin nhắn/)
+  assert.match(render({ ...message, text: 'Lời chào' }, undefined, { canPin: true }), /Ghim tin nhắn/)
+  assert.match(render({ ...message, text: 'Lời chào' }, undefined, { canPin: true, isPinned: true }), /Bỏ ghim tin nhắn/)
+  console.log('PASS: one Copy action for text, links, images and files; pin actions respect permissions and pin state')
 } finally {
   await server.close()
 }

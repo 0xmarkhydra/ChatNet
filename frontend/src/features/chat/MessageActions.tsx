@@ -3,10 +3,14 @@ import type { Message } from './types'
 import { messageReactions } from './messageReactions'
 import { attachmentLabel, formatTime } from '../../shared/lib/format'
 import type { MessageCopyTarget } from './messageCopyTarget'
+import { Copy, Pin } from 'lucide-react'
 
 type Props = {
   activeMessageAction: Message
   userId: number
+  canPin: boolean
+  isPinned: boolean
+  toggleMessagePin: (message: Message) => Promise<void>
   setMessageActionId: (id: number | null) => void
   toggleReaction: (message: Message, emoji: string) => Promise<void>
   setReplyingTo: (message: Message) => void
@@ -20,6 +24,9 @@ type Props = {
 export default function MessageActions({
   activeMessageAction,
   userId,
+  canPin,
+  isPinned,
+  toggleMessagePin,
   setMessageActionId,
   toggleReaction,
   setReplyingTo,
@@ -69,6 +76,15 @@ export default function MessageActions({
         </div>
 
         <div className="message-context-actions">
+          {canPin && !activeMessageAction.deleted && (
+            <button type="button" onClick={() => {
+              setMessageActionId(null)
+              void toggleMessagePin(activeMessageAction)
+            }}>
+              <span aria-hidden="true"><Pin size={20} strokeWidth={2} /></span>
+              <b>{isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}</b>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -82,7 +98,7 @@ export default function MessageActions({
 
           {copyTarget && (
             <button type="button" onClick={() => void copyMessageContent(activeMessageAction, copyTarget)}>
-              <span aria-hidden="true">▣</span>
+              <span aria-hidden="true"><Copy size={20} strokeWidth={2} /></span>
               <b>Sao chép</b>
             </button>
           )}
