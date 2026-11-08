@@ -684,7 +684,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         border: Border.all(color: socoLine),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(children: children),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(children: children),
+      ),
     );
   }
 

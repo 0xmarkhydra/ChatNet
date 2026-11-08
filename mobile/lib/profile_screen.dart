@@ -569,7 +569,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         border: Border.all(color: socoLine),
         borderRadius: BorderRadius.circular(18),
       ),
-      child: child,
+      child: Material(type: MaterialType.transparency, child: child),
     );
   }
 }

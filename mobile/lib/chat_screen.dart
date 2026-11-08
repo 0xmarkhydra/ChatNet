@@ -19,15 +19,19 @@ class ChatScreen extends StatefulWidget {
     required this.api,
     required this.query,
     required this.onConversationChanged,
+    this.onUnreadChanged,
     this.requestedConversation,
     this.createRequest = 0,
+    this.foreground = true,
   });
 
   final Api api;
   final String query;
   final ValueChanged<bool> onConversationChanged;
+  final ValueChanged<int>? onUnreadChanged;
   final Json? requestedConversation;
   final int createRequest;
+  final bool foreground;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -38,6 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final scrollController = ScrollController();
   List<Json> conversations = [];
   List<Json> messages = [];
+  String conversationFilter = 'all';
   Json? active;
   Json? replyingTo;
   bool loading = true;
@@ -52,17 +57,48 @@ class _ChatScreenState extends State<ChatScreen> {
   String friendError = '';
   String error = '';
   StreamSubscription<void>? events;
+  Timer? reconcileTimer;
+  bool reconciling = false;
+  bool reconcileAgain = false;
 
   @override
   void initState() {
     super.initState();
     _refresh();
-    events = widget.api.events().listen((_) => _reconcile());
+    if (widget.foreground) _listenForEvents();
+  }
+
+  void _listenForEvents() {
+    if (events != null) return;
+    events = widget.api.events().listen((_) => _scheduleReconcile());
+  }
+
+  void _scheduleReconcile() {
+    if (!mounted || !widget.foreground) return;
+    reconcileTimer?.cancel();
+    reconcileTimer = Timer(const Duration(milliseconds: 300), _reconcile);
+  }
+
+  void _stopEvents() {
+    reconcileTimer?.cancel();
+    reconcileTimer = null;
+    reconcileAgain = false;
+    final subscription = events;
+    events = null;
+    if (subscription != null) unawaited(subscription.cancel());
   }
 
   @override
   void didUpdateWidget(covariant ChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.foreground != widget.foreground) {
+      if (widget.foreground) {
+        _listenForEvents();
+        _scheduleReconcile();
+      } else {
+        _stopEvents();
+      }
+    }
     final requested = widget.requestedConversation;
     if (requested != null &&
         !identical(requested, oldWidget.requestedConversation) &&
@@ -91,6 +127,13 @@ class _ChatScreenState extends State<ChatScreen> {
         loading = false;
         error = '';
       });
+      final unread = data.fold<int>(
+        0,
+        (sum, room) => sum + ((room['unreadCount'] as num?)?.toInt() ?? 0),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onUnreadChanged?.call(unread);
+      });
       if (active != null) {
         final replacement = data.where((item) => item['id'] == active!['id']);
         if (replacement.isNotEmpty) active = replacement.first;
@@ -106,8 +149,83 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _reconcile() async {
-    await _refresh();
-    if (active != null) await _loadMessages(active!);
+    if (!mounted || !widget.foreground) return;
+    if (reconciling) {
+      reconcileAgain = true;
+      return;
+    }
+    reconciling = true;
+    try {
+      await _refresh();
+      final roomId = active?['id'];
+      if (roomId == null || !mounted || !widget.foreground) return;
+      // Realtime refresh must not re-open the room, reset the composer,
+      // re-fetch preferences or retranslate the entire history.
+      final updated = objects(
+        await widget.api.request(
+          'GET',
+          '/api/conversations/$roomId/messages'
+              '?target=${Uri.encodeQueryComponent(targetLanguage)}',
+        ),
+      );
+      if (!mounted || !widget.foreground || active?['id'] != roomId) return;
+
+      final previous = {for (final message in messages) message['id']: message};
+      final incoming = <Json>[];
+      var hasIncoming = false;
+      for (final message in updated) {
+        final old = previous[message['id']];
+        if (old != null) {
+          if (old['translationLanguage'] == targetLanguage &&
+              (message['translatedText']?.toString().isEmpty ?? true)) {
+            message['translatedText'] = old['translatedText'];
+            message['translationLanguage'] = old['translationLanguage'];
+          }
+          if (old['_showOriginal'] == true) {
+            message['_showOriginal'] = true;
+          }
+        } else if (message['senderId'] != widget.api.user['id']) {
+          hasIncoming = true;
+          incoming.add(message);
+        }
+      }
+      final followBottom =
+          !scrollController.hasClients ||
+          scrollController.position.extentAfter < 100;
+      setState(() => messages = updated);
+      if (hasIncoming) {
+        unawaited(() async {
+          try {
+            await widget.api.request('POST', '/api/conversations/$roomId/read');
+          } catch (_) {
+            // Reconcile will retry server read state on the next user action.
+          }
+        }());
+        if (autoTranslate) {
+          for (final message in incoming) {
+            if ((message['text']?.toString().trim().isNotEmpty ?? false) &&
+                (message['translatedText']?.toString().isEmpty ?? true)) {
+              unawaited(
+                _translate(message, target: targetLanguage, silent: true),
+              );
+            }
+          }
+        }
+      }
+      if (followBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && active?['id'] == roomId) _scrollToBottom();
+        });
+      }
+    } catch (_) {
+      // Keep the visible messages if a background refresh fails.
+    } finally {
+      reconciling = false;
+      if (reconcileAgain && mounted && widget.foreground) {
+        reconcileAgain = false;
+        _scheduleReconcile();
+      }
+    }
   }
 
   Future<void> _loadMessages(Json conversation) async {
@@ -167,17 +285,10 @@ class _ChatScreenState extends State<ChatScreen> {
         loading = false;
         error = '';
       });
-      if (shouldAutoTranslate) {
-        final userId = widget.api.user['id'];
-        await Future.wait([
-          for (final message in data)
-            if (message['senderId'] != userId &&
-                (message['text']?.toString().trim().isNotEmpty ?? false) &&
-                (message['translatedText']?.toString().isEmpty ?? true))
-              _translate(message, target: target, silent: true),
-        ]);
-      }
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      if (shouldAutoTranslate) {
+        await _translateMissing(data, target);
+      }
     } catch (value) {
       if (mounted) {
         setState(() {
@@ -345,6 +456,26 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _translateMissing(List<Json> source, String target) async {
+    final pending = source
+        .where(
+          (message) =>
+              message['senderId'] != widget.api.user['id'] &&
+              (message['text']?.toString().trim().isNotEmpty ?? false) &&
+              (message['translatedText']?.toString().isEmpty ?? true),
+        )
+        .toList();
+    // Bound translation concurrency: large histories must not flood the API
+    // or repaint dozens of bubbles in one burst on emulator devices.
+    for (var start = 0; start < pending.length; start += 3) {
+      await Future.wait([
+        for (final message in pending.skip(start).take(3))
+          _translate(message, target: target, silent: true),
+      ]);
+      if (!mounted) return;
+    }
+  }
+
   Future<void> _saveTranslationSettings({String? target, bool? enabled}) async {
     final nextTarget = target ?? targetLanguage;
     final nextEnabled = enabled ?? autoTranslate;
@@ -368,13 +499,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       });
       if (autoTranslate) {
-        await Future.wait([
-          for (final message in messages)
-            if (message['senderId'] != widget.api.user['id'] &&
-                (message['text']?.toString().trim().isNotEmpty ?? false) &&
-                (message['translatedText']?.toString().isEmpty ?? true))
-              _translate(message, target: targetLanguage, silent: true),
-        ]);
+        await _translateMissing(messages, targetLanguage);
       }
     } catch (value) {
       _show(value.toString());
@@ -707,7 +832,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    events?.cancel();
+    _stopEvents();
     messageController.dispose();
     scrollController.dispose();
     super.dispose();
@@ -717,10 +842,18 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final filtered = conversations.where((item) {
       final query = widget.query.trim().toLowerCase();
-      if (query.isEmpty) return true;
-      return '${item['name']} ${item['lastMessage']}'.toLowerCase().contains(
-        query,
-      );
+      if (query.isNotEmpty &&
+          !'${item['name']} ${item['lastMessage']}'.toLowerCase().contains(
+            query,
+          )) {
+        return false;
+      }
+      return switch (conversationFilter) {
+        'unread' => ((item['unreadCount'] as num?)?.toInt() ?? 0) > 0,
+        'group' => item['type'] == 'group',
+        'direct' => item['type'] == 'direct',
+        _ => true,
+      };
     }).toList();
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -756,30 +889,87 @@ class _ChatScreenState extends State<ChatScreen> {
       color: Colors.white,
       child: Column(
         children: [
-          SectionHeading(
-            eyebrow: 'TIN NHẮN',
-            title: 'Trò chuyện',
-            description:
-                '${conversations.length} cuộc trò chuyện · Kết nối không biên giới',
-            action: TextButton.icon(
-              key: const ValueKey('connect-action'),
-              onPressed: _newChat,
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF2A58C9),
-                backgroundColor: const Color(0xFFEDF3FF),
-                minimumSize: const Size(0, 39),
-                padding: const EdgeInsets.symmetric(horizontal: 11),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: Color(0xFFDCE6FF)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(15, 12, 15, 9),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Trò chuyện',
+                        style: TextStyle(
+                          fontSize: 19,
+                          color: socoNavy,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        '${conversations.length} cuộc trò chuyện',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              iconAlignment: IconAlignment.end,
-              icon: const Icon(Icons.arrow_outward_rounded, size: 15),
-              label: const Text(
-                'Kết nối',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
+                TextButton.icon(
+                  key: const ValueKey('connect-action'),
+                  onPressed: _newChat,
+                  style: TextButton.styleFrom(
+                    foregroundColor: socoBlue,
+                    backgroundColor: socoSoftBlue,
+                    minimumSize: const Size(0, 38),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_comment_outlined, size: 18),
+                  label: const Text(
+                    'Kết nối',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 9),
+            child: Row(
+              children: [
+                for (final entry in const [
+                  ('all', 'Tất cả'),
+                  ('unread', 'Chưa đọc'),
+                  ('group', 'Nhóm'),
+                  ('direct', 'Cá nhân'),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      key: ValueKey('chat-filter-${entry.$1}'),
+                      label: Text(entry.$2),
+                      selected: conversationFilter == entry.$1,
+                      onSelected: (_) =>
+                          setState(() => conversationFilter = entry.$1),
+                      showCheckmark: false,
+                      backgroundColor: const Color(0xFFF6F8FC),
+                      selectedColor: socoSoftBlue,
+                      side: BorderSide(
+                        color: conversationFilter == entry.$1
+                            ? const Color(0xFFBED0FB)
+                            : const Color(0xFFE8ECF7),
+                      ),
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: conversationFilter == entry.$1
+                            ? socoBlue
+                            : socoMuted,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           if (loading && conversations.isEmpty)
@@ -809,14 +999,14 @@ class _ChatScreenState extends State<ChatScreen> {
               child: RefreshIndicator(
                 onRefresh: _refresh,
                 child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(9, 0, 9, 12),
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final room = filtered[index];
                     final selected = active?['id'] == room['id'];
                     final unread = (room['unreadCount'] as num?)?.toInt() ?? 0;
                     return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      padding: const EdgeInsets.symmetric(vertical: 1),
                       child: Material(
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(16),
@@ -849,7 +1039,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                     UserAvatar(
                                       name: room['name']?.toString() ?? '',
                                       username: room['type'] == 'direct'
-                                          ? (room['otherUsername'] ?? room['name'])?.toString()
+                                          ? (room['otherUsername'] ??
+                                                    room['name'])
+                                                ?.toString()
                                           : null,
                                       size: 52,
                                       group: room['type'] == 'group',
@@ -1021,7 +1213,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       UserAvatar(
                         name: room['name']?.toString() ?? '',
                         username: room['type'] == 'direct'
-                            ? (room['otherUsername'] ?? room['name'])?.toString()
+                            ? (room['otherUsername'] ?? room['name'])
+                                  ?.toString()
                             : null,
                         size: compact ? 36 : 42,
                         group: room['type'] == 'group',
@@ -1079,7 +1272,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       icon: Icons.videocam_outlined,
                     ),
-                    if (compact && room['type'] == 'group') ...[
+                    if (veryNarrow || (compact && room['type'] == 'group')) ...[
                       SizedBox(width: compact ? 2 : 6),
                       PopupMenuButton<String>(
                         key: const ValueKey('chat-more-actions'),
@@ -1093,28 +1286,29 @@ class _ChatScreenState extends State<ChatScreen> {
                             _openGroupSettings(room);
                           }
                         },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
                             value: 'translate',
                             child: ListTile(
                               leading: Icon(Icons.translate_rounded),
                               title: Text('Cài đặt dịch AI'),
                             ),
                           ),
-                          PopupMenuItem(
+                          const PopupMenuItem(
                             value: 'shared',
                             child: ListTile(
                               leading: Icon(Icons.collections_outlined),
                               title: Text('Nội dung đã chia sẻ'),
                             ),
                           ),
-                          PopupMenuItem(
-                            value: 'group',
-                            child: ListTile(
-                              leading: Icon(Icons.group_outlined),
-                              title: Text('Quản lý nhóm'),
+                          if (room['type'] == 'group')
+                            const PopupMenuItem(
+                              value: 'group',
+                              child: ListTile(
+                                leading: Icon(Icons.group_outlined),
+                                title: Text('Quản lý nhóm'),
+                              ),
                             ),
-                          ),
                         ],
                         icon: const Icon(Icons.more_vert_rounded, size: 20),
                       ),
