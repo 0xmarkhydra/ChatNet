@@ -64,19 +64,19 @@
 }
 .post-comments-stats span:first-child { display: inline-flex; align-items: center; gap: 10px; }
 .post-comments-stats span:last-child { text-align: right; font-size: 12px; }
-.post-comments-post-actions {
-  display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 0;
-  min-height: 86px; border-top: 1px solid #e8ecf5;
+.post-comments-post-actions.post-toolbar-compact {
+  display: flex; justify-content: flex-start; align-items: center; gap: 4px;
+  min-height: 52px; padding-top: 8px; border-top: 1px solid #e8ecf5;
+  overflow: visible;
 }
-.post-comments-post-actions > button {
-  display: flex; justify-content: center; align-items: center; gap: 9px;
-  min-width: 0; min-height: 86px; border: 0; border-radius: 10px;
-  padding: 4px 7px; background: transparent; color: #243450;
-  font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+.post-comments-post-actions.post-toolbar-compact > button {
+  display: grid; place-items: center; flex: 0 0 40px;
+  width: 40px; min-width: 40px; height: 40px; min-height: 40px;
+  margin: 0; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: #627394; cursor: pointer;
 }
-.post-comments-post-actions > button:hover { background: #eff3ff; color: #2563eb; }
-.post-comments-post-actions > button.is-liked { color: #dc4162; }
-.post-comments-post-actions > button:disabled { opacity: .55; cursor: default; }
+.post-comments-post-actions.post-toolbar-compact > button:hover { background: #eef3f7; color: #2563eb; }
+.post-comments-post-actions.post-toolbar-compact > button:disabled { opacity: .55; cursor: default; }
 
 .post-comments-thread { display: flex; flex-direction: column; overflow: hidden; }
 .post-comments-thread-heading {

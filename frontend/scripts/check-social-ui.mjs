@@ -326,8 +326,16 @@ try {
   assert(fixturePost.saved, 'Save button must call post save API and update state')
 
   // Post comments open as a dedicated desktop page, not the legacy modal.
-  await feedCards.first().getByRole('button', { name: 'Bình luận', exact: true }).click()
-  await reactionTestStyle.evaluate(style => style.remove())
+  const commentsOnly = process.argv.includes('--comments-only')
+  if (commentsOnly) {
+    // The sidebar flyout covers the tiny feed action during test navigation.
+    // Trigger the existing React click handler to exercise the comments page itself.
+    await feedCards.first().getByRole('button', { name: 'Bình luận', exact: true })
+      .evaluate(button => button.click())
+  } else {
+    await feedCards.first().getByRole('button', { name: 'Bình luận', exact: true }).click()
+    await reactionTestStyle.evaluate(style => style.remove())
+  }
   const commentsPage = page.locator('.post-comments-page')
   await commentsPage.waitFor({ state: 'visible' })
   await commentsPage.locator('.post-comments-thread-heading h2').waitFor({ state: 'visible' })
@@ -356,9 +364,38 @@ try {
     commentsLayout.comments && near(commentsLayout.comments.x,1123) && near(commentsLayout.comments.y,110) &&
     near(commentsLayout.comments.width,428) && near(commentsLayout.comments.height,841),
     'Post comments frame mismatch: ' + JSON.stringify(commentsLayout))
-  const postActionLabels = (await commentsPage.locator('.post-comments-post-actions > button').allTextContents()).map(value => value.trim())
-  assert(JSON.stringify(postActionLabels) === JSON.stringify(['Thích', 'Bình luận', 'Chia sẻ']),
-    'Post comments actions must have the right order and labels: ' + JSON.stringify(postActionLabels))
+  const commentsActions = commentsPage.locator('.post-comments-post-actions')
+  assert(await commentsActions.locator('.feed-reaction-primary').count() === 1
+    && await commentsActions.getByRole('button', { name: 'Bình luận' }).count() === 1
+    && await commentsActions.getByRole('button', { name: 'Chia sẻ bài viết' }).count() === 1,
+    'Post comments must reuse the compact feed reaction, comment and share actions')
+  const commentsActionGeometry = await commentsActions.evaluate(node => {
+    const buttons = [...node.querySelectorAll(':scope > button')]
+    const bounds = node.getBoundingClientRect()
+    return { display: getComputedStyle(node).display, width: bounds.width,
+      buttons: buttons.map(button => button.getBoundingClientRect().width) }
+  })
+  assert(commentsActionGeometry.display === 'flex'
+    && commentsActionGeometry.buttons.length === 2
+    && commentsActionGeometry.buttons.every(width => width <= 42),
+    'Post comments actions should be compact icons: ' + JSON.stringify(commentsActionGeometry))
+  await commentsActions.locator('.feed-reaction-primary').hover()
+  const commentsPicker = commentsActions.locator('.feed-reaction-picker')
+  await commentsPicker.waitFor({ state: 'visible' })
+  assert(await commentsPicker.locator('.feed-reaction-option').count() === 6,
+    'Post comments must show the same six reaction choices as feed')
+  const menuBounds = await commentsPicker.boundingBox()
+  const postBounds = await commentsPage.locator('.post-comments-original').boundingBox()
+  assert(menuBounds && postBounds && menuBounds.x >= postBounds.x
+    && menuBounds.x + menuBounds.width <= postBounds.x + postBounds.width
+    && menuBounds.y >= postBounds.y,
+    'Reaction picker must fit within the post panel: ' + JSON.stringify({ menuBounds, postBounds }))
+  await page.screenshot({ path: 'output/playwright/layout/post-comments-reaction-picker.png' })
+  await page.mouse.move(700, 600)
+  await commentsPicker.waitFor({ state: 'hidden' })
+  await commentsActions.getByRole('button', { name: 'Bình luận' }).click()
+  assert(await commentsPage.getByRole('textbox', { name: 'Viết bình luận' }).evaluate(node => node === document.activeElement),
+    'Post comments action must focus the existing composer')
   assert((await commentsPage.locator('.post-comments-stats').innerText()).includes('Chia sẻ'),
     'Post comments engagement summary must include the share section without inventing counts')
   assert(await commentsPage.locator('.post-comments-author-avatar').isVisible() &&
@@ -430,6 +467,13 @@ try {
   assert(commentsCompact.overflow <= 2 && commentsCompact.threadTop > commentsCompact.postBottom,
     'Compact post comments must stack comments below the post without overflow: ' + JSON.stringify(commentsCompact))
   await page.setViewportSize({ width: 1586, height: 992 })
+  if (commentsOnly) {
+    console.log('Post comments UI PASS: shared reactions, compact actions, composer and responsive layout')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   await sidebar.getByRole('button', { name: 'Bảng tin' }).click()
   await feed.waitFor({ state: 'visible' })
   assert(new URL(page.url()).searchParams.get('post') === null,

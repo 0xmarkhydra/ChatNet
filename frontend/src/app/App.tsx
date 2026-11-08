@@ -6703,7 +6703,7 @@ export default function App({
             onDeleted={(id) => { removeFeedPost(id); closeFeedPostDetails(); }}
             onAuthorOpen={openVisitor}
             likeBusy={likePreviews[activePost.id] !== undefined}
-            onLike={(post) => void like(post)}
+            onLike={(post, emoji) => like(post, emoji)}
             onUpdated={syncFeedPost}
             onFeedback={(message, kind) => setNotice(message, kind)}
           >
