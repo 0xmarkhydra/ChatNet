@@ -101,7 +101,7 @@ export default function FeedModeration({ request, onRemoved }: Props) {
       {open && (
         <div className="soco-moderation-list">
           <button type="button" onClick={() => void load()} disabled={loading || busy !== null}>
-            <RefreshCw size={16} aria-hidden="true" /> {loading ? 'Đang tải…' : 'Làm mới'}
+            <RefreshCw size={16} aria-hidden="true" /> Làm mới
           </button>
           {error && <p role="alert" className="soco-moderation-error">{error}</p>}
           {!reports.length && !loading && <p>Không có báo cáo đang chờ xử lý.</p>}
@@ -123,7 +123,7 @@ export default function FeedModeration({ request, onRemoved }: Props) {
             </article>
           ))}
           {hasMore && <button type="button" disabled={loading || busy !== null} onClick={() => void loadMore()}>
-            {loading ? 'Đang tải…' : 'Tải thêm báo cáo'}
+            Tải thêm báo cáo
           </button>}
         </div>
       )}

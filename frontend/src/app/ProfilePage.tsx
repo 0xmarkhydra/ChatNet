@@ -121,16 +121,14 @@ export default function ProfilePage({
           <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel">
             {section === 'posts' && (
               <>
-                {pendingPost && <div className="profile-page-pending"><strong>Đang đăng bài viết...</strong><p>{pendingPost.content}</p></div>}
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
-                {postsBusy && posts.length === 0 && <p role="status" className="profile-page-hint">Đang tải bài viết...</p>}
                 <div className="profile-page-post-feed feed zalo-feed">{postCards}</div>
                 {!postsBusy && !postsError && posts.length === 0 && !pendingPost &&
                   <div className="profile-page-blank"><ImageIcon size={30} aria-hidden="true" /><p>Bạn chưa có bài viết nào.</p>
                     <button type="button" onClick={onCreatePost}>Đăng bài đầu tiên</button></div>}
                 {hasMorePosts && <button className="profile-page-more-posts" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>
-                  {postsBusy ? 'Đang tải...' : 'Xem bài viết cũ hơn'} <ArrowRight size={16} aria-hidden="true" /></button>}
+                  Xem bài viết cũ hơn <ArrowRight size={16} aria-hidden="true" /></button>}
               </>
             )}
             {section === 'media' && (

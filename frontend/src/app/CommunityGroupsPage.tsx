@@ -313,7 +313,7 @@ export default function CommunityGroupsPage({
         <button type="button" className="cg-secondary" onClick={()=>select(group.id,'manage')}><Settings size={16}/>Quản trị</button>
         <button type="button" className="cg-primary" onClick={()=>select(group.id,'channel')}>Mở nhóm<ArrowRight size={16}/></button>
       </div>)}{shownGroups.length===0&&<p className="cg-empty">{query?'Không tìm thấy nhóm phù hợp.':'Chưa có nhóm. Hãy tạo cộng đồng mới hoặc tải thêm.'}</p>}</div>
-      {hasMore&&<button type="button" className="cg-secondary" disabled={loadingMore} onClick={onLoadMore}>{loadingMore?'Đang tải...':'Tải thêm hội thoại'}</button>}
+      {hasMore&&<button type="button" className="cg-secondary" disabled={loadingMore} onClick={onLoadMore}>Tải thêm hội thoại</button>}
     </section><aside className="cg-card cg-list-aside"><ShieldCheck size={32}/><h3>Khám phá cộng đồng công khai</h3><p>Tìm và tham gia các cộng đồng phù hợp. Nhóm yêu cầu phê duyệt sẽ cần quản trị viên đồng ý.</p>
       <div className="cg-public-list">
         {publicGroups.filter(g=>!groups.some(group=>group.id===g.id)).map(g=><article key={g.id} className="cg-public-entry">
@@ -322,7 +322,7 @@ export default function CommunityGroupsPage({
           <button type="button" className="cg-secondary" disabled={joiningId!==null} onClick={()=>void joinPublic(g.id)}><UserPlus size={15}/>Tham gia</button>
         </article>)}
         {!publicLoading&&!publicGroups.length&&<p className="cg-muted">Chưa tìm thấy nhóm công khai.</p>}
-        {publicLoading&&<p className="cg-muted">Đang tìm cộng đồng...</p>}
+
       </div>
       <button type="button" className="cg-secondary" onClick={onCreate}>Tạo nhóm mới<ArrowRight size={16}/></button>
     </aside></div>
@@ -433,7 +433,7 @@ export default function CommunityGroupsPage({
         {!displayedMessages.length&&!channelUnconfirmed&&(activeChannelId!==0||!pendingMessages.some(item=>item.conversationId===selectedGroup.id))&&<p className="cg-empty">Chưa có tin nhắn. Hãy bắt đầu cuộc trò chuyện!</p>}</div>
         <form className="cg-card cg-chat-form" onSubmit={activeChannelId===0?onSend:sendChannelMessage}><label htmlFor="cg-chat-text">Nhắn tin cho # {currentChannel?.name||'Thảo luận chung'}</label><textarea id="cg-chat-text" rows={2} value={activeChannelId===0?messageText:channelDraft} onChange={e=>activeChannelId===0?onMessageText(e.target.value):(setChannelDraft(e.target.value),setChannelUnconfirmed(null))} placeholder="Nhập tin nhắn..."/>
           {channelError&&<p className="cg-error" role="alert">{channelError}</p>}
-          <div><button className="cg-secondary" type="button" onClick={onOpenFullChat}><Plus size={17}/>Tệp, trả lời, ghim (chat chung)</button><button type="submit" className="cg-primary" disabled={activeChannelId===0?!canSend:channelSendBusy||(!channelDraft.trim()&&!channelUnconfirmed)}><Send size={16}/>{channelSendBusy?'Đang gửi':'Gửi'}</button></div></form>
+          <div><button className="cg-secondary" type="button" onClick={onOpenFullChat}><Plus size={17}/>Tệp, trả lời, ghim (chat chung)</button><button type="submit" className="cg-primary" disabled={activeChannelId===0?!canSend:channelSendBusy||(!channelDraft.trim()&&!channelUnconfirmed)}><Send size={16}/>Gửi</button></div></form>
       </section>
       <aside className="cg-card cg-channel-info"><h3>Thông tin kênh</h3><hr/><h4>Mô tả</h4><p>{currentChannel?.description||metadata?.description||'Thảo luận chung của nhóm '+selectedGroup.name}</p><h4>Chủ đề</h4><p>{metadata?.topic||'Chưa có chủ đề'}</p>
         <h4>Thành viên</h4><div className="cg-channel-avatars">{members.slice(0,6).map(member=><UserAvatar key={member.id} username={member.username} name={nameOf(member)} className="avatar cg-small-avatar"/>)}</div>

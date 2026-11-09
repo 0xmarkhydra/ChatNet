@@ -118,7 +118,7 @@ export default function ProfileEditorPage({
             <RotateCcw size={17} aria-hidden="true" /> Hủy thay đổi
           </button>
           <button type="submit" className="profile-editor-submit" disabled={savingDisabled}>
-            {profileSaving ? <span role="status">Đang lưu...</span> : <><Save size={17} aria-hidden="true" /> Lưu hồ sơ</>}
+            <><Save size={17} aria-hidden="true" /> Lưu hồ sơ</>
           </button>
         </footer>
       </form>
@@ -141,7 +141,7 @@ export default function ProfileEditorPage({
         <section className="profile-editor-privacy-card" aria-label="Quyền hiển thị">
           <div className="profile-editor-privacy-heading"><Eye size={22} aria-hidden="true" /><h2>Quyền hiển thị</h2></div>
           <p>Chọn cách người khác tìm và kết nối với bạn.</p>
-          {privacyLoading && <div role="status" className="profile-editor-privacy-note">Đang tải quyền riêng tư...</div>}
+
           {privacyError && <div role="alert" className="profile-editor-privacy-error">{privacyError}
             <button type="button" onClick={retryPrivacy}>Thử lại</button>
           </div>}

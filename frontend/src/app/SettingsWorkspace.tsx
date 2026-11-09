@@ -156,7 +156,7 @@ export default function SettingsWorkspace({
                 {toggleRow("Hiển thị trạng thái online", "showOnlineStatus")}
               </div>
             </section>
-            {privacyLoading && <p role="status" className="settings-workspace-status">Đang tải quyền riêng tư...</p>}
+
             {privacyError && (
               <div role="alert" className="settings-workspace-error">
                 <span>{privacyError}</span>
@@ -174,7 +174,7 @@ export default function SettingsWorkspace({
                 disabled={!changed || privacyBusy || privacyLoading}
                 onClick={() => { if (draft) void onSavePrivacy(draft); }}
               >
-                <Check size={16} aria-hidden="true" /> {privacyBusy ? "Đang lưu..." : "Lưu thay đổi"}
+                <Check size={16} aria-hidden="true" /> Lưu thay đổi
               </button>
             </footer>
           </div>

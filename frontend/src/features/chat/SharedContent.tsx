@@ -1,6 +1,6 @@
 import { userLabel } from '../../shared/lib/userLabel'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FileText, Images, Link2, LoaderCircle, X } from 'lucide-react'
+import { FileText, Images, Link2, X } from 'lucide-react'
 
 type MediaAttachment = {
   id?: number
@@ -136,7 +136,7 @@ export default function SharedContent({
         </nav>
 
         <div className="shared-content-body">
-          {loading && <div className="shared-content-state"><LoaderCircle className="spinning" size={24} />Đang tải…</div>}
+
           {error && <div className="shared-content-state error"><span>{error}</span><button type="button" onClick={() => void load(true)}>Thử lại</button></div>}
           {empty && <div className="shared-content-state">Chưa có nội dung thuộc mục này.</div>}
 
@@ -198,7 +198,7 @@ export default function SharedContent({
 
           {!loading && !error && nextBefore && (
             <button className="shared-content-more" type="button" disabled={loadingMore} onClick={() => void load(false)}>
-              {loadingMore ? 'Đang tải…' : 'Xem thêm'}
+              Xem thêm
             </button>
           )}
         </div>

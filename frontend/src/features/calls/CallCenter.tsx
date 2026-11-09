@@ -175,7 +175,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
             <div className="call-history-layout">
               <section className="call-history-list call-center-card" aria-label="Danh sách lịch sử">
                 <h2>Cuộc gọi gần đây</h2>
-                {loading && <div className="call-center-state" role="status">Đang tải lịch sử cuộc gọi…</div>}
+
                 {!loading && error && <div className="call-center-state" role="alert"><strong>Không thể tải lịch sử</strong><p>{error}</p><button type="button" onClick={() => setRefreshId((n) => n + 1)}>Thử lại</button></div>}
                 {!loading && !error && filtered.length === 0 && <div className="call-center-state"><PhoneMissed size={31} /><strong>{query || filter !== 'all' ? 'Không có kết quả phù hợp' : 'Chưa có cuộc gọi nào'}</strong><p>Lịch sử thật từ máy chủ sẽ xuất hiện tại đây khi bạn thực hiện cuộc gọi.</p><button type="button" onClick={() => showView('people')}>Bắt đầu cuộc gọi</button></div>}
                 {!loading && !error && filtered.map((entry) => {

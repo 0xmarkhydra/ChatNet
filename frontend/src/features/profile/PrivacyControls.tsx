@@ -26,7 +26,7 @@ export default function PrivacyControls({
                   <small>Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. Thiết lập lưu trên máy chủ.</small>
                 </div>
               </div>
-              {privacyLoading && <div className="settings-row" role="status">Đang tải quyền riêng tư...</div>}
+
               {privacyError && <div className="settings-row" role="alert">
                 <span>{privacyError}</span>
                 <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>Thử lại</button>

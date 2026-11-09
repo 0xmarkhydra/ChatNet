@@ -521,7 +521,7 @@ export function GroupActivityDialog({
                 Hủy
               </button>
               <button type="submit" disabled={busy}>
-                {busy ? "Đang tạo..." : "Tạo mới"}
+                Tạo mới
               </button>
             </footer>
           </form>
@@ -591,11 +591,7 @@ export function GroupActivityDialog({
                   }
                   onClick={() => void castVote()}
                 >
-                  {busy
-                    ? "Đang lưu..."
-                    : activity.myVote === null
-                      ? "Gửi bình chọn"
-                      : "Thay đổi bình chọn"}
+                  {activity.myVote === null ? "Gửi bình chọn" : "Thay đổi bình chọn"}
                 </button>
               </div>
             )}
