@@ -81,7 +81,7 @@ import FeedReactionControl from "../features/feed/FeedReactionControl";
 import StoryViewer from "../features/feed/StoryViewer";
 import MessageActions from "../features/chat/MessageActions";
 import { GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/GroupActivities";
-import { messageReactionLabel, messageReactions } from "../features/chat/messageReactions";
+import { messageReactionLabel } from "../features/chat/messageReactions";
 import {
   copyChatImage,
   messageLinkHref,
@@ -327,12 +327,6 @@ export default function App({
   const ownSendScrollConversation = useRef<number | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [messageActionId, setMessageActionId] = useState<number | null>(null);
-  const [reactionPicker, setReactionPicker] = useState<{
-    messageId: number;
-    left: number;
-    top: number;
-  } | null>(null);
-  useEffect(() => setReactionPicker(null), [activeConversationId]);
   const [conversationActionId, setConversationActionId] = useState<number | null>(null);
   const [conversationMenuPosition, setConversationMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [pinnedExpanded, setPinnedExpanded] = useState(false);
@@ -1380,7 +1374,6 @@ export default function App({
   ) {
     if (message.deleted) return;
     cancelMessageLongPress();
-    setReactionPicker(null);
     const element =
       target instanceof Element
         ? target
@@ -6357,19 +6350,8 @@ export default function App({
                                 ))}
                                 <button type="button" className="reaction-add"
                                   aria-label="Chọn cảm xúc cho tin nhắn"
-                                  aria-expanded={reactionPicker?.messageId === message.id}
                                   title="Thả cảm xúc"
-                                  disabled={reactionPreviews[message.id] !== undefined}
-                                  onClick={(event) => {
-                                    const rect = event.currentTarget.getBoundingClientRect();
-                                    const width = Math.min(320, window.innerWidth - 24);
-                                    const preferredLeft = mine ? rect.right - width : rect.left;
-                                    const left = Math.max(12, Math.min(preferredLeft, window.innerWidth - width - 12));
-                                    const top = rect.top >= 64
-                                      ? rect.top - 60
-                                      : Math.min(rect.bottom + 8, window.innerHeight - 64);
-                                    setReactionPicker({ messageId: message.id, left, top });
-                                  }}>
+                                  onClick={() => openMessageActions(message)}>
                                   <SmilePlus size={16} aria-hidden="true" />
                                 </button>
                               </div>
@@ -7265,39 +7247,6 @@ export default function App({
             onCreate={groupActivities.create}
             onVote={groupActivities.vote}
           />
-        )}
-        {reactionPicker && visibleMessages.some((item) =>
-          item.id === reactionPicker.messageId && !item.deleted) && (
-          <div className="message-reaction-picker-layer">
-            <button type="button" className="message-reaction-picker-dismiss"
-              aria-label="Đóng bảng chọn cảm xúc"
-              onClick={() => setReactionPicker(null)} />
-            <div className="message-reaction-quick-picker" role="group"
-              aria-label="Chọn cảm xúc cho tin nhắn"
-              style={{ left: reactionPicker.left, top: reactionPicker.top }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setReactionPicker(null);
-              }}>
-              {messageReactions.map(({ emoji, label }, index) => {
-                const selected = visibleMessages.find((item) => item.id === reactionPicker.messageId)
-                  ?.reactions?.some((reaction) => reaction.emoji === emoji && reaction.mine) ?? false;
-                return (
-                  <button key={emoji} type="button" autoFocus={index === 0}
-                    aria-label={label} aria-pressed={selected}
-                    title={label}
-                    disabled={reactionPreviews[reactionPicker.messageId] !== undefined}
-                    className={selected ? "active" : ""}
-                    onClick={() => {
-                      const target = visibleMessages.find((item) => item.id === reactionPicker.messageId);
-                      setReactionPicker(null);
-                      if (target) void toggleReaction(target, emoji);
-                    }}>
-                    {emoji}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         )}
         {activeMessageAction && (
           <MessageActions
