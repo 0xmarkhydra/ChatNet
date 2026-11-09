@@ -190,12 +190,45 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 8px 16px;
   padding: 8px 3px 0;
   color: #6b7893;
   font-size: 12px;
 }
+.post-engagement-summary .feed-post-likes {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  margin-right: auto;
+  white-space: nowrap;
+}
+.post-engagement-summary .feed-post-likes svg {
+  color: #ef426b;
+  flex-shrink: 0;
+}
+.post-engagement-summary .feed-post-conversation-stats {
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+}
+/* The same single-heart button works in a feed card and in post details. */
+.post-toolbar > .feed-like-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 10px;
+  color: #243a5d;
+  background: transparent;
+  cursor: pointer;
+}
+.post-toolbar > .feed-like-button:hover { background: #f4f6fc; }
+.post-toolbar > .feed-like-button.is-liked { color: #ee416a; }
+.post-toolbar > .feed-like-button.is-liked:hover { background: #fff2f6; }
+.post-toolbar > .feed-like-button:disabled { cursor: not-allowed; opacity: .6; }
 .post-toolbar {
   display: flex;
   align-items: center;

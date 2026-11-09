@@ -367,17 +367,15 @@
     margin-inline: auto;
   }
 
-  .feed-media-preview .media-count-1 .media-item img,
-  .feed-media-preview .media-count-1 .media-item video {
-    max-height: min(68vh, 620px);
+  .feed-media-preview .media-count-1 .media-item img {
+    max-height: none;
+    height: auto;
     object-fit: contain;
   }
 
-  .feed-media-preview .media-count-1 .media-item img.media-extra-tall {
-    height: min(68vh, 620px);
-    max-height: 620px;
+  .feed-media-preview .media-count-1 .media-item video {
+    max-height: min(68vh, 620px);
     object-fit: contain;
-    object-position: center;
   }
 }
 

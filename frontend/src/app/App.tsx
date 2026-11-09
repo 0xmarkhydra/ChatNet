@@ -1915,26 +1915,6 @@ export default function App({
     return () => window.clearTimeout(timer);
   }, [nearbyUntil]);
 
-  useEffect(() => {
-    if (!activeStory) {
-      if (activeStoryId !== null) setActiveStoryId(null);
-      return;
-    }
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setActiveStoryId(null);
-      if (event.key === "ArrowLeft") previousStory();
-      if (event.key === "ArrowRight") nextStory();
-    };
-    window.addEventListener("keydown", handleKey);
-    const timer =
-      activeStory.attachment.kind === "image"
-        ? window.setTimeout(nextStory, 7000)
-        : undefined;
-    return () => {
-      window.removeEventListener("keydown", handleKey);
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [activeStory?.id, activeStoryId, stories.length]);
 
   async function uploadMediaFiles(
     files: File[],
@@ -2156,16 +2136,6 @@ export default function App({
     }
   }
 
-  function nextStory() {
-    const next = stories[activeStoryIndex + 1];
-    setActiveStoryId(next?.id ?? null);
-  }
-
-  function previousStory() {
-    const previous = stories[activeStoryIndex - 1];
-    if (previous) setActiveStoryId(previous.id);
-  }
-
   async function deleteStory(story: Story) {
     if (story.author !== name || storyBusy || !window.confirm("Xóa Story này?"))
       return;
@@ -2186,6 +2156,87 @@ export default function App({
         );
     } finally {
       if (sessionRef.current?.sessionId === sessionId) setStoryBusy(false);
+    }
+  }
+
+  async function replyToStory(story: Story, message: string): Promise<boolean> {
+    const content = message.trim();
+    if (!content || !sessionRef.current || story.author === sessionRef.current.user.username)
+      return false;
+
+    let queued = false;
+    await openDirectByUsername(story.author, undefined, (conversation) => {
+      const item: QueuedChatMessage = {
+        clientId: crypto.randomUUID(),
+        conversationId: conversation.id,
+        text: `↪️ Trả lời Story (${new Date(story.createdAt).toLocaleString("vi-VN", {
+          day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+        })})\n${content}`,
+        attachments: [],
+        createdAt: new Date().toISOString(),
+        status: "queued",
+      };
+      const next = updateChatOutbox((items) => enqueueChatMessage(items, item));
+      if (!next.some((pending) => pending.clientId === item.clientId)) {
+        setNotice("Không thể lưu phản hồi Story vào hàng đợi. Nội dung vẫn được giữ lại.", "warning");
+        return;
+      }
+      queued = true;
+      ownSendScrollConversation.current = conversation.id;
+      setActiveStoryId(null);
+      if (navigator.onLine) void retryQueuedChatMessages();
+      else setChatOnline(false);
+    });
+    return queued;
+  }
+
+  async function shareStory(story: Story) {
+    const url = story.attachment.url;
+    if (!url) {
+      setNotice("Không có đường dẫn Story để chia sẻ.");
+      return;
+    }
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "Khoảnh khắc của " + userLabel(story.authorDisplayName, story.author),
+          url,
+        });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setNotice("Đã sao chép liên kết media của Story (liên kết có thể hết hạn).");
+      } else {
+        setNotice("Trình duyệt không hỗ trợ chia sẻ liên kết Story.");
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError"))
+        setNotice("Không thể chia sẻ Story. Vui lòng thử lại.");
+    }
+  }
+
+  async function reportStory(story: Story) {
+    const answer = window.prompt("Nhập lý do báo cáo Story (5–500 ký tự):");
+    if (answer === null) return;
+    const reason = answer.trim();
+    const length = Array.from(reason).length;
+    if (length < 5 || length > 500) {
+      setNotice("Lý do báo cáo cần từ 5 đến 500 ký tự.");
+      return;
+    }
+    try {
+      const response = await apiFetch("/api/feed/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetType: "story",
+          targetId: story.id,
+          reason,
+        }),
+      });
+      if (!response.ok) throw new Error("Không gửi được báo cáo Story.");
+      setNotice("Đã gửi báo cáo Story.");
+    } catch {
+      setNotice("Không thể báo cáo Story. Vui lòng thử lại.");
     }
   }
 
@@ -3852,7 +3903,7 @@ export default function App({
     ],
   );
 
-  async function openDirectByUsername(username: string, mediaType?: "audio" | "video") {
+  async function openDirectByUsername(username: string, mediaType?: "audio" | "video", onOpened?: (conversation: Conversation) => void) {
     setChatCreateError("");
     const normalized = username.trim().toLowerCase();
     if (!normalized || actionLocks.current.has("chat:create")) return;
@@ -3893,6 +3944,7 @@ export default function App({
       if (mediaType) window.dispatchEvent(new CustomEvent("chatnet:start-call", {
         detail: { conversationId: created.id, mediaType },
       }));
+      onOpened?.(created);
     } catch {
       if (sessionRef.current?.sessionId === sessionId)
         setNotice(
@@ -7355,13 +7407,18 @@ export default function App({
         {activeStory && (
           <StoryViewer
             activeStory={activeStory}
+            stories={stories}
             name={name}
             storyBusy={storyBusy}
             deleteStory={deleteStory}
             setActiveStoryId={setActiveStoryId}
-            nextStory={nextStory}
-            previousStory={previousStory}
-            activeStoryIndex={activeStoryIndex}
+            onReply={replyToStory}
+            onProfile={(username) => {
+              setActiveStoryId(null);
+              openVisitor(username);
+            }}
+            onShare={(story) => void shareStory(story)}
+            onReport={(story) => void reportStory(story)}
           />
         )}
 

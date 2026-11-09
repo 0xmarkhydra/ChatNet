@@ -50,6 +50,8 @@ let followingRequests = 0
 let savedRequests = 0
 let lastFeedCreated = null
 let friendRequestsSent = 0
+let rejectStoryDirect = false
+const storyReplyRequests = []
 
 
 try {
@@ -71,6 +73,24 @@ try {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
     if (path === '/api/events') return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: ': connected\n\n' })
     if (path === '/api/feed/moderation/reports') return route.fulfill({ status: 403, contentType: 'application/json', headers: cors, body: JSON.stringify({error: 'forbidden'}) })
+    if (path === '/api/conversations/direct' && req.method() === 'POST') {
+      if (req.postDataJSON().username !== 'minhanh') return json({})
+      if (rejectStoryDirect) return route.fulfill({
+        status: 403, contentType: 'application/json', headers: cors,
+        body: JSON.stringify({ error: 'Không thể mở cuộc trò chuyện' }),
+      })
+      return json(conversations[0])
+    }
+    if (path === '/api/conversations/1/messages' && req.method() === 'POST') {
+      const body = req.postDataJSON()
+      storyReplyRequests.push(body)
+      return json({
+        id: 250 + storyReplyRequests.length, clientId: body.clientId,
+        conversationId: 1, senderId: 1, sender: 'soco_user',
+        text: body.text, attachments: body.attachments || [],
+        createdAt: new Date().toISOString(),
+      })
+    }
     if (path === '/api/conversations') return json(conversations)
     if (path === '/api/conversation-categories') return json([])
     if (path.endsWith('/messages')) return json([])
@@ -79,9 +99,21 @@ try {
     if (/\/(invites|join-requests|admin-audit)$/.test(path)) return json([])
     if (path === '/api/friends') return json([])
     if (path === '/api/friends/requests') return json([])
+    if (path === '/api/users/minhanh/profile') return json({
+      id: 2, username: 'minhanh', displayName: 'Minh Anh',
+      avatarSet: false, coverSet: false, allowFriendRequests: true,
+      updatedAt: '2026-11-05T00:00:00Z',
+    })
     if (path === '/api/users/suggestions') return json(suggestions)
     if (path === '/api/users/search') return json([])
     if (path === '/api/friends/4' && req.method() === 'POST') { friendRequestsSent++; return json({ ...suggestions[0], status:'pending', direction:'outgoing', updatedAt:new Date().toISOString() }) }
+    if (path === '/api/posts/88/reactions' && req.method() === 'POST') {
+      const selected = req.postDataJSON().emoji
+      fixturePost.myReaction = fixturePost.myReaction === selected ? '' : selected
+      fixturePost.liked = Boolean(fixturePost.myReaction)
+      fixturePost.likes += fixturePost.liked ? 1 : -1
+      return json({ ...fixturePost })
+    }
     if (path === '/api/posts/88/save' && req.method() === 'POST') { fixturePost.saved = !fixturePost.saved; return json({ ...fixturePost }) }
     if (path === '/api/posts/88/comments' && req.method() === 'POST') {
       lastCommentPayload = req.postDataJSON()
@@ -105,6 +137,7 @@ try {
       if (params.get('scope') === 'following') { followingRequests++; return json(feedPosts) }
       if (params.get('scope') === 'saved') { savedRequests++; return json(feedPosts.filter(post=>post.saved)) }
       if (params.get('q')) return json(feedPosts.filter(post=>post.content.toLowerCase().includes(params.get('q').toLowerCase())))
+      if (params.get('author') === 'minhanh') return json(feedPosts)
       if (params.get('scope') === 'mine') return json([{
         id: 91, author: 'soco_user', authorDisplayName: 'SocCO Tester',
         content: 'Bài viết kiểm thử giao diện trang cá nhân',
@@ -252,10 +285,93 @@ try {
     && postGeometry.buttonWidths.every(width => Math.abs(width - postGeometry.buttonWidths[0]) <= 2)
     && postGeometry.mediaWidth >= postGeometry.cardWidth - 70,
     'Post card should align four action columns and show full-width media: ' + JSON.stringify(postGeometry))
+  const feedImage = postCard.locator('.feed-media-preview .media-count-1 .media-item img').first()
+  await feedImage.evaluate(image => image.decode())
+  async function verifyUncroppedFeedImage() {
+    const image = await feedImage.evaluate(element => {
+      const rect = element.getBoundingClientRect()
+      const css = getComputedStyle(element)
+      return {
+        width: rect.width,
+        height: rect.height,
+        naturalWidth: element.naturalWidth,
+        naturalHeight: element.naturalHeight,
+        fit: css.objectFit,
+        maxHeight: css.maxHeight,
+      }
+    })
+    assert(image.naturalWidth > 0 && image.naturalHeight > 0
+      && image.fit === 'contain' && image.maxHeight === 'none'
+      && Math.abs(image.height / image.width - image.naturalHeight / image.naturalWidth) < 0.03,
+      'Single feed photo must display its full natural aspect ratio: ' + JSON.stringify(image))
+  }
+  await verifyUncroppedFeedImage()
+  const likeLayout = await postCard.evaluate(card => {
+    const row = card.querySelector('.post-engagement-summary')
+    const likes = card.querySelector('.feed-post-likes')
+    const comments = card.querySelector('.feed-post-conversation-stats')
+    const rowBox = row.getBoundingClientRect(), likesBox = likes.getBoundingClientRect(), commentsBox = comments.getBoundingClientRect()
+    return {
+      rowLeft: rowBox.left, rowRight: rowBox.right,
+      likesLeft: likesBox.left, likesRight: likesBox.right,
+      commentsLeft: commentsBox.left, commentsRight: commentsBox.right,
+      likesCentered: Math.abs(likesBox.y - commentsBox.y) <= 4,
+    }
+  })
+  assert(likeLayout.likesLeft - likeLayout.rowLeft < 20
+    && likeLayout.rowRight - likeLayout.commentsRight < 20
+    && likeLayout.commentsLeft > likeLayout.likesRight
+    && likeLayout.likesCentered,
+    'Post engagement count must align left and comments right in one row: ' + JSON.stringify(likeLayout))
+  if (process.argv.includes('--likes-only')) {
+    const firstLike = postCard.getByRole('button', { name: 'Thích bài viết' })
+    await firstLike.click()
+    await postCard.getByRole('button', { name: 'Bỏ thích bài viết' }).waitFor()
+    assert(await postCard.locator('.feed-post-likes').innerText() === '13 lượt thích', 'Like count must update after React')
+    await postCard.locator('.visitor-name-link').click()
+    const visitor = page.getByRole('dialog', { name: 'Trang cá nhân người dùng' })
+    await visitor.locator('.post').first().waitFor({ state: 'visible' })
+    const visitorAlignment = await visitor.locator('.post').first().evaluate(card => {
+      const row = card.querySelector('.post-engagement-summary').getBoundingClientRect()
+      const likes = card.querySelector('.feed-post-likes').getBoundingClientRect()
+      const comments = card.querySelector('.feed-post-conversation-stats').getBoundingClientRect()
+      return { rowLeft: row.left, rowRight: row.right, likesLeft: likes.left, likesRight: likes.right, commentsLeft: comments.left, commentsRight: comments.right }
+    })
+    assert(visitorAlignment.likesLeft - visitorAlignment.rowLeft < 20
+      && visitorAlignment.rowRight - visitorAlignment.commentsRight < 20
+      && visitorAlignment.commentsLeft > visitorAlignment.likesRight,
+      'Profile timeline like summary must align left, comments right: ' + JSON.stringify(visitorAlignment))
+    assert(await visitor.locator('.post').first().getByRole('button', { name: 'Bỏ thích bài viết' }).locator('svg.lucide-heart').count() === 1,
+      'Profile timeline must share the heart button')
+    await visitor.getByRole('button', { name: 'Quay lại', exact: true }).click()
+    await visitor.waitFor({ state: 'detached' })
+    await postCard.getByRole('button', { name: 'Bình luận', exact: true }).click()
+    const detail = page.locator('.post-comments-page')
+    await detail.waitFor({ state: 'visible' })
+    const detailLike = detail.getByRole('button', { name: 'Bỏ thích bài viết' })
+    assert(await detailLike.locator('svg.lucide-heart').count() === 1
+      && await detail.locator('.post-comments-stats .lucide-heart').count() === 1,
+      'Post detail must use the same heart for controls and stats')
+    assert(await detail.locator('.feed-reaction-control,.feed-reaction-picker').count() === 0,
+      'Post detail must not show legacy multi-reaction picker')
+    const detailActions = detail.locator('.post-comments-post-actions > button')
+    const widths = await detailActions.evaluateAll(buttons => buttons.map(button => button.getBoundingClientRect().width))
+    assert(widths.length === 3 && widths.every(width => Math.abs(width - widths[0]) < 2),
+      'Post detail controls must have equal widths: ' + JSON.stringify(widths))
+    await detailLike.click()
+    await detail.getByRole('button', { name: 'Thích bài viết' }).waitFor()
+    console.log('Like consistency PASS: summary alignment, heart icon in feed/detail, toggle/untoggle, equal action widths')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   mkdirSync('output/playwright/layout', { recursive: true })
   await page.screenshot({ path: 'output/playwright/layout/feed-post-single-heart.png' })
   if (process.argv.includes('--post-only')) {
-    console.log('Post card PASS: single heart, no picker, 4 equal actions, post summary', JSON.stringify(postGeometry))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await verifyUncroppedFeedImage()
+    console.log('Post card PASS: uncropped image on desktop/mobile, single heart, 4 equal actions', JSON.stringify(postGeometry))
     await browser.close()
     browser = null
     server.kill()
@@ -263,6 +379,85 @@ try {
   }
   await feed.getByRole('button', { name: 'Tạo Story mới' }).waitFor()
   await feed.getByRole('button', { name: 'Xem Story của Minh Anh' }).waitFor()
+  await feed.getByRole('button', { name: 'Xem Story của Minh Anh' }).click()
+  const storyDialog = page.getByRole('dialog', { name: 'Khoảnh khắc của Minh Anh' })
+  await storyDialog.waitFor({ state: 'visible' })
+  assert(await storyDialog.locator('.story-screen-people').isVisible(), 'S09 story list must be visible on desktop')
+  assert(await storyDialog.locator('.story-screen-stage img').isVisible(), 'S09 story media must be visible')
+  assert(await storyDialog.locator('.story-screen-insights').isVisible(), 'S09 story action panel must be visible')
+  assert(await storyDialog.getByRole('button', { name: 'Xem hồ sơ' }).isVisible(), 'S09 profile action missing')
+  const avatarStyle = await storyDialog.locator('.story-screen-person-avatar').first().evaluate(node => ({
+    clip: getComputedStyle(node).overflow,
+    shape: getComputedStyle(node).borderRadius,
+    initials: getComputedStyle(node.querySelector('.avatar-initials')).position,
+  }))
+  assert(avatarStyle.clip === 'hidden' && avatarStyle.initials === 'absolute',
+    'S09 avatar initials must be clipped behind the photo: ' + JSON.stringify(avatarStyle))
+  const progress = storyDialog.locator('.story-screen-progress-track > span').first()
+  const progressWidth = () => progress.evaluate(node => parseFloat(node.style.width || '0'))
+  const firstProgress = await progressWidth()
+  await page.waitForTimeout(450)
+  const movingProgress = await progressWidth()
+  assert(movingProgress > firstProgress, 'Image Story progress must increase while playing')
+  await storyDialog.getByRole('button', { name: 'Tạm dừng Story' }).click()
+  const pausedProgress = await progressWidth()
+  await page.waitForTimeout(350)
+  assert(Math.abs(await progressWidth() - pausedProgress) < 1, 'Image Story progress must stop when paused')
+  await storyDialog.getByRole('button', { name: 'Tiếp tục Story' }).click()
+  await page.waitForTimeout(350)
+  assert(await progressWidth() > pausedProgress, 'Image Story progress must resume')
+  if (process.argv.includes('--story-reply-only')) {
+    const input = storyDialog.getByRole('textbox', { name: 'Trả lời Story của Minh Anh' })
+    await input.fill('đẹp vậy')
+    const focusStyle = await input.evaluate(element => ({
+      outline: getComputedStyle(element).outlineStyle,
+      shadow: getComputedStyle(element).boxShadow,
+      border: getComputedStyle(element).borderRightWidth,
+    }))
+    assert(focusStyle.outline === 'none' && focusStyle.shadow === 'none' && focusStyle.border === '0px',
+      'Story composer should not show a vertical input divider: ' + JSON.stringify(focusStyle))
+    rejectStoryDirect = true
+    const failedDirect = page.waitForResponse(response => response.url().includes('/api/conversations/direct') && response.request().method() === 'POST')
+    await storyDialog.getByRole('button', { name: 'Trả lời Story', exact: true }).click()
+    assert((await failedDirect).status() === 403, 'Test must cover failed direct lookup')
+    await storyDialog.getByRole('button', { name: 'Trả lời Story', exact: true }).waitFor({ state: 'visible' })
+    assert(await input.inputValue() === 'đẹp vậy' && await storyDialog.isVisible(),
+      'Failed story reply must preserve draft and viewer')
+    assert(storyReplyRequests.length === 0, 'Failed lookup must not send message')
+    rejectStoryDirect = false
+    const directResponse = page.waitForResponse(response => response.url().includes('/api/conversations/direct') && response.request().method() === 'POST' && response.status() === 200)
+    const sendResponse = page.waitForResponse(response => response.url().includes('/api/conversations/1/messages') && response.request().method() === 'POST')
+    await storyDialog.getByRole('button', { name: 'Trả lời Story', exact: true }).click()
+    await directResponse
+    assert((await sendResponse).ok(), 'Story reply should receive a successful chat send receipt')
+    await storyDialog.waitFor({ state: 'hidden' })
+    assert(storyReplyRequests.length === 1
+      && storyReplyRequests[0].text.includes('đẹp vậy')
+      && storyReplyRequests[0].text.startsWith('↪️ Trả lời Story')
+      && typeof storyReplyRequests[0].clientId === 'string',
+      'Reply Story must send a single contextual message using chat outbox: ' + JSON.stringify(storyReplyRequests))
+    console.log('Story reply PASS: no focus divider; failed lookup keeps draft; single chat message with Story context')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
+  await storyDialog.getByRole('button', { name: 'Đóng', exact: true }).click()
+  await storyDialog.waitFor({ state: 'hidden' })
+  if (process.argv.includes('--story-only')) {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await feed.getByRole('button', { name: 'Xem Story của Minh Anh' }).evaluate(button => button.click())
+    await storyDialog.waitFor({ state: 'visible' })
+    assert(await storyDialog.locator('.story-screen-stage img').isVisible(), 'S09 mobile media must be visible')
+    assert(!(await storyDialog.locator('.story-screen-people').isVisible()), 'S09 mobile people panel must collapse')
+    assert(!(await storyDialog.locator('.story-screen-insights').isVisible()), 'S09 mobile insights panel must collapse')
+    await storyDialog.waitFor({ state: 'hidden', timeout: 9000 })
+    console.log('S09 Story viewer PASS: desktop/mobile, avatar clipping, ticking/pause/resume progress, auto-close after 7s')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   await feed.locator('.social-feed-stories-card').getByRole('button', { name: 'Xem tất cả' }).click()
   assert(await feed.locator('.social-feed-story-strip.is-expanded').count() === 1, 'View all stories must expand story row')
   await feed.getByRole('button', { name: 'Thu gọn' }).click()

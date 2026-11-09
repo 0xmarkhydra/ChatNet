@@ -62,20 +62,39 @@
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
   min-height: 68px; color: #7282a0; font-size: 13px;
 }
-.post-comments-stats span:first-child { display: inline-flex; align-items: center; gap: 10px; }
+.post-comments-stats span:first-child { display: inline-flex; align-items: center; gap: 8px; margin-right: auto; }
+.post-comments-stats .feed-post-likes svg { flex: none; color: #ef426b; }
 .post-comments-stats span:last-child { text-align: right; font-size: 12px; }
 .post-comments-post-actions.post-toolbar-compact {
-  display: flex; justify-content: flex-start; align-items: center; gap: 4px;
-  min-height: 52px; padding-top: 8px; border-top: 1px solid #e8ecf5;
-  overflow: visible;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+  padding-top: 8px;
+  border-top: 1px solid #e8ecf5;
 }
 .post-comments-post-actions.post-toolbar-compact > button {
-  display: grid; place-items: center; flex: 0 0 40px;
-  width: 40px; min-width: 40px; height: 40px; min-height: 40px;
-  margin: 0; padding: 0; border: 0; border-radius: 50%;
-  background: transparent; color: #627394; cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  margin: 0;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #243a5d;
+  font-size: 13px;
+  cursor: pointer;
 }
-.post-comments-post-actions.post-toolbar-compact > button:hover { background: #eef3f7; color: #2563eb; }
+.post-comments-post-actions.post-toolbar-compact > button:hover { background: #f4f6fc; }
+.post-comments-post-actions.post-toolbar-compact > button.feed-like-button.is-liked { color: #ee416a; }
+.post-comments-post-actions.post-toolbar-compact > button.feed-like-button.is-liked:hover { background: #fff2f6; }
 .post-comments-post-actions.post-toolbar-compact > button:disabled { opacity: .55; cursor: default; }
 
 .post-comments-thread { display: flex; flex-direction: column; overflow: hidden; }
@@ -114,8 +133,13 @@
   min-height: 24px; padding: 0; border: 0; background: none;
   color: #7282a0; font: inherit; font-size: 11px; cursor: pointer;
 }
-.post-comments-thread .feed-comment-actions > button:hover,
-.post-comments-thread .feed-comment-actions > button.feed-comment-liked { color: #2563eb; }
+.post-comments-thread .feed-comment-actions > button:hover { color: #e94970; }
+.post-comments-thread .feed-comment-actions > button.feed-comment-liked { color: #ee416a; }
+.post-comments-thread .feed-comment-actions > button:has(.lucide-heart) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .post-comments-thread .feed-comment-menu { margin-left: auto; }
 .post-comments-thread .feed-comment-menu > button {
   display: grid; place-items: center; height: 26px; width: 26px;

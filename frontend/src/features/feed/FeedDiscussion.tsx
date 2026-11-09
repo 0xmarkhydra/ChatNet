@@ -1,7 +1,7 @@
 import { userLabel } from '../../shared/lib/userLabel'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Ellipsis, SendHorizontal } from 'lucide-react'
+import { Ellipsis, Heart, SendHorizontal } from 'lucide-react'
 import UserAvatar from '../../shared/ui/UserAvatar'
 
 export type FeedComment = {
@@ -265,6 +265,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
               <button type="button" className={previewLikes.has(comment.id) ? 'feed-comment-liked' : ''}
                 aria-pressed={previewLikes.has(comment.id)} title="Lượt thích bình luận chưa được đồng bộ lên máy chủ"
                 onClick={() => setPreviewLikes(current => { const next = new Set(current); if (next.has(comment.id)) next.delete(comment.id); else next.add(comment.id); return next })}>
+                <Heart size={14} fill={previewLikes.has(comment.id) ? 'currentColor' : 'none'} aria-hidden="true" />
                 {previewLikes.has(comment.id) ? 'Đã thích' : 'Thích'}
               </button>
               <span aria-hidden="true">·</span>
