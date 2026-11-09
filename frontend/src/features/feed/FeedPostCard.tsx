@@ -1,4 +1,5 @@
 import { Heart } from 'lucide-react'
+import FeedLikeButton from './FeedLikeButton'
 import { userLabel } from '../../shared/lib/userLabel'
 import type { Post } from './types'
 import type { ToastKind } from '../notifications/toast'
@@ -60,7 +61,6 @@ export default function FeedPostCard({
   like,
 }: Props) {
   const authorLabel = userLabel(post.author === name ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
-  const isLiked = Boolean(post.myReaction || post.liked)
   const likeBusy = likePreviews[post.id] !== undefined
   const commentsCount = post.comments?.length ?? 0
 
@@ -104,13 +104,7 @@ export default function FeedPostCard({
           </span>
         </div>
         <div className="post-toolbar feed-post-toolbar">
-          <button type="button" className={isLiked ? 'feed-post-like is-liked' : 'feed-post-like'}
-            disabled={likeBusy} aria-pressed={isLiked} aria-busy={likeBusy}
-            aria-label={isLiked ? 'Bỏ thích bài viết' : 'Thích bài viết'}
-            onClick={() => void like(post, '❤️')}>
-            <Heart size={24} fill={isLiked ? 'currentColor' : 'none'} aria-hidden="true" />
-            <span>{isLiked ? 'Đã thích' : 'Thích'}</span>
-          </button>
+          <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void like(post, emoji)} />
           <button type="button" className="post-stat post-detail-trigger"
             onClick={() => setActivePostId(post.id)}>
             <UiIcon name="comment" size={22} /><span>Bình luận</span>

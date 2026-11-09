@@ -2623,10 +2623,16 @@
 }
 
 .feed-media-preview .media-count-1 .media-item img.media-extra-tall {
-  height: min(68vh, 620px);
-  max-height: 620px;
-  object-fit: cover;
-  object-position: center top;
+  height: auto;
+  max-height: none;
+  object-fit: contain;
+  object-position: center;
+}
+
+/* Feed photo grids retain compact tiles without cropping the uploaded images. */
+.feed-media-preview .media-grid .media-item img {
+  object-fit: contain;
+  background: #f2f4f8;
 }
 
 .feed-media-preview .media-count-1 .media-item video {

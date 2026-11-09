@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { ChevronDown, MessageCircle, ThumbsUp } from 'lucide-react'
-import FeedReactionControl from '../features/feed/FeedReactionControl'
+import { ChevronDown, Heart, MessageCircle } from 'lucide-react'
+import FeedLikeButton from '../features/feed/FeedLikeButton'
 import type { Post } from '../features/feed/types'
 import { FeedText } from '../features/feed/FeedDiscussion'
 import FeedPostActions, { FeedShareAction } from '../features/feed/FeedPostActions'
@@ -78,11 +78,11 @@ export default function PostCommentsPage({
             )}
             <div className="post-comments-post-footer">
               <div className="post-comments-stats">
-                <span><ThumbsUp size={22} fill="#2563eb" color="#2563eb" aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích</span>
+                <span className="feed-post-likes"><Heart size={20} aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích</span>
                 <span>{commentCount.toLocaleString('vi-VN')} bình luận{sharesLabel}</span>
               </div>
               <div className="post-comments-post-actions post-toolbar post-toolbar-compact">
-                <FeedReactionControl post={post} busy={likeBusy} react={onLike} showCount />
+                <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void onLike(post, emoji)} />
                 <button type="button" aria-label="Bình luận" title="Bình luận"
                   onClick={() => document.querySelector<HTMLTextAreaElement>('.post-comments-thread .feed-comment-compose textarea')?.focus()}>
                   <MessageCircle size={21} aria-hidden="true" /><span>Bình luận</span>
