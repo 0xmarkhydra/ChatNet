@@ -217,8 +217,50 @@ try {
   const centerWidth = socialGeometry['.social-feed-stories-card'].width
   assert(Math.abs(sideWidth / (sideWidth + centerWidth) - 337 / 1252) < .015,
     'Social feed right rail should be 20% narrower: ' + JSON.stringify({ sideWidth, centerWidth }))
-  assert(await feed.locator('.social-feed-center .post.zalo-post .post-toolbar > button').count() >= 4,
-    'Social V4 post must render Like / Comment / Share / Save actions')
+  const postCard = feedCards.first()
+  const postActions = postCard.locator('.feed-post-toolbar > button')
+  assert(await postActions.count() === 4,
+    'Post must show exactly four equal actions: Like, Comment, Share, Save')
+  assert(await postCard.locator('.feed-reaction-control, .feed-reaction-picker').count() === 0,
+    'Post must use a single heart reaction without a multi-reaction menu')
+  const heartButton = postCard.getByRole('button', { name: 'Thích bài viết' })
+  assert(await heartButton.locator('svg.lucide-heart').count() === 1,
+    'Post Like button must use a heart icon')
+  await heartButton.hover()
+  assert(await postCard.locator('.feed-reaction-picker').count() === 0,
+    'Hovering Like must not open a reaction picker')
+  const postGeometry = await postCard.evaluate(card => {
+    const buttons = [...card.querySelectorAll('.feed-post-toolbar > button')]
+    const boxes = buttons.map(button => button.getBoundingClientRect())
+    const toolbar = card.querySelector('.feed-post-toolbar')
+    return {
+      columns: getComputedStyle(toolbar).gridTemplateColumns,
+      buttonWidths: boxes.map(box => box.width),
+      reactionSummary: Boolean(card.querySelector('.feed-post-likes svg.lucide-heart')),
+      mediaWidth: card.querySelector('.feed-media-preview img')?.getBoundingClientRect().width,
+      cardWidth: card.getBoundingClientRect().width,
+      mediaBoxes: ['.feed-media-preview', '.media-attachments', '.media-item', '.media-item a', '.media-item img']
+        .map(selector => {
+          const elem = card.querySelector(selector)
+          const rect = elem?.getBoundingClientRect()
+          return { selector, width: rect?.width, left: rect?.left, maxWidth: elem ? getComputedStyle(elem).maxWidth : null, display: elem ? getComputedStyle(elem).display : null }
+        }),
+    }
+  })
+  assert(postGeometry.reactionSummary
+    && postGeometry.buttonWidths.length === 4
+    && postGeometry.buttonWidths.every(width => Math.abs(width - postGeometry.buttonWidths[0]) <= 2)
+    && postGeometry.mediaWidth >= postGeometry.cardWidth - 70,
+    'Post card should align four action columns and show full-width media: ' + JSON.stringify(postGeometry))
+  mkdirSync('output/playwright/layout', { recursive: true })
+  await page.screenshot({ path: 'output/playwright/layout/feed-post-single-heart.png' })
+  if (process.argv.includes('--post-only')) {
+    console.log('Post card PASS: single heart, no picker, 4 equal actions, post summary', JSON.stringify(postGeometry))
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   await feed.getByRole('button', { name: 'Tạo Story mới' }).waitFor()
   await feed.getByRole('button', { name: 'Xem Story của Minh Anh' }).waitFor()
   await feed.locator('.social-feed-stories-card').getByRole('button', { name: 'Xem tất cả' }).click()
