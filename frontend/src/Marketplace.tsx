@@ -135,7 +135,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
       </nav>
       <div className="marketplace-body">
         <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>
-        {loading && <p role="status">Đang tải dữ liệu sàn...</p>}
+
         {error && <p role="alert" className="marketplace-error">{error} <button onClick={() => void refresh()} type="button">Thử lại</button></p>}
         {message && <p role="status" className="marketplace-message">{message}</p>}
 

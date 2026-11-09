@@ -29,9 +29,8 @@ export default function ChatQuickSearch({
         <button type="button" aria-label="Đóng kết quả tìm kiếm" onClick={onClose}><X size={17} /></button>
       </div>
       <div className="chat-quick-search-scroll" aria-live="polite">
-        {loading ? <p className="chat-quick-search-status">Đang tìm liên hệ, tin nhắn và file...</p> :
-          error ? <p className="chat-quick-search-status" role="alert">{error} <button type="button" onClick={onRetry}>Thử lại</button></p> :
-          count === 0 ? <p className="chat-quick-search-status">Không tìm thấy kết quả phù hợp.</p> : null}
+        {!loading && error ? <p className="chat-quick-search-status" role="alert">{error} <button type="button" onClick={onRetry}>Thử lại</button></p> :
+          !loading && count === 0 ? <p className="chat-quick-search-status">Không tìm thấy kết quả phù hợp.</p> : null}
         {!loading && !error && sections.map(({ label, Icon, items }) => (
           <section key={label} className="chat-quick-search-section" aria-label={label}>
             <div className="chat-quick-search-label">

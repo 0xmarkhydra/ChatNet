@@ -135,7 +135,7 @@ export default function VoiceRecorder({
     return <span className="voice-recorder busy" role="status">Đang xin quyền mic…</span>
   }
   if (phase === 'finalizing') {
-    return <span className="voice-recorder busy" role="status">Đang xử lý ghi âm…</span>
+    return null
   }
   if (phase === 'recording') {
     return (

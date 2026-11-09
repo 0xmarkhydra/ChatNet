@@ -64,7 +64,7 @@ export default function GroupRenameDialog({ currentName, draft, onDraftChange, o
           <button type="button" className="group-rename-cancel"
             onClick={onClose} disabled={submitting || busy}>Hủy</button>
           <button type="submit" className="group-rename-confirm"
-            disabled={submitting || busy || invalid}>{submitting || busy ? 'Đang lưu...' : 'Xác nhận'}</button>
+            disabled={submitting || busy || invalid}>Xác nhận</button>
         </div>
       </form>
     </dialog>

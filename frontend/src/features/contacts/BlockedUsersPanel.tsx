@@ -25,7 +25,7 @@ export default function BlockedUsersPanel({
                 <div><strong>Người dùng đã chặn</strong><small>Quản lý những tài khoản không thể nhắn tin hoặc kết bạn với bạn.</small></div>
                 <button type="button" className="settings-action" disabled={blockedBusy}
                   onClick={() => blockedOpen ? setBlockedOpen(false) : void loadBlockedUsers()}>
-                  {blockedBusy ? 'Đang tải...' : blockedOpen ? 'Thu gọn' : 'Xem danh sách'}
+                  {blockedOpen ? 'Thu gọn' : 'Xem danh sách'}
                 </button>
               </div>
               {blockedError && <div className="settings-row" role="alert">

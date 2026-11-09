@@ -68,7 +68,7 @@ export default function GroupCreator({ ownerId, friends, query, onQuery, onCreat
           {!members.length && <p>{query.trim() ? 'Không tìm thấy bạn bè phù hợp.' : 'Chưa có bạn bè để mời vào nhóm.'}</p>}
         </div>
         {(validation || error) && <p className="connection-message" role="alert">{validation || error}</p>}
-        <button className="connection-primary" disabled={!selected.length || busy}>{busy ? 'Đang tạo...' : `Tạo nhóm${selected.length ? ` · ${selected.length + 1} người` : ''}`}</button>
+        <button className="connection-primary" disabled={!selected.length || busy}>{`Tạo nhóm${selected.length ? ` · ${selected.length + 1} người` : ''}`}</button>
       </form>
     </dialog>
   )

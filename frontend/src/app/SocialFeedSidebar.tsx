@@ -69,7 +69,7 @@ export default function SocialFeedSidebar({
     <aside className="social-feed-side" aria-label="Khám phá và gợi ý trên bảng tin">
       <section className="social-feed-side-card social-feed-suggestions" aria-label="Gợi ý kết nối">
         <header><h2>Gợi ý kết nối</h2><button type="button" onClick={onViewContacts}>Xem tất cả <ArrowRight size={16} aria-hidden="true" /></button></header>
-        {suggestionsBusy && <p className="social-feed-side-status" role="status">Đang tải gợi ý...</p>}
+
         {!suggestionsBusy && suggestionsError && <div className="social-feed-side-status" role="alert">Không tải được gợi ý.
           <button type="button" onClick={() => setRevision(value => value + 1)}>Thử lại</button>
         </div>}

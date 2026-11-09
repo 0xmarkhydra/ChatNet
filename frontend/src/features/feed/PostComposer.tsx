@@ -159,10 +159,10 @@ export default function PostComposer({
           ))}
         </div>}
       </div>
-      {mediaUploading === 'feed' && <div className="media-uploading-note">Đang tải media thẳng lên kho lưu trữ…</div>}
+
       {popup && submitError && <p className="profile-post-error" role="alert">{submitError}</p>}
       {(popup || postText.trim() || postAttachments.length > 0) && (
-        <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading || (!postText.trim() && postAttachments.length === 0 && !(checkInOpen && checkInLocation.trim()))}>{pendingPost ? 'Đang đăng...' : 'Đăng'}</button>
+        <button className="feed-submit" disabled={!!pendingPost || !!mediaUploading || (!postText.trim() && postAttachments.length === 0 && !(checkInOpen && checkInLocation.trim()))}>Đăng</button>
       )}
     </form>
   )

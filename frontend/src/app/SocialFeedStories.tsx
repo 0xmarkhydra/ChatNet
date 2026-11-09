@@ -30,7 +30,7 @@ export default function SocialFeedStories({
             <UserAvatar username={username} name={displayName} className="social-feed-story-avatar" />
             <span className="social-feed-story-add"><Plus size={16} aria-hidden="true" /></span>
           </span>
-          <span className="social-feed-story-label">{busy ? 'Đang tải...' : 'Tin của bạn'}</span>
+          <span className="social-feed-story-label">Tin của bạn</span>
         </button>
         {stories.map((story, index) => (
           <button type="button" className="social-feed-story" key={story.id} onClick={() => onOpen(story.id)}

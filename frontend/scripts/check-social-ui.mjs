@@ -217,96 +217,45 @@ try {
   const centerWidth = socialGeometry['.social-feed-stories-card'].width
   assert(Math.abs(sideWidth / (sideWidth + centerWidth) - 337 / 1252) < .015,
     'Social feed right rail should be 20% narrower: ' + JSON.stringify({ sideWidth, centerWidth }))
-  assert(await feedCards.first().locator('.post-toolbar > button').count() >= 3
-    && await feedCards.first().locator('.feed-reaction-primary').count() === 1,
-    'Social V4 post must render Like / Comment / Share / Save actions')
-  const toolbar = feedCards.first().locator('.post-toolbar-compact')
-  const footerButtons = toolbar.locator(':scope > button')
-  const footerPositions = await footerButtons.evaluateAll(buttons => buttons.map(button => {
-    const box = button.getBoundingClientRect()
-    return { left: box.left, right: box.right, width: box.width }
-  }))
-  assert(footerPositions.length >= 3
-    && footerPositions.every((button, index) => button.width <= 42
-      && (index === 0 || button.left - footerPositions[index - 1].right <= 9))
-    && footerPositions.at(-1).right - footerPositions[0].left <= 180,
-    'Post actions should be a compact icon group: ' + JSON.stringify(footerPositions))
-  const composerRadius = await page.locator('.social-feed-launcher-publish').evaluate(
-    button => getComputedStyle(button).borderRadius)
-  assert(composerRadius === '999px', 'Create post button must be pill shaped: ' + composerRadius)
-  const reactionButton = feedCards.first().locator('.feed-reaction-primary')
-  // Isolate the footer hover check from the navigation flyout covering the card's left edge.
-  const reactionTestStyle = await page.addStyleTag({ content: '.app-sidebar, .app-sidebar * { pointer-events: none !important }' })
-  await reactionButton.hover()
-  const picker = feedCards.first().locator('.feed-reaction-picker')
-  await picker.waitFor({ state: 'visible' })
-  const reactionGeometry = await page.evaluate(() => {
-    const picker = document.querySelector('.social-feed-center .post.zalo-post .feed-reaction-picker')
-    const trigger = document.querySelector('.social-feed-center .post.zalo-post .feed-reaction-primary')
-    const rect = picker?.getBoundingClientRect()
-    const buttonRect = trigger?.getBoundingClientRect()
-    const item = picker?.querySelector('button')
-    const emoji = picker?.querySelector('span')
+  const postCard = feedCards.first()
+  const postActions = postCard.locator('.feed-post-toolbar > button')
+  assert(await postActions.count() === 4,
+    'Post must show exactly four equal actions: Like, Comment, Share, Save')
+  assert(await postCard.locator('.feed-reaction-control, .feed-reaction-picker').count() === 0,
+    'Post must use a single heart reaction without a multi-reaction menu')
+  const heartButton = postCard.getByRole('button', { name: 'Thích bài viết' })
+  assert(await heartButton.locator('svg.lucide-heart').count() === 1,
+    'Post Like button must use a heart icon')
+  await heartButton.hover()
+  assert(await postCard.locator('.feed-reaction-picker').count() === 0,
+    'Hovering Like must not open a reaction picker')
+  const postGeometry = await postCard.evaluate(card => {
+    const buttons = [...card.querySelectorAll('.feed-post-toolbar > button')]
+    const boxes = buttons.map(button => button.getBoundingClientRect())
+    const toolbar = card.querySelector('.feed-post-toolbar')
     return {
-      count: picker?.querySelectorAll('button').length,
-      optionSizes: [...(picker?.querySelectorAll('button') || [])].map(button => ({
-        width: button.getBoundingClientRect().width,
-        height: button.getBoundingClientRect().height,
-        left: button.getBoundingClientRect().left,
-        right: button.getBoundingClientRect().right,
-        background: getComputedStyle(button).backgroundColor,
-      })),
-      width: rect?.width, height: rect?.height, left: rect?.left, bottom: rect?.bottom,
-      triggerLeft: buttonRect?.left, triggerTop: buttonRect?.top,
-      itemWidth: item?.getBoundingClientRect().width,
-      itemHeight: item?.getBoundingClientRect().height,
-      pickerPadding: picker ? getComputedStyle(picker).padding : null,
-      pickerLineHeight: picker ? getComputedStyle(picker).lineHeight : null,
-      pickerMinHeight: picker ? getComputedStyle(picker).minHeight : null,
-      itemMinHeight: item ? getComputedStyle(item).minHeight : null,
-      emojiSize: emoji ? parseFloat(getComputedStyle(emoji).fontSize) : null,
+      columns: getComputedStyle(toolbar).gridTemplateColumns,
+      buttonWidths: boxes.map(box => box.width),
+      reactionSummary: Boolean(card.querySelector('.feed-post-likes svg.lucide-heart')),
+      mediaWidth: card.querySelector('.feed-media-preview img')?.getBoundingClientRect().width,
+      cardWidth: card.getBoundingClientRect().width,
+      mediaBoxes: ['.feed-media-preview', '.media-attachments', '.media-item', '.media-item a', '.media-item img']
+        .map(selector => {
+          const elem = card.querySelector(selector)
+          const rect = elem?.getBoundingClientRect()
+          return { selector, width: rect?.width, left: rect?.left, maxWidth: elem ? getComputedStyle(elem).maxWidth : null, display: elem ? getComputedStyle(elem).display : null }
+        }),
     }
   })
-  assert(reactionGeometry.count === 6 && reactionGeometry.width <= 270
-    && reactionGeometry.height <= 54 && reactionGeometry.itemWidth === 36
-    && reactionGeometry.itemHeight === 36
-    && reactionGeometry.optionSizes.every((size, index) => size.width === reactionGeometry.itemWidth
-      && size.height === reactionGeometry.itemHeight
-      && (index === 0 || size.left - reactionGeometry.optionSizes[index - 1].right >= 5))
-    && reactionGeometry.optionSizes.slice(2).every(size => size.background === 'rgba(0, 0, 0, 0)')
-    && reactionGeometry.emojiSize === 32
-    && Math.abs(reactionGeometry.left - reactionGeometry.triggerLeft) <= 2
-    && reactionGeometry.bottom <= reactionGeometry.triggerTop,
-    'Compact reaction bar must align above the Like button: ' + JSON.stringify(reactionGeometry))
-  const triggerSize = await reactionButton.boundingBox()
-  assert(triggerSize.width <= 110 && triggerSize.height <= 40,
-    'Like control should be compact: ' + JSON.stringify(triggerSize))
-  for (const [type, background] of [
-    ['reaction-like', 'rgb(40, 121, 244)'],
-    ['reaction-love', 'rgb(241, 48, 88)'],
-  ]) {
-    const choice = picker.locator('.' + type)
-    await choice.hover()
-    await page.waitForTimeout(250)
-    const appearance = await choice.evaluate(button => ({
-      background: getComputedStyle(button).backgroundColor,
-      color: getComputedStyle(button).color,
-      width: button.getBoundingClientRect().width,
-    }))
-    assert(appearance.background === background && appearance.color === 'rgb(255, 255, 255)'
-      && appearance.width >= reactionGeometry.itemWidth * 1.1,
-      type + ' must remain visible and grow on hover: ' + JSON.stringify(appearance))
-  }
-  await picker.getByRole('button', { name: 'Haha' }).hover()
-  await page.waitForTimeout(250)
-  assert((await picker.getByRole('button', { name: 'Haha' }).boundingBox()).width >= reactionGeometry.itemWidth * 1.1,
-    'Face reaction should grow on hover')
+  assert(postGeometry.reactionSummary
+    && postGeometry.buttonWidths.length === 4
+    && postGeometry.buttonWidths.every(width => Math.abs(width - postGeometry.buttonWidths[0]) <= 2)
+    && postGeometry.mediaWidth >= postGeometry.cardWidth - 70,
+    'Post card should align four action columns and show full-width media: ' + JSON.stringify(postGeometry))
   mkdirSync('output/playwright/layout', { recursive: true })
-  await page.screenshot({ path: 'output/playwright/layout/reaction-picker-compact.png' })
-  await page.mouse.move(600, 400)
-  await picker.waitFor({ state: 'hidden' })
-  if (process.argv.includes('--reactions-only')) {
-    console.log('Reaction UI PASS: equal buttons, spacing, hover, compact toolbar, rounded composer')
+  await page.screenshot({ path: 'output/playwright/layout/feed-post-single-heart.png' })
+  if (process.argv.includes('--post-only')) {
+    console.log('Post card PASS: single heart, no picker, 4 equal actions, post summary', JSON.stringify(postGeometry))
     await browser.close()
     browser = null
     server.kill()
@@ -321,6 +270,7 @@ try {
   await feed.locator('.social-feed-trend').first().waitFor({ state: 'visible' })
   mkdirSync('output/playwright/layout', { recursive: true })
   await page.screenshot({ path: 'output/playwright/layout/social-feed-desktop-1586.png' })
+  const reactionTestStyle = await page.addStyleTag({ content: '.app-sidebar, .app-sidebar * { pointer-events: none !important }' })
   await feedCards.first().getByRole('button', { name: 'Lưu bài viết' }).click()
   await feedCards.first().getByRole('button', { name: 'Bỏ lưu bài viết' }).waitFor()
   assert(fixturePost.saved, 'Save button must call post save API and update state')

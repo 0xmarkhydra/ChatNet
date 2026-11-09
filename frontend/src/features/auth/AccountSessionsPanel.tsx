@@ -28,7 +28,7 @@ export default function AccountSessionsPanel({
             if (sessionsOpen) setSessionsOpen(false)
             else void fetchAccountSessions()
           }}>
-          {sessionsBusy ? 'Đang xử lý...' : sessionsOpen ? 'Thu gọn' : 'Xem thiết bị'}
+          {sessionsOpen ? 'Thu gọn' : 'Xem thiết bị'}
         </button>
       </div>
       {sessionsError && <div className="settings-row" role="alert">

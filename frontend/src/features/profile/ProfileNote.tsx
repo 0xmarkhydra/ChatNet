@@ -87,7 +87,7 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
      <select aria-label="Ai có thể xem ghi chú" value={visibility} disabled={busy} onChange={e=>setVisibility(e.target.value as Note['visibility'])}>
       <option value="friends">Bạn bè</option><option value="public">Công khai</option><option value="private">Chỉ mình tôi</option>
      </select></label>
-    <button type="submit" className="profile-note-publish" disabled={busy||!loaded||!!error||count<1||count>60}>{busy?'Đang đăng…':'Đăng ghi chú'}</button>
+    <button type="submit" className="profile-note-publish" disabled={busy||!loaded||!!error||count<1||count>60}>Đăng ghi chú</button>
    </form>}
    {error&&<div className="profile-note-error" role="alert"><span>{error}</span><button type="button" disabled={busy} onClick={()=>void load(true)}><RefreshCw size={14}/>Tải lại ghi chú</button></div>}
   </dialog>

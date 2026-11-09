@@ -488,62 +488,96 @@
     font-size: 12px;
     font-weight: 650;
   }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-toolbar
-    > button:hover {
-    background: #f2f5ff;
+  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar > button:hover { background: #f2f5ff; }
+  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar > button.liked { color: #d83d60; }
+  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar > button.is-saved { color: #2563eb; }
+  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar svg { flex: 0 0 auto; }
+  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar > button span { font-size: 12px; }
+
+  /* Four equal post actions and a single heart reaction, matching the post card layout. */
+  .modern-shell.app-layout .social-feed-center > .feed.zalo-feed > .post.zalo-post.feed-post-card {
+    padding: 18px 24px 14px;
+    border-radius: 20px;
   }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-toolbar
-    > button.liked {
-    color: #d83d60;
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card > .avatar {
+    width: 52px; height: 52px;
   }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-toolbar
-    > button.is-saved {
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .post-author {
+    min-height: 52px;
+    align-items: center;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .post-author strong {
+    color: #142443; font-size: 16px; font-weight: 750;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .post-author small {
+    color: #7889aa; font-size: 12px;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-text {
+    padding-top: 8px;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-text .feed-text > p {
+    margin: 0 0 6px; line-height: 1.5; font-size: 15px;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview {
+    margin-top: 10px; border-radius: 15px; overflow: hidden;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-attachments {
+    box-sizing: border-box; width: 100%; max-width: none; margin: 0; gap: 6px;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-item a {
+    display: block; width: 100%;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .media-count-1 .media-item img {
+    width: 100%; height: clamp(180px, 31vw, 280px); max-height: 280px;
+    border-radius: 15px; object-fit: cover;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-engagement {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 8px 16px; padding: 9px 4px 10px;
+    color: #7585a7; font-size: 12px;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-likes {
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-likes svg {
+    color: #f34373; flex: 0 0 auto;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-conversation-stats {
+    margin-left: auto; text-align: right;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px; margin-top: 0; padding-top: 5px; border-top: 1px solid #e8ecf5;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; min-width: 0; min-height: 43px; padding: 4px 6px;
+    border: 0; border-radius: 10px; background: transparent;
+    color: #243a5d; font-size: 13px; font-weight: 550; cursor: pointer;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button:hover {
+    background: #f4f6fc;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button.feed-post-like.is-liked {
+    background: transparent; color: #ee416a;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button.feed-post-like.is-liked:hover {
+    background: #fff2f6;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button.is-saved {
     color: #2563eb;
   }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-toolbar
-    svg {
-    flex: 0 0 auto;
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button span {
+    font-size: 13px;
   }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-toolbar
-    > button
-    span {
-    font-size: 12px;
-  }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-toolbar.post-toolbar-compact {
-    display: flex;
-    justify-content: flex-start;
-    gap: 4px;
-  }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-toolbar.post-toolbar-compact
-    > button {
-    flex: 0 0 40px;
-    width: 40px;
-    min-width: 40px;
-    min-height: 40px;
-    height: 40px;
-    padding: 0;
-    border-radius: 50%;
+  @media (max-width: 600px) {
+    .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button {
+      gap: 4px; font-size: 12px; padding: 4px 2px;
+    }
+    .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button span {
+      font-size: 12px;
+    }
   }
   .modern-shell.app-layout .social-feed-center .feed-empty {
     border-radius: 15px;

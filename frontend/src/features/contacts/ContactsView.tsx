@@ -139,7 +139,7 @@ export default function ContactsView({
           {searching ? <>
             <div className="fd-list-header"><div><h2>Kết quả tìm kiếm</h2><p>Tìm người dùng theo tên, username hoặc email</p></div>
               <button type="button" className="fd-text-button" onClick={() => setFriendQuery('')}>Xóa tìm kiếm</button></div>
-            {friendSearching && <p className="fd-empty" role="status">Đang tìm người dùng...</p>}
+
             {friendSearchError && !friendSearching && <p className="fd-empty" role="alert">Không thể tìm người dùng.
               <button type="button" className="fd-text-button" onClick={() => setFriendSearchRetry(value => value + 1)}>Thử lại</button></p>}
             {!friendSearching && !friendSearchError && contactSearchResults.length === 0 && <p className="fd-empty">Không tìm thấy người dùng phù hợp.</p>}

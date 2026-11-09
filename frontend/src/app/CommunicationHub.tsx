@@ -93,7 +93,7 @@ export default function CommunicationHub({
           </div>
           {hasMore && (
             <button type="button" className="communication-hub-load" disabled={loadingMore} onClick={onLoadMore} aria-busy={loadingMore}>
-              {loadingMore ? 'Đang tải...' : 'Tải thêm hội thoại'}
+              Tải thêm hội thoại
             </button>
           )}
         </section>
