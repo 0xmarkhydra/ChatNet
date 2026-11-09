@@ -6754,21 +6754,6 @@ export default function App({
         )}
 
         {tab === "discover" && (
-          <div className="marketplace-entry">
-            <div>
-              <h3>SocCO Market</h3>
-              <p>
-                Mua bán trong ChatNet — trò chuyện, giỏ hàng và theo dõi yêu cầu
-                đơn.
-              </p>
-            </div>
-            <button type="button" onClick={() => switchTab("market")}>
-              Mở sàn mua bán
-            </button>
-          </div>
-        )}
-
-        {tab === "discover" && (
           <Suspense fallback={<p role="status">Đang mở Quanh đây...</p>}>
             <NearbyExplorer
               query={globalSearch}
