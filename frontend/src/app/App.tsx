@@ -78,7 +78,7 @@ import FeedPostCard from "../features/feed/FeedPostCard";
 import FeedReactionControl from "../features/feed/FeedReactionControl";
 import StoryViewer from "../features/feed/StoryViewer";
 import MessageActions from "../features/chat/MessageActions";
-import { GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/GroupActivities";
+import { GroupActivityComposerMenu, GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/GroupActivities";
 import { messageReactionLabel } from "../features/chat/messageReactions";
 import {
   copyChatImage,
@@ -6366,6 +6366,12 @@ export default function App({
                       onRecorded={(file) => { void addChatFiles([file]) }}
                       onError={(message) => setNotice(message, 'error')}
                     />
+                    {activeConversation.type === 'group' && (
+                      <GroupActivityComposerMenu
+                        key={activeConversation.id}
+                        onCreate={setGroupActivityCreateKind}
+                      />
+                    )}
                     <input
                       ref={messageInputRef}
                       aria-label="Tin nhắn"
