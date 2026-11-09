@@ -10,6 +10,8 @@ import {
   ClipboardList,
   FileText,
   MoreHorizontal,
+  Pin,
+  PinOff,
   X,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -25,6 +27,7 @@ export type GroupActivity = {
   counts: number[];
   myVote: number | null;
   scheduledAt?: string;
+  pinnedAt?: string;
   creatorName: string;
   createdAt: string;
 };
@@ -36,6 +39,8 @@ export type GroupActivityEvent = {
   createdAt: string;
 };
 type ActivityData = {
+  conversationId: number | null;
+  sessionKey?: string;
   activities: GroupActivity[];
   events: GroupActivityEvent[];
 };
@@ -68,6 +73,7 @@ export function useGroupActivities(
   const activeRef = useRef({ conversationId, sessionKey });
   activeRef.current = { conversationId, sessionKey };
   const [data, setData] = useState<ActivityData>({
+    conversationId: null,
     activities: [],
     events: [],
   });
@@ -87,6 +93,8 @@ export function useGroupActivities(
       )
         return;
       setData({
+        conversationId,
+        sessionKey,
         activities: result.activities || [],
         events: result.events || [],
       });
@@ -104,7 +112,7 @@ export function useGroupActivities(
   }, [conversationId, sessionKey]);
 
   useEffect(() => {
-    setData({ activities: [], events: [] });
+    setData({ conversationId, sessionKey, activities: [], events: [] });
     setError("");
     if (!conversationId) return;
     void refresh();
@@ -122,6 +130,7 @@ export function useGroupActivities(
     body: string;
     options: string[];
     scheduledAt?: string;
+    pin?: boolean;
   }) => {
     if (!conversationId) throw new Error("Chưa chọn nhóm.");
     await readResponse(
@@ -132,6 +141,17 @@ export function useGroupActivities(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         },
+      ),
+    );
+    await refresh();
+  };
+
+  const setPin = async (id: number, pinned: boolean) => {
+    if (!conversationId) throw new Error("Chưa chọn nhóm.");
+    await readResponse(
+      await requestRef.current(
+        `/api/conversations/${conversationId}/activities/${id}/pin`,
+        { method: pinned ? "PUT" : "DELETE" },
       ),
     );
     await refresh();
@@ -151,7 +171,13 @@ export function useGroupActivities(
     );
     await refresh();
   };
-  return { ...data, error, refresh, create, vote };
+  const isCurrent = data.conversationId === conversationId && data.sessionKey === sessionKey;
+  return {
+    activities: isCurrent ? data.activities : [],
+    events: isCurrent ? data.events : [],
+    error: isCurrent ? error : "",
+    refresh, create, vote, setPin,
+  };
 }
 
 export function GroupActivityComposerMenu({
@@ -282,7 +308,9 @@ export function GroupActivityMarker({
           {event.kind === "created"
             ? labels[activity.kind].toLowerCase()
             : "cuộc bình chọn"}{" "}
-          <b>{activity.title}</b> · <em>Xem</em>
+          {activity.body && (
+            <b>{activity.body.length > 100 ? `${activity.body.slice(0, 100)}…` : activity.body}</b>
+          )} · <em>Xem</em>
         </span>
       </button>
     </div>
@@ -295,6 +323,7 @@ export function GroupActivityDialog({
   onClose,
   onCreate,
   onVote,
+  onTogglePin,
 }: {
   kind: GroupActivityKind | null;
   activity: GroupActivity | null;
@@ -305,13 +334,15 @@ export function GroupActivityDialog({
     body: string;
     options: string[];
     scheduledAt?: string;
+    pin?: boolean;
   }) => Promise<void>;
   onVote: (id: number, optionIndex: number) => Promise<void>;
+  onTogglePin: (id: number, pinned: boolean) => Promise<void>;
 }) {
-  const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [options, setOptions] = useState(["", ""]);
   const [scheduledAt, setScheduledAt] = useState("");
+  const [pinOnCreate, setPinOnCreate] = useState(false);
   const [selection, setSelection] = useState<number | null>(
     activity?.myVote ?? null,
   );
@@ -335,6 +366,10 @@ export function GroupActivityDialog({
       setError("Bình chọn cần ít nhất hai lựa chọn hợp lệ.");
       return;
     }
+    if (kind === "note" && !body.trim()) {
+      setError("Vui lòng nhập nội dung ghi chú.");
+      return;
+    }
     if (
       kind === "reminder" &&
       (!scheduledAt || new Date(scheduledAt).getTime() <= Date.now())
@@ -347,8 +382,9 @@ export function GroupActivityDialog({
     try {
       await onCreate({
         kind,
-        title: title.trim(),
+        title: labels[kind],
         body: body.trim(),
+        pin: pinOnCreate,
         options: kind === "poll" ? cleaned : [],
         ...(kind === "reminder"
           ? { scheduledAt: new Date(scheduledAt).toISOString() }
@@ -357,6 +393,19 @@ export function GroupActivityDialog({
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể tạo hoạt động.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const togglePinned = async () => {
+    if (!activity || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await onTogglePin(activity.id, !Boolean(activity.pinnedAt));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không cập nhật được ghim.");
     } finally {
       setBusy(false);
     }
@@ -395,7 +444,7 @@ export function GroupActivityDialog({
         aria-label={
           kind
             ? `Tạo ${labels[kind].toLowerCase()}`
-            : `Chi tiết ${activity?.title || "hoạt động"}`
+            : `Chi tiết ${labels[activity?.kind || "poll"].toLowerCase()}`
         }
       >
         <header>
@@ -407,7 +456,7 @@ export function GroupActivityDialog({
               {kind ? "Tạo hoạt động nhóm" : labels[activity?.kind || "poll"]}
             </small>
             <strong>
-              {kind ? labels[kind] : activity?.title || "Chi tiết hoạt động"}
+              {kind ? labels[kind] : labels[activity?.kind || "poll"]}
             </strong>
           </div>
           <button
@@ -426,29 +475,18 @@ export function GroupActivityDialog({
             className="group-activity-form"
           >
             <label>
-              Tiêu đề
-              <input
-                required
-                maxLength={200}
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder={
-                  kind === "poll"
-                    ? "Bạn muốn mọi người bình chọn điều gì?"
-                    : kind === "note"
-                      ? "Tiêu đề ghi chú"
-                      : "Tên cuộc hẹn"
-                }
-              />
-            </label>
-            <label>
-              {kind === "note" ? "Nội dung ghi chú" : "Mô tả (không bắt buộc)"}
+              {kind === "poll"
+                ? "Nội dung bình chọn (không bắt buộc)"
+                : kind === "note"
+                  ? "Nội dung ghi chú"
+                  : "Nội dung nhắc hẹn (không bắt buộc)"}
               <textarea
                 rows={3}
                 maxLength={5000}
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
-                placeholder="Nhập nội dung..."
+                required={kind === "note"}
+                placeholder={kind === "poll" ? "Nhập nội dung bình chọn..." : kind === "note" ? "Nhập ghi chú..." : "Nhập nội dung nhắc hẹn..."}
               />
             </label>
             {kind === "poll" && (
@@ -507,6 +545,14 @@ export function GroupActivityDialog({
                 />
               </label>
             )}
+            <label className="group-activity-pin-choice">
+              <input
+                type="checkbox"
+                checked={pinOnCreate}
+                onChange={(event) => setPinOnCreate(event.target.checked)}
+              />
+              <span>Ghim lên đầu cuộc trò chuyện nhóm</span>
+            </label>
             <p className="group-activity-readonly">
               Sau khi tạo, nội dung không thể sửa hoặc xóa. Tất cả thành viên
               nhóm đều xem và tương tác được.
@@ -527,6 +573,16 @@ export function GroupActivityDialog({
           </form>
         ) : activity ? (
           <div className="group-activity-view">
+            <button
+              type="button"
+              className="group-activity-toggle-pin"
+              disabled={busy}
+              onClick={() => void togglePinned()}
+              aria-pressed={Boolean(activity.pinnedAt)}
+            >
+              {activity.pinnedAt ? <PinOff size={17} aria-hidden="true" /> : <Pin size={17} aria-hidden="true" />}
+              {activity.pinnedAt ? "Bỏ ghim khỏi đầu cuộc trò chuyện" : "Ghim lên đầu cuộc trò chuyện"}
+            </button>
             <p className="group-activity-author">
               Tạo bởi {activity.creatorName} ·{" "}
               {new Date(activity.createdAt).toLocaleString("vi-VN")}

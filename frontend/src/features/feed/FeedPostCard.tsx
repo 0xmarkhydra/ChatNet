@@ -91,7 +91,7 @@ export default function FeedPostCard({
         )}
         {Boolean(post.attachments?.length) && (
           <div className="feed-media-preview" onClick={() => setActivePostId(post.id)}>
-            <MediaAttachmentsView items={post.attachments} />
+            <MediaAttachmentsView items={post.attachments} onImageClick={() => setActivePostId(post.id)} />
           </div>
         )}
         <div className="post-engagement-summary feed-post-engagement">

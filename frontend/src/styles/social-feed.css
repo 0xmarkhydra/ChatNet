@@ -528,7 +528,7 @@
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-attachments {
     box-sizing: border-box; width: 100%; max-width: none; margin: 0; gap: 6px;
   }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-item a {
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-item .media-image-button {
     display: block; width: 100%;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .media-count-1 .media-item img {
