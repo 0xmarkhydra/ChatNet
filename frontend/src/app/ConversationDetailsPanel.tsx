@@ -38,7 +38,7 @@ export default function ConversationDetailsPanel({
     <aside className="conversation-info-panel social-chat-details" id="conversation-details-panel" aria-label="Thông tin hội thoại">
       <div className="conversation-details-heading">
         <h2>Thông tin hội thoại</h2>
-        <button type="button" onClick={onClose} aria-label="Đóng thông tin hội thoại" title="Đóng">
+        <button type="button" className="sidebar-panel-close" onClick={onClose} aria-label="Đóng thông tin hội thoại" title="Đóng">
           <X size={19} aria-hidden="true" />
         </button>
       </div>
