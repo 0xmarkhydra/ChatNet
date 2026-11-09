@@ -71,7 +71,7 @@
 .profile-post-author strong { overflow-wrap: anywhere; font-size: 16px; color: var(--soco-navy); }
 .profile-post-author label { font-size: 0; }
 .profile-post-author select { max-width: 100%; min-height: 32px; padding: 4px 10px; border: 0; border-radius: 7px; background: var(--soco-line); color: var(--soco-text); font-size: 13px; font-weight: 600; }
-.modern-shell .profile-popup-composer .post-prompt textarea { grid-column: 1 / -1; box-sizing: border-box; width: 100%; min-height: 185px; max-height: 40dvh; padding: 6px 0; border: 0; border-radius: 0; background: transparent; font-size: 24px; line-height: 1.5; resize: vertical; }
+.modern-shell .profile-popup-composer .post-prompt textarea { grid-column: 1 / -1; box-sizing: border-box; width: 100%; height: auto; min-height: 52px; max-height: none; padding: 6px 0; border: 0; border-radius: 0; background: transparent; font-size: 22px; line-height: 1.5; resize: none; overflow-y: hidden; }
 .modern-shell .profile-popup-composer .post-prompt textarea.feed-composer-bg { padding: 20px; border-radius: 12px; }
 .profile-popup-composer .feed-pending-media { order: 2; }
 .profile-popup-composer .feed-composer-settings { order: 3; min-height: 0; padding: 0; border: 0; }
@@ -106,7 +106,7 @@
   .profile-overlay-heading h2 { font-size: 20px; }
   .profile-overlay-heading > button { top: 11px; right: 12px; }
   .modern-shell .profile-post-dialog .profile-popup-composer { padding: 16px; gap: 12px; }
-  .modern-shell .profile-popup-composer .post-prompt textarea { font-size: 20px; min-height: 150px; }
+  .modern-shell .profile-popup-composer .post-prompt textarea { font-size: 20px; min-height: 50px; }
   .profile-popup-composer .composer-shortcuts::before { flex-basis: 100%; }
   .profile-edit-drawer { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; }
 }

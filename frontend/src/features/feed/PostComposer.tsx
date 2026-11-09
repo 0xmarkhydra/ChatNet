@@ -1,3 +1,4 @@
+import { useLayoutEffect } from 'react'
 import { userLabel } from '../../shared/lib/userLabel'
 import type { Dispatch, SetStateAction, RefObject, FormEvent } from 'react'
 import type { Post } from './types'
@@ -61,6 +62,20 @@ export default function PostComposer({
   setPostVisibility,
   setPostBackground,
 }: Props) {
+  // Expand the popup text field with its content and avoid an inner scrollbar.
+  useLayoutEffect(() => {
+    if (!popup) return
+    const textarea = postComposerRef.current
+    if (!textarea) return
+    const resize = () => {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${textarea.scrollHeight}px`
+    }
+    resize()
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [popup, postText, postBackground, postComposerRef])
+
   const postAudience = (
     <label>Ai có thể xem?
       <select disabled={!!pendingPost} value={postVisibility} onChange={event => setPostVisibility(event.target.value as typeof postVisibility)}>

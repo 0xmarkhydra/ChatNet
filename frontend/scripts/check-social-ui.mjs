@@ -233,23 +233,30 @@ try {
     }))
   })
   const approx = (actual, expected, tolerance=8) => Math.abs(actual - expected) <= tolerance
-  for (const [selector, x, y] of [
-    ['.social-feed-stories-card', 109, 107],
-    ['.social-feed-launcher', 109, 286],
-    ['.social-feed-filter-bar', 109, 410],
-    ['.social-feed-center .post.zalo-post', 109, 474],
-    ['.social-feed-suggestions', null, 107],
-    ['.social-feed-trending', null, 425],
-    ['.social-feed-translation', null, 702],
+  for (const [selector, y] of [
+    ['.social-feed-stories-card', 107],
+    ['.social-feed-launcher', 286],
+    ['.social-feed-filter-bar', 410],
+    ['.social-feed-center .post.zalo-post', 474],
+    ['.social-feed-suggestions', 107],
+    ['.social-feed-trending', 425],
+    ['.social-feed-translation', 702],
   ]) {
     const rect = socialGeometry[selector]
-    assert(rect && (x === null || approx(rect.x, x)) && approx(rect.y, y),
-      'Social V4 frame geometry mismatch ' + selector + ': ' + JSON.stringify(socialGeometry))
+    assert(rect && approx(rect.y, y),
+      'Social feed vertical alignment mismatch ' + selector + ': ' + JSON.stringify(socialGeometry))
   }
-  const sideWidth = socialGeometry['.social-feed-suggestions'].width
-  const centerWidth = socialGeometry['.social-feed-stories-card'].width
-  assert(Math.abs(sideWidth / (sideWidth + centerWidth) - 337 / 1252) < .015,
-    'Social feed right rail should be 20% narrower: ' + JSON.stringify({ sideWidth, centerWidth }))
+  const centerRect = socialGeometry['.social-feed-stories-card']
+  const sideRect = socialGeometry['.social-feed-suggestions']
+  const centerWidth = centerRect.width
+  const sideWidth = sideRect.width
+  assert(centerWidth >= 540 && centerWidth <= 640 && sideWidth >= 260 && sideWidth <= 330
+    && sideRect.x >= centerRect.x + centerWidth + 14
+    && ['.social-feed-launcher', '.social-feed-filter-bar', '.social-feed-center .post.zalo-post']
+      .every(selector => approx(socialGeometry[selector].x, centerRect.x, 2)
+        && approx(socialGeometry[selector].width, centerWidth, 2)),
+    'Feed cards, composer and stories must share a compact central column next to a narrower rail: '
+      + JSON.stringify(socialGeometry))
   const postCard = feedCards.first()
   const postActions = postCard.locator('.feed-post-toolbar > button')
   assert(await postActions.count() === 4,
@@ -300,10 +307,12 @@ try {
         maxHeight: css.maxHeight,
       }
     })
+    const allowedHeight = Number.parseFloat(image.maxHeight)
+    const naturalDisplayHeight = image.width * image.naturalHeight / image.naturalWidth
     assert(image.naturalWidth > 0 && image.naturalHeight > 0
-      && image.fit === 'contain' && image.maxHeight === 'none'
-      && Math.abs(image.height / image.width - image.naturalHeight / image.naturalWidth) < 0.03,
-      'Single feed photo must display its full natural aspect ratio: ' + JSON.stringify(image))
+      && image.fit === 'contain' && allowedHeight > 0 && allowedHeight <= 440
+      && Math.abs(image.height - Math.min(naturalDisplayHeight, allowedHeight)) <= 2,
+      'Single feed photo must be height-limited while displaying its full contents: ' + JSON.stringify(image))
   }
   await verifyUncroppedFeedImage()
   const likeLayout = await postCard.evaluate(card => {
@@ -368,6 +377,33 @@ try {
   }
   mkdirSync('output/playwright/layout', { recursive: true })
   await page.screenshot({ path: 'output/playwright/layout/feed-post-single-heart.png' })
+  // The post editor should start short, expand with text, and shrink back without its own scrollbar.
+  await feed.locator('.social-feed-launcher-publish').click()
+  const createDialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+  await createDialog.waitFor({ state: 'visible' })
+  const postInput = createDialog.getByRole('textbox', { name: 'Nội dung bài viết' })
+  await postInput.fill('xinh quá nhé')
+  const measureComposer = () => postInput.evaluate(field => ({
+    height: field.getBoundingClientRect().height,
+    contentHeight: field.scrollHeight,
+    overflowY: getComputedStyle(field).overflowY,
+    resize: getComputedStyle(field).resize,
+  }))
+  const shortComposer = await measureComposer()
+  assert(shortComposer.height <= 85 && shortComposer.overflowY === 'hidden'
+    && shortComposer.resize === 'none',
+    'Short post text must not create a large editor or an internal scrollbar: ' + JSON.stringify(shortComposer))
+  await postInput.fill(Array(30).fill('Hôm nay mình muốn chia sẻ một câu chuyện').join(' '))
+  const longComposer = await measureComposer()
+  assert(longComposer.height > shortComposer.height + 80
+    && longComposer.height >= longComposer.contentHeight - 2,
+    'Post editor should grow as the caption wraps: ' + JSON.stringify(longComposer))
+  await postInput.fill('xinh quá nhé')
+  const shrunkComposer = await measureComposer()
+  assert(Math.abs(shrunkComposer.height - shortComposer.height) < 3,
+    'Post editor must shrink again when text is removed: ' + JSON.stringify(shrunkComposer))
+  await createDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+  await createDialog.waitFor({ state: 'detached' })
   if (process.argv.includes('--post-only')) {
     await page.setViewportSize({ width: 390, height: 844 })
     await verifyUncroppedFeedImage()
