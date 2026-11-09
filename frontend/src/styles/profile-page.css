@@ -1,5 +1,30 @@
 /* Social UI frame 03 · Hồ sơ cá nhân, BA & Modules V3, 1586 × 992.
  * Desktop only: reuse real profile/media/friend data and existing feature actions. */
+
+/* UserAvatar doesn't apply layout when given a custom class name. Center the
+   initials in every avatar used by ProfilePage, including image fallbacks. */
+.profile-page .profile-page-avatar.smart-avatar,
+.profile-page .profile-page-friend-avatar.smart-avatar,
+.modern-shell.app-layout .profile-page-header-avatar.smart-avatar {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  text-align: center;
+  line-height: 1;
+}
+
+.profile-page .profile-page-avatar.smart-avatar > .avatar-initials,
+.profile-page .profile-page-friend-avatar.smart-avatar > .avatar-initials,
+.profile-page-header-avatar.smart-avatar > .avatar-initials {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  line-height: 1;
+}
+
 @media (min-width: 761px) {
   .modern-shell.app-layout .profile-page {
     box-sizing: border-box;

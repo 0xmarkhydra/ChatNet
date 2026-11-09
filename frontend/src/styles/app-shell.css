@@ -209,7 +209,27 @@
   .app-sidebar:is(:hover, :has(:focus-visible)) .app-sidebar-account { width: 232px; }
   .app-sidebar-account:hover,
   .app-sidebar-account.is-active { background: #edf3ff; }
-  .app-sidebar-avatar { position: relative; flex: 0 0 43px; width: 43px; height: 43px; border-radius: 50%; overflow: visible; }
+  .app-sidebar-avatar {
+    position: relative;
+    box-sizing: border-box;
+    display: grid;
+    place-items: center;
+    flex: 0 0 43px;
+    width: 43px;
+    height: 43px;
+    border-radius: 50%;
+    overflow: visible;
+    text-align: center;
+    line-height: 1;
+  }
+  .app-sidebar-avatar .avatar-initials {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    line-height: 1;
+  }
   .app-sidebar-avatar .avatar-photo { border-radius: inherit; }
   .app-sidebar-avatar .presence-dot { position: absolute; right: 0; bottom: 0; }
   .app-sidebar-account-copy { position: absolute; left: 60px; top: 18px; width: 155px; pointer-events: none; }
@@ -522,11 +542,24 @@
   padding-bottom: 27px;
 }
 .conversation-info-panel-avatar {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  flex: 0 0 92px;
   width: 92px;
   height: 92px;
-  margin-bottom: 7px;
+  margin: 0 0 7px;
   border-radius: 50%;
   font-size: 28px;
+  line-height: 1;
+}
+.conversation-info-panel-avatar .avatar-initials {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: inherit;
+  line-height: 1;
 }
 .conversation-info-panel-identity strong {
   max-width: 100%;
@@ -536,7 +569,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.conversation-info-panel-identity span {
+.conversation-info-panel-identity > span {
   color: #36a47a;
   font-size: 12px;
 }
