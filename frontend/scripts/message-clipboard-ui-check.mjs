@@ -17,7 +17,7 @@ try {
     renderToStaticMarkup(React.createElement(MessageActions, {
       activeMessageAction: message, userId: 1, setMessageActionId() {},
       toggleReaction: async () => {}, setReplyingTo() {},
-      canPin: false, isPinned: false, toggleMessagePin: async () => {}, ...pin,
+      isPinned: false, toggleMessagePin: async () => {}, ...pin,
       copyTarget: target, copyMessageContent: async () => {},
       translateMessage: async () => {}, editOwnMessage: async () => {}, recallOwnMessage: async () => {},
     }))
@@ -84,10 +84,11 @@ try {
   assertSingleCopy(mixed, resolveMessageCopyTarget(mixed, fileElement), 'mixed message file')
 
   assert.doesNotMatch(render(message), />Sao chép<\/b>/)
-  assert.doesNotMatch(render({ ...message, text: 'Lời chào' }), /Ghim tin nhắn/)
-  assert.match(render({ ...message, text: 'Lời chào' }, undefined, { canPin: true }), /Ghim tin nhắn/)
-  assert.match(render({ ...message, text: 'Lời chào' }, undefined, { canPin: true, isPinned: true }), /Bỏ ghim tin nhắn/)
-  console.log('PASS: one Copy action for text, links, images and files; pin actions respect permissions and pin state')
+  const allowed = render({ ...message, text: 'Lời chào' })
+  assert.match(allowed, /Ghim tin nhắn/)
+  assert.doesNotMatch(allowed, /Chỉ quản trị viên|chỉ chủ nhóm|disabled=""/i)
+  assert.match(render({ ...message, text: 'Lời chào' }, undefined, { isPinned: true }), /Bỏ ghim tin nhắn/)
+  console.log('PASS: Copy actions for text, links, images and files; every member can pin and unpin')
 } finally {
   await server.close()
 }

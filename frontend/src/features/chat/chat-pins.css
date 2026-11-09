@@ -1,10 +1,8 @@
 /* P1-03: local conversation pins and shared message pins. */
 .zalo-conversation-list .conversation-pin-entry {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 36px;
-  align-items: center;
   min-width: 0;
   margin: 3px 9px;
+  touch-action: pan-y;
 }
 
 /* Reserve a separate column for the action button instead of overlaying chat content. */
@@ -13,7 +11,7 @@
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding-right: 4px;
+  padding-right: 12px;
 }
 
 /* The time gets its own non-shrinking column; long names ellipsize first. */
@@ -61,31 +59,7 @@
   color: var(--chatnet-accent, #2563eb);
 }
 
-.conversation-pin-menu-trigger {
-  position: static;
-  justify-self: center;
-  align-self: center;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--chatnet-muted, #656a61);
-  cursor: pointer;
-  opacity: .72;
-}
-
-.conversation-pin-menu-trigger:hover,
-.conversation-pin-menu-trigger:focus-visible {
-  opacity: 1;
-  color: var(--chatnet-accent, #2563eb);
-  background: rgba(62, 112, 241, .08);
-}
-
-/* Right click opens a compact menu at the pointer; the ellipsis keeps the touch sheet. */
+/* Desktop: right-click menu anchored at the pointer; touch: long-press sheet. */
 .conversation-context-backdrop {
   position: fixed;
   inset: 0;
@@ -242,24 +216,21 @@
 
 @media (max-width: 600px) {
   .zalo-conversation-list .conversation-pin-entry {
-    grid-template-columns: minmax(0, 1fr) 34px;
     margin-inline: 7px;
   }
   .zalo-conversation-list .conversation-pin-entry > .conversation-item {
     gap: 8px;
-    padding-right: 2px;
+    padding-right: 10px;
   }
   .zalo-conversation-list .conversation-pin-entry .conversation-copy > div:first-child {
     column-gap: 4px;
   }
-  .conversation-pin-menu-trigger { opacity: .9; }
   .chat-pinned-panel { padding: 8px 10px; }
   .chat-pinned-jump strong { max-width: 75px; }
 }
 
 @media (max-width: 360px) {
   .zalo-conversation-list .conversation-pin-entry {
-    grid-template-columns: minmax(0, 1fr) 30px;
     margin-inline: 5px;
   }
   .zalo-conversation-list .conversation-pin-entry .conversation-avatar {
@@ -270,5 +241,4 @@
   .zalo-conversation-list .conversation-pin-entry .conversation-copy time {
     font-size: 10px;
   }
-  .conversation-pin-menu-trigger { width: 28px; height: 34px; }
 }

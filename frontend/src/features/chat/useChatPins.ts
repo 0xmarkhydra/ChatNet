@@ -71,6 +71,9 @@ export function useChatPins({
         method: currentlyPinned ? 'DELETE' : 'PUT',
       })
       if (!response.ok) {
+        if (response.status === 404 || response.status === 405) {
+          throw new Error('Backend đang kết nối chưa hỗ trợ ghim tin nhắn. Cần cập nhật backend để sử dụng chức năng này.')
+        }
         const data = await response.json().catch(() => ({})) as { error?: string }
         throw new Error(data.error || 'Không cập nhật được ghim tin nhắn')
       }
@@ -96,6 +99,9 @@ export function useChatPins({
         method: currentlyPinned ? 'DELETE' : 'PUT',
       })
       if (!response.ok) {
+        if (response.status === 404 || response.status === 405) {
+          throw new Error('Backend đang kết nối chưa hỗ trợ ghim hội thoại. Cần cập nhật backend để sử dụng chức năng này.')
+        }
         const data = await response.json().catch(() => ({})) as { error?: string }
         throw new Error(data.error || 'Không cập nhật được ghim hội thoại')
       }

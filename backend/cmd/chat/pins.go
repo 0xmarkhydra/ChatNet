@@ -112,9 +112,10 @@ func (s *server) listPinnedMessages(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, items)
 }
 
-// In direct chats either member may pin; in groups only owner/admin may change shared pins.
-func canChangeMessagePin(conversationType, role string) bool {
-	return conversationType == "direct" || (conversationType == "group" && (role == "owner" || role == "admin"))
+// A conversation member can change shared message pins regardless of group role.
+// Membership is enforced by the conversation_members join in setMessagePin.
+func canChangeMessagePin(conversationType string) bool {
+	return conversationType == "direct" || conversationType == "group"
 }
 
 func (s *server) setMessagePin(w http.ResponseWriter, r *http.Request) {
@@ -132,16 +133,16 @@ func (s *server) setMessagePin(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 
 	var conversationID, senderID int64
-	var conversationType, role string
+	var conversationType string
 	var deleted bool
 	err = tx.QueryRow(r.Context(), `
-		SELECT m.conversation_id,m.user_id,c.type,cm.role,m.deleted_at IS NOT NULL
+		SELECT m.conversation_id,m.user_id,c.type,m.deleted_at IS NOT NULL
 		FROM messages m
 		JOIN conversations c ON c.id=m.conversation_id
 		JOIN conversation_members cm ON cm.conversation_id=c.id AND cm.user_id=$2
 		WHERE m.id=$1
 		FOR SHARE OF m,cm`, id, claims.UserID).
-		Scan(&conversationID, &senderID, &conversationType, &role, &deleted)
+		Scan(&conversationID, &senderID, &conversationType, &deleted)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, http.StatusForbidden, "message unavailable or not a member")
 		return
@@ -150,8 +151,8 @@ func (s *server) setMessagePin(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot check message pin permissions")
 		return
 	}
-	if !canChangeMessagePin(conversationType, role) {
-		httpx.Error(w, http.StatusForbidden, "group admin permission required")
+	if !canChangeMessagePin(conversationType) {
+		httpx.Error(w, http.StatusForbidden, "unsupported conversation type")
 		return
 	}
 	if deleted && pinned {

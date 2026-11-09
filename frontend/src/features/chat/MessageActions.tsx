@@ -8,7 +8,6 @@ import { Copy, Pin } from 'lucide-react'
 type Props = {
   activeMessageAction: Message
   userId: number
-  canPin: boolean
   isPinned: boolean
   toggleMessagePin: (message: Message) => Promise<void>
   setMessageActionId: (id: number | null) => void
@@ -24,7 +23,6 @@ type Props = {
 export default function MessageActions({
   activeMessageAction,
   userId,
-  canPin,
   isPinned,
   toggleMessagePin,
   setMessageActionId,
@@ -76,11 +74,11 @@ export default function MessageActions({
         </div>
 
         <div className="message-context-actions">
-          {canPin && !activeMessageAction.deleted && (
+          {!activeMessageAction.deleted && (
             <button type="button" onClick={() => {
-              setMessageActionId(null)
-              void toggleMessagePin(activeMessageAction)
-            }}>
+                setMessageActionId(null)
+                void toggleMessagePin(activeMessageAction)
+              }}>
               <span aria-hidden="true"><Pin size={20} strokeWidth={2} /></span>
               <b>{isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}</b>
             </button>

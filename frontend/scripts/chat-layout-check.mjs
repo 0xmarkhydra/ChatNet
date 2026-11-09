@@ -200,8 +200,8 @@ try {
           stage:[637 + sidebarShift,108,605 - sidebarShift,842],
           details:[1260,108,292,842],
           listSearch:[289 + sidebarShift,190,312,46],
-          // The pin action has a dedicated column, so the chat item is narrower.
-          firstRow:[291 + sidebarShift,305,271,79],
+          // Conversation row spans the full list width, with no ellipsis button.
+          firstRow:[291 + sidebarShift,305,307,79],
           stageHeader:[638 + sidebarShift,109,604 - sidebarShift,79],
           composer:[652 + sidebarShift,879,574 - sidebarShift,60],
           banner:[653 + sidebarShift,832,574 - sidebarShift,42],
@@ -239,6 +239,7 @@ try {
       await page.getByRole('button', {name:'Đóng thông tin hội thoại'}).click()
       await page.locator('.social-chat-details').waitFor({state:'detached'})
       if (width === 1586) {
+        assert.equal(await page.locator('.conversation-pin-menu-trigger').count(), 0, 'no ellipsis beside conversations')
         await page.locator('.conversation-pin-entry').first().click({button:'right'})
         await page.getByRole('button', {name:'Ghim cuộc trò chuyện'}).waitFor({state:'visible'})
         await page.keyboard.press('Escape')

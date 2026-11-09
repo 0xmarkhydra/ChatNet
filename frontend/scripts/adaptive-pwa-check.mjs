@@ -120,6 +120,21 @@ try {
         return { x: box.x, right: box.right, height: box.height }
       }))
       assert.ok(tabs.every(tab => tab.x >= -1 && tab.right <= width + 1 && tab.height >= 44), width + ': tabs must fit the screen and remain touch-friendly')
+      assert.equal(await page.locator('.conversation-pin-menu-trigger').count(), 0,
+        width + 'px: no ellipsis beside conversations')
+      if (width === 390) {
+        const entry = page.locator('.conversation-pin-entry').first()
+        const bounds = await entry.boundingBox()
+        const pointer = { pointerType: 'touch', clientX: bounds.x + 20, clientY: bounds.y + 20, button: 0 }
+        await entry.dispatchEvent('pointerdown', pointer)
+        await page.waitForTimeout(600)
+        await page.getByRole('button', { name: 'Ghim cuộc trò chuyện' }).waitFor({ state: 'visible' })
+        await entry.dispatchEvent('pointerup', pointer)
+        await page.locator('.message-context-cancel').click()
+        // Long-press must not also activate the conversation when the finger is lifted.
+        await entry.locator('.conversation-item').click()
+        assert.equal(await page.locator('.social-chat-layout.has-active').count(), 0)
+      }
       await page.screenshot({ path: 'output/playwright/layout/adaptive-chat-list-' + width + '.png' })
       await page.locator('.conversation-item').first().click()
       await page.locator('.social-chat-layout .conversation-panel').waitFor({ state: 'visible' })

@@ -19,19 +19,16 @@ import (
 
 func TestMessagePinPermissionMatrix(t *testing.T) {
 	for _, tc := range []struct {
-		typ, role string
-		want      bool
+		typ  string
+		want bool
 	}{
-		{"direct", "member", true},
-		{"direct", "owner", true},
-		{"group", "owner", true},
-		{"group", "admin", true},
-		{"group", "member", false},
-		{"group", "", false},
-		{"unknown", "owner", false},
+		{"direct", true},
+		{"group", true},
+		{"unknown", false},
+		{"", false},
 	} {
-		if got := canChangeMessagePin(tc.typ, tc.role); got != tc.want {
-			t.Errorf("type=%s role=%s got=%v want=%v", tc.typ, tc.role, got, tc.want)
+		if got := canChangeMessagePin(tc.typ); got != tc.want {
+			t.Errorf("type=%s got=%v want=%v", tc.typ, got, tc.want)
 		}
 	}
 }
@@ -157,9 +154,8 @@ func TestChatPinsIntegration(t *testing.T) {
 	if _, err := sub.Receive(ctx); err != nil {
 		t.Fatal(err)
 	}
-	assert(2, "PUT", msgPath, 403)
-	assert(3, "PUT", msgPath, 403)
-	assert(0, "PUT", msgPath, 200)
+	assert(2, "PUT", msgPath, 200) // ordinary group member can pin
+	assert(3, "PUT", msgPath, 403) // non-member still forbidden
 	select {
 	case item := <-sub.Channel():
 		var event realtimeEvent
@@ -170,7 +166,7 @@ func TestChatPinsIntegration(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("group member did not receive pins.updated")
 	}
-	assert(0, "PUT", msgPath, 200) // idempotent; no duplicate pin
+	assert(0, "PUT", msgPath, 200) // owner re-pinning is idempotent
 	var auditCount int
 	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM group_admin_audit
 		WHERE conversation_id=$1 AND action='message.pinned'`, groupID).Scan(&auditCount); err != nil || auditCount != 1 {
@@ -183,8 +179,8 @@ func TestChatPinsIntegration(t *testing.T) {
 		t.Fatalf("group member cannot see pin: %s / %v", response.Body.String(), err)
 	}
 	assert(3, "GET", pinsPath, 403)
-	assert(2, "DELETE", msgPath, 403)
-	assert(1, "DELETE", msgPath, 200)
+	assert(2, "DELETE", msgPath, 200) // ordinary group member can unpin
+	assert(1, "DELETE", msgPath, 200) // admin unpinning is idempotent
 	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM group_admin_audit
 		WHERE conversation_id=$1 AND action='message.unpinned'`, groupID).Scan(&auditCount); err != nil || auditCount != 1 {
 		t.Fatalf("missing group unpin audit: count=%d err=%v", auditCount, err)

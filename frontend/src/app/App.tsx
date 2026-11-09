@@ -330,6 +330,8 @@ export default function App({
   const [conversationActionId, setConversationActionId] = useState<number | null>(null);
   const [conversationMenuPosition, setConversationMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [pinnedExpanded, setPinnedExpanded] = useState(false);
+  const conversationLongPress = useRef<{ id: number; x: number; y: number; timer: number } | null>(null);
+  const suppressConversationClick = useRef<number | null>(null);
   const [groupActivityCreateKind, setGroupActivityCreateKind] = useState<GroupActivityKind | null>(null);
   const [groupActivityViewedId, setGroupActivityViewedId] = useState<number | null>(null);
   useEffect(() => {
@@ -1331,6 +1333,31 @@ export default function App({
     } catch {
       setNotice("Không sao chép được link trên trình duyệt này.", "error");
     }
+  }
+
+  function cancelConversationLongPress() {
+    if (conversationLongPress.current) {
+      window.clearTimeout(conversationLongPress.current.timer);
+      conversationLongPress.current = null;
+    }
+  }
+
+  function beginConversationLongPress(id: number, x: number, y: number) {
+    cancelConversationLongPress();
+    suppressConversationClick.current = null;
+    const timer = window.setTimeout(() => {
+      if (conversationLongPress.current?.id !== id) return;
+      conversationLongPress.current = null;
+      suppressConversationClick.current = id;
+      setConversationMenuPosition(null);
+      setConversationActionId(id);
+    }, 550);
+    conversationLongPress.current = { id, x, y, timer };
+  }
+
+  function moveConversationLongPress(x: number, y: number) {
+    const start = conversationLongPress.current;
+    if (start && Math.hypot(x - start.x, y - start.y) > 12) cancelConversationLongPress();
   }
 
   function cancelMessageLongPress() {
@@ -5741,14 +5768,28 @@ export default function App({
 
                 {sortedChatListConversations.map((conversation) => (
                   <div key={conversation.id} className="conversation-pin-entry"
+                    onPointerDown={(event) => {
+                      if (event.pointerType !== 'mouse') beginConversationLongPress(conversation.id, event.clientX, event.clientY)
+                    }}
+                    onPointerMove={(event) => moveConversationLongPress(event.clientX, event.clientY)}
+                    onPointerUp={cancelConversationLongPress}
+                    onPointerCancel={cancelConversationLongPress}
+                    onPointerLeave={cancelConversationLongPress}
                     onContextMenu={(event) => {
                       event.preventDefault()
-                      setConversationMenuPosition({ x: event.clientX, y: event.clientY })
+                      cancelConversationLongPress()
+                      const touchMenu = 'pointerType' in event.nativeEvent && event.nativeEvent.pointerType !== 'mouse'
+                      if (touchMenu) suppressConversationClick.current = conversation.id
+                      setConversationMenuPosition(touchMenu ? null : { x: event.clientX, y: event.clientY })
                       setConversationActionId(conversation.id)
                     }}>
                     <button type="button"
                       className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''} ${conversation.pinnedAt ? 'is-pinned' : ''}`}
                       onClick={() => {
+                        if (suppressConversationClick.current === conversation.id) {
+                          suppressConversationClick.current = null
+                          return
+                        }
                         if (conversationListSearch.active) {
                           setConversations((current) => current.some((item) => item.id === conversation.id)
                             ? current : [...current, conversation]);
@@ -5781,15 +5822,6 @@ export default function App({
                           {conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</b>}
                         </div>
                       </div>
-                    </button>
-                    <button type="button" className="conversation-pin-menu-trigger"
-                      aria-label={`Tùy chọn cuộc trò chuyện ${conversation.name}`}
-                      title="Tùy chọn cuộc trò chuyện"
-                      onClick={() => {
-                        setConversationMenuPosition(null)
-                        setConversationActionId(conversation.id)
-                      }}>
-                      <MoreHorizontal size={18} aria-hidden="true" />
                     </button>
                   </div>
                 ))}
@@ -6072,13 +6104,11 @@ export default function App({
                               <strong>{userLabel(message.senderDisplayName, message.sender)}</strong>
                               <span>{message.text || attachmentLabel(message.attachments) || 'Tin nhắn'}</span>
                             </button>
-                            {(activeConversation.type === 'direct' || canManageActiveGroup) && (
-                              <button type="button" className="chat-pinned-remove" disabled={pinBusy}
-                                aria-label="Bỏ ghim tin nhắn" title="Bỏ ghim tin nhắn"
-                                onClick={() => void toggleMessagePin(message)}>
-                                <X size={15} aria-hidden="true" />
-                              </button>
-                            )}
+                            <button type="button" className="chat-pinned-remove" disabled={pinBusy}
+                              aria-label="Bỏ ghim tin nhắn" title="Bỏ ghim tin nhắn"
+                              onClick={() => void toggleMessagePin(message)}>
+                              <X size={15} aria-hidden="true" />
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -7237,7 +7267,6 @@ export default function App({
           <MessageActions
             activeMessageAction={activeMessageAction}
             userId={session.user.id}
-            canPin={activeConversation?.type === 'direct' || Boolean(canManageActiveGroup)}
             isPinned={pinnedMessages.some((pin) => pin.message.id === activeMessageAction.id)}
             toggleMessagePin={toggleMessagePin}
             setMessageActionId={setMessageActionId}
