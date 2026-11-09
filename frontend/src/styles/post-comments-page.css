@@ -1,16 +1,5 @@
-/* Desktop post comments layout: 250px navigation, 86px header, and two fixed-height content panels. */
-@media (min-width: 761px) {
-  .modern-shell.app-layout:has(.post-comments-page) { padding-left: 250px; }
-  .modern-shell.app-layout:has(.post-comments-page) .app-sidebar { width: 250px; }
-  .modern-shell.app-layout:has(.post-comments-page) .app-sidebar::before { width: 250px; box-shadow: none; }
-  .modern-shell.app-layout:has(.post-comments-page) .app-sidebar-brand-copy,
-  .modern-shell.app-layout:has(.post-comments-page) .app-sidebar-account-copy,
-  .modern-shell.app-layout:has(.post-comments-page) .app-sidebar-link > span {
-    opacity: 1; visibility: visible; transform: none; transition-delay: 0s;
-  }
-  .modern-shell.app-layout:has(.post-comments-page) .app-sidebar-nav { pointer-events: auto; }
-  .modern-shell.app-layout:has(.post-comments-page) .app-sidebar-link { width: 100%; }
-}
+/* Post details share the app's compact sidebar and hover-to-expand navigation.
+   Do not force a 250px sidebar or shift the main content on this screen. */
 .post-comments-page {
   box-sizing: border-box; flex: 1 1 auto; width: 100%; height: 100%; min-width: 0;
   min-height: 0; overflow-x: hidden; overflow-y: auto;

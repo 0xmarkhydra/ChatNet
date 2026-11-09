@@ -1,6 +1,7 @@
 import { userLabel } from '../../shared/lib/userLabel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, Images, Link2, X } from 'lucide-react'
+import MediaViewer from '../../shared/ui/MediaViewer'
 
 type MediaAttachment = {
   id?: number
@@ -60,6 +61,7 @@ export default function SharedContent({
   const requestRef = useRef(request)
   requestRef.current = request
   const [tab, setTab] = useState<Tab>('media')
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [items, setItems] = useState<SharedMessage[]>([])
   const [nextBefore, setNextBefore] = useState<number | undefined>()
   const [loading, setLoading] = useState(true)
@@ -90,12 +92,14 @@ export default function SharedContent({
   useEffect(() => {
     setItems([])
     setNextBefore(undefined)
+    setViewerIndex(null)
     void load(true)
   }, [conversationId, tab])
 
   const media = useMemo(() => items.flatMap((message) =>
     (message.attachments || [])
-      .filter((attachment) => attachment.kind === 'image' || attachment.kind === 'video')
+      .filter((attachment): attachment is MediaAttachment & { url: string } =>
+        Boolean(attachment.url) && (attachment.kind === 'image' || attachment.kind === 'video'))
       .map((attachment) => ({ message, attachment })),
   ), [items])
 
@@ -142,20 +146,20 @@ export default function SharedContent({
 
           {!loading && !error && tab === 'media' && (
             <div className="shared-media-grid">
-              {media.map(({ message, attachment }) => (
-                <a
+              {media.map(({ message, attachment }, index) => (
+                <button
+                  type="button"
                   key={`${message.id}-${attachment.id || attachment.storageRef}`}
-                  href={attachment.url}
-                  target="_blank"
-                  rel="noreferrer"
                   className="shared-media-card"
                   title={attachment.name}
+                  aria-label={`Xem ${attachment.kind === 'video' ? 'video' : 'ảnh'} ${attachment.name}`}
+                  onClick={() => setViewerIndex(index)}
                 >
                   {attachment.kind === 'video'
                     ? <video src={attachment.url} muted playsInline preload="metadata" />
                     : <img src={attachment.url} alt={attachment.name || 'Ảnh đã chia sẻ'} loading="lazy" />}
                   <span>{userLabel(message.senderDisplayName, message.sender)}</span>
-                </a>
+                </button>
               ))}
             </div>
           )}
@@ -203,6 +207,14 @@ export default function SharedContent({
           )}
         </div>
       </section>
+      {viewerIndex !== null && media[viewerIndex] && (
+        <MediaViewer
+          items={media.map(({ attachment }) => attachment)}
+          activeIndex={viewerIndex}
+          onChange={setViewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
+      )}
     </div>
   )
 }
