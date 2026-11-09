@@ -144,7 +144,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
     {more&&<button type="button" className="soco-load-more" disabled={loading} onClick={()=>void loadMore()}>Xem bài viết cũ hơn</button>}
    </>}
-   {loading&&<p role="status" className="visitor-empty">Đang tải trang cá nhân...</p>}
+
    {error&&<div role="alert" className="visitor-empty"><p>{error}</p><button type="button" disabled={loading} onClick={()=>more&&posts.length?void loadMore():setRetry(n=>n+1)}>Thử lại</button></div>}
   </div></div>
  </section>
