@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(64) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     display_name VARCHAR(100) NOT NULL,
+    bio VARCHAR(160) NOT NULL DEFAULT '',
+    city VARCHAR(100) NOT NULL DEFAULT '',
     phone_e164 VARCHAR(32),
     searchable_by_username BOOLEAN NOT NULL DEFAULT TRUE,
     searchable_by_name BOOLEAN NOT NULL DEFAULT TRUE,
@@ -18,6 +20,8 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio VARCHAR(160) NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(100) NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_ref TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_ref TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
@@ -63,9 +67,12 @@ CREATE TABLE IF NOT EXISTS conversation_members (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role VARCHAR(16) NOT NULL DEFAULT 'member',
     last_read_message_id BIGINT NOT NULL DEFAULT 0,
+    cleared_through_message_id BIGINT NOT NULL DEFAULT 0,
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (conversation_id, user_id)
 );
+
+ALTER TABLE conversation_members ADD COLUMN IF NOT EXISTS cleared_through_message_id BIGINT NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_conversation_members_user
 ON conversation_members(user_id, conversation_id);

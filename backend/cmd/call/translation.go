@@ -265,7 +265,7 @@ func translationAllowedOrigin(r *http.Request) bool {
 	if err != nil || parsed.Host == "" {
 		return false
 	}
-	// SOCO Desktop's packaged renderer uses an isolated, secure app:// origin.
+	// SocCO Desktop's packaged renderer uses an isolated, secure app:// origin.
 	// Translation still requires an authenticated, call-scoped, one-time ticket.
 	if parsed.Scheme == "app" {
 		return parsed.Host == "soco" && parsed.User == nil && parsed.Path == "" && parsed.RawQuery == "" && parsed.Fragment == ""

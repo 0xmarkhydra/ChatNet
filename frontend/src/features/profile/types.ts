@@ -1,6 +1,8 @@
 export type ProfileMediaState = {
   username: string
   displayName: string
+  bio?: string
+  city?: string
   avatarSet: boolean
   coverSet: boolean
   updatedAt: string

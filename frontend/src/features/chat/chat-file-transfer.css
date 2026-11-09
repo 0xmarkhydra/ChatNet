@@ -1,0 +1,45 @@
+
+/* Clipboard/drag-and-drop attachment target for Web, PWA and Desktop. */
+.conversation-panel {
+  position: relative;
+}
+.conversation-panel.chat-file-drag-active {
+  outline: 2px solid var(--chatnet-accent, #2859d8);
+  outline-offset: -2px;
+}
+.chat-file-drop-overlay {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(233, 241, 255, .84);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+.chat-file-drop-card {
+  display: flex;
+  width: min(100%, 400px);
+  min-height: 175px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 2px dashed var(--chatnet-accent, #2859d8);
+  border-radius: 20px;
+  padding: 22px;
+  background: white;
+  color: var(--chatnet-accent-ink, #2859d8);
+  text-align: center;
+  box-shadow: 0 12px 35px rgba(24, 56, 110, .12);
+}
+.chat-file-drop-card strong {
+  font-size: 16px;
+}
+.chat-file-drop-card span {
+  max-width: 290px;
+  color: #59687d;
+  font-size: 12px;
+  line-height: 1.5;
+}

@@ -75,7 +75,7 @@ export default function ProfileIdentityForm({
           )
         }
       >
-        {profileSaving ? t('common.saving') : t('common.save')}
+        {t('common.save')}
       </button>
     </form>
   )

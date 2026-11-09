@@ -22,6 +22,17 @@ export type CallView = CallSession & {
   configured: boolean
 }
 
+export type CallHistoryEntry = CallSession & {
+  joined: boolean
+  declined: boolean
+  isGroup: boolean
+  participantCount: number
+}
+
+export async function getCallHistory(request: CallRequest): Promise<CallHistoryEntry[]> {
+  return expectJSON<CallHistoryEntry[]>(await request('/api/calls/history', { cache: 'no-store' }))
+}
+
 export type CallParticipant = {
   userId: number
   role: CallRole

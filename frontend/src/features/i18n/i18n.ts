@@ -2,7 +2,7 @@ export const UI_BUNDLE_VERSION = '2026-10-15.2'
 
 export const UI_MESSAGES = {
   'nav.chat': 'Tin nhắn',
-  'nav.contacts': 'Danh bạ',
+  'nav.contacts': 'Bạn bè',
   'nav.discover': 'Quanh đây',
   'nav.feed': 'Bảng tin',
   'nav.profile': 'Cá nhân',
@@ -30,7 +30,7 @@ export const UI_MESSAGES = {
   'profile.notifications': 'Thông báo',
   'profile.notificationsHint': 'Cho phép bật/tắt bất cứ lúc nào',
   'profile.messageSound': 'Âm báo tin nhắn',
-  'profile.messageSoundHint': 'Phát âm khi nhận tin mới lúc SOCO đang mở',
+  'profile.messageSoundHint': 'Phát âm khi nhận tin mới lúc SocCO đang mở',
   'profile.soundOn': 'Bật âm báo tin nhắn',
   'profile.soundOff': 'Tắt âm báo tin nhắn',
   'profile.soundPreview': 'Nghe thử',
@@ -42,11 +42,11 @@ export const UI_MESSAGES = {
   'profile.translationLanguageHint': 'Giữ nguyên sau khi F5/mở lại app',
   'profile.appLanguage': 'Ngôn ngữ ứng dụng',
   'profile.appLanguageHint': 'Tự động theo thiết bị hoặc chọn ngôn ngữ riêng',
-  'profile.install': 'Cài SOCO vào điện thoại',
+  'profile.install': 'Cài SocCO vào điện thoại',
   'profile.logout': 'Đăng xuất',
 
   'locale.title': 'Ngôn ngữ ứng dụng',
-  'locale.subtitle': 'Giao diện SOCO sẽ dùng ngôn ngữ này',
+  'locale.subtitle': 'Giao diện SocCO sẽ dùng ngôn ngữ này',
   'locale.device': 'Theo ngôn ngữ thiết bị',
   'locale.deviceHint': 'Tự nhận diện ngôn ngữ của điện thoại hoặc trình duyệt',
   'locale.searchPlaceholder': 'Tìm ngôn ngữ, quốc gia hoặc mã...',

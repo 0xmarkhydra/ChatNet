@@ -8,7 +8,7 @@ import type { Post } from '../feed/types'
 import type { FriendSearchResult } from '../contacts/types'
 import './visitor-profile.css'
 
-type Profile = FriendSearchResult & { avatarSet: boolean; coverSet: boolean; updatedAt: string; allowFriendRequests: boolean }
+type Profile = FriendSearchResult & { avatarSet: boolean; coverSet: boolean; updatedAt: string; allowFriendRequests: boolean; bio?: string; city?: string }
 type Props = {
  username: string
  request: (path: string, init?: RequestInit) => Promise<Response>
@@ -90,11 +90,11 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   finally{paging.current=false;if(alive.current&&id===sequence.current)setLoading(false)}
  }
  function update(post:Post){setPosts(current=>current.map(item=>item.id===post.id?post:item));onUpdated(post)}
- async function like(post:Post){
+ async function like(post:Post,emoji='👍'){
   if(likeBusy[post.id])return
   setLikeBusy(current=>({...current,[post.id]:true}))
   try{
-   const response=await request('/api/posts/'+post.id+'/like',{method:'POST'})
+   const response=await request('/api/posts/'+post.id+(emoji==='👍'?'/like':'/reactions'),{method:'POST',...(emoji==='👍'?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify({emoji})})})
    if(!response.ok)throw new Error('Không cập nhật được lượt thích.')
    const updated=await response.json() as Post
    if(alive.current)update(updated)
@@ -132,6 +132,8 @@ export default function VisitorProfile({ username, request, currentUser, token, 
     <section className="visitor-hero">
      <div className="visitor-cover">{profile.coverSet&&<img src={profileAssetUrl(profile.username,'cover',profile.updatedAt)} alt="Ảnh bìa" onError={event=>{event.currentTarget.hidden=true}}/>}<span>Khoảnh khắc và những câu chuyện</span></div>
      <div className="visitor-identity"><div className="profile-note-avatar"><UserAvatar username={profile.username} name={userLabel(profile.displayName,profile.username)} className="profile-avatar"/><ProfileNote username={profile.username} request={request} refreshKey={relation}/></div><h1>{userLabel(profile.displayName,profile.username)}</h1><p>@{profile.username}</p>
+      {profile.bio && <p className="visitor-profile-bio">{profile.bio}</p>}
+      {profile.city && <small className="visitor-profile-city">{profile.city}</small>}
       <div className="visitor-actions"><button type="button" onClick={()=>void onMessage(profile.username)}><MessageCircle size={18}/>Nhắn tin</button>
        <button type="button" disabled={relation==='accepted'||friendBusy===profile.id||(!profile.allowFriendRequests&&relation==='none')} onClick={()=>void onFriend(profile).catch(cause=>{if(alive.current)feedback(cause instanceof Error?cause.message:'Không cập nhật được kết bạn.','error')})}>{relation==='outgoing'?<UserMinus size={18}/>:relation==='accepted'||relation==='incoming'?<UserCheck size={18}/>:<UserPlus size={18}/>} {action}</button></div>
       {!profile.allowFriendRequests&&relation==='none'&&<small>Tài khoản này đang tắt nhận lời mời kết bạn.</small>}
@@ -142,7 +144,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
     {more&&<button type="button" className="soco-load-more" disabled={loading} onClick={()=>void loadMore()}>Xem bài viết cũ hơn</button>}
    </>}
-   {loading&&<p role="status" className="visitor-empty">Đang tải trang cá nhân...</p>}
+
    {error&&<div role="alert" className="visitor-empty"><p>{error}</p><button type="button" disabled={loading} onClick={()=>more&&posts.length?void loadMore():setRetry(n=>n+1)}>Thử lại</button></div>}
   </div></div>
  </section>

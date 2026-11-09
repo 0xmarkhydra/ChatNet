@@ -1,4 +1,4 @@
-# ChatNet / SOCO — Đặc tả sản phẩm POINT & COIN
+# ChatNet / SocCO — Đặc tả sản phẩm POINT & COIN
 
 **Ngày lập:** 27/10/2026
 **Trạng thái:** Đặc tả sản phẩm để triển khai, chưa phải nghiệm thu tính năng hoặc kết luận pháp lý

@@ -73,8 +73,8 @@ function createNativeNotifications({ Notification, getScope, getWindow, showWind
     return new Promise((resolve) => {
       let notification
       try {
-        notification = new Notification({ title: 'SOCO',
-          body: input.kind === 'call' ? 'Bạn có cuộc gọi đến. Mở SOCO để xem và trả lời.' : 'Bạn có tin nhắn mới. Mở SOCO để xem.',
+        notification = new Notification({ title: 'SocCO',
+          body: input.kind === 'call' ? 'Bạn có cuộc gọi đến. Mở SocCO để xem và trả lời.' : 'Bạn có tin nhắn mới. Mở SocCO để xem.',
           silent: !context.sound || input.kind === 'call' || Boolean(window && !window.isDestroyed() && window.isVisible() && window.isFocused()),
         })
       } catch { resolve({ shown: false, reason: 'unavailable' }); return }

@@ -29,10 +29,11 @@ import { buildLanguageOptions } from '../i18n/languages'
 import { isDesktopBuild } from '../../platform/desktop'
 import { requireDesktopMedia } from '../../platform/desktopMedia'
 import CallDeviceSettings from './CallDeviceSettings'
+import UserAvatar from '../../shared/ui/UserAvatar'
 import { notifyDesktopCall, dismissDesktopCall } from '../../platform/useDesktopNotifications'
 import './call.css'
 
-type ConversationLite = { id: number; name: string; type: 'direct' | 'group' }
+type ConversationLite = { id: number; name: string; type: 'direct' | 'group'; otherUsername?: string }
 type CallLaunchDetail = { conversationId: number; mediaType: CallMediaType }
 
 type CallManagerProps = {
@@ -80,6 +81,7 @@ export default function CallManager({
   const [busy, setBusy] = useState(false)
   const userActivatedCall = useRef<string | null>(null)
   const [error, setError] = useState('')
+  const [incomingPermission, setIncomingPermission] = useState('')
   const requestRef = useRef(request)
   requestRef.current = request
   const callRequest = useCallback<CallRequest>((path, init) => requestRef.current(path, init), [])
@@ -112,7 +114,7 @@ export default function CallManager({
     if (!token) return
     void refresh()
     const source = new EventSource(`${apiBase}/api/events?token=${encodeURIComponent(token)}`)
-    source.onmessage = (event) => {
+    const onCallEvent = (event: MessageEvent) => {
       try {
         const payload = JSON.parse(event.data) as CallRealtimeEvent
         if (!payload.type?.startsWith('call.')) return
@@ -121,19 +123,26 @@ export default function CallManager({
           if (payload.callId === active?.id) setActive(null)
           return
         }
-        if (payload.type === 'call.created' && payload.call && payload.call.createdBy !== userId && !active) {
-          void refresh()
-          return
-        }
-        if (payload.type === 'call.updated') void refresh()
+        if (payload.type === 'call.created' || payload.type === 'call.updated') void refresh()
       } catch {
         // Ignore unrelated SSE payloads.
       }
     }
-    source.onerror = () => {
-      // EventSource reconnects automatically.
+    // Chat sends named "update" events, not default "message" events.
+    source.addEventListener('update', onCallEvent)
+    source.onmessage = onCallEvent
+    source.onopen = () => void refresh()
+    // Recover missed ringing calls after SSE disconnects or background-tab suspension.
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh()
+    }, 10000)
+    const onFocus = () => void refresh()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.clearInterval(poll)
+      window.removeEventListener('focus', onFocus)
+      source.close()
     }
-    return () => source.close()
   }, [active?.id, apiBase, incoming?.id, refresh, token, userId])
 
   useEffect(() => {
@@ -154,12 +163,29 @@ export default function CallManager({
       if (!window.isSecureContext || !isE2EESupported()) {
         throw new Error('Trình duyệt này chưa hỗ trợ cuộc gọi E2EE an toàn.')
       }
+      // The lookup is best effort: a temporary read error must not prevent creating a call.
+      const available = await getCurrentCalls(callRequest).catch(() => [] as CallView[])
+      const existing = available.find((item) =>
+        item.conversationId === conversationId && (item.status === 'ringing' || item.status === 'active'))
+      if (existing) {
+        await joinExistingCall(existing)
+        return
+      }
       await requireDesktopMedia('microphone')
       if (mediaType === 'video') await requireDesktopMedia('camera')
-      const call = await createCall(callRequest, conversationId, mediaType)
-      userActivatedCall.current = call.id
-      setIncoming(null)
-      setActive(call)
+      try {
+        const call = await createCall(callRequest, conversationId, mediaType)
+        userActivatedCall.current = call.id
+        setIncoming(null)
+        setActive(call)
+      } catch (cause) {
+        // Another participant can create the room between the lookup and POST.
+        if (!(cause instanceof Error) || !cause.message.includes('already has an active call')) throw cause
+        const concurrent = (await getCurrentCalls(callRequest)).find((item) =>
+          item.conversationId === conversationId && (item.status === 'ringing' || item.status === 'active'))
+        if (!concurrent) throw cause
+        await joinExistingCall(concurrent)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể bắt đầu cuộc gọi.')
     } finally {
@@ -167,18 +193,22 @@ export default function CallManager({
     }
   }
 
+  async function joinExistingCall(call: CallView) {
+    if (!call.configured) throw new Error('Máy chủ gọi video chưa được cấu hình.')
+    if (!window.isSecureContext || !isE2EESupported()) throw new Error('Thiết bị này chưa hỗ trợ E2EE WebRTC.')
+    await requireDesktopMedia('microphone')
+    if (call.mediaType === 'video') await requireDesktopMedia('camera')
+    userActivatedCall.current = call.id
+    setActive(call)
+    setIncoming(null)
+  }
+
   async function acceptIncoming() {
     if (!incoming || busy) return
     setBusy(true)
     setError('')
     try {
-      if (!incoming.configured) throw new Error('Máy chủ gọi video chưa được cấu hình.')
-      if (!window.isSecureContext || !isE2EESupported()) throw new Error('Thiết bị này chưa hỗ trợ E2EE WebRTC.')
-      await requireDesktopMedia('microphone')
-      if (incoming.mediaType === 'video') await requireDesktopMedia('camera')
-      userActivatedCall.current = incoming.id
-      setActive(incoming)
-      setIncoming(null)
+      await joinExistingCall(incoming)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể nhận cuộc gọi.')
     } finally {
@@ -199,6 +229,24 @@ export default function CallManager({
     }
   }
 
+  async function checkIncomingPermission(kind: 'camera' | 'microphone') {
+    if (busy) return
+    setIncomingPermission('')
+    setBusy(true)
+    try {
+      await requireDesktopMedia(kind)
+      const stream = await navigator.mediaDevices.getUserMedia(
+        kind === 'camera' ? { video: true, audio: false } : { audio: true, video: false }
+      )
+      stream.getTracks().forEach((track) => track.stop())
+      setIncomingPermission(kind === 'camera' ? 'Camera đã được cấp quyền.' : 'Microphone đã được cấp quyền.')
+    } catch (cause) {
+      setIncomingPermission(friendlyCallError(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const incomingName = incoming ? conversationMap.get(incoming.conversationId)?.name || 'Cuộc trò chuyện' : ''
   const activeName = active ? conversationMap.get(active.conversationId)?.name || 'ChatNet Call' : ''
 
@@ -212,18 +260,43 @@ export default function CallManager({
 
       {incoming && !active && (
         <div className="incoming-call-layer" role="dialog" aria-modal="true" aria-label="Cuộc gọi đến">
-          <div className="incoming-call-card">
-            <div className="incoming-call-orb"><span>{incoming.mediaType === 'video' ? '📹' : '📞'}</span></div>
-            <small>Cuộc gọi {incoming.mediaType === 'video' ? 'video' : 'thoại'} E2EE</small>
-            <h2>{incomingName}</h2>
-            <p><ShieldCheck size={15} /> Mã hóa đầu cuối · ChatNet Secure Call</p>
-            <div className="incoming-call-actions">
-              <button type="button" className="call-reject" disabled={busy} onClick={() => void rejectIncoming()}>
-                <PhoneOff size={23} /><span>Từ chối</span>
-              </button>
-              <button type="button" className="call-accept" disabled={busy} onClick={() => void acceptIncoming()}>
-                {incoming.mediaType === 'video' ? <Video size={24} /> : <Phone size={23} />}<span>Nhận</span>
-              </button>
+          <span className="incoming-call-brand">SocCo</span>
+          <div className="incoming-call-layout">
+            <div className="incoming-call-card">
+              <strong className="incoming-call-title">Cuộc gọi đến</strong>
+              <div className="incoming-call-orb">
+                <UserAvatar
+                  name={incomingName}
+                  username={conversationMap.get(incoming.conversationId)?.otherUsername}
+                  group={conversationMap.get(incoming.conversationId)?.type === 'group'}
+                  className="incoming-call-avatar"
+                />
+                <span className="incoming-call-online-dot" />
+              </div>
+              <h2>{incomingName}</h2>
+              <p className="incoming-call-subtitle">Đang gọi {incoming.mediaType === 'video' ? 'video' : 'thoại'} đến…</p>
+              <div className="incoming-call-secure"><ShieldCheck size={16} /> Kết nối được bảo vệ bằng mã hóa đầu cuối E2EE</div>
+              <div className="incoming-call-actions">
+                <button type="button" className="call-reject" disabled={busy} onClick={() => void rejectIncoming()}>
+                  <PhoneOff size={23} /><span>Từ chối</span>
+                </button>
+                <button type="button" className="call-accept" disabled={busy} onClick={() => void acceptIncoming()}>
+                  {incoming.mediaType === 'video' ? <Video size={24} /> : <Phone size={23} />}<span>Trả lời</span>
+                </button>
+              </div>
+            </div>
+            <div className="incoming-call-information">
+              <section className="incoming-call-info-box">
+                <strong>ⓘ &nbsp; Quyền truy cập thiết bị</strong>
+                <p>Khi trả lời, SocCo cần quyền truy cập camera và microphone trên thiết bị của bạn.</p>
+                {incoming.mediaType === 'video' && <button type="button" disabled={busy} onClick={() => void checkIncomingPermission('camera')}><Video size={15} /> Camera · Kiểm tra quyền</button>}
+                <button type="button" disabled={busy} onClick={() => void checkIncomingPermission('microphone')}><Mic size={15} /> Microphone · Kiểm tra quyền</button>
+                {incomingPermission && <small role="status">{incomingPermission}</small>}
+              </section>
+              <section className="incoming-call-info-box">
+                <strong>Bạn có quyền lựa chọn</strong>
+                <p>Bạn có thể chỉ trả lời bằng thoại hoặc tắt camera ngay khi kết nối.</p>
+              </section>
             </div>
           </div>
         </div>
@@ -232,6 +305,7 @@ export default function CallManager({
       {active && (
         <SecureCallRoom
           call={active}
+          isGroup={conversationMap.get(active.conversationId)?.type === 'group'}
           autoPublish={!isDesktopBuild || userActivatedCall.current === active.id}
           title={activeName}
           apiBase={apiBase}
@@ -250,6 +324,7 @@ export default function CallManager({
 
 type SecureCallRoomProps = {
   autoPublish: boolean
+  isGroup: boolean
   call: CallSession
   title: string
   apiBase: string
@@ -271,7 +346,7 @@ type RoomRuntime = {
 }
 
 function SecureCallRoom({
-  call, autoPublish, title, apiBase, request, userId, sourceLanguage, targetLanguage, canEnd, onClosed, onError,
+  call, autoPublish, isGroup, title, apiBase, request, userId, sourceLanguage, targetLanguage, canEnd, onClosed, onError,
 }: SecureCallRoomProps) {
   const [phase, setPhase] = useState<'securing' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('securing')
   const [detail, setDetail] = useState('Đang thiết lập mã hóa đầu cuối…')
@@ -281,16 +356,18 @@ function SecureCallRoom({
   const [cameraOn, setCameraOn] = useState(call.mediaType === 'video')
   const [screenOn, setScreenOn] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
-  const [translationOn, setTranslationOn] = useState(false)
-  const [translationSheetOpen, setTranslationSheetOpen] = useState(false)
+  const [translationOn, setTranslationOn] = useState(() => localStorage.getItem('chatnet.call.translation.autostart.v1') === 'true')
+  const [translationSheetOpen, setTranslationSheetOpen] = useState(() => localStorage.getItem('chatnet.call.translation.autostart.v1') === 'true')
   const [moreOpen, setMoreOpen] = useState(false)
+  const [participantsSheetOpen, setParticipantsSheetOpen] = useState(true)
   const moreRef = useRef<HTMLDivElement>(null)
   const [mediaPermissionError, setMediaPermissionError] = useState('')
   const [permissionRetrying, setPermissionRetrying] = useState(false)
   const [callTargetLanguage, setCallTargetLanguage] = useState<string>(() => {
-    const lang = targetLanguage.toLowerCase().split('-')[0]
+    const lang = (localStorage.getItem('chatnet.call.target-language.v1') || targetLanguage).toLowerCase().split('-')[0]
     return lang === 'zh' ? 'zh-Hans' : lang === 'pt' ? 'pt-BR' : lang === 'tl' ? 'fil' : lang
   })
+  const [captionMode] = useState(() => localStorage.getItem('chatnet.call.subtitle-mode.v1') || 'both')
   const [translationError, setTranslationError] = useState('')
   const [translationRetryEpoch, setTranslationRetryEpoch] = useState(0)
   const [allowMyVoice, setAllowMyVoice] = useState(false)
@@ -862,7 +939,7 @@ function SecureCallRoom({
           </div>
         </header>
 
-        <div className={`call-main-layout ${translationOn && translationSheetOpen ? 'has-translation' : ''}`}>
+        <div className={`call-main-layout ${translationOn && translationSheetOpen ? 'has-translation' : isGroup && participantsSheetOpen ? 'has-participants' : ''}`}>
           <section className="call-stage-media" aria-label="Người tham gia cuộc gọi">
             <div className={`secure-call-grid count-${Math.min(participants.length, 6)}`}>
               {participants.length === 0 ? (
@@ -890,6 +967,26 @@ function SecureCallRoom({
               </button>
             )}
           </section>
+          {isGroup && participantsSheetOpen && !(translationOn && translationSheetOpen) && (
+            <aside className="call-group-panel" aria-label="Người tham gia cuộc gọi nhóm">
+              <header><strong>Người tham gia</strong><span>{participants.length} người đang kết nối</span></header>
+              <div className="call-group-members">
+                {participants.length === 0 ? <p>Đang kết nối với phòng gọi…</p> : participants.map((participant) => (
+                  <div key={participant.identity} className="call-group-member">
+                    <span className="call-group-member-avatar">{participant === room?.localParticipant ? 'B' : identityLabel(participant.identity).slice(0, 2)}</span>
+                    <span><strong>{participant === room?.localParticipant ? 'Bạn' : identityLabel(participant.identity)}</strong><small>{participant.isSpeaking ? 'Đang nói' : 'Đang nghe'}</small></span>
+                    {participant.isSpeaking ? <Volume2 size={17} /> : <Mic size={17} />}
+                  </div>
+                ))}
+              </div>
+              <footer>
+                <strong><Languages size={17} /> Dịch AI {translationOn ? 'đã bật' : 'đang tắt'}</strong>
+                <button type="button" onClick={() => { if (!translationOn) toggleTranslation(); else setTranslationSheetOpen(true) }}>
+                  <Settings2 size={15} /> {translationOn ? 'Xem bản dịch' : 'Thiết lập dịch'}
+                </button>
+              </footer>
+            </aside>
+          )}
           {translationOn && translationSheetOpen && (
             <aside className="call-live-panel" aria-label="Dịch trực tiếp">
               <div className="call-sheet-grabber" aria-hidden="true" />
@@ -941,7 +1038,7 @@ function SecureCallRoom({
                       <span className="call-live-entry-avatar">{identityLabel(caption.speakerId).slice(0, 2)}</span>
                       <strong>{identityLabel(caption.speakerId)}</strong>
                     </div>
-                    {caption.original && <p className="call-live-original">{caption.original}</p>}
+                    {captionMode === 'both' && caption.original && <p className="call-live-original">{caption.original}</p>}
                     {caption.translated && <p className="call-live-translated">{caption.translated}</p>}
                   </div>
                 ))}
@@ -964,11 +1061,11 @@ function SecureCallRoom({
             <div className="call-notice-icon"><Mic size={18} /></div>
             <div className="call-notice-copy">
               <strong>Cần quyền micro{call.mediaType === 'video' ? ' / camera' : ''}</strong>
-              <span>{mediaPermissionError} {isDesktopBuild ? 'Nếu đã chặn, hãy bật quyền SOCO trong cài đặt quyền riêng tư của hệ điều hành.' : 'Nếu đã chặn, hãy bật quyền trong cài đặt trình duyệt.'}</span>
+              <span>{mediaPermissionError} {isDesktopBuild ? 'Nếu đã chặn, hãy bật quyền SocCO trong cài đặt quyền riêng tư của hệ điều hành.' : 'Nếu đã chặn, hãy bật quyền trong cài đặt trình duyệt.'}</span>
             </div>
             <button type="button" disabled={!room || permissionRetrying}
               onClick={() => void requestCallMediaPermission()}>
-              {permissionRetrying ? 'Đang mở…' : 'Cấp quyền'}
+              Cấp quyền
             </button>
           </div>
         )}
@@ -981,7 +1078,7 @@ function SecureCallRoom({
               <span>Chỉ áp dụng cuộc gọi này. Người nghe có thể gửi giọng nói của bạn tới máy chủ ChatNet và Google Gemini để dịch.</span>
             </div>
             <div className="call-consent-actions">
-              <button type="button" disabled={consentBusy} onClick={() => void updateVoiceConsent(true)}>{consentBusy ? 'Đang lưu…' : 'Cho phép'}</button>
+              <button type="button" disabled={consentBusy} onClick={() => void updateVoiceConsent(true)}>Cho phép</button>
               <button type="button" className="call-consent-decline" disabled={consentBusy} onClick={() => setConsentRequested(false)}>Để sau</button>
             </div>
           </div>
@@ -1004,6 +1101,14 @@ function SecureCallRoom({
               onClick={toggleTranslation}>
               <Languages /><span>{translationOn ? 'Đang dịch' : 'Dịch AI'}</span>
             </button>
+            {isGroup && <button type="button" className={participantsSheetOpen && !translationSheetOpen ? 'is-on' : ''}
+              aria-label="Xem người tham gia" aria-pressed={participantsSheetOpen && !translationSheetOpen}
+              onClick={() => {
+                if (translationOn && translationSheetOpen) { setTranslationSheetOpen(false); setParticipantsSheetOpen(true) }
+                else setParticipantsSheetOpen((current) => !current)
+              }}>
+              <Users /><span>Thành viên</span>
+            </button>}
             <div className="call-more-wrapper" ref={moreRef}>
               <button type="button" aria-label="Thêm tùy chọn cuộc gọi" aria-expanded={moreOpen}
                 disabled={!room || ending} onClick={() => setMoreOpen((value) => !value)}>

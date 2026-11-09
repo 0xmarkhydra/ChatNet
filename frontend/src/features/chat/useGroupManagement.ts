@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type RefObject } from 'react'
+import { useState, useEffect, useMemo, useRef, type RefObject } from 'react'
 import type { Session } from '../auth/session'
 import type { Tab } from '../../app/types'
 import type { FriendConnection } from '../contacts/types'
@@ -10,6 +10,7 @@ type Options = {
   sessionRef: RefObject<Session | null>
   tab: Tab
   activeConversationId: number | null
+  activeConversationType?: Conversation['type']
   activeConversationIdRef: RefObject<number | null>
   friends: FriendConnection[]
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
@@ -25,6 +26,7 @@ export function useGroupManagement({
   sessionRef,
   tab,
   activeConversationId,
+  activeConversationType,
   activeConversationIdRef,
   friends,
   apiFetch,
@@ -35,17 +37,48 @@ export function useGroupManagement({
   actionLocks,
 }: Options) {
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
-  const [groupActionsOpen, setGroupActionsOpen] = useState(false)
-  useEffect(() => setGroupActionsOpen(false), [activeConversationId, tab])
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [groupNameDraft, setGroupNameDraft] = useState('')
-  const [groupInviteDraft, setGroupInviteDraft] = useState('')
   const [groupInviteSearch, setGroupInviteSearch] = useState('')
   const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
   const [groupBusy, setGroupBusy] = useState(false)
+  const [groupPolicy, setGroupPolicy] = useState<{ adminCanInvite: boolean; adminCanEditInfo: boolean } | null>(null)
+  const groupRequestRef = useRef(apiFetch)
+  groupRequestRef.current = apiFetch
+
+  // Header permissions and avatar previews must work before the sidebar is opened.
+  // Fetch only for the selected group, not for every conversation in the list.
+  useEffect(() => {
+    setGroupMembers([])
+    setGroupPolicy(null)
+    if (tab !== 'chat' || activeConversationType !== 'group' || !activeConversationId || !session?.token) return
+
+    const controller = new AbortController()
+    const groupId = activeConversationId
+    const get = groupRequestRef.current
+    void Promise.allSettled([
+      get(`/api/conversations/${groupId}/members`, { signal: controller.signal, cache: 'reload' })
+        .then(async response => {
+          if (!response.ok) throw new Error('Cannot load group members')
+          return response.json() as Promise<GroupMember[]>
+        }).then(members => {
+          if (!controller.signal.aborted && activeConversationIdRef.current === groupId) setGroupMembers(members)
+        }),
+      get(`/api/conversations/${groupId}/group-settings`, { signal: controller.signal, cache: 'reload' })
+        .then(async response => {
+          if (!response.ok) throw new Error('Cannot load group permissions')
+          return response.json() as Promise<{ adminCanInvite: boolean; adminCanEditInfo: boolean }>
+        }).then(settings => {
+          if (!controller.signal.aborted && activeConversationIdRef.current === groupId) setGroupPolicy(settings)
+        }),
+    ])
+    return () => controller.abort()
+  }, [activeConversationId, activeConversationType, session?.token, tab, activeConversationIdRef])
 
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
+  const canInviteActiveGroup = activeGroupMember?.role === 'owner' || (activeGroupMember?.role === 'admin' && groupPolicy?.adminCanInvite === true)
+  const canEditActiveGroup = activeGroupMember?.role === 'owner' || (activeGroupMember?.role === 'admin' && groupPolicy?.adminCanEditInfo === true)
   const groupInviteCandidates = useMemo(() => {
     const memberIds = new Set(groupMembers.map((member) => member.id))
     const normalized = groupInviteSearch.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
@@ -56,11 +89,17 @@ export function useGroupManagement({
   }, [friends, groupMembers, groupInviteSearch])
 
   function openGroupSettings(conversation: Conversation) {
-    setGroupActionsOpen(false)
     setGroupSettingsOpen(true)
     setGroupNameDraft(conversation.name)
     setGroupInviteSearch('')
     setGroupInviteSelection([])
+    setGroupPolicy(null)
+    void apiFetch(`/api/conversations/${conversation.id}/group-settings`)
+      .then(async response => {
+        if (!response.ok) throw new Error()
+        const result = await response.json() as { adminCanInvite: boolean; adminCanEditInfo: boolean }
+        if (activeConversationIdRef.current === conversation.id) setGroupPolicy(result)
+      }).catch(() => setNotice('Không tải được quyền quản trị nhóm.'))
     void Promise.all([
       refreshGroupMembers(conversation.id),
       refreshFriendConnections(),
@@ -87,8 +126,8 @@ export function useGroupManagement({
     }
   }
 
-  async function renameActiveGroup() {
-    if (!activeConversationId || !groupNameDraft.trim() || actionLocks.current.has('group:write')) return
+  async function renameActiveGroup(): Promise<boolean> {
+    if (!activeConversationId || !groupNameDraft.trim() || actionLocks.current.has('group:write')) return false
     const sessionId = session?.sessionId
     actionLocks.current.add('group:write')
     setGroupBusy(true)
@@ -99,13 +138,17 @@ export function useGroupManagement({
         body: JSON.stringify({ name: groupNameDraft.trim() }),
       })
       const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return
+      if (sessionRef.current?.sessionId !== sessionId) return false
       if (!response.ok) {
         setNotice(result?.error || 'Không đổi được tên nhóm')
-        return
+        return false
       }
       setNotice('Đã cập nhật tên nhóm.')
       await refreshConversations()
+      return true
+    } catch {
+      if (sessionRef.current?.sessionId === sessionId) setNotice('Không thể đổi tên nhóm. Hãy thử lại.')
+      return false
     } finally {
       if (sessionRef.current?.sessionId === sessionId) {
         actionLocks.current.delete('group:write')
@@ -120,10 +163,7 @@ export function useGroupManagement({
     const selectedUsernames = friends
       .filter((friend) => friend.status === 'accepted' && groupInviteSelection.includes(friend.id))
       .map((friend) => friend.username)
-    const usernames = Array.from(new Set([
-      ...selectedUsernames,
-      ...groupInviteDraft.split(/[\s,;]+/),
-    ].map((item) => item.trim().replace(/^@/, '').toLowerCase()).filter(Boolean)))
+    const usernames = Array.from(new Set(selectedUsernames.map((item) => item.trim().toLowerCase()).filter(Boolean)))
     if (usernames.length === 0) return
     if (usernames.length > 50) {
       setNotice('Mỗi lần có thể mời tối đa 50 người. Hãy chia thành nhiều lượt.', 'warning')
@@ -144,7 +184,6 @@ export function useGroupManagement({
         return
       }
       if (activeConversationIdRef.current === activeConversationId) {
-        setGroupInviteDraft((current) => current === groupInviteDraft ? '' : current)
         setGroupInviteSelection([])
         setGroupInviteSearch('')
       }
@@ -230,14 +269,10 @@ export function useGroupManagement({
   return {
     groupSettingsOpen,
     setGroupSettingsOpen,
-    groupActionsOpen,
-    setGroupActionsOpen,
     groupMembers,
     setGroupMembers,
     groupNameDraft,
     setGroupNameDraft,
-    groupInviteDraft,
-    setGroupInviteDraft,
     groupInviteSearch,
     setGroupInviteSearch,
     groupInviteSelection,
@@ -246,6 +281,8 @@ export function useGroupManagement({
     setGroupBusy,
     activeGroupMember,
     canManageActiveGroup,
+    canInviteActiveGroup,
+    canEditActiveGroup,
     groupInviteCandidates,
     openGroupSettings,
     launchGroupCall,

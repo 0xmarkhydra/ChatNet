@@ -1,5 +1,5 @@
 import { SessionResponseCache, mutationTags } from '../shared/lib/sessionCache'
-import { useRef, useState, type RefObject } from 'react'
+import { useRef, type RefObject } from 'react'
 import type { Session, createSessionClient } from '../features/auth/session'
 
 type Options = {
@@ -15,7 +15,6 @@ export function useApiRequest({
   sessionRef,
   sessionClient,
 }: Options) {
-  const [pendingActions, setPendingActions] = useState(0)
   const pendingRequests = useRef(new Set<symbol>())
   const mutationRequests = useRef(new Map<string, Promise<Response>>())
 
@@ -42,11 +41,10 @@ export function useApiRequest({
 
     async function performRequest() {
       const mutation = write && path !== '/api/profile/note' && !/\/(read|translate|presign|subscription|bundle)$/.test(path)
-        && !/^\/api\/conversations\/\d+\/category$/.test(path)
+        && !/^\/api\/conversations\/\d+\/(category|messages)$/.test(path)
       const request = Symbol(path)
       if (mutation) {
         pendingRequests.current.add(request)
-        setPendingActions(pendingRequests.current.size)
       }
       try {
         const response = await sessionClient.request(path, {
@@ -66,7 +64,6 @@ export function useApiRequest({
       } finally {
         if (write && sessionRef.current?.sessionId === sessionId) responseCache.current.invalidate(mutationTags(path))
         pendingRequests.current.delete(request)
-        if (sessionRef.current?.sessionId === sessionId) setPendingActions(pendingRequests.current.size)
       }
     }
   }
@@ -74,8 +71,6 @@ export function useApiRequest({
 
   return {
     apiFetch,
-    pendingActions,
-    setPendingActions,
     pendingRequests,
     mutationRequests,
   }

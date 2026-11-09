@@ -1,0 +1,314 @@
+/* SocCo calls workspace. Scoped so other ChatNet pages retain their existing layout. */
+.app-shell:has(> .phone-frame > .call-center:not(.is-embedded)) {
+  width: 100%; max-width: none; min-height: 100dvh; margin: 0; padding: 0;
+  background: #f4f7fc;
+}
+.app-shell:has(> .phone-frame > .call-center:not(.is-embedded)) > .phone-frame {
+  width: 100%; height: 100dvh; min-height: 0; margin: 0;
+  border: 0; border-radius: 0; box-shadow: none;
+}
+.app-shell:has(> .phone-frame > .call-center:not(.is-embedded)) > .bottom-navigation { display: none; }
+.call-center {
+  --calls-blue: #285ef2; --calls-navy: #182b4a;
+  display: flex; width: 100%; height: 100%; min-height: 0; overflow: hidden;
+  background: #f5f7fb; color: var(--calls-navy);
+  font-size: 13px;
+}
+.call-center button, .call-center select, .call-center input { font: inherit; }
+.call-center button:focus-visible, .call-center input:focus-visible, .call-center select:focus-visible {
+  outline: 2px solid #3867ff; outline-offset: 2px;
+}
+.call-center-sidebar {
+  width: 210px; flex: 0 0 210px; display: flex; flex-direction: column;
+  gap: 26px; padding: 20px 13px; background: #fff; border-right: 1px solid #edf0f7;
+}
+.call-center-brand { display: flex; align-items: center; gap: 9px; padding: 0 7px; }
+.call-center-logo {
+  flex: 0 0 40px; height: 40px; display: grid; place-items: center;
+  background: linear-gradient(130deg, #3565f2, #8958ff); color: #fff; font-size: 22px; font-weight: 800;
+  border-radius: 12px;
+}
+.call-center-brand > span:last-child { min-width: 0; display: grid; gap: 3px; }
+.call-center-brand strong { font-size: 22px; letter-spacing: -.8px; }
+.call-center-brand small { color: #7b8aab; white-space: nowrap; font-size: 9px; }
+.call-center-navigation { display: flex; flex-direction: column; gap: 7px; }
+.call-center-navigation button {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 42px;
+  border: 0; border-radius: 11px; padding: 0 11px; text-align: left;
+  color: #253b60; background: transparent; font-weight: 560;
+}
+.call-center-navigation button:hover { background: #f3f6ff; }
+.call-center-navigation button.active { background: #edf1ff; color: #265ff0; font-weight: 740; }
+.call-nav-symbol { display: grid; place-items: center; flex: 0 0 23px; color: #778eb8; }
+.call-center-navigation button.active .call-nav-symbol { color: #265ff0; }
+.call-center-sidebar-foot {
+  display: flex; align-items: center; gap: 7px; margin-top: auto; color: #6d83ab;
+  border-top: 1px solid #e9edf7; padding: 20px 7px 0; font-size: 11px;
+}
+.call-center-workspace { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.call-center-header {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+  min-height: 84px; padding: 15px 31px; background: #fff; border-bottom: 1px solid #eef1f6;
+}
+.call-center-heading h1 { margin: 0 0 3px; color: #1a2b49; font-weight: 800; font-size: 21px; letter-spacing: -.45px; }
+.call-center-heading p { margin: 0; color: #8391ab; font-size: 11px; }
+.call-center-header-actions { display: flex; align-items: center; gap: 13px; }
+.call-center-search {
+  display: flex; align-items: center; gap: 9px; min-width: min(300px, 37vw); height: 38px;
+  padding: 0 13px; border-radius: 30px; background: #f5f7fb; color: #8296b9;
+}
+.call-center-search input { width: 100%; min-width: 0; border: 0; background: transparent; outline: 0; color: #1c3156; font-size: 11px; }
+.call-center-search input::placeholder { color: #8b9cb8; }
+.call-center-search button { border: 0; background: transparent; color: #778bb1; padding: 2px; }
+.call-center-settings-trigger {
+  display: grid; place-items: center; flex: 0 0 36px; height: 36px;
+  border: 0; border-radius: 50%; background: #eff3ff; color: #2d62e9;
+}
+.call-center-content { flex: 1; min-height: 0; overflow: auto; padding: 20px 26px 32px; }
+.call-center-stats {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px;
+  background: #fff; border-radius: 18px; padding: 21px 25px; margin-bottom: 17px;
+}
+.call-center-stats > div { display: grid; gap: 7px; }
+.call-center-stats strong { color: #2862f2; font-size: 24px; line-height: 1; font-weight: 800; }
+.call-center-stats .danger { color: #ef5072; }
+.call-center-stats .teal { color: #06b39b; }
+.call-center-stats span { font-size: 11px; color: #8090ad; }
+.call-center-filters { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 17px; align-items: center; }
+.call-center-filters button {
+  border: 0; border-radius: 10px; padding: 9px 19px; min-width: 90px; background: #fff;
+  color: #7b8eae; font-size: 11px; font-weight: 620;
+}
+.call-center-filters button.active { background: #eaf0ff; color: #2a65f5; }
+.call-center-filters .call-center-refresh { margin-left: auto; min-width: 40px; padding: 9px; display: grid; place-items: center; }
+.call-history-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(275px, .95fr); gap: 16px; align-items: stretch; }
+.call-center-card { background: #fff; border-radius: 18px; padding: 18px 15px; min-width: 0; }
+.call-center-card > h2 { margin: 1px 5px 18px; font-size: 15px; font-weight: 770; }
+.call-history-list { min-height: 490px; }
+.call-history-item {
+  width: 100%; min-height: 69px; display: flex; align-items: center; gap: 12px;
+  background: transparent; border: 0; border-radius: 13px; padding: 9px 10px; text-align: left; color: inherit;
+}
+.call-history-item:hover { background: #f6f8ff; }
+.call-history-item.selected { background: #eef2ff; }
+.call-center .call-history-avatar,
+.call-center .call-detail-avatar {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  line-height: 1;
+  font-weight: 800;
+}
+.call-center .call-history-avatar {
+  flex: 0 0 43px;
+  width: 43px;
+  height: 43px;
+  border-radius: 50%;
+  font-size: 13px;
+}
+.call-center .call-history-avatar .avatar-initials,
+.call-center .call-detail-avatar .avatar-initials {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  line-height: 1;
+}
+.call-history-main { display: grid; min-width: 0; gap: 5px; flex: 1; }
+.call-history-main strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+.call-history-main small { color: #889ab7; font-size: 11px; }
+.call-history-main .missed, .call-detail-body .missed { color: #ed4e69; }
+.call-history-time { align-self: flex-start; padding-top: 9px; white-space: nowrap; font-size: 10px; color: #869ab8; }
+.call-history-icon { color: #2869fa; flex: 0 0 auto; }
+.call-center-limit { display: block; padding: 20px 8px 4px; color: #9aa8bf; font-size: 10px; }
+.call-history-details { min-height: 490px; }
+.call-detail-body { text-align: center; display: flex; flex-direction: column; align-items: center; }
+.call-detail-avatar { width: 76px; height: 76px; border-radius: 50%; margin: 9px 0 13px; }
+.call-detail-body h3 { font-size: 16px; margin: 0 0 7px; }
+.call-detail-body > p { margin: 0 0 20px; font-size: 12px; }
+.call-detail-body > p.success { color: #00a884; }
+.call-detail-body dl { width: 100%; margin: 0 0 23px; padding: 10px 0; border-top: 1px solid #edf1f8; }
+.call-detail-body dl div { display: flex; justify-content: space-between; gap: 12px; padding: 13px 3px; text-align: left; font-size: 11px; }
+.call-detail-body dt { color: #8a9cb8; }
+.call-detail-body dd { margin: 0; font-weight: 700; text-align: right; }
+.call-detail-actions { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 7px; }
+.call-detail-actions .call-header-actions { justify-content: center; gap: 13px; }
+.call-detail-actions .call-header-actions button {
+  border: 0; border-radius: 12px; background: #2963f0; color: #fff;
+  padding: 10px 20px; width: 46%; display: flex; align-items: center; justify-content: center;
+}
+.call-detail-actions > button { background: #edf1ff; color: #315fe8; border: 0; padding: 10px; border-radius: 10px; font-weight: 700; }
+.call-detail-unavailable { color: #8897b3; line-height: 1.6; }
+.call-center-state { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 25px; text-align: center; color: #8290aa; }
+.call-center-state strong { color: #27385a; }
+.call-center-state p { max-width: 340px; margin: 0; line-height: 1.5; }
+.call-center-state button { margin-top: 10px; padding: 10px 16px; border: 0; border-radius: 10px; background: #2d64ec; color: white; }
+.call-center-section-intro { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 20px; }
+.call-center-section-intro h2 { display: flex; align-items: center; gap: 12px; font-size: 18px; margin: 0 0 8px; }
+.call-center-section-intro h2 svg { color: #2866f4; }
+.call-center-section-intro p { color: #8999b4; margin: 0; }
+.call-center-section-intro > button { display: flex; align-items: center; gap: 7px; border: 0; border-radius: 11px; padding: 11px 14px; color: #2862ed; background: #e8efff; }
+.call-people-list { min-height: 450px; }
+.call-person-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-bottom: 1px solid #f0f3f9; border-radius: 11px; transition: background-color .15s ease; }
+.call-person-row:hover, .call-person-row:focus-within { background: #f2f6ff; }
+.call-person-identity {
+  display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0;
+  padding: 7px 5px; border: 0; background: transparent; border-radius: 10px;
+  text-align: left; cursor: pointer; color: #1a2b49;
+}
+.call-person-identity:hover { color: #2563eb; }
+.call-person-identity:focus-visible { outline: 2px solid #2563eb; outline-offset: -1px; }
+.call-person-info { display: grid; flex: 1; min-width: 0; gap: 5px; }
+.call-person-info strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.call-person-info small { color: #8c9bb7; font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.call-person-row .call-header-actions { display: flex; gap: 7px; flex: 0 0 auto; }
+.call-person-row .call-header-actions button {
+  display: grid; place-items: center; width: 39px; height: 39px;
+  border: 0; border-radius: 12px; background: #edf2ff; color: #2a65f4;
+}
+.call-settings-layout { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(275px, 1fr); gap: 17px; }
+.call-settings-form { padding: 23px; }
+.call-settings-form .call-center-section-intro { margin-bottom: 24px; }
+.call-setting-switch {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: #e4faef; border-radius: 13px; padding: 18px 17px; margin-bottom: 22px;
+}
+.call-setting-switch > span { display: grid; gap: 6px; }
+.call-setting-switch strong, .call-setting-field strong { font-size: 12px; }
+.call-setting-switch small, .call-setting-field small { font-size: 11px; color: #8196b1; }
+.call-setting-switch input { width: 19px; height: 19px; accent-color: #08b891; }
+.call-setting-field { display: grid; gap: 10px; margin-bottom: 20px; }
+.call-setting-field select {
+  appearance: auto; width: 100%; height: 44px; min-width: 0; border: 1px solid #edf1f8;
+  border-radius: 12px; background: #f5f7fb; color: #344664; padding: 0 13px;
+}
+.call-setting-actions { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #edf1f8; padding-top: 25px; }
+.call-setting-actions button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 10px; font-weight: 700; }
+.call-setting-cancel { background: #edf1ff; color: #3060e9; }
+.call-setting-save { background: #2862ed; color: #fff; }
+.call-setting-feedback { color: #316bc6; line-height: 1.5; }
+.call-settings-aside { display: flex; flex-direction: column; gap: 15px; }
+.call-settings-aside > section { padding: 21px; }
+.call-settings-aside p { margin: -8px 5px 18px; line-height: 1.6; color: #8c9cb7; font-size: 11px; }
+.call-caption-preview { background: #1b2d4e; color: #fff; border-radius: 18px; padding: 18px; display: grid; gap: 12px; min-height: 230px; }
+.call-preview-speaker { display: flex; align-items: center; gap: 10px; }
+.call-preview-avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #526fec; font-weight: 800; }
+.call-preview-speaker > span:last-child { display: grid; gap: 4px; }
+.call-preview-speaker small { color: #39d29e; font-size: 10px; }
+.call-preview-original, .call-preview-translated { padding: 15px; border-radius: 12px; background: #2c4064; line-height: 1.5; }
+.call-preview-translated { background: #364e80; }
+.call-preview-translated small { display: block; color: #acbff5; margin-bottom: 6px; }
+.call-settings-privacy { background: #eaf0ff; }
+.call-settings-privacy h2 { display: flex; align-items: center; gap: 9px; }
+.call-settings-privacy h2 svg { color: #2866f4; }
+.call-settings-privacy p { color: #526481; }
+.call-settings-privacy > small { display: block; padding: 13px; background: #fff; border-radius: 10px; color: #8799b9; }
+@media (max-width: 1000px) {
+  .call-center-sidebar { width: 178px; flex-basis: 178px; }
+  .call-center-header { padding: 15px 18px; }
+  .call-center-content { padding: 16px; }
+  .call-history-layout, .call-settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .call-history-details { min-height: 0; }
+}
+@media (max-width: 680px) {
+  .app-shell:has(> .phone-frame > .call-center:not(.is-embedded)) > .phone-frame { height: calc(100dvh - 65px); }
+  .app-shell:has(> .phone-frame > .call-center:not(.is-embedded)) > .bottom-navigation { display: flex; }
+  .call-center { flex-direction: column; }
+  .call-center-sidebar { display: none; }
+  .call-center-header { padding: 15px; align-items: flex-start; }
+  .call-center-heading h1 { font-size: 19px; }
+  .call-center-header-actions { width: 100%; }
+  .call-center-search { flex: 1; min-width: 0; }
+  .call-center-content { padding: 12px; }
+  .call-center-stats { padding: 15px; gap: 9px; }
+  .call-center-stats strong { font-size: 20px; }
+  .call-center-stats span { font-size: 10px; }
+  .call-center-filters { gap: 6px; }
+  .call-center-filters button { min-width: 0; flex: 1; padding: 9px 6px; }
+  .call-center-filters .call-center-refresh { flex: 0 0 34px; }
+  .call-history-item { gap: 9px; }
+  .call-history-time { font-size: 9px; }
+  .call-history-icon { display: none; }
+  .call-settings-form, .call-settings-aside > section { padding: 16px; }
+  .call-setting-actions button { flex: 1; padding: 0 8px; }
+}
+/* Use the host SocCo sidebar and app shell when embedded in the calls section. */
+.call-center.is-embedded { width:100%; height:100%; min-height:0; overflow:hidden; }
+.call-center.is-embedded .call-center-sidebar { display:none; }
+.call-center-tabs { display:flex; align-items:center; gap:5px; min-width:0; max-width:100%; background:#f2f5fb; padding:4px; border-radius:12px; }
+.call-center-tabs button { display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; padding:7px 10px; border:0; border-radius:9px; background:transparent; color:#7587a5; white-space:nowrap; font-size:11px; }
+.call-center-tabs button.active { background:white; color:#285ef2; font-weight:700; box-shadow:0 2px 7px rgba(36,67,119,.09); }
+/* The address book stays inside the call workspace and reuses the friends data/actions. */
+.call-center .call-center-directory { display:flex; min-height:0; padding:0; overflow:hidden; }
+.call-center-directory > .friends-design-v2 {
+  flex:1; min-width:0; min-height:0; height:100%; padding:16px 22px;
+  gap:12px; background:transparent;
+}
+.call-center-directory .fd-directory-layout.fd-list-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+.call-center-directory .fd-list-only .fd-list-card {
+  width:100%;
+}
+.call-center-directory .fd-list-only .fd-person-row:not(.selected):hover { background: #f2f6ff; }
+.call-center-directory .fd-list-only .fd-person-identity { cursor:pointer; }
+.call-center-directory .fd-call-extra-section {
+  display:grid; gap:6px; min-width:0;
+  padding:14px 0 0; margin-top:8px;
+  border-top:1px solid #edf0f8;
+}
+.call-center-directory .fd-call-section-heading {
+  display:flex; align-items:center; gap:9px;
+  padding:2px 11px 9px; font-size:15px; color:#1c3156;
+}
+.call-center-directory .fd-call-section-heading small {
+  font-size:11px; color:#8494b2; font-weight:600;
+}
+.call-center-directory .fd-call-conversation-row .call-header-actions {
+  display:flex; gap:5px; flex:0 0 auto;
+}
+.call-center-directory .fd-call-conversation-row .call-header-actions button {
+  display:grid; place-items:center; width:34px; height:34px;
+  border:0; border-radius:9px; background:transparent; color:#2563eb;
+}
+.call-center-directory .fd-call-conversation-row .call-header-actions button:hover,
+.call-center-directory .fd-list-only .fd-icon-btn:hover { background:#e1ebff; }
+.call-center-directory .fd-call-conversation-row .fd-person-identity:focus-visible {
+  outline:2px solid #2563eb; outline-offset:2px; border-radius:9px;
+}
+@media (max-width:780px) {
+  .call-center.is-embedded .call-center-header { padding:13px 14px; }
+  .call-center-header-actions {
+    width:100%; display:flex; flex-wrap:wrap; align-items:center;
+    gap:9px;
+  }
+  .call-center-tabs {
+    order:0; flex:0 0 100%; width:100%; max-width:100%;
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:3px;
+  }
+  .call-center-tabs button { gap:4px; padding:10px 4px; font-size:11px; }
+  .call-center-tabs button svg { flex-shrink:0; }
+  .call-center-header-actions .call-center-search {
+    order:1; flex:1 1 0; width:auto; min-width:0; max-width:none;
+  }
+  .call-center-header-actions .call-center-settings-trigger {
+    order:2; flex:0 0 36px;
+  }
+  .call-center-content { padding:12px; }
+  .call-center .call-center-directory { padding:0; }
+  .call-center-directory > .friends-design-v2 { padding:12px; }
+}
+@media (max-width:760px) {
+  .call-center-directory > .friends-design-v2 { height:100%; overflow:auto; }
+}
+@media (max-width:360px) {
+  .call-center-tabs button { gap:3px; font-size:10px; }
+}
+@media(min-width:761px) {
+  .modern-shell.app-layout:has(.call-center.is-embedded) > .chatnet-appbar {display:none;}
+}
+@media(max-width:760px) {
+  .app-shell:has(.call-center.is-embedded) > .chatnet-appbar {display:none;}
+}
+@media(max-width:760px) { .modern-shell .bottom-navigation { grid-template-columns: repeat(6,minmax(0,1fr)); } }

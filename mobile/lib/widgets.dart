@@ -279,7 +279,7 @@ class SocoLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'SOCO',
+      label: 'SocCO',
       image: true,
       child: DecoratedBox(
         decoration: BoxDecoration(

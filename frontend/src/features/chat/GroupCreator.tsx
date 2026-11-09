@@ -4,11 +4,9 @@ import '../../styles/connection-tools.css'
 
 type Member = { id: number; username: string; displayName: string }
 
-export default function GroupCreator({ ownerId, friends, results, searching, query, onQuery, onCreate, onClose, error }: {
+export default function GroupCreator({ ownerId, friends, query, onQuery, onCreate, onClose, error }: {
   ownerId: number
   friends: Member[]
-  results: Member[]
-  searching: boolean
   query: string
   onQuery: (value: string) => void
   onCreate: (name: string, usernames: string[]) => Promise<void>
@@ -25,8 +23,7 @@ export default function GroupCreator({ ownerId, friends, results, searching, que
   const normalizedQuery = query.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
   const matchingFriends = friends.filter((member) =>
     `${member.displayName} ${member.username}`.toLocaleLowerCase('vi-VN').includes(normalizedQuery))
-  const members = [...new Map((normalizedQuery ? [...matchingFriends, ...results] : friends)
-    .filter((member) => member.id !== ownerId).map((member) => [member.id, member])).values()]
+  const members = matchingFriends.filter((member) => member.id !== ownerId)
   const suggestedName = selected.length ? `Nhóm ${selected.map((member) => member.displayName || member.username).join(', ')}` : 'Nhóm mới'
   const defaultName = new TextEncoder().encode(suggestedName).length <= 120 ? suggestedName : 'Nhóm mới'
 
@@ -56,22 +53,22 @@ export default function GroupCreator({ ownerId, friends, results, searching, que
       <header><h2 id="group-create-title">Tạo nhóm</h2><button type="button" onClick={onClose} disabled={busy} aria-label="Đóng tạo nhóm" title="Đóng tạo nhóm"><X size={20} /></button></header>
       <form className="group-create-form" onSubmit={(event) => void submit(event)}>
         <label>Tên nhóm (không bắt buộc)<input value={name} onChange={(event) => setName(event.target.value)} placeholder={defaultName} maxLength={120} disabled={busy} /></label>
-        <label>Thêm thành viên<input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Tên bạn bè, @username hoặc email" disabled={busy} autoFocus /></label>
+        <label>Thêm thành viên<input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Tìm trong danh sách bạn bè" disabled={busy} autoFocus /></label>
         {!!selected.length && <div className="group-selection" aria-label="Thành viên đã chọn">
           {selected.map((member) => <button key={member.id} type="button" onClick={() => toggle(member)} disabled={busy} aria-label={`Bỏ chọn ${member.displayName || member.username}`}>{member.displayName || member.username} ×</button>)}
         </div>}
         <p className="group-count" aria-live="polite">{selected.length + 1} thành viên, gồm bạn</p>
-        <div className="group-members" aria-label="Chọn thành viên" aria-busy={!!query.trim() && searching}>
-          {query.trim() && searching ? <p role="status">Đang tìm...</p> : members.map((member) => (
+        <div className="group-members" aria-label="Chọn bạn bè">
+          {members.map((member) => (
             <label key={member.id} className="group-member">
               <span><strong>{member.displayName || member.username}</strong><small>@{member.username}</small></span>
               <input type="checkbox" checked={selected.some((item) => item.id === member.id)} onChange={() => toggle(member)} disabled={busy} aria-label={`Chọn ${member.displayName || member.username}`} />
             </label>
           ))}
-          {!searching && !members.length && <p>{query.trim() ? 'Không tìm thấy người phù hợp.' : 'Chưa có bạn bè. Tìm theo tên hoặc username.'}</p>}
+          {!members.length && <p>{query.trim() ? 'Không tìm thấy bạn bè phù hợp.' : 'Chưa có bạn bè để mời vào nhóm.'}</p>}
         </div>
         {(validation || error) && <p className="connection-message" role="alert">{validation || error}</p>}
-        <button className="connection-primary" disabled={!selected.length || busy}>{busy ? 'Đang tạo...' : `Tạo nhóm${selected.length ? ` · ${selected.length + 1} người` : ''}`}</button>
+        <button className="connection-primary" disabled={!selected.length || busy}>{`Tạo nhóm${selected.length ? ` · ${selected.length + 1} người` : ''}`}</button>
       </form>
     </dialog>
   )

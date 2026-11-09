@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 
-// Rasterize the existing reviewed SOCO brand asset, not a new logo/design.
+// Rasterize the existing reviewed SocCO brand asset, not a new logo/design.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const svg = await readFile(resolve(root, 'frontend/public/soco-mark.svg'), 'utf8')
 assert.ok(!/<script|<foreignObject|(?:href|src)\s*=|url\(https?:/i.test(svg), 'icon must remain self-contained')
@@ -22,5 +22,5 @@ try {
   await writeFile(resolve(out, 'icon.png'), png)
   await writeFile(resolve(out, 'icon-provenance.json'), JSON.stringify({ source: 'frontend/public/soco-mark.svg',
     sourceSha256: createHash('sha256').update(svg).digest('hex'), pngSha256: createHash('sha256').update(png).digest('hex'), size: 1024 }, null, 2) + '\n')
-  console.log('PASS: self-contained existing SOCO SVG rasterized to 1024px installer icon with SHA-256 provenance')
+  console.log('PASS: self-contained existing SocCO SVG rasterized to 1024px installer icon with SHA-256 provenance')
 } finally { await browser.close() }

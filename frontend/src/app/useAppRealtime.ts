@@ -31,6 +31,8 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     groupSettingsOpen: boolean
     activeConversationIdRef: RefObject<number | null>
     refreshGroupMembers: (id: number) => Promise<void>
+    refreshPinnedMessages: (id: number) => Promise<void>
+    clearPinnedMessages: () => void
     setMessages: Dispatch<SetStateAction<Message[]>>
     messageChanges: RefObject<Set<number>>
     setTranslations: Dispatch<SetStateAction<Record<number, string>>>
@@ -70,6 +72,8 @@ export function useAppRealtime({
   groupSettingsOpen,
   activeConversationIdRef,
   refreshGroupMembers,
+  refreshPinnedMessages,
+  clearPinnedMessages,
   setMessages,
   messageChanges,
   setTranslations,
@@ -120,11 +124,17 @@ export function useAppRealtime({
         // Remove potentially forbidden content immediately; refetch using current access rules.
         responseCache.current.invalidate(['messages', 'conversations', 'friends', 'feed', 'stories', 'profiles', 'notes'])
         setMessages([])
+        clearPinnedMessages()
+        if (activeConversationIdRef.current) void refreshPinnedMessages(activeConversationIdRef.current)
         void refreshConversations()
         void refreshFriendConnections()
         void refreshPosts()
         void refreshStories()
         void reconcileConversationMemberships()
+        return
+      }
+      if (update.type === 'group.activity') {
+        window.dispatchEvent(new CustomEvent('chatnet:group-activity', { detail: update.conversationId }))
         return
       }
       if (update.type === 'category.updated') {
@@ -146,19 +156,28 @@ export function useAppRealtime({
 
       if (update.type === 'conversation.removed') {
         responseCache.current.invalidate(['conversations','messages'])
+        if (activeConversationIdRef.current === update.conversationId) clearPinnedMessages()
         purgeConversation(update.conversationId)
         refreshCategoryConversations()
         return
       }
 
+      if (update.type === 'pins.updated') {
+        if (activeConversationIdRef.current === update.conversationId) {
+          void refreshPinnedMessages(update.conversationId)
+        }
+        return
+      }
+
       if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
         responseCache.current.invalidate(['conversations','messages'])
+        window.dispatchEvent(new CustomEvent('chatnet:group-community-updated',{detail:{conversationId:update.conversationId}}))
         revokedConversationIds.current.delete(update.conversationId)
         membershipSnapshot.current?.add(update.conversationId)
         membershipEventSequence.current += 1
         void refreshConversations()
         refreshCategoryConversations()
-        if (groupSettingsOpen && activeConversationIdRef.current === update.conversationId) {
+        if (activeConversationIdRef.current === update.conversationId) {
           void refreshGroupMembers(update.conversationId)
         }
         return
@@ -190,20 +209,16 @@ export function useAppRealtime({
       if (update.type === 'message.updated' && update.message) {
         responseCache.current.invalidate(['messages','conversations'])
         const changed = update.message
+        if (changed.channelId) window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'updated',message:changed}}))
         messageChanges.current.add(changed.id)
-        if (activeConversationIdRef.current === update.conversationId) {
+        if (!changed.channelId && activeConversationIdRef.current === update.conversationId) {
           setMessages((current) => {
             const item = current.find((message) => message.id === changed.id)
-            const mineByEmoji = new Map(
-              (item?.reactions || []).map((reaction) => [reaction.emoji, reaction.mine]),
-            )
             return mergeById(current, {
               ...changed,
               readByUserIds: [...new Set([...(item?.readByUserIds || []), ...(changed.readByUserIds || [])])],
-              reactions: (changed.reactions || []).map((reaction) => ({
-                ...reaction,
-                mine: mineByEmoji.get(reaction.emoji) ?? false,
-              })),
+              // The backend now personalizes "mine" for each realtime recipient.
+              reactions: changed.reactions || [],
             }).sort((a, b) => a.id - b.id)
           })
           setTranslations((current) => {
@@ -211,6 +226,8 @@ export function useAppRealtime({
             delete next[changed.id]
             return next
           })
+          // Edits and recalls must refresh the preview shown in the pinned banner.
+          void refreshPinnedMessages(update.conversationId)
         }
         void refreshConversations()
         refreshCategoryConversations()
@@ -220,6 +237,7 @@ export function useAppRealtime({
       if (update.type === 'message' && update.message) {
         responseCache.current.invalidate(['messages','conversations'])
         const incoming = update.message
+        if (incoming.channelId) window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'message',message:incoming}}))
         // Only genuine, recent messages from other users make a sound. Loading
         // history, updating reactions and our own sends never trigger one.
         const viewingDesktopChat = isDesktopBuild && document.hasFocus() && document.visibilityState === 'visible' &&
@@ -281,7 +299,7 @@ export function useAppRealtime({
         void refreshConversations()
         refreshCategoryConversations()
 
-        if (currentId === update.conversationId) {
+        if (!incoming.channelId && currentId === update.conversationId) {
           setMessages((current) =>
             current.some((item) => item.id === incoming.id)
               ? current

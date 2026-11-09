@@ -1,4 +1,4 @@
-/* iOS glass surfaces with SOCO blue-violet brand accents. */
+/* iOS glass surfaces with SocCO blue-violet brand accents. */
 
 :root {
   --chatnet-accent: #2563eb;
@@ -2623,10 +2623,16 @@
 }
 
 .feed-media-preview .media-count-1 .media-item img.media-extra-tall {
-  height: min(68vh, 620px);
-  max-height: 620px;
-  object-fit: cover;
-  object-position: center top;
+  height: auto;
+  max-height: none;
+  object-fit: contain;
+  object-position: center;
+}
+
+/* Feed photo grids retain compact tiles without cropping the uploaded images. */
+.feed-media-preview .media-grid .media-item img {
+  object-fit: contain;
+  background: #f2f4f8;
 }
 
 .feed-media-preview .media-count-1 .media-item video {
@@ -2761,7 +2767,27 @@
 
 .profile-avatar-editor {
   position: relative;
+  box-sizing: border-box;
+  width: 82px;
+  height: 82px;
   flex: 0 0 82px;
+}
+
+.profile-avatar-editor > .profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  line-height: 1;
+}
+
+.profile-avatar-editor > .profile-avatar .avatar-initials {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  line-height: 1;
 }
 
 .profile-avatar-edit,
@@ -3742,11 +3768,58 @@ select:focus-visible {
   cursor: text;
 }
 
-.message-reactions {
+.message-content {
+  position: relative;
+  max-width: 100%;
+  margin-bottom: 13px;
+}
+
+.message.mine .message-content {
+  margin-left: auto;
+}
+
+/* Keep reactions at the lower-right of the bubble without allowing short
+   messages to push the picker beyond the chat viewport. On incoming messages
+   the reaction row grows RIGHT from the bubble's left edge; on outgoing
+   messages it grows LEFT from the bubble's right edge. A long bubble still
+   right-aligns its reaction row naturally. */
+.message-content > .bubble:has(> .message-reactions) {
+  padding-bottom: 22px;
+}
+
+.message-content .message-reactions {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: auto;
+  bottom: -10px;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 5px;
+  justify-content: flex-end;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(230px, calc(100vw - 28px));
+  gap: 4px;
+  margin: 0;
+}
+
+.message.mine .message-content .message-reactions {
+  left: auto;
+  right: 0;
+}
+
+.message-content .reaction-chip,
+.message-content .reaction-add {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(26, 43, 72, .14);
+}
+
+.message-content:has(> .chat-message-photo) .chat-image-time {
+  right: auto;
+  left: 12px;
 }
 
 .reaction-chip {
@@ -3761,6 +3834,46 @@ select:focus-visible {
 }
 
 .reaction-chip.active {
+  border-color: var(--chatnet-accent);
+  background: var(--chatnet-accent-soft);
+  color: var(--chatnet-accent-ink);
+}
+
+.reaction-add {
+  display: inline-grid;
+  width: 29px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--chatnet-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .82);
+  color: var(--chatnet-muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity .15s ease, transform .15s ease;
+}
+
+/* Keep existing reaction counts visible; reveal the add icon on bubble hover. */
+.message-content:has(> .bubble:hover) .reaction-add,
+.message-content:has(> .chat-message-media:hover) .reaction-add,
+.message-content .message-reactions:hover .reaction-add,
+.message-content:focus-within .reaction-add {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+@media (hover: none) {
+  .message-content .reaction-add {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}
+
+.reaction-add:hover, .reaction-add:focus-visible {
   border-color: var(--chatnet-accent);
   background: var(--chatnet-accent-soft);
   color: var(--chatnet-accent-ink);
@@ -3838,13 +3951,18 @@ select:focus-visible {
 }
 
 .message-context-reactions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   min-width: 0;
-  height: 46px;
+  height: 56px;
   border: 0;
   border-radius: 14px;
   padding: 0;
   background: transparent;
-  font-size: 27px;
+  font-size: 26px;
   line-height: 1;
   cursor: pointer;
   transition: transform .12s ease, background .12s ease;
@@ -3855,6 +3973,13 @@ select:focus-visible {
   background: #f0f3f5;
   transform: scale(1.08);
 }
+
+.message-context-reactions button small {
+  color: var(--chatnet-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+.message-context-reactions button.active small { color: var(--chatnet-accent-ink); }
 
 .message-context-reactions button.active {
   background: var(--chatnet-accent-soft);
@@ -4000,7 +4125,7 @@ select:focus-visible {
   }
 
   .message-context-reactions button {
-    height: 44px;
+    height: 54px;
     font-size: 25px;
   }
 

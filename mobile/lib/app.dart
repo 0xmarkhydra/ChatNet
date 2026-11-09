@@ -99,7 +99,7 @@ class _SocoAppState extends State<SocoApp> {
     return UiTranslations(
       messages: messages,
       child: MaterialApp(
-        title: 'SOCO',
+        title: 'SocCO',
         debugShowCheckedModeBanner: false,
         theme: buildSocoTheme(),
         home: api.session == null

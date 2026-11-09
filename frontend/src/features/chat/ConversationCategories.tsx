@@ -146,7 +146,7 @@ export default function ConversationCategories({ model }: { model: Model }) {
      <div className="category-form-actions">
       <CategoryBadge category={{id:edit||0,name:name.trim()||'Tên thẻ',color}} />
       {edit && <button type="button" disabled={model.busy} onClick={reset}>Hủy</button>}
-      <button type="submit" disabled={model.busy || !name.trim() || (!edit && model.categories.length >= 50)}><Plus size={16} />{model.busy ? 'Đang lưu…' : edit ? 'Lưu thay đổi' : 'Thêm thẻ'}</button>
+      <button type="submit" disabled={model.busy || !name.trim() || (!edit && model.categories.length >= 50)}><Plus size={16} />{edit ? 'Lưu thay đổi' : 'Thêm thẻ'}</button>
      </div>
     </form>
     {model.error && <div className="category-error" role="alert">{model.error}<button type="button" disabled={model.busy} onClick={() => void model.refreshCategories(true)}>Tải lại thẻ</button></div>}

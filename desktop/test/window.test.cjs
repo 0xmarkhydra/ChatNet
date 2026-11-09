@@ -44,7 +44,7 @@ test('window preference roundtrip is atomic and corrupt settings use defaults', 
   fs.writeFileSync(file, '{bad')
   assert.equal(readWindowState(file, [area]).closeToTray, null)
 })
-test('tray raster matches the reviewed SOCO asset', () => {
+test('tray raster matches the reviewed SocCO asset', () => {
   const png = Buffer.from(require('../src/tray-icon.cjs').split(',')[1], 'base64')
   assert.equal(createHash('sha256').update(png).digest('hex'), '7521ecd180f6f7962575080e5436957e4a295fc35d0cf76c83032a6331944970')
   assert.equal(png.readUInt32BE(16), 32)

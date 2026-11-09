@@ -87,3 +87,15 @@
 .chat-options-menu button:hover { background: #f1f5ff; }
 .chat-options-menu button.chat-options-danger { color: #be123c; }
 .chat-options-menu button:disabled { opacity: .5; cursor: wait; }
+
+/* Keep the QR preview flexible so the actions fit within the dialog height. */
+.qr-dialog[open] { display: flex; flex-direction: column; }
+.qr-dialog > header, .qr-dialog > .connection-segments, .qr-dialog > .connection-message { flex-shrink: 0; }
+.qr-dialog .qr-scan { display: flex; flex-direction: column; min-height: 0; }
+.qr-dialog .qr-camera { flex: 0 1 380px; height: 380px; min-height: 80px; aspect-ratio: auto; }
+.qr-dialog .qr-camera video { position: absolute; inset: 0; }
+.qr-dialog .qr-scan > button, .qr-dialog .qr-upload { flex-shrink: 0; }
+.qr-dialog .qr-identity { display: flex; flex-direction: column; align-items: center; min-height: 0; }
+.qr-dialog .qr-identity > strong, .qr-dialog .qr-identity > span, .qr-dialog .connection-actions { flex-shrink: 0; }
+.qr-dialog .qr-image { flex: 0 1 280px; height: 280px; min-height: 0; box-sizing: border-box; aspect-ratio: auto; }
+.qr-dialog .qr-image img { min-height: 0; object-fit: contain; }

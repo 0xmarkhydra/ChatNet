@@ -35,31 +35,43 @@ export function useContactData({
     const request = ++friendSyncRequest.current
     setFriendSyncBusy(true)
     try {
-      const [friendsResponse, requestsResponse, metadataResponse] = await Promise.all([
-        apiFetch('/api/friends'),
-        apiFetch('/api/friends/requests'),
-        apiFetch('/api/contacts'),
-      ])
-      if (!friendsResponse.ok || !requestsResponse.ok) throw new Error('Friend sync failed')
-      const [nextFriends, nextRequests] = await Promise.all([
-        friendsResponse.json() as Promise<FriendConnection[]>,
-        requestsResponse.json() as Promise<FriendConnection[]>,
-      ])
-      if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
-      setFriends(nextFriends)
-      setFriendRequests(nextRequests)
-      if (metadataResponse.ok) {
-        const records = await metadataResponse.json() as Array<{ id: number; nickname: string; note: string; favorite: boolean }>
-        if (sessionRef.current?.sessionId !== sessionId || request !== friendSyncRequest.current) return
-        setContactMetadata(Object.fromEntries(records.map((item) => [item.id, {
-          nickname: item.nickname, note: item.note, favorite: item.favorite,
-        }])))
+      // Load the primary friend list independently. A slow or unavailable
+      // requests/metadata endpoint must not delay friends on mobile.
+      const isCurrent = () =>
+        sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current
+      void apiFetch('/api/friends/requests', { cache: 'no-store' })
+        .then(async (response) => {
+          if (!response.ok) return
+          const items: unknown = await response.json().catch(() => null)
+          if (isCurrent() && Array.isArray(items)) setFriendRequests(items as FriendConnection[])
+        }).catch(() => undefined)
+      void apiFetch('/api/contacts', { cache: 'no-store' })
+        .then(async (response) => {
+          if (!response.ok) return
+          const records: unknown = await response.json().catch(() => null)
+          if (isCurrent() && Array.isArray(records)) {
+            setContactMetadata(Object.fromEntries(
+              (records as Array<{ id: number; nickname: string; note: string; favorite: boolean }>)
+                .map((item) => [item.id, {
+                  nickname: item.nickname, note: item.note, favorite: item.favorite,
+                }]),
+            ))
+          }
+        }).catch(() => undefined)
+      const friendsResponse = await apiFetch('/api/friends', { cache: 'no-store' })
+      if (!isCurrent()) return
+      if (!friendsResponse.ok) {
+        throw new Error('Không thể tải danh sách bạn bè. Kiểm tra kết nối và thử lại.')
       }
+      const nextFriends: unknown = await friendsResponse.json()
+      if (!Array.isArray(nextFriends)) throw new Error('Dữ liệu bạn bè từ máy chủ không hợp lệ.')
+      if (!isCurrent()) return
+      setFriends(nextFriends as FriendConnection[])
       setFriendSyncSessionId(sessionId)
       setFriendSyncError('')
-    } catch {
+    } catch (error) {
       if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) {
-        setFriendSyncError('Chưa tải được trạng thái kết bạn.')
+        setFriendSyncError(error instanceof Error ? error.message : 'Chưa tải được danh sách bạn bè.')
       }
     } finally {
       if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) setFriendSyncBusy(false)
