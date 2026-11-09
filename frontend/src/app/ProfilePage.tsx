@@ -65,9 +65,9 @@ export default function ProfilePage({
         </button>
       ))}
     </div>
-  ) : (
+  ) : postsBusy ? null : (
     <div className="profile-page-blank"><ImageIcon size={30} aria-hidden="true" />
-      <p>{postsBusy ? 'Đang tải ảnh và video...' : emptyText}</p>
+      <p>{emptyText}</p>
       <button type="button" onClick={onCreatePost}>Chia sẻ khoảnh khắc</button>
     </div>
   )

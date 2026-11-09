@@ -1065,7 +1065,7 @@ function SecureCallRoom({
             </div>
             <button type="button" disabled={!room || permissionRetrying}
               onClick={() => void requestCallMediaPermission()}>
-              {permissionRetrying ? 'Đang mở…' : 'Cấp quyền'}
+              Cấp quyền
             </button>
           </div>
         )}

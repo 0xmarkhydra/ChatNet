@@ -426,7 +426,7 @@ export default function CommunityGroupsPage({
         </article>)}
         {activeChannelId===0&&pendingMessages.filter(item=>item.conversationId===selectedGroup.id).map(item=><article className="cg-message mine cg-message-pending" key={item.clientId}><div>
           <strong>Bạn · tin đang chờ</strong><p>{item.text||'Tệp đính kèm đang gửi'}</p>
-          <small>{item.status==='failed'?item.error||'Gửi thất bại':!chatOnline?'Chờ có mạng':item.status==='unconfirmed'?'Đang xác nhận...':'Đang gửi...'}</small>
+          {(item.status==='failed'||!chatOnline)&&<small>{item.status==='failed'?item.error||'Gửi thất bại':'Chờ có mạng'}</small>}
           {item.status==='failed'&&<button type="button" onClick={onRetryPending}>Gửi lại</button>}
         </div></article>)}
         {activeChannelId!==0&&channelUnconfirmed&&<article className="cg-message mine cg-message-pending"><div><strong>Bạn · Chờ xác nhận</strong><p>{channelUnconfirmed.text}</p><button type="button" disabled={channelSendBusy} onClick={()=>void sendChannelMessage({preventDefault(){}} as FormEvent)}>Gửi lại cùng mã tin</button></div></article>}

@@ -6262,10 +6262,11 @@ export default function App({
                         {item.text && <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>}
                         <MediaAttachmentsView items={item.attachments} />
                         <div className="chat-outbox-footer">
-                          <span className={item.status === 'failed' ? 'message-stamp chat-outbox-error' : 'message-stamp'} role="status">
-                            {item.status === 'failed' ? item.error || 'Không gửi được' :
-                              !chatOnline ? 'Chờ có mạng' : item.status === 'unconfirmed' ? 'Đang xác nhận...' : 'Đang gửi...'}
-                          </span>
+                          {(item.status === 'failed' || !chatOnline) && (
+                            <span className={item.status === 'failed' ? 'message-stamp chat-outbox-error' : 'message-stamp'} role="status">
+                              {item.status === 'failed' ? item.error || 'Không gửi được' : 'Chờ có mạng'}
+                            </span>
+                          )}
                           {(item.status === 'failed' || (item.status === 'unconfirmed' && chatOnline)) && (
                             <button type="button" className="chat-outbox-retry"
                               aria-label={item.status === 'failed' ? 'Gửi lại tin nhắn bị lỗi' : 'Gửi lại tin nhắn đang chờ'}
