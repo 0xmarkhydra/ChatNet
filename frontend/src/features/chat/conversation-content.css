@@ -1,3 +1,28 @@
+.chat-blocked-composer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px max(14px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(100, 116, 139, .16);
+  background: #f6f7fa;
+  color: #64748b;
+  min-height: 70px;
+}
+.chat-blocked-composer > svg { flex: 0 0 auto; color: #8b98a9; }
+.chat-blocked-composer > div { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+.chat-blocked-composer strong { color: #475569; font-size: 14px; font-weight: 650; }
+.chat-blocked-composer span { font-size: 12px; line-height: 1.5; }
+.chat-blocked-composer button {
+  flex: 0 0 auto; border: 1px solid #cbd5e1; background: white; color: #334155;
+  border-radius: 9px; padding: 8px 12px; font: inherit; font-size: 12px;
+  font-weight: 650; cursor: pointer;
+}
+.chat-blocked-composer button:disabled { opacity: .55; cursor: not-allowed; }
+@media (max-width: 480px) {
+  .chat-blocked-composer { gap: 9px; padding-inline: 12px; }
+  .chat-blocked-composer span { font-size: 11px; }
+  .chat-blocked-composer button { padding: 7px 9px; }
+}
 .shared-content-layer {
   position: fixed;
   z-index: 90;

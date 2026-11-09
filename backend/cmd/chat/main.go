@@ -58,6 +58,8 @@ type messageReaction struct {
 }
 
 type conversation struct {
+	BlockedByMe   bool      `json:"blockedByMe,omitempty"`
+	BlockedByOther bool      `json:"blockedByOther,omitempty"`
 	CategoryID    *int64     `json:"categoryId,omitempty"`
 	PinnedAt      *time.Time `json:"pinnedAt,omitempty"`
 	ID            int64      `json:"id"`
@@ -617,13 +619,15 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		               ), '')
 		           END
 		           FROM messages m
-		           WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		             (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))
+		           WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		             (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		               (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)))
 		           ORDER BY m.id DESC
 		           LIMIT 1
 		       ),''),
-		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)) ORDER BY m.id DESC LIMIT 1),c.created_at),
+		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		         (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		           (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))) ORDER BY m.id DESC LIMIT 1),c.created_at),
 		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0)
 		FROM conversations c
@@ -647,17 +651,11 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("meta.nickname")+`, `+searchx.FoldSQL("$6")+`)>0))
 		    OR EXISTS (SELECT 1 FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>cm.cleared_through_message_id
 		       AND msg.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$6")+`)>0
-		       AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id))))
-		  AND (c.type <> 'direct' OR NOT EXISTS (
-		    SELECT 1 FROM conversation_members other
-		    JOIN user_blocks b ON
-		      (b.blocker_id=$1 AND b.blocked_id=other.user_id)
-		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
-		    WHERE other.conversation_id=c.id AND other.user_id<>$1
-		  ))
-		ORDER BY (cm.pinned_at IS NOT NULL) DESC,cm.pinned_at DESC,COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
+		       AND (c.type='direct' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id)))))
+		ORDER BY (cm.pinned_at IS NOT NULL) DESC,cm.pinned_at DESC,COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		         (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		           (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
 		claims.UserID, limit, offset, categoryID, conversationID, keyword, unreadOnly, conversationType)
 	if err != nil {
@@ -683,16 +681,18 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			var username, displayName string
 			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status
+				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status,
+				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=$2 AND b.blocked_id=u.id),
+				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=u.id AND b.blocked_id=$2)
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
-				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline)
+				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline, &c.BlockedByMe, &c.BlockedByOther)
 			if err == nil {
 				c.Name = displayName
 				c.OtherUsername = username
 				c.OtherUserID = &otherID
-				c.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
+				c.Online = !c.BlockedByMe && !c.BlockedByOther && showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
 			}
 		}
 		items = append(items, c)
@@ -917,10 +917,8 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
-		return
-	}
-
+	// Existing participants may read their chat history after a block.
+	// Mutations and media downloads still enforce the block policy.
 	channelID := int64(0)
 	if raw := r.URL.Query().Get("channelId"); raw != "" {
 		value, err := strconv.ParseInt(raw, 10, 64)
@@ -1017,14 +1015,17 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
 		JOIN conversation_members viewer ON viewer.conversation_id=m.conversation_id AND viewer.user_id=$5
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND rm.id>viewer.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		  (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id))
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND rm.id>viewer.cleared_through_message_id
+		  AND (EXISTS(SELECT 1 FROM conversations rc WHERE rc.id=m.conversation_id AND rc.type='direct')
+		    OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id)))
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
 		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id AND COALESCE(m.channel_id,0)=$10 AND ($3::bigint=0 OR m.id<$3)
-		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
+		  AND (EXISTS(SELECT 1 FROM conversations dc WHERE dc.id=m.conversation_id AND dc.type='direct')
+		    OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id)))
 		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("m.text")+`, `+searchx.FoldSQL("$6")+`)>0))
 		  AND ($7::text='' OR lower(u.username)=lower($7))
 		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)

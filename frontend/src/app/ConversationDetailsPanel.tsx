@@ -16,14 +16,16 @@ type Props = {
   onNotifications: () => void
   onCreateGroupActivity: (kind: GroupActivityKind) => void
   onBlock: () => void
+  onUnblock: () => void
   onClearHistory: () => void
 }
 
 export default function ConversationDetailsPanel({
   conversation, busy, onClose, onProfile, onSearch, onShared, onTranslate,
-  onNotifications, onCreateGroupActivity, onBlock, onClearHistory,
+  onNotifications, onCreateGroupActivity, onBlock, onUnblock, onClearHistory,
 }: Props) {
   const isGroup = conversation.type === 'group'
+  const blocked = !isGroup && Boolean(conversation.blockedByMe || conversation.blockedByOther)
   const [groupOptionsOpen, setGroupOptionsOpen] = useState(false)
   useEffect(() => { setGroupOptionsOpen(false) }, [conversation.id])
   const options = [
@@ -47,10 +49,10 @@ export default function ConversationDetailsPanel({
           className="conversation-info-panel-avatar social-chat-details-avatar" group={isGroup}
           online={!isGroup && conversation.online} />
         <strong title={conversation.name}>{conversation.name}</strong>
-        <span>{isGroup ? `${conversation.memberCount} thành viên` : conversation.online ? '● Đang hoạt động' : 'Chat riêng'}</span>
+        <span>{blocked ? (conversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này') : isGroup ? `${conversation.memberCount} thành viên` : conversation.online ? '● Đang hoạt động' : 'Chat riêng'}</span>
       </div>
       <div className="conversation-info-panel-actions social-chat-details-actions">
-        <CallHeaderActions conversationId={conversation.id} />
+        <CallHeaderActions conversationId={conversation.id} disabled={blocked} />
         <button type="button" onClick={onProfile}>
           <Users size={20} aria-hidden="true" />
           <span>{isGroup ? 'Quản lý nhóm' : 'Hồ sơ'}</span>
@@ -100,10 +102,10 @@ export default function ConversationDetailsPanel({
             )}
           </div>
         )}
-        {!isGroup && conversation.otherUserId && (
-          <button type="button" className="conversation-options-danger" disabled={busy} onClick={onBlock}>
+        {!isGroup && conversation.otherUserId && !conversation.blockedByOther && (
+          <button type="button" className="conversation-options-danger" disabled={busy} onClick={conversation.blockedByMe ? onUnblock : onBlock}>
             <Ban size={19} aria-hidden="true" />
-            <span>Chặn tin nhắn và cuộc gọi</span>
+            <span>{conversation.blockedByMe ? 'Bỏ chặn người dùng' : 'Chặn tin nhắn và cuộc gọi'}</span>
             <ChevronRight size={16} aria-hidden="true" />
           </button>
         )}
