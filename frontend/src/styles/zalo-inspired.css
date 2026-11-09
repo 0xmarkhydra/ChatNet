@@ -3783,7 +3783,7 @@ select:focus-visible {
    the reaction row grows RIGHT from the bubble's left edge; on outgoing
    messages it grows LEFT from the bubble's right edge. A long bubble still
    right-aligns its reaction row naturally. */
-.message-content > .bubble:has(+ .message-reactions) {
+.message-content > .bubble:has(> .message-reactions) {
   padding-bottom: 22px;
 }
 

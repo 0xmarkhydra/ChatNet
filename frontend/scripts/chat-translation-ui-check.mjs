@@ -54,10 +54,12 @@ try {
     const messages = Object.entries(textById).map(([id,text]) => ({
       id:Number(id),conversationId:21,senderId:2,sender:'linhanh',
       senderDisplayName:'Linh Anh',text,createdAt:now,attachments:[],readByUserIds:[],
+      reactions: Number(id) === 13 ? [{ emoji:'❤️', count:2, mine:false }] : [],
     }))
     messages.push({ id:14,conversationId:21,senderId:1,sender:'viewer',
       senderDisplayName:'Người xem',text:long101,translatedText:'Own translated output',
-      translationLanguage:'en',createdAt:now,attachments:[],readByUserIds:[] })
+      translationLanguage:'en',createdAt:now,attachments:[],readByUserIds:[],
+      reactions:[{ emoji:'👍', count:1, mine:true }] })
     messages.push({ id:15,conversationId:21,senderId:1,sender:'viewer',
       senderDisplayName:'Người xem',text:'tôi test dịch cái',
       translatedText:'আমি অনুবাদ পরীক্ষা করছি।',
@@ -97,6 +99,21 @@ try {
     await page.goto(origin)
     await page.locator('.zalo-conversation-list .conversation-item').first().click()
     const row = id => page.locator(`[data-message-id="${id}"]`)
+    const assertReactionAnchored = async (id, state) => {
+      const bounds = await row(id).evaluate(message => {
+        const bubble = message.querySelector('.bubble')?.getBoundingClientRect()
+        const reactions = message.querySelector('.message-reactions')?.getBoundingClientRect()
+        if (!bubble || !reactions) return null
+        return {
+          bottomGap: reactions.bottom - bubble.bottom,
+          sideGap: message.classList.contains('mine')
+            ? reactions.right - bubble.right : reactions.left - bubble.left,
+        }
+      })
+      assert.ok(bounds && Math.abs(bounds.bottomGap - 10) <= 2 &&
+        Math.abs(bounds.sideGap) <= 2,
+      `Reaction must follow its bubble (${state}, message ${id}): ${JSON.stringify(bounds)}`)
+    }
     await row(11).locator('.bubble').waitFor({state:'visible'})
     if (autoTranslate) {
       await row(11).locator('.chat-translation-loading').waitFor({state:'visible'})
@@ -111,6 +128,7 @@ try {
       await row(11).locator('.chat-translation-loading').waitFor({state:'visible'})
     }
     await row(11).locator('.chat-translation-dual').waitFor({state:'visible'})
+    await assertReactionAnchored(11, 'incoming bilingual')
     const topText = await row(11).locator('.chat-translation-dual > .translation-flip-content').boundingBox()
     const originalText = await row(11).locator('.chat-translation-original').boundingBox()
     assert.ok(topText && originalText && topText.y + topText.height <= originalText.y,
@@ -129,21 +147,25 @@ try {
       await row(13).locator('.chat-translation-loading').waitFor({state:'visible'})
     }
     await row(13).locator('.translation-flip-pill').waitFor({state:'visible'})
+    await assertReactionAnchored(13, 'collapsed translated bubble')
     const longBubble = await row(13).locator('.bubble').boundingBox()
     const longToggle = await row(13).locator('.translation-flip-pill').boundingBox()
     assert.ok(longBubble && longToggle && longToggle.y >= longBubble.y + longBubble.height,
       'The original-text switch belongs below the long message')
     assert.equal(await row(13).locator('.chat-translation-original').count(),0, 'Long messages show one text at a time')
-    assert.ok((await row(13).locator('.bubble').innerText()).startsWith('DỊCH'))
+    assert.ok((await row(13).locator('.translation-flip-content').innerText()).startsWith('DỊCH'))
     await row(13).getByRole('button', {name:'Hiện tin nhắn gốc'}).click()
-    assert.equal(await row(13).locator('.bubble').innerText(), long101)
+    assert.equal(await row(13).locator('.translation-flip-content').innerText(), long101)
+    await assertReactionAnchored(13, 'expanded original')
     await row(13).getByRole('button', {name:'Hiện nội dung đã dịch'}).click()
-    assert.ok((await row(13).locator('.bubble').innerText()).startsWith('DỊCH'))
+    assert.ok((await row(13).locator('.translation-flip-content').innerText()).startsWith('DỊCH'))
+    await assertReactionAnchored(13, 'collapsed again')
     // Own short bilingual text must stay compact and legible on its gradient.
     if (!autoTranslate) {
       await row(15).getByRole('button', { name:'Dịch',exact:true }).click()
     }
     await row(15).locator('.chat-translation-dual').waitFor({state:'visible'})
+    await assertReactionAnchored(15, 'sent bilingual')
     const ownBubble = row(15).locator('.chat-translation-dual')
     const ownBox = await ownBubble.boundingBox()
     assert.ok(ownBox?.width < 290, 'Short sent bilingual messages must shrink-wrap their text')
@@ -164,9 +186,9 @@ try {
 
     if (autoTranslate) {
       await row(14).locator('.translation-flip-pill').waitFor({state:'visible'})
-      assert.equal(await row(14).locator('.bubble').innerText(), 'Own translated output')
+      assert.equal(await row(14).locator('.translation-flip-content').innerText(), 'Own translated output')
       await row(14).getByRole('button', {name:'Hiện tin nhắn gốc'}).click()
-      assert.equal(await row(14).locator('.bubble').innerText(), long101)
+      assert.equal(await row(14).locator('.translation-flip-content').innerText(), long101)
       assert.deepEqual([...requests].sort((a,b)=>a-b), [11,12,13,17],
         'Automatic translation must not re-request already translated outgoing messages')
     } else {
@@ -175,7 +197,7 @@ try {
       assert.equal(await row(11).getByRole('button', {name:'Dịch',exact:true}).count(),1)
       await row(14).getByRole('button', {name:'Dịch',exact:true}).click()
       await row(14).locator('.translation-flip-pill').waitFor({state:'visible'})
-      assert.equal(await row(14).locator('.bubble').innerText(), 'Own translated output')
+      assert.equal(await row(14).locator('.translation-flip-content').innerText(), 'Own translated output')
       const originalBefore = await row(16).locator('.bubble').boundingBox()
       await row(16).getByRole('button', {name:'Dịch',exact:true}).click()
       await row(16).locator('.chat-translation-loading').waitFor({state:'visible'})
@@ -190,6 +212,9 @@ try {
       assert.ok(shortTranslated?.width < 220, 'Short bilingual message must not stretch to panel width')
       assert.equal(requests.length,4, 'Manual toggle must reuse existing translations')
     }
+    await page.setViewportSize({ width:390, height:844 })
+    await assertReactionAnchored(13, 'mobile incoming')
+    await assertReactionAnchored(15, 'mobile sent')
     assert.deepEqual(errors, [], 'No uncaught browser exceptions')
     await ctx.close()
     console.log(`PASS ${autoTranslate ? 'automatic' : 'manual'}: loading, 99/100/101 characters, order and toggle`)

@@ -6302,6 +6302,29 @@ export default function App({
                         (activeChatTranslationSettings?.display !== 'bilingual' && Array.from(message.text).length > 100))
                       const isTranslating = Boolean(translationPending[message.id])
                       const translationFailed = Boolean(translationFailures[message.id])
+                      const reactionControls = (
+                        <div className="message-reactions">
+                          {(message.reactions || []).map((reaction) => (
+                            <button
+                              key={reaction.emoji}
+                              type="button"
+                              disabled={reactionPreviews[message.id] !== undefined}
+                              aria-pressed={reaction.mine}
+                              className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
+                              onClick={() => void toggleReaction(message, reaction.emoji)}
+                              aria-label={`${messageReactionLabel(reaction.emoji)}: ${reaction.count} lượt`}
+                            >
+                              {reaction.emoji} {reaction.count}
+                            </button>
+                          ))}
+                          <button type="button" className="reaction-add"
+                            aria-label="Chọn cảm xúc cho tin nhắn"
+                            title="Thả cảm xúc"
+                            onClick={() => openMessageActions(message)}>
+                            <SmilePlus size={16} aria-hidden="true" />
+                          </button>
+                        </div>
+                      )
                       return (
                         <Fragment key={message.id}>
                           {displayDay && <div className="day-divider"><span>{dayLabel}</span></div>}
@@ -6375,6 +6398,7 @@ export default function App({
                                         : <Fragment key={index}>{part.text}</Fragment>)}
                                     </span>
                                   )}
+                                  {reactionControls}
                                 </div>
                               )}
                               {longTranslation && (
@@ -6424,27 +6448,7 @@ export default function App({
                                   {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt)}</span>}
                                 </div>
                               )}
-                              <div className="message-reactions">
-                                {(message.reactions || []).map((reaction) => (
-                                  <button
-                                    key={reaction.emoji}
-                                    type="button"
-                                    disabled={reactionPreviews[message.id] !== undefined}
-                                    aria-pressed={reaction.mine}
-                                    className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
-                                    onClick={() => void toggleReaction(message, reaction.emoji)}
-                                    aria-label={`${messageReactionLabel(reaction.emoji)}: ${reaction.count} lượt`}
-                                  >
-                                    {reaction.emoji} {reaction.count}
-                                  </button>
-                                ))}
-                                <button type="button" className="reaction-add"
-                                  aria-label="Chọn cảm xúc cho tin nhắn"
-                                  title="Thả cảm xúc"
-                                  onClick={() => openMessageActions(message)}>
-                                  <SmilePlus size={16} aria-hidden="true" />
-                                </button>
-                              </div>
+                              {!message.text && reactionControls}
                             </div>
                           )}
                           <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
