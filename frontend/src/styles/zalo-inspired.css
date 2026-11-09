@@ -3853,6 +3853,55 @@ select:focus-visible {
   color: var(--chatnet-accent-ink);
 }
 
+
+/* Compact, viewport-clamped reaction picker opened from the bubble action. */
+.message-reaction-picker-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+}
+.message-reaction-picker-dismiss {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+.message-reaction-quick-picker {
+  position: fixed;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  width: min(320px, calc(100vw - 24px));
+  padding: 7px;
+  border: 1px solid var(--chatnet-line);
+  border-radius: 20px;
+  background: var(--chatnet-surface, #fff);
+  box-shadow: 0 14px 36px rgba(26, 43, 72, .22);
+}
+.message-reaction-quick-picker > button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 42px;
+  padding: 2px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 25px;
+  cursor: pointer;
+}
+.message-reaction-quick-picker > button:hover,
+.message-reaction-quick-picker > button:focus-visible,
+.message-reaction-quick-picker > button.active {
+  background: var(--chatnet-accent-soft, #eef2ff);
+  outline-offset: 1px;
+}
+.message-reaction-quick-picker > button:disabled { opacity: .5; cursor: wait; }
+
 .message-context-backdrop {
   position: fixed;
   z-index: 190;

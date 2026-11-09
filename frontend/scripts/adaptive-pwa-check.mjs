@@ -76,6 +76,11 @@ try {
         ...(callHistoryRevision ? [{ id: 'call-203', conversationId: 101, createdBy: 1, mediaType: 'audio', status: 'ended',
           createdAt: now, startedAt: now, endedAt: now, joined: true, declined: false, isGroup: false, participantCount: 2 }] : []),
       ])
+      if (req.method() === 'POST' && path === '/api/messages/204/reactions') {
+        const message = messages.find(item => item.id === 204)
+        const { emoji } = req.postDataJSON()
+        return json({ ...message, reactions: [...message.reactions, { emoji, count: 1, mine: true }] })
+      }
       if (path === '/api/conversations') return json(conversations)
       if (path === '/api/conversations/memberships') return json({ ids: conversations.map(c => c.id), nextAfter: null })
       if (path === '/api/conversation-categories') return json([])
@@ -161,6 +166,18 @@ try {
           width + 'px: individual reactions must not shrink or be clipped: ' + JSON.stringify(react))
         assert.ok(Math.abs(react.row.right - react.bubble.right) <= 2 || (!react.isMine && react.row.right >= react.bubble.right),
           width + 'px: reaction must stay anchored to its short bubble: ' + JSON.stringify(react))
+      }
+      if (width === 390) {
+        await page.locator('[data-message-id="204"] .reaction-add').click({ force: true })
+        const picker = page.locator('.message-reaction-quick-picker')
+        await picker.waitFor({ state: 'visible' })
+        assert.equal(await picker.locator('button').count(), 6, 'reaction picker offers six emotions')
+        const bounds = await picker.boundingBox()
+        assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width + 1, 'reaction picker fits phone viewport')
+        await picker.getByRole('button', { name: 'Wow' }).click()
+        await picker.waitFor({ state: 'detached' })
+        await page.locator('[data-message-id="204"] .reaction-chip[aria-label^="Wow"]').waitFor({ state: 'visible' })
+        console.log('PASS: direct message reaction picker, tap and API update at 390px')
       }
       await page.screenshot({ path: 'output/playwright/layout/adaptive-chat-detail-' + width + '.png' })
       await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
