@@ -253,6 +253,30 @@
 }
 .call-center-directory .fd-list-only .fd-person-row:not(.selected):hover { background: #f2f6ff; }
 .call-center-directory .fd-list-only .fd-person-identity { cursor:pointer; }
+.call-center-directory .fd-call-extra-section {
+  display:grid; gap:6px; min-width:0;
+  padding:14px 0 0; margin-top:8px;
+  border-top:1px solid #edf0f8;
+}
+.call-center-directory .fd-call-section-heading {
+  display:flex; align-items:center; gap:9px;
+  padding:2px 11px 9px; font-size:15px; color:#1c3156;
+}
+.call-center-directory .fd-call-section-heading small {
+  font-size:11px; color:#8494b2; font-weight:600;
+}
+.call-center-directory .fd-call-conversation-row .call-header-actions {
+  display:flex; gap:5px; flex:0 0 auto;
+}
+.call-center-directory .fd-call-conversation-row .call-header-actions button {
+  display:grid; place-items:center; width:34px; height:34px;
+  border:0; border-radius:9px; background:transparent; color:#2563eb;
+}
+.call-center-directory .fd-call-conversation-row .call-header-actions button:hover,
+.call-center-directory .fd-list-only .fd-icon-btn:hover { background:#e1ebff; }
+.call-center-directory .fd-call-conversation-row .fd-person-identity:focus-visible {
+  outline:2px solid #2563eb; outline-offset:2px; border-radius:9px;
+}
 @media (max-width:780px) {
   .call-center.is-embedded .call-center-header { padding:13px 14px; }
   .call-center-header-actions {
@@ -261,7 +285,7 @@
   }
   .call-center-tabs {
     order:0; flex:0 0 100%; width:100%; max-width:100%;
-    display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:3px;
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:3px;
   }
   .call-center-tabs button { gap:4px; padding:10px 4px; font-size:11px; }
   .call-center-tabs button svg { flex-shrink:0; }

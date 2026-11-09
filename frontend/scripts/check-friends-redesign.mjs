@@ -51,7 +51,7 @@ try {
   ]
   const targetUser = { id: 7, username: 'newfriend', displayName: 'Bạn mới', online: true }
   const requests = []
-  const testConversations = []
+  const testConversations = [{ id: 70, type: 'group', name: 'Nhóm dự án', memberCount: 3, unreadCount: 0, lastMessage: '', online: false, createdAt: '2026-11-06T00:00:00Z' }]
   const json = data => ({ status: 200, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }, contentType: 'application/json', body: JSON.stringify(data) })
   await context.route('**/api/**', async route => {
     const req = route.request()
@@ -75,6 +75,12 @@ try {
       const sent = { ...targetUser, status: 'pending', direction: 'outgoing', updatedAt: '2026-11-06' }
       pending.push(sent)
       return route.fulfill(json(sent))
+    }
+    if (path === '/api/conversations/70/members') {
+      return route.fulfill(json([{ id: 1, username: 'tester', displayName: 'Tester', role: 'member', online: true }]))
+    }
+    if (path === '/api/conversations/70/group-settings') {
+      return route.fulfill(json({ adminCanInvite: false, adminCanEditInfo: false }))
     }
     if (path === '/api/conversations/direct' && method === 'POST') {
       const conversation = { id: 25, type: 'direct', name: 'Linh Anh', otherUserId: 2, otherUsername: 'linhanh', memberCount: 2, unreadCount: 0, lastMessage: '', online: true, createdAt: '2026-11-06T00:00:00Z' }
@@ -117,10 +123,15 @@ try {
   await page.screenshot({ path: resolve(dir, 'directory-1478.png'), fullPage: true })
   await page.locator('.app-sidebar').getByRole('button', { name: 'Cuộc gọi' }).click()
   const callTabs = page.locator('.call-center-tabs')
-  assert.equal(await callTabs.getByRole('button').count(), 3, 'calls must have 3 tabs')
+  assert.equal(await callTabs.getByRole('button').count(), 2, 'calls must have only History and Directory')
+  assert.equal(await callTabs.getByRole('button', { name: 'Liên hệ' }).count(), 0, 'former contacts tab is merged into the directory')
   await callTabs.getByRole('button', { name: 'Danh bạ' }).click()
   await page.locator('.call-center-directory .fd-person-row').first().waitFor()
-  assert.equal(await page.locator('.call-center-directory .fd-person-row').count(), friends.length, 'call directory must reuse friend data')
+  assert.equal(await page.locator('.call-center-directory .fd-person-row').count(), friends.length + 1, 'merged directory must include friends and group conversations')
+  assert.equal(await page.locator('.call-center-directory .fd-call-extra-section').count(), 1, 'group section should be shown inside directory')
+  assert.match(await page.locator('.fd-call-extra-section').innerText(), /Nhóm dự án/)
+  assert.equal(await page.locator('.fd-call-extra-section').getByRole('button', { name: 'Gọi thoại' }).count(), 1)
+  assert.equal(await page.locator('.fd-call-extra-section').getByRole('button', { name: 'Gọi video' }).count(), 1)
   assert.equal(await page.locator('.call-center-directory .fd-profile-panel').count(), 0, 'call directory must not render a profile details panel')
   assert.equal(await page.locator('.call-center-directory .fd-list-card').count(), 1, 'call directory only renders the contacts list')
   assert.equal(await page.locator('.call-center-directory').getByRole('button', { name: 'Kết bạn mới' }).count(), 0, 'call directory must not expose new friend flow')
@@ -158,36 +169,43 @@ try {
     }
     assert.ok(await page.locator('.call-center-directory .fd-person-row').first().isVisible(),
       'directory panel must stay in call workspace at ' + width + 'px')
-    console.log('PASS 3 call tabs, separate search row and inline directory at ' + width + 'px')
+    console.log('PASS merged 2 call tabs, separate search row and inline directory at ' + width + 'px')
   }
   await page.setViewportSize({ width: 1478, height: 927 })
   assert.equal(await page.locator('.call-center-directory').getByRole('button', { name: 'Kết bạn mới' }).count(), 0, 'new friend action remains unavailable in call directory')
-  await callTabs.getByRole('button', { name: 'Liên hệ' }).click()
-  await page.getByRole('heading', { name: 'Gọi cho bạn bè và nhóm' }).waitFor()
   await callTabs.getByRole('button', { name: 'Lịch sử' }).click()
   await page.getByRole('heading', { name: 'Cuộc gọi gần đây' }).waitFor()
   await callTabs.getByRole('button', { name: 'Danh bạ' }).click()
-  await page.locator('.call-center-directory .fd-person-row').first().waitFor()
-  await page.locator('.call-center-directory .fd-person-row').filter({ hasText: 'Linh Anh' }).first().getByRole('button', { name: /Linh Anh/ }).first().click()
+  const groupRow = page.locator('.call-center-directory .fd-call-conversation-row').filter({ hasText: 'Nhóm dự án' })
+  await groupRow.waitFor()
+  assert.equal(await groupRow.getByRole('button', { name: 'Gọi thoại' }).count(), 1)
+  assert.equal(await groupRow.getByRole('button', { name: 'Gọi video' }).count(), 1)
+  const oldBackground = await groupRow.evaluate(el => getComputedStyle(el).backgroundColor)
+  await groupRow.hover()
+  await page.waitForTimeout(200)
+  const newBackground = await groupRow.evaluate(el => getComputedStyle(el).backgroundColor)
+  assert.notEqual(oldBackground, newBackground, 'group row should highlight on hover')
+  await groupRow.getByRole('button', { name: 'Mở cuộc trò chuyện với Nhóm dự án' }).click()
   await page.locator('.call-center').waitFor({ state: 'detached' })
+  // Active group chats can hide the desktop sidebar; reload into the test start view.
+  await page.goto(origin, { waitUntil: 'domcontentloaded' })
   await page.locator('.app-sidebar').getByRole('button', { name: 'Cuộc gọi' }).click()
-  await page.locator('.call-center-tabs').getByRole('button', { name: 'Liên hệ' }).click()
-  const personRow = page.locator('.call-person-row').filter({ hasText: 'Linh Anh' })
+  await page.locator('.call-center-tabs').getByRole('button', { name: 'Danh bạ' }).click()
+  const personRow = page.locator('.call-center-directory .fd-person-row').filter({ hasText: 'Linh Anh' }).first()
   await personRow.waitFor()
-  assert.equal(await personRow.locator('.call-person-message').count(), 0, 'no separate message button in contacts')
-  assert.equal(await personRow.getByRole('button', { name: 'Gọi thoại' }).count(), 1, 'voice calling remains available')
-  assert.equal(await personRow.getByRole('button', { name: 'Gọi video' }).count(), 1, 'video calling remains available')
+  assert.equal(await personRow.getByRole('button', { name: 'Gọi thoại cho Linh Anh' }).count(), 1)
+  assert.equal(await personRow.getByRole('button', { name: 'Gọi video cho Linh Anh' }).count(), 1)
   const normalBackground = await personRow.evaluate(el => getComputedStyle(el).backgroundColor)
   await personRow.hover()
-  await page.waitForTimeout(200) // Allow the 150ms hover transition to finish.
+  await page.waitForTimeout(200)
   const hoverBackground = await personRow.evaluate(el => getComputedStyle(el).backgroundColor)
-  assert.notEqual(hoverBackground, normalBackground, 'contact row must have hover feedback')
-  await personRow.getByRole('button', { name: 'Mở cuộc trò chuyện với Linh Anh' }).click()
+  assert.notEqual(hoverBackground, normalBackground, 'friend row should highlight on hover')
+  await personRow.getByRole('button', { name: /Linh Anh/ }).first().click()
   await page.locator('.call-center').waitFor({ state: 'detached' })
   await page.locator('.app-sidebar').getByRole('button', { name: 'Bạn bè' }).click()
   await page.getByRole('heading', { name: 'Tất cả bạn bè' }).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Kết bạn mới' }).count(), 1, 'sidebar friends must retain its add friend action')
-  console.log('PASS Cuộc gọi: three tabs, calls directory only existing friends without add button, contact hover/click to chat, voice/video actions')
+  console.log('PASS Cuộc gọi: two tabs, merged friend/group directory, hover/click to chat, voice/video actions')
   await page.getByRole('button', { name: 'Mở trang Thông báo' }).click()
   await page.getByRole('heading', { name: 'Thông báo mới' }).waitFor()
   assert.equal(await page.locator('.app-page-heading strong').innerText(), 'Thông báo')

@@ -5019,6 +5019,8 @@ export default function App({
       connectionUrl={connectUrl()}
       onScanQr={() => setQrOpen("scan")}
       embeddedInCalls={tab === "chat" && desktopSection === "calls"}
+      callConversations={tab === "chat" && desktopSection === "calls" ? displayConversations : undefined}
+      onOpenCallChat={(id) => { setDesktopSection(null); setActiveConversationId(id); }}
     />
   );
 

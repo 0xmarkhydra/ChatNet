@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import QRCode from 'qrcode'
-import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Heart, MessageCircle, MoreHorizontal, Phone, Plus, QrCode, RefreshCw, Search, ShieldCheck, UserRound, UserRoundPlus, Users, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Heart, MessageCircle, MoreHorizontal, Phone, Plus, QrCode, RefreshCw, Search, ShieldCheck, UserRound, UserRoundPlus, Users, Video, X } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from './types'
+import type { Conversation } from '../chat/types'
+import { CallHeaderActions } from '../calls/CallManager'
 import UserAvatar from '../../shared/ui/UserAvatar'
 
 export type FriendsScreen = 'directory' | 'invitations'
@@ -37,6 +39,8 @@ type Props = {
   connectionUrl: string
   onScanQr: () => void
   embeddedInCalls?: boolean
+  callConversations?: Conversation[]
+  onOpenCallChat?: (id: number) => void
 }
 
 const personName = (friend: FriendSearchResult) => friend.displayName || friend.username
@@ -50,6 +54,7 @@ export default function ContactsView({
   setFriendMenuId, friendMenuId, blockContact, reportContact, friendRequests, declineFriendRequest,
   friends, friendsLoading, friendsError, onRetryFriends, contactMetadata, openDirectByUsername, setFriendPreview, changePersonalContact,
   removeAcceptedFriend, connectionUrl, onScanQr, embeddedInCalls = false,
+  callConversations = [], onOpenCallChat,
 }: Props) {
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
   const [invitationTab, setInvitationTab] = useState<InvitationTab>('incoming')
@@ -75,6 +80,22 @@ export default function ContactsView({
         contactMetadata[b.id]?.nickname || personName(b), 'vi'))
     return items
   }, [friends, directoryFilter, contactMetadata, embeddedInCalls, friendQuery])
+  // The merged call directory keeps direct chats not yet represented by a friend,
+  // and group conversations, without showing duplicate friend entries.
+  const callSections = useMemo(() => {
+    const friendUsernames = new Set(friends.map(friend => friend.username.toLocaleLowerCase('vi-VN')))
+    const friendIds = new Set(friends.map(friend => friend.id))
+    const search = embeddedInCalls ? friendQuery.trim().toLocaleLowerCase('vi-VN') : ''
+    const matches = (conversation: Conversation) => !search || [conversation.name, conversation.otherUsername || '']
+      .some(value => value.toLocaleLowerCase('vi-VN').includes(search))
+    const all = callConversations.filter(matches)
+    return {
+      groups: all.filter(conversation => conversation.type === 'group'),
+      otherContacts: all.filter(conversation => conversation.type === 'direct' &&
+        !(conversation.otherUsername && friendUsernames.has(conversation.otherUsername.toLocaleLowerCase('vi-VN'))) &&
+        !(conversation.otherUserId && friendIds.has(conversation.otherUserId))),
+    }
+  }, [callConversations, friends, friendQuery, embeddedInCalls])
   const selectedFriend = visibleFriends.find(friend => friend.id === selectedId) ?? visibleFriends[0] ?? null
   const relationshipFor = (friend: FriendSearchResult) => friendRelationship(friend.id)
   const act = (friend: FriendSearchResult | FriendConnection) => {
@@ -108,6 +129,21 @@ export default function ContactsView({
       setCopyStatus('Đã sao chép liên kết kết bạn')
     } catch { setCopyStatus('Không thể sao chép. Kiểm tra quyền clipboard.') }
   }
+  const callConversationSection = (items: Conversation[], label: string) => items.length > 0 && (
+    <section className="fd-call-extra-section" aria-label={label}>
+      <h3 className="fd-call-section-heading">{label}<small>{items.length}</small></h3>
+      {items.map(conversation => <div key={conversation.id} className="fd-person-row fd-call-conversation-row">
+        <button type="button" className="fd-person-identity" onClick={() => onOpenCallChat?.(conversation.id)}
+          aria-label={'Mở cuộc trò chuyện với ' + conversation.name}>
+          <UserAvatar name={conversation.name} username={conversation.otherUsername} group={conversation.type === 'group'}
+            className="avatar fd-avatar" online={conversation.type === 'direct' && conversation.online}/>
+          <span><strong>{conversation.name}</strong><small>{conversation.type === 'group'
+            ? conversation.memberCount + ' thành viên' : conversation.online ? 'Đang hoạt động' : 'Cuộc trò chuyện cá nhân'}</small></span>
+        </button>
+        <CallHeaderActions conversationId={conversation.id}/>
+      </div>)}
+    </section>
+  )
   const avatar = (friend: FriendSearchResult, additional = '') => (
     <UserAvatar username={friend.username} name={personName(friend)}
       className={'avatar fd-avatar ' + additional} online={friend.online} />
@@ -157,7 +193,7 @@ export default function ContactsView({
               <button type="button" className="fd-secondary fd-search-action" disabled={friendBusyIds.has(friend.id)} onClick={() => act(friend)}>{actionText(relationshipFor(friend))}</button>
             </div>)}</div>
           </> : <>
-            <div className="fd-list-header"><h2>Tất cả bạn bè</h2>
+            <div className="fd-list-header"><h2>{embeddedInCalls ? 'Bạn bè' : 'Tất cả bạn bè'}</h2>
               <div className="fd-list-actions">
                 <span>{friends.length.toLocaleString('vi-VN')} người</span>
                 <button type="button" aria-label="Tải lại danh sách bạn bè" title="Tải lại danh sách bạn bè"
@@ -181,14 +217,23 @@ export default function ContactsView({
                     <small>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
                       {contactMetadata[friend.id]?.favorite ? ' · Yêu thích' : ''}</small>
                   </span></button>
-                <button type="button" className="fd-icon-btn" aria-label={'Nhắn tin cho ' + personName(friend)}
-                  onClick={() => void openDirectByUsername(friend.username)}><MessageCircle size={20}/></button>
-                <button type="button" className="fd-icon-btn" aria-label={'Gọi thoại cho ' + personName(friend)}
-                  onClick={() => startCall(friend)}><Phone size={20}/></button>
+                {embeddedInCalls ? <>
+                  <button type="button" className="fd-icon-btn" aria-label={'Gọi thoại cho ' + personName(friend)}
+                    onClick={() => startCall(friend)}><Phone size={20}/></button>
+                  <button type="button" className="fd-icon-btn" aria-label={'Gọi video cho ' + personName(friend)}
+                    onClick={() => void openDirectByUsername(friend.username, 'video')}><Video size={20}/></button>
+                </> : <>
+                  <button type="button" className="fd-icon-btn" aria-label={'Nhắn tin cho ' + personName(friend)}
+                    onClick={() => void openDirectByUsername(friend.username)}><MessageCircle size={20}/></button>
+                  <button type="button" className="fd-icon-btn" aria-label={'Gọi thoại cho ' + personName(friend)}
+                    onClick={() => startCall(friend)}><Phone size={20}/></button>
+                </>}
               </div>)}
-              {visibleFriends.length === 0 && !friendsError && <p className="fd-empty" role={friendsLoading ? 'status' : undefined}>
+              {visibleFriends.length === 0 && !friendsError && (!embeddedInCalls || (callSections.groups.length === 0 && callSections.otherContacts.length === 0)) && <p className="fd-empty" role={friendsLoading ? 'status' : undefined}>
                 {friendsLoading ? 'Đang tải danh sách bạn bè...' : friends.length ? 'Không có bạn bè phù hợp.' : embeddedInCalls ? 'Bạn chưa có bạn bè trong danh bạ.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}
               </p>}
+              {embeddedInCalls && callConversationSection(callSections.groups, 'Nhóm')}
+              {embeddedInCalls && callConversationSection(callSections.otherContacts, 'Liên hệ khác')}
             </div>
           </>}
         </section>
