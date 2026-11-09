@@ -128,7 +128,7 @@ export default function ProfileQr({ username, displayName, url, initialMode, onC
       {mode === 'mine' ? (
         <div className="qr-identity">
           <strong>{displayName}</strong><span>@{username}</span>
-          <div className="qr-image">{image ? <img src={image} alt={`Mã QR hồ sơ ${username}`} /> : <p role="status">Đang tạo mã QR...</p>}</div>
+          <div className="qr-image">{image && <img src={image} alt={`Mã QR hồ sơ ${username}`} />}</div>
           <div className="connection-actions">
             <button type="button" disabled={!image || sharing} onClick={() => void share()}><Share2 size={18} />Chia sẻ QR</button>
             {image && <a href={image} download={`chatnet-${username}.png`}><Download size={18} />Tải ảnh QR</a>}

@@ -1078,7 +1078,7 @@ function SecureCallRoom({
               <span>Chỉ áp dụng cuộc gọi này. Người nghe có thể gửi giọng nói của bạn tới máy chủ ChatNet và Google Gemini để dịch.</span>
             </div>
             <div className="call-consent-actions">
-              <button type="button" disabled={consentBusy} onClick={() => void updateVoiceConsent(true)}>{consentBusy ? 'Đang lưu…' : 'Cho phép'}</button>
+              <button type="button" disabled={consentBusy} onClick={() => void updateVoiceConsent(true)}>Cho phép</button>
               <button type="button" className="call-consent-decline" disabled={consentBusy} onClick={() => setConsentRequested(false)}>Để sau</button>
             </div>
           </div>

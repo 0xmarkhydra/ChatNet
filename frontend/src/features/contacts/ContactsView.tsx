@@ -273,7 +273,7 @@ export default function ContactsView({
         <aside className="fd-card fd-qr-panel">
           <h2>Kết bạn bằng QR</h2><p>Chia sẻ mã QR cá nhân hoặc mở camera để quét.</p>
           <div className="fd-qr-preview">
-            {qrImage ? <img src={qrImage} alt="Mã QR liên kết kết bạn của tôi"/> : <p role="status">Đang tạo mã QR...</p>}
+            {qrImage && <img src={qrImage} alt="Mã QR liên kết kết bạn của tôi"/>}
           </div>
           <small>Mã QR chính xác của tài khoản hiện tại</small>
           <div className="fd-qr-actions">

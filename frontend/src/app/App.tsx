@@ -848,7 +848,6 @@ export default function App({
 
   const {
     apiFetch,
-    setPendingActions,
     pendingRequests,
     mutationRequests,
   } = useApiRequest({ session, sessionRef, sessionClient, responseCache });
@@ -3548,7 +3547,6 @@ export default function App({
     messageReceipts.current.clear();
     messageSound.current?.clearSeen();
     ++preferenceRevision.current;
-    setPendingActions(0);
     sendingRef.current = false;
     setMessageSending(false);
     setGroupBusy(false);
@@ -5142,7 +5140,7 @@ export default function App({
         }}
       />
       {qrOpen && (
-        <Suspense fallback={<div role="status">Đang mở QR...</div>}>
+        <Suspense fallback={null}>
           <ProfileQr
             username={session.user.username}
             displayName={session.user.displayName || session.user.username}
@@ -6776,7 +6774,7 @@ export default function App({
         {tab === "contacts" && contactsContent}
 
         {tab === "discover" && (
-          <Suspense fallback={<p role="status">Đang mở Quanh đây...</p>}>
+          <Suspense fallback={null}>
             <NearbyExplorer
               query={globalSearch}
               onQueryChange={setGlobalSearch}
@@ -6806,7 +6804,7 @@ export default function App({
         )}
 
         {tab === "market" && (
-          <Suspense fallback={<p role="status">Đang mở SocCO Market...</p>}>
+          <Suspense fallback={null}>
             <Marketplace
               key={session.sessionId}
               userId={session.user.id}
@@ -7702,11 +7700,7 @@ export default function App({
                   onClick={() => coverFileInputRef.current?.click()}
                 >
                   <UiIcon name="photo" size={17} />
-                  {profileBusy === "cover"
-                    ? t("common.loading")
-                    : profileMedia?.coverSet
-                      ? t("profile.changeCover")
-                      : t("profile.addCover")}
+                  {profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover")}
                 </button>
               </div>
 

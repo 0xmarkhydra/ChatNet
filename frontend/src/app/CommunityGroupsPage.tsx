@@ -360,7 +360,7 @@ export default function CommunityGroupsPage({
                 </>}
                 {member.id===userId&&<button role="menuitem" type="button" disabled={groupBusy} onClick={()=>{setMenuId(null);void onRemoveMember(member)}}>Rời nhóm</button>}
               </div>}</div>
-          </article>)}{!members.length&&<p className="cg-muted">Đang tải thành viên hoặc danh sách trống.</p>}</div>
+          </article>)}{!members.length&&<p className="cg-muted">Chưa có thành viên để hiển thị.</p>}</div>
         </>}
         {manageTab==='details'&&<><h2>Thông tin cộng đồng</h2><p className="cg-muted">Mô tả và chủ đề được lưu vào PostgreSQL.</p>
           <div className="cg-admin-edit">
