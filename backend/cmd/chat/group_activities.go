@@ -23,6 +23,7 @@ type groupActivity struct {
 	Counts      []int      `json:"counts"`
 	MyVote      *int       `json:"myVote"`
 	ScheduledAt *time.Time `json:"scheduledAt,omitempty"`
+	PinnedAt    *time.Time `json:"pinnedAt,omitempty"`
 	CreatorName string     `json:"creatorName"`
 	CreatedAt   time.Time  `json:"createdAt"`
 }
@@ -41,11 +42,22 @@ type newGroupActivity struct {
 	Body        string     `json:"body"`
 	Options     []string   `json:"options"`
 	ScheduledAt *time.Time `json:"scheduledAt"`
+	Pin         bool       `json:"pin"`
 }
 
 func validGroupActivity(v *newGroupActivity) bool {
 	v.Title = strings.TrimSpace(v.Title)
 	v.Body = strings.TrimSpace(v.Body)
+	if v.Title == "" {
+		switch v.Kind {
+		case "poll":
+			v.Title = "Bình chọn"
+		case "note":
+			v.Title = "Ghi chú"
+		case "reminder":
+			v.Title = "Nhắc hẹn"
+		}
+	}
 	if utf8.RuneCountInString(v.Title) == 0 || utf8.RuneCountInString(v.Title) > 200 || utf8.RuneCountInString(v.Body) > 5000 {
 		return false
 	}
@@ -65,7 +77,7 @@ func validGroupActivity(v *newGroupActivity) bool {
 			v.Options[i] = option
 		}
 	case "note":
-		if len(v.Options) != 0 || v.ScheduledAt != nil {
+		if v.Body == "" || len(v.Options) != 0 || v.ScheduledAt != nil {
 			return false
 		}
 	case "reminder":
@@ -98,18 +110,20 @@ func (s *server) listGroupActivities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	activities := make([]groupActivity, 0)
-	rows, err := s.db.Query(r.Context(), `SELECT a.id,a.kind,a.title,a.body,a.options,a.scheduled_at,a.created_at,
+	rows, err := s.db.Query(r.Context(), `SELECT a.id,a.kind,a.title,a.body,a.options,a.scheduled_at,a.pinned_at,a.created_at,
         COALESCE(NULLIF(u.display_name,''),u.username,'Thành viên đã rời')
         FROM group_activities a LEFT JOIN users u ON u.id=a.creator_id
         WHERE a.conversation_id=$1 AND a.id IN (
           SELECT id FROM (SELECT id FROM group_activities WHERE conversation_id=$1 ORDER BY id DESC LIMIT 200) recent
           UNION
-          SELECT activity_id FROM (SELECT activity_id FROM group_activity_events WHERE conversation_id=$1 ORDER BY id DESC LIMIT 200) recent_events)
+          SELECT activity_id FROM (SELECT activity_id FROM group_activity_events WHERE conversation_id=$1 ORDER BY id DESC LIMIT 200) recent_events
+          UNION
+          SELECT id FROM (SELECT id FROM group_activities WHERE conversation_id=$1 AND pinned_at IS NOT NULL ORDER BY pinned_at DESC LIMIT 100) pinned)
         AND NOT EXISTS (
           SELECT 1 FROM user_blocks b WHERE
           (b.blocker_id=$2 AND b.blocked_id=a.creator_id) OR
           (b.blocked_id=$2 AND b.blocker_id=a.creator_id))
-        ORDER BY a.id DESC LIMIT 400`, id, claims.UserID)
+        ORDER BY a.pinned_at DESC NULLS LAST, a.id DESC LIMIT 400`, id, claims.UserID)
 	if err != nil {
 		httpx.Error(w, 500, "cannot load group activities")
 		return
@@ -117,7 +131,7 @@ func (s *server) listGroupActivities(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var a groupActivity
 		var raw []byte
-		if err = rows.Scan(&a.ID, &a.Kind, &a.Title, &a.Body, &raw, &a.ScheduledAt, &a.CreatedAt, &a.CreatorName); err != nil {
+		if err = rows.Scan(&a.ID, &a.Kind, &a.Title, &a.Body, &raw, &a.ScheduledAt, &a.PinnedAt, &a.CreatedAt, &a.CreatorName); err != nil {
 			break
 		}
 		if err = json.Unmarshal(raw, &a.Options); err != nil {
@@ -144,7 +158,9 @@ func (s *server) listGroupActivities(w http.ResponseWriter, r *http.Request) {
         WHERE a.conversation_id=$1 AND a.id IN (
           SELECT id FROM (SELECT id FROM group_activities WHERE conversation_id=$1 ORDER BY id DESC LIMIT 200) recent
           UNION
-          SELECT activity_id FROM (SELECT activity_id FROM group_activity_events WHERE conversation_id=$1 ORDER BY id DESC LIMIT 200) recent_events)
+          SELECT activity_id FROM (SELECT activity_id FROM group_activity_events WHERE conversation_id=$1 ORDER BY id DESC LIMIT 200) recent_events
+          UNION
+          SELECT id FROM (SELECT id FROM group_activities WHERE conversation_id=$1 AND pinned_at IS NOT NULL ORDER BY pinned_at DESC LIMIT 100) pinned)
         AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
           (b.blocker_id=$2 AND b.blocked_id=a.creator_id) OR (b.blocked_id=$2 AND b.blocker_id=a.creator_id)
           OR (b.blocker_id=$2 AND b.blocked_id=v.user_id) OR (b.blocked_id=$2 AND b.blocker_id=v.user_id))
@@ -235,9 +251,11 @@ func (s *server) createGroupActivity(w http.ResponseWriter, r *http.Request) {
 	options, _ := json.Marshal(body.Options)
 	var activityID int64
 	err = tx.QueryRow(r.Context(), `INSERT INTO group_activities
-        (conversation_id,creator_id,kind,title,body,options,scheduled_at)
-        VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-		id, claims.UserID, body.Kind, body.Title, body.Body, options, body.ScheduledAt).Scan(&activityID)
+        (conversation_id,creator_id,kind,title,body,options,scheduled_at,pinned_at,pinned_by)
+        VALUES($1,$2,$3,$4,$5,$6,$7,
+          CASE WHEN $8::boolean THEN NOW() ELSE NULL END,
+          CASE WHEN $8::boolean THEN $2 ELSE NULL END) RETURNING id`,
+		id, claims.UserID, body.Kind, body.Title, body.Body, options, body.ScheduledAt, body.Pin).Scan(&activityID)
 	if err == nil {
 		_, err = tx.Exec(r.Context(), `INSERT INTO group_activity_events
             (conversation_id,activity_id,actor_id,kind) VALUES ($1,$2,$3,'created')`,
@@ -249,6 +267,66 @@ func (s *server) createGroupActivity(w http.ResponseWriter, r *http.Request) {
 	}
 	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), id), realtimeEvent{Type: "group.activity", ConversationID: id})
 	httpx.JSON(w, 201, map[string]any{"activityId": activityID})
+}
+
+// Every group member may pin or unpin an activity. Pins are shared by the group,
+// whereas the activity content itself stays immutable.
+func (s *server) setGroupActivityPin(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	conversationID, ok := parseID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	activityID, ok := parseID(w, r.PathValue("activityId"))
+	if !ok {
+		return
+	}
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, 500, "cannot change activity pin")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	if err = groupActivityMemberTx(r.Context(), tx, conversationID, claims.UserID); err != nil {
+		httpx.Error(w, 403, "not a group member")
+		return
+	}
+	var previous *time.Time
+	err = tx.QueryRow(r.Context(), `SELECT a.pinned_at FROM group_activities a
+        WHERE a.id=$1 AND a.conversation_id=$2
+          AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+            (b.blocker_id=$3 AND b.blocked_id=a.creator_id) OR
+            (b.blocked_id=$3 AND b.blocker_id=a.creator_id))
+        FOR UPDATE`, activityID, conversationID, claims.UserID).Scan(&previous)
+	if errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, 404, "activity not found")
+		return
+	}
+	if err != nil {
+		httpx.Error(w, 500, "cannot check activity pin")
+		return
+	}
+	pin := r.Method == http.MethodPut
+	changed := (previous == nil) == pin
+	if changed {
+		_, err = tx.Exec(r.Context(), `UPDATE group_activities
+            SET pinned_at=CASE WHEN $2::boolean THEN NOW() ELSE NULL END,
+                pinned_by=CASE WHEN $2::boolean THEN $3 ELSE NULL END
+            WHERE id=$1`, activityID, pin, claims.UserID)
+		if err != nil {
+			httpx.Error(w, 500, "cannot change activity pin")
+			return
+		}
+	}
+	if err = tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, 500, "cannot change activity pin")
+		return
+	}
+	if changed {
+		s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID),
+			realtimeEvent{Type: "group.activity", ConversationID: conversationID})
+	}
+	httpx.JSON(w, 200, map[string]any{"activityId": activityID, "pinned": pin, "changed": changed})
 }
 
 func (s *server) voteGroupActivity(w http.ResponseWriter, r *http.Request) {

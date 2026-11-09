@@ -1175,6 +1175,13 @@ export default function App({
     displayConversations.find((item) => item.id === activeConversationId) ||
     null;
   const groupActivities = useGroupActivities(activeConversation?.type === 'group' ? activeConversation.id : null, session?.sessionId, apiFetch);
+  const pinnedItems = [
+    ...pinnedMessages.map((item) => ({ type: 'message' as const, pinnedAt: item.pinnedAt, message: item.message })),
+    ...(activeConversation?.type === 'group'
+      ? groupActivities.activities.filter((item) => Boolean(item.pinnedAt))
+        .map((activity) => ({ type: 'activity' as const, pinnedAt: activity.pinnedAt!, activity }))
+      : []),
+  ].sort((a, b) => Date.parse(b.pinnedAt) - Date.parse(a.pinnedAt));
   const sortedGroupActivityEvents = groupActivities.events.slice().reverse();
   const viewedGroupActivity = groupActivities.activities.find(activity => activity.id === groupActivityViewedId) || null;
   const chatFriend =
@@ -6169,12 +6176,12 @@ export default function App({
                     </div>
                   </header>
 
-                  {pinnedMessages.length > 0 && (
-                    <div className="chat-pinned-panel" role="region" aria-label="Tin nhắn đã ghim">
+                  {pinnedItems.length > 0 && (
+                    <div className="chat-pinned-panel" role="region" aria-label="Nội dung đã ghim">
                       <div className="chat-pinned-heading">
                         <Pin size={16} aria-hidden="true" />
-                        <strong>Tin nhắn đã ghim ({pinnedMessages.length})</strong>
-                        {pinnedMessages.length > 1 && (
+                        <strong>Nội dung đã ghim ({pinnedItems.length})</strong>
+                        {pinnedItems.length > 1 && (
                           <button type="button" onClick={() => setPinnedExpanded((value) => !value)}
                             aria-expanded={pinnedExpanded}>
                             {pinnedExpanded ? 'Thu gọn' : 'Xem tất cả'}
@@ -6182,24 +6189,43 @@ export default function App({
                         )}
                       </div>
                       <div className="chat-pinned-items">
-                        {pinnedMessages.slice(0, pinnedExpanded ? 100 : 1).map(({ message }) => (
-                          <div className="chat-pinned-item" key={message.id}>
-                            <button type="button" className="chat-pinned-jump"
-                              title="Đi đến tin nhắn đã ghim"
-                              onClick={() => setChatSearchJump({
-                                conversationId: activeConversation.id,
-                                messageId: message.id,
-                                revision: ++chatSearchJumpRevision.current,
-                              })}>
-                              <strong>{userLabel(message.senderDisplayName, message.sender)}</strong>
-                              <span>{message.text || attachmentLabel(message.attachments) || 'Tin nhắn'}</span>
-                            </button>
-                            <button type="button" className="chat-pinned-remove" disabled={pinBusy}
-                              aria-label="Bỏ ghim tin nhắn" title="Bỏ ghim tin nhắn"
-                              onClick={() => void toggleMessagePin(message)}>
-                              <X size={15} aria-hidden="true" />
-                            </button>
-                          </div>
+                        {pinnedItems.slice(0, pinnedExpanded ? 200 : 1).map((pin) => (
+                          pin.type === 'message' ? (
+                            <div className="chat-pinned-item" key={`message-${pin.message.id}`}>
+                              <button type="button" className="chat-pinned-jump"
+                                title="Đi đến tin nhắn đã ghim"
+                                onClick={() => setChatSearchJump({
+                                  conversationId: activeConversation.id,
+                                  messageId: pin.message.id,
+                                  revision: ++chatSearchJumpRevision.current,
+                                })}>
+                                <strong>{userLabel(pin.message.senderDisplayName, pin.message.sender)}</strong>
+                                <span>{pin.message.text || attachmentLabel(pin.message.attachments) || 'Tin nhắn'}</span>
+                              </button>
+                              <button type="button" className="chat-pinned-remove" disabled={pinBusy}
+                                aria-label="Bỏ ghim tin nhắn" title="Bỏ ghim tin nhắn"
+                                onClick={() => void toggleMessagePin(pin.message)}>
+                                <X size={15} aria-hidden="true" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="chat-pinned-item" key={`activity-${pin.activity.id}`}>
+                              <button type="button" className="chat-pinned-jump"
+                                title="Xem hoạt động nhóm đã ghim"
+                                onClick={() => setGroupActivityViewedId(pin.activity.id)}>
+                                <strong>{pin.activity.kind === 'poll' ? 'Bình chọn' : pin.activity.kind === 'note' ? 'Ghi chú' : 'Nhắc hẹn'}</strong>
+                                <span>{pin.activity.body || (pin.activity.scheduledAt
+                                  ? new Date(pin.activity.scheduledAt).toLocaleString('vi-VN')
+                                  : 'Nhấn để xem chi tiết')}</span>
+                              </button>
+                              <button type="button" className="chat-pinned-remove"
+                                aria-label="Bỏ ghim hoạt động nhóm" title="Bỏ ghim hoạt động nhóm"
+                                onClick={() => void groupActivities.setPin(pin.activity.id, false)
+                                  .catch((error) => setNotice(error instanceof Error ? error.message : 'Không thể bỏ ghim.', 'error'))}>
+                                <X size={15} aria-hidden="true" />
+                              </button>
+                            </div>
+                          )
                         ))}
                       </div>
                     </div>
@@ -7304,6 +7330,7 @@ export default function App({
             onClose={() => { setGroupActivityCreateKind(null); setGroupActivityViewedId(null) }}
             onCreate={groupActivities.create}
             onVote={groupActivities.vote}
+            onTogglePin={groupActivities.setPin}
           />
         )}
         {activeMessageAction && (
