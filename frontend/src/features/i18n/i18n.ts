@@ -2,7 +2,7 @@ export const UI_BUNDLE_VERSION = '2026-10-15.2'
 
 export const UI_MESSAGES = {
   'nav.chat': 'Tin nhắn',
-  'nav.contacts': 'Danh bạ',
+  'nav.contacts': 'Bạn bè',
   'nav.discover': 'Quanh đây',
   'nav.feed': 'Bảng tin',
   'nav.profile': 'Cá nhân',

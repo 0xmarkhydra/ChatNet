@@ -51,6 +51,7 @@ try {
   ]
   const targetUser = { id: 7, username: 'newfriend', displayName: 'Bạn mới', online: true }
   const requests = []
+  const testConversations = []
   const json = data => ({ status: 200, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }, contentType: 'application/json', body: JSON.stringify(data) })
   await context.route('**/api/**', async route => {
     const req = route.request()
@@ -76,15 +77,18 @@ try {
       return route.fulfill(json(sent))
     }
     if (path === '/api/conversations/direct' && method === 'POST') {
-      return route.fulfill(json({ id: 25, type: 'direct', name: 'Linh Anh', otherUserId: 2, otherUsername: 'linhanh', memberCount: 2, unreadCount: 0, lastMessage: '', online: true, createdAt: '2026-11-06T00:00:00Z' }))
+      const conversation = { id: 25, type: 'direct', name: 'Linh Anh', otherUserId: 2, otherUsername: 'linhanh', memberCount: 2, unreadCount: 0, lastMessage: '', online: true, createdAt: '2026-11-06T00:00:00Z' }
+      if (!testConversations.some(item => item.id === conversation.id)) testConversations.push(conversation)
+      return route.fulfill(json(conversation))
     }
     const response = (
       path === '/api/friends' ? friends :
       path === '/api/friends/requests' ? pending :
       path === '/api/contacts' ? [] :
       path === '/api/users/suggestions' || path === '/api/users/search' ? [targetUser] :
-      path === '/api/conversations' || path === '/api/conversation-categories' || path === '/api/posts' ||
-      path === '/api/stories' || path === '/api/calls/current' ? [] :
+      path === '/api/conversations' ? testConversations :
+      path === '/api/conversation-categories' || path === '/api/posts' ||
+      path === '/api/stories' || path === '/api/calls/current' || path === '/api/calls/history' ? [] :
       path === '/api/profile' ? { username: 'tester', displayName: 'Tester', avatarSet: false, coverSet: false, updatedAt: '2026-11-06' } :
       {}
     )
@@ -99,7 +103,7 @@ try {
   assert.equal(await page.locator('.notification-appbar .appbar-badge-count').innerText(), '1')
   const border = await page.locator('.fd-searchbar').evaluate(element => getComputedStyle(element).borderTopColor)
   assert.notEqual(border, 'rgb(19, 205, 178)', 'Directory search should not have the green border')
-  assert.equal(await page.locator('.app-page-heading strong').innerText(), 'Danh bạ')
+  assert.equal(await page.locator('.app-page-heading strong').innerText(), 'Bạn bè')
   assert.equal(await page.locator('.fd-person-row').count(), friends.length)
   assert.match(await page.locator('.fd-profile-core').innerText(), /David Chen/)
   await page.locator('.fd-person-identity').filter({ hasText: 'Linh Anh' }).click()
@@ -111,6 +115,79 @@ try {
   const dir = resolve(root, 'output', 'friends-redesign')
   await mkdir(dir, { recursive: true })
   await page.screenshot({ path: resolve(dir, 'directory-1478.png'), fullPage: true })
+  await page.locator('.app-sidebar').getByRole('button', { name: 'Cuộc gọi' }).click()
+  const callTabs = page.locator('.call-center-tabs')
+  assert.equal(await callTabs.getByRole('button').count(), 3, 'calls must have 3 tabs')
+  await callTabs.getByRole('button', { name: 'Danh bạ' }).click()
+  await page.locator('.call-center-directory .fd-person-row').first().waitFor()
+  assert.equal(await page.locator('.call-center-directory .fd-person-row').count(), friends.length, 'call directory must reuse friend data')
+  assert.equal(await page.locator('.call-center-directory .fd-profile-panel').count(), 0, 'call directory must not render a profile details panel')
+  assert.equal(await page.locator('.call-center-directory .fd-list-card').count(), 1, 'call directory only renders the contacts list')
+  assert.equal(await page.locator('.call-center-directory').getByRole('button', { name: 'Kết bạn mới' }).count(), 0, 'call directory must not expose new friend flow')
+  assert.equal(await callTabs.getByRole('button', { name: 'Danh bạ' }).getAttribute('aria-pressed'), 'true')
+  assert.equal(await page.locator('.call-center-directory .fd-searchbar').count(), 0, 'call directory must not have a duplicate search bar')
+  assert.equal(await page.locator('.call-center-directory-search input').count(), 1, 'call directory uses the same header search as other call tabs')
+  const callDirectorySearch = page.locator('.call-center-directory-search input')
+  const searchRequestsBefore = requests.filter(item => item === 'GET /api/users/search').length
+  await callDirectorySearch.fill('Linh')
+  await page.waitForFunction(() => document.querySelectorAll('.call-center-directory .fd-person-row').length === 1)
+  assert.match(await page.locator('.call-center-directory .fd-person-row').first().innerText(), /Linh Anh/)
+  assert.equal(requests.filter(item => item === 'GET /api/users/search').length, searchRequestsBefore, 'call directory must filter existing friends locally, not search strangers')
+  await callDirectorySearch.fill('')
+  await page.locator('.call-center-directory .fd-person-row').first().waitFor()
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 850 })
+    const bounds = await page.locator('.call-center-header-actions').evaluate((container) => {
+      const tabs = container.querySelector('.call-center-tabs').getBoundingClientRect()
+      const search = container.querySelector('.call-center-search').getBoundingClientRect()
+      const buttons = [...container.querySelectorAll('.call-center-tabs button')].map(element => element.getBoundingClientRect())
+      return {
+        tabsTop: tabs.top, tabsBottom: tabs.bottom,
+        tabsLeft: tabs.left, tabsRight: tabs.right, searchTop: search.top,
+        searchWidth: search.width,
+        contained: buttons.every(box => box.left >= tabs.left - 1 && box.right <= tabs.right + 1),
+        viewport: innerWidth,
+      }
+    })
+    assert.ok(bounds.contained && bounds.tabsLeft >= -1 && bounds.tabsRight <= width + 1,
+      'call tabs overflow at ' + width + 'px: ' + JSON.stringify(bounds))
+    if (width <= 780) {
+      assert.ok(bounds.tabsBottom + 1 <= bounds.searchTop,
+        'call tabs must be on their own row above search at ' + width + 'px: ' + JSON.stringify(bounds))
+      assert.ok(bounds.searchWidth >= 110, 'call search field too narrow at ' + width + 'px')
+    }
+    assert.ok(await page.locator('.call-center-directory .fd-person-row').first().isVisible(),
+      'directory panel must stay in call workspace at ' + width + 'px')
+    console.log('PASS 3 call tabs, separate search row and inline directory at ' + width + 'px')
+  }
+  await page.setViewportSize({ width: 1478, height: 927 })
+  assert.equal(await page.locator('.call-center-directory').getByRole('button', { name: 'Kết bạn mới' }).count(), 0, 'new friend action remains unavailable in call directory')
+  await callTabs.getByRole('button', { name: 'Liên hệ' }).click()
+  await page.getByRole('heading', { name: 'Gọi cho bạn bè và nhóm' }).waitFor()
+  await callTabs.getByRole('button', { name: 'Lịch sử' }).click()
+  await page.getByRole('heading', { name: 'Cuộc gọi gần đây' }).waitFor()
+  await callTabs.getByRole('button', { name: 'Danh bạ' }).click()
+  await page.locator('.call-center-directory .fd-person-row').first().waitFor()
+  await page.locator('.call-center-directory .fd-person-row').filter({ hasText: 'Linh Anh' }).first().getByRole('button', { name: /Linh Anh/ }).first().click()
+  await page.locator('.call-center').waitFor({ state: 'detached' })
+  await page.locator('.app-sidebar').getByRole('button', { name: 'Cuộc gọi' }).click()
+  await page.locator('.call-center-tabs').getByRole('button', { name: 'Liên hệ' }).click()
+  const personRow = page.locator('.call-person-row').filter({ hasText: 'Linh Anh' })
+  await personRow.waitFor()
+  assert.equal(await personRow.locator('.call-person-message').count(), 0, 'no separate message button in contacts')
+  assert.equal(await personRow.getByRole('button', { name: 'Gọi thoại' }).count(), 1, 'voice calling remains available')
+  assert.equal(await personRow.getByRole('button', { name: 'Gọi video' }).count(), 1, 'video calling remains available')
+  const normalBackground = await personRow.evaluate(el => getComputedStyle(el).backgroundColor)
+  await personRow.hover()
+  await page.waitForTimeout(200) // Allow the 150ms hover transition to finish.
+  const hoverBackground = await personRow.evaluate(el => getComputedStyle(el).backgroundColor)
+  assert.notEqual(hoverBackground, normalBackground, 'contact row must have hover feedback')
+  await personRow.getByRole('button', { name: 'Mở cuộc trò chuyện với Linh Anh' }).click()
+  await page.locator('.call-center').waitFor({ state: 'detached' })
+  await page.locator('.app-sidebar').getByRole('button', { name: 'Bạn bè' }).click()
+  await page.getByRole('heading', { name: 'Tất cả bạn bè' }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Kết bạn mới' }).count(), 1, 'sidebar friends must retain its add friend action')
+  console.log('PASS Cuộc gọi: three tabs, calls directory only existing friends without add button, contact hover/click to chat, voice/video actions')
   await page.getByRole('button', { name: 'Mở trang Thông báo' }).click()
   await page.getByRole('heading', { name: 'Thông báo mới' }).waitFor()
   assert.equal(await page.locator('.app-page-heading strong').innerText(), 'Thông báo')

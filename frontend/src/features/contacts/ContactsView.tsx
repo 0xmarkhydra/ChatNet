@@ -36,6 +36,7 @@ type Props = {
   removeAcceptedFriend: (friend: FriendConnection) => Promise<void>
   connectionUrl: string
   onScanQr: () => void
+  embeddedInCalls?: boolean
 }
 
 const personName = (friend: FriendSearchResult) => friend.displayName || friend.username
@@ -48,7 +49,7 @@ export default function ContactsView({
   setFriendSearchRetry, contactSearchResults, friendRelationship, friendBusyIds, actOnFriend,
   setFriendMenuId, friendMenuId, blockContact, reportContact, friendRequests, declineFriendRequest,
   friends, friendsLoading, friendsError, onRetryFriends, contactMetadata, openDirectByUsername, setFriendPreview, changePersonalContact,
-  removeAcceptedFriend, connectionUrl, onScanQr,
+  removeAcceptedFriend, connectionUrl, onScanQr, embeddedInCalls = false,
 }: Props) {
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
   const [invitationTab, setInvitationTab] = useState<InvitationTab>('incoming')
@@ -58,17 +59,22 @@ export default function ContactsView({
   const searchRef = useRef<HTMLInputElement>(null)
   const incoming = friendRequests.filter(friend => friend.direction === 'incoming')
   const outgoing = friendRequests.filter(friend => friend.direction === 'outgoing')
-  const searching = Boolean(friendQuery.trim())
+  const searching = !embeddedInCalls && Boolean(friendQuery.trim())
 
   const visibleFriends = useMemo(() => {
-    const items = [...friends].filter(friend =>
-      directoryFilter === 'online' ? friend.online :
-      directoryFilter === 'favorites' ? Boolean(contactMetadata[friend.id]?.favorite) : true)
+    const query = embeddedInCalls ? friendQuery.trim().toLocaleLowerCase('vi-VN') : ''
+    const items = [...friends].filter(friend => {
+      const inFilter = directoryFilter === 'online' ? friend.online :
+        directoryFilter === 'favorites' ? Boolean(contactMetadata[friend.id]?.favorite) : true
+      const matchesQuery = !query || [personName(friend), friend.username, contactMetadata[friend.id]?.nickname || '']
+        .some(value => value.toLocaleLowerCase('vi-VN').includes(query))
+      return inFilter && matchesQuery
+    })
     if (directoryFilter === 'alphabetical') items.sort((a, b) =>
       (contactMetadata[a.id]?.nickname || personName(a)).localeCompare(
         contactMetadata[b.id]?.nickname || personName(b), 'vi'))
     return items
-  }, [friends, directoryFilter, contactMetadata])
+  }, [friends, directoryFilter, contactMetadata, embeddedInCalls, friendQuery])
   const selectedFriend = visibleFriends.find(friend => friend.id === selectedId) ?? visibleFriends[0] ?? null
   const relationshipFor = (friend: FriendSearchResult) => friendRelationship(friend.id)
   const act = (friend: FriendSearchResult | FriendConnection) => {
@@ -84,7 +90,9 @@ export default function ContactsView({
   const openSearch = () => {
     setFriendQuery('')
     onScreenChange('directory')
-    window.requestAnimationFrame(() => searchRef.current?.focus())
+    window.requestAnimationFrame(() => {
+      (searchRef.current ?? document.querySelector<HTMLInputElement>('.call-center-directory-search input'))?.focus()
+    })
   }
   useEffect(() => {
     let cancelled = false
@@ -124,17 +132,17 @@ export default function ContactsView({
     </div>
   )
 
-  return <div className="friends-design-v2" aria-label={screen === 'directory' ? 'Danh bạ' : 'Lời mời kết bạn'}>
+  return <div className={'friends-design-v2' + (embeddedInCalls ? ' is-call-directory' : '')} aria-label={screen === 'directory' ? 'Danh bạ' : 'Lời mời kết bạn'}>
     {screen === 'directory' ? <>
-      <section className="fd-searchbar">
+      {!embeddedInCalls && <section className="fd-searchbar">
         <label><Search size={22} aria-hidden="true"/>
           <input ref={searchRef} type="search" value={friendQuery} onChange={event => setFriendQuery(event.target.value)}
             placeholder="Tìm theo tên, số điện thoại hoặc ID SocCo..." aria-label="Tìm trong danh bạ" />
           {friendQuery && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => {setFriendQuery('');searchRef.current?.focus()}}><X size={17}/></button>}
         </label>
         <button type="button" className="fd-primary fd-add-new" onClick={enterInvitations}><Plus size={18}/>Kết bạn mới</button>
-      </section>
-      <div className="fd-directory-layout">
+      </section>}
+      <div className={'fd-directory-layout' + (embeddedInCalls ? ' fd-list-only' : '')}>
         <section className="fd-card fd-list-card">
           {searching ? <>
             <div className="fd-list-header"><div><h2>Kết quả tìm kiếm</h2><p>Tìm người dùng theo tên, username hoặc email</p></div>
@@ -166,9 +174,9 @@ export default function ContactsView({
               <button type="button" className="fd-secondary" disabled={friendsLoading} onClick={onRetryFriends}>Thử lại</button>
             </div>}
             <div className="fd-person-list" aria-label="Danh sách bạn bè" aria-busy={friendsLoading}>
-              {visibleFriends.map(friend => <div className={'fd-person-row' + (selectedFriend?.id === friend.id ? ' selected' : '')} key={friend.id}>
-                <button type="button" className="fd-person-identity" aria-pressed={selectedFriend?.id === friend.id}
-                  onClick={() => setSelectedId(friend.id)}>{avatar(friend)}<span>
+              {visibleFriends.map(friend => <div className={'fd-person-row' + (!embeddedInCalls && selectedFriend?.id === friend.id ? ' selected' : '')} key={friend.id}>
+                <button type="button" className="fd-person-identity" aria-pressed={embeddedInCalls ? undefined : selectedFriend?.id === friend.id}
+                  onClick={() => embeddedInCalls ? void openDirectByUsername(friend.username) : setSelectedId(friend.id)}>{avatar(friend)}<span>
                     <strong>{contactMetadata[friend.id]?.nickname || personName(friend)}</strong>
                     <small>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
                       {contactMetadata[friend.id]?.favorite ? ' · Yêu thích' : ''}</small>
@@ -179,12 +187,12 @@ export default function ContactsView({
                   onClick={() => startCall(friend)}><Phone size={20}/></button>
               </div>)}
               {visibleFriends.length === 0 && !friendsError && <p className="fd-empty" role={friendsLoading ? 'status' : undefined}>
-                {friendsLoading ? 'Đang tải danh sách bạn bè...' : friends.length ? 'Không có bạn bè trong bộ lọc này.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}
+                {friendsLoading ? 'Đang tải danh sách bạn bè...' : friends.length ? 'Không có bạn bè phù hợp.' : embeddedInCalls ? 'Bạn chưa có bạn bè trong danh bạ.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}
               </p>}
             </div>
           </>}
         </section>
-        <section className="fd-card fd-profile-panel" aria-label="Thông tin bạn bè">
+        {!embeddedInCalls && <section className="fd-card fd-profile-panel" aria-label="Thông tin bạn bè">
           {selectedFriend && !searching ? <>
             <div className="fd-profile-cover" aria-hidden="true"/>
             <div className="fd-profile-core">
@@ -218,7 +226,7 @@ export default function ContactsView({
             </div>
           </> : <div className="fd-empty fd-profile-placeholder"><Users size={38}/>
             <h2>{searching ? 'Kết nối bạn bè' : 'Chưa chọn bạn bè'}</h2><p>{searching ? 'Chọn một kết quả tìm kiếm để xem hồ sơ.' : 'Kết bạn mới để xem thông tin ở đây.'}</p></div>}
-        </section>
+        </section>}
       </div>
     </> : <>
       <div className="fd-invitation-tabs">

@@ -91,7 +91,30 @@
 }
 .call-history-item:hover { background: #f6f8ff; }
 .call-history-item.selected { background: #eef2ff; }
-.call-history-avatar, .call-people-list .call-history-avatar { flex: 0 0 43px; width: 43px; height: 43px; border-radius: 50%; }
+.call-center .call-history-avatar,
+.call-center .call-detail-avatar {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  line-height: 1;
+  font-weight: 800;
+}
+.call-center .call-history-avatar {
+  flex: 0 0 43px;
+  width: 43px;
+  height: 43px;
+  border-radius: 50%;
+  font-size: 13px;
+}
+.call-center .call-history-avatar .avatar-initials,
+.call-center .call-detail-avatar .avatar-initials {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  line-height: 1;
+}
 .call-history-main { display: grid; min-width: 0; gap: 5px; flex: 1; }
 .call-history-main strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
 .call-history-main small { color: #889ab7; font-size: 11px; }
@@ -127,12 +150,20 @@
 .call-center-section-intro p { color: #8999b4; margin: 0; }
 .call-center-section-intro > button { display: flex; align-items: center; gap: 7px; border: 0; border-radius: 11px; padding: 11px 14px; color: #2862ed; background: #e8efff; }
 .call-people-list { min-height: 450px; }
-.call-person-row { display: flex; align-items: center; gap: 14px; padding: 13px; border-bottom: 1px solid #f0f3f9; }
-.call-person-row > div:nth-child(2) { flex: 1; min-width: 0; display: grid; gap: 5px; }
-.call-person-row strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.call-person-row span { color: #8c9bb7; font-size: 11px; }
-.call-person-row .call-header-actions { display: flex; gap: 7px; }
-.call-person-row .call-header-actions button, .call-person-message {
+.call-person-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-bottom: 1px solid #f0f3f9; border-radius: 11px; transition: background-color .15s ease; }
+.call-person-row:hover, .call-person-row:focus-within { background: #f2f6ff; }
+.call-person-identity {
+  display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0;
+  padding: 7px 5px; border: 0; background: transparent; border-radius: 10px;
+  text-align: left; cursor: pointer; color: #1a2b49;
+}
+.call-person-identity:hover { color: #2563eb; }
+.call-person-identity:focus-visible { outline: 2px solid #2563eb; outline-offset: -1px; }
+.call-person-info { display: grid; flex: 1; min-width: 0; gap: 5px; }
+.call-person-info strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.call-person-info small { color: #8c9bb7; font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.call-person-row .call-header-actions { display: flex; gap: 7px; flex: 0 0 auto; }
+.call-person-row .call-header-actions button {
   display: grid; place-items: center; width: 39px; height: 39px;
   border: 0; border-radius: 12px; background: #edf2ff; color: #2a65f4;
 }
@@ -205,14 +236,50 @@
 /* Use the host SocCo sidebar and app shell when embedded in the calls section. */
 .call-center.is-embedded { width:100%; height:100%; min-height:0; overflow:hidden; }
 .call-center.is-embedded .call-center-sidebar { display:none; }
-.call-center-tabs { display:flex; align-items:center; gap:5px; background:#f2f5fb; padding:4px; border-radius:12px; }
-.call-center-tabs button { display:flex; align-items:center; gap:5px; padding:7px 10px; border:0; border-radius:9px; background:transparent; color:#7587a5; white-space:nowrap; font-size:11px; }
+.call-center-tabs { display:flex; align-items:center; gap:5px; min-width:0; max-width:100%; background:#f2f5fb; padding:4px; border-radius:12px; }
+.call-center-tabs button { display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; padding:7px 10px; border:0; border-radius:9px; background:transparent; color:#7587a5; white-space:nowrap; font-size:11px; }
 .call-center-tabs button.active { background:white; color:#285ef2; font-weight:700; box-shadow:0 2px 7px rgba(36,67,119,.09); }
-@media(max-width:780px) {
- .call-center.is-embedded .call-center-header {padding:13px 14px;}
- .call-center-header-actions {flex-wrap:wrap;}
- .call-center-tabs {order:1;}
- .call-center-content {padding:12px;}
+/* The address book stays inside the call workspace and reuses the friends data/actions. */
+.call-center .call-center-directory { display:flex; min-height:0; padding:0; overflow:hidden; }
+.call-center-directory > .friends-design-v2 {
+  flex:1; min-width:0; min-height:0; height:100%; padding:16px 22px;
+  gap:12px; background:transparent;
+}
+.call-center-directory .fd-directory-layout.fd-list-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+.call-center-directory .fd-list-only .fd-list-card {
+  width:100%;
+}
+.call-center-directory .fd-list-only .fd-person-row:not(.selected):hover { background: #f2f6ff; }
+.call-center-directory .fd-list-only .fd-person-identity { cursor:pointer; }
+@media (max-width:780px) {
+  .call-center.is-embedded .call-center-header { padding:13px 14px; }
+  .call-center-header-actions {
+    width:100%; display:flex; flex-wrap:wrap; align-items:center;
+    gap:9px;
+  }
+  .call-center-tabs {
+    order:0; flex:0 0 100%; width:100%; max-width:100%;
+    display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:3px;
+  }
+  .call-center-tabs button { gap:4px; padding:10px 4px; font-size:11px; }
+  .call-center-tabs button svg { flex-shrink:0; }
+  .call-center-header-actions .call-center-search {
+    order:1; flex:1 1 0; width:auto; min-width:0; max-width:none;
+  }
+  .call-center-header-actions .call-center-settings-trigger {
+    order:2; flex:0 0 36px;
+  }
+  .call-center-content { padding:12px; }
+  .call-center .call-center-directory { padding:0; }
+  .call-center-directory > .friends-design-v2 { padding:12px; }
+}
+@media (max-width:760px) {
+  .call-center-directory > .friends-design-v2 { height:100%; overflow:auto; }
+}
+@media (max-width:360px) {
+  .call-center-tabs button { gap:3px; font-size:10px; }
 }
 @media(min-width:761px) {
   .modern-shell.app-layout:has(.call-center.is-embedded) > .chatnet-appbar {display:none;}

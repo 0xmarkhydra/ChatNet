@@ -112,6 +112,9 @@
     opacity: 1;
     padding: 0;
   }
+  .modern-shell.app-layout .mobile-chat-appbar.mobile-search-in-list .appbar-actions {
+    margin-left: auto;
+  }
   .modern-shell.app-layout .mobile-chat-appbar .appbar-actions {
     flex: 0 0 auto;
     margin-left: 0;
@@ -210,6 +213,73 @@
     background: #edf3ff;
     color: #2563eb;
     cursor: pointer;
+  }
+  /* Creating a conversation remains available from the top appbar + menu. */
+  .modern-shell.app-layout .social-chat-list-title .social-chat-new {
+    display: none;
+  }
+
+  /* On phones the header quick-search is the only search field in chat.
+     Give it exactly the former conversation-list input's visual treatment. */
+  .modern-shell.app-layout .social-chat-list-header > .appbar-search-anchor {
+    position: relative;
+    display: block;
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+  .modern-shell.app-layout .social-chat-list-header > .appbar-search-anchor .appbar-search {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 12px;
+    border: 1px solid #e9eef8;
+    border-radius: 12px;
+    background: #f6f8fc;
+    box-shadow: none;
+    color: #788ba9;
+  }
+  .modern-shell.app-layout .social-chat-list-header > .appbar-search-anchor .appbar-search svg {
+    flex: 0 0 auto;
+    width: 19px;
+    height: 19px;
+  }
+  .modern-shell.app-layout .social-chat-list-header > .appbar-search-anchor .appbar-search input {
+    position: static;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    opacity: 1;
+    font-size: 16px !important;
+    color: #243650;
+  }
+  .modern-shell.app-layout .social-chat-list-header > .appbar-search-anchor .appbar-search input::placeholder {
+    color: #8c9ab0;
+  }
+  .modern-shell.app-layout .social-chat-list-header > .appbar-search-anchor .appbar-search:focus-within {
+    border-color: #9cb8f7;
+    box-shadow: 0 0 0 3px #2563eb12;
+  }
+  .modern-shell.app-layout .social-chat-list-header:has(.chat-quick-search) {
+    position: relative;
+    z-index: 110;
+  }
+  .modern-shell.app-layout .social-chat-list-header > .appbar-search-anchor .chat-quick-search {
+    width: 100%;
   }
   .modern-shell.app-layout .social-chat-list-search {
     display: flex;

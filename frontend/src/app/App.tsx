@@ -280,6 +280,16 @@ export default function App({
   const [chatListQuery, setChatListQuery] = useState('');
   const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'groups'>('all');
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
+  const [phoneSearchLayout, setPhoneSearchLayout] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 760px)");
+    const update = () => setPhoneSearchLayout(media.matches);
+    media.addEventListener("change", update);
+    update();
+    return () => media.removeEventListener("change", update);
+  }, []);
   const quickSearchAnchorRef = useRef<HTMLDivElement>(null);
   const [chatSearchJump, setChatSearchJump] = useState<{
     conversationId: number;
@@ -3250,13 +3260,14 @@ export default function App({
     }
     if (
       tab === "contacts" ||
+      (tab === "chat" && desktopSection === "calls") ||
       newChatMode === "friends" ||
       newChatMode === "group" ||
       chatFriend
     ) {
       void refreshFriendConnections();
     }
-  }, [session?.token, tab, newChatMode, chatFriend?.id]);
+  }, [session?.token, tab, desktopSection, newChatMode, chatFriend?.id]);
 
   useEffect(() => {
     const friendSurfaceOpen = newChatMode === "friends" || tab === "contacts";
@@ -3319,7 +3330,7 @@ export default function App({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, tab]);
+  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, tab, desktopSection]);
 
   function purgeConversation(id: number) {
     responseCache.current.invalidate(["conversations", "messages"]);
@@ -3874,6 +3885,7 @@ export default function App({
         ...current.filter((item) => item.id !== created.id),
       ]);
       setActiveConversationId(created.id);
+      setDesktopSection(null);
       setTab("chat");
       setGlobalSearch("");
       setDirectUsername("");
@@ -4978,6 +4990,123 @@ export default function App({
       />
     ));
 
+  const contactsContent = (
+    <ContactsView
+      screen={contactsScreen}
+      onScreenChange={setContactsScreen}
+      friendQuery={friendQuery}
+      setFriendQuery={setFriendQuery}
+      friendSearching={friendSearching}
+      friendSearchError={friendSearchError}
+      setFriendSearchRetry={setFriendSearchRetry}
+      contactSearchResults={contactSearchResults}
+      friendRelationship={friendRelationship}
+      friendBusyIds={friendBusyIds}
+      actOnFriend={actOnFriend}
+      setFriendMenuId={setFriendMenuId}
+      friendMenuId={friendMenuId}
+      blockContact={blockContact}
+      reportContact={reportContact}
+      friendRequests={friendRequests}
+      declineFriendRequest={declineFriendRequest}
+      friends={friends}
+      friendsLoading={friendSyncBusy}
+      friendsError={friendSyncError}
+      onRetryFriends={() => void refreshFriendConnections()}
+      contactMetadata={contactMetadata}
+      openDirectByUsername={openDirectByUsername}
+      setFriendPreview={setFriendPreview}
+      changePersonalContact={changePersonalContact}
+      removeAcceptedFriend={removeAcceptedFriend}
+      connectionUrl={connectUrl()}
+      onScanQr={() => setQrOpen("scan")}
+      embeddedInCalls={tab === "chat" && desktopSection === "calls"}
+    />
+  );
+
+  const searchInConversationList = phoneSearchLayout && tab === "chat" &&
+    desktopSection === null && translationSettingsConversationId === null;
+  // Render the same quick-search control at only one location per viewport.
+  // Its globalSearch state, keyboard behavior and results stay unchanged.
+  const quickSearchControl = (
+        <div className="appbar-search-anchor" ref={quickSearchAnchorRef}>
+          <label className="appbar-search">
+            <UiIcon name="search" size={27} />
+            <input
+              value={tab === "contacts" ? friendQuery : globalSearch}
+              maxLength={tab === "feed" || tab === "chat" ? 120 : undefined}
+              type="search"
+              onKeyDown={(event) => {
+                if (tab === "chat" && event.key === "Escape") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setQuickSearchOpen(false);
+                }
+              }}
+              aria-expanded={
+                tab === "chat" && conversationSearching && quickSearchOpen
+              }
+              aria-controls={
+                tab === "chat" ? "chat-quick-search-results" : undefined
+              }
+              onFocus={() => {
+                if (tab === "chat" && globalSearch.trim())
+                  setQuickSearchOpen(true);
+              }}
+              onClick={() => {
+                if (tab === "chat" && globalSearch.trim())
+                  setQuickSearchOpen(true);
+              }}
+              onChange={(event) => {
+                if (tab === "contacts") setFriendQuery(event.target.value);
+                else if (tab === "profile") {
+                  setFeedFilter("all");
+                  setGlobalSearch(event.target.value);
+                  setTab("feed");
+                } else {
+                  setGlobalSearch(event.target.value);
+                  if (tab === "chat")
+                    setQuickSearchOpen(Boolean(event.target.value.trim()));
+                }
+              }}
+              placeholder={
+                tab === "notifications"
+                  ? "Tìm kiếm thông báo..."
+                  : tab === "contacts"
+                  ? "Tên, @username hoặc email"
+                  : tab === "profile"
+                    ? "Tìm kiếm trên SocCo..."
+                    : tab === "feed"
+                      ? "Tìm tác giả hoặc nội dung bài viết"
+                      : "Tìm liên hệ, tin nhắn, file"
+              }
+              aria-label={
+                tab === "notifications"
+                  ? "Tìm thông báo..."
+                  : tab === "contacts"
+                  ? "Tìm bạn bằng tên, username hoặc email"
+                  : tab === "profile"
+                    ? "Tìm bài viết trên SocCo"
+                    : tab === "feed"
+                      ? "Tìm bài viết"
+                      : "Tìm cuộc trò chuyện"
+              }
+            />
+          </label>
+          {tab === "chat" && conversationSearching && quickSearchOpen && (
+            <ChatQuickSearch
+              results={chatQuickSearch.results}
+              loading={chatQuickSearch.loading}
+              error={chatQuickSearch.error}
+              onRetry={chatQuickSearch.retry}
+              onClose={() => setQuickSearchOpen(false)}
+              onContact={openChatQuickContact}
+              onHit={openChatQuickHit}
+            />
+          )}
+        </div>
+  );
+
   return (
     <main
       className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
@@ -5114,7 +5243,7 @@ export default function App({
         />
       )}
       <header
-        className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
+        className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
       >
         <div className="app-page-heading">
           <strong>
@@ -5127,7 +5256,7 @@ export default function App({
                 : (
                     {
                       chat: "Tin nhắn",
-                      contacts: contactsScreen === "directory" ? "Danh bạ" : "Lời mời kết bạn",
+                      contacts: contactsScreen === "directory" ? "Bạn bè" : "Lời mời kết bạn",
                       notifications: "Thông báo",
                       discover: "Khám phá",
                       market: "Marketplace",
@@ -5167,82 +5296,7 @@ export default function App({
           <img src="/soco-mark.svg" width="32" height="32" alt="" />
           <strong>SocCO</strong>
         </div>
-        <div className="appbar-search-anchor" ref={quickSearchAnchorRef}>
-          <label className="appbar-search">
-            <UiIcon name="search" size={27} />
-            <input
-              value={tab === "contacts" ? friendQuery : globalSearch}
-              maxLength={tab === "feed" || tab === "chat" ? 120 : undefined}
-              type="search"
-              onKeyDown={(event) => {
-                if (tab === "chat" && event.key === "Escape") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setQuickSearchOpen(false);
-                }
-              }}
-              aria-expanded={
-                tab === "chat" && conversationSearching && quickSearchOpen
-              }
-              aria-controls={
-                tab === "chat" ? "chat-quick-search-results" : undefined
-              }
-              onFocus={() => {
-                if (tab === "chat" && globalSearch.trim())
-                  setQuickSearchOpen(true);
-              }}
-              onClick={() => {
-                if (tab === "chat" && globalSearch.trim())
-                  setQuickSearchOpen(true);
-              }}
-              onChange={(event) => {
-                if (tab === "contacts") setFriendQuery(event.target.value);
-                else if (tab === "profile") {
-                  setFeedFilter("all");
-                  setGlobalSearch(event.target.value);
-                  setTab("feed");
-                } else {
-                  setGlobalSearch(event.target.value);
-                  if (tab === "chat")
-                    setQuickSearchOpen(Boolean(event.target.value.trim()));
-                }
-              }}
-              placeholder={
-                tab === "notifications"
-                  ? "Tìm kiếm thông báo..."
-                  : tab === "contacts"
-                  ? "Tên, @username hoặc email"
-                  : tab === "profile"
-                    ? "Tìm kiếm trên SocCo..."
-                    : tab === "feed"
-                      ? "Tìm tác giả hoặc nội dung bài viết"
-                      : "Tìm liên hệ, tin nhắn, file"
-              }
-              aria-label={
-                tab === "notifications"
-                  ? "Tìm thông báo..."
-                  : tab === "contacts"
-                  ? "Tìm bạn bằng tên, username hoặc email"
-                  : tab === "profile"
-                    ? "Tìm bài viết trên SocCo"
-                    : tab === "feed"
-                      ? "Tìm bài viết"
-                      : "Tìm cuộc trò chuyện"
-              }
-            />
-          </label>
-          {tab === "chat" && conversationSearching && quickSearchOpen && (
-            <ChatQuickSearch
-              results={chatQuickSearch.results}
-              loading={chatQuickSearch.loading}
-              error={chatQuickSearch.error}
-              onRetry={chatQuickSearch.retry}
-              onClose={() => setQuickSearchOpen(false)}
-              onContact={openChatQuickContact}
-              onHit={openChatQuickHit}
-            />
-          )}
-        </div>
+        {!searchInConversationList && quickSearchControl}
         <div className="appbar-actions">
           {tab === "chat" && (
             <>
@@ -5596,12 +5650,14 @@ export default function App({
                     <Plus size={20} aria-hidden="true" />
                   </button>
                 </div>
-                <label className="social-chat-list-search">
-                  <Search size={19} aria-hidden="true" />
-                  <input type="search" value={chatListQuery} onChange={(event) => setChatListQuery(event.target.value)}
-                    maxLength={120} placeholder="Tìm cuộc trò chuyện hoặc tin nhắn..."
-                    aria-label="Tìm kiếm toàn bộ cuộc trò chuyện" />
-                </label>
+                {searchInConversationList ? quickSearchControl : (
+                  <label className="social-chat-list-search">
+                    <Search size={19} aria-hidden="true" />
+                    <input type="search" value={chatListQuery} onChange={(event) => setChatListQuery(event.target.value)}
+                      maxLength={120} placeholder="Tìm cuộc trò chuyện hoặc tin nhắn..."
+                      aria-label="Tìm kiếm toàn bộ cuộc trò chuyện" />
+                  </label>
+                )}
                 <div className="social-chat-list-filters" role="group" aria-label="Lọc cuộc trò chuyện">
                   {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
                     <button key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
@@ -6689,6 +6745,10 @@ export default function App({
             token={session.token}
             conversations={displayConversations}
             targetLanguage={targetLanguage}
+            directoryContent={contactsContent}
+            directoryQuery={friendQuery}
+            onDirectoryQueryChange={setFriendQuery}
+            onDirectoryOpen={() => setContactsScreen("directory")}
             onNavigate={(destination) => { switchTab(destination); setDesktopSection(null); }}
             onOpenChat={(id) => { setDesktopSection(null); setActiveConversationId(id); }}
 
@@ -6720,38 +6780,7 @@ export default function App({
           />
         )}
 
-        {tab === "contacts" && (
-          <ContactsView
-            screen={contactsScreen}
-            onScreenChange={setContactsScreen}
-            friendQuery={friendQuery}
-            setFriendQuery={setFriendQuery}
-            friendSearching={friendSearching}
-            friendSearchError={friendSearchError}
-            setFriendSearchRetry={setFriendSearchRetry}
-            contactSearchResults={contactSearchResults}
-            friendRelationship={friendRelationship}
-            friendBusyIds={friendBusyIds}
-            actOnFriend={actOnFriend}
-            setFriendMenuId={setFriendMenuId}
-            friendMenuId={friendMenuId}
-            blockContact={blockContact}
-            reportContact={reportContact}
-            friendRequests={friendRequests}
-            declineFriendRequest={declineFriendRequest}
-            friends={friends}
-            friendsLoading={friendSyncBusy}
-            friendsError={friendSyncError}
-            onRetryFriends={() => void refreshFriendConnections()}
-            contactMetadata={contactMetadata}
-            openDirectByUsername={openDirectByUsername}
-            setFriendPreview={setFriendPreview}
-            changePersonalContact={changePersonalContact}
-            removeAcceptedFriend={removeAcceptedFriend}
-            connectionUrl={connectUrl()}
-            onScanQr={() => setQrOpen("scan")}
-          />
-        )}
+        {tab === "contacts" && contactsContent}
 
         {tab === "discover" && (
           <Suspense fallback={<p role="status">Đang mở Quanh đây...</p>}>

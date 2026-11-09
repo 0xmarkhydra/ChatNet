@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
-  ArrowLeft, CalendarDays, Check, Clock3, Languages, MessageCircle,
+  ArrowLeft, BookUser, CalendarDays, Check, Clock3, Languages, MessageCircle,
   PhoneCall, PhoneIncoming, PhoneMissed, PhoneOutgoing,
   RefreshCw, Search, Settings2, ShieldCheck, Users, X,
 } from 'lucide-react'
@@ -8,9 +8,10 @@ import type { Conversation } from '../chat/types'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import { CallHeaderActions } from './CallManager'
 import { getCallHistory, type CallHistoryEntry, type CallRequest } from './calls'
+import { formatDuration, latestCallDuration } from './call-history'
 import './call-center.css'
 
-type View = 'history' | 'people' | 'settings'
+type View = 'history' | 'people' | 'directory' | 'settings'
 type Filter = 'all' | 'missed' | 'outgoing' | 'group'
 type Props = {
   request: CallRequest
@@ -18,6 +19,10 @@ type Props = {
   token: string
   conversations: Conversation[]
   targetLanguage: string
+  directoryContent: ReactNode
+  directoryQuery: string
+  onDirectoryQueryChange: (value: string) => void
+  onDirectoryOpen: () => void
   onNavigate: (tab: 'feed' | 'chat' | 'contacts') => void
   onOpenChat: (id: number) => void
   embedded?: boolean
@@ -30,11 +35,6 @@ const CAPTION_KEY = 'chatnet.call.subtitle-mode.v1'
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
-function formatDuration(entry: CallHistoryEntry) {
-  if (!entry.startedAt || !entry.endedAt) return 'Không kết nối'
-  const seconds = Math.max(0, Math.floor((Date.parse(entry.endedAt) - Date.parse(entry.startedAt)) / 1000))
-  return (Math.floor(seconds / 60)).toString().padStart(2, '0') + ':' + (seconds % 60).toString().padStart(2, '0')
-}
 function outcome(entry: CallHistoryEntry, userId: number) {
   if (entry.createdBy !== userId && !entry.joined && !entry.declined) return 'Gọi nhỡ'
   if (entry.declined) return 'Đã từ chối'
@@ -42,10 +42,11 @@ function outcome(entry: CallHistoryEntry, userId: number) {
   return 'Không kết nối'
 }
 
-export default function CallCenter({ request, userId, token, conversations, targetLanguage, onNavigate, onOpenChat, embedded = false }: Props) {
+export default function CallCenter({ request, userId, token, conversations, targetLanguage, directoryContent, directoryQuery, onDirectoryQueryChange, onDirectoryOpen, onNavigate, onOpenChat, embedded = false }: Props) {
   const requestRef = useRef(request)
   requestRef.current = request
   const [view, setView] = useState<View>('history')
+  const previousViewRef = useRef<Exclude<View, 'settings'>>('history')
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [entries, setEntries] = useState<CallHistoryEntry[]>([])
@@ -130,6 +131,9 @@ export default function CallCenter({ request, userId, token, conversations, targ
     }
   }
   const showView = (next: View) => {
+    if (next === 'directory' && view !== 'settings' && view !== 'directory') onDirectoryOpen()
+    if (view === 'directory' && next !== 'directory' && next !== 'settings') onDirectoryQueryChange('')
+    if (next === 'settings' && view !== 'settings') previousViewRef.current = view
     if (view === 'settings' && next !== 'settings') {
       setAutoTranslation(localStorage.getItem(ENABLE_KEY) === 'true')
       setLanguage(localStorage.getItem(LANGUAGE_KEY) || targetLanguage.split('-')[0] || 'vi')
@@ -160,25 +164,28 @@ export default function CallCenter({ request, userId, token, conversations, targ
       <div className="call-center-workspace">
         <header className="call-center-header">
           <div className="call-center-heading">
-            <h1>{view === 'history' ? 'Lịch sử cuộc gọi' : view === 'people' ? 'Cuộc gọi' : 'Cài đặt dịch AI'}</h1>
-            <p>{view === 'history' ? 'Cuộc gọi nhỡ, đã nhận và đã thực hiện' : view === 'people' ? 'Kết nối bằng thoại hoặc video với bạn bè và nhóm' : 'Điều chỉnh phụ đề trong cuộc gọi'}</p>
+            <h1>{view === 'history' ? 'Lịch sử cuộc gọi' : view === 'people' ? 'Cuộc gọi' : view === 'directory' ? 'Danh bạ' : 'Cài đặt dịch AI'}</h1>
+            <p>{view === 'history' ? 'Cuộc gọi nhỡ, đã nhận và đã thực hiện' : view === 'people' ? 'Kết nối bằng thoại hoặc video với bạn bè và nhóm' : view === 'directory' ? 'Tìm kiếm, quản lý và kết nối bạn bè' : 'Điều chỉnh phụ đề trong cuộc gọi'}</p>
           </div>
           <div className="call-center-header-actions">
             <div className="call-center-tabs" role="group" aria-label="Chọn màn cuộc gọi">
-              <button type="button" className={view === 'history' ? 'active' : ''} onClick={() => showView('history')}><Clock3 size={15} /> Lịch sử</button>
-              <button type="button" className={view === 'people' ? 'active' : ''} onClick={() => showView('people')}><PhoneCall size={15} /> Liên hệ</button>
+              <button type="button" className={view === 'history' ? 'active' : ''} aria-pressed={view === 'history'} onClick={() => showView('history')}><Clock3 size={15} /> Lịch sử</button>
+              <button type="button" className={view === 'people' ? 'active' : ''} aria-pressed={view === 'people'} onClick={() => showView('people')}><PhoneCall size={15} /> Liên hệ</button>
+              <button type="button" className={view === 'directory' ? 'active' : ''} aria-pressed={view === 'directory'} onClick={() => showView('directory')}><BookUser size={15} /> Danh bạ</button>
             </div>
-            {view !== 'settings' && <label className="call-center-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm kiếm trên SocCo..." aria-label="Tìm cuộc trò chuyện" />{query && <button type="button" onClick={() => setQuery('')} aria-label="Xóa tìm kiếm"><X size={14} /></button>}</label>}
-            <button type="button" className="call-center-settings-trigger" onClick={() => showView(view === 'settings' ? 'history' : 'settings')} title={view === 'settings' ? 'Quay lại lịch sử' : 'Cài đặt dịch AI'} aria-label={view === 'settings' ? 'Quay lại lịch sử' : 'Cài đặt dịch AI'}>{view === 'settings' ? <ArrowLeft size={20} /> : <Settings2 size={20} />}</button>
+            {view !== 'settings' && <label className={'call-center-search' + (view === 'directory' ? ' call-center-directory-search' : '')}><Search size={18} /><input value={view === 'directory' ? directoryQuery : query} onChange={(event) => view === 'directory' ? onDirectoryQueryChange(event.target.value) : setQuery(event.target.value)} placeholder={view === 'directory' ? 'Tìm kiếm trong danh bạ...' : 'Tìm kiếm trên SocCo...'} aria-label={view === 'directory' ? 'Tìm trong danh bạ' : 'Tìm cuộc trò chuyện'} />{(view === 'directory' ? directoryQuery : query) && <button type="button" onClick={() => view === 'directory' ? onDirectoryQueryChange('') : setQuery('')} aria-label="Xóa tìm kiếm"><X size={14} /></button>}</label>}
+            <button type="button" className="call-center-settings-trigger" onClick={() => showView(view === 'settings' ? previousViewRef.current : 'settings')} title={view === 'settings' ? 'Quay lại lịch sử' : 'Cài đặt dịch AI'} aria-label={view === 'settings' ? 'Quay lại lịch sử' : 'Cài đặt dịch AI'}>{view === 'settings' ? <ArrowLeft size={20} /> : <Settings2 size={20} />}</button>
           </div>
         </header>
+
+        {view === 'directory' && <div className="call-center-content call-center-directory">{directoryContent}</div>}
 
         {view === 'history' && (
           <div className="call-center-content">
             <section className="call-center-stats" aria-label="Thống kê lịch sử đã tải">
               <div><strong>{monthCount}</strong><span>Cuộc gọi tháng này</span></div>
               <div><strong className="danger">{missedCount}</strong><span>Cuộc gọi nhỡ</span></div>
-              <div><strong className="teal">{entries[0] ? formatDuration(entries[0]) : '00:00'}</strong><span>Thời lượng cuộc gọi gần nhất</span></div>
+              <div><strong className="teal">{latestCallDuration(entries)}</strong><span>Thời lượng cuộc gọi gần nhất</span></div>
             </section>
             <div className="call-center-filters" role="group" aria-label="Lọc lịch sử">
               {([['all', 'Tất cả'], ['missed', 'Gọi nhỡ'], ['outgoing', 'Đã gọi'], ['group', 'Gọi nhóm']] as const).map(([id, label]) =>
@@ -194,10 +201,11 @@ export default function CallCenter({ request, userId, token, conversations, targ
                 {!loading && !error && filtered.map((entry) => {
                   const conversation = conversationMap.get(entry.conversationId)
                   const isMissed = missed(entry)
+                  const duration = formatDuration(entry)
                   return (
                     <button type="button" key={entry.id} className={'call-history-item' + (selected?.id === entry.id ? ' selected' : '')} onClick={() => setSelectedId(entry.id)} aria-pressed={selected?.id === entry.id}>
                       <UserAvatar name={conversation?.name || 'Cuộc trò chuyện'} username={conversation?.otherUsername} group={entry.isGroup} className="call-history-avatar" />
-                      <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {outcome(entry, userId)}{entry.joined && entry.startedAt ? ' · ' + formatDuration(entry) : ''}</small></span>
+                      <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {outcome(entry, userId)}{' · ' + duration}</small></span>
                       <span className="call-history-time">{formatDate(entry.createdAt)}</span>
                       {isMissed ? <PhoneMissed size={19} className="call-history-icon" /> : entry.createdBy === userId ? <PhoneOutgoing size={19} className="call-history-icon" /> : <PhoneIncoming size={19} className="call-history-icon" />}
                     </button>
@@ -231,10 +239,12 @@ export default function CallCenter({ request, userId, token, conversations, targ
           <div className="call-center-section-intro"><div><h2>Gọi cho bạn bè và nhóm</h2><p>Chọn cuộc hội thoại để bắt đầu một cuộc gọi được mã hóa.</p></div><button type="button" onClick={() => showView('history')}><Clock3 size={17} /> Xem lịch sử</button></div>
           <section className="call-people-list call-center-card" aria-label="Danh sách có thể gọi">
             {contacts.map((conversation) => <div className="call-person-row" key={conversation.id}>
-              <UserAvatar name={conversation.name} username={conversation.otherUsername} group={conversation.type === 'group'} className="call-history-avatar" online={conversation.type === 'direct' && conversation.online} />
-              <div><strong>{conversation.name}</strong><span>{conversation.type === 'group' ? 'Nhóm · ' + conversation.memberCount + ' thành viên' : conversation.online ? 'Đang hoạt động' : 'Cuộc trò chuyện cá nhân'}</span></div>
+              <button type="button" className="call-person-identity" onClick={() => onOpenChat(conversation.id)}
+                title={'Mở cuộc trò chuyện với ' + conversation.name} aria-label={'Mở cuộc trò chuyện với ' + conversation.name}>
+                <UserAvatar name={conversation.name} username={conversation.otherUsername} group={conversation.type === 'group'} className="call-history-avatar" online={conversation.type === 'direct' && conversation.online} />
+                <span className="call-person-info"><strong>{conversation.name}</strong><small>{conversation.type === 'group' ? 'Nhóm · ' + conversation.memberCount + ' thành viên' : conversation.online ? 'Đang hoạt động' : 'Cuộc trò chuyện cá nhân'}</small></span>
+              </button>
               <CallHeaderActions conversationId={conversation.id} />
-              <button type="button" className="call-person-message" onClick={() => onOpenChat(conversation.id)} title="Mở tin nhắn" aria-label={'Nhắn tin với ' + conversation.name}><MessageCircle size={18} /></button>
             </div>)}
             {contacts.length === 0 && <div className="call-center-state"><Users size={32} /><strong>Chưa có cuộc trò chuyện phù hợp</strong><p>Mở Tin nhắn để kết nối với bạn bè và tạo nhóm.</p><button type="button" onClick={() => onNavigate('chat')}>Mở tin nhắn</button></div>}
           </section>
