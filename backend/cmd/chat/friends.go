@@ -14,13 +14,15 @@ import (
 )
 
 type friendConnection struct {
-	ID          int64     `json:"id"`
-	Username    string    `json:"username"`
-	DisplayName string    `json:"displayName"`
-	Online      bool      `json:"online"`
-	Status      string    `json:"status"`
-	Direction   string    `json:"direction,omitempty"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID             int64     `json:"id"`
+	Username       string    `json:"username"`
+	DisplayName    string    `json:"displayName"`
+	Online         bool      `json:"online"`
+	Status         string    `json:"status"`
+	Direction      string    `json:"direction,omitempty"`
+	BlockedByMe    bool      `json:"blockedByMe,omitempty"`
+	BlockedByOther bool      `json:"blockedByOther,omitempty"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
 func orderedUserPair(a, b int64) (int64, int64) {
@@ -72,16 +74,13 @@ func (s *server) friendConnectionFor(ctx context.Context, userID, otherID int64)
 func (s *server) listFriends(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	rows, err := s.db.Query(r.Context(), `
-		SELECT u.id,u.username,u.display_name,u.show_online_status,fc.updated_at
+		SELECT u.id,u.username,u.display_name,u.show_online_status,fc.updated_at,
+		       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=$1 AND b.blocked_id=u.id),
+		       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=u.id AND b.blocked_id=$1)
 		FROM friend_connections fc
 		JOIN users u ON u.id=CASE WHEN fc.user_low=$1 THEN fc.user_high ELSE fc.user_low END
 		WHERE fc.status='accepted'
 		  AND ($1=fc.user_low OR $1=fc.user_high)
-		  AND NOT EXISTS (
-		    SELECT 1 FROM user_blocks b WHERE
-		      (b.blocker_id=$1 AND b.blocked_id=u.id)
-		      OR (b.blocked_id=$1 AND b.blocker_id=u.id)
-		  )
 		ORDER BY fc.updated_at DESC,u.username ASC
 	`, claims.UserID)
 	if err != nil {
@@ -94,11 +93,11 @@ func (s *server) listFriends(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item friendConnection
 		var showOnline bool
-		if err := rows.Scan(&item.ID, &item.Username, &item.DisplayName, &showOnline, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Username, &item.DisplayName, &showOnline, &item.UpdatedAt, &item.BlockedByMe, &item.BlockedByOther); err != nil {
 			continue
 		}
 		item.Status = "accepted"
-		item.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(item.ID)).Val() > 0
+		item.Online = !item.BlockedByMe && !item.BlockedByOther && showOnline && s.redis.Exists(r.Context(), presenceKey(item.ID)).Val() > 0
 		items = append(items, item)
 	}
 	httpx.JSON(w, http.StatusOK, items)

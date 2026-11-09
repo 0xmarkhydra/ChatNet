@@ -124,6 +124,7 @@ export function useAppRealtime({
         // Remove potentially forbidden content immediately; refetch using current access rules.
         responseCache.current.invalidate(['messages', 'conversations', 'friends', 'feed', 'stories', 'profiles', 'notes'])
         setMessages([])
+        window.dispatchEvent(new Event('chatnet:privacy-updated'))
         clearPinnedMessages()
         if (activeConversationIdRef.current) void refreshPinnedMessages(activeConversationIdRef.current)
         void refreshConversations()
