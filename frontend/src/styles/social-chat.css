@@ -735,7 +735,7 @@
     .social-chat-layout
     .message
     .message-content
-    > .bubble:has(+ .message-reactions) {
+    > .bubble:has(> .message-reactions) {
     padding-bottom: 22px;
   }
   .modern-shell.app-layout .social-chat-layout .message-stamp {
