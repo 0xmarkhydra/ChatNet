@@ -95,7 +95,7 @@ export default function CommunityGroupWizard({ friends, userId, myName, step, on
       {(validation||error)&&<p className="cg-error" role="alert">{validation||error}</p>}
       <footer className="cg-wizard-footer"><button type="button" className="cg-secondary" disabled={busy} onClick={()=>step===1?onCancel():onStep(step===3?2:1)}><X size={18}/>{step===1?'Hủy':'Quay lại'}</button>
         {step<3?<button type="button" className="cg-primary" onClick={goNext}><ArrowRight size={18}/>Tiếp: {step===1?'Mời thành viên':'Xác nhận'}</button>:
-        <button type="button" className="cg-primary" onClick={()=>void create()} disabled={busy}><Check size={17}/>{busy?'Đang tạo...':'Tạo nhóm'}</button>}
+        <button type="button" className="cg-primary" onClick={()=>void create()} disabled={busy}><Check size={17}/>Tạo nhóm</button>}
       </footer>
     </div>
   </div>

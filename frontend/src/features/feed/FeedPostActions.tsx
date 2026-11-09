@@ -228,7 +228,7 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
                 <div className="feed-actions-footer">
                   <button type="button" onClick={() => setScreen('options')}>Hủy</button>
                   <button type="button" disabled={busy || (!content.trim() && !post.attachments?.length)}
-                    onClick={() => void saveEdit()}>{busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button>
+                    onClick={() => void saveEdit()}>Lưu thay đổi</button>
                 </div>
               </div>
             ) : screen === 'delete' ? (
@@ -237,7 +237,7 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
                 <div className="feed-actions-footer">
                   <button type="button" onClick={() => setScreen('options')}>Hủy</button>
                   <button type="button" className="feed-confirm-delete" disabled={busy}
-                    onClick={() => void deletePost()}>{busy ? 'Đang xóa…' : 'Xóa bài viết'}</button>
+                    onClick={() => void deletePost()}>Xóa bài viết</button>
                 </div>
               </div>
             ) : screen === 'report' ? (

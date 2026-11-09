@@ -349,7 +349,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
               {pending.parentId && <small className="feed-reply-to">Trả lời {userLabel(byID.get(pending.parentId)?.authorDisplayName, byID.get(pending.parentId)?.author)}</small>}
               <p className="pending-content">{pending.content}</p>
             </div>
-            <small role="status">Đang gửi bình luận...</small>
+
           </div>
         </div>
       )}
@@ -372,8 +372,8 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
                 void send()
               }
             }} />
-          <button type="submit" disabled={sending || !draft.trim()} aria-label={sending ? 'Đang gửi bình luận' : 'Gửi bình luận'}>
-            {variant === 'post-page' ? <SendHorizontal size={21} aria-hidden="true" /> : sending ? '…' : 'Gửi'}
+          <button type="submit" disabled={sending || !draft.trim()} aria-label="Gửi bình luận">
+            {variant === 'post-page' ? <SendHorizontal size={21} aria-hidden="true" /> : 'Gửi'}
           </button>
         </div>
         {error && <p role="alert" className="feed-comment-error">{error}</p>}

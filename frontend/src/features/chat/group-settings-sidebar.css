@@ -1,6 +1,8 @@
-/* Group management lives alongside the conversation instead of inside the message stack. */
-.modern-shell .messenger-layout.group-sidebar-open {
-  grid-template-columns: 320px minmax(0, 1fr) minmax(310px, 350px);
+/* Group management uses the same third pane width as conversation details. */
+@media (min-width: 1420px) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.group-sidebar-open {
+    grid-template-columns: minmax(285px, 347px) minmax(0, 1fr) 292px;
+  }
 }
 .modern-shell .group-settings-sidebar {
   grid-column: 3;
@@ -11,8 +13,9 @@
   min-height: 0;
   overflow: hidden;
   background: #fff;
-  border-left: 1px solid #e4eafb;
-  box-shadow: -4px 0 20px rgba(30, 47, 98, .045);
+  border: 1px solid #e8ecf5;
+  border-radius: 16px;
+  box-shadow: 0 3px 20px rgba(30, 51, 96, .035);
 }
 .modern-shell .group-sidebar-scrim { display: none; }
 .modern-shell .group-settings-sidebar > .group-settings-panel {
@@ -51,7 +54,7 @@
   font-size: 18px;
   font-weight: 800;
 }
-.modern-shell .group-settings-sidebar .group-settings-heading > button {
+.modern-shell .group-settings-sidebar .group-settings-heading > .group-member-back {
   display: grid;
   place-items: center;
   width: 36px;
@@ -63,7 +66,7 @@
   color: #3a5dca;
   cursor: pointer;
 }
-.modern-shell .group-settings-sidebar .group-settings-heading > button:focus-visible {
+.modern-shell .group-settings-sidebar .group-settings-heading > .group-member-back:focus-visible {
   outline: 2px solid #6366f1;
   outline-offset: 2px;
 }
@@ -97,10 +100,11 @@
   min-width: 0;
 }
 
-@media (max-width: 1199px) {
-  .modern-shell .messenger-layout.group-sidebar-open {
+/* At tablet widths, details and management share one overlay footprint
+   without resizing the conversation list or the message area. */
+@media (max-width: 1419px) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.group-sidebar-open {
     position: relative;
-    grid-template-columns: 320px minmax(0, 1fr);
   }
   .modern-shell .group-sidebar-scrim {
     display: block;
@@ -115,23 +119,39 @@
     background: rgba(13, 23, 53, .35);
     cursor: default;
   }
-  .modern-shell .group-settings-sidebar {
+  .modern-shell.app-layout .social-chat-layout.group-sidebar-open > .group-settings-sidebar {
     position: absolute;
-    z-index: 29;
-    inset: 0 0 0 auto;
-    width: min(390px, 100%);
+    z-index: 60;
+    grid-column: auto;
+    inset: 8px 8px 8px auto;
+    width: min(304px, 55%);
     max-width: 100%;
-    height: 100%;
-    box-shadow: -14px 0 42px rgba(20,34,70,.2);
+    height: auto;
+    box-shadow: 0 10px 40px rgba(27,46,82,.18);
     animation: chatnet-group-sidebar-in 200ms cubic-bezier(.2,.8,.2,1) both;
+  }
+}
+@media (min-width: 1101px) and (max-width: 1419px) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.group-sidebar-open {
+    grid-template-columns: minmax(285px, 347px) minmax(0, 1fr);
+  }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.group-sidebar-open {
+    grid-template-columns: minmax(205px, 250px) minmax(0, 1fr);
   }
 }
 @media (max-width: 760px) {
   .modern-shell .messenger-layout.group-sidebar-open {
     grid-template-columns: minmax(0, 1fr);
   }
-  .modern-shell .group-settings-sidebar {
-    width: min(400px, 100%);
+  .modern-shell.app-layout .social-chat-layout.group-sidebar-open > .group-settings-sidebar {
+    position: fixed;
+    z-index: 250;
+    inset: 0 0 0 auto;
+    width: min(350px, 100vw);
+    height: 100dvh;
+    border-radius: 0;
   }
   .modern-shell .group-settings-sidebar .group-settings-heading {
     min-height: 68px;
@@ -366,7 +386,7 @@
 .modern-shell .group-settings-sidebar .group-settings-heading strong {
   font-size: 16px;
 }
-.modern-shell .group-settings-sidebar .group-settings-heading > button {
+.modern-shell .group-settings-sidebar .group-settings-heading > .group-member-back {
   width: 32px;
   min-width: 32px;
   height: 32px;

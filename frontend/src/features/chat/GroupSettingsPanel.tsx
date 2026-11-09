@@ -132,11 +132,11 @@ export default function GroupSettingsPanel({
                 : activeGroupMember.role === 'admin'
                   ? 'Bạn là quản trị viên'
                   : 'Bạn là thành viên'
-              : 'Đang tải quyền...'}
+              : ''}
           </small>
         </div>
-        <button type="button" autoFocus onClick={() => setGroupSettingsOpen(false)} aria-label="Đóng thanh quản lý nhóm">
-          <X size={21} aria-hidden="true" />
+        <button type="button" className="sidebar-panel-close" autoFocus onClick={() => setGroupSettingsOpen(false)} aria-label="Đóng thanh quản lý nhóm">
+          <X size={19} aria-hidden="true" />
         </button>
       </div>
 
@@ -204,7 +204,7 @@ export default function GroupSettingsPanel({
             onClick={() => void inviteGroupMembers()}
             disabled={groupBusy || groupInviteSelection.length === 0}
           >
-            {groupBusy ? 'Đang thêm...' : `Thêm ${groupInviteSelection.length} bạn vào nhóm`}
+            {`Thêm ${groupInviteSelection.length} bạn vào nhóm`}
           </button>}
         </div>
       )}

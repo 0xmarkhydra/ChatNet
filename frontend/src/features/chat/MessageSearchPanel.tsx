@@ -286,7 +286,7 @@ export default function MessageSearchPanel({ conversationId, request, onJump, on
         {showResults && <>
           <section className="message-search-section">
             <h3>Tin nhắn</h3>
-            {loading && <p className="message-search-state">Đang tìm kiếm...</p>}
+
             {error && <p className="message-search-state error">{error}</p>}
             {!loading && !loadingFiles && !error && messageHits.length === 0 && <p className="message-search-state">Không tìm thấy tin nhắn phù hợp.</p>}
             {messageHits.slice(0, messageLimit).map((message) => {
@@ -303,13 +303,13 @@ export default function MessageSearchPanel({ conversationId, request, onJump, on
             })}
             {(messageHits.length > messageLimit || hasMore) && <button className="message-search-load-more" type="button" disabled={loadingMore}
               onClick={() => { if (messageLimit < messageHits.length) setMessageLimit((value) => value + 10); else void loadMoreMessages() }}>
-              {loadingMore ? 'Đang tải...' : 'Xem thêm'}
+              Xem thêm
             </button>}
           </section>
 
           <section className="message-search-section message-search-file-section">
             <h3>File</h3>
-            {loadingFiles && <p className="message-search-state">Đang tải file...</p>}
+
             {filesError && <p className="message-search-state error">{filesError}</p>}
             {!loadingFiles && !filesError && files.length === 0 && <p className="message-search-state">Không có file phù hợp.</p>}
             {files.slice(0, fileLimit).map(({ message, attachment }, index) => {
@@ -326,7 +326,7 @@ export default function MessageSearchPanel({ conversationId, request, onJump, on
             })}
             {(files.length > fileLimit || Boolean(nextFilesBefore)) && <button className="message-search-load-more" type="button" disabled={loadingMore}
               onClick={() => { if (fileLimit < files.length) setFileLimit((value) => value + 10); else void loadMoreFiles() }}>
-              {loadingMore ? 'Đang tải...' : 'Xem thêm'}
+              Xem thêm
             </button>}
           </section>
         </>}

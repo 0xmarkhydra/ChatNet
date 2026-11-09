@@ -99,7 +99,7 @@ export default function AuthSetup({ onComplete }: { onComplete: (locale: string)
           </div>
           <button className="auth-outline-button" type="button" disabled={busy !== null || permissions.notification === 'granted'}
             onClick={() => void requestPermission('notification')}>
-            {permissions.notification === 'granted' ? 'Đã cấp quyền' : busy === 'notification' ? 'Đang yêu cầu...' : 'Cho phép thông báo'}
+            {permissions.notification === 'granted' ? 'Đã cấp quyền' : 'Cho phép thông báo'}
           </button>
           <p className="auth-permission-note">Đăng ký nhận push sẽ được hoàn tất trong phần cài đặt thông báo của ứng dụng.</p>
         </div>
@@ -122,7 +122,7 @@ export default function AuthSetup({ onComplete }: { onComplete: (locale: string)
                 <button type="button" aria-label={`Cấp quyền ${name} (${defaultLabel.toLowerCase()})`}
                   disabled={busy !== null || permissions[key] === 'granted'}
                   onClick={() => void requestPermission(key)}>
-                  {permissions[key] === 'granted' ? 'Đã cấp' : busy === key ? 'Đang hỏi...' : permissions[key] === 'denied' ? 'Thử lại' : permissions[key] === 'unsupported' ? 'Không hỗ trợ' : 'Cấp quyền'}
+                  {permissions[key] === 'granted' ? 'Đã cấp' : permissions[key] === 'denied' ? 'Thử lại' : permissions[key] === 'unsupported' ? 'Không hỗ trợ' : 'Cấp quyền'}
                 </button>
               </div>
             ))}

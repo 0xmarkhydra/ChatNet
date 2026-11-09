@@ -80,7 +80,7 @@ import FeedPostCard from "../features/feed/FeedPostCard";
 import FeedReactionControl from "../features/feed/FeedReactionControl";
 import StoryViewer from "../features/feed/StoryViewer";
 import MessageActions from "../features/chat/MessageActions";
-import { GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/GroupActivities";
+import { GroupActivityComposerMenu, GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/GroupActivities";
 import { messageReactionLabel } from "../features/chat/messageReactions";
 import {
   copyChatImage,
@@ -848,7 +848,6 @@ export default function App({
 
   const {
     apiFetch,
-    pendingActions,
     setPendingActions,
     pendingRequests,
     mutationRequests,
@@ -2908,7 +2907,6 @@ export default function App({
             : `Đã gửi lời mời kết bạn tới ${label}`,
         );
       } else {
-        setNotice("Đang kiểm tra trạng thái kết bạn");
         await refreshFriendConnections();
       }
     } catch {
@@ -5582,7 +5580,7 @@ export default function App({
               onClick={() => void togglePush()}
               disabled={pushBusy}
             >
-              {pushBusy ? "Đang bật..." : "Bật thông báo"}
+              Bật thông báo
             </button>
           </div>
         </section>
@@ -5624,15 +5622,6 @@ export default function App({
           </button>
         </div>
       )}
-      {pendingActions > 0 && (
-        <div className="request-progress" role="status" aria-live="polite">
-          <RefreshCw size={16} aria-hidden="true" />
-          <span>
-            Đang xử lý{pendingActions > 1 ? ` (${pendingActions})` : ""}...
-          </span>
-        </div>
-      )}
-
       <section
         className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
       >
@@ -5725,11 +5714,7 @@ export default function App({
                     </div>
 
                     <div className="friend-search-results connect-results">
-                      {friendSearching && (
-                        <div className="connect-loading" aria-label="Đang tìm">
-                          <span /><span /><span />
-                        </div>
-                      )}
+
                       {!friendSearching && !friendQuery.trim() && friendResults.length > 0 && (
                         <div className="friend-suggestion-label">Người bạn có thể biết</div>
                       )}
@@ -5791,13 +5776,11 @@ export default function App({
 
               <ConversationCategories key={session.sessionId} model={conversationCategories} />
               <div className="conversation-list zalo-conversation-list" aria-busy={conversationListSearch.active && conversationListSearch.loading}>
-                {!conversationListSearch.active && conversationCategories.selected !== null && conversationCategories.loading && <p role="status">Đang tải phân loại…</p>}
+
                 {!conversationListSearch.active && conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
                   {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>Thử lại</button>
                 </div>}
-                {conversationListSearch.active && conversationListSearch.loading && (
-                  <p className="conversation-search-status" role="status">Đang tìm trong tất cả cuộc trò chuyện…</p>
-                )}
+
                 {conversationListSearch.active && conversationListSearch.error && (
                   <p className="conversation-search-status" role="alert">
                     {conversationListSearch.error}
@@ -5890,8 +5873,7 @@ export default function App({
                       : conversationLoadingMore || conversationCategories.loading}
                     aria-busy={conversationListSearch.active ? conversationListSearch.loadingMore : conversationLoadingMore || conversationCategories.loading}>
                     <RefreshCw size={15} aria-hidden="true" />
-                    {(conversationListSearch.active ? conversationListSearch.loadingMore : conversationLoadingMore || conversationCategories.loading)
-                      ? 'Đang tải...' : 'Tải thêm hội thoại'}
+                    Tải thêm hội thoại
                   </button>
                 )}
               </div>
@@ -6237,7 +6219,7 @@ export default function App({
                         onClick={() => void loadOlderMessages()} disabled={messagesLoadingMore}
                         aria-busy={messagesLoadingMore}>
                         <RefreshCw size={16} aria-hidden="true" />
-                        {messagesLoadingMore ? 'Đang tải...' : 'Tải thêm tin nhắn cũ'}
+                        Tải thêm tin nhắn cũ
                       </button>
                     )}
                     {visibleMessages.map((message, index) => {
@@ -6282,7 +6264,7 @@ export default function App({
                               onClick={() => void loadMissingMessages()} disabled={messageGapLoading}
                               aria-busy={messageGapLoading}>
                               <RefreshCw size={15} aria-hidden="true" />
-                              {messageGapLoading ? 'Đang tải...' : 'Tải tin nhắn ở giữa'}
+                              Tải tin nhắn ở giữa
                             </button>
                           )}
                         <article
@@ -6446,10 +6428,11 @@ export default function App({
                         {item.text && <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>}
                         <MediaAttachmentsView items={item.attachments} />
                         <div className="chat-outbox-footer">
-                          <span className={item.status === 'failed' ? 'message-stamp chat-outbox-error' : 'message-stamp'} role="status">
-                            {item.status === 'failed' ? item.error || 'Không gửi được' :
-                              !chatOnline ? 'Chờ có mạng' : item.status === 'unconfirmed' ? 'Đang xác nhận...' : 'Đang gửi...'}
-                          </span>
+                          {(item.status === 'failed' || !chatOnline) && (
+                            <span className={item.status === 'failed' ? 'message-stamp chat-outbox-error' : 'message-stamp'} role="status">
+                              {item.status === 'failed' ? item.error || 'Không gửi được' : 'Chờ có mạng'}
+                            </span>
+                          )}
                           {(item.status === 'failed' || (item.status === 'unconfirmed' && chatOnline)) && (
                             <button type="button" className="chat-outbox-retry"
                               aria-label={item.status === 'failed' ? 'Gửi lại tin nhắn bị lỗi' : 'Gửi lại tin nhắn đang chờ'}
@@ -6532,10 +6515,16 @@ export default function App({
                       onRecorded={(file) => { void addChatFiles([file]) }}
                       onError={(message) => setNotice(message, 'error')}
                     />
+                    {activeConversation.type === 'group' && (
+                      <GroupActivityComposerMenu
+                        key={activeConversation.id}
+                        onCreate={setGroupActivityCreateKind}
+                      />
+                    )}
                     <input
                       ref={messageInputRef}
                       aria-label="Tin nhắn"
-                      placeholder={mediaUploading === 'chat' ? 'Đang tải file lên...' : isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
+                      placeholder={isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
                       value={messageText}
                       onChange={(event) => setMessageText(event.target.value)}
                       onPaste={(event) => {
@@ -6548,7 +6537,7 @@ export default function App({
                       maxLength={4000}
                     />
                     <button className="send-button polished-send" disabled={!canSend} aria-label="Gửi tin nhắn">
-                      {messageSending || mediaUploading === 'chat' ? <RefreshCw size={19} aria-label="Đang gửi" /> : <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>}
+                      <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>
                     </button>
                   </form>
                 </>
@@ -6571,7 +6560,11 @@ export default function App({
                 onClearHistory={() => { void clearActiveConversationHistory() }}
                 onCreateGroupActivity={setGroupActivityCreateKind}
                 onProfile={() => {
-                  if (activeConversation.type === 'group') { setGroupMemberViewOpen(false); openGroupSettings(activeConversation) }
+                  if (activeConversation.type === 'group') {
+                    setConversationDetailsOpen(false)
+                    setGroupMemberViewOpen(false)
+                    openGroupSettings(activeConversation)
+                  }
                   else if (activeConversation.otherUsername) openVisitor(activeConversation.otherUsername)
                   else setNotice('Không thể mở hồ sơ từ cuộc trò chuyện này.', 'warning')
                 }}
@@ -6922,9 +6915,7 @@ export default function App({
                           </span>
                         </div>
                         <span>
-                          {storyBusy || mediaUploading === "story"
-                            ? "Đang tải..."
-                            : "Tạo mới"}
+                          Tạo mới
                         </span>
                       </button>
                       {stories.map((story) => (
@@ -7104,31 +7095,17 @@ export default function App({
                               pendingPost.author,
                             )}
                           </strong>
-                          <small role="status">Đang đăng...</small>
+                          <small>{pendingPost.visibility === "friends" ? "Bạn bè" : pendingPost.visibility === "private" ? "Chỉ mình tôi" : "Công khai"}</small>
                         </div>
                         <p className="pending-content">{pendingPost.content}</p>
                         <MediaAttachmentsView items={pendingPost.attachments} />
                       </div>
                     </article>
                   )}
-                  {feedSearchActive && postSearch.loading && (
-                    <p role="status" className="soco-feed-load-more">
-                      Đang tìm bài viết...
-                    </p>
-                  )}
-                  {!feedSearchActive &&
-                    feedFilter === "following" &&
-                    followingFeed.loading && (
-                      <p role="status" className="soco-feed-load-more">
-                        Đang tải bài viết của bạn bè...
-                      </p>
-                    )}
+
+
                   {renderPosts(searchedPosts, isProfileDesktop)}
-                  {feedLoadingMore && (
-                    <p role="status" className="soco-feed-load-more">
-                      Đang tải thêm bài viết...
-                    </p>
-                  )}
+
                   {feedPagingError && (
                     <div role="alert" className="soco-feed-load-more">
                       <span>
@@ -7870,9 +7847,7 @@ export default function App({
                     </button>
                   </div>
                 )}
-                {profilePostsBusy && (
-                  <p role="status">Đang tải dòng thời gian...</p>
-                )}
+
                 <div className="feed zalo-feed">
                   {pendingPost && (
                     <article
@@ -7888,7 +7863,7 @@ export default function App({
                         className="avatar"
                       />
                       <div className="post-body">
-                        <strong>Đang đăng...</strong>
+                        <strong>{userLabel(profileMedia?.displayName || session.user.displayName, name)}</strong>
                         <p>{pendingPost.content}</p>
                         <MediaAttachmentsView items={pendingPost.attachments} />
                       </div>
@@ -7919,7 +7894,7 @@ export default function App({
                     disabled={profilePostsBusy || !!pendingPost}
                     onClick={() => void loadProfilePosts(true)}
                   >
-                    {profilePostsBusy ? "Đang tải..." : "Xem bài viết cũ hơn"}
+                    Xem bài viết cũ hơn
                   </button>
                 )}
               </section>
