@@ -9,6 +9,7 @@ import VisitorProfile from "../features/profile/VisitorProfile";
 import { userLabel } from "../shared/lib/userLabel";
 import { useMessageData } from "../features/chat/useMessageData";
 import { useChatPins } from "../features/chat/useChatPins";
+import { shouldSendChatOnEnter } from "../features/chat/composerKeyboard";
 import "../features/chat/chat-pins.css";
 import { getMessageTranslationView } from "../features/chat/messageTranslationPresentation";
 import { useApiRequest } from "./useApiRequest";
@@ -349,6 +350,7 @@ export default function App({
   const ownSendScrollConversation = useRef<number | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [messageActionId, setMessageActionId] = useState<number | null>(null);
+  const [messageActionMode, setMessageActionMode] = useState<'reactions' | 'actions'>('actions');
   const [conversationActionId, setConversationActionId] = useState<number | null>(null);
   const [conversationMenuPosition, setConversationMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [pinnedExpanded, setPinnedExpanded] = useState(false);
@@ -368,6 +370,7 @@ export default function App({
     y: number;
     messageId: number;
   } | null>(null);
+  const suppressMessageClick = useRef<number | null>(null);
 
   const [sharedContentOpen, setSharedContentOpen] = useState(false);
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
@@ -809,7 +812,13 @@ export default function App({
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const postComposerRef = useRef<HTMLTextAreaElement>(null);
-  const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const input = messageInputRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(input.scrollHeight, 154)}px`;
+  }, [messageText, activeConversationId, tab, desktopSection]);
   const chatDragDepth = useRef(0);
   const [chatDragActive, setChatDragActive] = useState(false);
   useEffect(() => {
@@ -1319,8 +1328,6 @@ export default function App({
   const selectedLanguage =
     languageOptions.find((language) => language.value === targetLanguage) ||
     languageOptions[0];
-  const selectedConversationLanguage =
-    languageOptions.find(language => language.value === effectiveTargetLanguage) || selectedLanguage;
   const visibleLanguageOptions = useMemo(
     () => filterLanguageOptions(languageOptions, languageSearch),
     [languageOptions, languageSearch],
@@ -1444,8 +1451,17 @@ export default function App({
           ? target.parentElement
           : null;
     setMessageCopyTarget(resolveMessageCopyTarget(message, element));
+    setMessageActionMode('actions');
     setMessageActionId(message.id);
     navigator.vibrate?.(24);
+  }
+
+  function openMessageReactions(message: Message) {
+    if (message.deleted) return;
+    cancelMessageLongPress();
+    setMessageCopyTarget(null);
+    setMessageActionMode('reactions');
+    setMessageActionId(message.id);
   }
 
   function beginMessageLongPress(
@@ -1453,9 +1469,11 @@ export default function App({
     x: number,
     y: number,
     button: number,
+    pointerType: string,
     target: EventTarget | null,
   ) {
-    if (message.deleted || button !== 0) return;
+    // Mouse users keep native text selection and the existing right-click menu.
+    if (message.deleted || button !== 0 || pointerType === "mouse") return;
     const element =
       target instanceof Element
         ? target
@@ -1463,23 +1481,18 @@ export default function App({
           ? target.parentElement
           : null;
     if (element?.closest("button,input,textarea,select,video,audio")) return;
-    // Long-press on a link or an image should offer the same chat copy action.
-    if (
-      element?.closest("a") &&
-      !element.closest("a.message-inline-link, .media-item")
-    )
-      return;
-    // Keep native selection when long-pressing ordinary message text.
-    if (
-      element?.closest(".message-selectable-text") &&
-      !element.closest("a.message-inline-link")
-    )
-      return;
+    // Only touch-holding the bubble (including text, links and attachments)
+    // opens the sheet; holding the avatar or empty timeline does not.
+    if (!element?.closest(".bubble, .chat-message-media, .message-reply-quote")) return;
+    if (element.closest("a") && !element.closest("a.message-inline-link, .media-item")) return;
     cancelMessageLongPress();
+    suppressMessageClick.current = null;
     messageLongPressStart.current = { x, y, messageId: message.id };
     messageLongPressTimer.current = window.setTimeout(() => {
-      if (messageLongPressStart.current?.messageId === message.id)
+      if (messageLongPressStart.current?.messageId === message.id) {
+        suppressMessageClick.current = message.id;
         openMessageActions(message, target);
+      }
     }, 500);
   }
 
@@ -4564,7 +4577,7 @@ export default function App({
     }
   }
 
-  async function requestTranslation(text: string, messageId?: number) {
+  async function requestTranslation(text: string, messageId?: number, showError = true) {
     const response = await apiFetch("/api/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -4577,7 +4590,33 @@ export default function App({
     const result = await response.json().catch(() => null);
     if (sessionRef.current?.sessionId !== session?.sessionId) return null;
     if (!response.ok || typeof result?.translatedText !== "string") {
-      setNotice(result?.error || "AI dịch thất bại");
+      // A proxy or unavailable AI service may return HTML/empty text instead of JSON.
+      // Do not leak message contents or provider credentials into diagnostics.
+      console.warn("Translation request failed", {
+        status: response.status,
+        error: typeof result?.error === "string" ? result.error : "invalid response",
+      });
+      if (showError) {
+        const serverError = typeof result?.error === "string" ? result.error : "";
+        const message = /not configured|missing_ai_config/i.test(serverError)
+          ? "Dịch vụ AI trên máy chủ chưa được cấu hình. Kiểm tra AI_API_KEY, AI_BASE_URL và AI_MODEL."
+          : response.status === 401 || response.status === 403
+            ? "Phiên đăng nhập hoặc quyền truy cập dịch AI không hợp lệ."
+            : response.status === 429
+              ? "Dịch vụ AI đang giới hạn yêu cầu (HTTP 429). Hãy thử lại sau."
+              : response.status === 502 && /service unavailable/i.test(serverError)
+                ? "Gateway không kết nối được đến dịch vụ translate (HTTP 502). Kiểm tra dịch vụ translate trên Railway."
+                : response.status === 502 && /AI translation failed/i.test(serverError)
+                  ? "Dịch vụ translate không nhận được bản dịch từ nhà cung cấp AI (HTTP 502). Kiểm tra log AI provider."
+                  : response.status >= 500
+                    ? `Dịch vụ AI hoặc backend không phản hồi (HTTP ${response.status}). Kiểm tra dịch vụ translate và nhà cung cấp AI.`
+                    : response.status === 404
+                  ? "Không tìm thấy tin nhắn hoặc API dịch AI (HTTP 404)."
+                  : response.ok
+                    ? "Dịch vụ AI trả dữ liệu không hợp lệ."
+                    : `Không dịch được tin nhắn (HTTP ${response.status})${serverError ? `: ${serverError}` : "."}`;
+        setNotice(message, "error");
+      }
       return null;
     }
     return result as { translatedText: string };
@@ -4603,7 +4642,7 @@ export default function App({
     setTranslationPending((current) => ({ ...current, [message.id]: true }));
     setTranslationFailures((current) => ({ ...current, [message.id]: false }));
     try {
-      const result = await requestTranslation(message.text, message.id);
+      const result = await requestTranslation(message.text, message.id, reveal);
       if (sessionRef.current?.sessionId !== sessionId ||
           translationLanguageRef.current !== language ||
           activeConversationIdRef.current !== conversationId) return;
@@ -4617,7 +4656,12 @@ export default function App({
           translationLanguageRef.current === language &&
           activeConversationIdRef.current === conversationId) {
         setTranslationFailures((current) => ({ ...current, [message.id]: true }));
-        setNotice(error instanceof Error ? error.message : "Không dịch được tin nhắn", "error");
+        if (reveal) setNotice(
+          error instanceof TypeError
+            ? "Không kết nối được API dịch AI. Kiểm tra kết nối tới backend cloud."
+            : error instanceof Error ? error.message : "Không dịch được tin nhắn",
+          "error",
+        );
       }
     } finally {
       translationInFlight.current.delete(requestKey);
@@ -6226,6 +6270,19 @@ export default function App({
                           onClick={() => setMessageSearchOpen(true)}>
                           <Search size={20} aria-hidden="true" />
                         </button>
+                        <div className="translation-hub">
+                          <button type="button" className="group-more-trigger translation-toolbar-toggle"
+                            aria-label={effectiveAutoTranslate ? 'Cài đặt dịch AI, đang bật' : 'Cài đặt dịch AI, đang tắt'}
+                            title="Cài đặt dịch AI"
+                            aria-expanded={translationMenuOpen}
+                            aria-controls="chat-translation-dialog"
+                            onClick={() => {
+                              setLanguageSearch('')
+                              setTranslationMenuOpen((open) => !open)
+                            }}>
+                            <Languages size={20} strokeWidth={1.9} aria-hidden="true" />
+                          </button>
+                        </div>
                         <button type="button" className="group-more-trigger"
                           aria-label="Thông tin hội thoại" aria-controls="conversation-details-panel"
                           aria-expanded={conversationDetailsOpen}
@@ -6238,19 +6295,14 @@ export default function App({
                     <div className="translate-controls">
                       <CallHeaderActions conversationId={activeConversation.id} disabled={conversationBlocked} />
                       <button type="button" className="group-settings-toggle" onClick={() => setMessageSearchOpen(true)} title="Tìm trong cuộc trò chuyện" aria-label="Tìm tin nhắn trong cuộc trò chuyện"><Search size={19} /></button>
-                      <button type="button" className={conversationDetailsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
-                        onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}
-                        title="Thông tin hội thoại" aria-label="Thông tin hội thoại"
-                        aria-controls="conversation-details-panel" aria-expanded={conversationDetailsOpen}>
-                        <MoreHorizontal size={22} aria-hidden="true" />
-                      </button>
                       <div className="translation-hub">
                         <button
                           type="button"
-                          className={autoTranslate ? 'translation-hub-trigger active' : 'translation-hub-trigger'}
+                          className={translationMenuOpen ? 'group-settings-toggle translation-toolbar-toggle active' : 'group-settings-toggle translation-toolbar-toggle'}
                           aria-expanded={translationMenuOpen}
                           aria-controls="chat-translation-dialog"
-                          aria-label="Cài đặt dịch AI"
+                          aria-label={effectiveAutoTranslate ? 'Cài đặt dịch AI, đang bật' : 'Cài đặt dịch AI, đang tắt'}
+                          title="Cài đặt dịch AI"
                           onClick={() => {
                             setTranslationMenuOpen((current) => {
                               const next = !current
@@ -6259,12 +6311,7 @@ export default function App({
                             })
                           }}
                         >
-                          <span className="translation-hub-flag" aria-hidden="true">{selectedLanguage?.flag || '🌐'}</span>
-                          <span className="translation-hub-spark" aria-hidden="true">✦</span>
-                          <b>AI</b>
-                          <span className="translation-hub-dot" aria-hidden="true">·</span>
-                          <strong>{selectedLanguage?.code || targetLanguage.toUpperCase()}</strong>
-                          <span className="translation-hub-chevron" aria-hidden="true">{translationMenuOpen ? '⌃' : '⌄'}</span>
+                          <Languages size={21} strokeWidth={1.9} aria-hidden="true" />
                         </button>
 
                         {translationMenuOpen && createPortal(
@@ -6349,6 +6396,12 @@ export default function App({
                           </>, document.body
                         )}
                       </div>
+                      <button type="button" className={conversationDetailsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
+                        onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}
+                        title="Thông tin hội thoại" aria-label="Thông tin hội thoại"
+                        aria-controls="conversation-details-panel" aria-expanded={conversationDetailsOpen}>
+                        <MoreHorizontal size={22} aria-hidden="true" />
+                      </button>
                     </div>
                   </header>
 
@@ -6523,7 +6576,7 @@ export default function App({
                           <button type="button" className="reaction-add"
                             aria-label="Chọn cảm xúc cho tin nhắn"
                             title="Thả cảm xúc"
-                            onClick={() => openMessageActions(message)}>
+                            onClick={() => openMessageReactions(message)}>
                             <SmilePlus size={16} aria-hidden="true" />
                           </button>
                         </div>
@@ -6548,11 +6601,20 @@ export default function App({
                         <article
                           data-message-id={message.id}
                           className={mine ? 'message mine message-press-target' : 'message message-press-target'}
-                          onPointerDown={(event) => { if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target) }}
+                          onPointerDown={(event) => {
+                            suppressMessageClick.current = null
+                            if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.pointerType, event.target)
+                          }}
                           onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
                           onPointerUp={cancelMessageLongPress}
                           onPointerCancel={cancelMessageLongPress}
                           onPointerLeave={cancelMessageLongPress}
+                          onClickCapture={(event) => {
+                            if (suppressMessageClick.current !== message.id) return
+                            event.preventDefault()
+                            event.stopPropagation()
+                            suppressMessageClick.current = null
+                          }}
                           onContextMenu={(event) => {
                             if (message.deleted || conversationBlocked) return
                             // Keep native context-copy for text selected inside this message.
@@ -6602,6 +6664,29 @@ export default function App({
                                     </span>
                                   )}
                                   {reactionControls}
+                                  {!isTranslating && !effectiveAutoTranslate && translationView.mode === 'dual' && (
+                                    <button type="button" className="chat-translation-action"
+                                      aria-label="Ẩn dịch" title="Ẩn dịch"
+                                      onClick={() => setManuallyTranslated((current) => ({ ...current, [message.id]: false }))}>
+                                      <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
+                                    </button>
+                                  )}
+                                  {!isTranslating && !effectiveAutoTranslate &&
+                                    (!manuallyTranslated[message.id] || !hasTranslation) && (
+                                    <button type="button" className="chat-translation-action"
+                                      aria-label={translationFailed ? 'Thử dịch lại' : 'Dịch'}
+                                      title={translationFailed ? 'Thử dịch lại' : 'Dịch'}
+                                      onClick={() => void translateMessage(message)}>
+                                      <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
+                                    </button>
+                                  )}
+                                  {!isTranslating && effectiveAutoTranslate && translationFailed && !hasTranslation && (
+                                    <button type="button" className="chat-translation-action"
+                                      aria-label="Thử dịch lại" title="Thử dịch lại"
+                                      onClick={() => void translateMessage(message)}>
+                                      <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
+                                    </button>
+                                  )}
                                 </div>
                               )}
                               {longTranslation && (
@@ -6624,26 +6709,6 @@ export default function App({
                                   <LoaderCircle size={15} aria-hidden="true" />
                                   Đang dịch tin nhắn…
                                 </span>
-                              )}
-                              {!isTranslating && !effectiveAutoTranslate && translationView.mode === 'dual' && (
-                                <button type="button" className="chat-translation-action"
-                                  onClick={() => setManuallyTranslated((current) => ({ ...current, [message.id]: false }))}>
-                                  <Languages size={15} aria-hidden="true" /> Ẩn dịch
-                                </button>
-                              )}
-                              {!isTranslating && !effectiveAutoTranslate &&
-                                (!manuallyTranslated[message.id] || !hasTranslation) && (
-                                <button type="button" className="chat-translation-action"
-                                  onClick={() => void translateMessage(message)}>
-                                  <Languages size={15} aria-hidden="true" />
-                                  {translationFailed ? 'Thử dịch lại' : 'Dịch'}
-                                </button>
-                              )}
-                              {!isTranslating && effectiveAutoTranslate && translationFailed && !hasTranslation && (
-                                <button type="button" className="chat-translation-action"
-                                  onClick={() => void translateMessage(message)}>
-                                  <Languages size={15} aria-hidden="true" /> Thử dịch lại
-                                </button>
                               )}
                               {Boolean(message.attachments?.length) && (
                                 <div className={photoOnly ? 'chat-message-media chat-message-photo' : 'chat-message-media'}>
@@ -6705,17 +6770,6 @@ export default function App({
                       </article>
                     ))}
                     <div ref={bottomRef} />
-                  </div>
-
-                  <div className={`social-chat-ai-banner${effectiveAutoTranslate ? ' is-enabled' : ''}`} role="status">
-                    <Languages size={18} aria-hidden="true" />
-                    <span>{effectiveAutoTranslate
-                      ? `Dịch tự động đang bật · ${selectedConversationLanguage?.localizedLanguage || effectiveTargetLanguage.toUpperCase()}`
-                      : 'Dịch tự động đang tắt'}</span>
-                    <button type="button" aria-label="Cài đặt dịch AI" aria-expanded={translationMenuOpen}
-                      onClick={() => { setLanguageSearch(''); setTranslationMenuOpen((open) => !open) }}>
-                      <span>Cài đặt</span><ChevronDown size={15} aria-hidden="true" />
-                    </button>
                   </div>
 
                   {conversationBlocked ? (
@@ -6794,12 +6848,19 @@ export default function App({
                         onCreate={setGroupActivityCreateKind}
                       />
                     )}
-                    <input
+                    <textarea
                       ref={messageInputRef}
+                      className="chat-message-input"
+                      rows={1}
                       aria-label="Tin nhắn"
                       placeholder={isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? selectedChannelId ? `Nhắn vào # ${groupChannels.find(channel => channel.id === selectedChannelId)?.name || 'kênh hội thoại'}...` : `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
                       value={messageText}
                       onChange={(event) => setMessageText(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (!shouldSendChatOnEnter(event.nativeEvent)) return;
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
+                      }}
                       onPaste={(event) => {
                         const files = chatFilesFromClipboard(event.clipboardData)
                         if (files.length === 0) return // Preserve normal text paste (Cmd/Ctrl+V).
@@ -7471,6 +7532,7 @@ export default function App({
         )}
         {activeMessageAction && (
           <MessageActions
+            mode={messageActionMode}
             activeMessageAction={activeMessageAction}
             userId={session.user.id}
             isPinned={pinnedMessages.some((pin) => pin.message.id === activeMessageAction.id)}

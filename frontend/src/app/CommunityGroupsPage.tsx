@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type FormEvent, type SetSta
 import { ArrowLeft, ArrowRight, Bell, Check, Clock3, FileText, Image as ImageIcon, MessageCircle, MoreHorizontal, PencilLine, Plus, Search, Send, Settings, ShieldCheck, Users, UserPlus, Video, X } from 'lucide-react'
 import type { Conversation, GroupMember, Message } from '../features/chat/types'
 import type { QueuedChatMessage } from '../chatOutbox'
+import { shouldSendChatOnEnter } from '../features/chat/composerKeyboard'
 import type { FriendConnection } from '../features/contacts/types'
 import UserAvatar from '../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../shared/ui/MediaAttachmentsView'
@@ -431,7 +432,7 @@ export default function CommunityGroupsPage({
         </div></article>)}
         {activeChannelId!==0&&channelUnconfirmed&&<article className="cg-message mine cg-message-pending"><div><strong>Bạn · Chờ xác nhận</strong><p>{channelUnconfirmed.text}</p><button type="button" disabled={channelSendBusy} onClick={()=>void sendChannelMessage({preventDefault(){}} as FormEvent)}>Gửi lại cùng mã tin</button></div></article>}
         {!displayedMessages.length&&!channelUnconfirmed&&(activeChannelId!==0||!pendingMessages.some(item=>item.conversationId===selectedGroup.id))&&<p className="cg-empty">Chưa có tin nhắn. Hãy bắt đầu cuộc trò chuyện!</p>}</div>
-        <form className="cg-card cg-chat-form" onSubmit={activeChannelId===0?onSend:sendChannelMessage}><label htmlFor="cg-chat-text">Nhắn tin cho # {currentChannel?.name||'Thảo luận chung'}</label><textarea id="cg-chat-text" rows={2} value={activeChannelId===0?messageText:channelDraft} onChange={e=>activeChannelId===0?onMessageText(e.target.value):(setChannelDraft(e.target.value),setChannelUnconfirmed(null))} placeholder="Nhập tin nhắn..."/>
+        <form className="cg-card cg-chat-form" onSubmit={activeChannelId===0?onSend:sendChannelMessage}><label htmlFor="cg-chat-text">Nhắn tin cho # {currentChannel?.name||'Thảo luận chung'}</label><textarea id="cg-chat-text" rows={2} value={activeChannelId===0?messageText:channelDraft} onChange={e=>activeChannelId===0?onMessageText(e.target.value):(setChannelDraft(e.target.value),setChannelUnconfirmed(null))} onKeyDown={e=>{if(!shouldSendChatOnEnter(e.nativeEvent))return;e.preventDefault();e.currentTarget.form?.requestSubmit()}} placeholder="Nhập tin nhắn..."/>
           {channelError&&<p className="cg-error" role="alert">{channelError}</p>}
           <div><button className="cg-secondary" type="button" onClick={onOpenFullChat}><Plus size={17}/>Tệp, trả lời, ghim (chat chung)</button><button type="submit" className="cg-primary" disabled={activeChannelId===0?!canSend:channelSendBusy||(!channelDraft.trim()&&!channelUnconfirmed)}><Send size={16}/>Gửi</button></div></form>
       </section>

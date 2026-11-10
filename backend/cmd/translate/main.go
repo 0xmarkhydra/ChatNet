@@ -462,7 +462,11 @@ func providerHTTPError(status int, raw []byte) error {
 
 func shouldFallbackToChatCompletions(status int) bool {
 	switch status {
-	case http.StatusBadRequest, http.StatusNotFound, http.StatusMethodNotAllowed, http.StatusUnprocessableEntity:
+	case http.StatusBadRequest, http.StatusNotFound, http.StatusMethodNotAllowed,
+		http.StatusUnprocessableEntity, http.StatusInternalServerError,
+		http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		// In auto mode, providers can reject or temporarily fail /responses while
+		// their /chat/completions endpoint remains available.
 		return true
 	default:
 		return false
