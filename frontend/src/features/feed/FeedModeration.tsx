@@ -18,7 +18,7 @@ type Props = {
   onRemoved: (type: Report["targetType"], id: number) => void
 }
 
-// Mounted only on Feed. A 403 hides this entirely from ordinary members.
+// Mounted only on Feed. Checks /api/feed/moderation/me before fetching reports.
 // The backend independently checks database-granted moderator membership.
 export default function FeedModeration({ request, onRemoved }: Props) {
   const [allowed, setAllowed] = useState(false)
@@ -33,13 +33,18 @@ export default function FeedModeration({ request, onRemoved }: Props) {
     setLoading(true)
     setError('')
     try {
+      const meRes = await request('/api/feed/moderation/me')
+      if (!meRes.ok) { setAllowed(false); return }
+      const me = await meRes.json() as { moderator: boolean }
+      if (!me.moderator) { setAllowed(false); return }
+      setAllowed(true)
+
       const response = await request('/api/feed/moderation/reports?limit=30')
       if (response.status === 403) { setAllowed(false); return }
       if (!response.ok) throw new Error('Không tải được báo cáo. Vui lòng thử lại.')
       const items = await response.json() as Report[]
       setReports(items)
       setHasMore(items.length === 30)
-      setAllowed(true)
     } catch {
       setError('Không tải được báo cáo. Vui lòng thử lại.')
     } finally { setLoading(false) }

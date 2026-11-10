@@ -71,6 +71,7 @@ func main() {
 	mux.Handle("/api/contacts", chatProxy)
 	mux.Handle("/api/contacts/", chatProxy)
 	mux.Handle("/api/privacy", chatProxy)
+	mux.Handle("/api/preferences", chatProxy)
 	mux.Handle("/api/preferences/", chatProxy)
 	mux.Handle("/api/conversation-categories", chatProxy)
 	mux.Handle("/api/conversation-categories/", chatProxy)
