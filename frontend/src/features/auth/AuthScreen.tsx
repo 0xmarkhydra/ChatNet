@@ -145,7 +145,7 @@ export default function AuthScreen({
 
             {authError && <div className="auth-alert" role="alert">{authError}</div>}
             <button className="auth-submit" type="submit" disabled={authLoading}>
-              <ArrowRight size={18} /> {authMode === 'register' ? 'Gửi mã xác minh' : usingPassword ? 'Đăng nhập' : 'Gửi mã OTP'}
+              <ArrowRight size={18} /> {authLoading ? (usingPassword ? 'Đang đăng nhập...' : 'Đang gửi...') : authMode === 'register' ? 'Gửi mã xác minh' : usingPassword ? 'Đăng nhập' : 'Gửi mã OTP'}
             </button>
             <div className="auth-login-bottom">
               {authMode === 'login' && !isDesktopBuild && (
