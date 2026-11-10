@@ -115,9 +115,12 @@
 }
 
 .shared-content-tabs button.active {
-  background: #fff;
+  background: transparent;
   color: var(--chatnet-accent-ink);
-  box-shadow: 0 1px 4px rgba(20, 30, 40, .08);
+}
+.shared-content-tabs .shared-content-active-pill {
+  background: #fff;
+  border-radius: 10px;
 }
 
 .shared-content-body {

@@ -47,7 +47,8 @@
 .friends-design-v2 .fd-text-button{border:0;background:transparent;color:#2563eb;font-size:12px;font-weight:700}
 .fd-filters{display:flex;gap:8px;flex:0 0 auto;padding:3px 7px 14px}
 .fd-filters button{border:0;border-radius:12px;min-height:34px;padding:7px 14px;background:transparent;color:#64789c;font-size:12px}
-.fd-filters button.active{background:#ebf0ff;color:#2465eb;font-weight:800}
+.fd-filters button.active{background:transparent;color:#2465eb;font-weight:800}
+.fd-filters .contacts-filter-active-pill{background:#ebf0ff;border-radius:12px}
 .fd-filters button:hover:not(.active){background:#f6f8ff}
 .fd-person-list{overflow-y:auto;overflow-x:hidden;min-height:0;flex:1;display:grid;align-content:start;gap:6px}
 .fd-person-row{
@@ -108,7 +109,8 @@
 .fd-invitation-tabs .fd-back{flex:0 0 30px;height:30px;border:0;background:#f3f6ff;border-radius:9px;color:#6080bf;display:grid;place-items:center}
 .fd-invitation-tabs>div{display:flex;gap:6px;align-items:center;flex:1}
 .fd-invitation-tabs [role=tab]{min-height:35px;border:0;background:transparent;color:#7385a7;border-radius:11px;padding:9px 19px;font-size:12px;white-space:nowrap}
-.fd-invitation-tabs [role=tab].active{background:#ebf0ff;color:#2563eb;font-weight:800}
+.fd-invitation-tabs [role=tab].active{background:transparent;color:#2563eb;font-weight:800}
+.fd-invitation-tabs .invitation-active-pill{background:#ebf0ff;border-radius:11px}
 .fd-invitation-tabs>small{font-size:12px;color:#8091b0;white-space:nowrap}
 .fd-invitation-layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(290px,1fr);gap:17px;flex:1;min-height:0}
 .fd-invitation-list{padding:25px 16px;display:flex;flex-direction:column;min-height:0;overflow:auto}

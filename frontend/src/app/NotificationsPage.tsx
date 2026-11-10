@@ -3,6 +3,7 @@ import { Bell, Check, MessageCircle, Settings, UserRoundPlus, Users, X } from 'l
 import type { FriendConnection } from '../features/contacts/types'
 import type { Conversation } from '../features/chat/types'
 import UserAvatar from '../shared/ui/UserAvatar'
+import useSlidingPill from '../shared/ui/useSlidingPill'
 import { isIncomingFriendRequest, hasUnreadConversation } from './notification-count'
 import './notifications-page.css'
 
@@ -42,6 +43,7 @@ export default function NotificationsPage({
   onOpenConversation, onOpenInvitations, onOpenFriend, onSettings,
 }: Props) {
   const [filter, setFilter] = useState<NotificationFilter>('all')
+  const filtersPill = useSlidingPill<HTMLDivElement>(filter)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [readKeys, setReadKeys] = useState<Set<string>>(() => new Set())
   const notifications = useMemo<Notification[]>(() => {
@@ -88,9 +90,10 @@ export default function NotificationsPage({
     <div className="np-layout">
       <section className="np-card np-list-pane" aria-label="Thông báo mới">
         <h2>Thông báo mới</h2>
-        <div className="np-filters" role="tablist" aria-label="Lọc thông báo">
+        <div ref={filtersPill.hostRef} className="np-filters sliding-pill-host" role="tablist" aria-label="Lọc thông báo">
+          <span ref={filtersPill.pillRef} className="sliding-pill notifications-active-pill" aria-hidden="true" />
           {([['all','Tất cả'], ['unread','Chưa đọc'], ['mentions','Nhắc đến']] as const)
-            .map(([key, label]) => <button type="button" role="tab" key={key}
+            .map(([key, label]) => <button ref={filter === key ? filtersPill.activeRef : undefined} type="button" role="tab" key={key}
               className={filter === key ? 'active' : ''} aria-selected={filter === key}
               onClick={() => setFilter(key)}>{label}</button>)}
         </div>

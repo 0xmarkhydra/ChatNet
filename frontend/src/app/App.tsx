@@ -71,6 +71,7 @@ import UserAvatar, {
   avatarRefreshVersions,
   profileAssetUrl,
 } from "../shared/ui/UserAvatar";
+import useSlidingPill from "../shared/ui/useSlidingPill";
 import MediaAttachmentsView from "../shared/ui/MediaAttachmentsView";
 import UiIcon from "../shared/ui/UiIcon";
 import NearbyRadar from "../features/discover/NearbyRadar";
@@ -284,6 +285,7 @@ export default function App({
   const [globalSearch, setGlobalSearch] = useState("");
   const [chatListQuery, setChatListQuery] = useState('');
   const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'groups'>('all');
+  const chatFiltersPill = useSlidingPill<HTMLDivElement>(chatListFilter);
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const [phoneSearchLayout, setPhoneSearchLayout] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches,
@@ -587,6 +589,7 @@ export default function App({
   const [feedFilter, setFeedFilter] = useState<
     "all" | "following" | "latest" | "saved"
   >("all");
+  const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
   const [feedComposerOpen, setFeedComposerOpen] = useState(false);
   const [feedCheckInOpen, setFeedCheckInOpen] = useState(false);
   const [feedCheckInLocation, setFeedCheckInLocation] = useState("");
@@ -5925,9 +5928,10 @@ export default function App({
                       aria-label="Tìm kiếm toàn bộ cuộc trò chuyện" />
                   </label>
                 )}
-                <div className="social-chat-list-filters" role="group" aria-label="Lọc cuộc trò chuyện">
+                <div ref={chatFiltersPill.hostRef} className="social-chat-list-filters sliding-pill-host" role="group" aria-label="Lọc cuộc trò chuyện">
+                  <span ref={chatFiltersPill.pillRef} className="sliding-pill social-chat-active-pill" aria-hidden="true" />
                   {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
-                    <button key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
+                    <button ref={chatListFilter === filter.key ? chatFiltersPill.activeRef : undefined} key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
                       className={chatListFilter === filter.key ? 'is-active' : ''}
                       onClick={() => setChatListFilter(filter.key)}>{filter.label}</button>
                   ))}
@@ -7312,11 +7316,14 @@ export default function App({
                           : "Bài viết mới"}
                       </strong>
                       <div
-                        className="feed-filter-tabs"
+                        ref={feedFiltersPill.hostRef}
+                        className="feed-filter-tabs sliding-pill-host"
                         role="group"
                         aria-label="Lọc bảng tin"
                       >
+                        <span ref={feedFiltersPill.pillRef} className="sliding-pill feed-filter-active-pill" aria-hidden="true" />
                         <button
+                          ref={!feedCommunitiesOpen && feedFilter === "all" ? feedFiltersPill.activeRef : undefined}
                           type="button"
                           aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
                           onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
@@ -7324,6 +7331,7 @@ export default function App({
                           Mới nhất
                         </button>
                         <button
+                          ref={!feedCommunitiesOpen && feedFilter === "saved" ? feedFiltersPill.activeRef : undefined}
                           type="button"
                           aria-pressed={!feedCommunitiesOpen && feedFilter === "saved"}
                           onClick={() => {

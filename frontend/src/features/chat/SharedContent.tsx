@@ -2,6 +2,7 @@ import { userLabel } from '../../shared/lib/userLabel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, Images, Link2, X } from 'lucide-react'
 import MediaViewer from '../../shared/ui/MediaViewer'
+import useSlidingPill from '../../shared/ui/useSlidingPill'
 
 type MediaAttachment = {
   id?: number
@@ -63,6 +64,7 @@ export default function SharedContent({
   const requestRef = useRef(request)
   requestRef.current = request
   const [tab, setTab] = useState<Tab>('media')
+  const tabsPill = useSlidingPill<HTMLElement>(tab)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [items, setItems] = useState<SharedMessage[]>([])
   const [nextBefore, setNextBefore] = useState<number | undefined>()
@@ -133,9 +135,10 @@ export default function SharedContent({
           <button type="button" onClick={onClose} aria-label="Đóng"><X size={20} /></button>
         </header>
 
-        <nav className="shared-content-tabs" aria-label="Loại nội dung">
+        <nav ref={tabsPill.hostRef} className="shared-content-tabs sliding-pill-host" aria-label="Loại nội dung">
+          <span ref={tabsPill.pillRef} className="sliding-pill shared-content-active-pill" aria-hidden="true" />
           {tabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
+            <button ref={tab === id ? tabsPill.activeRef : undefined} key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
               <Icon size={17} /><span>{label}</span>
             </button>
           ))}

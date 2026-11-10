@@ -160,8 +160,12 @@
   }
   .social-chat-list-filters button.is-active {
     border-color: #e3eafd;
-    background: #eff3ff;
+    background: transparent;
     color: #2563eb;
+  }
+  .social-chat-list-filters .social-chat-active-pill {
+    background: #eff3ff;
+    border-radius: 9px;
   }
 
   /* Preserve category filtering, tucked beside the list heading rather than taking an extra row. */

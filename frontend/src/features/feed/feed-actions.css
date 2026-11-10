@@ -573,9 +573,14 @@
 }
 .feed-filter-tabs button[aria-pressed="true"] {
   color: #335ddd;
-  background: #fff;
-  box-shadow: 0 1px 6px #2a4c8a20;
+  background: transparent;
+  box-shadow: none;
   font-weight: 700;
+}
+.feed-filter-tabs .feed-filter-active-pill {
+  background: #fff;
+  border-radius: 9px;
+  box-shadow: 0 1px 6px #2a4c8a20;
 }
 .feed-comment-menu {
   position: relative;

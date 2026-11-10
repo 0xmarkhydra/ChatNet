@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ShoppingBag, ShoppingCart, ClipboardList } from 'lucide-react'
+import useSlidingPill from './shared/ui/useSlidingPill'
 import './marketplace.css'
 
 type Product = {
@@ -23,6 +24,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
   const apiRef = useRef(request)
   apiRef.current = request
   const [view, setView] = useState<'products' | 'cart' | 'orders' | 'sell'>('products')
+  const tabsPill = useSlidingPill<HTMLElement>(view)
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [orders, setOrders] = useState<Order[]>([])
@@ -127,11 +129,12 @@ export default function Marketplace({ userId, request, onBack }: Props) {
         <h2>SocCO Market</h2>
         <span>Sàn mua bán trên ChatNet</span>
       </header>
-      <nav className="marketplace-tabs" aria-label="Sàn mua bán">
-        <button type="button" className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><ShoppingBag size={17}/> Sản phẩm</button>
-        <button type="button" className={view === 'cart' ? 'active' : ''} onClick={() => setView('cart')}><ShoppingCart size={17}/> Giỏ ({cart.length})</button>
-        <button type="button" className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ClipboardList size={17}/> Đơn hàng</button>
-        <button type="button" className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}>+ Bán hàng</button>
+      <nav ref={tabsPill.hostRef} className="marketplace-tabs sliding-pill-host" aria-label="Sàn mua bán">
+        <span ref={tabsPill.pillRef} className="sliding-pill marketplace-active-pill" aria-hidden="true" />
+        <button ref={view === 'products' ? tabsPill.activeRef : undefined} type="button" className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><ShoppingBag size={17}/> Sản phẩm</button>
+        <button ref={view === 'cart' ? tabsPill.activeRef : undefined} type="button" className={view === 'cart' ? 'active' : ''} onClick={() => setView('cart')}><ShoppingCart size={17}/> Giỏ ({cart.length})</button>
+        <button ref={view === 'orders' ? tabsPill.activeRef : undefined} type="button" className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ClipboardList size={17}/> Đơn hàng</button>
+        <button ref={view === 'sell' ? tabsPill.activeRef : undefined} type="button" className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}>+ Bán hàng</button>
       </nav>
       <div className="marketplace-body">
         <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>

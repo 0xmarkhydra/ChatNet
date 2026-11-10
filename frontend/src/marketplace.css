@@ -7,7 +7,8 @@
 .marketplace-header button{width:36px;height:36px;border:1px solid #e2e8f0;border-radius:10px;background:white;display:grid;place-items:center;cursor:pointer}
 .marketplace-tabs{display:flex;gap:7px;padding:10px 16px;overflow-x:auto;background:white;border-bottom:1px solid #e2e8f0}
 .marketplace-tabs button{display:flex;align-items:center;white-space:nowrap;gap:6px;border:0;border-radius:10px;padding:10px 14px;background:transparent;color:#475569;cursor:pointer;font-size:14px}
-.marketplace-tabs button.active{background:#e0e7ff;color:#3730a3;font-weight:700}
+.marketplace-tabs button.active{background:transparent;color:#3730a3;font-weight:700}
+.marketplace-tabs .marketplace-active-pill{background:#e0e7ff;border-radius:10px}
 .marketplace-body{padding:18px;overflow:auto;flex:1}
 .marketplace-warning,.marketplace-error,.marketplace-message{border-radius:12px;padding:12px 14px;font-size:13px;margin:0 0 16px}
 .marketplace-warning{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}

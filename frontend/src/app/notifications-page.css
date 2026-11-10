@@ -43,7 +43,8 @@
 .np-list-pane{display:flex;flex-direction:column;min-height:0}
 .np-filters{display:flex;align-items:center;gap:7px;margin:0 0 18px}
 .np-filters button{border:0;background:transparent;color:#788cad;padding:9px 16px;border-radius:12px;font-size:12px;min-width:82px}
-.np-filters button.active{font-weight:770;color:#2763e7;background:#eaf0ff}
+.np-filters button.active{font-weight:770;color:#2763e7;background:transparent}
+.np-filters .notifications-active-pill{background:#eaf0ff;border-radius:12px}
 .np-filters button:hover:not(.active){background:#f5f7fc}
 .np-notification-list{min-height:0;overflow:auto;display:grid;align-content:start;gap:8px}
 .np-notification-row{
