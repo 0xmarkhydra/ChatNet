@@ -358,6 +358,7 @@ export default function App({
     y: number;
     messageId: number;
   } | null>(null);
+  const suppressMessageClick = useRef<number | null>(null);
 
   const [sharedContentOpen, setSharedContentOpen] = useState(false);
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
@@ -1413,9 +1414,11 @@ export default function App({
     x: number,
     y: number,
     button: number,
+    pointerType: string,
     target: EventTarget | null,
   ) {
-    if (message.deleted || button !== 0) return;
+    // Mouse users keep native text selection and the existing right-click menu.
+    if (message.deleted || button !== 0 || pointerType === "mouse") return;
     const element =
       target instanceof Element
         ? target
@@ -1423,23 +1426,18 @@ export default function App({
           ? target.parentElement
           : null;
     if (element?.closest("button,input,textarea,select,video,audio")) return;
-    // Long-press on a link or an image should offer the same chat copy action.
-    if (
-      element?.closest("a") &&
-      !element.closest("a.message-inline-link, .media-item")
-    )
-      return;
-    // Keep native selection when long-pressing ordinary message text.
-    if (
-      element?.closest(".message-selectable-text") &&
-      !element.closest("a.message-inline-link")
-    )
-      return;
+    // Only touch-holding the bubble (including text, links and attachments)
+    // opens the sheet; holding the avatar or empty timeline does not.
+    if (!element?.closest(".bubble, .chat-message-media, .message-reply-quote")) return;
+    if (element.closest("a") && !element.closest("a.message-inline-link, .media-item")) return;
     cancelMessageLongPress();
+    suppressMessageClick.current = null;
     messageLongPressStart.current = { x, y, messageId: message.id };
     messageLongPressTimer.current = window.setTimeout(() => {
-      if (messageLongPressStart.current?.messageId === message.id)
+      if (messageLongPressStart.current?.messageId === message.id) {
+        suppressMessageClick.current = message.id;
         openMessageActions(message, target);
+      }
     }, 500);
   }
 
@@ -6473,11 +6471,20 @@ export default function App({
                         <article
                           data-message-id={message.id}
                           className={mine ? 'message mine message-press-target' : 'message message-press-target'}
-                          onPointerDown={(event) => { if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target) }}
+                          onPointerDown={(event) => {
+                            suppressMessageClick.current = null
+                            if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.pointerType, event.target)
+                          }}
                           onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
                           onPointerUp={cancelMessageLongPress}
                           onPointerCancel={cancelMessageLongPress}
                           onPointerLeave={cancelMessageLongPress}
+                          onClickCapture={(event) => {
+                            if (suppressMessageClick.current !== message.id) return
+                            event.preventDefault()
+                            event.stopPropagation()
+                            suppressMessageClick.current = null
+                          }}
                           onContextMenu={(event) => {
                             if (message.deleted || conversationBlocked) return
                             // Keep native context-copy for text selected inside this message.

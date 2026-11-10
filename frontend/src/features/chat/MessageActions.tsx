@@ -3,7 +3,7 @@ import type { Message } from './types'
 import { messageReactions } from './messageReactions'
 import { attachmentLabel, formatTime } from '../../shared/lib/format'
 import type { MessageCopyTarget } from './messageCopyTarget'
-import { Copy, Pin } from 'lucide-react'
+import { Copy, Languages, Pin, Reply } from 'lucide-react'
 
 type Props = {
   activeMessageAction: Message
@@ -90,7 +90,7 @@ export default function MessageActions({
               setMessageActionId(null)
             }}
           >
-            <span aria-hidden="true">↩</span>
+            <span aria-hidden="true"><Reply size={21} strokeWidth={2} /></span>
             <b>Trả lời</b>
           </button>
 
@@ -109,7 +109,7 @@ export default function MessageActions({
                 void translateMessage(activeMessageAction)
               }}
             >
-              <span aria-hidden="true">文</span>
+              <span aria-hidden="true"><Languages size={21} strokeWidth={2} /></span>
               <b>Dịch</b>
             </button>
           )}
