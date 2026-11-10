@@ -28,6 +28,20 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	channelID := int64(0)
+	if raw := strings.TrimSpace(r.URL.Query().Get("channelId")); raw != "" {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || value < 0 {
+			httpx.Error(w, 400, "invalid channel id")
+			return
+		}
+		channelID = value
+	}
+	if channelID > 0 && !s.groupChannelExists(r.Context(), conversationID, channelID) {
+		httpx.Error(w, 404, "channel not found")
+		return
+	}
+
 	kind := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("kind")))
 	if kind == "" {
 		kind = "media"
@@ -58,11 +72,11 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,m.text,m.created_at
+		SELECT m.id,m.conversation_id,m.channel_id,m.user_id,u.username,u.display_name,m.text,m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
 		JOIN conversation_members viewer ON viewer.conversation_id=m.conversation_id AND viewer.user_id=$5
-		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id
+		WHERE m.conversation_id=$1 AND m.channel_id=$6 AND m.id>viewer.cleared_through_message_id
 		  AND m.deleted_at IS NULL
 		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR
@@ -83,7 +97,7 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 		  )
 		ORDER BY m.id DESC
 		LIMIT $4
-	`, conversationID, before, kind, limit, claims.UserID)
+	`, conversationID, before, kind, limit, claims.UserID, channelID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load shared content")
 		return
@@ -96,6 +110,7 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(
 			&item.ID,
 			&item.ConversationID,
+			&item.ChannelID,
 			&item.SenderID,
 			&item.Sender,
 			&item.SenderDisplayName,

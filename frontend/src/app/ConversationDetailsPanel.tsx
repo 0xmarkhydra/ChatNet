@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Ban, Bell, CalendarClock, ChevronDown, ChevronRight, ClipboardList, FileText, Images, Languages, Link2, MoreHorizontal, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
+import { Ban, Bell, CalendarClock, ChevronDown, ChevronRight, ClipboardList, FileText, Images, Languages, Link2, MoreHorizontal, Hash, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
 import type { GroupActivityKind } from '../features/chat/GroupActivities'
 import type { Conversation } from '../features/chat/types'
 import { CallHeaderActions } from '../features/calls/CallManager'
 import UserAvatar from '../shared/ui/UserAvatar'
+import type { GroupChannel } from '../features/chat/groupChannels'
 
 type Props = {
   conversation: Conversation
@@ -15,6 +16,9 @@ type Props = {
   onTranslate: () => void
   onNotifications: () => void
   onCreateGroupActivity: (kind: GroupActivityKind) => void
+  channels: GroupChannel[]
+  selectedChannelId: number
+  onSelectChannel: (id: number) => void
   onBlock: () => void
   onUnblock: () => void
   onClearHistory: () => void
@@ -22,7 +26,7 @@ type Props = {
 
 export default function ConversationDetailsPanel({
   conversation, busy, onClose, onProfile, onSearch, onShared, onTranslate,
-  onNotifications, onCreateGroupActivity, onBlock, onUnblock, onClearHistory,
+  onNotifications, onCreateGroupActivity, channels, selectedChannelId, onSelectChannel, onBlock, onUnblock, onClearHistory,
 }: Props) {
   const isGroup = conversation.type === 'group'
   const blocked = !isGroup && Boolean(conversation.blockedByMe || conversation.blockedByOther)
@@ -68,6 +72,17 @@ export default function ConversationDetailsPanel({
         ))}
         {isGroup && (
           <div className="conversation-group-options">
+            <div className="conversation-channel-list" aria-label="Danh sách kênh hội thoại">
+              <strong className="conversation-channel-list-header">Kênh hội thoại</strong>
+              {channels.map(channel => (
+                <button key={channel.id} type="button" aria-current={channel.id === selectedChannelId}
+                  onClick={() => onSelectChannel(channel.id)}>
+                  <Hash size={17} aria-hidden="true" />
+                  <span>{channel.name}</span>
+                  {channel.id === selectedChannelId && <span aria-hidden="true">✓</span>}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               className="conversation-group-options-trigger"

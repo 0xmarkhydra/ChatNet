@@ -11,6 +11,8 @@ import { refreshDesktopUnread } from '../../platform/useDesktopNotifications'
 type Options = Omit<AppDataContext, 'setStatus'> &
   Pick<ReturnType<typeof useConversationData>, 'setConversations'> & {
     activeConversationId: number | null
+    activeChannelId: number
+    activeChannelIdRef: RefObject<number>
     activeConversationIdRef: RefObject<number | null>
     translationPreferencesLoaded: boolean
     targetLanguage: string
@@ -32,6 +34,8 @@ export function useMessageData({
   apiFetch,
   setNotice,
   activeConversationId,
+  activeChannelId,
+  activeChannelIdRef,
   activeConversationIdRef,
   translationPreferencesLoaded,
   targetLanguage,
@@ -70,11 +74,14 @@ export function useMessageData({
     const changes = new Set<number>()
     messageChanges.current = changes
     setTranslations({})
+    // Never show another channel's messages while its own history is loading.
+    setMessages([])
+    setHasMoreMessages(false)
     const jump = jumpToMessage?.conversationId === activeConversationId ? jumpToMessage : null
     setMessageGapBefore(null)
     const pageSize = jump ? 80 : MESSAGE_PAGE_SIZE
     const before = jump ? `&before=${jump.messageId + 1}` : ''
-    const basePath = `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}`
+    const basePath = `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}&channelId=${activeChannelId}`
     const requestedPages = [
       apiFetch(`${basePath}&limit=${pageSize}${before}`),
       ...(jump ? [apiFetch(`${basePath}&limit=200`)] : []),
@@ -90,7 +97,7 @@ export function useMessageData({
         if (cancelled) return
         // Include the targeted history and newer messages from BOTH participants.
         const byId = new Map(pages.flat().map((item) => [item.id, item]))
-        const data = [...byId.values()].sort((a, b) => a.id - b.id)
+        const data = [...byId.values()].filter(item => (item.channelId || 0) === activeChannelId).sort((a, b) => a.id - b.id)
 
         // Reconcile a POST whose ACK vanished before refresh. A persisted
         // clientId in history is proof of delivery; no second POST is needed.
@@ -99,7 +106,7 @@ export function useMessageData({
         if (confirmed && recovered) {
           clearPendingSend(session.user.id, recovered.clientId)
           if (pendingSend.current?.clientId === recovered.clientId) pendingSend.current = null
-          setMessageDrafts((current) => {
+          if (!confirmed.channelId) setMessageDrafts((current) => {
             const existing = current[confirmed.conversationId]
             if (!existing || existing.text.trim() !== confirmed.text || existing.attachments.length > 0) return current
             const next = { ...current }
@@ -117,8 +124,8 @@ export function useMessageData({
         // The older-page cursor applies to the anchor page, not the combined result.
         setHasMoreMessages(pages[0].length === pageSize)
         setMessages((current) => {
-          const live = current.filter((item) => item.conversationId === activeConversationId && changes.has(item.id))
-          const existing = jump ? current.filter((item) => item.conversationId === activeConversationId) : []
+          const live = current.filter((item) => item.conversationId === activeConversationId && (item.channelId || 0) === activeChannelId && changes.has(item.id))
+          const existing = jump ? current.filter((item) => item.conversationId === activeConversationId && (item.channelId || 0) === activeChannelId) : []
           const merged = new Map(existing.map((item) => [item.id, item]))
           for (const item of data) if (!changes.has(item.id)) merged.set(item.id, item)
           for (const item of live) merged.set(item.id, item)
@@ -156,6 +163,7 @@ export function useMessageData({
     }
   }, [
     activeConversationId,
+    activeChannelId,
     session?.token,
     targetLanguage,
     translationPreferencesLoaded,
@@ -196,11 +204,11 @@ export function useMessageData({
     setMessageGapLoading(true)
     try {
       const response = await apiFetch(
-        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=80&before=${before}`,
+        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&channelId=${activeChannelId}&limit=80&before=${before}`,
       )
       if (!response.ok) throw new Error('Không tải được tin nhắn ở giữa')
       const data = (await response.json()) as Message[]
-      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId) return
+      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId || activeChannelIdRef.current !== activeChannelId) return
       const lowerWindowMax = messages.reduce((max, item) => item.id < before ? Math.max(max, item.id) : max, 0)
       const newMin = data.reduce((min, item) => Math.min(min, item.id), Infinity)
       setMessageGapBefore(data.length === 80 && newMin > lowerWindowMax ? newMin : null)
@@ -236,11 +244,11 @@ export function useMessageData({
     setMessagesLoadingMore(true)
     try {
       const response = await apiFetch(
-        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&limit=${MESSAGE_PAGE_SIZE}&before=${before}`,
+        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&channelId=${activeChannelId}&limit=${MESSAGE_PAGE_SIZE}&before=${before}`,
       )
       if (!response.ok) throw new Error('Không tải thêm được lịch sử tin nhắn')
       const data = (await response.json()) as Message[]
-      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId) return
+      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId || activeChannelIdRef.current !== activeChannelId) return
       setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
       if (data.length > 0) {
         const container = messagesScrollRef.current

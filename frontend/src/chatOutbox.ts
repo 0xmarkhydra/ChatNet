@@ -11,6 +11,7 @@ export type QueuedChatAttachment = {
 export type QueuedChatMessage = {
   clientId: string
   conversationId: number
+  channelId?: number
   text: string
   attachments: QueuedChatAttachment[]
   replyToMessageId?: number
@@ -49,6 +50,7 @@ function validItem(value: unknown): value is QueuedChatMessage {
   if (!value || typeof value !== 'object') return false
   const m = value as QueuedChatMessage
   return validClientID(m.clientId) && validID(m.conversationId) &&
+    (m.channelId === undefined || (Number.isSafeInteger(m.channelId) && m.channelId >= 0)) &&
     typeof m.text === 'string' && m.text.length <= 4000 &&
     typeof m.createdAt === 'string' && !Number.isNaN(Date.parse(m.createdAt)) &&
     (m.replyToMessageId === undefined || validID(m.replyToMessageId)) &&
@@ -68,6 +70,7 @@ function safeItem(item: QueuedChatMessage): QueuedChatMessage {
   return {
     clientId: item.clientId,
     conversationId: item.conversationId,
+    ...(item.channelId ? { channelId: item.channelId } : {}),
     text: item.text,
     attachments: item.attachments.map(({ storageRef, name, sizeBytes, contentType, kind }) =>
       ({ storageRef, name, sizeBytes, contentType, kind })),

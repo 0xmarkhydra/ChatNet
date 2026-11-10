@@ -86,9 +86,9 @@ func (s *server) createGroupChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	role, cfg, err := groupGovernanceTx(r.Context(), tx, id, claims.UserID, true)
-	if err != nil || !groupPermission(role, cfg, "edit") {
-		httpx.Error(w, 403, "group edit permission required")
+	role, _, err := groupGovernanceTx(r.Context(), tx, id, claims.UserID, true)
+	if err != nil || role != "owner" {
+		httpx.Error(w, 403, "only group owner can create channels")
 		return
 	}
 	var locked int64

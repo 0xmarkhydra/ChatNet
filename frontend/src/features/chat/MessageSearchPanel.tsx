@@ -7,6 +7,7 @@ import './message-search-panel.css'
 
 type Props = {
   conversationId: number
+  channelId?: number
   request: (path: string, init?: RequestInit) => Promise<Response>
   onJump: (message: Message) => Promise<void>
   onClose: () => void
@@ -48,7 +49,7 @@ function matchesFilters(message: Message, sender: string, from: string, to: stri
   return (!from || localDay >= from) && (!to || localDay <= to)
 }
 
-export default function MessageSearchPanel({ conversationId, request, onJump, onClose }: Props) {
+export default function MessageSearchPanel({ conversationId, channelId = 0, request, onJump, onClose }: Props) {
   const requestRef = useRef(request)
   requestRef.current = request
   const [keyword, setKeyword] = useState('')
@@ -108,7 +109,7 @@ export default function MessageSearchPanel({ conversationId, request, onJump, on
     setLoading(true)
     const timer = window.setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
+        const params = new URLSearchParams({ limit: String(PAGE_SIZE), channelId: String(channelId) })
         if (keyword.trim()) params.set('search', keyword.trim())
         if (sender.trim()) params.set('sender', sender.trim().replace(/^@/, ''))
         if (from) params.set('from', from)
@@ -129,7 +130,7 @@ export default function MessageSearchPanel({ conversationId, request, onJump, on
       }
     }, 300)
     return () => { window.clearTimeout(timer); ++sequence.current }
-  }, [conversationId, keyword, sender, from, to, hasFilters, invalidDates])
+  }, [conversationId, channelId, keyword, sender, from, to, hasFilters, invalidDates])
 
   // The message search API filters text only; shared files supply filename matches.
   useEffect(() => {
@@ -142,7 +143,7 @@ export default function MessageSearchPanel({ conversationId, request, onJump, on
     setLoadingFiles(true)
     const timer = window.setTimeout(async () => {
       try {
-        const response = await requestRef.current('/api/conversations/' + conversationId + '/shared?kind=files&limit=48')
+        const response = await requestRef.current('/api/conversations/' + conversationId + '/shared?kind=files&channelId=' + channelId + '&limit=48')
         if (!response.ok) throw new Error('Không tải được danh sách file')
         const page = await response.json() as SharedPage
         if (fileSequence.current !== id) return
@@ -155,11 +156,11 @@ export default function MessageSearchPanel({ conversationId, request, onJump, on
       }
     }, 300)
     return () => { window.clearTimeout(timer); ++fileSequence.current }
-  }, [conversationId, keyword, sender, from, to, hasFilters, invalidDates])
+  }, [conversationId, channelId, keyword, sender, from, to, hasFilters, invalidDates])
 
   const fileHits = useMemo(() => fileMessages.filter((message) =>
-    !message.deleted && matchesFilters(message, sender, from, to) && searchFileName(message, keyword.trim())
-  ), [fileMessages, sender, from, to, keyword])
+    !message.deleted && (message.channelId || 0) === channelId && matchesFilters(message, sender, from, to) && searchFileName(message, keyword.trim())
+  ), [fileMessages, channelId, sender, from, to, keyword])
 
   const messageHits = useMemo(() => {
     const byId = new Map<number, Message>()

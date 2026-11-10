@@ -9,6 +9,7 @@ type Options = {
   session: Session | null
   sessionRef: RefObject<Session | null>
   tab: Tab
+  communityWorkspaceOpen: boolean
   activeConversationId: number | null
   activeConversationType?: Conversation['type']
   activeConversationIdRef: RefObject<number | null>
@@ -25,6 +26,7 @@ export function useGroupManagement({
   session,
   sessionRef,
   tab,
+  communityWorkspaceOpen,
   activeConversationId,
   activeConversationType,
   activeConversationIdRef,
@@ -38,7 +40,6 @@ export function useGroupManagement({
 }: Options) {
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
-  const [groupNameDraft, setGroupNameDraft] = useState('')
   const [groupInviteSearch, setGroupInviteSearch] = useState('')
   const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
   const [groupBusy, setGroupBusy] = useState(false)
@@ -51,7 +52,7 @@ export function useGroupManagement({
   useEffect(() => {
     setGroupMembers([])
     setGroupPolicy(null)
-    if (tab !== 'chat' || activeConversationType !== 'group' || !activeConversationId || !session?.token) return
+    if ((tab !== 'chat' && !communityWorkspaceOpen) || activeConversationType !== 'group' || !activeConversationId || !session?.token) return
 
     const controller = new AbortController()
     const groupId = activeConversationId
@@ -73,12 +74,12 @@ export function useGroupManagement({
         }),
     ])
     return () => controller.abort()
-  }, [activeConversationId, activeConversationType, session?.token, tab, activeConversationIdRef])
+  }, [activeConversationId, activeConversationType, session?.token, tab, communityWorkspaceOpen, activeConversationIdRef])
 
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
   const canInviteActiveGroup = activeGroupMember?.role === 'owner' || (activeGroupMember?.role === 'admin' && groupPolicy?.adminCanInvite === true)
-  const canEditActiveGroup = activeGroupMember?.role === 'owner' || (activeGroupMember?.role === 'admin' && groupPolicy?.adminCanEditInfo === true)
+  const canEditGroup = activeGroupMember?.role === 'owner' || (activeGroupMember?.role === 'admin' && groupPolicy?.adminCanEditInfo === true)
   const groupInviteCandidates = useMemo(() => {
     const memberIds = new Set(groupMembers.map((member) => member.id))
     const normalized = groupInviteSearch.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
@@ -90,7 +91,6 @@ export function useGroupManagement({
 
   function openGroupSettings(conversation: Conversation) {
     setGroupSettingsOpen(true)
-    setGroupNameDraft(conversation.name)
     setGroupInviteSearch('')
     setGroupInviteSelection([])
     setGroupPolicy(null)
@@ -123,37 +123,6 @@ export function useGroupManagement({
       }
     } catch {
       setNotice('Không tải được danh sách thành viên nhóm.')
-    }
-  }
-
-  async function renameActiveGroup(): Promise<boolean> {
-    if (!activeConversationId || !groupNameDraft.trim() || actionLocks.current.has('group:write')) return false
-    const sessionId = session?.sessionId
-    actionLocks.current.add('group:write')
-    setGroupBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: groupNameDraft.trim() }),
-      })
-      const result = await response.json().catch(() => null) as { error?: string } | null
-      if (sessionRef.current?.sessionId !== sessionId) return false
-      if (!response.ok) {
-        setNotice(result?.error || 'Không đổi được tên nhóm')
-        return false
-      }
-      setNotice('Đã cập nhật tên nhóm.')
-      await refreshConversations()
-      return true
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) setNotice('Không thể đổi tên nhóm. Hãy thử lại.')
-      return false
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete('group:write')
-        setGroupBusy(false)
-      }
     }
   }
 
@@ -271,8 +240,6 @@ export function useGroupManagement({
     setGroupSettingsOpen,
     groupMembers,
     setGroupMembers,
-    groupNameDraft,
-    setGroupNameDraft,
     groupInviteSearch,
     setGroupInviteSearch,
     groupInviteSelection,
@@ -282,12 +249,11 @@ export function useGroupManagement({
     activeGroupMember,
     canManageActiveGroup,
     canInviteActiveGroup,
-    canEditActiveGroup,
+    canEditGroup,
     groupInviteCandidates,
     openGroupSettings,
     launchGroupCall,
     refreshGroupMembers,
-    renameActiveGroup,
     inviteGroupMembers,
     changeGroupMemberRole,
     removeGroupMember,
