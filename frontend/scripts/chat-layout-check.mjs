@@ -125,7 +125,7 @@ try {
       // One outlined shell for each input: no nested shape or pseudo-element.
       const surfaceAudit = await page.evaluate(() => {
         const form = document.querySelector('.social-chat-layout .media-composer')
-        const field = form?.querySelector('input[aria-label="Tin nhắn"]')
+        const field = form?.querySelector('textarea[aria-label="Tin nhắn"]')
         if (!form || !field) throw new Error('Chat composer input not found')
         const sty = el => getComputedStyle(el)
         const borderFree = el => parseFloat(sty(el).borderTopWidth) === 0 &&
@@ -174,7 +174,7 @@ try {
         assert.ok(item.borderFree && item.transparent,
           `Nested input style found in ${item.name}: ${JSON.stringify(item)}`)
       }
-      const inputTypography = await page.locator('.media-composer input[aria-label="Tin nhắn"]').evaluate(
+      const inputTypography = await page.locator('.media-composer textarea[aria-label="Tin nhắn"]').evaluate(
         input => parseFloat(getComputedStyle(input).fontSize))
       assert.ok(inputTypography >= (width > 760 ? 15 : 16),
         `Chat input font too small at ${width}px: ${inputTypography}px`)
