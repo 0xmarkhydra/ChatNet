@@ -9,6 +9,7 @@ import VisitorProfile from "../features/profile/VisitorProfile";
 import { userLabel } from "../shared/lib/userLabel";
 import { useMessageData } from "../features/chat/useMessageData";
 import { useChatPins } from "../features/chat/useChatPins";
+import { shouldSendChatOnEnter } from "../features/chat/composerKeyboard";
 import "../features/chat/chat-pins.css";
 import { getMessageTranslationView } from "../features/chat/messageTranslationPresentation";
 import { useApiRequest } from "./useApiRequest";
@@ -795,7 +796,13 @@ export default function App({
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const postComposerRef = useRef<HTMLTextAreaElement>(null);
-  const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const input = messageInputRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(input.scrollHeight, 154)}px`;
+  }, [messageText, activeConversationId, tab, desktopSection]);
   const chatDragDepth = useRef(0);
   const [chatDragActive, setChatDragActive] = useState(false);
   useEffect(() => {
@@ -6704,12 +6711,19 @@ export default function App({
                         onCreate={setGroupActivityCreateKind}
                       />
                     )}
-                    <input
+                    <textarea
                       ref={messageInputRef}
+                      className="chat-message-input"
+                      rows={1}
                       aria-label="Tin nhắn"
                       placeholder={isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
                       value={messageText}
                       onChange={(event) => setMessageText(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (!shouldSendChatOnEnter(event.nativeEvent)) return;
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
+                      }}
                       onPaste={(event) => {
                         const files = chatFilesFromClipboard(event.clipboardData)
                         if (files.length === 0) return // Preserve normal text paste (Cmd/Ctrl+V).
