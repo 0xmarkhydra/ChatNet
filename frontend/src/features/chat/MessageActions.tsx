@@ -6,6 +6,7 @@ import type { MessageCopyTarget } from './messageCopyTarget'
 import { Copy, Languages, Pin, Reply } from 'lucide-react'
 
 type Props = {
+  mode?: 'reactions' | 'actions'
   activeMessageAction: Message
   userId: number
   isPinned: boolean
@@ -21,6 +22,7 @@ type Props = {
 }
 
 export default function MessageActions({
+  mode = 'actions',
   activeMessageAction,
   userId,
   isPinned,
@@ -38,22 +40,25 @@ export default function MessageActions({
   const preview = activeMessageAction.text.trim() || attachmentLabel(activeMessageAction.attachments)
   return (
     <div
-      className="message-context-backdrop"
+      className={mode === 'reactions' ? 'message-context-backdrop reaction-only' : 'message-context-backdrop'}
       role="dialog"
       aria-modal="true"
-      aria-label="Tùy chọn tin nhắn"
-      onMouseDown={(event) => {
+      aria-label={mode === 'reactions' ? 'Chọn cảm xúc' : 'Tùy chọn tin nhắn'}
+      onClick={(event) => {
         if (event.currentTarget === event.target) setMessageActionId(null)
       }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setMessageActionId(null)
+      }}
     >
-      <section className="message-context-sheet">
-        <div className={mine ? 'message-context-preview mine' : 'message-context-preview'}>
+      <section className={mode === 'reactions' ? 'message-context-sheet reaction-only' : 'message-context-sheet'}>
+        {mode === 'actions' && <div className={mine ? 'message-context-preview mine' : 'message-context-preview'}>
           <small>{mine ? 'Bạn' : userLabel(activeMessageAction.senderDisplayName, activeMessageAction.sender)}</small>
           <div className="message-context-preview-bubble">{preview || 'Tin nhắn'}</div>
           <time>{formatTime(activeMessageAction.createdAt)}</time>
-        </div>
+        </div>}
 
-        <div className="message-context-reactions" aria-label="Thả cảm xúc">
+        {mode === 'reactions' && <div className="message-context-reactions" aria-label="Thả cảm xúc">
           {messageReactions.map(({ emoji, label }) => (
             <button
               key={emoji}
@@ -71,9 +76,9 @@ export default function MessageActions({
               <small>{label}</small>
             </button>
           ))}
-        </div>
+        </div>}
 
-        <div className="message-context-actions">
+        {mode === 'actions' && <div className="message-context-actions">
           {!activeMessageAction.deleted && (
             <button type="button" onClick={() => {
                 setMessageActionId(null)
@@ -140,15 +145,15 @@ export default function MessageActions({
               <b>Thu hồi</b>
             </button>
           )}
-        </div>
+        </div>}
 
-        <button
+        {mode === 'actions' && <button
           type="button"
           className="message-context-cancel"
           onClick={() => setMessageActionId(null)}
         >
           Đóng
-        </button>
+        </button>}
       </section>
     </div>
   )

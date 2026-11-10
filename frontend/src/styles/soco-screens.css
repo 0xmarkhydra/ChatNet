@@ -340,3 +340,48 @@
 @media (prefers-reduced-motion: reduce) {
   .incoming-call-orb { animation: none; }
 }
+
+/* The reaction button opens only a compact emoji picker. Other message
+   actions remain exclusive to the desktop context menu / touch long-press. */
+.modern-shell .message-context-backdrop.reaction-only {
+  background: rgba(17, 24, 50, .24);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  place-items: center;
+}
+.modern-shell .message-context-sheet.reaction-only {
+  width: min(420px, 100%);
+  max-height: none;
+  overflow: visible;
+  display: block;
+  padding: 7px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgba(20, 36, 87, .2);
+}
+.modern-shell .message-context-sheet.reaction-only .message-context-reactions {
+  padding: 7px 4px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  box-shadow: none;
+}
+@media (max-width: 760px) {
+  .modern-shell .message-context-backdrop.reaction-only {
+    align-items: center;
+    padding: 12px;
+  }
+  .modern-shell .message-context-sheet.reaction-only {
+    width: min(420px, 100%);
+    max-height: none;
+    padding: 8px;
+    border-radius: 24px;
+  }
+  .modern-shell .message-context-sheet.reaction-only .message-context-reactions {
+    padding: 5px 2px;
+    gap: 2px;
+  }
+  .modern-shell .message-context-sheet.reaction-only .message-context-reactions button {
+    height: 62px;
+  }
+}
