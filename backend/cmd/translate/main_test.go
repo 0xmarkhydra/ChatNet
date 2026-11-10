@@ -27,48 +27,57 @@ func TestCacheKeyChangesWithTarget(t *testing.T) {
 }
 
 func TestAutoFallsBackToChatCompletions(t *testing.T) {
-	responsesCalls := 0
-	chatCalls := 0
+	for _, upstreamStatus := range []int{
+		http.StatusNotFound,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+	} {
+		t.Run(http.StatusText(upstreamStatus), func(t *testing.T) {
+			responsesCalls := 0
+			chatCalls := 0
 
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/responses":
-			responsesCalls++
-			http.Error(w, "not found", http.StatusNotFound)
-		case "/chat/completions":
-			chatCalls++
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"Xin chào"}}]}`))
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer upstream.Close()
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/responses":
+					responsesCalls++
+					http.Error(w, "provider error", upstreamStatus)
+				case "/chat/completions":
+					chatCalls++
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"Xin chào"}}]}`))
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer upstream.Close()
 
-	s := &server{
-		apiKey:     "test-key",
-		baseURL:    upstream.URL,
-		model:      "partner-model",
-		apiStyle:   "auto",
-		provider:   "partner",
-		authHeader: "Authorization",
-		authScheme: "Bearer",
-		client:     &http.Client{Timeout: 2 * time.Second},
-	}
+			s := &server{
+				apiKey:     "test-key",
+				baseURL:    upstream.URL,
+				model:      "partner-model",
+				apiStyle:   "auto",
+				provider:   "partner",
+				authHeader: "Authorization",
+				authScheme: "Bearer",
+				client:     &http.Client{Timeout: 2 * time.Second},
+			}
 
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	value, style, err := s.callAI(req, "Hello", "vi")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if value != "Xin chào" {
-		t.Fatalf("translation=%q", value)
-	}
-	if style != "chat_completions" {
-		t.Fatalf("style=%q", style)
-	}
-	if responsesCalls != 1 || chatCalls != 1 {
-		t.Fatalf("calls responses=%d chat=%d", responsesCalls, chatCalls)
+			req := httptest.NewRequest(http.MethodPost, "/", nil)
+			value, style, err := s.callAI(req, "Hello", "vi")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if value != "Xin chào" {
+				t.Fatalf("translation=%q", value)
+			}
+			if style != "chat_completions" {
+				t.Fatalf("style=%q", style)
+			}
+			if responsesCalls != 1 || chatCalls != 1 {
+				t.Fatalf("calls responses=%d chat=%d", responsesCalls, chatCalls)
+			}
+		})
 	}
 }
 
