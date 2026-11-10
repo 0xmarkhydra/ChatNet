@@ -80,6 +80,14 @@ try {
       await page.locator('.zalo-conversation-list .conversation-item').first().waitFor({state:'visible'})
       await page.locator('.zalo-conversation-list .conversation-item').first().click()
       await page.locator('.social-chat-layout.has-active').waitFor({state:'visible'})
+      assert.equal(await page.locator('.social-chat-ai-banner').count(), 0,
+        'Translation settings must no longer take space above the composer')
+      const translationButton = page.locator('.chat-head .translate-controls .translation-toolbar-toggle')
+      await translationButton.waitFor({state:'visible'})
+      await translationButton.click()
+      await page.getByRole('dialog', {name:'Cài đặt dịch AI'}).waitFor({state:'visible'})
+      await page.keyboard.press('Escape')
+      await page.getByRole('dialog', {name:'Cài đặt dịch AI'}).waitFor({state:'hidden'})
       const detailsButton = page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first()
       if (width > 760) {
         await detailsButton.click()
@@ -96,7 +104,7 @@ try {
         date: '.social-chat-layout .day-divider span',
         avatar: '.social-chat-layout .chat-message-sender-avatar',
         firstBubble: '.social-chat-layout .message:not(.mine) .bubble',
-        banner: '.social-chat-ai-banner', composer: '.media-composer',
+        composer: '.media-composer',
         details: '.social-chat-details',
         detailsAvatar: '.social-chat-details-avatar',
         detailsCall: '.social-chat-details-actions .call-header-actions button',
@@ -130,15 +138,7 @@ try {
           inputBorderFree: borderFree(field),
           inputTransparent: clearBackground(field),
           pseudoContent: getComputedStyle(form, '::before').content,
-          bannerAligned: true,
-        }
-        const banner = document.querySelector('.social-chat-ai-banner')
-        const button = banner?.querySelector('button[aria-label="Cài đặt dịch AI"]')
-        if (banner && button && banner.getBoundingClientRect().height) {
-          const a = banner.getBoundingClientRect()
-          const b = button.getBoundingClientRect()
-          values.bannerAligned = Math.abs(a.y + a.height / 2 - b.y - b.height / 2) < 3
-        }
+         }
         const classes = [
           'appbar-search', 'social-chat-list-search', 'communication-hub-search',
           'friend-search-input-wrap', 'connect-search-input', 'nearby-search',
@@ -170,7 +170,6 @@ try {
       assert.ok(surfaceAudit.inputBorderFree && surfaceAudit.inputTransparent,
         'Composer field must not draw its own rectangle')
       assert.equal(surfaceAudit.pseudoContent, 'none', 'Composer must not draw an inner pseudo-element')
-      assert.ok(surfaceAudit.bannerAligned, 'AI translation settings button must be centered in its banner')
       for (const item of surfaceAudit.wrapped) {
         assert.ok(item.borderFree && item.transparent,
           `Nested input style found in ${item.name}: ${JSON.stringify(item)}`)
@@ -181,9 +180,6 @@ try {
         `Chat input font too small at ${width}px: ${inputTypography}px`)
       if (width > 760) {
         assert.ok(rects.composer.height <= 62, `Desktop composer too tall at ${width}px: ${rects.composer.height}px`)
-        const gap = rects.composer.y - (rects.banner.y + rects.banner.height)
-        assert.ok(gap >= 0 && gap <= 8,
-          `AI translation settings are too far above composer at ${width}px: ${gap}px`)
       } else {
         assert.ok(rects.composer.height <= 60,
           `Mobile composer too tall at ${width}px: ${rects.composer.height}px`)
@@ -204,7 +200,6 @@ try {
           firstRow:[291 + sidebarShift,305,307,79],
           stageHeader:[638 + sidebarShift,109,604 - sidebarShift,79],
           composer:[652 + sidebarShift,879,574 - sidebarShift,60],
-          banner:[653 + sidebarShift,832,574 - sidebarShift,42],
           date:[877 + sidebarShift / 2,209,121,29],
           avatar:[652 + sidebarShift,273,32,32],
           composerSend:[1144,887,69,44],
@@ -220,12 +215,14 @@ try {
         console.log('content', JSON.stringify({firstBubble:rects.firstBubble,translationAction:rects.translationAction,photo:rects.photo,photoTime:rects.photoTime,composerImage:rects.composerImage,composerMic:rects.composerMic}))
         assert.ok(rects.avatar, 'incoming message avatar visible')
         assert.ok(rects.translationAction, 'manual translation action appears when automatic translation is off')
-        assert.ok(rects.photo && rects.photo.width === 258 && rects.photo.height === 142, 'photo size must match reference')
+        assert.ok(rects.photo && rects.photo.width >= 200 && rects.photo.width <= 258 &&
+          rects.photo.height >= 120 && rects.photo.height <= 150,
+        'Photo must retain a readable size when the translation banner is removed')
         assert.ok(rects.photoTime, 'photo time chip visible')
       } else console.log(`${width}px:`, JSON.stringify(rects))
       if (width > 760) {
         const headerButtons = page.locator('.chat-head .translate-controls button:visible')
-        assert.equal(await headerButtons.count(), 4, 'header contains call, video, search and info only')
+        assert.equal(await headerButtons.count(), 5, 'header contains call, video, search, translation and info')
       } else {
         await detailsButton.click()
         await page.locator('.social-chat-details').waitFor({state:'visible'})
@@ -246,6 +243,18 @@ try {
         await page.locator('[data-message-id="1"] .bubble').click({button:'right'})
         await page.getByRole('button', {name:'Ghim tin nhắn'}).waitFor({state:'visible'})
         await page.locator('.message-context-cancel').click()
+      }
+      if (width === 390) {
+        await page.getByRole('button', {name:'Quay lại danh sách'}).click()
+        await page.locator('.zalo-conversation-list .conversation-item').nth(1).click()
+        const groupTranslation = page.locator('.group-chat-panel .group-mobile-actions .translation-toolbar-toggle')
+        await groupTranslation.waitFor({state:'visible'})
+        const groupTranslationBox = await groupTranslation.boundingBox()
+        assert.ok(groupTranslationBox && groupTranslationBox.x + groupTranslationBox.width <= width,
+          'Group translation action must fit inside the mobile header')
+        await groupTranslation.click()
+        await page.getByRole('dialog', {name:'Cài đặt dịch AI'}).waitFor({state:'visible'})
+        await page.keyboard.press('Escape')
       }
       assert.deepEqual(jsErrors, [], `browser errors at ${width}px`)
       await ctx.close()

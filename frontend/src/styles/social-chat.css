@@ -512,12 +512,15 @@
   }
 }
 
-/* Conversation header: the AI language picker is still available from details and the translation bar. */
-.modern-shell.app-layout
-  .social-chat-layout
-  .chat-head
-  .translation-hub-trigger {
-  display: none;
+/* Translation settings share the compact icon treatment of call and search. */
+.modern-shell.app-layout .social-chat-layout .chat-head .translation-toolbar-toggle {
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.modern-shell.app-layout .social-chat-layout .chat-head .translate-controls .translation-toolbar-toggle {
+  width: 38px;
+  height: 38px;
 }
 .modern-shell.app-layout .social-chat-layout {
   position: relative;
