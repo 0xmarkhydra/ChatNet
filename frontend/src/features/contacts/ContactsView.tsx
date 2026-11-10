@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import QRCode from 'qrcode'
 import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Heart, MessageCircle, MoreHorizontal, Phone, Plus, QrCode, RefreshCw, Search, ShieldCheck, UserRound, UserRoundPlus, Users, Video, X } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from './types'
@@ -59,6 +59,7 @@ export default function ContactsView({
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
   const [invitationTab, setInvitationTab] = useState<InvitationTab>('incoming')
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [expandedFriendId, setExpandedFriendId] = useState<number | null>(null)
   const [qrImage, setQrImage] = useState('')
   const [copyStatus, setCopyStatus] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
@@ -168,6 +169,39 @@ export default function ContactsView({
     </div>
   )
 
+  const profileDetails = (friend: FriendConnection) => <>
+    <div className="fd-profile-cover" aria-hidden="true"/>
+    <div className="fd-profile-core">
+      {avatar(friend, 'fd-profile-avatar')}
+      <h2>{contactMetadata[friend.id]?.nickname || personName(friend)}</h2>
+      <p className={friend.online ? 'fd-online' : ''}>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
+        {typeof friend.mutualGroups === 'number' && friend.mutualGroups > 0 ? ' · ' + friend.mutualGroups + ' nhóm chung' : ''}
+      </p>
+    </div>
+    <div className="fd-profile-actions">
+      <button type="button" className="fd-primary" onClick={() => void openDirectByUsername(friend.username)}><MessageCircle size={20}/>Nhắn tin</button>
+      <button type="button" className="fd-secondary" onClick={() => startCall(friend)}><Phone size={20}/>Gọi thoại</button>
+    </div>
+    <div className="fd-profile-info">
+      <h3>Thông tin bạn bè</h3>
+      <p><UserRound size={19}/>@{friend.username}</p>
+      {typeof friend.mutualGroups === 'number' && <p><Users size={19}/>{friend.mutualGroups} nhóm chung</p>}
+      {contactMetadata[friend.id]?.note && <p><Heart size={19}/>{contactMetadata[friend.id].note}</p>}
+      <button type="button" onClick={() => setFriendPreview(friend)}><UserRound size={19}/>Xem trang cá nhân</button>
+    </div>
+    <div className="fd-profile-options"><h3><MoreHorizontal size={20}/>Tùy chọn</h3>
+      <div>
+        <button type="button" onClick={() => void changePersonalContact(friend, 'favorite')}>
+          {contactMetadata[friend.id]?.favorite ? 'Bỏ yêu thích' : 'Ghim'}
+        </button><span>·</span>
+        <button type="button" disabled={friendBusyIds.has(friend.id)} onClick={() => void blockContact(friend)}>Chặn</button><span>·</span>
+        <button type="button" onClick={() => void reportContact(friend)}>Báo cáo</button><span>·</span>
+        <button type="button" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
+      </div>
+      {menu(friend)}
+    </div>
+  </>
+
   return <div className={'friends-design-v2' + (embeddedInCalls ? ' is-call-directory' : '')} aria-label={screen === 'directory' ? 'Danh bạ' : 'Lời mời kết bạn'}>
     {screen === 'directory' ? <>
       {!embeddedInCalls && <section className="fd-searchbar">
@@ -210,25 +244,29 @@ export default function ContactsView({
               <button type="button" className="fd-secondary" disabled={friendsLoading} onClick={onRetryFriends}>Thử lại</button>
             </div>}
             <div className="fd-person-list" aria-label="Danh sách bạn bè" aria-busy={friendsLoading}>
-              {visibleFriends.map(friend => <div className={'fd-person-row' + (!embeddedInCalls && selectedFriend?.id === friend.id ? ' selected' : '')} key={friend.id}>
+              {visibleFriends.map(friend => <Fragment key={friend.id}><div className={'fd-person-row' + (!embeddedInCalls && selectedFriend?.id === friend.id ? ' selected' : '') + (!embeddedInCalls && expandedFriendId === friend.id ? ' expanded' : '')}>
                 <button type="button" className="fd-person-identity" aria-pressed={embeddedInCalls ? undefined : selectedFriend?.id === friend.id}
-                  onClick={() => embeddedInCalls ? void openDirectByUsername(friend.username) : setSelectedId(friend.id)}>{avatar(friend)}<span>
+                  aria-expanded={embeddedInCalls ? undefined : expandedFriendId === friend.id}
+                  onClick={() => {
+                    if (embeddedInCalls) { void openDirectByUsername(friend.username); return }
+                    setSelectedId(friend.id)
+                    setExpandedFriendId(value => value === friend.id ? null : friend.id)
+                  }}>{avatar(friend)}<span>
                     <strong>{contactMetadata[friend.id]?.nickname || personName(friend)}</strong>
                     <small>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
                       {contactMetadata[friend.id]?.favorite ? ' · Yêu thích' : ''}</small>
                   </span></button>
-                {embeddedInCalls ? <>
+                {embeddedInCalls && <>
                   <button type="button" className="fd-icon-btn" aria-label={'Gọi thoại cho ' + personName(friend)}
                     onClick={() => startCall(friend)}><Phone size={20}/></button>
                   <button type="button" className="fd-icon-btn" aria-label={'Gọi video cho ' + personName(friend)}
                     onClick={() => void openDirectByUsername(friend.username, 'video')}><Video size={20}/></button>
-                </> : <>
-                  <button type="button" className="fd-icon-btn" aria-label={'Nhắn tin cho ' + personName(friend)}
-                    onClick={() => void openDirectByUsername(friend.username)}><MessageCircle size={20}/></button>
-                  <button type="button" className="fd-icon-btn" aria-label={'Gọi thoại cho ' + personName(friend)}
-                    onClick={() => startCall(friend)}><Phone size={20}/></button>
                 </>}
-              </div>)}
+              </div>
+              {!embeddedInCalls && expandedFriendId === friend.id && <section className="fd-inline-profile" aria-label={'Thông tin của ' + personName(friend)}>
+                {profileDetails(friend)}
+              </section>}
+              </Fragment>)}
               {visibleFriends.length === 0 && !friendsError && (!embeddedInCalls || (callSections.groups.length === 0 && callSections.otherContacts.length === 0)) && <p className="fd-empty" role={friendsLoading ? 'status' : undefined}>
                 {friendsLoading ? 'Đang tải danh sách bạn bè...' : friends.length ? 'Không có bạn bè phù hợp.' : embeddedInCalls ? 'Bạn chưa có bạn bè trong danh bạ.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}
               </p>}
@@ -238,38 +276,7 @@ export default function ContactsView({
           </>}
         </section>
         {!embeddedInCalls && <section className="fd-card fd-profile-panel" aria-label="Thông tin bạn bè">
-          {selectedFriend && !searching ? <>
-            <div className="fd-profile-cover" aria-hidden="true"/>
-            <div className="fd-profile-core">
-              {avatar(selectedFriend, 'fd-profile-avatar')}
-              <h2>{contactMetadata[selectedFriend.id]?.nickname || personName(selectedFriend)}</h2>
-              <p className={selectedFriend.online ? 'fd-online' : ''}>{selectedFriend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
-                {typeof selectedFriend.mutualGroups === 'number' && selectedFriend.mutualGroups > 0 ? ' · ' + selectedFriend.mutualGroups + ' nhóm chung' : ''}
-              </p>
-            </div>
-            <div className="fd-profile-actions">
-              <button type="button" className="fd-primary" onClick={() => void openDirectByUsername(selectedFriend.username)}><MessageCircle size={20}/>Nhắn tin</button>
-              <button type="button" className="fd-secondary" onClick={() => startCall(selectedFriend)}><Phone size={20}/>Gọi thoại</button>
-            </div>
-            <div className="fd-profile-info">
-              <h3>Thông tin bạn bè</h3>
-              <p><UserRound size={19}/>@{selectedFriend.username}</p>
-              {typeof selectedFriend.mutualGroups === 'number' && <p><Users size={19}/>{selectedFriend.mutualGroups} nhóm chung</p>}
-              {contactMetadata[selectedFriend.id]?.note && <p><Heart size={19}/>{contactMetadata[selectedFriend.id].note}</p>}
-              <button type="button" onClick={() => setFriendPreview(selectedFriend)}><UserRound size={19}/>Xem trang cá nhân</button>
-            </div>
-            <div className="fd-profile-options"><h3><MoreHorizontal size={20}/>Tùy chọn</h3>
-              <div>
-                <button type="button" onClick={() => void changePersonalContact(selectedFriend, 'favorite')}>
-                  {contactMetadata[selectedFriend.id]?.favorite ? 'Bỏ yêu thích' : 'Ghim'}
-                </button><span>·</span>
-                <button type="button" disabled={friendBusyIds.has(selectedFriend.id)} onClick={() => void blockContact(selectedFriend)}>Chặn</button><span>·</span>
-                <button type="button" onClick={() => void reportContact(selectedFriend)}>Báo cáo</button><span>·</span>
-                <button type="button" disabled={friendBusyIds.has(selectedFriend.id)} onClick={() => void removeAcceptedFriend(selectedFriend)}>Hủy kết bạn</button>
-              </div>
-              {menu(selectedFriend)}
-            </div>
-          </> : <div className="fd-empty fd-profile-placeholder"><Users size={38}/>
+          {selectedFriend && !searching ? profileDetails(selectedFriend) : <div className="fd-empty fd-profile-placeholder"><Users size={38}/>
             <h2>{searching ? 'Kết nối bạn bè' : 'Chưa chọn bạn bè'}</h2><p>{searching ? 'Chọn một kết quả tìm kiếm để xem hồ sơ.' : 'Kết bạn mới để xem thông tin ở đây.'}</p></div>}
         </section>}
       </div>

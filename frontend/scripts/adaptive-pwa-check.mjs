@@ -191,6 +191,22 @@ try {
     await page.locator('.fd-person-row').first().waitFor({ state: 'visible', timeout: 8000 })
     if (width === 320) assert.equal(optionalContactsFinished, false,
       'Mobile friends must render before slow optional contact metadata finishes')
+    if (phone) {
+      assert.equal(await page.locator('.fd-inline-profile').count(), 0, 'no friend details should open by default on mobile')
+      const firstFriend = page.locator('.fd-person-row .fd-person-identity').first()
+      await firstFriend.click()
+      assert.equal(await page.locator('.fd-inline-profile').count(), 1, 'only the tapped friend should expand')
+      assert.equal(await page.locator('.fd-profile-panel').isVisible(), false, 'mobile must not show the separate profile panel')
+      assert.equal(await page.locator('.friends-design-v2:not(.is-call-directory) .fd-person-row .fd-icon-btn').count(), 0, 'adjacent call and message buttons must not exist in friends list')
+      assert.ok(await page.locator('.fd-inline-profile').evaluate(el => el.previousElementSibling?.classList.contains('fd-person-row')),
+        'friend details must appear immediately after the tapped user')
+      await firstFriend.click()
+      assert.equal(await page.locator('.fd-inline-profile').count(), 0, 'tapping an expanded friend should collapse details')
+      await page.locator('.fd-person-row .fd-person-identity').nth(1).click()
+      assert.equal(await page.locator('.fd-inline-profile').count(), 1)
+      assert.ok(await page.locator('.fd-inline-profile').evaluate(el => el.previousElementSibling?.textContent?.includes('Linh Anh') || el.previousElementSibling?.classList.contains('expanded')),
+        'the expanded details belong to the selected row')
+    }
     const audit = await page.evaluate(() => {
       const selectors = ['.modern-frame','.friends-design-v2','.fd-searchbar','.fd-searchbar label','.fd-add-new','.fd-directory-layout','.fd-list-card','.fd-list-header','.fd-filters','.fd-person-list','.fd-person-row','.fd-profile-panel','.bottom-navigation','.chatnet-appbar']
       const measure = sel => {
@@ -209,8 +225,7 @@ try {
       width + 'px: contacts must not overflow horizontally')
     if (phone) {
       const bounds = audit.boxes
-      assert.ok(bounds['.fd-profile-panel'].y >= bounds['.fd-list-card'].bottom + 8,
-        width + 'px: friend profile overlaps friend list: ' + JSON.stringify(bounds))
+      assert.ok(bounds['.fd-profile-panel'].h === 0, width + 'px: separate friend profile panel must be hidden on phones')
       assert.ok(bounds['.fd-searchbar'].bottom + 8 <= bounds['.fd-list-card'].y,
         width + 'px: search bar overlaps directory list')
       assert.ok(bounds['.friends-design-v2'].bottom <= bounds['.bottom-navigation'].y + 1,
@@ -218,10 +233,10 @@ try {
       const navTop = bounds['.bottom-navigation'].y
       const scroller = page.locator('.friends-design-v2')
       await scroller.evaluate(el => { el.scrollTop = el.scrollHeight })
-      const scrolledProfile = await page.locator('.fd-profile-panel').boundingBox()
-      assert.ok(scrolledProfile && scrolledProfile.y >= bounds['.friends-design-v2'].y - 1 &&
-        scrolledProfile.y + scrolledProfile.height <= navTop - 5,
-        width + 'px: profile must be fully reachable by scrolling, without bottom tabs covering it: ' +
+      await page.locator('.fd-inline-profile').evaluate(el => el.scrollIntoView({ block: 'end' }))
+      const scrolledProfile = await page.locator('.fd-inline-profile').boundingBox()
+      assert.ok(scrolledProfile && scrolledProfile.y + scrolledProfile.height <= navTop - 5,
+        width + 'px: inline friend details must be fully reachable without bottom tabs covering them: ' +
         JSON.stringify(scrolledProfile))
       await scroller.evaluate(el => { el.scrollTop = 0 })
       await page.getByRole('button', { name: 'Đang online' }).click()
