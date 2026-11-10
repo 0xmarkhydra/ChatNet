@@ -1274,8 +1274,6 @@ export default function App({
   const selectedLanguage =
     languageOptions.find((language) => language.value === targetLanguage) ||
     languageOptions[0];
-  const selectedConversationLanguage =
-    languageOptions.find(language => language.value === effectiveTargetLanguage) || selectedLanguage;
   const visibleLanguageOptions = useMemo(
     () => filterLanguageOptions(languageOptions, languageSearch),
     [languageOptions, languageSearch],
@@ -6107,6 +6105,19 @@ export default function App({
                           onClick={() => setMessageSearchOpen(true)}>
                           <Search size={20} aria-hidden="true" />
                         </button>
+                        <div className="translation-hub">
+                          <button type="button" className="group-more-trigger translation-toolbar-toggle"
+                            aria-label={effectiveAutoTranslate ? 'Cài đặt dịch AI, đang bật' : 'Cài đặt dịch AI, đang tắt'}
+                            title="Cài đặt dịch AI"
+                            aria-expanded={translationMenuOpen}
+                            aria-controls="chat-translation-dialog"
+                            onClick={() => {
+                              setLanguageSearch('')
+                              setTranslationMenuOpen((open) => !open)
+                            }}>
+                            <Languages size={20} strokeWidth={1.9} aria-hidden="true" />
+                          </button>
+                        </div>
                         <button type="button" className="group-more-trigger"
                           aria-label="Thông tin hội thoại" aria-controls="conversation-details-panel"
                           aria-expanded={conversationDetailsOpen}
@@ -6119,19 +6130,14 @@ export default function App({
                     <div className="translate-controls">
                       <CallHeaderActions conversationId={activeConversation.id} disabled={conversationBlocked} />
                       <button type="button" className="group-settings-toggle" onClick={() => setMessageSearchOpen(true)} title="Tìm trong cuộc trò chuyện" aria-label="Tìm tin nhắn trong cuộc trò chuyện"><Search size={19} /></button>
-                      <button type="button" className={conversationDetailsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
-                        onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}
-                        title="Thông tin hội thoại" aria-label="Thông tin hội thoại"
-                        aria-controls="conversation-details-panel" aria-expanded={conversationDetailsOpen}>
-                        <MoreHorizontal size={22} aria-hidden="true" />
-                      </button>
                       <div className="translation-hub">
                         <button
                           type="button"
-                          className={autoTranslate ? 'translation-hub-trigger active' : 'translation-hub-trigger'}
+                          className={translationMenuOpen ? 'group-settings-toggle translation-toolbar-toggle active' : 'group-settings-toggle translation-toolbar-toggle'}
                           aria-expanded={translationMenuOpen}
                           aria-controls="chat-translation-dialog"
-                          aria-label="Cài đặt dịch AI"
+                          aria-label={effectiveAutoTranslate ? 'Cài đặt dịch AI, đang bật' : 'Cài đặt dịch AI, đang tắt'}
+                          title="Cài đặt dịch AI"
                           onClick={() => {
                             setTranslationMenuOpen((current) => {
                               const next = !current
@@ -6140,12 +6146,7 @@ export default function App({
                             })
                           }}
                         >
-                          <span className="translation-hub-flag" aria-hidden="true">{selectedLanguage?.flag || '🌐'}</span>
-                          <span className="translation-hub-spark" aria-hidden="true">✦</span>
-                          <b>AI</b>
-                          <span className="translation-hub-dot" aria-hidden="true">·</span>
-                          <strong>{selectedLanguage?.code || targetLanguage.toUpperCase()}</strong>
-                          <span className="translation-hub-chevron" aria-hidden="true">{translationMenuOpen ? '⌃' : '⌄'}</span>
+                          <Languages size={21} strokeWidth={1.9} aria-hidden="true" />
                         </button>
 
                         {translationMenuOpen && createPortal(
@@ -6230,6 +6231,12 @@ export default function App({
                           </>, document.body
                         )}
                       </div>
+                      <button type="button" className={conversationDetailsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
+                        onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}
+                        title="Thông tin hội thoại" aria-label="Thông tin hội thoại"
+                        aria-controls="conversation-details-panel" aria-expanded={conversationDetailsOpen}>
+                        <MoreHorizontal size={22} aria-hidden="true" />
+                      </button>
                     </div>
                   </header>
 
@@ -6585,17 +6592,6 @@ export default function App({
                       </article>
                     ))}
                     <div ref={bottomRef} />
-                  </div>
-
-                  <div className={`social-chat-ai-banner${effectiveAutoTranslate ? ' is-enabled' : ''}`} role="status">
-                    <Languages size={18} aria-hidden="true" />
-                    <span>{effectiveAutoTranslate
-                      ? `Dịch tự động đang bật · ${selectedConversationLanguage?.localizedLanguage || effectiveTargetLanguage.toUpperCase()}`
-                      : 'Dịch tự động đang tắt'}</span>
-                    <button type="button" aria-label="Cài đặt dịch AI" aria-expanded={translationMenuOpen}
-                      onClick={() => { setLanguageSearch(''); setTranslationMenuOpen((open) => !open) }}>
-                      <span>Cài đặt</span><ChevronDown size={15} aria-hidden="true" />
-                    </button>
                   </div>
 
                   {conversationBlocked ? (
