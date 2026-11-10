@@ -71,6 +71,7 @@
 .fd-sync-feedback span{flex:1;min-width:0;overflow-wrap:anywhere}
 .fd-sync-feedback .fd-secondary{flex:0 0 auto;min-height:38px;padding:8px 12px}
 .fd-profile-panel{padding:16px;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
+.fd-inline-profile{display:none}
 .fd-profile-cover{
  height:142px;min-height:142px;width:100%;border-radius:14px;
  background:linear-gradient(100deg,#d6dff3,#f2d5c1);
@@ -168,7 +169,18 @@
  }
  .fd-list-card,.fd-invitation-list{max-height:none;min-height:0;overflow:visible}
  .fd-person-list{overflow:visible}
- .fd-profile-panel{min-height:0;overflow:visible}
+ .friends-design-v2:not(.is-call-directory) .fd-profile-panel{display:none}
+ .fd-person-row.selected:not(.expanded){background:transparent}
+ .fd-person-row.expanded{background:#edf1ff}
+ .fd-inline-profile{
+   display:flex;flex-direction:column;min-width:0;margin:0 5px 10px;padding:12px;scroll-margin-bottom:32px;
+   background:#fff;border:1px solid #e1e8f8;border-radius:13px;
+   box-shadow:0 6px 18px rgba(29,51,100,.06);
+ }
+ .fd-inline-profile .fd-profile-actions{margin:18px 0}
+ .fd-inline-profile .fd-profile-info{padding:18px 7px 12px}
+ .fd-inline-profile .fd-profile-options{margin:15px 0 0;padding:17px 12px}
+ .fd-inline-profile .fd-profile-core h2{overflow-wrap:anywhere}
  .fd-sync-feedback{flex-wrap:wrap}
  .fd-sync-feedback .fd-secondary{margin-left:auto}
  .fd-request-row{flex-wrap:wrap;gap:8px}

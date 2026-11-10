@@ -82,6 +82,9 @@ try {
     if (path === '/api/conversations/70/group-settings') {
       return route.fulfill(json({ adminCanInvite: false, adminCanEditInfo: false }))
     }
+    if (/^\/api\/conversations\/\d+\/pins$/.test(path)) {
+      return route.fulfill(json([]))
+    }
     if (path === '/api/conversations/direct' && method === 'POST') {
       const conversation = { id: 25, type: 'direct', name: 'Linh Anh', otherUserId: 2, otherUsername: 'linhanh', memberCount: 2, unreadCount: 0, lastMessage: '', online: true, createdAt: '2026-11-06T00:00:00Z' }
       if (!testConversations.some(item => item.id === conversation.id)) testConversations.push(conversation)
@@ -111,9 +114,9 @@ try {
   assert.notEqual(border, 'rgb(19, 205, 178)', 'Directory search should not have the green border')
   assert.equal(await page.locator('.app-page-heading strong').innerText(), 'Bạn bè')
   assert.equal(await page.locator('.fd-person-row').count(), friends.length)
-  assert.match(await page.locator('.fd-profile-core').innerText(), /David Chen/)
+  assert.match(await page.locator('.fd-profile-panel .fd-profile-core').innerText(), /David Chen/)
   await page.locator('.fd-person-identity').filter({ hasText: 'Linh Anh' }).click()
-  assert.match(await page.locator('.fd-profile-core').innerText(), /Linh Anh/)
+  assert.match(await page.locator('.fd-profile-panel .fd-profile-core').innerText(), /Linh Anh/)
   await page.getByRole('button', { name: 'Đang online' }).click()
   assert.equal(await page.locator('.fd-person-row').count(), 2)
   await page.getByRole('button', { name: 'A – Z' }).click()
@@ -202,6 +205,8 @@ try {
   assert.notEqual(hoverBackground, normalBackground, 'friend row should highlight on hover')
   await personRow.getByRole('button', { name: /Linh Anh/ }).first().click()
   await page.locator('.call-center').waitFor({ state: 'detached' })
+  // Chat view hides the desktop sidebar; restore the initial shell before navigating.
+  await page.goto(origin, { waitUntil: 'domcontentloaded' })
   await page.locator('.app-sidebar').getByRole('button', { name: 'Bạn bè' }).click()
   await page.getByRole('heading', { name: 'Tất cả bạn bè' }).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Kết bạn mới' }).count(), 1, 'sidebar friends must retain its add friend action')
