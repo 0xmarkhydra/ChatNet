@@ -13,9 +13,9 @@ const server = await createServer({
 try {
   const { default: MessageActions } = await server.ssrLoadModule('/src/features/chat/MessageActions.tsx')
   const { resolveMessageCopyTarget } = await server.ssrLoadModule('/src/features/chat/messageCopyTarget.ts')
-  const render = (message, target = resolveMessageCopyTarget(message, null), pin = {}) =>
+  const render = (message, target = resolveMessageCopyTarget(message, null), pin = {}, mode = 'actions') =>
     renderToStaticMarkup(React.createElement(MessageActions, {
-      activeMessageAction: message, userId: 1, setMessageActionId() {},
+      mode, activeMessageAction: message, userId: 1, setMessageActionId() {},
       toggleReaction: async () => {}, setReplyingTo() {},
       isPinned: false, toggleMessagePin: async () => {}, ...pin,
       copyTarget: target, copyMessageContent: async () => {},
@@ -88,7 +88,19 @@ try {
   assert.match(allowed, /Ghim tin nhắn/)
   assert.doesNotMatch(allowed, /Chỉ quản trị viên|chỉ chủ nhóm|disabled=""/i)
   assert.match(render({ ...message, text: 'Lời chào' }, undefined, { isPinned: true }), /Bỏ ghim tin nhắn/)
-  console.log('PASS: Copy actions for text, links, images and files; every member can pin and unpin')
+  const picker = render({ ...message, text: 'Lời chào' }, undefined, {}, 'reactions')
+  assert.match(picker, /class="message-context-reactions"/)
+  assert.match(picker, /Chọn cảm xúc/)
+  assert.match(picker, /❤️/)
+  assert.doesNotMatch(picker, /Ghim tin nhắn|Trả lời|Sao chép|Dịch|Thu hồi|Đóng|message-context-preview/)
+  assert.doesNotMatch(allowed, /class="message-context-reactions"/)
+  assert.match(allowed, /Trả lời|Sao chép|Dịch/)
+  const { readFileSync } = await import('node:fs')
+  const appSource = readFileSync(fileURLToPath(new URL('../src/app/App.tsx', import.meta.url)), 'utf8')
+  assert.match(appSource, /onClick=\{\(\) => openMessageReactions\(message\)\}/)
+  assert.match(appSource, /openMessageActions\(message, event\.target\)/)
+  assert.match(appSource, /openMessageActions\(message, target\)/)
+  console.log('PASS: Copy actions for text, links, images and files; every member can pin and unpin; reaction picker and message actions are separate')
 } finally {
   await server.close()
 }

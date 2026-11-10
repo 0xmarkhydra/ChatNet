@@ -339,6 +339,7 @@ export default function App({
   const ownSendScrollConversation = useRef<number | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [messageActionId, setMessageActionId] = useState<number | null>(null);
+  const [messageActionMode, setMessageActionMode] = useState<'reactions' | 'actions'>('actions');
   const [conversationActionId, setConversationActionId] = useState<number | null>(null);
   const [conversationMenuPosition, setConversationMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [pinnedExpanded, setPinnedExpanded] = useState(false);
@@ -1405,8 +1406,17 @@ export default function App({
           ? target.parentElement
           : null;
     setMessageCopyTarget(resolveMessageCopyTarget(message, element));
+    setMessageActionMode('actions');
     setMessageActionId(message.id);
     navigator.vibrate?.(24);
+  }
+
+  function openMessageReactions(message: Message) {
+    if (message.deleted) return;
+    cancelMessageLongPress();
+    setMessageCopyTarget(null);
+    setMessageActionMode('reactions');
+    setMessageActionId(message.id);
   }
 
   function beginMessageLongPress(
@@ -6446,7 +6456,7 @@ export default function App({
                           <button type="button" className="reaction-add"
                             aria-label="Chọn cảm xúc cho tin nhắn"
                             title="Thả cảm xúc"
-                            onClick={() => openMessageActions(message)}>
+                            onClick={() => openMessageReactions(message)}>
                             <SmilePlus size={16} aria-hidden="true" />
                           </button>
                         </div>
@@ -7463,6 +7473,7 @@ export default function App({
         )}
         {activeMessageAction && (
           <MessageActions
+            mode={messageActionMode}
             activeMessageAction={activeMessageAction}
             userId={session.user.id}
             isPinned={pinnedMessages.some((pin) => pin.message.id === activeMessageAction.id)}
