@@ -149,6 +149,38 @@ try {
       await page.locator('.social-chat-layout .conversation-panel').waitFor({ state: 'visible' })
       assert.equal(await bottom.isVisible(), false, width + ': tabs hidden in conversation detail')
       assert.equal(await page.locator('.chatnet-appbar').isVisible(), false, width + ': compact header hidden in detail')
+      const imageButton = page.getByRole('button', { name: 'Đính kèm ảnh hoặc video' })
+      assert.equal(await imageButton.isVisible(), true, width + ': photo picker must remain visible')
+      const imageIcon = await imageButton.evaluate(button => {
+        const outer = button.getBoundingClientRect()
+        const inner = button.querySelector('svg').getBoundingClientRect()
+        return {
+          offsetX: Math.abs((inner.left + inner.width / 2) - (outer.left + outer.width / 2)),
+          offsetY: Math.abs((inner.top + inner.height / 2) - (outer.top + outer.height / 2)),
+          size: inner.width, buttonWidth: outer.width,
+        }
+      })
+      assert.ok(imageIcon.offsetX <= 2 && imageIcon.offsetY <= 2 && imageIcon.size >= 19 && imageIcon.size <= 21,
+        width + 'px: image picker icon should be 20px and perfectly centered: ' + JSON.stringify(imageIcon))
+      const actionShapes = await page.locator('.media-composer').evaluate(form =>
+        ['.attach-button', '.chat-composer-image', '.voice-record-trigger'].map(sel => {
+          const button = form.querySelector(sel)
+          const icon = button.querySelector('svg:not(.chat-composer-plus)')
+          const b = button.getBoundingClientRect()
+          const i = icon.getBoundingClientRect()
+          const s = getComputedStyle(button)
+          return {
+            width:b.width, height:b.height, radius:s.borderRadius, bg:s.backgroundColor, color:s.color,
+            iconWidth:i.width, iconHeight:i.height,
+            dx:Math.abs(b.left + b.width/2 - i.left - i.width/2),
+            dy:Math.abs(b.top + b.height/2 - i.top - i.height/2),
+          }
+        }))
+      assert.ok(actionShapes.every(a => a.width === actionShapes[0].width && a.height === actionShapes[0].height &&
+        a.radius === actionShapes[0].radius && a.bg === actionShapes[0].bg && a.color === actionShapes[0].color &&
+        a.iconWidth === 20 && a.iconHeight === 20 && a.dx <= 2 && a.dy <= 2),
+        width + 'px: file, image and microphone buttons must have matching shape and centered icons: ' +
+        JSON.stringify(actionShapes))
       const reactions = await page.evaluate(() => [203, 204].map(id => {
         const message = document.querySelector('[data-message-id="' + id + '"]')
         const scroll = document.querySelector('.social-chat-layout .messages')?.getBoundingClientRect()
