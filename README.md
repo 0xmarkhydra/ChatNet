@@ -459,7 +459,7 @@ AI_AUTH_HEADER
 AI_AUTH_SCHEME
 ~~~
 
-AI_API_STYLE=auto sẽ thử /responses trước; nếu provider trả 400/404/405/422 thì ChatNet tự fallback sang /chat/completions.
+AI_API_STYLE=auto sẽ thử /responses trước; nếu provider trả 400/404/405/422 hoặc lỗi tạm thời 500/502/503/504 thì ChatNet thử dự phòng qua /chat/completions. Cơ chế dự phòng này không thay thế việc cấu hình đúng provider hoặc khắc phục dịch vụ translate không chạy.
 
 Nếu provider dùng Authorization: Bearer thì giữ cấu hình mặc định. Nếu provider dùng x-api-key thì đặt AI_AUTH_HEADER=x-api-key và để AI_AUTH_SCHEME rỗng.
 

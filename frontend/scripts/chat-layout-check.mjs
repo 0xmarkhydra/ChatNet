@@ -88,6 +88,45 @@ try {
       await page.getByRole('dialog', {name:'Cài đặt dịch AI'}).waitFor({state:'visible'})
       await page.keyboard.press('Escape')
       await page.getByRole('dialog', {name:'Cài đặt dịch AI'}).waitFor({state:'hidden'})
+      // Icon-only manual translation follows each bubble, not a chip below it.
+      for (const [messageId, direction] of [[1, 'incoming'], [2, 'outgoing']]) {
+        const placement = await page.locator(`[data-message-id="${messageId}"]`).evaluate(message => {
+          const bubble = message.querySelector('.message-content > .bubble')
+          const action = bubble?.querySelector('.chat-translation-action')
+          if (!bubble || !action) return null
+          const svg = action.querySelector('svg')
+          const b = bubble.getBoundingClientRect(), a = action.getBoundingClientRect()
+          const glyph = svg?.getBoundingClientRect()
+          return {
+            bubble: {left:b.left, right:b.right, top:b.top, height:b.height},
+            action: {left:a.left, right:a.right, top:a.top, width:a.width, height:a.height},
+            label: action.getAttribute('aria-label'),
+            text: action.textContent?.trim(),
+            svg: !!svg,
+            glyphOffset: glyph ? {
+              x: (glyph.left + glyph.width / 2) - (a.left + a.width / 2),
+              y: (glyph.top + glyph.height / 2) - (a.top + a.height / 2),
+            } : null,
+            viewport: window.innerWidth,
+          }
+        })
+        assert.ok(placement && placement.svg && placement.label === 'Dịch' &&
+          placement.text === '' && Math.abs(placement.action.width - 30) < 0.1,
+          `Translation must be an accessible icon only (${direction}, ${width}px): ${JSON.stringify(placement)}`)
+        assert.ok(Math.abs(placement.glyphOffset.x) < 1 && Math.abs(placement.glyphOffset.y) < 1,
+          `Translation SVG must be centered inside its click target (${direction}, ${width}px): ${JSON.stringify(placement)}`)
+        assert.ok(Math.abs(placement.action.top + placement.action.height / 2 -
+          placement.bubble.top - placement.bubble.height / 2) < 2,
+          `Translation icon must remain centered on its bubble (${direction}, ${width}px)`)
+        assert.ok(direction === 'incoming'
+          ? placement.action.left >= placement.bubble.right + 6 &&
+            placement.action.left <= placement.bubble.right + 12
+          : placement.action.right <= placement.bubble.left - 6 &&
+            placement.action.right >= placement.bubble.left - 12,
+        `Translation icon must sit outside the correct bubble side (${direction}, ${width}px)`)
+        assert.ok(placement.action.left >= 0 && placement.action.right <= placement.viewport,
+          `Translation icon must fit inside the viewport (${direction}, ${width}px)`)
+      }
       const detailsButton = page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first()
       if (width > 760) {
         await detailsButton.click()

@@ -1091,6 +1091,50 @@
 .social-chat-layout .chat-translation-action:hover {
   background: #e8efff;
 }
+/* The per-message translation action is an icon outside the bubble, not a text
+   chip below it. Its position follows the bubble even when translated text grows. */
+.social-chat-layout .messages .message-content > .bubble:has(> .chat-translation-action) {
+  position: relative;
+  overflow: visible;
+}
+.social-chat-layout .messages .message-content > .bubble > .chat-translation-action {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: calc(100% + 8px);
+  right: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #6a81aa;
+  box-shadow: none;
+  transform: translateY(-50%);
+}
+.social-chat-layout .messages .message-content > .bubble > .chat-translation-action > svg {
+  display: block;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.social-chat-layout .messages .message.mine .message-content > .bubble > .chat-translation-action {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.social-chat-layout .messages .message-content > .bubble > .chat-translation-action:hover {
+  background: #e8efff;
+  color: #416bc3;
+}
 .social-chat-layout .chat-translation-action:focus-visible,
 .social-chat-layout .translation-flip-pill:focus-visible {
   outline: 2px solid #8daff7;

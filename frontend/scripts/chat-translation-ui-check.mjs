@@ -80,6 +80,9 @@ try {
       if (p === '/api/translate') {
         const body = JSON.parse(req.postData() || '{}')
         requests.push(body.messageId)
+        if (!autoTranslate && body.messageId === 17 && requests.filter(id => id === 17).length === 1) {
+          return route.fulfill({status:502, contentType:'text/html', body:'upstream unavailable'})
+        }
         await sleep(body.messageId === 17 ? 1900 : 650)
         return json({ translatedText: 'DỊCH ' + String(body.text).slice(0, 20) })
       }
@@ -211,6 +214,14 @@ try {
       const shortTranslated = await row(16).locator('.chat-translation-dual').boundingBox()
       assert.ok(shortTranslated?.width < 220, 'Short bilingual message must not stretch to panel width')
       assert.equal(requests.length,4, 'Manual toggle must reuse existing translations')
+      // A non-JSON cloud proxy error should produce a useful status and keep retry available.
+      await row(17).getByRole('button', {name:'Dịch', exact:true}).click()
+      await row(17).getByRole('button', {name:'Thử dịch lại'}).waitFor({state:'visible'})
+      await page.getByText('Dịch vụ AI hoặc backend không phản hồi (HTTP 502)', {exact:false}).waitFor({state:'visible'})
+      await row(17).getByRole('button', {name:'Thử dịch lại'}).click()
+      await row(17).locator('.chat-translation-dual').waitFor({state:'visible'})
+      assert.equal(requests.filter(id => id === 17).length, 2,
+        'Manual translation retry must issue a second request after upstream failure')
     }
     await page.setViewportSize({ width:390, height:844 })
     await assertReactionAnchored(13, 'mobile incoming')

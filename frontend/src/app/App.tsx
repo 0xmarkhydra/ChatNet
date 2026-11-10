@@ -4417,7 +4417,7 @@ export default function App({
     }
   }
 
-  async function requestTranslation(text: string, messageId?: number) {
+  async function requestTranslation(text: string, messageId?: number, showError = true) {
     const response = await apiFetch("/api/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -4430,7 +4430,33 @@ export default function App({
     const result = await response.json().catch(() => null);
     if (sessionRef.current?.sessionId !== session?.sessionId) return null;
     if (!response.ok || typeof result?.translatedText !== "string") {
-      setNotice(result?.error || "AI dịch thất bại");
+      // A proxy or unavailable AI service may return HTML/empty text instead of JSON.
+      // Do not leak message contents or provider credentials into diagnostics.
+      console.warn("Translation request failed", {
+        status: response.status,
+        error: typeof result?.error === "string" ? result.error : "invalid response",
+      });
+      if (showError) {
+        const serverError = typeof result?.error === "string" ? result.error : "";
+        const message = /not configured|missing_ai_config/i.test(serverError)
+          ? "Dịch vụ AI trên máy chủ chưa được cấu hình. Kiểm tra AI_API_KEY, AI_BASE_URL và AI_MODEL."
+          : response.status === 401 || response.status === 403
+            ? "Phiên đăng nhập hoặc quyền truy cập dịch AI không hợp lệ."
+            : response.status === 429
+              ? "Dịch vụ AI đang giới hạn yêu cầu (HTTP 429). Hãy thử lại sau."
+              : response.status === 502 && /service unavailable/i.test(serverError)
+                ? "Gateway không kết nối được đến dịch vụ translate (HTTP 502). Kiểm tra dịch vụ translate trên Railway."
+                : response.status === 502 && /AI translation failed/i.test(serverError)
+                  ? "Dịch vụ translate không nhận được bản dịch từ nhà cung cấp AI (HTTP 502). Kiểm tra log AI provider."
+                  : response.status >= 500
+                    ? `Dịch vụ AI hoặc backend không phản hồi (HTTP ${response.status}). Kiểm tra dịch vụ translate và nhà cung cấp AI.`
+                    : response.status === 404
+                  ? "Không tìm thấy tin nhắn hoặc API dịch AI (HTTP 404)."
+                  : response.ok
+                    ? "Dịch vụ AI trả dữ liệu không hợp lệ."
+                    : `Không dịch được tin nhắn (HTTP ${response.status})${serverError ? `: ${serverError}` : "."}`;
+        setNotice(message, "error");
+      }
       return null;
     }
     return result as { translatedText: string };
@@ -4456,7 +4482,7 @@ export default function App({
     setTranslationPending((current) => ({ ...current, [message.id]: true }));
     setTranslationFailures((current) => ({ ...current, [message.id]: false }));
     try {
-      const result = await requestTranslation(message.text, message.id);
+      const result = await requestTranslation(message.text, message.id, reveal);
       if (sessionRef.current?.sessionId !== sessionId ||
           translationLanguageRef.current !== language ||
           activeConversationIdRef.current !== conversationId) return;
@@ -4470,7 +4496,12 @@ export default function App({
           translationLanguageRef.current === language &&
           activeConversationIdRef.current === conversationId) {
         setTranslationFailures((current) => ({ ...current, [message.id]: true }));
-        setNotice(error instanceof Error ? error.message : "Không dịch được tin nhắn", "error");
+        if (reveal) setNotice(
+          error instanceof TypeError
+            ? "Không kết nối được API dịch AI. Kiểm tra kết nối tới backend cloud."
+            : error instanceof Error ? error.message : "Không dịch được tin nhắn",
+          "error",
+        );
       }
     } finally {
       translationInFlight.current.delete(requestKey);
@@ -6489,6 +6520,29 @@ export default function App({
                                     </span>
                                   )}
                                   {reactionControls}
+                                  {!isTranslating && !effectiveAutoTranslate && translationView.mode === 'dual' && (
+                                    <button type="button" className="chat-translation-action"
+                                      aria-label="Ẩn dịch" title="Ẩn dịch"
+                                      onClick={() => setManuallyTranslated((current) => ({ ...current, [message.id]: false }))}>
+                                      <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
+                                    </button>
+                                  )}
+                                  {!isTranslating && !effectiveAutoTranslate &&
+                                    (!manuallyTranslated[message.id] || !hasTranslation) && (
+                                    <button type="button" className="chat-translation-action"
+                                      aria-label={translationFailed ? 'Thử dịch lại' : 'Dịch'}
+                                      title={translationFailed ? 'Thử dịch lại' : 'Dịch'}
+                                      onClick={() => void translateMessage(message)}>
+                                      <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
+                                    </button>
+                                  )}
+                                  {!isTranslating && effectiveAutoTranslate && translationFailed && !hasTranslation && (
+                                    <button type="button" className="chat-translation-action"
+                                      aria-label="Thử dịch lại" title="Thử dịch lại"
+                                      onClick={() => void translateMessage(message)}>
+                                      <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
+                                    </button>
+                                  )}
                                 </div>
                               )}
                               {longTranslation && (
@@ -6511,26 +6565,6 @@ export default function App({
                                   <LoaderCircle size={15} aria-hidden="true" />
                                   Đang dịch tin nhắn…
                                 </span>
-                              )}
-                              {!isTranslating && !effectiveAutoTranslate && translationView.mode === 'dual' && (
-                                <button type="button" className="chat-translation-action"
-                                  onClick={() => setManuallyTranslated((current) => ({ ...current, [message.id]: false }))}>
-                                  <Languages size={15} aria-hidden="true" /> Ẩn dịch
-                                </button>
-                              )}
-                              {!isTranslating && !effectiveAutoTranslate &&
-                                (!manuallyTranslated[message.id] || !hasTranslation) && (
-                                <button type="button" className="chat-translation-action"
-                                  onClick={() => void translateMessage(message)}>
-                                  <Languages size={15} aria-hidden="true" />
-                                  {translationFailed ? 'Thử dịch lại' : 'Dịch'}
-                                </button>
-                              )}
-                              {!isTranslating && effectiveAutoTranslate && translationFailed && !hasTranslation && (
-                                <button type="button" className="chat-translation-action"
-                                  onClick={() => void translateMessage(message)}>
-                                  <Languages size={15} aria-hidden="true" /> Thử dịch lại
-                                </button>
                               )}
                               {Boolean(message.attachments?.length) && (
                                 <div className={photoOnly ? 'chat-message-media chat-message-photo' : 'chat-message-media'}>
