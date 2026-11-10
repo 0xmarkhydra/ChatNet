@@ -24,6 +24,8 @@ type Props = {
   setFriendMenuId: Dispatch<SetStateAction<number | null>>
   friendMenuId: number | null
   blockContact: (friend: FriendSearchResult | FriendConnection) => Promise<void>
+  unblockContact: (id: number) => Promise<void>
+  onOpenBlockedChat: (id: number) => void
   reportContact: (friend: FriendSearchResult | FriendConnection) => Promise<void>
   friendRequests: FriendConnection[]
   declineFriendRequest: (friend: FriendConnection) => Promise<void>
@@ -51,7 +53,7 @@ const actionText = (relationship: ReturnType<Props['friendRelationship']>) => ({
 export default function ContactsView({
   screen, onScreenChange, friendQuery, setFriendQuery, friendSearching, friendSearchError,
   setFriendSearchRetry, contactSearchResults, friendRelationship, friendBusyIds, actOnFriend,
-  setFriendMenuId, friendMenuId, blockContact, reportContact, friendRequests, declineFriendRequest,
+  setFriendMenuId, friendMenuId, blockContact, unblockContact, onOpenBlockedChat, reportContact, friendRequests, declineFriendRequest,
   friends, friendsLoading, friendsError, onRetryFriends, contactMetadata, openDirectByUsername, setFriendPreview, changePersonalContact,
   removeAcceptedFriend, connectionUrl, onScanQr, embeddedInCalls = false,
   callConversations = [], onOpenCallChat,
@@ -98,12 +100,23 @@ export default function ContactsView({
     }
   }, [callConversations, friends, friendQuery, embeddedInCalls])
   const selectedFriend = visibleFriends.find(friend => friend.id === selectedId) ?? visibleFriends[0] ?? null
+  const blockedStatus = (friend: FriendSearchResult) => friends.find(item => item.id === friend.id)
+  const isBlocked = (friend: FriendSearchResult) => {
+    const item = blockedStatus(friend)
+    return Boolean(item?.blockedByMe || item?.blockedByOther)
+  }
+  const openChat = (friend: FriendSearchResult) => {
+    if (isBlocked(friend)) onOpenBlockedChat(friend.id)
+    else void openDirectByUsername(friend.username)
+  }
   const relationshipFor = (friend: FriendSearchResult) => friendRelationship(friend.id)
   const act = (friend: FriendSearchResult | FriendConnection) => {
-    if (friendRelationship(friend.id) === 'accepted') void openDirectByUsername(friend.username)
+    if (friendRelationship(friend.id) === 'accepted') openChat(friend)
     else void actOnFriend(friend)
   }
-  const startCall = (friend: FriendSearchResult) => void openDirectByUsername(friend.username, 'audio')
+  const startCall = (friend: FriendSearchResult) => {
+    if (!isBlocked(friend)) void openDirectByUsername(friend.username, 'audio')
+  }
   const enterInvitations = () => {
     setFriendQuery('')
     setInvitationTab('incoming')
@@ -141,7 +154,7 @@ export default function ContactsView({
           <span><strong>{conversation.name}</strong><small>{conversation.type === 'group'
             ? conversation.memberCount + ' thành viên' : conversation.online ? 'Đang hoạt động' : 'Cuộc trò chuyện cá nhân'}</small></span>
         </button>
-        <CallHeaderActions conversationId={conversation.id}/>
+        <CallHeaderActions conversationId={conversation.id} disabled={Boolean(conversation.blockedByMe || conversation.blockedByOther)}/>
       </div>)}
     </section>
   )
@@ -160,8 +173,10 @@ export default function ContactsView({
         <button role="menuitem" type="button" onClick={() => { setFriendMenuId(null); void changePersonalContact(friend, 'favorite') }}>
           {contactMetadata[friend.id]?.favorite ? 'Bỏ yêu thích' : 'Yêu thích'}
         </button>
-        <button role="menuitem" type="button" disabled={friendBusyIds.has(friend.id)}
-          onClick={() => { setFriendMenuId(null); void blockContact(friend) }}>Chặn người dùng</button>
+        {!friend.blockedByOther && <button role="menuitem" type="button" disabled={friendBusyIds.has(friend.id)}
+          onClick={() => { setFriendMenuId(null); void (friend.blockedByMe ? unblockContact(friend.id) : blockContact(friend)) }}>
+          {friend.blockedByMe ? 'Bỏ chặn người dùng' : 'Chặn người dùng'}
+        </button>}
         <button role="menuitem" type="button" onClick={() => { setFriendMenuId(null); void reportContact(friend) }}>Báo cáo</button>
         <button role="menuitem" type="button" disabled={friendBusyIds.has(friend.id)}
           onClick={() => { setFriendMenuId(null); void removeAcceptedFriend(friend) }}>Hủy kết bạn</button>
@@ -174,13 +189,13 @@ export default function ContactsView({
     <div className="fd-profile-core">
       {avatar(friend, 'fd-profile-avatar')}
       <h2>{contactMetadata[friend.id]?.nickname || personName(friend)}</h2>
-      <p className={friend.online ? 'fd-online' : ''}>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
+      <p className={friend.online && !isBlocked(friend) ? 'fd-online' : ''}>{friend.blockedByOther ? 'Bạn đã bị chặn' : friend.blockedByMe ? 'Bạn đã chặn người này' : friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
         {typeof friend.mutualGroups === 'number' && friend.mutualGroups > 0 ? ' · ' + friend.mutualGroups + ' nhóm chung' : ''}
       </p>
     </div>
     <div className="fd-profile-actions">
-      <button type="button" className="fd-primary" onClick={() => void openDirectByUsername(friend.username)}><MessageCircle size={20}/>Nhắn tin</button>
-      <button type="button" className="fd-secondary" onClick={() => startCall(friend)}><Phone size={20}/>Gọi thoại</button>
+      <button type="button" className="fd-primary" onClick={() => openChat(friend)}><MessageCircle size={20}/>{isBlocked(friend) ? 'Xem hội thoại' : 'Nhắn tin'}</button>
+      <button type="button" className="fd-secondary" disabled={isBlocked(friend)} onClick={() => startCall(friend)}><Phone size={20}/>Gọi thoại</button>
     </div>
     <div className="fd-profile-info">
       <h3>Thông tin bạn bè</h3>
@@ -194,7 +209,12 @@ export default function ContactsView({
         <button type="button" onClick={() => void changePersonalContact(friend, 'favorite')}>
           {contactMetadata[friend.id]?.favorite ? 'Bỏ yêu thích' : 'Ghim'}
         </button><span>·</span>
-        <button type="button" disabled={friendBusyIds.has(friend.id)} onClick={() => void blockContact(friend)}>Chặn</button><span>·</span>
+        {!friend.blockedByOther && <>
+          <button type="button" disabled={friendBusyIds.has(friend.id)}
+            onClick={() => void (friend.blockedByMe ? unblockContact(friend.id) : blockContact(friend))}>
+            {friend.blockedByMe ? 'Bỏ chặn' : 'Chặn'}
+          </button><span>·</span>
+        </>}
         <button type="button" onClick={() => void reportContact(friend)}>Báo cáo</button><span>·</span>
         <button type="button" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
       </div>
@@ -248,19 +268,20 @@ export default function ContactsView({
                 <button type="button" className="fd-person-identity" aria-pressed={embeddedInCalls ? undefined : selectedFriend?.id === friend.id}
                   aria-expanded={embeddedInCalls ? undefined : expandedFriendId === friend.id}
                   onClick={() => {
-                    if (embeddedInCalls) { void openDirectByUsername(friend.username); return }
+                    if (embeddedInCalls) { openChat(friend); return }
                     setSelectedId(friend.id)
                     setExpandedFriendId(value => value === friend.id ? null : friend.id)
                   }}>{avatar(friend)}<span>
                     <strong>{contactMetadata[friend.id]?.nickname || personName(friend)}</strong>
                     <small>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
-                      {contactMetadata[friend.id]?.favorite ? ' · Yêu thích' : ''}</small>
+                      {contactMetadata[friend.id]?.favorite ? ' · Yêu thích' : ''}
+                      {friend.blockedByOther ? ' · Bạn đã bị chặn' : friend.blockedByMe ? ' · Đã chặn' : ''}</small>
                   </span></button>
                 {embeddedInCalls && <>
                   <button type="button" className="fd-icon-btn" aria-label={'Gọi thoại cho ' + personName(friend)}
-                    onClick={() => startCall(friend)}><Phone size={20}/></button>
+                    disabled={isBlocked(friend)} onClick={() => startCall(friend)}><Phone size={20}/></button>
                   <button type="button" className="fd-icon-btn" aria-label={'Gọi video cho ' + personName(friend)}
-                    onClick={() => void openDirectByUsername(friend.username, 'video')}><Video size={20}/></button>
+                    disabled={isBlocked(friend)} onClick={() => void openDirectByUsername(friend.username, 'video')}><Video size={20}/></button>
                 </>}
               </div>
               {!embeddedInCalls && expandedFriendId === friend.id && <section className="fd-inline-profile" aria-label={'Thông tin của ' + personName(friend)}>

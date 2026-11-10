@@ -41,6 +41,8 @@ export type Conversation = {
   pinnedAt?: string
   id: number
   type: 'direct' | 'group'
+  blockedByMe?: boolean
+  blockedByOther?: boolean
   name: string
   otherUserId?: number
   otherUsername?: string

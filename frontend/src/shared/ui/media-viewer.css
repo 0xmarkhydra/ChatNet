@@ -1,0 +1,178 @@
+/* In-app preview for images and videos in posts, messages and shared content. */
+.media-image-button {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+.media-image-button:focus-visible {
+  outline: 2px solid #6f9fff;
+  outline-offset: -2px;
+}
+.media-image-button img { width: 100%; }
+.media-image-button.open-post { cursor: pointer; }
+
+/* The shared media grid forces square crops and a 150px min-height.
+   Reset those rules only in conversation messages so every thumbnail
+   preserves the original image ratio (single, multiple, portrait, landscape). */
+.social-chat-layout .chat-message-media .media-attachments .media-item .media-image-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+.social-chat-layout .chat-message-media .media-attachments .media-item .media-image-button img,
+.modern-shell.app-layout .social-chat-layout .chat-message-media .media-attachments .media-item .media-image-button img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 180px;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  object-fit: contain;
+  object-position: center;
+  background: #e9edf2;
+}
+.social-chat-layout .chat-message-photo .media-attachments .media-item .media-image-button img,
+.modern-shell.app-layout .social-chat-layout .chat-message-photo .media-attachments .media-item .media-image-button img {
+  max-height: 220px;
+}
+
+.media-viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100100;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(7, 12, 25, .94);
+  color: #f4f7ff;
+}
+.media-viewer-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 1500px);
+  height: min(100%, 1000px);
+  min-width: 0;
+  min-height: 0;
+}
+.media-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 0 12px;
+  min-height: 44px;
+}
+.media-viewer-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.media-viewer-heading strong {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.media-viewer-heading span { font-size: 12px; color: #acb9ce; }
+.media-viewer-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+.media-viewer-actions a,
+.media-viewer-actions button,
+.media-viewer-nav {
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,.10);
+  color: #fff;
+  cursor: pointer;
+}
+.media-viewer-actions a,
+.media-viewer-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 11px;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  text-decoration: none;
+}
+.media-viewer-actions a:hover,
+.media-viewer-actions button:hover,
+.media-viewer-nav:hover { background: rgba(255,255,255,.20); }
+.media-viewer-backdrop :is(button, a):focus-visible {
+  outline: 2px solid #a7c7ff;
+  outline-offset: 2px;
+}
+.media-viewer-content {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.media-viewer-content > img,
+.media-viewer-content > video {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(calc(100% - 110px), 1100px);
+  max-height: min(100%, 740px);
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.media-viewer-error {
+  max-width: 360px;
+  padding: 16px;
+  color: #e4eaf8;
+  text-align: center;
+}
+.media-viewer-nav {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  width: 42px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  transform: translateY(-50%);
+}
+.media-viewer-nav.previous { left: 0; }
+.media-viewer-nav.next { right: 0; }
+@media (max-width: 640px) {
+  .media-viewer-backdrop { padding: 9px; }
+  .media-viewer-header { padding: 6px 2px 12px; }
+  .media-viewer-actions a { padding: 0 9px; }
+  .media-viewer-actions a span { display: none; }
+  .media-viewer-nav { width: 32px; height: 42px; }
+  .media-viewer-content > img,
+  .media-viewer-content > video {
+    max-width: calc(100% - 68px);
+    max-height: calc(100% - 16px);
+  }
+}

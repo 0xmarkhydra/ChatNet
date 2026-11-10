@@ -145,7 +145,7 @@ func TestConversationCategoriesIntegration(t *testing.T) {
 		t.Fatal("unclassified filter incorrect")
 	}
 
-	// A blocked direct chat stays hidden even when the owner filters by a private category.
+	// Blocked direct chats remain readable in their assigned category; mutations stay denied.
 	var direct int64
 	if err = db.QueryRow(ctx, "INSERT INTO conversations(type,created_by) VALUES('direct',$1) RETURNING id", users[0]).Scan(&direct); err != nil {
 		t.Fatal(err)
@@ -165,10 +165,18 @@ func TestConversationCategoriesIntegration(t *testing.T) {
 		call(0, "PUT", directPath, `{"categoryId":null}`, 403)
 		var blocked []conversation
 		json.Unmarshal(call(0, "GET", fmt.Sprintf("/api/conversations?category=%d&limit=100", cat.ID), "", 200), &blocked)
+		found := false
 		for _, c := range blocked {
 			if c.ID == direct {
-				t.Fatal("blocked conversation leaked through category filter")
+				found = true
+				if (pair[0] == users[0] && !c.BlockedByMe) ||
+					(pair[0] == users[1] && !c.BlockedByOther) {
+					t.Fatalf("blocked direct missing status in category: %+v", c)
+				}
 			}
+		}
+		if !found {
+			t.Fatal("blocked direct missing from category")
 		}
 		db.Exec(ctx, "DELETE FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2", pair[0], pair[1])
 	}

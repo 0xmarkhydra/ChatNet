@@ -28,6 +28,7 @@ type Client struct {
 	secretKey      string
 	forcePathStyle bool
 	http           *http.Client
+	stream         *http.Client
 }
 
 type PresignedUpload struct {
@@ -64,6 +65,8 @@ func NewFromEnv() *Client {
 		secretKey:      strings.TrimSpace(os.Getenv("S3_SECRET_ACCESS_KEY")),
 		forcePathStyle: forcePathStyle,
 		http:           &http.Client{Timeout: 15 * time.Second},
+		// Do not apply a 15-second whole-response timeout to large media streams.
+		stream: &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: 15 * time.Second}},
 	}
 }
 
@@ -186,10 +189,14 @@ func (c *Client) keyFromRef(storageRef string) (string, bool) {
 }
 
 func (c *Client) signedURL(method, key string, expiresAt time.Time) (string, error) {
+	return c.signedURLWithQuery(method, key, expiresAt, nil)
+}
+
+func (c *Client) signedURLWithQuery(method, key string, expiresAt time.Time, extra map[string]string) (string, error) {
 	if !c.Configured() {
 		return "", errors.New("S3 storage is not configured")
 	}
-	if key == "" || strings.Contains(key, "..") {
+	if (key == "" && extra["list-type"] != "2") || strings.Contains(key, "..") {
 		return "", errors.New("invalid object key")
 	}
 
@@ -222,6 +229,9 @@ func (c *Client) signedURL(method, key string, expiresAt time.Time) (string, err
 		"X-Amz-Date":          amzDate,
 		"X-Amz-Expires":       strconv.Itoa(expires),
 		"X-Amz-SignedHeaders": "host",
+	}
+	for key, value := range extra {
+		params[key] = value
 	}
 	keys := make([]string, 0, len(params))
 	for k := range params {

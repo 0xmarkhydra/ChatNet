@@ -58,6 +58,8 @@ type messageReaction struct {
 }
 
 type conversation struct {
+	BlockedByMe   bool      `json:"blockedByMe,omitempty"`
+	BlockedByOther bool      `json:"blockedByOther,omitempty"`
 	CategoryID    *int64     `json:"categoryId,omitempty"`
 	PinnedAt      *time.Time `json:"pinnedAt,omitempty"`
 	ID            int64      `json:"id"`
@@ -116,6 +118,7 @@ func main() {
 		storage:   objectstore.NewFromEnv(),
 	}
 	go s.expireNearby(ctx)
+	go s.cleanupOrphanChatMedia(ctx)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
@@ -125,6 +128,7 @@ func main() {
 	mux.Handle("DELETE /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deletePushSubscription)))
 	mux.Handle("POST /api/push/test", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.testPushNotification)))
 	mux.Handle("POST /api/media/presign", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.presignMedia)))
+	mux.HandleFunc("GET /api/media/chat/{id}", s.serveChatMedia)
 	mux.Handle("GET /api/users/{username}/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getUserProfile)))
 	mux.Handle("GET /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfileNote)))
 	mux.Handle("POST /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveProfileNote)))
@@ -183,6 +187,8 @@ func main() {
 	mux.Handle("GET /api/conversations/{id}/activities", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupActivities)))
 	mux.Handle("POST /api/conversations/{id}/activities", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupActivity)))
 	mux.Handle("POST /api/conversations/{id}/activities/{activityId}/vote", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.voteGroupActivity)))
+	mux.Handle("PUT /api/conversations/{id}/activities/{activityId}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setGroupActivityPin)))
+	mux.Handle("DELETE /api/conversations/{id}/activities/{activityId}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setGroupActivityPin)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessages)))
 	mux.Handle("DELETE /api/conversations/{id}/history", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.clearConversationHistory)))
 	mux.Handle("GET /api/conversations/{id}/shared", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listSharedContent)))
@@ -615,13 +621,15 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		               ), '')
 		           END
 		           FROM messages m
-		           WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		             (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))
+		           WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		             (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		               (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)))
 		           ORDER BY m.id DESC
 		           LIMIT 1
 		       ),''),
-		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)) ORDER BY m.id DESC LIMIT 1),c.created_at),
+		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		         (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		           (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))) ORDER BY m.id DESC LIMIT 1),c.created_at),
 		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0)
 		FROM conversations c
@@ -645,17 +653,11 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("meta.nickname")+`, `+searchx.FoldSQL("$6")+`)>0))
 		    OR EXISTS (SELECT 1 FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>cm.cleared_through_message_id
 		       AND msg.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$6")+`)>0
-		       AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id))))
-		  AND (c.type <> 'direct' OR NOT EXISTS (
-		    SELECT 1 FROM conversation_members other
-		    JOIN user_blocks b ON
-		      (b.blocker_id=$1 AND b.blocked_id=other.user_id)
-		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
-		    WHERE other.conversation_id=c.id AND other.user_id<>$1
-		  ))
-		ORDER BY (cm.pinned_at IS NOT NULL) DESC,cm.pinned_at DESC,COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
+		       AND (c.type='direct' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id)))))
+		ORDER BY (cm.pinned_at IS NOT NULL) DESC,cm.pinned_at DESC,COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		         (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		           (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
 		claims.UserID, limit, offset, categoryID, conversationID, keyword, unreadOnly, conversationType)
 	if err != nil {
@@ -681,16 +683,18 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			var username, displayName string
 			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status
+				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status,
+				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=$2 AND b.blocked_id=u.id),
+				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=u.id AND b.blocked_id=$2)
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
-				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline)
+				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline, &c.BlockedByMe, &c.BlockedByOther)
 			if err == nil {
 				c.Name = displayName
 				c.OtherUsername = username
 				c.OtherUserID = &otherID
-				c.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
+				c.Online = !c.BlockedByMe && !c.BlockedByOther && showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
 			}
 		}
 		items = append(items, c)
@@ -915,10 +919,8 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
-		return
-	}
-
+	// Existing participants may read their chat history after a block.
+	// Mutations and media downloads still enforce the block policy.
 	channelID := int64(0)
 	if raw := r.URL.Query().Get("channelId"); raw != "" {
 		value, err := strconv.ParseInt(raw, 10, 64)
@@ -1015,14 +1017,17 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
 		JOIN conversation_members viewer ON viewer.conversation_id=m.conversation_id AND viewer.user_id=$5
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND rm.id>viewer.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		  (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id))
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND rm.id>viewer.cleared_through_message_id
+		  AND (EXISTS(SELECT 1 FROM conversations rc WHERE rc.id=m.conversation_id AND rc.type='direct')
+		    OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id)))
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
 		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id AND COALESCE(m.channel_id,0)=$10 AND ($3::bigint=0 OR m.id<$3)
-		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
+		  AND (EXISTS(SELECT 1 FROM conversations dc WHERE dc.id=m.conversation_id AND dc.type='direct')
+		    OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id)))
 		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("m.text")+`, `+searchx.FoldSQL("$6")+`)>0))
 		  AND ($7::text='' OR lower(u.username)=lower($7))
 		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)
@@ -1053,7 +1058,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
 		items[i], items[j] = items[j], items[i]
 	}
-	if err := s.attachMessageMedia(r.Context(), items); err != nil {
+	if err := s.attachMessageMedia(r.Context(), items, claims.UserID); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load message attachments")
 		return
 	}
@@ -1283,10 +1288,11 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for position, attachment := range attachments {
-		if _, err := tx.Exec(r.Context(), `
+		var savedID int64
+		if err := tx.QueryRow(r.Context(), `
 			INSERT INTO message_attachments(
 				message_id,storage_ref,original_name,content_type,size_bytes,kind,position
-			) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+			) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
 			m.ID,
 			attachment.StorageRef,
 			attachment.Name,
@@ -1294,10 +1300,11 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 			attachment.SizeBytes,
 			attachment.Kind,
 			position,
-		); err != nil {
+		).Scan(&savedID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot save message attachment")
 			return
 		}
+		m.Attachments[position].ID = savedID
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
@@ -1319,6 +1326,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		log.Printf("cannot filter message recipients: %v", visibilityErr)
 		visibleIDs = []int64{claims.UserID} // Message persisted; never notify blocked peers on failure.
 	}
+	s.signChatAttachments(&m, claims.UserID)
 	s.publishConversationEvent(r.Context(), visibleIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
 
 	recipients := make([]int64, 0, len(visibleIDs))
@@ -1377,7 +1385,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		m.Text = ""
 	}
 	items := []message{m}
-	if err := s.attachMessageMedia(ctx, items); err != nil {
+	if err := s.attachMessageMedia(ctx, items, viewerID); err != nil {
 		return message{}, err
 	}
 	if err := s.attachMessageReactions(ctx, viewerID, items); err != nil {
@@ -1568,7 +1576,7 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, m)
 }
 
-func (s *server) attachMessageMedia(ctx context.Context, items []message) error {
+func (s *server) attachMessageMedia(ctx context.Context, items []message, viewerID int64) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -1604,7 +1612,7 @@ func (s *server) attachMessageMedia(ctx context.Context, items []message) error 
 		); err != nil {
 			return err
 		}
-		mediax.SignAttachment(s.storage, &attachment)
+		attachment.URL = s.mediaTicket(attachment.ID, viewerID)
 		if idx, ok := indexByID[messageID]; ok {
 			items[idx].Attachments = append(items[idx].Attachments, attachment)
 		}
@@ -1933,6 +1941,13 @@ func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, 
 				continue
 			}
 			outgoing.Message = &personalized
+		}
+		if outgoing.Message != nil {
+			// Each recipient receives a distinct, revocable media capability.
+			copyMessage := *outgoing.Message
+			copyMessage.Attachments = append([]mediax.Attachment(nil), outgoing.Message.Attachments...)
+			s.signChatAttachments(&copyMessage, userID)
+			outgoing.Message = &copyMessage
 		}
 		data, err := json.Marshal(outgoing)
 		if err != nil {

@@ -111,7 +111,7 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load shared content")
 		return
 	}
-	if err := s.attachMessageMedia(r.Context(), items); err != nil {
+	if err := s.attachMessageMedia(r.Context(), items, claims.UserID); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load shared attachments")
 		return
 	}

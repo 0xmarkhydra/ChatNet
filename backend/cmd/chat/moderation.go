@@ -53,8 +53,9 @@ func (s *server) visibleRecipients(ctx context.Context, actorID int64, recipient
 	return result, rows.Err()
 }
 
-// Direct messages cannot be opened or delivered while either participant
-// blocks the other. Group membership and group-message policy are separate.
+// Direct conversations cannot accept new messages or other mutations while
+// either participant blocks the other. Historical chat text remains readable;
+// media downloads and group-message policy have separate authorization.
 func (s *server) blockedDirectConversation(ctx context.Context, conversationID, userID int64) (bool, error) {
 	var blocked bool
 	err := s.db.QueryRow(ctx, `
@@ -113,8 +114,10 @@ func (s *server) blockUser(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot block user")
 		return
 	}
+	// Preserve accepted friendships in the directory. Only unaccepted
+	// invitations are cancelled by a block; contact actions remain forbidden.
 	low, high := orderedUserPair(claims.UserID, targetID)
-	if _, err = tx.Exec(r.Context(), "DELETE FROM friend_connections WHERE user_low=$1 AND user_high=$2", low, high); err != nil {
+	if _, err = tx.Exec(r.Context(), "DELETE FROM friend_connections WHERE user_low=$1 AND user_high=$2 AND status='pending'", low, high); err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot block user")
 		return
 	}

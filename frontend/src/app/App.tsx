@@ -147,6 +147,7 @@ import ProfileOverlay from "../features/profile/ProfileOverlay";
 import type { NearbyUser } from "../features/discover/NearbyExplorer";
 import GroupCreator from "../features/chat/GroupCreator";
 import {
+  Ban,
   Bell,
   Check,
   Images,
@@ -1174,7 +1175,16 @@ export default function App({
   const activeConversation =
     displayConversations.find((item) => item.id === activeConversationId) ||
     null;
+  const conversationBlocked = Boolean(activeConversation?.type === 'direct' &&
+    (activeConversation.blockedByMe || activeConversation.blockedByOther));
   const groupActivities = useGroupActivities(activeConversation?.type === 'group' ? activeConversation.id : null, session?.sessionId, apiFetch);
+  const pinnedItems = [
+    ...pinnedMessages.map((item) => ({ type: 'message' as const, pinnedAt: item.pinnedAt, message: item.message })),
+    ...(activeConversation?.type === 'group'
+      ? groupActivities.activities.filter((item) => Boolean(item.pinnedAt))
+        .map((activity) => ({ type: 'activity' as const, pinnedAt: activity.pinnedAt!, activity }))
+      : []),
+  ].sort((a, b) => Date.parse(b.pinnedAt) - Date.parse(a.pinnedAt));
   const sortedGroupActivityEvents = groupActivities.events.slice().reverse();
   const viewedGroupActivity = groupActivities.activities.find(activity => activity.id === groupActivityViewedId) || null;
   const chatFriend =
@@ -2000,7 +2010,9 @@ export default function App({
               sizeBytes: file.size,
               contentType,
               kind: ticket.kind,
-              url: ticket.downloadUrl,
+              // Pending chat media uses a local preview. Never persist/reuse
+              // the raw S3 GET URL from the upload ticket.
+              url: scope === "chat" ? URL.createObjectURL(file) : ticket.downloadUrl,
             };
           }
         } catch (error) {
@@ -2902,7 +2914,12 @@ export default function App({
     const relationship = friendRelationship(friend.id);
     if (decline && relationship !== "incoming") return;
     if (relationship === "accepted") {
-      if (friend.username) await openDirectByUsername(friend.username);
+      const contact = friends.find((item) => item.id === friend.id);
+      if (contact?.blockedByMe || contact?.blockedByOther) {
+        await openBlockedFriendConversation(friend.id);
+      } else if (friend.username) {
+        await openDirectByUsername(friend.username);
+      }
       return;
     }
 
@@ -3065,7 +3082,10 @@ export default function App({
         setNotice(result?.error || "Không thể chặn người dùng.", "error");
         return;
       }
-      setFriends((old) => old.filter((item) => item.id !== friend.id));
+      // Blocking a contact must not remove an accepted friend from the directory.
+      setFriends((old) => old.map((item) => item.id === friend.id
+        ? { ...item, blockedByMe: true, online: false }
+        : item));
       setFriendRequests((old) => old.filter((item) => item.id !== friend.id));
       setFriendResults((old) => old.filter((item) => item.id !== friend.id));
       setBlockedUsers((old) => [
@@ -3078,13 +3098,11 @@ export default function App({
       ]);
       setFriendPreview(null);
       setConversations((old) =>
-        old.filter((item) => item.otherUserId !== friend.id),
+        old.map((item) => item.type === 'direct' && item.otherUserId === friend.id
+          ? { ...item, blockedByMe: true, online: false }
+          : item),
       );
-      const currentConversation = conversations.find(
-        (item) => item.id === activeConversationId,
-      );
-      if (currentConversation?.otherUserId === friend.id)
-        setActiveConversationId(null);
+      window.dispatchEvent(new Event('chatnet:privacy-updated'));
       setNotice(`Đã chặn @${friend.username}.`);
       await refreshFriendConnections();
       void refreshConversations();
@@ -3222,6 +3240,16 @@ export default function App({
       if (!response.ok) throw new Error();
       if (sessionRef.current?.sessionId === sid) {
         setBlockedUsers((old) => old.filter((item) => item.id !== userId));
+        setFriends((old) => old.map((item) => item.id === userId
+          ? { ...item, blockedByMe: false }
+          : item));
+        void refreshFriendConnections();
+        setConversations((old) => old.map((item) =>
+          item.type === 'direct' && item.otherUserId === userId
+            ? { ...item, blockedByMe: false }
+            : item));
+        window.dispatchEvent(new Event('chatnet:privacy-updated'));
+        void refreshConversations();
         setNotice("Đã bỏ chặn người dùng.");
       }
     } catch {
@@ -3890,12 +3918,14 @@ export default function App({
     () =>
       Boolean(
         activeConversationId &&
+        !conversationBlocked &&
         !mediaUploading &&
         !messageSending &&
         (messageText.trim() || messageAttachments.length > 0),
       ),
     [
       activeConversationId,
+      conversationBlocked,
       messageText,
       messageAttachments.length,
       mediaUploading,
@@ -5038,6 +5068,36 @@ export default function App({
       />
     ));
 
+  async function openBlockedFriendConversation(userId: number) {
+    let direct = conversations.find((item) => item.type === 'direct' && item.otherUserId === userId);
+    if (!direct) {
+      const username = friends.find((item) => item.id === userId)?.username;
+      if (username) {
+        try {
+          // The chat may be on a later page of the paginated conversation list.
+          const response = await apiFetch(`/api/conversations?type=direct&q=${encodeURIComponent(username)}&limit=100`, { cache: 'no-store' });
+          if (response.ok) {
+            const data = (await response.json()) as Conversation[];
+            direct = data.find((item) => item.type === 'direct' && item.otherUserId === userId);
+            if (direct) {
+              const found = direct;
+              setConversations((current) => [found, ...current.filter((item) => item.id !== found.id)]);
+            }
+          }
+        } catch {
+          // A connectivity problem must not remove the contact from the directory.
+        }
+      }
+    }
+    if (!direct) {
+      setNotice('Chưa tìm thấy hội thoại cũ để mở.', 'warning');
+      return;
+    }
+    setDesktopSection(null);
+    setActiveConversationId(direct.id);
+    setTab('chat');
+  }
+
   const contactsContent = (
     <ContactsView
       screen={contactsScreen}
@@ -5054,6 +5114,8 @@ export default function App({
       setFriendMenuId={setFriendMenuId}
       friendMenuId={friendMenuId}
       blockContact={blockContact}
+      unblockContact={unblockContact}
+      onOpenBlockedChat={(id) => { void openBlockedFriendConversation(id) }}
       reportContact={reportContact}
       friendRequests={friendRequests}
       declineFriendRequest={declineFriendRequest}
@@ -5935,13 +5997,14 @@ export default function App({
               onDragEnter={(event) => {
                 if (!transferHasFiles(event.dataTransfer)) return
                 event.preventDefault()
+                if (conversationBlocked) return
                 chatDragDepth.current += 1
                 if (!chatDragActive) setChatDragActive(true)
               }}
               onDragOver={(event) => {
                 if (!transferHasFiles(event.dataTransfer)) return
                 event.preventDefault()
-                event.dataTransfer.dropEffect = 'copy'
+                event.dataTransfer.dropEffect = conversationBlocked ? 'none' : 'copy'
               }}
               onDragLeave={(event) => {
                 if (chatDragDepth.current === 0) return
@@ -5954,12 +6017,13 @@ export default function App({
                 event.preventDefault()
                 chatDragDepth.current = 0
                 setChatDragActive(false)
+                if (conversationBlocked) return
                 void addChatFiles(Array.from(event.dataTransfer.files))
               }}
               className={`conversation-panel${activeConversation?.type === 'group'
                 ? ' group-chat-panel'
                 : ''}${chatDragActive ? ' chat-file-drag-active' : ''}`}>
-              {chatDragActive && activeConversationId && (
+              {chatDragActive && activeConversationId && !conversationBlocked && (
                 <div className="chat-file-drop-overlay" role="status" aria-live="polite">
                   <div className="chat-file-drop-card">
                     <Images size={32} aria-hidden="true" />
@@ -6025,7 +6089,7 @@ export default function App({
                                 aria-label="Xem trang cá nhân">{activeConversation.name}</button>
                               : activeConversation.name}</strong>
                             <small className="room-subtitle">
-                              {activeConversation.online ? '● Đang hoạt động' : 'Chat riêng'}
+                              {conversationBlocked ? (activeConversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này') : activeConversation.online ? '● Đang hoạt động' : 'Chat riêng'}
                               <CategoryAssignment model={conversationCategories}
                                 conversationId={activeConversation.id}
                                 categoryId={activeConversation.categoryId} />
@@ -6037,7 +6101,7 @@ export default function App({
 
                     {activeConversation.type === 'group' && (
                       <div className="group-mobile-actions">
-                        <CallHeaderActions conversationId={activeConversation.id} />
+                        <CallHeaderActions conversationId={activeConversation.id} disabled={conversationBlocked} />
                         <button type="button" className="group-more-trigger"
                           aria-label="Tìm tin nhắn trong cuộc trò chuyện"
                           onClick={() => setMessageSearchOpen(true)}>
@@ -6053,7 +6117,7 @@ export default function App({
                     )}
 
                     <div className="translate-controls">
-                      <CallHeaderActions conversationId={activeConversation.id} />
+                      <CallHeaderActions conversationId={activeConversation.id} disabled={conversationBlocked} />
                       <button type="button" className="group-settings-toggle" onClick={() => setMessageSearchOpen(true)} title="Tìm trong cuộc trò chuyện" aria-label="Tìm tin nhắn trong cuộc trò chuyện"><Search size={19} /></button>
                       <button type="button" className={conversationDetailsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
                         onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}
@@ -6169,12 +6233,12 @@ export default function App({
                     </div>
                   </header>
 
-                  {pinnedMessages.length > 0 && (
-                    <div className="chat-pinned-panel" role="region" aria-label="Tin nhắn đã ghim">
+                  {pinnedItems.length > 0 && (
+                    <div className="chat-pinned-panel" role="region" aria-label="Nội dung đã ghim">
                       <div className="chat-pinned-heading">
                         <Pin size={16} aria-hidden="true" />
-                        <strong>Tin nhắn đã ghim ({pinnedMessages.length})</strong>
-                        {pinnedMessages.length > 1 && (
+                        <strong>Nội dung đã ghim ({pinnedItems.length})</strong>
+                        {pinnedItems.length > 1 && (
                           <button type="button" onClick={() => setPinnedExpanded((value) => !value)}
                             aria-expanded={pinnedExpanded}>
                             {pinnedExpanded ? 'Thu gọn' : 'Xem tất cả'}
@@ -6182,24 +6246,43 @@ export default function App({
                         )}
                       </div>
                       <div className="chat-pinned-items">
-                        {pinnedMessages.slice(0, pinnedExpanded ? 100 : 1).map(({ message }) => (
-                          <div className="chat-pinned-item" key={message.id}>
-                            <button type="button" className="chat-pinned-jump"
-                              title="Đi đến tin nhắn đã ghim"
-                              onClick={() => setChatSearchJump({
-                                conversationId: activeConversation.id,
-                                messageId: message.id,
-                                revision: ++chatSearchJumpRevision.current,
-                              })}>
-                              <strong>{userLabel(message.senderDisplayName, message.sender)}</strong>
-                              <span>{message.text || attachmentLabel(message.attachments) || 'Tin nhắn'}</span>
-                            </button>
-                            <button type="button" className="chat-pinned-remove" disabled={pinBusy}
-                              aria-label="Bỏ ghim tin nhắn" title="Bỏ ghim tin nhắn"
-                              onClick={() => void toggleMessagePin(message)}>
-                              <X size={15} aria-hidden="true" />
-                            </button>
-                          </div>
+                        {pinnedItems.slice(0, pinnedExpanded ? 200 : 1).map((pin) => (
+                          pin.type === 'message' ? (
+                            <div className="chat-pinned-item" key={`message-${pin.message.id}`}>
+                              <button type="button" className="chat-pinned-jump"
+                                title="Đi đến tin nhắn đã ghim"
+                                onClick={() => setChatSearchJump({
+                                  conversationId: activeConversation.id,
+                                  messageId: pin.message.id,
+                                  revision: ++chatSearchJumpRevision.current,
+                                })}>
+                                <strong>{userLabel(pin.message.senderDisplayName, pin.message.sender)}</strong>
+                                <span>{pin.message.text || attachmentLabel(pin.message.attachments) || 'Tin nhắn'}</span>
+                              </button>
+                              <button type="button" className="chat-pinned-remove" disabled={pinBusy}
+                                aria-label="Bỏ ghim tin nhắn" title="Bỏ ghim tin nhắn"
+                                onClick={() => void toggleMessagePin(pin.message)}>
+                                <X size={15} aria-hidden="true" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="chat-pinned-item" key={`activity-${pin.activity.id}`}>
+                              <button type="button" className="chat-pinned-jump"
+                                title="Xem hoạt động nhóm đã ghim"
+                                onClick={() => setGroupActivityViewedId(pin.activity.id)}>
+                                <strong>{pin.activity.kind === 'poll' ? 'Bình chọn' : pin.activity.kind === 'note' ? 'Ghi chú' : 'Nhắc hẹn'}</strong>
+                                <span>{pin.activity.body || (pin.activity.scheduledAt
+                                  ? new Date(pin.activity.scheduledAt).toLocaleString('vi-VN')
+                                  : 'Nhấn để xem chi tiết')}</span>
+                              </button>
+                              <button type="button" className="chat-pinned-remove"
+                                aria-label="Bỏ ghim hoạt động nhóm" title="Bỏ ghim hoạt động nhóm"
+                                onClick={() => void groupActivities.setPin(pin.activity.id, false)
+                                  .catch((error) => setNotice(error instanceof Error ? error.message : 'Không thể bỏ ghim.', 'error'))}>
+                                <X size={15} aria-hidden="true" />
+                              </button>
+                            </div>
+                          )
                         ))}
                       </div>
                     </div>
@@ -6302,7 +6385,7 @@ export default function App({
                         (activeChatTranslationSettings?.display !== 'bilingual' && Array.from(message.text).length > 100))
                       const isTranslating = Boolean(translationPending[message.id])
                       const translationFailed = Boolean(translationFailures[message.id])
-                      const reactionControls = (
+                      const reactionControls = !conversationBlocked ? (
                         <div className="message-reactions">
                           {(message.reactions || []).map((reaction) => (
                             <button
@@ -6324,7 +6407,7 @@ export default function App({
                             <SmilePlus size={16} aria-hidden="true" />
                           </button>
                         </div>
-                      )
+                      ) : null
                       return (
                         <Fragment key={message.id}>
                           {displayDay && <div className="day-divider"><span>{dayLabel}</span></div>}
@@ -6345,13 +6428,13 @@ export default function App({
                         <article
                           data-message-id={message.id}
                           className={mine ? 'message mine message-press-target' : 'message message-press-target'}
-                          onPointerDown={(event) => beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)}
+                          onPointerDown={(event) => { if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target) }}
                           onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
                           onPointerUp={cancelMessageLongPress}
                           onPointerCancel={cancelMessageLongPress}
                           onPointerLeave={cancelMessageLongPress}
                           onContextMenu={(event) => {
-                            if (message.deleted) return
+                            if (message.deleted || conversationBlocked) return
                             // Keep native context-copy for text selected inside this message.
                             const selection = window.getSelection()
                             if (event.target instanceof Element &&
@@ -6489,7 +6572,7 @@ export default function App({
                               {item.status === 'failed' ? item.error || 'Không gửi được' : 'Chờ có mạng'}
                             </span>
                           )}
-                          {(item.status === 'failed' || (item.status === 'unconfirmed' && chatOnline)) && (
+                          {!conversationBlocked && (item.status === 'failed' || (item.status === 'unconfirmed' && chatOnline)) && (
                             <button type="button" className="chat-outbox-retry"
                               aria-label={item.status === 'failed' ? 'Gửi lại tin nhắn bị lỗi' : 'Gửi lại tin nhắn đang chờ'}
                               onClick={() => {
@@ -6515,6 +6598,20 @@ export default function App({
                     </button>
                   </div>
 
+                  {conversationBlocked ? (
+                    <div className="chat-blocked-composer" role="status" aria-live="polite">
+                      <Ban size={20} aria-hidden="true" />
+                      <div>
+                        <strong>{activeConversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này'}</strong>
+                        <span>Không thể nhắn tin, gọi điện hoặc gửi tệp trong cuộc trò chuyện này.</span>
+                      </div>
+                      {activeConversation.blockedByMe && !activeConversation.blockedByOther && activeConversation.otherUserId && (
+                        <button type="button" onClick={() => void unblockContact(activeConversation.otherUserId!)} disabled={blockedBusy}>
+                          Bỏ chặn
+                        </button>
+                      )}
+                    </div>
+                  ) : (
                   <form className="composer media-composer" onSubmit={(event) => {
                     void sendMessage(event)
                     if (isDesktopBuild) messageInputRef.current?.focus()
@@ -6596,13 +6693,15 @@ export default function App({
                       <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>
                     </button>
                   </form>
+                  )}
                 </>
               )}
             </section>
             {activeConversation && conversationDetailsOpen && (
               <ConversationDetailsPanel
                 conversation={activeConversation}
-                busy={historyActionBusy}
+                busy={historyActionBusy || blockedBusy}
+                onUnblock={() => { if (activeConversation.otherUserId) void unblockContact(activeConversation.otherUserId) }}
                 onClose={() => setConversationDetailsOpen(false)}
                 onBlock={() => {
                   if (activeConversation.otherUserId && activeConversation.otherUsername) {
@@ -7308,6 +7407,7 @@ export default function App({
             onClose={() => { setGroupActivityCreateKind(null); setGroupActivityViewedId(null) }}
             onCreate={groupActivities.create}
             onVote={groupActivities.vote}
+            onTogglePin={groupActivities.setPin}
           />
         )}
         {activeMessageAction && (
@@ -8465,11 +8565,12 @@ export default function App({
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}
-        conversations={displayConversations.map(({ id, name, type, otherUsername }) => ({
+        conversations={displayConversations.map(({ id, name, type, otherUsername, blockedByMe, blockedByOther }) => ({
           id,
           name,
           type,
           otherUsername,
+          blocked: Boolean(blockedByMe || blockedByOther),
         }))}
       />
 

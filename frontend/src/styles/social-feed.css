@@ -16,12 +16,15 @@
   .modern-shell.app-layout .social-feed-grid {
     box-sizing: border-box;
     display: grid;
-    grid-template-columns: minmax(0, 915fr) minmax(260px, 337fr);
+    grid-template-columns: minmax(0, 620px) minmax(260px, 320px);
     align-items: start;
-    gap: 18px;
+    justify-content: center;
+    gap: 22px;
     width: 100%;
+    max-width: 1040px;
     min-width: 0;
-    padding: 21px 33px 40px;
+    margin-inline: auto;
+    padding: 20px 24px 36px;
   }
   .modern-shell.app-layout .social-feed-center,
   .modern-shell.app-layout .social-feed-side {
@@ -357,11 +360,11 @@
     > .feed.zalo-feed
     > .post.zalo-post {
     display: grid;
-    grid-template-columns: 49px minmax(0, 1fr);
-    gap: 7px 14px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 6px 11px;
     min-width: 0;
     margin: 0;
-    padding: 16px 22px 11px;
+    padding: 14px 18px 11px;
     border: 1px solid #e8ecf5;
     border-radius: 17px;
     background: #fff;
@@ -372,8 +375,8 @@
     display: block;
     grid-column: 1;
     grid-row: 1;
-    width: 49px;
-    height: 49px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
   }
   .modern-shell.app-layout .social-feed-center .post.zalo-post .post-body {
@@ -387,7 +390,7 @@
     grid-column: 2;
     grid-row: 1;
     align-items: flex-start;
-    min-height: 49px;
+    min-height: 44px;
   }
   .modern-shell.app-layout
     .social-feed-center
@@ -496,36 +499,36 @@
 
   /* Four equal post actions and a single heart reaction, matching the post card layout. */
   .modern-shell.app-layout .social-feed-center > .feed.zalo-feed > .post.zalo-post.feed-post-card {
-    padding: 18px 24px 14px;
-    border-radius: 20px;
+    padding: 14px 18px 11px;
+    border-radius: 16px;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card > .avatar {
-    width: 52px; height: 52px;
+    width: 44px; height: 44px;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .post-author {
-    min-height: 52px;
+    min-height: 44px;
     align-items: center;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .post-author strong {
-    color: #142443; font-size: 16px; font-weight: 750;
+    color: #142443; font-size: 14px; font-weight: 750;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .post-author small {
-    color: #7889aa; font-size: 12px;
+    color: #7889aa; font-size: 11px;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-text {
-    padding-top: 8px;
+    padding-top: 6px;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-text .feed-text > p {
-    margin: 0 0 6px; line-height: 1.5; font-size: 15px;
+    margin: 0 0 5px; line-height: 1.5; font-size: 14px;
     white-space: pre-wrap; overflow-wrap: anywhere;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview {
-    margin-top: 10px; border-radius: 15px; overflow: hidden;
+    margin-top: 8px; border-radius: 12px; overflow: hidden;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-attachments {
     box-sizing: border-box; width: 100%; max-width: none; margin: 0; gap: 6px;
   }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-item a {
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-item .media-image-button {
     display: block; width: 100%;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .media-count-1 .media-item img {
@@ -533,21 +536,30 @@
     width: 100%;
     height: auto;
     min-height: 0;
-    max-height: none;
+    max-height: 440px;
     aspect-ratio: auto;
-    border-radius: 15px;
+    border-radius: 12px;
     object-fit: contain;
+    background: #f4f6fa;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .media-count-1 .media-item video {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 440px;
+    object-fit: contain;
+    background: #f4f6fa;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-engagement {
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
-    gap: 8px 16px; padding: 9px 4px 10px;
-    color: #7585a7; font-size: 12px;
+    gap: 6px 12px; padding: 7px 2px 8px;
+    color: #7585a7; font-size: 11px;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-likes {
     display: inline-flex; align-items: center; gap: 8px;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-likes svg {
-    color: #f34373; flex: 0 0 auto;
+    color: #f34373; flex: 0 0 auto; width: 19px; height: 19px;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-conversation-stats {
     margin-left: auto; text-align: right;
@@ -557,10 +569,10 @@
     gap: 4px; margin-top: 0; padding-top: 5px; border-top: 1px solid #e8ecf5;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    width: 100%; min-width: 0; min-height: 43px; padding: 4px 6px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; min-width: 0; min-height: 39px; padding: 3px 4px;
     border: 0; border-radius: 10px; background: transparent;
-    color: #243a5d; font-size: 13px; font-weight: 550; cursor: pointer;
+    color: #243a5d; font-size: 12px; font-weight: 550; cursor: pointer;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button:hover {
     background: #f4f6fc;
@@ -575,7 +587,7 @@
     color: #2563eb;
   }
   .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button span {
-    font-size: 13px;
+    font-size: 12px;
   }
   @media (max-width: 600px) {
     .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button {
@@ -869,7 +881,8 @@
 @media (min-width: 761px) and (max-width: 1330px) {
   .modern-shell.app-layout .social-feed-grid {
     grid-template-columns: minmax(0, 1fr);
-    padding: 17px;
+    max-width: 700px;
+    padding: 17px 18px 36px;
   }
   .modern-shell.app-layout .social-feed-side {
     display: grid;
@@ -937,6 +950,14 @@
   }
   .modern-shell.app-layout .social-feed-side {
     display: none;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card {
+    padding: 12px 12px 10px;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-count-1 .media-item img,
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-count-1 .media-item video {
+    max-height: min(60dvh, 420px);
+    object-fit: contain;
   }
 }
 

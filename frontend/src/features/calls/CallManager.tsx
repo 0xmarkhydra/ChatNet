@@ -33,7 +33,7 @@ import UserAvatar from '../../shared/ui/UserAvatar'
 import { notifyDesktopCall, dismissDesktopCall } from '../../platform/useDesktopNotifications'
 import './call.css'
 
-type ConversationLite = { id: number; name: string; type: 'direct' | 'group'; otherUsername?: string }
+type ConversationLite = { id: number; name: string; type: 'direct' | 'group'; otherUsername?: string; blocked?: boolean }
 type CallLaunchDetail = { conversationId: number; mediaType: CallMediaType }
 
 type CallManagerProps = {
@@ -55,7 +55,7 @@ type CallCaption = {
   updatedAt: number
 }
 const CONSENT_TOPIC = 'chatnet.call.translation.consent.v1'
-export function CallHeaderActions({ conversationId }: { conversationId: number }) {
+export function CallHeaderActions({ conversationId, disabled = false }: { conversationId: number; disabled?: boolean }) {
   const start = (mediaType: CallMediaType) => {
     window.dispatchEvent(new CustomEvent<CallLaunchDetail>('chatnet:start-call', {
       detail: { conversationId, mediaType },
@@ -63,10 +63,10 @@ export function CallHeaderActions({ conversationId }: { conversationId: number }
   }
   return (
     <div className="call-header-actions" aria-label="Gọi điện">
-      <button type="button" aria-label="Gọi thoại" title="Gọi thoại" onClick={() => start('audio')}>
+      <button type="button" aria-label="Gọi thoại" title={disabled ? "Không thể gọi khi hội thoại bị chặn" : "Gọi thoại"} disabled={disabled} onClick={() => start('audio')}>
         <Phone size={19} />
       </button>
-      <button type="button" aria-label="Gọi video" title="Gọi video" onClick={() => start('video')}>
+      <button type="button" aria-label="Gọi video" title={disabled ? "Không thể gọi khi hội thoại bị chặn" : "Gọi video"} disabled={disabled} onClick={() => start('video')}>
         <Video size={20} />
       </button>
     </div>
@@ -157,6 +157,10 @@ export default function CallManager({
 
   async function startCall(conversationId: number, mediaType: CallMediaType) {
     if (busy || active) return
+    if (conversationMap.get(conversationId)?.blocked) {
+      setError('Không thể gọi khi cuộc hội thoại bị chặn.')
+      return
+    }
     setBusy(true)
     setError('')
     try {

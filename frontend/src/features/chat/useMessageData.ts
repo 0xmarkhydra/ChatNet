@@ -46,6 +46,12 @@ export function useMessageData({
   jumpToMessage,
 }: Options) {
   const [messages, setMessages] = useState<Message[]>([])
+  const [privacyRevision, setPrivacyRevision] = useState(0)
+  useEffect(() => {
+    const refresh = () => setPrivacyRevision(current => current + 1)
+    window.addEventListener('chatnet:privacy-updated', refresh)
+    return () => window.removeEventListener('chatnet:privacy-updated', refresh)
+  }, [])
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
   const [messageGapBefore, setMessageGapBefore] = useState<number | null>(null)
@@ -154,6 +160,7 @@ export function useMessageData({
     targetLanguage,
     translationPreferencesLoaded,
     jumpToMessage?.revision,
+    privacyRevision,
   ])
 
   useEffect(() => {

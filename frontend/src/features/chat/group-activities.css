@@ -200,6 +200,39 @@
   font-size: 14px;
   outline: 0;
 }
+.group-activity-form .group-activity-pin-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.group-activity-form .group-activity-pin-choice input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  margin: 0;
+  accent-color: #3768d7;
+}
+.group-activity-toggle-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid #dbe5f6;
+  border-radius: 10px;
+  background: #f7f9ff;
+  color: #3e69bb;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.group-activity-toggle-pin:hover { background: #ecf3ff; }
+.group-activity-toggle-pin:disabled { opacity: .6; cursor: not-allowed; }
 .group-activity-form input:focus-visible,
 .group-activity-form textarea:focus-visible {
   border-color: #7298fa;

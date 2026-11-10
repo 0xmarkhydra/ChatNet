@@ -31,6 +31,7 @@ const session = {
   user: { id: 1, username: 'soco_user', displayName: 'SocCO Tester', email: 'test@example.com' },
 }
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization, Content-Type', 'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS' }
+const portraitImageUrl = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="900" viewBox="0 0 360 900"><rect width="360" height="900" fill="#f3f6fa"/><rect x="0" y="0" width="65" height="65" fill="#f24"/><rect x="295" y="0" width="65" height="65" fill="#2ac"/><rect x="0" y="835" width="65" height="65" fill="#4a2"/><rect x="295" y="835" width="65" height="65" fill="#f90"/></svg>')
 let storedProfile = { username: 'soco_user', displayName: 'SocCO Tester', bio: '', city: '', avatarSet: false, coverSet: false, updatedAt: '2026-11-05T09:00:00Z' }
 let profileUpdatePayload = null
 let storedPrivacy = { searchableByUsername: true, searchableByName: true, searchableByEmail: false, allowFriendRequests: true, showOnlineStatus: true }
@@ -52,6 +53,7 @@ let lastFeedCreated = null
 let friendRequestsSent = 0
 let rejectStoryDirect = false
 const storyReplyRequests = []
+const mediaOnly = process.argv.includes('--media-only')
 
 
 try {
@@ -91,6 +93,30 @@ try {
         createdAt: new Date().toISOString(),
       })
     }
+    if (mediaOnly && path === '/api/conversations/1/messages' && req.method() === 'GET') return json([{
+      id: 12, conversationId: 1, senderId: 2, sender: 'minhanh',
+      senderDisplayName: 'Minh Anh', text: '',
+      attachments: [
+        { kind: 'image', storageRef: 'test/chat-photo-1', name: 'Ảnh hội thoại 1',
+          sizeBytes: 300, contentType: 'image/jpeg', url: origin + '/default-profile-cover.jpg' },
+        { kind: 'image', storageRef: 'test/chat-photo-2', name: 'Ảnh hội thoại 2',
+          sizeBytes: 300, contentType: 'image/svg+xml', url: portraitImageUrl },
+      ],
+      createdAt: '2026-11-06T08:00:00Z', readByUserIds: [],
+    }])
+    if (mediaOnly && path === '/api/conversations/1/shared' && new URL(req.url()).searchParams.get('kind') === 'media') return json({
+      items: [{
+        id: 12, sender: 'minhanh', senderDisplayName: 'Minh Anh',
+        text: '', createdAt: '2026-11-06T08:00:00Z',
+        attachments: [
+          { kind: 'image', storageRef: 'test/chat-photo-1', name: 'Ảnh đã chia sẻ 1', sizeBytes: 300,
+            contentType: 'image/jpeg', url: origin + '/default-profile-cover.jpg' },
+          { kind: 'image', storageRef: 'test/chat-photo-2', name: 'Ảnh đã chia sẻ 2', sizeBytes: 300,
+            contentType: 'image/svg+xml', url: portraitImageUrl },
+        ],
+      }], nextBefore: null,
+    })
+    if (mediaOnly && /\/api\/conversations\/\d+\/pins$/.test(path)) return json([])
     if (path === '/api/conversations') return json(conversations)
     if (path === '/api/conversation-categories') return json([])
     if (path.endsWith('/messages')) return json([])
@@ -233,23 +259,30 @@ try {
     }))
   })
   const approx = (actual, expected, tolerance=8) => Math.abs(actual - expected) <= tolerance
-  for (const [selector, x, y] of [
-    ['.social-feed-stories-card', 109, 107],
-    ['.social-feed-launcher', 109, 286],
-    ['.social-feed-filter-bar', 109, 410],
-    ['.social-feed-center .post.zalo-post', 109, 474],
-    ['.social-feed-suggestions', null, 107],
-    ['.social-feed-trending', null, 425],
-    ['.social-feed-translation', null, 702],
+  for (const [selector, y] of [
+    ['.social-feed-stories-card', 107],
+    ['.social-feed-launcher', 286],
+    ['.social-feed-filter-bar', 410],
+    ['.social-feed-center .post.zalo-post', 474],
+    ['.social-feed-suggestions', 107],
+    ['.social-feed-trending', 425],
+    ['.social-feed-translation', 702],
   ]) {
     const rect = socialGeometry[selector]
-    assert(rect && (x === null || approx(rect.x, x)) && approx(rect.y, y),
-      'Social V4 frame geometry mismatch ' + selector + ': ' + JSON.stringify(socialGeometry))
+    assert(rect && approx(rect.y, y),
+      'Social feed vertical alignment mismatch ' + selector + ': ' + JSON.stringify(socialGeometry))
   }
-  const sideWidth = socialGeometry['.social-feed-suggestions'].width
-  const centerWidth = socialGeometry['.social-feed-stories-card'].width
-  assert(Math.abs(sideWidth / (sideWidth + centerWidth) - 337 / 1252) < .015,
-    'Social feed right rail should be 20% narrower: ' + JSON.stringify({ sideWidth, centerWidth }))
+  const centerRect = socialGeometry['.social-feed-stories-card']
+  const sideRect = socialGeometry['.social-feed-suggestions']
+  const centerWidth = centerRect.width
+  const sideWidth = sideRect.width
+  assert(centerWidth >= 540 && centerWidth <= 640 && sideWidth >= 260 && sideWidth <= 330
+    && sideRect.x >= centerRect.x + centerWidth + 14
+    && ['.social-feed-launcher', '.social-feed-filter-bar', '.social-feed-center .post.zalo-post']
+      .every(selector => approx(socialGeometry[selector].x, centerRect.x, 2)
+        && approx(socialGeometry[selector].width, centerWidth, 2)),
+    'Feed cards, composer and stories must share a compact central column next to a narrower rail: '
+      + JSON.stringify(socialGeometry))
   const postCard = feedCards.first()
   const postActions = postCard.locator('.feed-post-toolbar > button')
   assert(await postActions.count() === 4,
@@ -272,7 +305,7 @@ try {
       reactionSummary: Boolean(card.querySelector('.feed-post-likes svg.lucide-heart')),
       mediaWidth: card.querySelector('.feed-media-preview img')?.getBoundingClientRect().width,
       cardWidth: card.getBoundingClientRect().width,
-      mediaBoxes: ['.feed-media-preview', '.media-attachments', '.media-item', '.media-item a', '.media-item img']
+      mediaBoxes: ['.feed-media-preview', '.media-attachments', '.media-item', '.media-image-button', '.media-item img']
         .map(selector => {
           const elem = card.querySelector(selector)
           const rect = elem?.getBoundingClientRect()
@@ -300,12 +333,133 @@ try {
         maxHeight: css.maxHeight,
       }
     })
+    const allowedHeight = Number.parseFloat(image.maxHeight)
+    const naturalDisplayHeight = image.width * image.naturalHeight / image.naturalWidth
     assert(image.naturalWidth > 0 && image.naturalHeight > 0
-      && image.fit === 'contain' && image.maxHeight === 'none'
-      && Math.abs(image.height / image.width - image.naturalHeight / image.naturalWidth) < 0.03,
-      'Single feed photo must display its full natural aspect ratio: ' + JSON.stringify(image))
+      && image.fit === 'contain' && allowedHeight > 0 && allowedHeight <= 440
+      && Math.abs(image.height - Math.min(naturalDisplayHeight, allowedHeight)) <= 2,
+      'Single feed photo must be height-limited while displaying its full contents: ' + JSON.stringify(image))
   }
   await verifyUncroppedFeedImage()
+  if (mediaOnly) {
+    const popups = []
+    page.on('popup', popup => { popups.push(popup.url()); void popup.close() })
+    const viewer = page.getByRole('dialog', { name: 'Xem ảnh và video' })
+
+    await postCard.getByRole('button', { name: 'Xem bài viết có ảnh Đà Lạt' }).click()
+    const postComments = page.locator('.post-comments-page')
+    await postComments.waitFor({ state: 'visible' })
+    assert(await viewer.count() === 0, 'Feed image should open post comments, not the image viewer')
+    assert(popups.length === 0, 'Clicking feed image must not open S3')
+    // Start the chat portion without the post=... deep-link that keeps Feed active.
+    await page.goto(origin)
+    await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
+    await page.locator('.zalo-conversation-list .conversation-item').first().click()
+    const chatImages = page.locator('.chat-message-media .media-image-button')
+    try {
+      await chatImages.first().waitFor({ state: 'visible', timeout: 9000 })
+    } catch (error) {
+      console.log('MEDIA ERRORS', JSON.stringify(errors), 'server', serverLog.slice(-900))
+      console.log('MEDIA DEBUG', JSON.stringify(await page.evaluate(() => ({
+        url: location.href,
+        active: Boolean(document.querySelector('.social-chat-layout.has-active')),
+        visibleMessages: document.querySelector('.social-chat-layout .messages')?.innerText.slice(0, 700),
+        mediaItems: document.querySelectorAll('.chat-message-media').length,
+        images: document.querySelectorAll('.media-image-button').length,
+        chatListVisible: Boolean(document.querySelector('.zalo-conversation-list')),
+        chatListItems: [...document.querySelectorAll('.zalo-conversation-list .conversation-item')].slice(0,3).map(element => ({name: element.innerText.slice(0,60), active: element.className})),
+        mainSnippet: document.querySelector('main')?.innerText.slice(0,400),
+        bodySnippet: document.body.innerText.slice(0,450),
+      }))))
+      throw error
+    }
+    assert(await chatImages.count() === 2, 'Chat fixture must show two image attachments')
+    const thumbs = await chatImages.locator('img').evaluateAll(async images => {
+      await Promise.all(images.map(img => img.decode()))
+      return images.map(img => {
+        const rect = img.getBoundingClientRect()
+        const css = getComputedStyle(img)
+        return {
+          width: rect.width, height: rect.height,
+          naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight,
+          fit: css.objectFit, aspect: css.aspectRatio, minHeight: css.minHeight,
+        }
+      })
+    })
+    assert(thumbs.length === 2 && thumbs.some(img => img.naturalHeight > img.naturalWidth)
+      && thumbs.some(img => img.naturalWidth > img.naturalHeight)
+      && thumbs.every(img => img.width <= 221 && img.height <= 221
+        && img.fit === 'contain' && img.aspect === 'auto'
+        && img.minHeight === '0px' && img.naturalWidth > 0 && img.naturalHeight > 0
+        && Math.abs(img.width / img.height - img.naturalWidth / img.naturalHeight) < 0.025),
+      'Landscape and portrait thumbnails must retain the exact original aspect ratio: ' + JSON.stringify(thumbs))
+    await chatImages.first().click()
+    await viewer.waitFor({ state: 'visible' })
+    assert(await viewer.locator('.media-viewer-content img').isVisible(),
+      'Chat image must open in the in-app media viewer')
+    async function measurePreview() {
+      return viewer.locator('.media-viewer-content img').evaluate(async img => {
+        await img.decode()
+        const rect = img.getBoundingClientRect()
+        const frame = img.parentElement.getBoundingClientRect()
+        return {
+          fit: getComputedStyle(img).objectFit,
+          width: rect.width, height: rect.height,
+          naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight,
+          frameWidth: frame.width, frameHeight: frame.height,
+        }
+      })
+    }
+    function assertUncroppedPreview(info, label) {
+      assert(info.fit === 'contain' && info.naturalWidth > 0 && info.naturalHeight > 0
+        && info.width <= Math.min(info.frameWidth, info.naturalWidth) + 1
+        && info.height <= Math.min(info.frameHeight, info.naturalHeight) + 1
+        && Math.abs(info.width / info.height - info.naturalWidth / info.naturalHeight) < 0.025,
+        label + ': image should be fully visible and never upscaled beyond original pixels: ' + JSON.stringify(info))
+    }
+    assertUncroppedPreview(await measurePreview(), 'Landscape preview')
+    await viewer.getByRole('button', { name: 'Ảnh tiếp theo' }).click()
+    assert(await viewer.locator('.media-viewer-heading span').innerText() === '2 / 2',
+      'Chat image viewer must navigate attachments')
+    assertUncroppedPreview(await measurePreview(), 'Portrait preview')
+    await page.keyboard.press('ArrowLeft')
+    assert(await viewer.locator('.media-viewer-heading span').innerText() === '1 / 2',
+      'Chat image viewer must navigate by keyboard')
+    await viewer.getByRole('button', { name: 'Đóng trình xem ảnh' }).click()
+    await viewer.waitFor({ state: 'detached' })
+
+    await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
+    await page.locator('.social-chat-details').getByRole('button', { name: 'Ảnh & video' }).click()
+    const sharedDialog = page.getByRole('dialog', { name: 'Nội dung đã chia sẻ' })
+    await sharedDialog.waitFor({ state: 'visible' })
+    await sharedDialog.locator('.shared-media-card').first().click()
+    await viewer.waitFor({ state: 'visible' })
+    assert(await viewer.locator('.media-viewer-content img').isVisible(),
+      'Shared media must open in the same viewer')
+    await page.keyboard.press('Escape')
+    await viewer.waitFor({ state: 'detached' })
+    assert(await sharedDialog.isVisible(), 'Closing media viewer must preserve the shared content dialog')
+    assert(popups.length === 0, 'Feed, chat and shared media must not open external browser tabs')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await sharedDialog.locator('.shared-media-card').first().click()
+    await viewer.waitFor({ state: 'visible' })
+    assertUncroppedPreview(await measurePreview(), 'Mobile landscape preview')
+    await viewer.getByRole('button', { name: 'Ảnh tiếp theo' }).click()
+    assertUncroppedPreview(await measurePreview(), 'Mobile portrait preview')
+    const mobileImage = await viewer.locator('.media-viewer-content img').boundingBox()
+    assert(mobileImage && mobileImage.x >= 0 && mobileImage.y >= 0
+      && mobileImage.x + mobileImage.width <= 391
+      && mobileImage.y + mobileImage.height <= 845,
+      'Mobile portrait photo must fit fully within the viewport: ' + JSON.stringify(mobileImage))
+    await viewer.getByRole('button', { name: 'Đóng trình xem ảnh' }).click()
+    await viewer.waitFor({ state: 'detached' })
+    assert(popups.length === 0, 'Mobile media preview must not open an external tab')
+    console.log('Media viewer PASS: desktop/mobile feed/chat/shared, no external tabs, carousel, keyboard, escape')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   const likeLayout = await postCard.evaluate(card => {
     const row = card.querySelector('.post-engagement-summary')
     const likes = card.querySelector('.feed-post-likes')
@@ -348,6 +502,24 @@ try {
     await postCard.getByRole('button', { name: 'Bình luận', exact: true }).click()
     const detail = page.locator('.post-comments-page')
     await detail.waitFor({ state: 'visible' })
+    await page.mouse.move(500, 250)
+    await page.waitForTimeout(180)
+    const detailFrame = await page.locator('.modern-frame').boundingBox()
+    assert(Math.abs((await sidebar.boundingBox()).width - 76) < 2,
+      'Post detail must not force the sidebar open')
+    assert(detailFrame && Math.abs(detailFrame.x - mainBeforeHover.x) < 1,
+      'Post detail must not shift main content to accommodate a permanently expanded sidebar')
+    await page.mouse.move(45, navY)
+    await page.waitForTimeout(180)
+    assert(Math.abs((await sidebar.boundingBox()).width - 250) < 2,
+      'Post detail should retain sidebar hover expansion')
+    const detailFrameHovered = await page.locator('.modern-frame').boundingBox()
+    assert(detailFrameHovered && Math.abs(detailFrameHovered.x - detailFrame.x) < 1,
+      'Hovering sidebar in post detail must not shift the main page')
+    await page.mouse.move(500, 250)
+    await page.waitForTimeout(180)
+    assert(Math.abs((await sidebar.boundingBox()).width - 76) < 2,
+      'Sidebar must collapse after the pointer leaves on post detail')
     const detailLike = detail.getByRole('button', { name: 'Bỏ thích bài viết' })
     assert(await detailLike.locator('svg.lucide-heart').count() === 1
       && await detail.locator('.post-comments-stats .lucide-heart').count() === 1,
@@ -368,6 +540,33 @@ try {
   }
   mkdirSync('output/playwright/layout', { recursive: true })
   await page.screenshot({ path: 'output/playwright/layout/feed-post-single-heart.png' })
+  // The post editor should start short, expand with text, and shrink back without its own scrollbar.
+  await feed.locator('.social-feed-launcher-publish').click()
+  const createDialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+  await createDialog.waitFor({ state: 'visible' })
+  const postInput = createDialog.getByRole('textbox', { name: 'Nội dung bài viết' })
+  await postInput.fill('xinh quá nhé')
+  const measureComposer = () => postInput.evaluate(field => ({
+    height: field.getBoundingClientRect().height,
+    contentHeight: field.scrollHeight,
+    overflowY: getComputedStyle(field).overflowY,
+    resize: getComputedStyle(field).resize,
+  }))
+  const shortComposer = await measureComposer()
+  assert(shortComposer.height <= 85 && shortComposer.overflowY === 'hidden'
+    && shortComposer.resize === 'none',
+    'Short post text must not create a large editor or an internal scrollbar: ' + JSON.stringify(shortComposer))
+  await postInput.fill(Array(30).fill('Hôm nay mình muốn chia sẻ một câu chuyện').join(' '))
+  const longComposer = await measureComposer()
+  assert(longComposer.height > shortComposer.height + 80
+    && longComposer.height >= longComposer.contentHeight - 2,
+    'Post editor should grow as the caption wraps: ' + JSON.stringify(longComposer))
+  await postInput.fill('xinh quá nhé')
+  const shrunkComposer = await measureComposer()
+  assert(Math.abs(shrunkComposer.height - shortComposer.height) < 3,
+    'Post editor must shrink again when text is removed: ' + JSON.stringify(shrunkComposer))
+  await createDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+  await createDialog.waitFor({ state: 'detached' })
   if (process.argv.includes('--post-only')) {
     await page.setViewportSize({ width: 390, height: 844 })
     await verifyUncroppedFeedImage()

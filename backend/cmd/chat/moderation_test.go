@@ -71,23 +71,40 @@ func TestBlockReportAndFriendQuotaIntegration(t *testing.T) {
 		t.Fatalf("direct=%s err=%v", w.Body.String(), err)
 	}
 	call(0, "POST", "/api/friends/request", s.sendFriendRequest, "", ids[1], 200)
+	call(1, "POST", "/api/friends/accept", s.acceptFriendRequest, "", ids[0], 200)
+	// Existing direct history and accepted friendship remain visible after a block.
+	// Sending new messages, calling and media requests are still forbidden.
+	if _, err := db.Exec(ctx, "INSERT INTO messages(conversation_id,user_id,text) VALUES($1,$2,'old direct message')", direct.ID, ids[1]); err != nil {
+		t.Fatal(err)
+	}
 	call(1, "POST", "/api/users/1/block", s.blockUser, "", ids[0], 200)
 	call(1, "POST", "/api/users/1/block", s.blockUser, "", ids[0], 200)
+	for actor := range ids {
+		raw := call(actor, "GET", "/api/friends", s.listFriends, "", 0, 200).Body.Bytes()
+		var saved []friendConnection
+		if err := json.Unmarshal(raw, &saved); err != nil || len(saved) != 1 {
+			t.Fatalf("blocking removed an accepted friend for user %d: %s (%v)", actor, raw, err)
+		}
+		if actor == 0 && (!saved[0].BlockedByOther || saved[0].BlockedByMe) ||
+			actor == 1 && (!saved[0].BlockedByMe || saved[0].BlockedByOther) {
+			t.Fatalf("incorrect directional block status for user %d: %+v", actor, saved[0])
+		}
+	}
 	call(0, "POST", "/api/friends/request", s.sendFriendRequest, "", ids[1], 403)
 	call(0, "POST", "/api/conversations/direct", s.createDirect, fmt.Sprintf(`{"username":%q}`, names[1]), 0, 403)
 	call(0, "GET", "/api/conversations", s.listConversations, "", 0, 200)
 	w = call(0, "GET", "/api/conversations", s.listConversations, "", 0, 200)
 	var convs []conversation
-	if json.Unmarshal(w.Body.Bytes(), &convs) != nil || len(convs) != 0 {
-		t.Fatalf("blocked direct leaked in list: %s", w.Body.String())
+	if json.Unmarshal(w.Body.Bytes(), &convs) != nil || len(convs) != 1 || convs[0].ID != direct.ID || !convs[0].BlockedByOther {
+		t.Fatalf("blocked direct missing read-only status: %s", w.Body.String())
 	}
 	w = httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/api/conversations/test/messages", nil)
 	r.SetPathValue("id", fmt.Sprint(direct.ID))
 	r.Header.Set("Authorization", "Bearer "+tokens[0])
 	authx.Middleware("test", http.HandlerFunc(s.listMessages)).ServeHTTP(w, r)
-	if w.Code != 403 {
-		t.Fatalf("blocked direct messages exposed: %d %s", w.Code, w.Body.String())
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "old direct message") {
+		t.Fatalf("blocked direct history must remain visible: %d %s", w.Code, w.Body.String())
 	}
 	r = httptest.NewRequest("GET", "/api/conversations/test/shared?kind=links", nil)
 	r.SetPathValue("id", fmt.Sprint(direct.ID))
@@ -113,6 +130,13 @@ func TestBlockReportAndFriendQuotaIntegration(t *testing.T) {
 		t.Fatalf("block list missing user: %s", w.Body.String())
 	}
 	call(1, "DELETE", "/api/users/1/block", s.unblockUser, "", ids[0], 200)
+	for actor := range ids {
+		raw := call(actor, "GET", "/api/friends", s.listFriends, "", 0, 200).Body.Bytes()
+		var saved []friendConnection
+		if err := json.Unmarshal(raw, &saved); err != nil || len(saved) != 1 || saved[0].BlockedByMe || saved[0].BlockedByOther {
+			t.Fatalf("unblock did not preserve the friend for user %d: %s (%v)", actor, raw, err)
+		}
+	}
 	w = call(0, "POST", "/api/conversations/direct", s.createDirect, fmt.Sprintf(`{"username":%q}`, names[1]), 0, 201)
 	var reopened conversation
 	if json.Unmarshal(w.Body.Bytes(), &reopened) != nil || reopened.ID != direct.ID {
@@ -141,8 +165,17 @@ func TestBlockReportAndFriendQuotaIntegration(t *testing.T) {
 		defer db.Exec(ctx, "DELETE FROM users WHERE id=$1", id)
 		call(0, "POST", "/api/friends/request", s.sendFriendRequest, "", id, 200)
 	}
-	call(0, "POST", "/api/friends/request", s.sendFriendRequest, "", ids[1], 429)
-	// Existing pending requests stay idempotent even after the quota is reached.
+	// A fresh recipient is still rejected after the daily quota is reached.
+	extraName := fmt.Sprintf("quota_extra_%d", time.Now().UnixNano())
+	var extraID int64
+	if err := db.QueryRow(ctx, "INSERT INTO users(email,username,display_name,password_hash) VALUES($1,$2,$2,'!') RETURNING id",
+		extraName+"@example.com", extraName).Scan(&extraID); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec(ctx, "DELETE FROM users WHERE id=$1", extraID)
+	call(0, "POST", "/api/friends/request", s.sendFriendRequest, "", extraID, 429)
+	// Existing accepted friendships and pending requests stay idempotent.
+	call(0, "POST", "/api/friends/request", s.sendFriendRequest, "", ids[1], 200)
 	var existingRecipient int64
 	err = db.QueryRow(ctx, `SELECT recipient_id FROM friend_request_events
 		WHERE sender_id=$1 ORDER BY id DESC LIMIT 1`, ids[0]).Scan(&existingRecipient)
