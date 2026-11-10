@@ -2224,12 +2224,34 @@
  */
 
 .smart-avatar {
+  --avatar-radius: 50%;
   position: relative;
   isolation: isolate;
   overflow: visible;
   background: linear-gradient(145deg, #2859d8, #6157e8);
   color: #fff;
   box-shadow: 0 7px 18px rgba(44, 98, 180, .18);
+  border-radius: var(--avatar-radius);
+  display: grid;
+  place-items: center;
+}
+
+.smart-avatar .avatar-initials {
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-page-header-account,
+.social-feed-header-account {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
 }
 
 .smart-avatar::before {

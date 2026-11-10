@@ -355,7 +355,7 @@
     background: transparent;
     cursor: pointer;
   }
-  .modern-shell.app-layout .profile-page-header-avatar { display: block; width: 46px; height: 46px; border-radius: 50%; }
+  .modern-shell.app-layout .profile-page-header-avatar { display: grid; width: 46px; height: 46px; border-radius: 50%; }
   .modern-shell.app-layout .profile-page-header-account:focus-visible { outline: 3px solid #a4bafa; outline-offset: 2px; }
 }
 @media (prefers-reduced-motion: reduce) {

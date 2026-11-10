@@ -102,35 +102,66 @@
   .modern-shell .story-card:not(:disabled):active { transform: scale(.965); }
 }
 
-/* The active tab has a tiny iOS-style spring response; no layout reflow. */
-.modern-shell .bottom-navigation .nav-icon {
-  transition: transform var(--soco-motion-standard) var(--soco-motion-spring),
-    background-color var(--soco-motion-standard) ease, color var(--soco-motion-quick) ease;
+/* Shared Liquid Pill Indicator for Mobile & Tablet BottomNavigation */
+.modern-shell .bottom-navigation {
+  position: relative;
+}
+.modern-shell .bottom-navigation > button {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: color var(--soco-motion-quick) ease;
 }
 .modern-shell .bottom-navigation > button.active .nav-icon {
-  animation: soco-tab-pop var(--soco-motion-standard) var(--soco-motion-spring) both;
+  background: transparent !important;
+  box-shadow: none !important;
 }
-.modern-shell .bottom-navigation > button.active::before {
-  animation: soco-indicator-in var(--soco-motion-quick) var(--soco-motion-ease) both;
+.modern-shell .bottom-navigation .nav-icon {
+  transition: transform var(--soco-motion-standard) var(--soco-motion-spring),
+    color var(--soco-motion-quick) ease;
 }
-@keyframes soco-tab-pop {
-  0% { transform: scale(.88); }
-  68% { transform: scale(1.075); }
-  100% { transform: scale(1); }
+.modern-shell .bottom-navigation .nav-liquid-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--pill-w, 48px);
+  height: var(--pill-h, 48px);
+  transform: translate3d(var(--pill-x, 0), var(--pill-y, 0), 0);
+  border-radius: 16px;
+  background: rgba(37, 99, 235, .14);
+  border: 1px solid rgba(37, 99, 235, .22);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, .10);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transform-origin: center center;
 }
-@keyframes soco-indicator-in {
-  from { opacity: 0; transform: translateX(-50%) scaleX(.5); }
-  to { opacity: 1; transform: translateX(-50%) scaleX(1); }
+.modern-shell .bottom-navigation .nav-liquid-pill.is-ready {
+  transition: transform 0.42s cubic-bezier(.34, 1.4, .5, 1),
+              width 0.35s cubic-bezier(.34, 1.4, .5, 1),
+              height 0.35s cubic-bezier(.34, 1.4, .5, 1),
+              opacity 0.2s ease;
+}
+.modern-shell .bottom-navigation .nav-liquid-pill.is-sliding {
+  transform: translate3d(var(--pill-x, 0), var(--pill-y, 0), 0) scaleX(1.18) scaleY(0.9);
+}
+.modern-shell .bottom-navigation .nav-liquid-pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 50%, rgba(37, 99, 235, .18) 0%, transparent 75%);
+  pointer-events: none;
 }
 
-/* Page-level motion uses only opacity: transforming scrollable ancestors
-   would change the containing block of their position:fixed modals. */
-.modern-shell :is(.simple-view, .zalo-feed-view, .nearby-explorer, .messenger-layout) {
-  animation: soco-screen-in var(--soco-motion-standard) var(--soco-motion-ease);
+/* Page-level motion: fluid liquid dissolve and subtle glide on tab switch */
+.modern-shell :is(.simple-view, .zalo-feed-view, .nearby-explorer, .messenger-layout, .profile-page, .contacts-view) {
+  animation: soco-liquid-screen-in 0.42s cubic-bezier(.16, 1, .3, 1) backwards;
 }
-@keyframes soco-screen-in {
-  from { opacity: .82; }
-  to { opacity: 1; }
+@keyframes soco-liquid-screen-in {
+  0% { opacity: 0.65; transform: translate3d(0, 4px, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 /* Sheets are composited. The outer modal height stays fixed while searching. */
@@ -186,8 +217,8 @@
     .message-context-sheet, .connect-modal-scrim,
     .shared-content-scrim, .message-context-backdrop,
     .quick-create-menu, .new-chat-panel, .translation-hub-popover,
-    .bottom-navigation > button.active .nav-icon,
-    .bottom-navigation > button.active::before,
+    .nav-liquid-pill,
+    .profile-page, .contacts-view,
     .message.mine:last-child
   ),
   .modern-shell > .notice.toast,
@@ -195,12 +226,17 @@
   .locale-picker-backdrop,
   .connection-dialog[open] {
     animation: none !important;
+    transition: none !important;
   }
   .modern-shell button,
   .locale-picker-sheet button,
   .connection-dialog button,
-  .modern-shell .bottom-navigation .nav-icon {
+  .modern-shell .bottom-navigation .nav-icon,
+  .modern-shell .nav-liquid-pill {
     transition: none !important;
+  }
+  .modern-shell .nav-liquid-pill.is-sliding {
+    transform: none !important;
   }
   .modern-shell button:active,
   .locale-picker-sheet button:active,

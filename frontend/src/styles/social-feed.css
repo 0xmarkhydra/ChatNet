@@ -156,6 +156,7 @@
     object-fit: cover;
     background: #eff3ff;
   }
+  .social-feed-story-avatar { display: grid; place-items: center; }
   .social-feed-story-add {
     position: absolute;
     right: -3px;
@@ -372,7 +373,7 @@
     overflow: hidden;
   }
   .modern-shell.app-layout .social-feed-center .post.zalo-post > .avatar {
-    display: block;
+    display: grid;
     grid-column: 1;
     grid-row: 1;
     width: 44px;
@@ -627,6 +628,7 @@
   }
   .social-feed-suggestion-list {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     margin-top: 13px;
     gap: 8px;
   }
@@ -635,6 +637,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    min-width: 0;
     min-height: 64px;
   }
   .social-feed-suggestion-person {
@@ -871,7 +874,7 @@
     cursor: pointer;
   }
   .modern-shell.app-layout .social-feed-header-avatar {
-    display: block;
+    display: grid;
     width: 46px;
     height: 46px;
     border-radius: 50%;

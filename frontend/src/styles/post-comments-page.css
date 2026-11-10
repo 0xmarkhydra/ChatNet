@@ -22,7 +22,7 @@
 }
 .post-comments-original { display: flex; flex-direction: column; overflow: hidden; padding: 23px 26px 46px; }
 .post-comments-author { display: flex; flex: 0 0 auto; align-items: center; min-width: 0; gap: 12px; }
-.post-comments-author-avatar { display: block; width: 51px; height: 51px; flex: 0 0 51px; border-radius: 50%; object-fit: cover; }
+.post-comments-author-avatar { display: grid; width: 51px; height: 51px; flex: 0 0 51px; border-radius: 50%; object-fit: cover; }
 .post-comments-author-copy { display: flex; flex-direction: column; justify-content: center; gap: 5px; min-width: 0; flex: 1 1 auto; }
 .post-comments-author-name {
   align-self: flex-start; min-width: 0; border: 0; padding: 0; background: none; color: #152441;
@@ -103,7 +103,7 @@
 }
 .post-comments-thread .feed-comment-threads > li { min-height: 138px; margin: 0; padding: 0; }
 .post-comments-thread .feed-comment-row { gap: 10px; min-width: 0; align-items: flex-start; }
-.post-comments-thread .feed-comment-avatar { box-sizing: border-box; display: block; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.post-comments-thread .feed-comment-avatar { box-sizing: border-box; display: grid; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
 .post-comments-thread .feed-comment-body { flex: 1 1 auto; min-width: 0; }
 .post-comments-thread .feed-comment-bubble {
   box-sizing: border-box; width: 100%; max-width: 330px; min-height: 82px;

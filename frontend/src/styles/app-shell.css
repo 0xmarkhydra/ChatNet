@@ -155,6 +155,48 @@
   .app-sidebar-link svg { flex: 0 0 auto; }
   .app-sidebar-link:hover { background: #f4f7fd; color: #315cc2; }
   .app-sidebar-link.is-active { background: #eff3ff; color: #2563eb; font-weight: 750; }
+  .modern-shell.app-layout .app-sidebar-nav > .app-sidebar-link.is-active { background: transparent; }
+  .modern-shell.app-layout .app-sidebar-nav .sidebar-liquid-pill {
+    position: absolute;
+    z-index: 0;
+    box-sizing: border-box;
+    left: var(--sidebar-pill-x, 0);
+    top: var(--sidebar-pill-y, 0);
+    width: var(--sidebar-pill-w, 58px);
+    height: var(--sidebar-pill-h, 51px);
+    transform: none;
+    border: 1px solid rgba(37, 99, 235, .22);
+    border-radius: 12px;
+    background: rgba(37, 99, 235, .14);
+    box-shadow: 0 2px 10px rgba(37, 99, 235, .1);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      left 420ms cubic-bezier(.34, 1.4, .5, 1),
+      top 420ms cubic-bezier(.34, 1.4, .5, 1),
+      width 420ms cubic-bezier(.34, 1.4, .5, 1),
+      height 420ms cubic-bezier(.34, 1.4, .5, 1),
+      opacity 200ms ease;
+  }
+  .modern-shell.app-layout .app-sidebar-nav .sidebar-liquid-pill.is-ready { opacity: 1; }
+  .modern-shell.app-layout .app-sidebar-nav .sidebar-liquid-pill.is-sliding[data-direction="down"] {
+    transform-origin: center top;
+    animation: app-sidebar-liquid-down 420ms cubic-bezier(.34, 1.4, .5, 1) both;
+  }
+  .modern-shell.app-layout .app-sidebar-nav .sidebar-liquid-pill.is-sliding[data-direction="up"] {
+    transform-origin: center bottom;
+    animation: app-sidebar-liquid-up 420ms cubic-bezier(.34, 1.4, .5, 1) both;
+  }
+  @keyframes app-sidebar-liquid-down {
+    0%, 100% { transform: scaleY(1); }
+    28% { transform: scaleY(1.16); }
+    66% { transform: scaleY(.92); }
+  }
+  @keyframes app-sidebar-liquid-up {
+    0%, 100% { transform: scaleY(1); }
+    28% { transform: scaleY(1.16); }
+    66% { transform: scaleY(.92); }
+  }
   .app-sidebar-link:focus-visible,
   .app-sidebar-account:focus-visible { outline: 3px solid rgba(37, 99, 235, .4); outline-offset: 2px; }
 
@@ -499,6 +541,8 @@
   .app-sidebar-link > span,
   .app-sidebar-brand-copy,
   .app-sidebar-account-copy { transition: none; }
+  .modern-shell.app-layout .app-sidebar-nav .sidebar-liquid-pill { transition: none; animation: none; }
+  .modern-shell.app-layout .app-sidebar-nav .sidebar-liquid-pill.is-sliding { transform: none !important; }
 }
 
 /* Social V4 chat: third pane is a responsive enhancement; original chat survives at narrow widths. */
