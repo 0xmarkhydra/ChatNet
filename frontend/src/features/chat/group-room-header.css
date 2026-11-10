@@ -40,9 +40,11 @@
   display: flex;
   align-items: center;
   flex: 0 1 auto;
-  gap: 4px;
-  min-height: 0;
-  height: 22px;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 3px;
+  min-height: 22px;
+  height: auto;
   width: fit-content;
   max-width: 100%;
   min-width: 0;
@@ -59,37 +61,6 @@
   font-size: 16px;
   font-weight: 760;
   line-height: 1.3;
-}
-.modern-shell .group-chat-panel .group-room-edit {
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  flex: 0 0 0;
-  width: 0;
-  height: 22px;
-  min-width: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 50%;
-  color: #53698d;
-  background: #edf1f8;
-  opacity: 0;
-  pointer-events: none;
-  cursor: pointer;
-  transition: opacity .12s ease, flex-basis .12s ease;
-}
-.modern-shell .group-chat-panel .group-room-title:hover .group-room-edit,
-.modern-shell .group-chat-panel .group-room-title:focus-within .group-room-edit,
-.modern-shell .group-chat-panel .group-room-edit:focus-visible {
-  flex-basis: 23px;
-  width: 23px;
-  opacity: 1;
-  pointer-events: auto;
-}
-.modern-shell .group-chat-panel .group-room-edit:hover {
-  color: #3158d9;
-  background: #dfe8ff;
 }
 .modern-shell .group-chat-panel .group-room-subtitle {
   display: flex;
@@ -155,19 +126,9 @@
 .modern-shell .group-chat-panel .group-room-subtitle .conversation-category-assignment > button:hover {
   background: #edf2ff;
 }
-.modern-shell .group-chat-panel .group-room-member-count:focus-visible,
-.modern-shell .group-chat-panel .group-room-edit:focus-visible {
+.modern-shell .group-chat-panel .group-room-member-count:focus-visible {
   outline: 2px solid #4169de;
   outline-offset: 2px;
-}
-@media (hover: none) {
-  .modern-shell .group-chat-panel .group-room-edit {
-    width: 25px;
-    width: 23px;
-    flex-basis: 23px;
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 @media (max-width: 760px) {
   .modern-shell .group-chat-panel > .chat-head {
@@ -193,8 +154,10 @@
     min-width: 0;
   }
   .modern-shell .group-chat-panel .group-room-title {
-    min-height: 0;
-    height: 21px;
+    min-height: 21px;
+    height: auto;
+    column-gap: 9px;
+    row-gap: 2px;
   }
   .modern-shell .group-chat-panel .chat-head .room-info .group-room-title > strong {
     font-size: 14px;
@@ -219,8 +182,26 @@
     height: 19px;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .modern-shell .group-chat-panel .group-room-edit {
-    transition: none;
+/* On narrow phones the call/search buttons must not squeeze the group name
+   and channel selector into an unusable strip. Keep tools on their own row. */
+@media (max-width: 430px) {
+  .modern-shell .group-chat-panel > .chat-head {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    row-gap: 4px;
+    height: auto;
+    min-height: 0;
+  }
+  .modern-shell .group-chat-panel .chat-head > .room-info {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .modern-shell .group-chat-panel .chat-head > .group-mobile-actions {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    justify-content: flex-end;
   }
 }

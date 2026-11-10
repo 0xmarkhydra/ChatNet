@@ -114,10 +114,13 @@ import SocialFeedStories from "./SocialFeedStories";
 import PostCommentsPage from "./PostCommentsPage";
 import CommunicationHub from "./CommunicationHub";
 import CallCenter from "../features/calls/CallCenter";
-import CommunityGroupsPage, { type GroupWorkspaceMode } from "./CommunityGroupsPage";
+import type { GroupWorkspaceMode } from "./CommunityGroupsPage";
+import FeedCommunitiesList from "./FeedCommunitiesList";
+import "./community-groups.css";
 import CommunityGroupWizard, { type CommunityCreationExtras } from "./CommunityGroupWizard";
 import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
-import GroupRenameDialog from "../features/chat/GroupRenameDialog";
+import GroupChannelPicker from "../features/chat/GroupChannelPicker";
+import { validGroupChannels, type GroupChannel } from "../features/chat/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/GroupInviteJoinDialog";
 import ContactsView, { type FriendsScreen } from "../features/contacts/ContactsView";
 import PrivacyControls from "../features/profile/PrivacyControls";
@@ -330,9 +333,17 @@ export default function App({
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
-  const [groupNameEditing, setGroupNameEditing] = useState(false);
   const [groupMemberViewOpen, setGroupMemberViewOpen] = useState(false);
   const activeConversationIdRef = useRef<number | null>(null);
+  const [channelSelection, setChannelSelection] = useState<{ conversationId: number | null; channelId: number }>({ conversationId: null, channelId: 0 });
+  const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
+  const activeChannelIdRef = useRef(selectedChannelId);
+  activeChannelIdRef.current = selectedChannelId;
+  const [groupChannelState, setGroupChannelState] = useState<{ conversationId: number | null; channels: GroupChannel[] }>({ conversationId: null, channels: [] });
+  const [groupChannelBusy, setGroupChannelBusy] = useState(false);
+  const groupChannels = groupChannelState.conversationId === activeConversationId
+    ? groupChannelState.channels
+    : validGroupChannels([], activeConversationId ?? 0);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messageScrollAtBottom = useRef(true);
   const ownSendScrollConversation = useRef<number | null>(null);
@@ -384,7 +395,9 @@ export default function App({
       saveChatDrafts(session.user.id, messageDrafts);
     }
   }, [session?.user.id, messageDrafts]);
-  const draft = messageDrafts[activeConversationId ?? 0] ?? emptyDraft;
+  const [channelDrafts, setChannelDrafts] = useState<Record<string, MessageDraft>>({});
+  const channelDraftKey = `${activeConversationId ?? 0}:${selectedChannelId}`;
+  const draft = selectedChannelId > 0 ? channelDrafts[channelDraftKey] ?? emptyDraft : messageDrafts[activeConversationId ?? 0] ?? emptyDraft;
   const messageText = draft.text;
   const messageAttachments = draft.attachments;
   const [messageSending, setMessageSending] = useState(false);
@@ -503,6 +516,7 @@ export default function App({
     }
   }, [translationSettingsConversationId, activeConversationId]);
   const [groupWorkspaceMode, setGroupWorkspaceMode] = useState<GroupWorkspaceMode>("list");
+  const [feedCommunitiesOpen, setFeedCommunitiesOpen] = useState(false);
   const [groupCreateStep, setGroupCreateStep] = useState<1 | 2 | 3>(1);
   const [chatCreateError, setChatCreateError] = useState("");
   const [nearbyUsers, setNearbyUsers] = useState<FriendSearchResult[]>([]);
@@ -1042,6 +1056,8 @@ export default function App({
     apiFetch,
     setNotice,
     activeConversationId,
+    activeChannelId: selectedChannelId,
+    activeChannelIdRef,
     activeConversationIdRef,
     translationPreferencesLoaded,
     targetLanguage: effectiveTargetLanguage,
@@ -1061,8 +1077,6 @@ export default function App({
     setGroupSettingsOpen,
     groupMembers,
     setGroupMembers,
-    groupNameDraft,
-    setGroupNameDraft,
     groupInviteSearch,
     setGroupInviteSearch,
     groupInviteSelection,
@@ -1072,12 +1086,11 @@ export default function App({
     activeGroupMember,
     canManageActiveGroup,
     canInviteActiveGroup,
-    canEditActiveGroup,
+    canEditGroup,
     groupInviteCandidates,
     openGroupSettings,
     launchGroupCall,
     refreshGroupMembers,
-    renameActiveGroup,
     inviteGroupMembers,
     changeGroupMemberRole,
     removeGroupMember,
@@ -1085,6 +1098,7 @@ export default function App({
     session,
     sessionRef,
     tab,
+    communityWorkspaceOpen: false,
     activeConversationId,
     activeConversationType: conversations.find(
       (conversation) => conversation.id === activeConversationId,
@@ -1115,14 +1129,13 @@ export default function App({
     const onEscape = (event: KeyboardEvent) => {
       if (
         event.key === "Escape" &&
-        !groupNameEditing &&
         !document.querySelector("dialog[open]")
       )
         setGroupSettingsOpen(false);
     };
     window.addEventListener("keydown", onEscape);
     return () => window.removeEventListener("keydown", onEscape);
-  }, [groupSettingsOpen, groupNameEditing, setGroupSettingsOpen]);
+  }, [groupSettingsOpen, setGroupSettingsOpen]);
 
   const conversationListSearch = useConversationListSearch({
     query: chatListQuery,
@@ -1175,12 +1188,44 @@ export default function App({
   const activeConversation =
     displayConversations.find((item) => item.id === activeConversationId) ||
     null;
+
+  // Channel selection stays inside the active group and never leaks into another conversation.
+  useEffect(() => {
+    const id = activeConversation?.type === 'group' ? activeConversation.id : null;
+    setGroupChannelState({ conversationId: id, channels: validGroupChannels([], id ?? 0) });
+    if (!id || !session?.token) return;
+    const controller = new AbortController();
+    const reload = async () => {
+      try {
+        const response = await apiFetch(`/api/conversations/${id}/channels`, { signal: controller.signal });
+        if (!response.ok) throw new Error('Không tải được kênh hội thoại.');
+        const channels = validGroupChannels(await response.json(), id);
+        if (!controller.signal.aborted) {
+          setGroupChannelState({ conversationId: id, channels });
+          if (channelSelection.conversationId === id && !channels.some(channel => channel.id === channelSelection.channelId))
+            setChannelSelection({ conversationId: id, channelId: 0 });
+        }
+      } catch {
+        if (!controller.signal.aborted) setNotice('Không tải được kênh hội thoại.', 'warning');
+      }
+    };
+    void reload();
+    const onUpdate = (event: Event) => {
+      const value = (event as CustomEvent<{ conversationId: number }>).detail;
+      if (value?.conversationId === id) void reload();
+    };
+    window.addEventListener('chatnet:group-community-updated', onUpdate);
+    return () => {
+      controller.abort();
+      window.removeEventListener('chatnet:group-community-updated', onUpdate);
+    };
+  }, [activeConversation?.id, activeConversation?.type, session?.token]);
   const conversationBlocked = Boolean(activeConversation?.type === 'direct' &&
     (activeConversation.blockedByMe || activeConversation.blockedByOther));
   const groupActivities = useGroupActivities(activeConversation?.type === 'group' ? activeConversation.id : null, session?.sessionId, apiFetch);
   const pinnedItems = [
-    ...pinnedMessages.map((item) => ({ type: 'message' as const, pinnedAt: item.pinnedAt, message: item.message })),
-    ...(activeConversation?.type === 'group'
+    ...pinnedMessages.filter(item => (item.message.channelId || 0) === selectedChannelId).map((item) => ({ type: 'message' as const, pinnedAt: item.pinnedAt, message: item.message })),
+    ...(activeConversation?.type === 'group' && selectedChannelId === 0
       ? groupActivities.activities.filter((item) => Boolean(item.pinnedAt))
         .map((activity) => ({ type: 'activity' as const, pinnedAt: activity.pinnedAt!, activity }))
       : []),
@@ -1219,7 +1264,7 @@ export default function App({
           ),
         },
   );
-  const visibleMessages = messages.map((message) =>
+  const visibleMessages = messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
     reactionPreviews[message.id]
       ? {
           ...message,
@@ -1564,7 +1609,6 @@ export default function App({
     messagesPagingBusy.current = false;
     setReplyingTo(null);
     setGroupSettingsOpen(false);
-    setGroupNameEditing(false);
     setGroupMemberViewOpen(false);
     setSharedContentOpen(false);
     setGroupMembers([]);
@@ -1572,8 +1616,23 @@ export default function App({
     setGroupInviteSelection([]);
   }, [activeConversationId]);
 
+  useEffect(() => {
+    setReplyingTo(null);
+    setMessageActionId(null);
+    setMessageSearchOpen(false);
+    setSharedContentOpen(false);
+    messageScrollAtBottom.current = true;
+  }, [selectedChannelId]);
+
   function setMessageText(text: string) {
     if (!activeConversationId) return;
+    if (selectedChannelId > 0) {
+      setChannelDrafts(current => ({
+        ...current,
+        [channelDraftKey]: { ...(current[channelDraftKey] ?? emptyDraft), text },
+      }));
+      return;
+    }
     setMessageDrafts((current) => ({
       ...current,
       [activeConversationId]: {
@@ -1585,6 +1644,19 @@ export default function App({
 
   function setMessageAttachments(update: SetStateAction<MediaAttachment[]>) {
     if (!activeConversationId) return;
+    if (selectedChannelId > 0) {
+      setChannelDrafts(current => {
+        const previous = current[channelDraftKey] ?? emptyDraft;
+        return {
+          ...current,
+          [channelDraftKey]: {
+            ...previous,
+            attachments: typeof update === 'function' ? update(previous.attachments) : update,
+          },
+        };
+      });
+      return;
+    }
     setMessageDrafts((current) => {
       const previous = current[activeConversationId] ?? emptyDraft;
       return {
@@ -2062,6 +2134,8 @@ export default function App({
       return;
     }
     const conversationId = activeConversationId;
+    const channelId = selectedChannelId;
+    const channelKey = channelDraftKey;
     const sessionId = session?.sessionId;
     const remaining = Math.max(0, 10 - messageAttachments.length);
     if (remaining === 0) {
@@ -2074,16 +2148,26 @@ export default function App({
     try {
       const uploaded = await uploadMediaFiles(selected, "chat");
       if (sessionRef.current?.sessionId !== sessionId) return;
-      setMessageDrafts((current) => {
-        const previous = current[conversationId] ?? emptyDraft;
-        return {
-          ...current,
-          [conversationId]: {
-            ...previous,
-            attachments: [...previous.attachments, ...uploaded].slice(0, 10),
-          },
-        };
-      });
+      if (channelId > 0) {
+        setChannelDrafts(current => {
+          const previous = current[channelKey] ?? emptyDraft;
+          return {
+            ...current,
+            [channelKey]: { ...previous, attachments: [...previous.attachments, ...uploaded].slice(0, 10) },
+          };
+        });
+      } else {
+        setMessageDrafts((current) => {
+          const previous = current[conversationId] ?? emptyDraft;
+          return {
+            ...current,
+            [conversationId]: {
+              ...previous,
+              attachments: [...previous.attachments, ...uploaded].slice(0, 10),
+            },
+          };
+        });
+      }
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId)
         setNotice(
@@ -3766,6 +3850,7 @@ export default function App({
     membershipSyncSequence,
     groupSettingsOpen,
     activeConversationIdRef,
+    activeChannelIdRef,
     refreshGroupMembers,
     refreshPinnedMessages,
     clearPinnedMessages,
@@ -3914,6 +3999,55 @@ export default function App({
     void saveTranslationPreferences(next, autoTranslate);
   }
 
+  function selectGroupChannel(channelId: number) {
+    if (activeConversation?.type !== 'group' || !groupChannels.some(channel => channel.id === channelId)) return;
+    activeChannelIdRef.current = channelId;
+    setChannelSelection({ conversationId: activeConversation.id, channelId });
+    setMessages([]);
+    setHasMoreMessages(false);
+    setChatSearchJump(null);
+    setReplyingTo(null);
+    setMessageActionId(null);
+    setConversationDetailsOpen(false);
+    setMessageSearchOpen(false);
+    messageScrollAtBottom.current = true;
+  }
+
+  async function createGroupChannel(name: string, description: string): Promise<boolean> {
+    if (activeConversation?.type !== 'group' || activeGroupMember?.role !== 'owner' || groupChannelBusy) return false;
+    const groupId = activeConversation.id;
+    setGroupChannelBusy(true);
+    try {
+      const response = await apiFetch(`/api/conversations/${groupId}/channels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      });
+      const data = await response.json().catch(() => null) as (GroupChannel & { error?: string }) | null;
+      if (!response.ok || !data?.id || data.conversationId !== groupId)
+        throw new Error(data?.error || 'Không tạo được kênh hội thoại.');
+      setGroupChannelState(current => ({
+        conversationId: groupId,
+        channels: validGroupChannels([...(
+          current.conversationId === groupId ? current.channels : []
+        ), data], groupId),
+      }));
+      activeChannelIdRef.current = data.id;
+      setChannelSelection({ conversationId: groupId, channelId: data.id });
+      setMessages([]);
+      setHasMoreMessages(false);
+      setReplyingTo(null);
+      setChatSearchJump(null);
+      setNotice('Đã tạo kênh hội thoại ' + data.name + '.', 'success');
+      return true;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Không tạo được kênh.', 'error');
+      return false;
+    } finally {
+      setGroupChannelBusy(false);
+    }
+  }
+
   const canSend = useMemo(
     () =>
       Boolean(
@@ -4018,9 +4152,6 @@ export default function App({
       ]);
       setActiveConversationId(created.id);
       setTab("chat");
-      if (desktopSection === "groups" && groupWorkspaceMode === "create") {
-        setGroupWorkspaceMode("channel");
-      }
       setFriendQuery("");
       setNewChatMode("none");
       void refreshConversations();
@@ -4061,6 +4192,7 @@ export default function App({
             text: item.text,
             attachments: item.attachments,
             clientId: item.clientId,
+            ...(item.channelId ? { channelId: item.channelId } : {}),
             ...(item.replyToMessageId
               ? { replyToMessageId: item.replyToMessageId }
               : {}),
@@ -4109,7 +4241,8 @@ export default function App({
       updateChatOutbox((items) =>
         confirmChatMessage(items, item.clientId, item.conversationId),
       );
-      if (activeConversationIdRef.current === item.conversationId) {
+      if (activeConversationIdRef.current === item.conversationId &&
+          activeChannelIdRef.current === (item.channelId || 0)) {
         messageChanges.current.add(confirmed.id);
         setMessages((current) =>
           mergeById(current, confirmed).sort((a, b) => a.id - b.id),
@@ -4218,9 +4351,12 @@ export default function App({
     }, 0);
 
     const conversationId = activeConversationId;
+    const channelId = selectedChannelId;
+    const draftKey = channelDraftKey;
     const submittedDraft = draft;
     const reply = replyingTo;
     const item: QueuedChatMessage = {
+      ...(channelId > 0 ? { channelId } : {}),
       clientId: crypto.randomUUID(),
       conversationId,
       text: messageText.trim(),
@@ -4244,12 +4380,21 @@ export default function App({
       return;
     }
     ownSendScrollConversation.current = conversationId;
-    setMessageDrafts((current) => {
-      if (current[conversationId] !== submittedDraft) return current;
-      const updated = { ...current };
-      delete updated[conversationId];
-      return updated;
-    });
+    if (channelId > 0) {
+      setChannelDrafts(current => {
+        if (current[draftKey] !== submittedDraft) return current;
+        const next = { ...current };
+        delete next[draftKey];
+        return next;
+      });
+    } else {
+      setMessageDrafts((current) => {
+        if (current[conversationId] !== submittedDraft) return current;
+        const updated = { ...current };
+        delete updated[conversationId];
+        return updated;
+      });
+    }
     setReplyingTo((current) => (current === reply ? null : current));
     if (navigator.onLine) void retryQueuedChatMessages();
     else setChatOnline(false);
@@ -4888,6 +5033,7 @@ export default function App({
   };
   const switchTab = (nextTab: Tab) => {
     setDesktopSection(null);
+    setFeedCommunitiesOpen(false);
     setTranslationSettingsConversationId(null);
     if (nextTab === "contacts") setContactsScreen("directory");
     if (nextTab === "profile") {
@@ -5235,11 +5381,6 @@ export default function App({
         unreadTotal={unreadTotal}
         feedSaved={feedFilter === "saved"}
         onNavigate={switchTab}
-        onGroups={() => {
-          switchTab("chat");
-          setDesktopSection("groups");
-          setGroupWorkspaceMode("list");
-        }}
         onCalls={() => {
           switchTab("chat");
           setDesktopSection("calls");
@@ -5294,22 +5435,6 @@ export default function App({
           </button>
         </div>
       )}
-      {groupNameEditing &&
-        activeConversation?.type === "group" &&
-        canEditActiveGroup && (
-          <GroupRenameDialog
-            key={activeConversation.id}
-            currentName={activeConversation.name}
-            draft={groupNameDraft}
-            onDraftChange={setGroupNameDraft}
-            onConfirm={renameActiveGroup}
-            onClose={() => {
-              setGroupNameEditing(false);
-              setGroupNameDraft(activeConversation.name);
-            }}
-            busy={groupBusy}
-          />
-        )}
       {visitorUsername && (
         <VisitorProfile
           key={session.sessionId + ":" + visitorUsername}
@@ -5513,23 +5638,21 @@ export default function App({
           {tab === "feed" && (
             <>
               <button
-                className="appbar-icon-button social-feed-header-new"
+                className="appbar-icon-button social-feed-header-community"
                 type="button"
-                aria-label="Tạo bài viết"
+                aria-label="Cộng đồng"
+                title="Cộng đồng"
+                aria-pressed={feedCommunitiesOpen}
                 onClick={() => {
-                  if (isProfileDesktop) {
+                  if (!feedCommunitiesOpen) {
+                    setActivePostId(null);
+                    setFeedComposerOpen(false);
                     setFeedCheckInOpen(false);
-                    setFeedComposerOpen(true);
-                  } else {
-                    postComposerRef.current?.focus();
-                    postComposerRef.current?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "center",
-                    });
                   }
+                  setFeedCommunitiesOpen(current => !current);
                 }}
               >
-                <UiIcon name="compose" size={24} />
+                <Users size={23} aria-hidden="true" />
               </button>
               <button
                 className="appbar-icon-button notification-appbar"
@@ -5745,9 +5868,6 @@ export default function App({
               <div className="social-chat-list-header">
                 <div className="social-chat-list-title">
                   <h2>Cuộc trò chuyện</h2>
-                  <button type="button" className="social-chat-groups-link" aria-label="Nhóm và cộng đồng" title="Nhóm và cộng đồng" onClick={() => { switchTab("chat"); setDesktopSection("groups"); setGroupWorkspaceMode("list"); }}>
-                    <Users size={20} aria-hidden="true" />
-                  </button>
                   <button type="button" className="social-chat-new" aria-label="Tạo cuộc trò chuyện mới"
                     title="Tạo cuộc trò chuyện" onClick={() => { setChatCreateError(''); setNewChatMode('direct') }}>
                     <Plus size={20} aria-hidden="true" />
@@ -6055,16 +6175,15 @@ export default function App({
                           <>
                             <div className="group-room-title">
                                 <strong title={activeConversation.name}>{activeConversation.name}</strong>
-                                {canEditActiveGroup && (
-                                  <button type="button" className="group-room-edit"
-                                    aria-label="Chỉnh sửa tên nhóm" title="Chỉnh sửa tên nhóm"
-                                    onClick={() => {
-                                      setGroupNameDraft(activeConversation.name)
-                                      setGroupNameEditing(true)
-                                    }}>
-                                    <PencilLine size={16} aria-hidden="true" />
-                                  </button>
-                                )}
+                                <GroupChannelPicker
+                                  conversationId={activeConversation.id}
+                                  channels={groupChannels}
+                                  selectedId={selectedChannelId}
+                                  canCreate={activeGroupMember?.role === 'owner'}
+                                  busy={groupChannelBusy}
+                                  onSelect={selectGroupChannel}
+                                  onCreate={createGroupChannel}
+                                />
                             </div>
                             <div className="room-subtitle group-room-subtitle">
                               <button type="button" className="group-room-member-count"
@@ -6326,13 +6445,14 @@ export default function App({
                   {sharedContentOpen && (
                     <SharedContent
                       conversationId={activeConversation.id}
+                      channelId={selectedChannelId}
                       request={apiFetch}
                       onClose={() => setSharedContentOpen(false)}
                     />
                   )}
 
                   {messageSearchOpen && (
-                    <MessageSearchPanel conversationId={activeConversation.id} request={apiFetch}
+                    <MessageSearchPanel conversationId={activeConversation.id} channelId={selectedChannelId} request={apiFetch}
                       onClose={() => setMessageSearchOpen(false)}
                       onJump={async (result) => {
                         if (activeConversationIdRef.current !== activeConversation.id) return
@@ -6557,7 +6677,7 @@ export default function App({
                         Không tải được hoạt động nhóm. Nhấn để thử lại.
                       </button>
                     )}
-                    {chatOutbox.filter((item) => item.conversationId === activeConversationId).map((item) => (
+                    {chatOutbox.filter((item) => item.conversationId === activeConversationId && (item.channelId || 0) === selectedChannelId).map((item) => (
                       <article className="message mine outgoing-preview chat-outbox-message" key={item.clientId} aria-busy={item.status !== 'failed'}>
                         {item.replyToMessageId && (
                           <div className="message-reply-quote">
@@ -6677,7 +6797,7 @@ export default function App({
                     <input
                       ref={messageInputRef}
                       aria-label="Tin nhắn"
-                      placeholder={isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
+                      placeholder={isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? selectedChannelId ? `Nhắn vào # ${groupChannels.find(channel => channel.id === selectedChannelId)?.name || 'kênh hội thoại'}...` : `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
                       value={messageText}
                       onChange={(event) => setMessageText(event.target.value)}
                       onPaste={(event) => {
@@ -6714,6 +6834,9 @@ export default function App({
                 }}
                 onClearHistory={() => { void clearActiveConversationHistory() }}
                 onCreateGroupActivity={setGroupActivityCreateKind}
+                channels={groupChannels}
+                selectedChannelId={selectedChannelId}
+                onSelectChannel={selectGroupChannel}
                 onProfile={() => {
                   if (activeConversation.type === 'group') {
                     setConversationDetailsOpen(false)
@@ -6738,17 +6861,14 @@ export default function App({
                 <button type="button" className="group-sidebar-scrim"
                   aria-label="Đóng thanh quản lý nhóm"
                   onClick={() => setGroupSettingsOpen(false)} />
-                <aside className="group-settings-sidebar" aria-label="Thanh bên quản lý nhóm">
+                <aside className="group-settings-sidebar" id="group-settings-sidebar" aria-label="Thanh bên quản lý nhóm">
                   <GroupSettingsPanel
                     activeGroupMember={activeGroupMember}
                     setGroupSettingsOpen={setGroupSettingsOpen}
                     canManageActiveGroup={canManageActiveGroup}
                     canInviteActiveGroup={canInviteActiveGroup}
-                    canEditActiveGroup={canEditActiveGroup}
-                    onRenameRequest={() => {
-                      setGroupNameDraft(activeConversation.name)
-                      setGroupNameEditing(true)
-                    }}
+                    canEditGroup={canEditGroup}
+                    onOpenShared={() => { setGroupSettingsOpen(false); setSharedContentOpen(true) }}
                     onOpenMemberProfile={(username) => {
                       setGroupMemberViewOpen(false)
                       setGroupSettingsOpen(false)
@@ -6810,80 +6930,6 @@ export default function App({
           />
         )}
 
-
-        {tab === "chat" && desktopSection === "groups" && (
-          groupWorkspaceMode === "create" ? (
-            <CommunityGroupWizard
-              key={session.sessionId + ":group-wizard"}
-              friends={friends}
-              userId={session.user.id}
-              myName={session.user.displayName || session.user.username}
-              step={groupCreateStep}
-              onStep={setGroupCreateStep}
-              onCancel={() => setGroupWorkspaceMode("list")}
-              onCreate={createGroup}
-              error={chatCreateError}
-            />
-          ) : (
-            <CommunityGroupsPage
-              mode={groupWorkspaceMode}
-              onMode={setGroupWorkspaceMode}
-              groups={conversations}
-              userId={session.user.id}
-              myName={session.user.displayName || session.user.username}
-              selectedGroup={activeConversation?.type === "group" ? activeConversation : null}
-              onSelectGroup={(id, mode) => {
-                setActiveConversationId(id);
-                setGroupWorkspaceMode(mode);
-              }}
-              onOpenFullChat={() => setDesktopSection(null)}
-              onCreate={() => {
-                setChatCreateError("");
-                setGroupCreateStep(1);
-                setGroupWorkspaceMode("create");
-              }}
-              onJoinedGroup={async (id) => {
-                await refreshConversations();
-                setActiveConversationId(id);
-                setGroupWorkspaceMode("channel");
-              }}
-              members={groupMembers}
-              groupBusy={groupBusy}
-              activeMember={activeGroupMember}
-              canManage={Boolean(canManageActiveGroup)}
-              canInvite={Boolean(canInviteActiveGroup)}
-              canEdit={Boolean(canEditActiveGroup)}
-              onRename={() => {
-                if (activeConversation) setGroupNameDraft(activeConversation.name);
-                setGroupNameEditing(true);
-              }}
-              onInvite={() => void inviteGroupMembers()}
-              inviteCandidates={groupInviteCandidates}
-              inviteSelection={groupInviteSelection}
-              setInviteSelection={setGroupInviteSelection}
-              inviteSearch={groupInviteSearch}
-              setInviteSearch={setGroupInviteSearch}
-              onChangeRole={changeGroupMemberRole}
-              onRemoveMember={removeGroupMember}
-              onOpenMember={openVisitor}
-              onMembersChanged={() => refreshGroupMembers(activeConversationId || undefined)}
-              request={apiFetch}
-              notify={setNotice}
-              messages={messages}
-              pendingMessages={chatOutbox}
-              chatOnline={chatOnline}
-              onRetryPending={() => void retryQueuedChatMessages()}
-              messageText={messageText}
-              onMessageText={setMessageText}
-              onSend={sendMessage}
-              canSend={canSend}
-              onCall={(id) => launchGroupCall(id, "video")}
-              hasMore={hasMoreConversations}
-              loadingMore={conversationLoadingMore}
-              onLoadMore={() => void loadMoreConversations()}
-            />
-          )
-        )}
 
         {tab === "chat" && desktopSection === "calls" && (
           <CallCenter
@@ -6993,7 +7039,7 @@ export default function App({
           </PostCommentsPage>
         )}
 
-        {tab === "feed" && (!isProfileDesktop || !activePost) && (
+        {tab === "feed" && (!isProfileDesktop || !activePost || feedCommunitiesOpen) && (
           <div
             className="feed-view zalo-feed-view social-feed"
             ref={feedViewRef}
@@ -7038,6 +7084,7 @@ export default function App({
             />
             <div className="social-feed-grid">
               <div className="social-feed-center">
+                {!feedCommunitiesOpen && (<>
                 {isProfileDesktop ? (
                   <SocialFeedStories
                     username={name}
@@ -7146,8 +7193,9 @@ export default function App({
                 ) : (
                   postComposer
                 )}
+                </>)}
 
-                {isProfileDesktop ? (
+                {!feedCommunitiesOpen && (isProfileDesktop ? (
                   <div
                     className="social-feed-filter-bar"
                     role="group"
@@ -7156,32 +7204,32 @@ export default function App({
                     <div className="social-feed-filter-options">
                       <button
                         type="button"
-                        aria-pressed={feedFilter === "all"}
-                        onClick={() => setFeedFilter("all")}
+                        aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
+                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
                       >
                         Dành cho bạn
                       </button>
                       <button
                         type="button"
-                        aria-pressed={feedFilter === "following"}
-                        onClick={() => setFeedFilter("following")}
+                        aria-pressed={!feedCommunitiesOpen && feedFilter === "following"}
+                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("following"); }}
                       >
                         Đang theo dõi
                       </button>
                       <button
                         type="button"
-                        aria-pressed={feedFilter === "latest"}
-                        onClick={() => setFeedFilter("latest")}
+                        aria-pressed={!feedCommunitiesOpen && feedFilter === "latest"}
+                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("latest"); }}
                       >
                         Mới nhất
                       </button>
-                      {feedFilter === "saved" && (
+                      {!feedCommunitiesOpen && feedFilter === "saved" && (
                         <button type="button" aria-pressed={true}>
                           Đã lưu
                         </button>
                       )}
                     </div>
-                    <button
+                    {!feedCommunitiesOpen && <button
                       className="social-feed-refresh"
                       type="button"
                       onClick={() => {
@@ -7192,13 +7240,13 @@ export default function App({
                     >
                       <RefreshCw size={15} aria-hidden="true" />
                       {feedFilter === "saved" ? "Bài đã lưu" : "Bài viết mới"}
-                    </button>
+                    </button>}
                   </div>
                 ) : (
                   <>
                     <div className="soco-feed-section-label soco-feed-posts-label">
                       <strong>
-                        {feedFilter === "saved"
+                        {feedCommunitiesOpen ? "Cộng đồng" : feedFilter === "saved"
                           ? "Bài viết đã lưu"
                           : "Bài viết mới"}
                       </strong>
@@ -7209,15 +7257,16 @@ export default function App({
                       >
                         <button
                           type="button"
-                          aria-pressed={feedFilter === "all"}
-                          onClick={() => setFeedFilter("all")}
+                          aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
+                          onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
                         >
                           Mới nhất
                         </button>
                         <button
                           type="button"
-                          aria-pressed={feedFilter === "saved"}
+                          aria-pressed={!feedCommunitiesOpen && feedFilter === "saved"}
                           onClick={() => {
+                            setFeedCommunitiesOpen(false);
                             setFeedFilter("saved");
                             void loadSavedPosts();
                           }}
@@ -7227,8 +7276,17 @@ export default function App({
                       </div>
                     </div>
                   </>
-                )}
+                ))}
                 <div className="feed zalo-feed">
+                  {feedCommunitiesOpen ? (
+                    <FeedCommunitiesList
+                      groups={conversations}
+                      onOpen={(id) => { switchTab("chat"); setChatListFilter("all"); setActiveConversationId(id); }}
+                      hasMore={hasMoreConversations}
+                      loadingMore={conversationLoadingMore}
+                      onLoadMore={() => void loadMoreConversations()}
+                    />
+                  ) : (<>
                   {pendingPost && (
                     <article
                       className="post zalo-post outgoing-preview"
@@ -7333,9 +7391,10 @@ export default function App({
                         />
                       </div>
                     )}
+                  </>)}
                 </div>
               </div>
-              {isProfileDesktop && (
+              {!feedCommunitiesOpen && isProfileDesktop && (
                 <SocialFeedSidebar
                   username={name}
                   sessionId={session.sessionId}

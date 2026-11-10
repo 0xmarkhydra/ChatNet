@@ -846,9 +846,17 @@
   .modern-shell.app-layout:has(.social-feed) > .chatnet-appbar .appbar-actions {
     gap: 10px;
   }
-  .modern-shell.app-layout .social-feed-header-new {
+  .modern-shell.app-layout .social-feed-header-community {
     background: #eff3ff;
     color: #2563eb;
+  }
+  .modern-shell.app-layout .social-feed-header-community:hover,
+  .modern-shell.app-layout .social-feed-header-community[aria-pressed="true"] {
+    background: #dfeaff;
+    color: #1e54bf;
+  }
+  .modern-shell.app-layout .social-feed-header-community[aria-pressed="true"] {
+    box-shadow: inset 0 0 0 1px #bfd3ff;
   }
   .modern-shell.app-layout .social-feed-header-account {
     display: grid;

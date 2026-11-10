@@ -395,30 +395,6 @@
   gap: 9px;
   margin-bottom: 10px;
 }
-.modern-shell .group-settings-sidebar .group-rename-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 38px;
-  padding: 8px 11px;
-  border: 1px solid #e3e9f6;
-  border-radius: 11px;
-  background: #f7f9ff;
-  color: #315bd1;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 650;
-  text-align: left;
-  cursor: pointer;
-}
-.modern-shell .group-settings-sidebar .group-rename-trigger:hover:not(:disabled) {
-  background: #eaf0ff;
-}
-.modern-shell .group-settings-sidebar .group-rename-trigger:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-}
 .modern-shell .group-settings-sidebar .group-members-preview {
   min-height: 62px;
   margin: 7px 0 13px;

@@ -303,15 +303,15 @@ export default function CommunityGroupsPage({
     onSelectGroup(id,next)
   }
 
-  if (mode==='list') return <div className="cg-page" aria-label="Nhóm & cộng đồng">
-    <div className="cg-card cg-list-head"><div><span className="cg-eyebrow"><Users size={16}/>CỘNG ĐỒNG SOCCO</span><h2>Nhóm & cộng đồng</h2><p>Tiếp tục trò chuyện và quản trị các nhóm bạn tham gia.</p></div><button type="button" className="cg-primary" onClick={onCreate}><Plus size={18}/>Tạo cộng đồng mới</button></div>
+  if (mode==='list') return <div className="cg-page" aria-label="Cộng đồng">
+    <div className="cg-card cg-list-head"><div><span className="cg-eyebrow"><Users size={16}/>CỘNG ĐỒNG SOCCO</span><h2>Cộng đồng</h2><p>Khám phá và kết nối với những cộng đồng bạn quan tâm.</p></div><button type="button" className="cg-primary" onClick={onCreate}><Plus size={18}/>Tạo cộng đồng mới</button></div>
     <div className="cg-list-grid"><section className="cg-card cg-list-card">
-      <header className="cg-card-head"><h3>Nhóm của bạn</h3><small>{shownGroups.length} nhóm</small></header>
+      <header className="cg-card-head"><h3>Cộng đồng của bạn</h3><small>{shownGroups.length} nhóm đã tham gia</small></header>
       <label className="cg-search"><Search size={18}/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm tên nhóm..." aria-label="Tìm nhóm"/></label>
       <div className="cg-group-list">{shownGroups.map(group=><div className="cg-group-row" key={group.id}>
         <span className="cg-group-icon"><Users size={23}/></span><div><strong>{group.name}</strong><small>{group.memberCount} thành viên · {group.unreadCount} tin chưa đọc</small><p>{group.lastMessage||'Bắt đầu trao đổi với nhóm của bạn.'}</p></div>
         <button type="button" className="cg-secondary" onClick={()=>select(group.id,'manage')}><Settings size={16}/>Quản trị</button>
-        <button type="button" className="cg-primary" onClick={()=>select(group.id,'channel')}>Mở nhóm<ArrowRight size={16}/></button>
+        <button type="button" className="cg-primary" onClick={()=>select(group.id,'channel')}>Thảo luận<ArrowRight size={16}/></button>
       </div>)}{shownGroups.length===0&&<p className="cg-empty">{query?'Không tìm thấy nhóm phù hợp.':'Chưa có nhóm. Hãy tạo cộng đồng mới hoặc tải thêm.'}</p>}</div>
       {hasMore&&<button type="button" className="cg-secondary" disabled={loadingMore} onClick={onLoadMore}>Tải thêm hội thoại</button>}
     </section><aside className="cg-card cg-list-aside"><ShieldCheck size={32}/><h3>Khám phá cộng đồng công khai</h3><p>Tìm và tham gia các cộng đồng phù hợp. Nhóm yêu cầu phê duyệt sẽ cần quản trị viên đồng ý.</p>

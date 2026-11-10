@@ -30,6 +30,7 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     purgeConversation: (id: number) => void
     groupSettingsOpen: boolean
     activeConversationIdRef: RefObject<number | null>
+    activeChannelIdRef: RefObject<number>
     refreshGroupMembers: (id: number) => Promise<void>
     refreshPinnedMessages: (id: number) => Promise<void>
     clearPinnedMessages: () => void
@@ -71,6 +72,7 @@ export function useAppRealtime({
   membershipSyncSequence,
   groupSettingsOpen,
   activeConversationIdRef,
+  activeChannelIdRef,
   refreshGroupMembers,
   refreshPinnedMessages,
   clearPinnedMessages,
@@ -212,7 +214,7 @@ export function useAppRealtime({
         const changed = update.message
         if (changed.channelId) window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'updated',message:changed}}))
         messageChanges.current.add(changed.id)
-        if (!changed.channelId && activeConversationIdRef.current === update.conversationId) {
+        if ((changed.channelId || 0) === activeChannelIdRef.current && activeConversationIdRef.current === update.conversationId) {
           setMessages((current) => {
             const item = current.find((message) => message.id === changed.id)
             return mergeById(current, {
@@ -251,7 +253,7 @@ export function useAppRealtime({
           const recovered = loadPendingSend(session.user.id, session.sessionId)
           if (recovered?.clientId === incoming.clientId && recovered.conversationId === incoming.conversationId) {
             clearPendingSend(session.user.id, incoming.clientId)
-            setMessageDrafts((current) => {
+            if (!incoming.channelId) setMessageDrafts((current) => {
               const existing = current[incoming.conversationId]
               if (!existing || existing.text.trim() !== incoming.text || existing.attachments.length > 0) return current
               const next = { ...current }
@@ -300,7 +302,7 @@ export function useAppRealtime({
         void refreshConversations()
         refreshCategoryConversations()
 
-        if (!incoming.channelId && currentId === update.conversationId) {
+        if ((incoming.channelId || 0) === activeChannelIdRef.current && currentId === update.conversationId) {
           setMessages((current) =>
             current.some((item) => item.id === incoming.id)
               ? current

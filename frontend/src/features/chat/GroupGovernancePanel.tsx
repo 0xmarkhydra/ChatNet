@@ -313,14 +313,14 @@ export default function GroupGovernancePanel({
   return (
     <div className="group-governance" data-section={section}>
       <h3>
-        <ShieldCheck size={18} /> Thiết lập &amp; quyền nhóm
+        <ShieldCheck size={18} /> {section === "requests" ? "Yêu cầu tham gia" : section === "activity" ? "Nhật ký hoạt động" : "Quyền quản trị"}
       </h3>
       {error && (
         <p className="group-governance-error" role="alert">
           {error}
         </p>
       )}
-      <section>
+      {(!section || section === "permissions") && <section>
         <h4>Quyền quản trị</h4>
         <label>
           <input
@@ -376,7 +376,7 @@ export default function GroupGovernancePanel({
               }))
             }
           />
-          Cho phép admin đổi tên nhóm
+          Cho phép admin sửa thông tin cộng đồng
         </label>
         {isOwner && (
           <button
@@ -387,9 +387,9 @@ export default function GroupGovernancePanel({
             Lưu quyền nhóm
           </button>
         )}
-      </section>
+      </section>}
 
-      {canInvite && (
+      {canInvite && (!section || section === "permissions") && (
         <section>
           <h4>
             <Link2 size={17} /> Link mời có thời hạn
@@ -483,7 +483,7 @@ export default function GroupGovernancePanel({
         </section>
       )}
 
-      {canApprove && (
+      {canApprove && (!section || section === "requests") && (
         <section>
           <h4>
             <UserCheck size={17} /> Yêu cầu tham gia ({requests.length}){" "}
@@ -523,7 +523,7 @@ export default function GroupGovernancePanel({
         </section>
       )}
 
-      {canAudit && (
+      {canAudit && (!section || section === "activity") && (
         <section>
           <h4>
             <History size={17} /> Nhật ký quản trị

@@ -51,10 +51,12 @@ function extractLinks(text: string) {
 
 export default function SharedContent({
   conversationId,
+  channelId = 0,
   request,
   onClose,
 }: {
   conversationId: number
+  channelId?: number
   request: RequestFn
   onClose: () => void
 }) {
@@ -75,7 +77,7 @@ export default function SharedContent({
     try {
       const before = reset ? '' : nextBefore ? `&before=${nextBefore}` : ''
       const response = await requestRef.current(
-        `/api/conversations/${conversationId}/shared?kind=${tab}&limit=48${before}`,
+        `/api/conversations/${conversationId}/shared?kind=${tab}&channelId=${channelId}&limit=48${before}`,
       )
       const page = await response.json().catch(() => null) as (SharedPage & { error?: string }) | null
       if (!response.ok || !page) throw new Error(page?.error || 'Không tải được nội dung dùng chung')
@@ -94,7 +96,7 @@ export default function SharedContent({
     setNextBefore(undefined)
     setViewerIndex(null)
     void load(true)
-  }, [conversationId, tab])
+  }, [conversationId, channelId, tab])
 
   const media = useMemo(() => items.flatMap((message) =>
     (message.attachments || [])
