@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chatMessageSearchQuery, matchesChatMessageSearch } from '../src/features/chat/chat-message-filter.ts'
+import { chatMessageSearchQuery, matchesChatMessageSearch } from '../src/features/chat/utils/chat-message-filter.ts'
 
 const messages = [
   { sender: 'An', text: 'Xin chào, hôm nay đi họp nhé', createdAt: '2026-10-28T09:00:00' },

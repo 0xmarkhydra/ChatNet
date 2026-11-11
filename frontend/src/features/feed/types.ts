@@ -1,5 +1,5 @@
-import type { FeedComment } from './FeedDiscussion'
-import type { MediaAttachment } from '../../shared/lib/media'
+import type { FeedComment } from './components/FeedDiscussion'
+import type { MediaAttachment } from '../../shared/utils/media'
 
 export const FEED_PAGE_SIZE = 15
 

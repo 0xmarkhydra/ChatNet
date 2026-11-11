@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { build } from 'esbuild'
 import { fileURLToPath } from 'node:url'
 const bundle = await build({
-  entryPoints: [fileURLToPath(new URL('../src/features/chat/conversationTranslationSettings.ts', import.meta.url))],
+  entryPoints: [fileURLToPath(new URL('../src/features/chat/lib/conversationTranslationSettings.ts', import.meta.url))],
   bundle: true, write: false, platform: 'node', format: 'esm',
 })
 const { readConversationTranslationSettings, persistConversationTranslationSettings } =

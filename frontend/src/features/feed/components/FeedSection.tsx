@@ -1,0 +1,523 @@
+import FeedModeration from "./FeedModeration";
+import SocialFeedStories from "./SocialFeedStories";
+import { userLabel } from "../../../shared/utils/userLabel";
+import UiIcon from "../../../shared/ui/UiIcon";
+import UserAvatar from "../../../shared/ui/UserAvatar";
+import SocialFeedComposer from "./SocialFeedComposer";
+import { RefreshCw } from "lucide-react";
+import FeedCommunitiesList from "./FeedCommunitiesList";
+import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
+import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
+import SocialFeedSidebar from "./SocialFeedSidebar";
+import type { FriendSearchResult, FriendConnection } from "../../contacts/types";
+import { type Conversation } from "../../chat/types";
+import { type Post, type Story } from "../types";
+import type { ProfileMediaState } from "../../profile/types";
+import { type Session } from "../../auth/lib/session";
+import { type SetStateAction } from "react";
+import type { Tab } from "../../../app/types";
+import type { Dispatch, RefObject, ReactNode } from "react";
+
+export type FeedSectionProps = {
+  activePostId: number | null;
+  activeStoryId: number | null;
+  actOnFriend: (friend: FriendSearchResult | FriendConnection, decline?: boolean) => Promise<void>;
+  apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
+  conversationLoadingMore: boolean;
+  conversations: Conversation[];
+  createStory: (file?: File) => Promise<void>;
+  feedCommunitiesOpen: boolean;
+  feedFilter: "all" | "following" | "latest" | "saved";
+  feedFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
+  feedInfiniteScrollRef: RefObject<HTMLDivElement | null>;
+  feedLoadingMore: boolean;
+  feedPagingError: boolean;
+  feedSearchActive: boolean;
+  feedViewRef: RefObject<HTMLDivElement | null>;
+  followingFeed: { refresh: () => void; syncPost: (post: Post) => void; removePost: (id: number) => void; posts: Post[]; loading: boolean; loadingMore: boolean; hasMore: boolean; error: string; loadMore: () => Promise<void>; };
+  friendBusyIds: Set<number>;
+  friendRequests: FriendConnection[];
+  friends: FriendConnection[];
+  hasMoreConversations: boolean;
+  isProfileDesktop: boolean;
+  loadMoreConversations: () => Promise<void>;
+  loadMorePosts: () => Promise<void>;
+  loadSavedPosts: (more?: boolean) => Promise<void>;
+  mediaUploading: "chat" | "feed" | "profile" | "story" | null;
+  name: string;
+  normalizedSearch: string;
+  openVisitor: (username: string) => void;
+  pendingPost: Post | null;
+  postComposer: ReactNode;
+  postComposerRef: RefObject<HTMLTextAreaElement | null>;
+  posts: Post[];
+  postSearch: { posts: Post[]; loading: boolean; loadingMore: boolean; hasMore: boolean; error: string; loadMore: (retryOnError?: boolean) => Promise<void>; retry: () => void; syncPost: (updated: Post) => void; removePost: (id: number) => void; };
+  postText: string;
+  profileMedia: ProfileMediaState | null;
+  refreshPosts: () => Promise<void>;
+  renderPosts: (items: Post[], showSave?: boolean) => ReactNode[];
+  savedPosts: Post[];
+  searchedPosts: Post[];
+  session: Session;
+  setActiveConversationId: Dispatch<SetStateAction<number | null>>;
+  setActivePostId: Dispatch<SetStateAction<number | null>>;
+  setActiveStoryId: Dispatch<SetStateAction<number | null>>;
+  setChatListFilter: Dispatch<SetStateAction<"all" | "unread" | "groups">>;
+  setFeedCheckInOpen: Dispatch<SetStateAction<boolean>>;
+  setFeedCommunitiesOpen: Dispatch<SetStateAction<boolean>>;
+  setFeedComposerOpen: Dispatch<SetStateAction<boolean>>;
+  setFeedFilter: Dispatch<SetStateAction<"all" | "following" | "latest" | "saved">>;
+  setGlobalSearch: Dispatch<SetStateAction<string>>;
+  setPosts: Dispatch<SetStateAction<Post[]>>;
+  setSavedPosts: Dispatch<SetStateAction<Post[]>>;
+  setSearchHasScrolled: Dispatch<SetStateAction<boolean>>;
+  setStories: Dispatch<SetStateAction<Story[]>>;
+  stories: Story[];
+  storyBusy: boolean;
+  storyFileInputRef: RefObject<HTMLInputElement | null>;
+  switchTab: (nextTab: Tab) => void;
+};
+
+export default function FeedSection({
+  activePostId,
+  activeStoryId,
+  actOnFriend,
+  apiFetch,
+  conversationLoadingMore,
+  conversations,
+  createStory,
+  feedCommunitiesOpen,
+  feedFilter,
+  feedFiltersPill,
+  feedInfiniteScrollRef,
+  feedLoadingMore,
+  feedPagingError,
+  feedSearchActive,
+  feedViewRef,
+  followingFeed,
+  friendBusyIds,
+  friendRequests,
+  friends,
+  hasMoreConversations,
+  isProfileDesktop,
+  loadMoreConversations,
+  loadMorePosts,
+  loadSavedPosts,
+  mediaUploading,
+  name,
+  normalizedSearch,
+  openVisitor,
+  pendingPost,
+  postComposer,
+  postComposerRef,
+  posts,
+  postSearch,
+  postText,
+  profileMedia,
+  refreshPosts,
+  renderPosts,
+  savedPosts,
+  searchedPosts,
+  session,
+  setActiveConversationId,
+  setActivePostId,
+  setActiveStoryId,
+  setChatListFilter,
+  setFeedCheckInOpen,
+  setFeedCommunitiesOpen,
+  setFeedComposerOpen,
+  setFeedFilter,
+  setGlobalSearch,
+  setPosts,
+  setSavedPosts,
+  setSearchHasScrolled,
+  setStories,
+  stories,
+  storyBusy,
+  storyFileInputRef,
+  switchTab,
+}: FeedSectionProps) {
+  return (
+      <div
+            className="feed-view zalo-feed-view social-feed"
+            ref={feedViewRef}
+            onScroll={(event) => {
+              if (feedSearchActive && event.currentTarget.scrollTop > 0)
+                setSearchHasScrolled(true);
+            }}
+          >
+            <FeedModeration
+              request={apiFetch}
+              onRemoved={(type, id) => {
+                if (type === "post") {
+                  setPosts((current) =>
+                    current.filter((post) => post.id !== id),
+                  );
+                  setSavedPosts((current) =>
+                    current.filter((post) => post.id !== id),
+                  );
+                  postSearch.removePost(id);
+                  if (activePostId === id) setActivePostId(null);
+                } else if (type === "comment") {
+                  void refreshPosts();
+                } else {
+                  setStories((current) =>
+                    current.filter((story) => story.id !== id),
+                  );
+                  if (activeStoryId === id) setActiveStoryId(null);
+                }
+              }}
+            />
+            <input
+              ref={storyFileInputRef}
+              className="hidden-media-input"
+              type="file"
+              accept="image/*,video/*"
+              aria-label="Chọn ảnh hoặc video cho Story"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = "";
+                void createStory(file);
+              }}
+            />
+            <div className="social-feed-grid">
+              <div className="social-feed-center">
+                {!feedCommunitiesOpen && (<>
+                {isProfileDesktop ? (
+                  <SocialFeedStories
+                    username={name}
+                    displayName={userLabel(
+                      profileMedia?.displayName || session.user.displayName,
+                      name,
+                    )}
+                    stories={stories}
+                    busy={storyBusy || mediaUploading === "story"}
+                    onCreate={() => storyFileInputRef.current?.click()}
+                    onOpen={setActiveStoryId}
+                  />
+                ) : (
+                  <>
+                    <div className="soco-feed-section-label">
+                      <strong>Khoảnh khắc</strong>
+                      <small>Story trong 24 giờ</small>
+                    </div>
+                    <div className="stories-row">
+                      <button
+                        type="button"
+                        className="story-card"
+                        disabled={storyBusy || mediaUploading === "story"}
+                        onClick={() => storyFileInputRef.current?.click()}
+                        aria-label="Tạo Story mới"
+                      >
+                        <div className="story-visual self-story">
+                          <span className="story-camera">
+                            <UiIcon name="plus" size={22} />
+                          </span>
+                        </div>
+                        <span>
+                          Tạo mới
+                        </span>
+                      </button>
+                      {stories.map((story) => (
+                        <button
+                          type="button"
+                          className="story-card"
+                          key={story.id}
+                          onClick={() => setActiveStoryId(story.id)}
+                          aria-label={`Xem Story của ${userLabel(story.authorDisplayName, story.author)}`}
+                        >
+                          <div className="story-visual">
+                            {story.attachment.kind === "video" ? (
+                              <video
+                                src={story.attachment.url}
+                                muted
+                                playsInline
+                                preload="metadata"
+                              />
+                            ) : (
+                              <img
+                                src={story.attachment.url}
+                                alt=""
+                                loading="lazy"
+                              />
+                            )}
+                            <UserAvatar
+                              className="story-avatar-mini"
+                              username={story.author}
+                              name={userLabel(
+                                story.authorDisplayName,
+                                story.author,
+                              )}
+                            />
+                          </div>
+                          <span>
+                            {story.author === name
+                              ? "Story của bạn"
+                              : userLabel(
+                                  story.authorDisplayName,
+                                  story.author,
+                                )}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {isProfileDesktop ? (
+                  <SocialFeedComposer
+                    username={name}
+                    displayName={userLabel(
+                      profileMedia?.displayName || session.user.displayName,
+                      name,
+                    )}
+                    draft={postText}
+                    pending={Boolean(pendingPost)}
+                    storyBusy={storyBusy || mediaUploading === "story"}
+                    onCreatePost={() => {
+                      setFeedCheckInOpen(false);
+                      setFeedComposerOpen(true);
+                    }}
+                    onCreateMediaPost={() => {
+                      setFeedCheckInOpen(false);
+                      setFeedComposerOpen(true);
+                    }}
+                    onCreateStory={() => storyFileInputRef.current?.click()}
+                    onCheckIn={() => {
+                      setFeedCheckInOpen(true);
+                      setFeedComposerOpen(true);
+                    }}
+                  />
+                ) : (
+                  postComposer
+                )}
+                </>)}
+
+                {!feedCommunitiesOpen && (isProfileDesktop ? (
+                  <div
+                    className="social-feed-filter-bar"
+                    role="group"
+                    aria-label="Lọc bảng tin"
+                  >
+                    <div className="social-feed-filter-options">
+                      <button
+                        type="button"
+                        aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
+                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
+                      >
+                        Dành cho bạn
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={!feedCommunitiesOpen && feedFilter === "following"}
+                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("following"); }}
+                      >
+                        Đang theo dõi
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={!feedCommunitiesOpen && feedFilter === "latest"}
+                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("latest"); }}
+                      >
+                        Mới nhất
+                      </button>
+                      {!feedCommunitiesOpen && feedFilter === "saved" && (
+                        <button type="button" aria-pressed={true}>
+                          Đã lưu
+                        </button>
+                      )}
+                    </div>
+                    {!feedCommunitiesOpen && <button
+                      className="social-feed-refresh"
+                      type="button"
+                      onClick={() => {
+                        if (feedFilter === "following") followingFeed.refresh();
+                        else if (feedFilter === "saved") void loadSavedPosts();
+                        else void refreshPosts();
+                      }}
+                    >
+                      <RefreshCw size={15} aria-hidden="true" />
+                      {feedFilter === "saved" ? "Bài đã lưu" : "Bài viết mới"}
+                    </button>}
+                  </div>
+                ) : (
+                  <>
+                    <div className="soco-feed-section-label soco-feed-posts-label">
+                      <strong>
+                        {feedCommunitiesOpen ? "Cộng đồng" : feedFilter === "saved"
+                          ? "Bài viết đã lưu"
+                          : "Bài viết mới"}
+                      </strong>
+                      <div
+                        ref={feedFiltersPill.hostRef}
+                        className="feed-filter-tabs sliding-pill-host"
+                        role="group"
+                        aria-label="Lọc bảng tin"
+                      >
+                        <span ref={feedFiltersPill.pillRef} className="sliding-pill feed-filter-active-pill" aria-hidden="true" />
+                        <button
+                          ref={!feedCommunitiesOpen && feedFilter === "all" ? feedFiltersPill.activeRef : undefined}
+                          type="button"
+                          aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
+                          onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
+                        >
+                          Mới nhất
+                        </button>
+                        <button
+                          ref={!feedCommunitiesOpen && feedFilter === "saved" ? feedFiltersPill.activeRef : undefined}
+                          type="button"
+                          aria-pressed={!feedCommunitiesOpen && feedFilter === "saved"}
+                          onClick={() => {
+                            setFeedCommunitiesOpen(false);
+                            setFeedFilter("saved");
+                            void loadSavedPosts();
+                          }}
+                        >
+                          Đã lưu
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ))}
+                <div className="feed zalo-feed">
+                  {feedCommunitiesOpen ? (
+                    <FeedCommunitiesList
+                      groups={conversations}
+                      onOpen={(id) => { switchTab("chat"); setChatListFilter("all"); setActiveConversationId(id); }}
+                      hasMore={hasMoreConversations}
+                      loadingMore={conversationLoadingMore}
+                      onLoadMore={() => void loadMoreConversations()}
+                    />
+                  ) : (<>
+                  {pendingPost && (
+                    <article
+                      className="post zalo-post outgoing-preview"
+                      aria-busy="true"
+                    >
+                      <UserAvatar
+                        username={pendingPost.author}
+                        name={userLabel(
+                          pendingPost.authorDisplayName,
+                          pendingPost.author,
+                        )}
+                        className="avatar"
+                      />
+                      <div className="post-body">
+                        <div className="post-author">
+                          <strong>
+                            {userLabel(
+                              pendingPost.authorDisplayName,
+                              pendingPost.author,
+                            )}
+                          </strong>
+                          <small>{pendingPost.visibility === "friends" ? "Bạn bè" : pendingPost.visibility === "private" ? "Chỉ mình tôi" : "Công khai"}</small>
+                        </div>
+                        <p className="pending-content">{pendingPost.content}</p>
+                        <MediaAttachmentsView items={pendingPost.attachments} />
+                      </div>
+                    </article>
+                  )}
+
+
+                  {renderPosts(searchedPosts, isProfileDesktop)}
+
+                  {feedPagingError && (
+                    <div role="alert" className="soco-feed-load-more">
+                      <span>
+                        {feedSearchActive
+                          ? postSearch.error
+                          : feedFilter === "following"
+                            ? followingFeed.error
+                            : "Không thể tải bài viết."}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (feedSearchActive) postSearch.retry();
+                          else if (feedFilter === "saved")
+                            void loadSavedPosts(savedPosts.length > 0);
+                          else if (feedFilter === "following")
+                            followingFeed.refresh();
+                          else if (posts.length === 0) void refreshPosts();
+                          else void loadMorePosts();
+                        }}
+                      >
+                        Thử lại
+                      </button>
+                    </div>
+                  )}
+                  <div
+                    ref={feedInfiniteScrollRef}
+                    aria-hidden="true"
+                    style={{ height: 1 }}
+                  />
+                  {searchedPosts.length === 0 &&
+                    !feedLoadingMore &&
+                    !(feedSearchActive && postSearch.loading) &&
+                    !(feedFilter === "following" && followingFeed.loading) &&
+                    !feedPagingError && (
+                      <div className="feed-empty">
+                        <SocoEmptyState
+                          title={
+                            normalizedSearch
+                              ? "Không tìm thấy bài viết"
+                              : feedFilter === "following"
+                                ? "Chưa có bài viết từ bạn bè"
+                                : "Chưa có bài viết"
+                          }
+                          description={
+                            normalizedSearch
+                              ? "Thử một từ khóa khác nhé."
+                              : feedFilter === "following"
+                                ? "Kết bạn để xem các bài viết được chia sẻ với bạn."
+                                : "Hãy chia sẻ khoảnh khắc đầu tiên của bạn."
+                          }
+                          action={
+                            !normalizedSearch && (
+                              <SocoTextAction
+                                onClick={() =>
+                                  feedFilter === "following"
+                                    ? switchTab("contacts")
+                                    : isProfileDesktop
+                                      ? (setFeedCheckInOpen(false),
+                                        setFeedComposerOpen(true))
+                                      : postComposerRef.current?.focus()
+                                }
+                              >
+                                {feedFilter === "following"
+                                  ? "Tìm bạn bè"
+                                  : "Tạo bài viết"}
+                              </SocoTextAction>
+                            )
+                          }
+                        />
+                      </div>
+                    )}
+                  </>)}
+                </div>
+              </div>
+              {!feedCommunitiesOpen && isProfileDesktop && (
+                <SocialFeedSidebar
+                  username={name}
+                  sessionId={session.sessionId}
+                  posts={posts}
+                  friends={friends}
+                  friendRequests={friendRequests}
+                  friendBusyIds={friendBusyIds}
+                  request={apiFetch}
+                  onFriend={(friend) => {
+                    void actOnFriend(friend);
+                  }}
+                  onViewUser={openVisitor}
+                  onViewContacts={() => switchTab("contacts")}
+                  onSearchTag={(tag) => {
+                    setFeedFilter("all");
+                    setGlobalSearch(tag);
+                  }}
+                  onOpenChat={() => switchTab("chat")}
+                />
+              )}
+            </div>
+          </div>
+  );
+}

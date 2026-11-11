@@ -1,30 +1,30 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, tabFromPath } from "./routes";
-import ProfileNote from "../features/profile/ProfileNote";
+import ProfileNote from "../features/profile/components/ProfileNote";
 import ConversationCategories, {
   CategoryAssignment,
   CategoryBadge,
-} from "../features/chat/ConversationCategories";
-import { useConversationCategories } from "../features/chat/useConversationCategories";
+} from "../features/chat/components/ConversationCategories";
+import { useConversationCategories } from "../features/chat/hooks/useConversationCategories";
 import { SessionResponseCache } from "../shared/lib/sessionCache";
-import VisitorProfile from "../features/profile/VisitorProfile";
-import { userLabel } from "../shared/lib/userLabel";
-import { useMessageData } from "../features/chat/useMessageData";
-import { useChatPins } from "../features/chat/useChatPins";
-import { shouldSendChatOnEnter } from "../features/chat/composerKeyboard";
-import "../features/chat/chat-pins.css";
-import { getMessageTranslationView } from "../features/chat/messageTranslationPresentation";
-import { useApiRequest } from "./useApiRequest";
-import { useAppRealtime } from "./useAppRealtime";
+import VisitorProfile from "../features/profile/components/VisitorProfile";
+import { userLabel } from "../shared/utils/userLabel";
+import { useMessageData } from "../features/chat/hooks/useMessageData";
+import { useChatPins } from "../features/chat/hooks/useChatPins";
+import { shouldSendChatOnEnter } from "../features/chat/utils/composerKeyboard";
+import "../features/chat/styles/chat-pins.css";
+import { getMessageTranslationView } from "../features/chat/utils/messageTranslationPresentation";
+import { useApiRequest } from "./hooks/useApiRequest";
+import { useAppRealtime } from "./hooks/useAppRealtime";
 import { useDesktopNotifications } from "../platform/useDesktopNotifications";
-import { useConversationData } from "../features/chat/useConversationData";
-import { useConversationListSearch } from "../features/chat/useConversationListSearch";
+import { useConversationData } from "../features/chat/hooks/useConversationData";
+import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
 import {
   useChatQuickSearch,
   type ChatQuickContact,
   type ChatQuickHit,
-} from "../features/chat/useChatQuickSearch";
-import ChatQuickSearch from "../features/chat/ChatQuickSearch";
+} from "../features/chat/hooks/useChatQuickSearch";
+import ChatQuickSearch from "../features/chat/components/ChatQuickSearch";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
 import HeaderSearch from "./header/HeaderSearch";
@@ -32,13 +32,13 @@ import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
 import HeaderTitle from "./header/HeaderTitle";
 import { searchLabels } from "./header/headerContext";
-import { useContactData } from "../features/contacts/useContactData";
-import { useFeedData } from "../features/feed/useFeedData";
-import { usePostSearch } from "../features/feed/usePostSearch";
-import { useFollowingPosts } from "../features/feed/useFollowingPosts";
-import { useFeedInfiniteScroll } from "../features/feed/useFeedInfiniteScroll";
+import { useContactData } from "../features/contacts/hooks/useContactData";
+import { useFeedData } from "../features/feed/hooks/useFeedData";
+import { usePostSearch } from "../features/feed/hooks/usePostSearch";
+import { useFollowingPosts } from "../features/feed/hooks/useFollowingPosts";
+import { useFeedInfiniteScroll } from "../features/feed/hooks/useFeedInfiniteScroll";
 
-import { useGroupManagement } from "../features/chat/useGroupManagement";
+import { useGroupManagement } from "../features/chat/hooks/useGroupManagement";
 import { API } from "../shared/lib/config";
 import type {
   ProfileMediaState,
@@ -49,7 +49,7 @@ import {
   attachmentRequestBody,
   type MediaAttachment,
   type PresignedUpload,
-} from "../shared/lib/media";
+} from "../shared/utils/media";
 import {
   emptyDraft,
   CHAT_LIST_PAGE_SIZE,
@@ -74,8 +74,8 @@ import {
   inferToastKind,
   type ToastKind,
   type ToastNotice,
-} from "../features/notifications/toast";
-import { formatTime, attachmentLabel } from "../shared/lib/format";
+} from "../features/notifications/utils/toast";
+import { formatTime, attachmentLabel } from "../shared/utils/format";
 import UserAvatar, {
   avatarRefreshVersions,
   profileAssetUrl,
@@ -83,60 +83,60 @@ import UserAvatar, {
 import useSlidingPill from "../shared/ui/useSlidingPill";
 import MediaAttachmentsView from "../shared/ui/MediaAttachmentsView";
 import UiIcon from "../shared/ui/UiIcon";
-import NearbyRadar from "../features/discover/NearbyRadar";
-import AuthScreen from "../features/auth/AuthScreen";
-import { useAuthFlow } from "../features/auth/useAuthFlow";
-import PostComposer from "../features/feed/PostComposer";
-import FeedPostCard from "../features/feed/FeedPostCard";
-import FeedReactionControl from "../features/feed/FeedReactionControl";
-import StoryViewer from "../features/feed/StoryViewer";
-import MessageActions from "../features/chat/MessageActions";
-import { GroupActivityComposerMenu, GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/GroupActivities";
-import { messageReactionLabel } from "../features/chat/messageReactions";
+import NearbyRadar from "../features/discover/components/NearbyRadar";
+import AuthScreen from "../features/auth/components/AuthScreen";
+import { useAuthFlow } from "../features/auth/hooks/useAuthFlow";
+import PostComposer from "../features/feed/components/PostComposer";
+import FeedPostCard from "../features/feed/components/FeedPostCard";
+import FeedReactionControl from "../features/feed/components/FeedReactionControl";
+import StoryViewer from "../features/feed/components/StoryViewer";
+import MessageActions from "../features/chat/components/MessageActions";
+import { GroupActivityComposerMenu, GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/components/GroupActivities";
+import { messageReactionLabel } from "../features/chat/utils/messageReactions";
 import {
   copyChatImage,
   messageLinkHref,
   messageTextParts,
-} from "../features/chat/messageClipboard";
+} from "../features/chat/lib/messageClipboard";
 import {
   resolveMessageCopyTarget,
   type MessageCopyTarget,
-} from "../features/chat/messageCopyTarget";
-import MessageSearchPanel from "../features/chat/MessageSearchPanel";
-import ProfileIdentityForm from "../features/profile/ProfileIdentityForm";
+} from "../features/chat/utils/messageCopyTarget";
+import MessageSearchPanel from "../features/chat/components/MessageSearchPanel";
+import ProfileIdentityForm from "../features/profile/components/ProfileIdentityForm";
 import BottomNavigation from "./navigation/BottomNavigation";
 import AppSidebar from "./navigation/AppSidebar";
-import { countNotificationItems, formatNotificationBadge } from "../features/notifications/notification-count";
-import NotificationsPage from "../features/notifications/NotificationsPage";
-import ConversationDetailsPanel from "../features/chat/ConversationDetailsPanel";
-import ChatTranslationSettingsPage from '../features/chat/ChatTranslationSettingsPage';
+import { countNotificationItems, formatNotificationBadge } from "../features/notifications/utils/notification-count";
+import NotificationsPage from "../features/notifications/components/NotificationsPage";
+import ConversationDetailsPanel from "../features/chat/components/ConversationDetailsPanel";
+import ChatTranslationSettingsPage from '../features/chat/components/ChatTranslationSettingsPage';
 import {
   readConversationTranslationSettings,
   persistConversationTranslationSettings,
   type ChatTranslationSettings,
   type ConversationTranslationSettingsMap,
-} from '../features/chat/conversationTranslationSettings';
-import ProfilePage from "../features/profile/ProfilePage";
-import ProfileEditorPage from "../features/profile/ProfileEditorPage";
-import SettingsWorkspace from "../features/settings/SettingsWorkspace";
-import SocialFeedComposer from "../features/feed/SocialFeedComposer";
-import SocialFeedSidebar from "../features/feed/SocialFeedSidebar";
-import SocialFeedStories from "../features/feed/SocialFeedStories";
-import PostCommentsPage from "../features/feed/PostCommentsPage";
-import CommunicationHub from "../features/chat/CommunicationHub";
-import CallCenter from "../features/calls/CallCenter";
-import type { GroupWorkspaceMode } from "../features/chat/CommunityGroupsPage";
-import FeedCommunitiesList from "../features/feed/FeedCommunitiesList";
-import "../features/chat/community-groups.css";
-import CommunityGroupWizard, { type CommunityCreationExtras } from "../features/chat/CommunityGroupWizard";
-import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
-import GroupChannelPicker from "../features/chat/GroupChannelPicker";
-import { validGroupChannels, type GroupChannel } from "../features/chat/groupChannels";
-import GroupInviteJoinDialog from "../features/chat/GroupInviteJoinDialog";
-import ContactsView, { type FriendsScreen } from "../features/contacts/ContactsView";
-import PrivacyControls from "../features/profile/PrivacyControls";
-import AccountSessionsPanel from "../features/auth/AccountSessionsPanel";
-import BlockedUsersPanel from "../features/contacts/BlockedUsersPanel";
+} from '../features/chat/lib/conversationTranslationSettings';
+import ProfilePage from "../features/profile/components/ProfilePage";
+import ProfileEditorPage from "../features/profile/components/ProfileEditorPage";
+import SettingsWorkspace from "../features/settings/components/SettingsWorkspace";
+import SocialFeedComposer from "../features/feed/components/SocialFeedComposer";
+import SocialFeedSidebar from "../features/feed/components/SocialFeedSidebar";
+import SocialFeedStories from "../features/feed/components/SocialFeedStories";
+import PostCommentsPage from "../features/feed/components/PostCommentsPage";
+import CommunicationHub from "../features/chat/components/CommunicationHub";
+import CallCenter from "../features/calls/components/CallCenter";
+import type { GroupWorkspaceMode } from "../features/chat/components/CommunityGroupsPage";
+import FeedCommunitiesList from "../features/feed/components/FeedCommunitiesList";
+import "../features/chat/styles/community-groups.css";
+import CommunityGroupWizard, { type CommunityCreationExtras } from "../features/chat/components/CommunityGroupWizard";
+import GroupSettingsPanel from "../features/chat/components/GroupSettingsPanel";
+import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
+import { validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
+import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
+import ContactsView, { type FriendsScreen } from "../features/contacts/components/ContactsView";
+import PrivacyControls from "../features/profile/components/PrivacyControls";
+import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
+import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
 import {
   FormEvent,
   Fragment,
@@ -155,11 +155,11 @@ import {
   FeedText,
   type FeedComment,
   type DiscussionDraft,
-} from "../features/feed/FeedDiscussion";
-import FeedModeration from "../features/feed/FeedModeration";
-import ProfileOverlay from "../features/profile/ProfileOverlay";
-import type { NearbyUser } from "../features/discover/NearbyExplorer";
-import GroupCreator from "../features/chat/GroupCreator";
+} from "../features/feed/components/FeedDiscussion";
+import FeedModeration from "../features/feed/components/FeedModeration";
+import ProfileOverlay from "../features/profile/components/ProfileOverlay";
+import type { NearbyUser } from "../features/discover/components/NearbyExplorer";
+import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
   Bell,
@@ -190,20 +190,20 @@ import {
   MESSAGE_SOUND_SETTING_KEY,
   persistMessageSoundEnabled,
   readMessageSoundEnabled,
-} from "../features/notifications/incomingSound";
+} from "../features/notifications/lib/incomingSound";
 import {
   createSessionClient,
   loadSession,
   type Session,
-} from "../features/auth/session";
+} from "../features/auth/lib/session";
 import {
   clearChatPersistence,
   clearPendingSend,
   loadChatDrafts,
   loadPendingSend,
   saveChatDrafts,
-} from "../features/chat/chatPersistence";
-import { restoreChatOutbox } from "../features/chat/outboxRecovery";
+} from "../features/chat/lib/chatPersistence";
+import { restoreChatOutbox } from "../features/chat/utils/outboxRecovery";
 import {
   clearChatOutbox,
   confirmChatMessage,
@@ -211,28 +211,28 @@ import {
   persistChatOutboxChange,
   retryableChatMessages,
   type QueuedChatMessage,
-} from "../features/chat/chatOutbox";
-import { uploadPresignedFile } from "../features/chat/mediaUpload";
+} from "../features/chat/lib/chatOutbox";
+import { uploadPresignedFile } from "../features/chat/lib/mediaUpload";
 import {
   chatFilesFromClipboard,
   transferHasFiles,
-} from "../features/chat/chatFileTransfer";
-import { canMarkConversationRead } from "../features/chat/conversationRead";
-import { mergeById, toggleMessageReactionCount } from "../shared/lib/optimistic";
-import CallManager, { CallHeaderActions } from "../features/calls/CallManager";
-import SharedContent from "../features/chat/SharedContent";
-import VoiceRecorder from "../features/chat/VoiceRecorder";
+} from "../features/chat/utils/chatFileTransfer";
+import { canMarkConversationRead } from "../features/chat/utils/conversationRead";
+import { mergeById, toggleMessageReactionCount } from "../shared/utils/optimistic";
+import CallManager, { CallHeaderActions } from "../features/calls/components/CallManager";
+import SharedContent from "../features/chat/components/SharedContent";
+import VoiceRecorder from "../features/chat/components/VoiceRecorder";
 import { SocoEmptyState, SocoTextAction } from "../shared/ui/SocoUI";
 import {
   getCurrentPositionSmart,
   geolocationErrorMessage,
-} from "../features/discover/geolocation";
+} from "../features/discover/lib/geolocation";
 
 const NearbyExplorer = lazy(
-  () => import("../features/discover/NearbyExplorer"),
+  () => import("../features/discover/components/NearbyExplorer"),
 );
-const Marketplace = lazy(() => import("../features/discover/Marketplace"));
-const ProfileQr = lazy(() => import("../features/profile/ProfileQr"));
+const Marketplace = lazy(() => import("../features/discover/components/Marketplace"));
+const ProfileQr = lazy(() => import("../features/profile/components/ProfileQr"));
 import {
   defaultBundle,
   loadAppLocalePreference,
@@ -244,12 +244,12 @@ import {
   UI_BUNDLE_VERSION,
   UI_MESSAGES,
   type UIBundle,
-} from "../features/i18n/i18n";
+} from "../features/i18n/lib/i18n";
 import {
   buildLanguageOptions,
   filterLanguageOptions,
   isSupportedLanguageCode,
-} from "../features/i18n/languages";
+} from "../features/i18n/utils/languages";
 import {
   disableOneSignalPush,
   enableOneSignalPush,
@@ -257,33 +257,73 @@ import {
   isPushDisabled,
   setupOneSignal,
   type PushState,
-} from "../features/notifications/onesignal";
+} from "../features/notifications/lib/onesignal";
 
 import { desktopBridge, isDesktopBuild } from "../platform/desktop";
-import NotificationsSection from "../features/notifications/NotificationsSection";
-import DiscoverSection from "../features/discover/DiscoverSection";
-import MarketSection from "../features/discover/MarketSection";
-import CallsSection from "../features/calls/CallsSection";
-import ChatTranslationSection from "../features/chat/ChatTranslationSection";
-import FeedPostDetail from "../features/feed/FeedPostDetail";
-import FeedSection from "../features/feed/FeedSection";
-import ConversationActionDialog from "../features/chat/ConversationActionDialog";
-import MessageActionDialog from "../features/chat/MessageActionDialog";
-import PostDetailOverlay from "../features/feed/PostDetailOverlay";
-import StoryOverlay from "../features/feed/StoryOverlay";
-import ProfileOverviewSection from "../features/profile/ProfileOverviewSection";
-import ProfileSection from "../features/profile/ProfileSection";
-import ChatSection from "../features/chat/ChatSection";
-import FeedComposerOverlay from "../features/feed/FeedComposerOverlay";
+import NotificationsSection from "../features/notifications/components/NotificationsSection";
+import DiscoverSection from "../features/discover/components/DiscoverSection";
+import MarketSection from "../features/discover/components/MarketSection";
+import CallsSection from "../features/calls/components/CallsSection";
+import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
+import FeedPostDetail from "../features/feed/components/FeedPostDetail";
+import FeedSection from "../features/feed/components/FeedSection";
+import ConversationActionDialog from "../features/chat/components/ConversationActionDialog";
+import MessageActionDialog from "../features/chat/components/MessageActionDialog";
+import PostDetailOverlay from "../features/feed/components/PostDetailOverlay";
+import StoryOverlay from "../features/feed/components/StoryOverlay";
+import ProfileOverviewSection from "../features/profile/components/ProfileOverviewSection";
+import ProfileSection from "../features/profile/components/ProfileSection";
+import ChatSection from "../features/chat/components/ChatSection";
+import FeedComposerOverlay from "../features/feed/components/FeedComposerOverlay";
+import { useStoryActions } from "../features/feed/hooks/useStoryActions";
+import { useNearbyDiscovery } from "../features/discover/hooks/useNearbyDiscovery";
+import { useAccountSessions } from "../features/auth/hooks/useAccountSessions";
+import { usePushSettings } from "../features/notifications/hooks/usePushSettings";
+import { useMessageLongPress } from "../features/chat/hooks/useMessageLongPress";
+import { useMessageClipboard } from "../features/chat/hooks/useMessageClipboard";
+import { useMediaUploads } from "../features/chat/hooks/useMediaUploads";
+import { useContactActions } from "../features/contacts/hooks/useContactActions";
+import { useTranslationActions } from "../features/chat/hooks/useTranslationActions";
+import { useChatMessaging } from "../features/chat/hooks/useChatMessaging";
+import { useConversationActions } from "../features/chat/hooks/useConversationActions";
+import { useFeedActions } from "../features/feed/hooks/useFeedActions";
+import { useInviteSharing } from "../features/profile/hooks/useInviteSharing";
+import { usePrivacySettings } from "../features/settings/hooks/usePrivacySettings";
+import { useNearbyState } from "../features/discover/hooks/useNearbyState";
+import { useBlockedUsers } from "../features/contacts/hooks/useBlockedUsers";
+import { useFriendSearch } from "../features/contacts/hooks/useFriendSearch";
+import { useAppLocaleState } from "../features/i18n/hooks/useAppLocaleState";
+import { useTranslationState } from "../features/chat/hooks/useTranslationState";
+import { useProfileState } from "../features/profile/hooks/useProfileState";
+import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
+import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
+import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
+import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
 export default function App({
   initialSession,
 }: {
   initialSession?: Session | null;
 }) {
+  const { chatCreateError, directUsername, groupCreateStep, groupWorkspaceMode, newChatMode, quickCreateOpen, setChatCreateError, setDirectUsername, setGroupCreateStep, setGroupWorkspaceMode, setNewChatMode, setQuickCreateOpen } = useGroupWorkspaceState({  });
+
+  const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({  });
+
+  const { appLocale, languageSearch, localePickerOpen, localeSearch, setAppLocale, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setTranslationPickerOpen, setUiBundle, setUiLocaleLoading, translationPickerOpen, uiBundle, uiLocaleLoading } = useAppLocaleState({  });
+
+  const { friendActionBusy, friendActionRef, friendBusyIds, friendMenuId, friendQuery, friendResults, friendSearchError, friendSearchRetry, friendSearching, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendQuery, setFriendResults, setFriendSearchError, setFriendSearchRetry, setFriendSearching } = useFriendSearch({  });
+
+  const { blockedBusy, blockedError, blockedOpen, blockedUsers, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers } = useBlockedUsers({  });
+
+  const { nearbyBusy, nearbyRadiusKm, nearbyRequest, nearbyResultRadiusKm, nearbyScanning, nearbyUntil, nearbyUsers, setNearbyBusy, setNearbyRadiusKm, setNearbyResultRadiusKm, setNearbyScanning, setNearbyUntil, setNearbyUsers } = useNearbyState({  });
+
   const [session, setSession] = useState<Session | null>(() =>
     isDesktopBuild ? (initialSession ?? null) : loadSession(),
   );
+  const { managedSessions, sessionsBusy, sessionsError, sessionsOpen, setManagedSessions, setSessionsBusy, setSessionsError, setSessionsOpen } = useSessionsPanel({ session });
+
+  const { autoTranslate, conversationTranslationOverrides, manuallyTranslated, setAutoTranslate, setConversationTranslationOverrides, setManuallyTranslated, setTargetLanguage, setTranslationFailures, setTranslationMenuOpen, setTranslationOriginals, setTranslationPending, setTranslations, targetLanguage, translationAttempted, translationFailures, translationLanguageRef, translationMenuOpen, translationOriginals, translationPending, translations } = useTranslationState({ session });
+
   const sessionRef = useRef(session);
   const responseCache = useRef(new SessionResponseCache());
   const [sessionClient] = useState(() =>
@@ -317,6 +357,8 @@ export default function App({
     navigate(path);
   };
   const tab: Tab = tabFromPath(location.pathname) ?? "chat";
+  const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, postAttachments, postBackground, postText, postVisibility, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setPostAttachments, setPostBackground, setPostText, setPostVisibility, setSearchHasScrolled, setShowPostBackgrounds, setStoryBusy, showPostBackgrounds, storyBusy } = useFeedUiState({ tab });
+
   const setTab = (next: Tab) => navigateTo(TAB_PATH[next]);
   const desktopSection: "groups" | "calls" | null =
     location.pathname === ROUTE.calls ? ("calls" as const) : (null as "groups" | null);
@@ -380,64 +422,26 @@ export default function App({
       document.removeEventListener("keydown", escape);
     };
   }, [quickSearchOpen]);
-  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
-  useEffect(() => {
-    if (!quickCreateOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setQuickCreateOpen(false);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [quickCreateOpen]);
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
-  const [groupMemberViewOpen, setGroupMemberViewOpen] = useState(false);
+  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, pinnedExpanded, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setPinnedExpanded, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId });
+
   const activeConversationIdRef = useRef<number | null>(null);
-  const [channelSelection, setChannelSelection] = useState<{ conversationId: number | null; channelId: number }>({ conversationId: null, channelId: 0 });
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
   const activeChannelIdRef = useRef(selectedChannelId);
   activeChannelIdRef.current = selectedChannelId;
-  const [groupChannelState, setGroupChannelState] = useState<{ conversationId: number | null; channels: GroupChannel[] }>({ conversationId: null, channels: [] });
-  const [groupChannelBusy, setGroupChannelBusy] = useState(false);
   const groupChannels = groupChannelState.conversationId === activeConversationId
     ? groupChannelState.channels
     : validGroupChannels([], activeConversationId ?? 0);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messageScrollAtBottom = useRef(true);
   const ownSendScrollConversation = useRef<number | null>(null);
-  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-  const [messageActionId, setMessageActionId] = useState<number | null>(null);
-  const [messageActionMode, setMessageActionMode] = useState<'reactions' | 'actions'>('actions');
-  const [conversationActionId, setConversationActionId] = useState<number | null>(null);
-  const [conversationMenuPosition, setConversationMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const [pinnedExpanded, setPinnedExpanded] = useState(false);
-  const conversationLongPress = useRef<{ id: number; x: number; y: number; timer: number } | null>(null);
   const suppressConversationClick = useRef<number | null>(null);
-  const [groupActivityCreateKind, setGroupActivityCreateKind] = useState<GroupActivityKind | null>(null);
-  const [groupActivityViewedId, setGroupActivityViewedId] = useState<number | null>(null);
-  useEffect(() => {
-    setGroupActivityCreateKind(null);
-    setGroupActivityViewedId(null);
-  }, [activeConversationId]);
   const [messageCopyTarget, setMessageCopyTarget] =
     useState<MessageCopyTarget | null>(null);
-  const messageLongPressTimer = useRef<number | null>(null);
-  const messageLongPressStart = useRef<{
-    x: number;
-    y: number;
-    messageId: number;
-  } | null>(null);
   const suppressMessageClick = useRef<number | null>(null);
-
-  const [sharedContentOpen, setSharedContentOpen] = useState(false);
-  const [messageSearchOpen, setMessageSearchOpen] = useState(false);
-  const [conversationDetailsOpen, setConversationDetailsOpen] = useState(false);
-  const [historyActionBusy, setHistoryActionBusy] = useState(false);
-  useEffect(() => {
-    setMessageSearchOpen(false);
-    setConversationDetailsOpen(false);
-  }, [activeConversationId]);
+  const { beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress, cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress, openMessageActions, openMessageReactions } = useMessageLongPress({ setConversationActionId, setConversationMenuPosition, setMessageActionId, setMessageActionMode, setMessageCopyTarget, suppressConversationClick, suppressMessageClick });
 
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
   const [messageDrafts, setMessageDrafts] = useState<
@@ -529,10 +533,7 @@ export default function App({
     sendingClientIDs.current.clear();
     retryOutboxBusy.current = false;
   }, [session?.sessionId]);
-  const preferenceQueue = useRef(Promise.resolve());
   const preferenceRevision = useRef(0);
-  const [newChatMode, setNewChatMode] = useState<NewChatMode>("none");
-  const [friendQuery, setFriendQuery] = useState("");
   const [localContactsScreen, setLocalContactsScreen] = useState<FriendsScreen>("directory");
   // On the contacts route the screen lives in the URL; inside Calls it stays local.
   const contactsScreen: FriendsScreen =
@@ -543,16 +544,6 @@ export default function App({
     if (tab === "contacts") navigateTo(next === "invitations" ? ROUTE.invitations : TAB_PATH.contacts);
     else setLocalContactsScreen(next);
   };
-  const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([]);
-  const [friendSearching, setFriendSearching] = useState(false);
-  const [friendSearchError, setFriendSearchError] = useState(false);
-  const [friendSearchRetry, setFriendSearchRetry] = useState(0);
-  const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null);
-  const friendActionRef = useRef(new Set<number>());
-  const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(
-    () => new Set(),
-  );
-  const [friendMenuId, setFriendMenuId] = useState<number | null>(null);
   const [visitorUsername, setVisitorUsername] = useState<string | null>(null);
   function openVisitor(username: string) {
     if (username === sessionRef.current?.user.username) {
@@ -567,13 +558,6 @@ export default function App({
     if (friend) openVisitor(friend.username);
     else setVisitorUsername(null);
   }
-  const [blockedUsers, setBlockedUsers] = useState<
-    Array<{ id: number; username: string; displayName: string }>
-  >([]);
-  const [blockedOpen, setBlockedOpen] = useState(false);
-  const [blockedBusy, setBlockedBusy] = useState(false);
-  const [blockedError, setBlockedError] = useState("");
-  const [directUsername, setDirectUsername] = useState("");
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
   const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);
   useEffect(() => {
@@ -582,33 +566,7 @@ export default function App({
       setTranslationSettingsConversationId(null);
     }
   }, [translationSettingsConversationId, activeConversationId]);
-  const [groupWorkspaceMode, setGroupWorkspaceMode] = useState<GroupWorkspaceMode>("list");
-  const [feedCommunitiesOpen, setFeedCommunitiesOpen] = useState(false);
-  const [groupCreateStep, setGroupCreateStep] = useState<1 | 2 | 3>(1);
-  const [chatCreateError, setChatCreateError] = useState("");
-  const [nearbyUsers, setNearbyUsers] = useState<FriendSearchResult[]>([]);
-  const [nearbyBusy, setNearbyBusy] = useState(false);
-  const [nearbyScanning, setNearbyScanning] = useState(false);
-  const [nearbyUntil, setNearbyUntil] = useState(0);
-  const [nearbyResultRadiusKm, setNearbyResultRadiusKm] = useState(5);
-  const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5);
-  const nearbyRequest = useRef(0);
-
-  const [profileTimelineOpen, setProfileTimelineOpen] = useState(false);
-  const [isProfileDesktop, setIsProfileDesktop] = useState(
-    () => window.matchMedia("(min-width: 761px)").matches,
-  );
-  useEffect(() => {
-    const query = window.matchMedia("(min-width: 761px)");
-    const onResize = (event: MediaQueryListEvent) =>
-      setIsProfileDesktop(event.matches);
-    query.addEventListener("change", onResize);
-    return () => query.removeEventListener("change", onResize);
-  }, []);
   const desktopProfileOverview = isProfileDesktop && !desktopProfileSettings;
-  const [profileComposerOpen, setProfileComposerOpen] = useState(false);
-  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
-  const [postSubmitError, setPostSubmitError] = useState("");
   useEffect(() => {
     if (
       tab !== "profile" ||
@@ -618,14 +576,6 @@ export default function App({
       setProfileEditorOpen(false);
     }
   }, [tab, profileTimelineOpen, desktopProfileOverview]);
-  const [profilePosts, setProfilePosts] = useState<Post[]>([]);
-  const [profilePostsBusy, setProfilePostsBusy] = useState(false);
-  const [profilePostsError, setProfilePostsError] = useState("");
-  const [profileHasMore, setProfileHasMore] = useState(false);
-  const profileLoadSequence = useRef(0);
-  const profilePagingBusy = useRef(false);
-  const profileIdentityRef = useRef<HTMLButtonElement>(null);
-  const profileHeadingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (
       (!profileTimelineOpen && !desktopProfileOverview) ||
@@ -646,37 +596,12 @@ export default function App({
     session?.sessionId,
     session?.user.username,
   ]);
-
-  const [feedFilter, setFeedFilter] = useState<
-    "all" | "following" | "latest" | "saved"
-  >("all");
   const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
-  const [feedComposerOpen, setFeedComposerOpen] = useState(false);
-  const [feedCheckInOpen, setFeedCheckInOpen] = useState(false);
-  const [feedCheckInLocation, setFeedCheckInLocation] = useState("");
-  useEffect(() => {
-    if (tab !== "feed") {
-      setFeedComposerOpen(false);
-      setFeedCheckInOpen(false);
-      setFeedCheckInLocation("");
-    }
-  }, [tab]);
-  const feedViewRef = useRef<HTMLDivElement>(null);
-  const [searchHasScrolled, setSearchHasScrolled] = useState(false);
   useLayoutEffect(() => {
     if (tab !== "feed") return;
     if (feedViewRef.current) feedViewRef.current.scrollTop = 0;
     setSearchHasScrolled(false);
   }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN"), feedFilter]);
-  const [activePostId, setActivePostId] = useState<number | null>(null);
-  const [commentSortOrder, setCommentSortOrder] = useState<'newest' | 'oldest'>('newest');
-  const feedScrollBeforeComments = useRef<number | null>(null);
-  useLayoutEffect(() => {
-    if (tab === "feed" && activePostId === null && feedScrollBeforeComments.current !== null && feedViewRef.current) {
-      feedViewRef.current.scrollTop = feedScrollBeforeComments.current;
-      feedScrollBeforeComments.current = null;
-    }
-  }, [activePostId, tab]);
   // The desktop comments view is a real in-app page with a shareable post URL.
   // Popstate keeps the browser Back button in sync with the SPA.
   useEffect(() => {
@@ -725,18 +650,6 @@ export default function App({
       cancelled = true;
     };
   }, [session?.token]);
-  const [activeStoryId, setActiveStoryId] = useState<number | null>(null);
-  const [storyBusy, setStoryBusy] = useState(false);
-  const [commentEditors, setCommentEditors] = useState<
-    Record<number, DiscussionDraft>
-  >({});
-  const [postText, setPostText] = useState("");
-  const [postVisibility, setPostVisibility] = useState<
-    "public" | "friends" | "private"
-  >("public");
-  const [postBackground, setPostBackground] = useState("");
-  const [showPostBackgrounds, setShowPostBackgrounds] = useState(false);
-  const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([]);
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -745,81 +658,8 @@ export default function App({
     total: number;
   } | null>(null);
   const mediaUploadAbort = useRef<AbortController | null>(null);
-  const [profileMedia, setProfileMedia] = useState<ProfileMediaState | null>(
-    null,
-  );
-  const [profileBusy, setProfileBusy] = useState<"avatar" | "cover" | null>(
-    null,
-  );
-  const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState("");
-  const [profileUsernameDraft, setProfileUsernameDraft] = useState("");
-  const [profileBioDraft, setProfileBioDraft] = useState("");
-  const [profileCityDraft, setProfileCityDraft] = useState("");
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [privacy, setPrivacy] = useState<UserPrivacy | null>(null);
-  const [privacyBusy, setPrivacyBusy] = useState(false);
-  const [privacyLoading, setPrivacyLoading] = useState(false);
-  const [privacyError, setPrivacyError] = useState("");
-  const [privacyRetry, setPrivacyRetry] = useState(0);
-  const [sessionsOpen, setSessionsOpen] = useState(false);
-  const [managedSessions, setManagedSessions] = useState<
-    ManagedAccountSession[]
-  >([]);
-  const [sessionsBusy, setSessionsBusy] = useState(false);
-  const [sessionsError, setSessionsError] = useState("");
-  const [translations, setTranslations] = useState<Record<number, string>>({});
-  const [translationOriginals, setTranslationOriginals] = useState<
-    Record<number, boolean>
-  >({});
-  const [manuallyTranslated, setManuallyTranslated] = useState<Record<number, boolean>>({});
-  const [translationPending, setTranslationPending] = useState<Record<number, boolean>>({});
-  const [translationFailures, setTranslationFailures] = useState<Record<number, boolean>>({});
-  const translationInFlight = useRef(new Set<string>());
-  const translationAttempted = useRef(new Set<string>());
-  const [translationMenuOpen, setTranslationMenuOpen] = useState(false);
-  useEffect(() => {
-    if (!translationMenuOpen) return;
-    const onOutsidePointer = (event: PointerEvent) => {
-      if (
-        event.target instanceof Element &&
-        !event.target.closest(".translation-hub, .translation-dialog-modal, .translation-hub-scrim")
-      ) {
-        setTranslationMenuOpen(false);
-      }
-    };
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setTranslationMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", onOutsidePointer, true);
-    document.addEventListener("keydown", onEscape);
-    return () => {
-      document.removeEventListener("pointerdown", onOutsidePointer, true);
-      document.removeEventListener("keydown", onEscape);
-    };
-  }, [translationMenuOpen]);
-  const [languageSearch, setLanguageSearch] = useState("");
-  const [appLocale, setAppLocale] = useState(loadAppLocalePreference);
-  const [uiBundle, setUiBundle] = useState<UIBundle>(defaultBundle);
-  const [uiLocaleLoading, setUiLocaleLoading] = useState(false);
-  const [localePickerOpen, setLocalePickerOpen] = useState(false);
-  const [localeSearch, setLocaleSearch] = useState("");
-  const [translationPickerOpen, setTranslationPickerOpen] = useState(false);
   const [translationSettingsSearch, setTranslationSettingsSearch] =
     useState("");
-  const [targetLanguage, setTargetLanguage] = useState("en");
-  const translationLanguageRef = useRef(targetLanguage);
-
-  useEffect(() => {
-    translationAttempted.current.clear();
-    setManuallyTranslated({});
-    setTranslationPending({});
-    setTranslationFailures({});
-    setTranslationOriginals({});
-  }, [session?.sessionId, targetLanguage]);
-  const [autoTranslate, setAutoTranslate] = useState(true);
-  const [conversationTranslationOverrides, setConversationTranslationOverrides] = useState<ConversationTranslationSettingsMap>(
-    () => session?.user.id ? readConversationTranslationSettings(session.user.id) : {},
-  );
   useEffect(() => {
     setConversationTranslationOverrides(
       session?.user.id ? readConversationTranslationSettings(session.user.id) : {},
@@ -939,6 +779,8 @@ export default function App({
     pendingRequests,
     mutationRequests,
   } = useApiRequest({ session, sessionRef, sessionClient, responseCache });
+  const { privacy, privacyBusy, privacyError, privacyLoading, setPrivacy, setPrivacyBusy, setPrivacyError, setPrivacyRetry } = usePrivacySettings({ apiFetch, session });
+
 
   const {
     conversations,
@@ -1434,222 +1276,21 @@ export default function App({
       kind: kind || inferToastKind(clean),
     });
   }
+  const { connectUrl, copyInviteLink, openConnectSurface, shareMyProfile } = useInviteSharing({ session, setActiveConversationId, setFriendQuery, setNewChatMode, setNotice, setQuickCreateOpen, setTab });
 
-  function connectUrl(username = session?.user.username || "") {
-    const url = new URL(window.location.href);
-    url.hash = "";
-    url.search = "";
-    if (username) url.searchParams.set("connect", username);
-    return url.toString();
-  }
+  const { addComment, closeFeedPostDetails, createPost, like, loadProfilePosts, manageFeedComment, openFeedPostDetails, removeFeedPost, reportFeedComment, syncFeedPost } = useFeedActions({ actionLocks, apiFetch, feedCheckInLocation, feedCheckInOpen, feedRevision, feedScrollBeforeComments, feedViewRef, followingFeed, isProfileDesktop, mediaUploading, name, postAttachments, postBackground, postSearch, postText, postVisibility, profileLoadSequence, profilePagingBusy, profilePosts, refreshPosts, removeFeedDataPost, session, sessionRef, setActivePostId, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setLikePreviews, setNotice, setPendingComments, setPendingPost, setPostAttachments, setPostBackground, setPosts, setPostSubmitError, setPostText, setProfileComposerOpen, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setSavedPosts, setShowPostBackgrounds, syncFeedDataPost, tab });
 
-  function openConnectSurface(query = "") {
-    setTab("chat");
-    setActiveConversationId(null);
-    setQuickCreateOpen(false);
-    setNewChatMode("friends");
-    if (query) setFriendQuery(query.replace(/^@/, "").trim());
-  }
+  const { clearActiveConversationHistory, createDirect, createGroup, createGroupChannel, openDirectByUsername, selectGroupChannel } = useConversationActions({ actionLocks, activeChannelIdRef, activeConversation, activeConversationId, activeConversationIdRef, activeGroupMember, apiFetch, conversations, directUsername, groupChannelBusy, groupChannels, historyActionBusy, membershipEventSequence, membershipSnapshot, messageScrollAtBottom, refreshConversations, responseCache, revokedConversationIds, session, sessionRef, setActiveConversationId, setChannelSelection, setChatCreateError, setChatSearchJump, setConversationDetailsOpen, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setHistoryActionBusy, setMessageActionId, setMessages, setMessageSearchOpen, setNewChatMode, setNotice, setReplyingTo, setSharedContentOpen, setTab, setTranslations });
 
-  async function shareMyProfile() {
-    if (!session?.user.username) return;
-    const url = connectUrl(session.user.username);
-    const shareData = {
-      title: `Kết nối với @${session.user.username} trên SocCO`,
-      text: `Kết nối với ${session.user.displayName || "@" + session.user.username} trên SocCO`,
-      url,
-    };
-    try {
-      if (typeof navigator.share === "function") {
-        await navigator.share(shareData);
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      setNotice("Đã sao chép link hồ sơ SocCO.", "success");
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      setNotice("Không thể chia sẻ hồ sơ trên thiết bị này.", "error");
-    }
-  }
+  const { changeAppLocale, changeAutoTranslate, changeTargetLanguage, saveConversationTranslationSettings, translateMessage } = useTranslationActions({ activeChatTranslationSettings, activeConversationId, activeConversationIdRef, apiFetch, appLocale, autoTranslate, conversationTranslationOverrides, effectiveTargetLanguage, preferenceRevision, session, sessionRef, setAppLocale, setAutoTranslate, setConversationTranslationOverrides, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setManuallyTranslated, setNotice, setTargetLanguage, setTranslationFailures, setTranslationMenuOpen, setTranslationOriginals, setTranslationPending, setTranslationPickerOpen, setTranslations, setTranslationSettingsSearch, targetLanguage, translationAttempted, translationFailures, translationLanguageRef, translations });
 
-  async function copyInviteLink() {
-    if (!session?.user.username) return;
-    try {
-      await navigator.clipboard.writeText(connectUrl(session.user.username));
-      setNotice("Đã sao chép link kết nối SocCO.", "success");
-    } catch {
-      setNotice("Không sao chép được link trên trình duyệt này.", "error");
-    }
-  }
+  const { addChatFiles, addFeedFiles, setMessageAttachments, uploadMediaFiles } = useMediaUploads({ activeConversationId, apiFetch, channelDraftKey, mediaUploadAbort, mediaUploading, messageAttachments, messageSending, pendingPost, postAttachments, selectedChannelId, session, sessionRef, setChannelDrafts, setMediaUploading, setMediaUploadProgress, setMessageDrafts, setNotice, setPostAttachments });
 
-  function cancelConversationLongPress() {
-    if (conversationLongPress.current) {
-      window.clearTimeout(conversationLongPress.current.timer);
-      conversationLongPress.current = null;
-    }
-  }
+  const { copyMessageContent } = useMessageClipboard({ setMessageActionId, setNotice });
 
-  function beginConversationLongPress(id: number, x: number, y: number) {
-    cancelConversationLongPress();
-    suppressConversationClick.current = null;
-    const timer = window.setTimeout(() => {
-      if (conversationLongPress.current?.id !== id) return;
-      conversationLongPress.current = null;
-      suppressConversationClick.current = id;
-      setConversationMenuPosition(null);
-      setConversationActionId(id);
-    }, 550);
-    conversationLongPress.current = { id, x, y, timer };
-  }
+  const { installApp, previewMessageSound, sendTestPush, syncPushState, toggleMessageSound, togglePush } = usePushSettings({ apiFetch, installPrompt, isStandalone, messageSound, messageSoundEnabledRef, pushAppId, pushBusy, pushConfigured, pushEnabled, pushInitFailed, session, setInstallPrompt, setMessageSoundEnabled, setNotice, setPushBusy, setPushEnabled, setPushInitFailed, setPushPrompt });
 
-  function moveConversationLongPress(x: number, y: number) {
-    const start = conversationLongPress.current;
-    if (start && Math.hypot(x - start.x, y - start.y) > 12) cancelConversationLongPress();
-  }
-
-  function cancelMessageLongPress() {
-    if (messageLongPressTimer.current !== null) {
-      window.clearTimeout(messageLongPressTimer.current);
-      messageLongPressTimer.current = null;
-    }
-    messageLongPressStart.current = null;
-  }
-
-  function openMessageActions(
-    message: Message,
-    target: EventTarget | null = null,
-  ) {
-    if (message.deleted) return;
-    cancelMessageLongPress();
-    const element =
-      target instanceof Element
-        ? target
-        : target instanceof Node
-          ? target.parentElement
-          : null;
-    setMessageCopyTarget(resolveMessageCopyTarget(message, element));
-    setMessageActionMode('actions');
-    setMessageActionId(message.id);
-    navigator.vibrate?.(24);
-  }
-
-  function openMessageReactions(message: Message) {
-    if (message.deleted) return;
-    cancelMessageLongPress();
-    setMessageCopyTarget(null);
-    setMessageActionMode('reactions');
-    setMessageActionId(message.id);
-  }
-
-  function beginMessageLongPress(
-    message: Message,
-    x: number,
-    y: number,
-    button: number,
-    pointerType: string,
-    target: EventTarget | null,
-  ) {
-    // Mouse users keep native text selection and the existing right-click menu.
-    if (message.deleted || button !== 0 || pointerType === "mouse") return;
-    const element =
-      target instanceof Element
-        ? target
-        : target instanceof Node
-          ? target.parentElement
-          : null;
-    if (element?.closest("button,input,textarea,select,video,audio")) return;
-    // Only touch-holding the bubble (including text, links and attachments)
-    // opens the sheet; holding the avatar or empty timeline does not.
-    if (!element?.closest(".bubble, .chat-message-media, .message-reply-quote")) return;
-    if (element.closest("a") && !element.closest("a.message-inline-link, .media-item")) return;
-    cancelMessageLongPress();
-    suppressMessageClick.current = null;
-    messageLongPressStart.current = { x, y, messageId: message.id };
-    messageLongPressTimer.current = window.setTimeout(() => {
-      if (messageLongPressStart.current?.messageId === message.id) {
-        suppressMessageClick.current = message.id;
-        openMessageActions(message, target);
-      }
-    }, 500);
-  }
-
-  function moveMessageLongPress(x: number, y: number) {
-    const start = messageLongPressStart.current;
-    if (!start) return;
-    if (Math.hypot(x - start.x, y - start.y) > 12) cancelMessageLongPress();
-  }
-
-  async function copyMessage(message: Message) {
-    const content = message.text.trim();
-    setMessageActionId(null);
-    if (!content) return;
-    try {
-      await navigator.clipboard.writeText(content);
-      setNotice("Đã sao chép tin nhắn.", "success");
-    } catch {
-      setNotice("Không sao chép được tin nhắn trên trình duyệt này.", "error");
-    }
-  }
-
-  async function copyMessageImage(attachment: MediaAttachment) {
-    setMessageActionId(null);
-    if (!attachment.url) return;
-    try {
-      await copyChatImage(attachment.url);
-      setNotice("Đã sao chép ảnh. Bạn có thể dán bằng Cmd/Ctrl+V.", "success");
-    } catch (error) {
-      const reason =
-        error instanceof Error
-          ? error.message
-          : "Trình duyệt không cho phép đọc hoặc sao chép ảnh.";
-      setNotice(`Không sao chép được ảnh. ${reason}`, "error");
-    }
-  }
-
-  async function copyMessageLink(link: string) {
-    setMessageActionId(null);
-    try {
-      await navigator.clipboard.writeText(link);
-      setNotice("Đã sao chép liên kết.", "success");
-    } catch {
-      setNotice("Không sao chép được liên kết trên trình duyệt này.", "error");
-    }
-  }
-
-  async function copyMessageContent(
-    message: Message,
-    target: MessageCopyTarget,
-  ) {
-    if (target.kind === "image") return copyMessageImage(target.attachment);
-    if (target.kind === "unavailable-link") {
-      setMessageActionId(null);
-      setNotice(
-        `Tệp "${target.name}" hiện không có liên kết tải xuống.`,
-        "warning",
-      );
-      return;
-    }
-    if (target.kind === "file-name") {
-      setMessageActionId(null);
-      try {
-        await navigator.clipboard.writeText(target.name);
-        setNotice("Đã sao chép tên tệp.", "success");
-      } catch {
-        setNotice("Không sao chép được tên tệp.", "error");
-      }
-      return;
-    }
-    if (target.kind === "link") {
-      await copyMessageLink(target.url);
-      if (target.temporary)
-        setNotice(
-          "Đã sao chép liên kết tải tệp. Liên kết này có thời hạn.",
-          "success",
-        );
-      return;
-    }
-    return copyMessage(message);
-  }
+  const { findNearby, stopNearby } = useNearbyDiscovery({ apiFetch, nearbyBusy, nearbyRadiusKm, nearbyRequest, session, sessionRef, setNearbyBusy, setNearbyResultRadiusKm, setNearbyScanning, setNearbyUntil, setNearbyUsers, setNotice });
 
   useEffect(() => {
     if (!notice) return;
@@ -1735,36 +1376,6 @@ export default function App({
     }));
   }
 
-  function setMessageAttachments(update: SetStateAction<MediaAttachment[]>) {
-    if (!activeConversationId) return;
-    if (selectedChannelId > 0) {
-      setChannelDrafts(current => {
-        const previous = current[channelDraftKey] ?? emptyDraft;
-        return {
-          ...current,
-          [channelDraftKey]: {
-            ...previous,
-            attachments: typeof update === 'function' ? update(previous.attachments) : update,
-          },
-        };
-      });
-      return;
-    }
-    setMessageDrafts((current) => {
-      const previous = current[activeConversationId] ?? emptyDraft;
-      return {
-        ...current,
-        [activeConversationId]: {
-          ...previous,
-          attachments:
-            typeof update === "function"
-              ? update(previous.attachments)
-              : update,
-        },
-      };
-    });
-  }
-
   useEffect(() => {
     const navigatorWithStandalone = navigator as Navigator & {
       standalone?: boolean;
@@ -1791,26 +1402,6 @@ export default function App({
       window.removeEventListener("appinstalled", handleInstalled);
     };
   }, []);
-
-  async function installApp() {
-    if (isStandalone) return;
-
-    if (installPrompt) {
-      await installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-      if (choice.outcome === "accepted") {
-        setInstallPrompt(null);
-      }
-      return;
-    }
-
-    const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    setNotice(
-      isiOS
-        ? "Trên iPhone: bấm Chia sẻ trong Safari → Thêm vào Màn hình chính"
-        : "Mở menu trình duyệt → Cài đặt ứng dụng / Add to Home screen",
-    );
-  }
 
   function saveSession(next: Session) {
     if (isDesktopBuild) {
@@ -1975,471 +1566,6 @@ export default function App({
     void loadProfileMedia().catch(() => setStatus("Đang kết nối lại..."));
   }, [session?.sessionId]);
 
-  async function findNearby() {
-    if (!session || nearbyBusy) return;
-    const request = ++nearbyRequest.current;
-    const sessionId = session.sessionId;
-    setNearbyBusy(true);
-    setNearbyScanning(true);
-    try {
-      const position = await getCurrentPositionSmart();
-      if (
-        request !== nearbyRequest.current ||
-        sessionRef.current?.sessionId !== sessionId
-      )
-        return;
-      const { latitude, longitude } = position.coords;
-      if (
-        !Number.isFinite(latitude) ||
-        !Number.isFinite(longitude) ||
-        Math.abs(latitude) > 85.05112878 ||
-        Math.abs(longitude) > 180
-      ) {
-        throw new Error(
-          "Tọa độ trình duyệt không hợp lệ. Kiểm tra Latitude (vĩ độ) và Longitude (kinh độ) trong cài đặt vị trí giả lập nếu đang dùng.",
-        );
-      }
-      const response = await apiFetch("/api/users/nearby", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          latitude,
-          longitude,
-          radiusKm: nearbyRadiusKm,
-        }),
-      });
-      if (
-        request !== nearbyRequest.current ||
-        sessionRef.current?.sessionId !== sessionId
-      )
-        return;
-      if (!response.ok)
-        throw new Error(
-          response.status === 429
-            ? "Chờ 10 giây trước khi tìm lại."
-            : "Không tìm được bạn quanh đây. Thử lại sau.",
-        );
-      const result = (await response.json()) as {
-        users: FriendSearchResult[];
-        expiresAt: string;
-        cacheExpiresAt?: string;
-        radiusKm?: number;
-      };
-      if (
-        request !== nearbyRequest.current ||
-        sessionRef.current?.sessionId !== sessionId
-      )
-        return;
-      setNearbyUsers(result.users);
-      setNearbyResultRadiusKm(nearbyRadiusKm);
-      setNearbyUntil(Date.parse(result.expiresAt));
-      setNotice(
-        result.users.length
-          ? `Quét thành công: tìm thấy ${result.users.length} người trong bán kính ${nearbyRadiusKm} km.`
-          : `Quét thành công nhưng chưa tìm thấy người dùng trong bán kính ${nearbyRadiusKm} km.`,
-        result.users.length ? "success" : "info",
-      );
-    } catch (error) {
-      if (request !== nearbyRequest.current) return;
-      setNotice(await geolocationErrorMessage(error), "error");
-    } finally {
-      if (request === nearbyRequest.current) {
-        setNearbyBusy(false);
-        setNearbyScanning(false);
-      }
-    }
-  }
-
-  async function stopNearby() {
-    if (!session || nearbyBusy) return;
-    const request = ++nearbyRequest.current;
-    setNearbyBusy(true);
-    try {
-      const response = await apiFetch("/api/users/nearby", {
-        method: "DELETE",
-      });
-      if (request !== nearbyRequest.current) return;
-      if (!response.ok)
-        throw new Error("Chưa tắt được Quanh đây. Thử lại sau.");
-      setNearbyUntil(0);
-      setNearbyUsers([]);
-      setNotice("Đã tắt Quanh đây và xóa cache vị trí gần nhất.", "success");
-    } catch (error) {
-      if (request !== nearbyRequest.current) return;
-      setNotice(
-        error instanceof Error
-          ? error.message
-          : "Mất kết nối. Chưa xác nhận đã tắt Quanh đây.",
-        "error",
-      );
-    } finally {
-      if (request === nearbyRequest.current) setNearbyBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!nearbyUntil) return;
-    const timer = window.setTimeout(
-      () => {
-        // Keep the last scan results visible from the longer server-side cache.
-        // Only the short "active nearby" lease expires here.
-        setNearbyUntil(0);
-      },
-      Math.max(0, nearbyUntil - Date.now()),
-    );
-    return () => window.clearTimeout(timer);
-  }, [nearbyUntil]);
-
-
-  async function uploadMediaFiles(
-    files: File[],
-    scope: "chat" | "feed" | "story" | "profile",
-  ) {
-    if (!files.length) return [] as MediaAttachment[];
-    if (mediaUploadAbort.current)
-      throw new Error(
-        "Đang tải tệp khác. Hãy hoàn tất hoặc hủy trước khi tải tiếp.",
-      );
-    const sessionId = session?.sessionId;
-    const controller = new AbortController();
-    mediaUploadAbort.current = controller;
-    setMediaUploading(scope);
-    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-    const loadedBytes = files.map(() => 0);
-    setMediaUploadProgress({ loaded: 0, total: Math.max(1, totalBytes) });
-    let lastReport = 0;
-
-    function trackProgress(index: number, loaded: number) {
-      if (mediaUploadAbort.current !== controller) return;
-      loadedBytes[index] = Math.min(files[index].size, Math.max(0, loaded));
-      const now = performance.now();
-      if (loadedBytes[index] < files[index].size && now - lastReport < 120)
-        return;
-      lastReport = now;
-      setMediaUploadProgress({
-        loaded: loadedBytes.reduce((sum, value) => sum + value, 0),
-        total: Math.max(1, totalBytes),
-      });
-    }
-
-    try {
-      const result = new Array<MediaAttachment>(files.length);
-      let nextIndex = 0;
-      const workerCount = Math.min(4, files.length);
-
-      async function worker() {
-        try {
-          while (true) {
-            if (controller.signal.aborted)
-              throw new DOMException("Đã hủy tải tệp.", "AbortError");
-            const index = nextIndex++;
-            if (index >= files.length) return;
-
-            const file = files[index];
-            const contentType = file.type || "application/octet-stream";
-            const presignResponse = await apiFetch("/api/media/presign", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                scope,
-                name: file.name,
-                sizeBytes: file.size,
-                contentType,
-              }),
-              signal: controller.signal,
-            });
-            if (controller.signal.aborted)
-              throw new DOMException("Đã hủy tải tệp.", "AbortError");
-            const ticket = (await presignResponse.json().catch(() => null)) as
-              | (PresignedUpload & { error?: string })
-              | null;
-            if (!presignResponse.ok || !ticket?.uploadUrl) {
-              throw new Error(
-                ticket?.error ||
-                  "Không cấp được quyền upload file. Hãy kiểm tra cấu hình S3.",
-              );
-            }
-
-            await uploadPresignedFile(
-              ticket.uploadUrl,
-              file,
-              contentType,
-              controller.signal,
-              (loaded) => trackProgress(index, loaded),
-            );
-            if (controller.signal.aborted)
-              throw new DOMException("Đã hủy tải tệp.", "AbortError");
-            result[index] = {
-              storageRef: ticket.storageRef,
-              name: file.name,
-              sizeBytes: file.size,
-              contentType,
-              kind: ticket.kind,
-              // Pending chat media uses a local preview. Never persist/reuse
-              // the raw S3 GET URL from the upload ticket.
-              url: scope === "chat" ? URL.createObjectURL(file) : ticket.downloadUrl,
-            };
-          }
-        } catch (error) {
-          controller.abort();
-          throw error;
-        }
-      }
-
-      const outcomes = await Promise.allSettled(
-        Array.from({ length: workerCount }, () => worker()),
-      );
-      const errors = outcomes.filter(
-        (outcome): outcome is PromiseRejectedResult =>
-          outcome.status === "rejected",
-      );
-      const firstError =
-        errors.find(
-          (item) =>
-            !(
-              item.reason instanceof DOMException &&
-              item.reason.name === "AbortError"
-            ),
-        ) ?? errors[0];
-      if (firstError) throw firstError.reason;
-      return result;
-    } finally {
-      if (mediaUploadAbort.current === controller) {
-        mediaUploadAbort.current = null;
-        setMediaUploadProgress(null);
-        if (sessionRef.current?.sessionId === sessionId)
-          setMediaUploading(null);
-      }
-    }
-  }
-
-  async function addChatFiles(files: File[]) {
-    if (!files.length) return;
-    if (!activeConversationId) {
-      setNotice("Chọn hội thoại trước khi đính kèm tệp.", "warning");
-      return;
-    }
-    if (mediaUploading || messageSending || mediaUploadAbort.current) {
-      setNotice(
-        "Hãy hoàn tất hoặc hủy tác vụ hiện tại trước khi thêm tệp.",
-        "warning",
-      );
-      return;
-    }
-    const conversationId = activeConversationId;
-    const channelId = selectedChannelId;
-    const channelKey = channelDraftKey;
-    const sessionId = session?.sessionId;
-    const remaining = Math.max(0, 10 - messageAttachments.length);
-    if (remaining === 0) {
-      setNotice("Mỗi tin nhắn tối đa 10 file đính kèm.");
-      return;
-    }
-    const selected = files.slice(0, remaining);
-    if (selected.length < files.length)
-      setNotice("Mỗi tin nhắn tối đa 10 file đính kèm.");
-    try {
-      const uploaded = await uploadMediaFiles(selected, "chat");
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (channelId > 0) {
-        setChannelDrafts(current => {
-          const previous = current[channelKey] ?? emptyDraft;
-          return {
-            ...current,
-            [channelKey]: { ...previous, attachments: [...previous.attachments, ...uploaded].slice(0, 10) },
-          };
-        });
-      } else {
-        setMessageDrafts((current) => {
-          const previous = current[conversationId] ?? emptyDraft;
-          return {
-            ...current,
-            [conversationId]: {
-              ...previous,
-              attachments: [...previous.attachments, ...uploaded].slice(0, 10),
-            },
-          };
-        });
-      }
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId)
-        setNotice(
-          error instanceof Error ? error.message : "Không upload được file",
-        );
-    }
-  }
-
-  async function addFeedFiles(files: File[]) {
-    if (!files.length || pendingPost || mediaUploading) return;
-    const sessionId = session?.sessionId;
-    const remaining = Math.max(0, 12 - postAttachments.length);
-    if (remaining === 0) {
-      setNotice("Mỗi bài viết tối đa 12 ảnh/video.");
-      return;
-    }
-    const selected = files.slice(0, remaining);
-    if (selected.length < files.length)
-      setNotice("Mỗi bài viết tối đa 12 ảnh/video.");
-    try {
-      const uploaded = await uploadMediaFiles(selected, "feed");
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      setPostAttachments((current) => [...current, ...uploaded].slice(0, 12));
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId)
-        setNotice(
-          error instanceof Error ? error.message : "Không upload được media",
-        );
-    }
-  }
-
-  async function createStory(file?: File) {
-    if (!file || storyBusy || mediaUploading) return;
-    const sessionId = session?.sessionId;
-    setStoryBusy(true);
-    try {
-      const [attachment] = await uploadMediaFiles([file], "story");
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      const response = await apiFetch("/api/stories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attachment: attachmentRequestBody(attachment) }),
-      });
-      const result = (await response.json().catch(() => null)) as
-        | (Story & { error?: string })
-        | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (!response.ok || !result?.id || !result.attachment)
-        throw new Error(result?.error || "Không đăng được Story");
-      setStories((current) => [
-        result,
-        ...current.filter((item) => item.id !== result.id),
-      ]);
-      setActiveStoryId(result.id);
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId)
-        setNotice(
-          error instanceof Error ? error.message : "Không đăng được Story",
-        );
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) setStoryBusy(false);
-    }
-  }
-
-  async function deleteStory(story: Story) {
-    if (story.author !== name || storyBusy || !window.confirm("Xóa Story này?"))
-      return;
-    const sessionId = session?.sessionId;
-    setStoryBusy(true);
-    try {
-      const response = await apiFetch(`/api/stories/${story.id}`, {
-        method: "DELETE",
-      });
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (!response.ok) throw new Error("Không xóa được Story");
-      setStories((current) => current.filter((item) => item.id !== story.id));
-      setActiveStoryId((current) => (current === story.id ? null : current));
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId)
-        setNotice(
-          error instanceof Error ? error.message : "Không xóa được Story",
-        );
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) setStoryBusy(false);
-    }
-  }
-
-  async function replyToStory(story: Story, message: string): Promise<boolean> {
-    const content = message.trim();
-    if (!content || !sessionRef.current || story.author === sessionRef.current.user.username)
-      return false;
-
-    let queued = false;
-    await openDirectByUsername(story.author, undefined, (conversation) => {
-      const item: QueuedChatMessage = {
-        clientId: crypto.randomUUID(),
-        conversationId: conversation.id,
-        text: `↪️ Trả lời Story (${new Date(story.createdAt).toLocaleString("vi-VN", {
-          day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-        })})\n${content}`,
-        attachments: [],
-        createdAt: new Date().toISOString(),
-        status: "queued",
-      };
-      const next = updateChatOutbox((items) => enqueueChatMessage(items, item));
-      if (!next.some((pending) => pending.clientId === item.clientId)) {
-        setNotice("Không thể lưu phản hồi Story vào hàng đợi. Nội dung vẫn được giữ lại.", "warning");
-        return;
-      }
-      queued = true;
-      ownSendScrollConversation.current = conversation.id;
-      setActiveStoryId(null);
-      if (navigator.onLine) void retryQueuedChatMessages();
-      else setChatOnline(false);
-    });
-    return queued;
-  }
-
-  async function shareStory(story: Story) {
-    const url = story.attachment.url;
-    if (!url) {
-      setNotice("Không có đường dẫn Story để chia sẻ.");
-      return;
-    }
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: "Khoảnh khắc của " + userLabel(story.authorDisplayName, story.author),
-          url,
-        });
-      } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-        setNotice("Đã sao chép liên kết media của Story (liên kết có thể hết hạn).");
-      } else {
-        setNotice("Trình duyệt không hỗ trợ chia sẻ liên kết Story.");
-      }
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError"))
-        setNotice("Không thể chia sẻ Story. Vui lòng thử lại.");
-    }
-  }
-
-  async function reportStory(story: Story) {
-    const answer = window.prompt("Nhập lý do báo cáo Story (5–500 ký tự):");
-    if (answer === null) return;
-    const reason = answer.trim();
-    const length = Array.from(reason).length;
-    if (length < 5 || length > 500) {
-      setNotice("Lý do báo cáo cần từ 5 đến 500 ký tự.");
-      return;
-    }
-    try {
-      const response = await apiFetch("/api/feed/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetType: "story",
-          targetId: story.id,
-          reason,
-        }),
-      });
-      if (!response.ok) throw new Error("Không gửi được báo cáo Story.");
-      setNotice("Đã gửi báo cáo Story.");
-    } catch {
-      setNotice("Không thể báo cáo Story. Vui lòng thử lại.");
-    }
-  }
-
-  async function syncPushState(state: PushState) {
-    if (!session?.token || !state.subscriptionId) return;
-
-    const response = await apiFetch("/api/push/subscription", {
-      method: state.optedIn ? "POST" : "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscriptionId: state.subscriptionId }),
-    });
-    if (!response.ok) throw new Error("Không lưu được đăng ký thông báo.");
-  }
-
   useEffect(() => {
     if (!session?.token) {
       setTranslationPreferencesLoaded(false);
@@ -2553,75 +1679,6 @@ export default function App({
       cancelled = true;
     };
   }, [session?.sessionId]);
-
-  async function savePreferences(
-    nextTarget: string,
-    nextAuto: boolean,
-    nextAppLocale: string,
-  ) {
-    if (!session?.token) return;
-    const sessionId = session.sessionId;
-    const revision = ++preferenceRevision.current;
-    const preferenceKey = `chatnet-preferences:${session.user.id}`;
-    localStorage.setItem(
-      preferenceKey,
-      JSON.stringify({
-        targetLanguage: nextTarget,
-        autoTranslate: nextAuto,
-        appLocale: nextAppLocale,
-      }),
-    );
-    const save = async () => {
-      if (
-        sessionRef.current?.sessionId !== sessionId ||
-        revision !== preferenceRevision.current
-      )
-        return;
-      const response = await apiFetch("/api/preferences", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetLanguage: nextTarget,
-          autoTranslate: nextAuto,
-          appLocale: nextAppLocale,
-        }),
-      });
-      if (
-        !response.ok &&
-        sessionRef.current?.sessionId === sessionId &&
-        revision === preferenceRevision.current
-      ) {
-        setNotice(
-          "Cài đặt đã áp dụng trên máy này nhưng chưa đồng bộ được. Chọn lại cài đặt để thử lại.",
-          "warning",
-        );
-      }
-    };
-    preferenceQueue.current = preferenceQueue.current
-      .catch(() => undefined)
-      .then(save);
-    await preferenceQueue.current;
-  }
-
-  async function saveTranslationPreferences(
-    nextTarget: string,
-    nextAuto: boolean,
-  ) {
-    await savePreferences(nextTarget, nextAuto, appLocale);
-  }
-
-  async function changeAppLocale(nextLocale: string) {
-    const normalized =
-      nextLocale === "auto" ? "auto" : nextLocale.toLowerCase().split("-")[0];
-    if (normalized !== "auto" && !isSupportedLanguageCode(normalized)) return;
-    setAppLocale(normalized);
-    saveAppLocalePreference(normalized);
-    setLocalePickerOpen(false);
-    setLocaleSearch("");
-    if (session?.token) {
-      await savePreferences(targetLanguage, autoTranslate, normalized);
-    }
-  }
 
   useEffect(() => {
     document.documentElement.lang = effectiveAppLocale;
@@ -2805,149 +1862,6 @@ export default function App({
     };
   }, [session?.sessionId]);
 
-  async function sendTestPush(silent = false, force = false) {
-    if (!pushConfigured || (!pushEnabled && !force) || (pushBusy && !force))
-      return false;
-
-    const response = await apiFetch("/api/push/test", { method: "POST" });
-    const result = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      if (!silent) {
-        setNotice(
-          result.error === "no push subscription registered"
-            ? "Thiết bị chưa có Push Subscription hợp lệ."
-            : result.error || "Không gửi được thông báo test.",
-        );
-      }
-      return false;
-    }
-
-    if (!silent) {
-      setNotice(
-        `Đã gửi thông báo test tới ${result.recipients || 1} thiết bị.`,
-      );
-    }
-    return true;
-  }
-
-  async function previewMessageSound() {
-    const played = await messageSound.current?.preview();
-    if (!played)
-      setNotice(
-        "Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SocCO.",
-        "warning",
-      );
-  }
-
-  function toggleMessageSound() {
-    const enabled = !messageSoundEnabledRef.current;
-    messageSoundEnabledRef.current = enabled;
-    setMessageSoundEnabled(enabled);
-    persistMessageSoundEnabled(enabled);
-    if (enabled) void previewMessageSound();
-  }
-
-  async function togglePush() {
-    if (pushBusy) return;
-
-    if (!pushConfigured || !pushAppId) {
-      setNotice(
-        "Hệ thống thông báo chưa sẵn sàng. Vui lòng thử lại sau vài giây.",
-      );
-      return;
-    }
-
-    if (pushInitFailed) {
-      try {
-        const state = await setupOneSignal(pushAppId, async (nextState) => {
-          setPushEnabled(nextState.optedIn);
-          await syncPushState(nextState);
-        });
-        setPushInitFailed(false);
-        setPushEnabled(state.optedIn);
-        await syncPushState(state);
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        setNotice(`Không khởi tạo được Push Notification: ${detail}`);
-        return;
-      }
-    }
-
-    const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    if (isiOS && !isStandalone && !pushEnabled) {
-      setNotice(
-        "Trên iPhone: thêm SocCO vào Màn hình chính trước, rồi mở app và bật thông báo.",
-      );
-      return;
-    }
-
-    setPushBusy(true);
-    try {
-      const state = pushEnabled
-        ? await disableOneSignalPush()
-        : await enableOneSignalPush();
-
-      setPushEnabled(state.optedIn);
-      setPushPrompt(
-        state.supported && state.permission === "default" && !isPushDisabled(),
-      );
-      await syncPushState(state);
-
-      if (state.permission === "denied") {
-        setNotice(
-          "Thông báo đang bị chặn. Hãy mở cài đặt của trình duyệt/PWA → Notifications → Allow rồi quay lại SocCO.",
-        );
-      } else if (state.permission === "unsupported") {
-        setNotice("Thiết bị hoặc trình duyệt này chưa hỗ trợ Web Push.");
-      } else if (!pushEnabled && !state.optedIn) {
-        setNotice(
-          "Chưa bật được thông báo. Vui lòng thử lại và chọn Cho phép.",
-        );
-      } else if (state.optedIn) {
-        setNotice("Đã bật thông báo SocCO.");
-      } else {
-        setNotice("Đã tắt thông báo SocCO");
-      }
-    } catch {
-      setNotice(
-        "Không thể bật thông báo. Kiểm tra quyền Notification của trình duyệt/PWA rồi thử lại.",
-      );
-    } finally {
-      setPushBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!session?.token) {
-      setPrivacy(null);
-      setPrivacyError("");
-      setPrivacyLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    setPrivacy(null);
-    setPrivacyBusy(false);
-    setPrivacyLoading(true);
-    setPrivacyError("");
-    apiFetch("/api/privacy", { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Không thể tải quyền riêng tư.");
-        return response.json() as Promise<UserPrivacy>;
-      })
-      .then((value) => {
-        if (!controller.signal.aborted) setPrivacy(value);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted)
-          setPrivacyError("Không thể tải cài đặt riêng tư.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setPrivacyLoading(false);
-      });
-    return () => controller.abort();
-  }, [session?.sessionId, privacyRetry]);
-
   async function changePrivacy(key: keyof UserPrivacy) {
     if (!privacy || privacyBusy) return;
     await savePrivacy({ ...privacy, [key]: !privacy[key] });
@@ -2982,105 +1896,6 @@ export default function App({
     }
   }
 
-  useEffect(() => {
-    setManagedSessions([]);
-    setSessionsOpen(false);
-    setSessionsBusy(false);
-    setSessionsError("");
-  }, [session?.sessionId]);
-
-  async function fetchAccountSessions() {
-    const current = sessionRef.current;
-    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy)
-      return;
-    const identity = current.sessionId;
-    setSessionsBusy(true);
-    setSessionsError("");
-    try {
-      let data: ManagedAccountSession[];
-      if (isDesktopBuild) {
-        data = await desktopBridge().auth.listSessions(identity);
-      } else {
-        const response = await fetch(`${API}/api/auth/sessions/list`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          cache: "no-store",
-          body: JSON.stringify({ refreshToken: current.refreshToken }),
-        });
-        if (!response.ok) throw new Error("Không tải được phiên đăng nhập.");
-        data = (await response.json()) as ManagedAccountSession[];
-      }
-      if (sessionRef.current?.sessionId === identity) {
-        setManagedSessions(data);
-        setSessionsOpen(true);
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === identity) {
-        setSessionsError("Không thể tải các thiết bị. Vui lòng thử lại.");
-      }
-    } finally {
-      if (sessionRef.current?.sessionId === identity) setSessionsBusy(false);
-    }
-  }
-
-  async function revokeAccountSessions(sessionID?: string) {
-    const current = sessionRef.current;
-    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy)
-      return;
-    const identity = current.sessionId;
-    const selected = managedSessions.find((item) => item.id === sessionID);
-    if (sessionID && !selected) return;
-    const message = sessionID
-      ? selected?.current
-        ? "Bạn muốn đăng xuất khỏi thiết bị này?"
-        : "Bạn muốn thu hồi phiên đăng nhập trên thiết bị đã chọn?"
-      : "Bạn muốn đăng xuất tất cả thiết bị khác?";
-    if (!window.confirm(message)) return;
-    setSessionsBusy(true);
-    setSessionsError("");
-    try {
-      if (isDesktopBuild) {
-        const nativeAuth = desktopBridge().auth;
-        const revoked = sessionID
-          ? await nativeAuth.revokeSession(identity, sessionID)
-          : await nativeAuth.revokeOthers(identity);
-        if (!revoked) throw new Error("Không thu hồi được phiên đăng nhập.");
-      } else {
-        const response = await fetch(
-          `${API}/api/auth/sessions/${sessionID ? "revoke" : "revoke-others"}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            cache: "no-store",
-            body: JSON.stringify({
-              refreshToken: current.refreshToken,
-              ...(sessionID ? { sessionId: sessionID } : {}),
-            }),
-          },
-        );
-        if (!response.ok)
-          throw new Error("Không thu hồi được phiên đăng nhập.");
-      }
-      if (sessionRef.current?.sessionId !== identity) return;
-      if (selected?.current) {
-        logout(false);
-      } else {
-        setManagedSessions((items) =>
-          sessionID
-            ? items.filter((item) => item.id !== sessionID)
-            : items.filter((item) => item.current),
-        );
-        setNotice("Đã thu hồi phiên đăng nhập được chọn.");
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === identity) {
-        setSessionsError("Không thu hồi được phiên. Vui lòng thử lại.");
-      }
-    } finally {
-      if (sessionRef.current?.sessionId === identity) setSessionsBusy(false);
-    }
-  }
-
   const contactQuery = friendQuery
     .trim()
     .replace(/^@/, "")
@@ -3104,427 +1919,6 @@ export default function App({
     if (request?.direction === "incoming") return "incoming" as const;
     if (request?.direction === "outgoing") return "outgoing" as const;
     return "none" as const;
-  }
-
-  async function actOnFriend(
-    friend: FriendSearchResult | FriendConnection,
-    decline = false,
-  ) {
-    const sessionId = session?.sessionId;
-    if (
-      !sessionId ||
-      friendActionRef.current.has(friend.id) ||
-      friend.id === session.user.id
-    )
-      return;
-    const relationship = friendRelationship(friend.id);
-    if (decline && relationship !== "incoming") return;
-    if (relationship === "accepted") {
-      const contact = friends.find((item) => item.id === friend.id);
-      if (contact?.blockedByMe || contact?.blockedByOther) {
-        await openBlockedFriendConversation(friend.id);
-      } else if (friend.username) {
-        await openDirectByUsername(friend.username);
-      }
-      return;
-    }
-
-    friendActionRef.current.add(friend.id);
-    setFriendBusyIds((current) => new Set(current).add(friend.id));
-    ++friendSyncRequest.current;
-    setFriendActionBusy(friend.id);
-    try {
-      const removing = decline || relationship === "outgoing";
-      const method = removing ? "DELETE" : "POST";
-      const path = removing
-        ? `/api/friends/${friend.id}?direction=${relationship}`
-        : relationship === "incoming"
-          ? `/api/friends/${friend.id}/accept`
-          : `/api/friends/${friend.id}`;
-      const response = await apiFetch(path, { method });
-      const result = (await response.json().catch(() => null)) as
-        | (FriendConnection & { error?: string })
-        | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      ++friendSyncRequest.current;
-      if (!response.ok) {
-        setNotice(result?.error || "Không cập nhật được lời mời kết bạn");
-        await refreshFriendConnections();
-        return;
-      }
-      const label = friend.displayName || `@${friend.username}`;
-      if (removing) {
-        setFriendRequests((current) =>
-          current.filter((item) => item.id !== friend.id),
-        );
-        setNotice(
-          decline ? "Đã từ chối lời mời kết bạn" : "Đã hủy lời mời kết bạn",
-        );
-      } else if (result?.id === friend.id && result.status === "accepted") {
-        setFriends((current) => [
-          ...current.filter((item) => item.id !== friend.id),
-          result,
-        ]);
-        setFriendRequests((current) =>
-          current.filter((item) => item.id !== friend.id),
-        );
-        setNotice(`Đã kết bạn với ${label}`);
-      } else if (result?.id === friend.id && result.status === "pending") {
-        setFriendRequests((current) => [
-          ...current.filter((item) => item.id !== friend.id),
-          result,
-        ]);
-        setNotice(
-          result.direction === "incoming"
-            ? `${label} cũng đã gửi lời mời. Bạn có thể chấp nhận ngay.`
-            : `Đã gửi lời mời kết bạn tới ${label}`,
-        );
-      } else {
-        await refreshFriendConnections();
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) {
-        setNotice(
-          "Không cập nhật được lời mời kết bạn. Kiểm tra kết nối rồi thử lại.",
-        );
-        await refreshFriendConnections();
-      }
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        friendActionRef.current.delete(friend.id);
-        setFriendBusyIds((current) => {
-          const next = new Set(current);
-          next.delete(friend.id);
-          return next;
-        });
-        setFriendActionBusy(
-          friendActionRef.current.values().next().value ?? null,
-        );
-      }
-    }
-  }
-
-  async function changePersonalContact(
-    friend: FriendConnection,
-    field: "nickname" | "note" | "favorite",
-  ) {
-    const sid = session?.sessionId;
-    if (!sid || friendBusyIds.has(friend.id)) return;
-    const previous = contactMetadata[friend.id] || {
-      nickname: "",
-      note: "",
-      favorite: false,
-    };
-    const next = { ...previous };
-    if (field === "favorite") {
-      next.favorite = !next.favorite;
-    } else {
-      const label =
-        field === "nickname"
-          ? "Biệt danh riêng (tối đa 60 ký tự)"
-          : "Ghi chú riêng (tối đa 1500 ký tự)";
-      const answer = window.prompt(label, previous[field]);
-      if (answer === null) return;
-      next[field] = answer.trim();
-      if (next[field].length > (field === "nickname" ? 60 : 1500)) {
-        setNotice("Nội dung vượt quá độ dài cho phép.", "warning");
-        return;
-      }
-    }
-    setFriendMenuId(null);
-    setFriendBusyIds((ids) => new Set(ids).add(friend.id));
-    try {
-      const response = await apiFetch(`/api/contacts/${friend.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(next),
-      });
-      const result = (await response.json().catch(() => null)) as {
-        error?: string;
-        id?: number;
-        nickname?: string;
-        note?: string;
-        favorite?: boolean;
-      } | null;
-      if (sessionRef.current?.sessionId !== sid) return;
-      if (!response.ok || !result || result.id !== friend.id) {
-        setNotice(result?.error || "Không lưu được liên hệ.", "error");
-        return;
-      }
-      setContactMetadata((old) => ({ ...old, [friend.id]: next }));
-      setNotice("Đã lưu thông tin liên hệ riêng.");
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setNotice("Không thể lưu liên hệ. Hãy thử lại.", "error");
-    } finally {
-      setFriendBusyIds((ids) => {
-        const nextIDs = new Set(ids);
-        nextIDs.delete(friend.id);
-        return nextIDs;
-      });
-    }
-  }
-
-  async function blockContact(friend: Pick<FriendSearchResult, 'id' | 'username' | 'displayName'>) {
-    const sid = session?.sessionId;
-    if (!sid || friendBusyIds.has(friend.id)) return;
-    if (
-      !window.confirm(
-        `Chặn @${friend.username}? Hai bạn sẽ không thể nhắn tin, gọi điện hoặc kết bạn với nhau.`,
-      )
-    )
-      return;
-    setFriendBusyIds((old) => new Set(old).add(friend.id));
-    setFriendMenuId(null);
-    try {
-      const response = await apiFetch(`/api/users/${friend.id}/block`, {
-        method: "POST",
-      });
-      const result = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      if (sessionRef.current?.sessionId !== sid) return;
-      if (!response.ok) {
-        setNotice(result?.error || "Không thể chặn người dùng.", "error");
-        return;
-      }
-      // Blocking a contact must not remove an accepted friend from the directory.
-      setFriends((old) => old.map((item) => item.id === friend.id
-        ? { ...item, blockedByMe: true, online: false }
-        : item));
-      setFriendRequests((old) => old.filter((item) => item.id !== friend.id));
-      setFriendResults((old) => old.filter((item) => item.id !== friend.id));
-      setBlockedUsers((old) => [
-        ...old.filter((item) => item.id !== friend.id),
-        {
-          id: friend.id,
-          username: friend.username,
-          displayName: friend.displayName,
-        },
-      ]);
-      setFriendPreview(null);
-      setConversations((old) =>
-        old.map((item) => item.type === 'direct' && item.otherUserId === friend.id
-          ? { ...item, blockedByMe: true, online: false }
-          : item),
-      );
-      window.dispatchEvent(new Event('chatnet:privacy-updated'));
-      setNotice(`Đã chặn @${friend.username}.`);
-      await refreshFriendConnections();
-      void refreshConversations();
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setNotice("Không thể chặn người dùng. Hãy thử lại.", "error");
-    } finally {
-      setFriendBusyIds((old) => {
-        const next = new Set(old);
-        next.delete(friend.id);
-        return next;
-      });
-    }
-  }
-
-  async function clearActiveConversationHistory() {
-    const current = conversations.find((item) => item.id === activeConversationId)
-    const sessionId = sessionRef.current?.sessionId
-    if (!current || !sessionId || historyActionBusy) return
-    if (!window.confirm(`Xóa lịch sử trò chuyện với ${current.name} trên tài khoản của bạn?\nNgười khác vẫn giữ lịch sử của họ. Bạn không thể khôi phục các tin nhắn cũ sau thao tác này.`)) return
-    setHistoryActionBusy(true)
-    try {
-      const response = await apiFetch(`/api/conversations/${current.id}/history`, { method: 'DELETE' })
-      if (!response.ok) {
-        const data = await response.json().catch(() => null) as { error?: string } | null
-        throw new Error(data?.error || 'Không xóa được lịch sử trò chuyện.')
-      }
-      if (sessionRef.current?.sessionId !== sessionId) return
-      responseCache.current.invalidate(['conversations', 'messages'])
-      if (activeConversationIdRef.current === current.id) {
-        setActiveConversationId(null)
-        setMessages([])
-        setHasMoreMessages(false)
-        setTranslations({})
-        setReplyingTo(null)
-        setSharedContentOpen(false)
-        setMessageSearchOpen(false)
-        setConversationDetailsOpen(false)
-      }
-      setNotice('Đã xóa lịch sử trò chuyện khỏi tài khoản của bạn.', 'success')
-      void refreshConversations()
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không xóa được lịch sử trò chuyện.', 'error')
-    } finally {
-      setHistoryActionBusy(false)
-    }
-  }
-
-
-  async function reportContact(friend: FriendSearchResult | FriendConnection) {
-    const sid = session?.sessionId;
-    if (!sid) return;
-    const answer = window.prompt(
-      "Lý do báo cáo: 1 - Spam, 2 - Quấy rối, 3 - Giả mạo, 4 - Khác",
-    );
-    if (answer === null) return;
-    const reason = (
-      {
-        "1": "spam",
-        "2": "harassment",
-        "3": "impersonation",
-        "4": "other",
-      } as Record<string, string>
-    )[answer.trim()];
-    if (!reason) {
-      setNotice("Vui lòng chọn lý do từ 1 đến 4.", "warning");
-      return;
-    }
-    const details = window.prompt(
-      "Mô tả sự việc (không quá 1000 ký tự, có thể để trống):",
-    );
-    if (details === null) return;
-    if (details.length > 1000) {
-      setNotice("Mô tả không được quá 1000 ký tự.", "warning");
-      return;
-    }
-    setFriendMenuId(null);
-    try {
-      const response = await apiFetch(`/api/users/${friend.id}/report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason, details: details.trim() }),
-      });
-      const result = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      if (sessionRef.current?.sessionId !== sid) return;
-      setNotice(
-        response.ok
-          ? "Đã gửi báo cáo. Cảm ơn bạn."
-          : result?.error || "Không thể gửi báo cáo.",
-        response.ok ? "success" : "error",
-      );
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setNotice("Không thể gửi báo cáo. Hãy thử lại.", "error");
-    }
-  }
-
-  async function loadBlockedUsers() {
-    const sid = session?.sessionId;
-    if (!sid || blockedBusy) return;
-    setBlockedBusy(true);
-    setBlockedError("");
-    try {
-      const response = await apiFetch("/api/users/blocked");
-      if (!response.ok) throw new Error();
-      const data = (await response.json()) as Array<{
-        id: number;
-        username: string;
-        displayName: string;
-      }>;
-      if (sessionRef.current?.sessionId === sid) {
-        setBlockedUsers(data);
-        setBlockedOpen(true);
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setBlockedError("Không tải được danh sách chặn.");
-    } finally {
-      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false);
-    }
-  }
-
-  async function unblockContact(userId: number) {
-    const sid = session?.sessionId;
-    if (!sid || blockedBusy || !window.confirm("Bỏ chặn người dùng này?"))
-      return;
-    setBlockedBusy(true);
-    setBlockedError("");
-    try {
-      const response = await apiFetch(`/api/users/${userId}/block`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error();
-      if (sessionRef.current?.sessionId === sid) {
-        setBlockedUsers((old) => old.filter((item) => item.id !== userId));
-        setFriends((old) => old.map((item) => item.id === userId
-          ? { ...item, blockedByMe: false }
-          : item));
-        void refreshFriendConnections();
-        setConversations((old) => old.map((item) =>
-          item.type === 'direct' && item.otherUserId === userId
-            ? { ...item, blockedByMe: false }
-            : item));
-        window.dispatchEvent(new Event('chatnet:privacy-updated'));
-        void refreshConversations();
-        setNotice("Đã bỏ chặn người dùng.");
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setBlockedError("Không thể bỏ chặn. Hãy thử lại.");
-    } finally {
-      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false);
-    }
-  }
-
-  async function declineFriendRequest(friend: FriendConnection) {
-    await actOnFriend(friend, true);
-  }
-
-  async function removeAcceptedFriend(friend: FriendConnection) {
-    const sessionId = session?.sessionId;
-    if (
-      !sessionId ||
-      friendRelationship(friend.id) !== "accepted" ||
-      friendActionRef.current.has(friend.id)
-    )
-      return;
-    if (
-      !window.confirm(
-        `Hủy kết bạn với ${friend.displayName || "@" + friend.username}?`,
-      )
-    )
-      return;
-    friendActionRef.current.add(friend.id);
-    setFriendBusyIds((current) => new Set(current).add(friend.id));
-    setFriendActionBusy(friend.id);
-    setFriendMenuId(null);
-    try {
-      const response = await apiFetch(
-        `/api/friends/${friend.id}?direction=accepted`,
-        { method: "DELETE" },
-      );
-      const result = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (!response.ok) {
-        setNotice(result?.error || "Không thể hủy kết bạn. Vui lòng thử lại.");
-      } else {
-        setFriends((current) =>
-          current.filter((item) => item.id !== friend.id),
-        );
-        setFriendPreview(null);
-        setNotice("Đã hủy kết bạn");
-      }
-      await refreshFriendConnections();
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) {
-        setNotice("Mạng gián đoạn. Đang đồng bộ lại danh sách bạn bè.");
-        await refreshFriendConnections();
-      }
-    } finally {
-      friendActionRef.current.delete(friend.id);
-      if (sessionRef.current?.sessionId === sessionId) {
-        setFriendBusyIds((current) => {
-          const next = new Set(current);
-          next.delete(friend.id);
-          return next;
-        });
-        setFriendActionBusy(
-          friendActionRef.current.values().next().value ?? null,
-        );
-      }
-    }
   }
 
   useEffect(() => {
@@ -3637,90 +2031,6 @@ export default function App({
       setReplyingTo(null);
       setMessageActionId(null);
       setNotice("Bạn không còn là thành viên của nhóm này.");
-    }
-  }
-
-  function syncFeedPost(updated: Post) {
-    ++feedRevision.current;
-    setProfilePosts((current) =>
-      current.map((p) => (p.id === updated.id ? updated : p)),
-    );
-    syncFeedDataPost(updated);
-    followingFeed.syncPost(updated);
-    postSearch.syncPost(updated);
-  }
-
-  function removeFeedPost(id: number) {
-    ++feedRevision.current;
-    setProfilePosts((current) => current.filter((p) => p.id !== id));
-    removeFeedDataPost(id);
-    followingFeed.removePost(id);
-    postSearch.removePost(id);
-  }
-
-  async function loadProfilePosts(more = false, force = false) {
-    if (!session || profilePagingBusy.current) return;
-    const sessionId = session.sessionId;
-    const sequence = ++profileLoadSequence.current;
-    const revision = feedRevision.current;
-    const before =
-      more && profilePosts.length
-        ? Math.min(...profilePosts.map((post) => post.id))
-        : 0;
-    profilePagingBusy.current = true;
-    setProfilePostsBusy(true);
-    setProfilePostsError("");
-    try {
-      const response = await apiFetch(
-        `/api/posts?scope=mine&limit=${FEED_PAGE_SIZE}${before ? "&before=" + before : ""}`,
-        force ? { cache: "reload" } : {},
-      );
-      if (!response.ok)
-        throw new Error("Không tải được dòng thời gian. Hãy thử lại.");
-      const data = (await response.json()) as Post[];
-      if (
-        sessionRef.current?.sessionId !== sessionId ||
-        sequence !== profileLoadSequence.current
-      )
-        return;
-      if (revision !== feedRevision.current)
-        throw new Error(
-          "Dòng thời gian vừa thay đổi. Hãy tải lại để cập nhật.",
-        );
-      if (
-        !Array.isArray(data) ||
-        data.some(
-          (post) =>
-            !Number.isSafeInteger(post.id) ||
-            post.id <= 0 ||
-            post.author !== sessionRef.current?.user.username,
-        )
-      ) {
-        throw new Error("Dữ liệu dòng thời gian không hợp lệ. Hãy tải lại.");
-      }
-      setProfilePosts((current) =>
-        more
-          ? data.reduce((items, post) => mergeById(items, post), current)
-          : data,
-      );
-      setProfileHasMore(data.length === FEED_PAGE_SIZE);
-    } catch (error) {
-      if (
-        sessionRef.current?.sessionId === sessionId &&
-        sequence === profileLoadSequence.current
-      ) {
-        setProfilePostsError(
-          error instanceof Error
-            ? error.message
-            : "Không tải được dòng thời gian. Hãy thử lại.",
-        );
-      }
-    } finally {
-      if (sequence === profileLoadSequence.current) {
-        profilePagingBusy.current = false;
-        if (sessionRef.current?.sessionId === sessionId)
-          setProfilePostsBusy(false);
-      }
     }
   }
 
@@ -3875,6 +2185,8 @@ export default function App({
     setPostAttachments([]);
     setTranslations({});
   }
+  const { fetchAccountSessions, revokeAccountSessions } = useAccountSessions({ logout, managedSessions, sessionRef, sessionsBusy, setManagedSessions, setNotice, setSessionsBusy, setSessionsError, setSessionsOpen });
+
 
   useEffect(() => {
     if (isDesktopBuild) {
@@ -4074,102 +2386,6 @@ export default function App({
     activeConversationId,
   ]);
 
-  function saveConversationTranslationSettings(conversationId: number, settings: ChatTranslationSettings) {
-    if (!session?.user.id || !Number.isSafeInteger(conversationId)) return false;
-    const updated = { ...conversationTranslationOverrides, [conversationId]: settings };
-    if (!persistConversationTranslationSettings(session.user.id, updated)) {
-      setNotice('Không lưu được cài đặt dịch trên thiết bị này.', 'error');
-      return false;
-    }
-    setConversationTranslationOverrides(updated);
-    setTranslations({});
-    setTranslationOriginals({});
-    setManuallyTranslated({});
-    setTranslationPending({});
-    setTranslationFailures({});
-    translationAttempted.current.clear();
-    return true;
-  }
-
-  function changeAutoTranslate(next: boolean) {
-    if (activeConversationId !== null && activeChatTranslationSettings) {
-      saveConversationTranslationSettings(activeConversationId, { ...activeChatTranslationSettings, enabled: next });
-      return;
-    }
-    setAutoTranslate(next);
-    void saveTranslationPreferences(targetLanguage, next);
-  }
-
-  function changeTargetLanguage(next: string) {
-    if (activeConversationId !== null && activeChatTranslationSettings) {
-      saveConversationTranslationSettings(activeConversationId, { ...activeChatTranslationSettings, targetLanguage: next });
-      setTranslationMenuOpen(false);
-      setLanguageSearch('');
-      return;
-    }
-    setTargetLanguage(next);
-    setTranslations({});
-    setTranslationOriginals({});
-    setManuallyTranslated({});
-    setTranslationPending({});
-    setTranslationFailures({});
-    translationAttempted.current.clear();
-    setTranslationMenuOpen(false);
-    setTranslationPickerOpen(false);
-    setLanguageSearch("");
-    setTranslationSettingsSearch("");
-    void saveTranslationPreferences(next, autoTranslate);
-  }
-
-  function selectGroupChannel(channelId: number) {
-    if (activeConversation?.type !== 'group' || !groupChannels.some(channel => channel.id === channelId)) return;
-    activeChannelIdRef.current = channelId;
-    setChannelSelection({ conversationId: activeConversation.id, channelId });
-    setMessages([]);
-    setHasMoreMessages(false);
-    setChatSearchJump(null);
-    setReplyingTo(null);
-    setMessageActionId(null);
-    setConversationDetailsOpen(false);
-    setMessageSearchOpen(false);
-    messageScrollAtBottom.current = true;
-  }
-
-  async function createGroupChannel(name: string, description: string): Promise<boolean> {
-    if (activeConversation?.type !== 'group' || activeGroupMember?.role !== 'owner' || groupChannelBusy) return false;
-    const groupId = activeConversation.id;
-    setGroupChannelBusy(true);
-    try {
-      const response = await apiFetch(`/api/conversations/${groupId}/channels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
-      });
-      const data = await response.json().catch(() => null) as (GroupChannel & { error?: string }) | null;
-      if (!response.ok || !data?.id || data.conversationId !== groupId)
-        throw new Error(data?.error || 'Không tạo được kênh hội thoại.');
-      setGroupChannelState(current => ({
-        conversationId: groupId,
-        channels: validGroupChannels([...(
-          current.conversationId === groupId ? current.channels : []
-        ), data], groupId),
-      }));
-      activeChannelIdRef.current = data.id;
-      setChannelSelection({ conversationId: groupId, channelId: data.id });
-      setMessages([]);
-      setHasMoreMessages(false);
-      setReplyingTo(null);
-      setChatSearchJump(null);
-      setNotice('Đã tạo kênh hội thoại ' + data.name + '.', 'success');
-      return true;
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không tạo được kênh.', 'error');
-      return false;
-    } finally {
-      setGroupChannelBusy(false);
-    }
-  }
-
   const canSend = useMemo(
     () =>
       Boolean(
@@ -4188,226 +2404,10 @@ export default function App({
       messageSending,
     ],
   );
+  const { editOwnMessage, recallOwnMessage, retryQueuedChatMessages, sendMessage, toggleReaction } = useChatMessaging({ actionLocks, activeChannelIdRef, activeConversationId, activeConversationIdRef, apiFetch, canSend, channelDraftKey, chatOutboxRef, chatOutboxSession, draft, messageAttachments, messageChanges, messageText, ownSendScrollConversation, refreshConversations, replyingTo, retryOutboxBusy, selectedChannelId, sendingClientIDs, sendingRef, session, sessionRef, setChannelDrafts, setChatOnline, setMessageDrafts, setMessages, setNotice, setReactionPreviews, setReplyingTo, setTranslations, updateChatOutbox });
+  const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
+  const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ apiFetch, mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, session, sessionRef, setActiveStoryId, setChatOnline, setNotice, setStories, setStoryBusy, storyBusy, updateChatOutbox, uploadMediaFiles });
 
-  async function openDirectByUsername(username: string, mediaType?: "audio" | "video", onOpened?: (conversation: Conversation) => void) {
-    setChatCreateError("");
-    const normalized = username.trim().toLowerCase();
-    if (!normalized || actionLocks.current.has("chat:create")) return;
-    const sessionId = session?.sessionId;
-    actionLocks.current.add("chat:create");
-    try {
-      const response = await apiFetch("/api/conversations/direct", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: normalized }),
-      });
-      const result = await response.json();
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (!response.ok || !Number.isSafeInteger(result?.id) || result.id <= 0) {
-        setNotice(result?.error || "Không thể mở cuộc trò chuyện");
-        return;
-      }
-
-      if (sessionRef.current?.sessionId !== session?.sessionId) return;
-      const created = result as Conversation;
-      membershipSnapshot.current?.add(created.id);
-      revokedConversationIds.current.delete(created.id);
-      membershipEventSequence.current += 1;
-      setConversations((current) => [
-        created,
-        ...current.filter((item) => item.id !== created.id),
-      ]);
-      setActiveConversationId(created.id);
-      setDesktopSection(null);
-      setTab("chat");
-      setGlobalSearch("");
-      setDirectUsername("");
-      setFriendQuery("");
-      setFriendResults([]);
-      setNewChatMode("none");
-      setTranslations({});
-      void refreshConversations();
-      if (mediaType) window.dispatchEvent(new CustomEvent("chatnet:start-call", {
-        detail: { conversationId: created.id, mediaType },
-      }));
-      onOpened?.(created);
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId)
-        setNotice(
-          "Không mở được cuộc trò chuyện. Kiểm tra kết nối rồi thử lại.",
-        );
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId)
-        actionLocks.current.delete("chat:create");
-    }
-  }
-
-  async function createDirect(event: FormEvent) {
-    event.preventDefault();
-    await openDirectByUsername(directUsername);
-  }
-
-  async function createGroup(name: string, usernames: string[], extras?: CommunityCreationExtras): Promise<number | null> {
-    if (actionLocks.current.has("chat:create")) return null;
-    actionLocks.current.add("chat:create");
-    setChatCreateError("");
-    const sessionId = session?.sessionId;
-    try {
-      const response = await apiFetch("/api/conversations/groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, usernames, ...extras }),
-      });
-      const result = await response.json();
-      if (sessionRef.current?.sessionId !== sessionId) return null;
-      if (!response.ok || !Number.isSafeInteger(result?.id) || result.id <= 0) {
-        setChatCreateError(result?.error || "Không thể tạo nhóm");
-        return null;
-      }
-      const created = result as Conversation;
-      membershipSnapshot.current?.add(created.id);
-      revokedConversationIds.current.delete(created.id);
-      membershipEventSequence.current += 1;
-      setConversations((current) => [
-        created,
-        ...current.filter((item) => item.id !== created.id),
-      ]);
-      setActiveConversationId(created.id);
-      setTab("chat");
-      setFriendQuery("");
-      setNewChatMode("none");
-      void refreshConversations();
-      return created.id;
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId)
-        setChatCreateError("Không thể tạo nhóm. Kiểm tra kết nối rồi thử lại.");
-      return null;
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId)
-        actionLocks.current.delete("chat:create");
-    }
-  }
-
-  async function deliverQueuedChatMessage(item: QueuedChatMessage) {
-    const identity = sessionRef.current;
-    if (
-      !identity ||
-      chatOutboxSession.current !== identity.sessionId ||
-      !navigator.onLine ||
-      sendingClientIDs.current.has(item.clientId) ||
-      !chatOutboxRef.current.some(
-        (pending) =>
-          pending.clientId === item.clientId &&
-          pending.conversationId === item.conversationId &&
-          pending.status !== "failed",
-      )
-    )
-      return;
-    sendingClientIDs.current.add(item.clientId);
-    try {
-      const response = await apiFetch(
-        `/api/conversations/${item.conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: item.text,
-            attachments: item.attachments,
-            clientId: item.clientId,
-            ...(item.channelId ? { channelId: item.channelId } : {}),
-            ...(item.replyToMessageId
-              ? { replyToMessageId: item.replyToMessageId }
-              : {}),
-          }),
-        },
-      );
-      if (sessionRef.current?.sessionId !== identity.sessionId) return;
-      if (!response.ok) {
-        const permanent =
-          response.status >= 400 &&
-          response.status < 500 &&
-          response.status !== 408 &&
-          response.status !== 429;
-        const error = permanent
-          ? (
-              (await response.json().catch(() => null)) as {
-                error?: string;
-              } | null
-            )?.error
-          : undefined;
-        updateChatOutbox((items) =>
-          items.map((pending) =>
-            pending.clientId === item.clientId &&
-            pending.conversationId === item.conversationId
-              ? {
-                  ...pending,
-                  status: permanent ? "failed" : "unconfirmed",
-                  error: permanent
-                    ? error || "Không gửi được. Kiểm tra quyền hoặc nội dung."
-                    : undefined,
-                }
-              : pending,
-          ),
-        );
-        return;
-      }
-      const confirmed = (await response.json()) as Message;
-      if (
-        !Number.isSafeInteger(confirmed.id) ||
-        confirmed.id <= 0 ||
-        confirmed.clientId !== item.clientId ||
-        confirmed.conversationId !== item.conversationId ||
-        confirmed.senderId !== identity.user.id
-      )
-        throw new Error("Unexpected send receipt");
-      updateChatOutbox((items) =>
-        confirmChatMessage(items, item.clientId, item.conversationId),
-      );
-      if (activeConversationIdRef.current === item.conversationId &&
-          activeChannelIdRef.current === (item.channelId || 0)) {
-        messageChanges.current.add(confirmed.id);
-        setMessages((current) =>
-          mergeById(current, confirmed).sort((a, b) => a.id - b.id),
-        );
-      }
-      void refreshConversations();
-    } catch {
-      if (sessionRef.current?.sessionId === identity.sessionId) {
-        // The HTTP ACK might be lost after the database commit. Reuse the same clientId.
-        updateChatOutbox((items) =>
-          items.map((pending) =>
-            pending.clientId === item.clientId &&
-            pending.conversationId === item.conversationId
-              ? { ...pending, status: "unconfirmed", error: undefined }
-              : pending,
-          ),
-        );
-      }
-    } finally {
-      sendingClientIDs.current.delete(item.clientId);
-    }
-  }
-
-  async function retryQueuedChatMessages() {
-    if (!navigator.onLine || retryOutboxBusy.current || !sessionRef.current)
-      return;
-    retryOutboxBusy.current = true;
-    try {
-      while (navigator.onLine) {
-        const item = retryableChatMessages(chatOutboxRef.current)[0];
-        if (!item) break;
-        await deliverQueuedChatMessage(item);
-        const remaining = chatOutboxRef.current.find(
-          (pending) =>
-            pending.clientId === item.clientId &&
-            pending.conversationId === item.conversationId,
-        );
-        if (remaining && remaining.status !== "failed") break;
-      }
-    } finally {
-      retryOutboxBusy.current = false;
-    }
-  }
 
   useEffect(() => {
     if (!session?.sessionId) return;
@@ -4462,603 +2462,6 @@ export default function App({
       );
     });
   }, [messages, session?.sessionId]);
-
-  function sendMessage(event: FormEvent) {
-    event.preventDefault();
-    if (!canSend || !activeConversationId || sendingRef.current || !session)
-      return;
-    sendingRef.current = true;
-    window.setTimeout(() => {
-      sendingRef.current = false;
-    }, 0);
-
-    const conversationId = activeConversationId;
-    const channelId = selectedChannelId;
-    const draftKey = channelDraftKey;
-    const submittedDraft = draft;
-    const reply = replyingTo;
-    const item: QueuedChatMessage = {
-      ...(channelId > 0 ? { channelId } : {}),
-      clientId: crypto.randomUUID(),
-      conversationId,
-      text: messageText.trim(),
-      attachments: messageAttachments.map(attachmentRequestBody),
-      ...(reply
-        ? {
-            replyToMessageId: reply.id,
-            replyToSender: reply.sender,
-            replyToText: reply.text,
-          }
-        : {}),
-      createdAt: new Date().toISOString(),
-      status: "queued",
-    };
-    const next = updateChatOutbox((items) => enqueueChatMessage(items, item));
-    if (!next.some((pending) => pending.clientId === item.clientId)) {
-      setNotice(
-        "Hàng đợi tin nhắn đã đầy. Nội dung vẫn ở ô nhập; hãy thử lại sau.",
-        "warning",
-      );
-      return;
-    }
-    ownSendScrollConversation.current = conversationId;
-    if (channelId > 0) {
-      setChannelDrafts(current => {
-        if (current[draftKey] !== submittedDraft) return current;
-        const next = { ...current };
-        delete next[draftKey];
-        return next;
-      });
-    } else {
-      setMessageDrafts((current) => {
-        if (current[conversationId] !== submittedDraft) return current;
-        const updated = { ...current };
-        delete updated[conversationId];
-        return updated;
-      });
-    }
-    setReplyingTo((current) => (current === reply ? null : current));
-    if (navigator.onLine) void retryQueuedChatMessages();
-    else setChatOnline(false);
-  }
-
-  async function editOwnMessage(message: Message) {
-    const key = `message:${message.id}`;
-    if (
-      message.deleted ||
-      message.senderId !== session?.user.id ||
-      actionLocks.current.has(key)
-    )
-      return;
-    const next = window.prompt("Sửa tin nhắn", message.text);
-    if (next === null || next.trim() === message.text.trim()) return;
-    if (!next.trim()) {
-      setNotice("Tin nhắn sau khi sửa không được để trống.");
-      return;
-    }
-
-    const sessionId = session?.sessionId;
-    actionLocks.current.add(key);
-    try {
-      const response = await apiFetch(`/api/messages/${message.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: next.trim() }),
-      });
-      const result = (await response.json().catch(() => null)) as
-        | Message
-        | { error?: string }
-        | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (
-        !response.ok ||
-        !result ||
-        !("id" in result) ||
-        result.id !== message.id ||
-        typeof result.text !== "string"
-      ) {
-        setNotice(
-          (result as { error?: string } | null)?.error ||
-            "Không sửa được tin nhắn",
-        );
-        return;
-      }
-      const updated = result as Message;
-      if (activeConversationIdRef.current !== message.conversationId) return;
-      messageChanges.current.add(updated.id);
-      setMessages((current) =>
-        current.map((item) =>
-          item.id === updated.id
-            ? {
-                ...item,
-                text: updated.text,
-                editedAt: updated.editedAt,
-              }
-            : item,
-        ),
-      );
-      setTranslations((current) => {
-        const nextTranslations = { ...current };
-        delete nextTranslations[message.id];
-        return nextTranslations;
-      });
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId)
-        actionLocks.current.delete(key);
-    }
-  }
-
-  async function recallOwnMessage(message: Message) {
-    const key = `message:${message.id}`;
-    if (
-      message.deleted ||
-      message.senderId !== session?.user.id ||
-      actionLocks.current.has(key)
-    )
-      return;
-    if (!window.confirm("Thu hồi tin nhắn này?")) return;
-    const sessionId = session?.sessionId;
-    actionLocks.current.add(key);
-    try {
-      const response = await apiFetch(`/api/messages/${message.id}`, {
-        method: "DELETE",
-      });
-      const result = (await response.json().catch(() => null)) as
-        | Message
-        | { error?: string }
-        | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (
-        !response.ok ||
-        !result ||
-        !("id" in result) ||
-        result.id !== message.id ||
-        !result.deleted
-      ) {
-        setNotice(
-          (result as { error?: string } | null)?.error ||
-            "Không thu hồi được tin nhắn",
-        );
-        return;
-      }
-      const updated = result as Message;
-      if (activeConversationIdRef.current !== message.conversationId) return;
-      messageChanges.current.add(updated.id);
-      setMessages((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
-      setTranslations((current) => {
-        const next = { ...current };
-        delete next[message.id];
-        return next;
-      });
-      setReplyingTo((current) => (current?.id === message.id ? null : current));
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId)
-        actionLocks.current.delete(key);
-    }
-  }
-
-  async function toggleReaction(message: Message, emoji: string) {
-    const key = `message:${message.id}`;
-    if (message.deleted || actionLocks.current.has(key)) return;
-    const sessionId = session?.sessionId;
-    actionLocks.current.add(key);
-    setReactionPreviews((current) => ({
-      ...current,
-      [message.id]: toggleMessageReactionCount(message.reactions || [], emoji),
-    }));
-    try {
-      const response = await apiFetch(`/api/messages/${message.id}/reactions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emoji }),
-      });
-      const result = (await response.json()) as Message & { error?: string };
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (!response.ok || result.id !== message.id)
-        throw new Error(result.error || "Không thả cảm xúc được");
-      if (activeConversationIdRef.current === message.conversationId) {
-        messageChanges.current.add(result.id);
-        setMessages((current) =>
-          current.map((item) =>
-            item.id === result.id
-              ? { ...item, reactions: result.reactions }
-              : item,
-          ),
-        );
-      }
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId)
-        setNotice(
-          error instanceof Error ? error.message : "Không thả cảm xúc được",
-          "error",
-        );
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete(key);
-        setReactionPreviews((current) => {
-          const next = { ...current };
-          delete next[message.id];
-          return next;
-        });
-      }
-    }
-  }
-
-  async function requestTranslation(text: string, messageId?: number, showError = true) {
-    const response = await apiFetch("/api/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text,
-        target: effectiveTargetLanguage,
-        ...(messageId ? { messageId } : {}),
-      }),
-    });
-    const result = await response.json().catch(() => null);
-    if (sessionRef.current?.sessionId !== session?.sessionId) return null;
-    if (!response.ok || typeof result?.translatedText !== "string") {
-      // A proxy or unavailable AI service may return HTML/empty text instead of JSON.
-      // Do not leak message contents or provider credentials into diagnostics.
-      console.warn("Translation request failed", {
-        status: response.status,
-        error: typeof result?.error === "string" ? result.error : "invalid response",
-      });
-      if (showError) {
-        const serverError = typeof result?.error === "string" ? result.error : "";
-        const message = /not configured|missing_ai_config/i.test(serverError)
-          ? "Dịch vụ AI trên máy chủ chưa được cấu hình. Kiểm tra AI_API_KEY, AI_BASE_URL và AI_MODEL."
-          : response.status === 401 || response.status === 403
-            ? "Phiên đăng nhập hoặc quyền truy cập dịch AI không hợp lệ."
-            : response.status === 429
-              ? "Dịch vụ AI đang giới hạn yêu cầu (HTTP 429). Hãy thử lại sau."
-              : response.status === 502 && /service unavailable/i.test(serverError)
-                ? "Gateway không kết nối được đến dịch vụ translate (HTTP 502). Kiểm tra dịch vụ translate trên Railway."
-                : response.status === 502 && /AI translation failed/i.test(serverError)
-                  ? "Dịch vụ translate không nhận được bản dịch từ nhà cung cấp AI (HTTP 502). Kiểm tra log AI provider."
-                  : response.status >= 500
-                    ? `Dịch vụ AI hoặc backend không phản hồi (HTTP ${response.status}). Kiểm tra dịch vụ translate và nhà cung cấp AI.`
-                    : response.status === 404
-                  ? "Không tìm thấy tin nhắn hoặc API dịch AI (HTTP 404)."
-                  : response.ok
-                    ? "Dịch vụ AI trả dữ liệu không hợp lệ."
-                    : `Không dịch được tin nhắn (HTTP ${response.status})${serverError ? `: ${serverError}` : "."}`;
-        setNotice(message, "error");
-      }
-      return null;
-    }
-    return result as { translatedText: string };
-  }
-
-  async function translateMessage(message: Message, reveal = true) {
-    if (message.deleted || !message.text.trim()) return;
-    const sessionId = sessionRef.current?.sessionId;
-    if (!sessionId) return;
-    const language = effectiveTargetLanguage;
-    const conversationId = activeConversationIdRef.current;
-    const requestKey = `${sessionId}:${language}:${message.id}:${message.editedAt ?? ""}`;
-    if (reveal) {
-      setManuallyTranslated((current) => ({ ...current, [message.id]: true }));
-    }
-    if (translations[message.id] && !translationFailures[message.id]) return;
-    if (translationInFlight.current.has(requestKey)) return;
-    // An automatic failure must not re-trigger for every incoming event.
-    // A manual retry remains available when translation fails.
-    if (!reveal && translationAttempted.current.has(requestKey)) return;
-    translationAttempted.current.add(requestKey);
-    translationInFlight.current.add(requestKey);
-    setTranslationPending((current) => ({ ...current, [message.id]: true }));
-    setTranslationFailures((current) => ({ ...current, [message.id]: false }));
-    try {
-      const result = await requestTranslation(message.text, message.id, reveal);
-      if (sessionRef.current?.sessionId !== sessionId ||
-          translationLanguageRef.current !== language ||
-          activeConversationIdRef.current !== conversationId) return;
-      if (!result?.translatedText.trim()) {
-        setTranslationFailures((current) => ({ ...current, [message.id]: true }));
-        return;
-      }
-      setTranslations((current) => ({ ...current, [message.id]: result.translatedText }));
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId &&
-          translationLanguageRef.current === language &&
-          activeConversationIdRef.current === conversationId) {
-        setTranslationFailures((current) => ({ ...current, [message.id]: true }));
-        if (reveal) setNotice(
-          error instanceof TypeError
-            ? "Không kết nối được API dịch AI. Kiểm tra kết nối tới backend cloud."
-            : error instanceof Error ? error.message : "Không dịch được tin nhắn",
-          "error",
-        );
-      }
-    } finally {
-      translationInFlight.current.delete(requestKey);
-      if (sessionRef.current?.sessionId === sessionId &&
-          translationLanguageRef.current === language &&
-          activeConversationIdRef.current === conversationId) {
-        setTranslationPending((current) => ({ ...current, [message.id]: false }));
-      }
-    }
-  }
-
-  async function createPost(event: FormEvent) {
-    event.preventDefault();
-    if (
-      !session ||
-      actionLocks.current.has("feed:create") ||
-      mediaUploading ||
-      (!postText.trim() &&
-        postAttachments.length === 0 &&
-        !(feedCheckInOpen && feedCheckInLocation.trim()))
-    )
-      return;
-
-    setPostSubmitError("");
-    const locationText = feedCheckInOpen ? feedCheckInLocation.trim() : "";
-    const content = [locationText ? `📍 ${locationText}` : "", postText.trim()]
-      .filter(Boolean)
-      .join("\n");
-    const attachments = postAttachments;
-    const visibility = postVisibility;
-    const background = postBackground;
-    const sessionId = session.sessionId;
-    actionLocks.current.add("feed:create");
-    ++feedRevision.current;
-    setPendingPost({
-      id: -1,
-      author: name,
-      authorDisplayName: session?.user.displayName,
-      content,
-      visibility,
-      background,
-      attachments,
-      likes: 0,
-      liked: false,
-      comments: [],
-      createdAt: new Date().toISOString(),
-    });
-    try {
-      const response = await apiFetch("/api/posts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content,
-          attachments: attachments.map(attachmentRequestBody),
-          visibility,
-          background,
-        }),
-      });
-      const post = (await response.json()) as Post & { error?: string };
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (!response.ok || !Number.isSafeInteger(post.id) || post.id <= 0)
-        throw new Error(post.error || "Không đăng được bài viết");
-      setPosts((current) => [
-        post,
-        ...current.filter((item) => item.id !== post.id),
-      ]);
-      setProfilePosts((current) => [
-        post,
-        ...current.filter((item) => item.id !== post.id),
-      ]);
-      setPostText("");
-      setPostAttachments([]);
-      setPostBackground("");
-      setShowPostBackgrounds(false);
-      setProfileComposerOpen(false);
-      setFeedComposerOpen(false);
-      setFeedCheckInOpen(false);
-      setFeedCheckInLocation("");
-      setNotice("Đã đăng bài viết.", "success");
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Không đăng được bài viết. Bản nháp được giữ lại.";
-        setPostSubmitError(message);
-        setNotice(message, "error");
-      }
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        ++feedRevision.current;
-        actionLocks.current.delete("feed:create");
-        setPendingPost(null);
-      }
-    }
-  }
-
-  async function like(post: Post, emoji = "👍") {
-    const key = `feed:like:${post.id}`;
-    if (actionLocks.current.has(key)) return;
-    const sessionId = session?.sessionId;
-    actionLocks.current.add(key);
-    ++feedRevision.current;
-    setLikePreviews((current) => ({ ...current, [post.id]: (post.myReaction || (post.liked ? "👍" : "")) !== emoji }));
-    try {
-      const response = await apiFetch(`/api/posts/${post.id}/${emoji === "👍" ? "like" : "reactions"}`, {
-        method: "POST",
-        ...(emoji !== "👍" ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji }) } : {}),
-      });
-      const updated = (await response.json()) as Post & { error?: string };
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (
-        !response.ok ||
-        updated.id !== post.id ||
-        typeof updated.liked !== "boolean" ||
-        !Number.isFinite(updated.likes)
-      ) {
-        throw new Error(updated.error || "Không cập nhật được lượt thích.");
-      }
-      setPosts((current) =>
-        current.map((item) =>
-          item.id === updated.id
-            ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions }
-            : item,
-        ),
-      );
-      setSavedPosts((current) =>
-        current.map((item) =>
-          item.id === updated.id
-            ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions }
-            : item,
-        ),
-      );
-      setProfilePosts((current) =>
-        current.map((item) =>
-          item.id === updated.id
-            ? { ...item, liked: updated.liked, likes: updated.likes, myReaction: updated.myReaction, reactions: updated.reactions }
-            : item,
-        ),
-      );
-      followingFeed.syncPost({
-        ...post,
-        liked: updated.liked,
-        likes: updated.likes,
-        myReaction: updated.myReaction,
-        reactions: updated.reactions,
-      });
-      postSearch.syncPost({
-        ...post,
-        liked: updated.liked,
-        likes: updated.likes,
-        myReaction: updated.myReaction,
-        reactions: updated.reactions,
-      });
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) void refreshPosts();
-      if (sessionRef.current?.sessionId === sessionId)
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : "Không cập nhật được lượt thích.",
-          "error",
-        );
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        ++feedRevision.current;
-        actionLocks.current.delete(key);
-        setLikePreviews((current) => {
-          const next = { ...current };
-          delete next[post.id];
-          return next;
-        });
-      }
-    }
-  }
-
-  async function manageFeedComment(
-    post: Post,
-    commentId: number,
-    method: "PATCH" | "DELETE",
-    content?: string,
-  ) {
-    const response = await apiFetch(
-      "/api/posts/" + post.id + "/comments/" + commentId,
-      {
-        method,
-        ...(method === "PATCH"
-          ? {
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ content }),
-            }
-          : {}),
-      },
-    );
-    if (!response.ok) {
-      const data = (await response.json().catch(() => ({}))) as {
-        error?: string;
-      };
-      throw new Error(data.error || "Không cập nhật được bình luận");
-    }
-    const updated = (await response.json()) as Post;
-    syncFeedPost(updated);
-    setNotice(
-      method === "PATCH" ? "Đã sửa bình luận." : "Đã xóa bình luận.",
-      "success",
-    );
-  }
-  async function reportFeedComment(commentId: number, reason: string) {
-    const response = await apiFetch("/api/feed/reports", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        targetType: "comment",
-        targetId: commentId,
-        reason,
-      }),
-    });
-    if (!response.ok) throw new Error("Không thể gửi báo cáo bình luận.");
-    setNotice("Đã gửi báo cáo bình luận.", "success");
-  }
-
-  async function addComment(post: Post, content: string, parentId?: number) {
-    const sessionId = session?.sessionId;
-    const key = `feed:comment:${post.id}`;
-    if (actionLocks.current.has(key))
-      throw new Error("Bình luận đang được gửi.");
-    actionLocks.current.add(key);
-    ++feedRevision.current;
-    setPendingComments((current) => ({
-      ...current,
-      [post.id]: {
-        id: -1,
-        parentId,
-        author: name,
-        authorDisplayName: session?.user.displayName,
-        content,
-        createdAt: new Date().toISOString(),
-      },
-    }));
-    try {
-      const response = await apiFetch(`/api/posts/${post.id}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, parentId }),
-      });
-      if (!response.ok)
-        throw new Error(
-          "Chưa xác nhận được bình luận. Bản nháp được giữ lại; kiểm tra bài viết trước khi gửi lại.",
-        );
-      const updated = (await response.json()) as Post;
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (updated.id !== post.id || !Array.isArray(updated.comments))
-        throw new Error("Phản hồi không hợp lệ. Bản nháp được giữ lại.");
-      setPosts((current) =>
-        current.map((item) =>
-          item.id === updated.id
-            ? { ...item, comments: updated.comments }
-            : item,
-        ),
-      );
-      setSavedPosts((current) =>
-        current.map((item) =>
-          item.id === updated.id
-            ? { ...item, comments: updated.comments }
-            : item,
-        ),
-      );
-      setProfilePosts((current) =>
-        current.map((item) =>
-          item.id === updated.id
-            ? { ...item, comments: updated.comments }
-            : item,
-        ),
-      );
-      followingFeed.syncPost({ ...post, comments: updated.comments });
-      postSearch.syncPost({ ...post, comments: updated.comments });
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        ++feedRevision.current;
-        actionLocks.current.delete(key);
-        setPendingComments((current) => {
-          const next = { ...current };
-          delete next[post.id];
-          return next;
-        });
-      }
-    }
-  }
 
   if (!session) return <AuthScreen {...auth} />;
 
@@ -5269,27 +2672,6 @@ export default function App({
       setCheckInLocation={setFeedCheckInLocation}
     />
   );
-  function openFeedPostDetails(id: number) {
-    if (tab === "feed" && isProfileDesktop) {
-      feedScrollBeforeComments.current = feedViewRef.current?.scrollTop ?? 0;
-      const url = new URL(window.location.href);
-      if (url.searchParams.get("post") !== String(id)) {
-        url.searchParams.set("tab", "feed");
-        url.searchParams.set("post", String(id));
-        window.history.pushState({ ...window.history.state, postId: id }, "", url);
-      }
-    }
-    setActivePostId(id);
-  }
-
-  function closeFeedPostDetails() {
-    setActivePostId(null);
-    const url = new URL(window.location.href);
-    if (url.searchParams.has("post")) {
-      url.searchParams.delete("post");
-      window.history.replaceState(window.history.state, "", url);
-    }
-  }
 
   const postDiscussion = activePost ? (
                     <FeedDiscussion
@@ -5361,36 +2743,6 @@ export default function App({
         like={like}
       />
     ));
-
-  async function openBlockedFriendConversation(userId: number) {
-    let direct = conversations.find((item) => item.type === 'direct' && item.otherUserId === userId);
-    if (!direct) {
-      const username = friends.find((item) => item.id === userId)?.username;
-      if (username) {
-        try {
-          // The chat may be on a later page of the paginated conversation list.
-          const response = await apiFetch(`/api/conversations?type=direct&q=${encodeURIComponent(username)}&limit=100`, { cache: 'no-store' });
-          if (response.ok) {
-            const data = (await response.json()) as Conversation[];
-            direct = data.find((item) => item.type === 'direct' && item.otherUserId === userId);
-            if (direct) {
-              const found = direct;
-              setConversations((current) => [found, ...current.filter((item) => item.id !== found.id)]);
-            }
-          }
-        } catch {
-          // A connectivity problem must not remove the contact from the directory.
-        }
-      }
-    }
-    if (!direct) {
-      setNotice('Chưa tìm thấy hội thoại cũ để mở.', 'warning');
-      return;
-    }
-    setDesktopSection(null);
-    setActiveConversationId(direct.id);
-    setTab('chat');
-  }
 
   const contactsContent = (
     <ContactsView

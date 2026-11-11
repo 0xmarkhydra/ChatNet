@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 
 const read = (file) => readFileSync(new URL(file, import.meta.url), 'utf8')
-const ui = read('../src/features/calls/CallManager.tsx')
-const css = read('../src/features/calls/call.css')
+const ui = read('../src/features/calls/components/CallManager.tsx')
+const css = read('../src/features/calls/styles/call.css')
 const required = [
   'call-live-panel', 'call-sheet-backdrop', 'call-translation-consent-prompt',
   'call-permission-prompt', 'call-primary-controls', 'call-more-popover',

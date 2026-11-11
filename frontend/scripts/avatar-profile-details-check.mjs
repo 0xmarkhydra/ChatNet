@@ -8,8 +8,8 @@ const cssFiles = [
   '../src/styles/soco-theme.css',
   '../src/styles/soco-layout-v2.css',
   '../src/styles/app-shell.css',
-  '../src/features/profile/profile-page.css',
-  '../src/features/chat/social-chat.css',
+  '../src/features/profile/styles/profile-page.css',
+  '../src/features/chat/styles/social-chat.css',
   '../src/styles/adaptive-pwa.css',
 ]
 const css = cssFiles.map(path => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n')

@@ -1,5 +1,5 @@
 import type { Tab } from "../types";
-import type { GroupWorkspaceMode } from "../../features/chat/CommunityGroupsPage";
+import type { GroupWorkspaceMode } from "../../features/chat/components/CommunityGroupsPage";
 import type { DesktopSection } from "./headerContext";
 
 export type HeaderTitleProps = {

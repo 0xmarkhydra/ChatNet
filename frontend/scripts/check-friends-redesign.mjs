@@ -22,7 +22,7 @@ const vite = await createServer({
 let browser
 try {
   await vite.listen()
-  const { countNotificationItems, formatNotificationBadge } = await vite.ssrLoadModule('/src/features/notifications/notification-count.ts')
+  const { countNotificationItems, formatNotificationBadge } = await vite.ssrLoadModule('/src/features/notifications/utils/notification-count.ts')
   assert.equal(countNotificationItems([], []), 0)
   assert.equal(countNotificationItems([{ direction: 'outgoing' }], [{ unreadCount: 0 }]), 0)
   assert.equal(countNotificationItems([{ direction: 'incoming' }], [{ unreadCount: 7 }]), 2)
