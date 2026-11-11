@@ -1,5 +1,5 @@
 import { Image as ImageIcon, MapPin, PencilLine, Plus, Video } from 'lucide-react'
-import UserAvatar from '../shared/ui/UserAvatar'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 type Props = {
   username: string

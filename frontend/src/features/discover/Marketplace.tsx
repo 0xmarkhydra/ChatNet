@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ShoppingBag, ShoppingCart, ClipboardList } from 'lucide-react'
-import useSlidingPill from './shared/ui/useSlidingPill'
+import useSlidingPill from '../../shared/ui/useSlidingPill'
 import './marketplace.css'
 
 type Product = {

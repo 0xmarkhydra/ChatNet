@@ -1,9 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { ArrowRight, AtSign, MapPin, Camera, Image as ImageIcon, LockKeyhole, Mail, PencilLine, Plus, RefreshCw, ShieldCheck, Users, UserRound, Video } from 'lucide-react'
-import type { Post } from '../features/feed/types'
-import type { FriendConnection } from '../features/contacts/types'
-import type { MediaAttachment } from '../shared/lib/media'
-import UserAvatar from '../shared/ui/UserAvatar'
+import type { Post } from '../feed/types'
+import type { FriendConnection } from '../contacts/types'
+import type { MediaAttachment } from '../../shared/lib/media'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 type Section = 'posts' | 'media' | 'about' | 'friends'
 type MediaItem = { postId: number; attachment: MediaAttachment; index: number }

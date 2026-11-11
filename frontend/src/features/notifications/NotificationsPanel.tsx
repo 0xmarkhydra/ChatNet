@@ -1,5 +1,5 @@
 import { Bell, Check, MessageCircle, UserPlus, X } from 'lucide-react'
-import type { FriendConnection } from '../features/contacts/types'
+import type { FriendConnection } from '../contacts/types'
 
 type Props = {
   requests: FriendConnection[]

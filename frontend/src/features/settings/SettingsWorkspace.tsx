@@ -3,7 +3,7 @@ import {
   Bell, Check, ChevronDown, Database, Languages, LockKeyhole, MessageCircle,
   Monitor, Palette, ShieldCheck, UserRound,
 } from "lucide-react";
-import type { UserPrivacy } from "../features/profile/types";
+import type { UserPrivacy } from "../profile/types";
 
 type Section =
   | "account" | "privacy" | "security" | "notifications" | "language"

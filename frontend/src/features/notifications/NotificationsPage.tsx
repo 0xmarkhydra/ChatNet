@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bell, Check, MessageCircle, Settings, UserRoundPlus, Users, X } from 'lucide-react'
-import type { FriendConnection } from '../features/contacts/types'
-import type { Conversation } from '../features/chat/types'
-import UserAvatar from '../shared/ui/UserAvatar'
-import useSlidingPill from '../shared/ui/useSlidingPill'
+import type { FriendConnection } from '../contacts/types'
+import type { Conversation } from '../chat/types'
+import UserAvatar from '../../shared/ui/UserAvatar'
+import useSlidingPill from '../../shared/ui/useSlidingPill'
 import { isIncomingFriendRequest, hasUnreadConversation } from './notification-count'
 import './notifications-page.css'
 

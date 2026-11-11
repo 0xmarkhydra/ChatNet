@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createSessionClient } from '../src/features/auth/session.ts'
 import { configureChatPersistenceStore, saveChatDrafts, loadChatDrafts, clearChatPersistence } from '../src/features/chat/chatPersistence.ts'
-import { persistChatOutboxChange, loadChatOutbox, clearChatOutbox } from '../src/chatOutbox.ts'
+import { persistChatOutboxChange, loadChatOutbox, clearChatOutbox } from '../src/features/chat/chatOutbox.ts'
 
 // Contract/unit tests. Injected transport is not evidence of a real login or delivered message.
 const ID = 'a7ce5309-8fb5-4f57-861c-ef54c75db291'

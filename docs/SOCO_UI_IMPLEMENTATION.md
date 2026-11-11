@@ -105,7 +105,7 @@ This is web/PWA UI refinement. It does not certify Flutter/TestFlight parity or 
 ## SocCo iOS Motion System — 2026-10-15
 
 A single reusable motion layer is loaded last in `frontend/src/main.tsx`:
-`frontend/src/design-system/motion.css`. It adds touch press-down scale (.965),
+`frontend/src/styles/motion.css`. It adds touch press-down scale (.965),
 active navigation spring, subtle screen fades, sheet entrances, contextual menus,
 new sent-message feedback and floating toast entrances. Animation durations are
 115–340ms, with opacity and transform used instead of animating layout dimensions.

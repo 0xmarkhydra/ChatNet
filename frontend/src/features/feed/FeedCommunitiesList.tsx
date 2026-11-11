@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronRight, Search, UsersRound } from 'lucide-react'
-import type { Conversation } from '../features/chat/types'
-import UserAvatar from '../shared/ui/UserAvatar'
+import type { Conversation } from '../chat/types'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 type Props = {
   groups: Conversation[]

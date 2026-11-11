@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Ban, Bell, CalendarClock, ChevronDown, ChevronRight, ClipboardList, FileText, Images, Languages, Link2, MoreHorizontal, Hash, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
-import type { GroupActivityKind } from '../features/chat/GroupActivities'
-import type { Conversation } from '../features/chat/types'
-import { CallHeaderActions } from '../features/calls/CallManager'
-import UserAvatar from '../shared/ui/UserAvatar'
-import type { GroupChannel } from '../features/chat/groupChannels'
+import type { GroupActivityKind } from './GroupActivities'
+import type { Conversation } from './types'
+import { CallHeaderActions } from '../calls/CallManager'
+import UserAvatar from '../../shared/ui/UserAvatar'
+import type { GroupChannel } from './groupChannels'
 
 type Props = {
   conversation: Conversation

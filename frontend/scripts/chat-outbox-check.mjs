@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import {
   clearChatOutbox, confirmChatMessage, enqueueChatMessage,
   loadChatOutbox, persistChatOutboxChange, retryableChatMessages,
-} from '../src/chatOutbox.ts'
+} from '../src/features/chat/chatOutbox.ts'
 
 const storage = new Map()
 const store = {

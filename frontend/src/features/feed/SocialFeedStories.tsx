@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronRight, Plus } from 'lucide-react'
-import type { Story } from '../features/feed/types'
-import UserAvatar from '../shared/ui/UserAvatar'
+import type { Story } from './types'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 type Props = {
   username: string

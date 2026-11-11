@@ -1,7 +1,7 @@
 import { useEffect, useRef, type FormEvent } from 'react'
 import { ArrowLeft, Camera, Check, Eye, MapPin, RotateCcw, Save, ShieldCheck } from 'lucide-react'
-import UserAvatar from '../shared/ui/UserAvatar'
-import type { ProfileMediaState, UserPrivacy } from '../features/profile/types'
+import UserAvatar from '../../shared/ui/UserAvatar'
+import type { ProfileMediaState, UserPrivacy } from './types'
 
 type Props = {
   profile: ProfileMediaState | null

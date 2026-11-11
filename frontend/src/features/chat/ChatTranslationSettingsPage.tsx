@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { ArrowLeft, Check, ChevronDown, Info, Languages, ShieldCheck, X } from 'lucide-react'
-import type { Conversation } from '../features/chat/types'
-import type { LanguageOption } from '../features/i18n/languages'
-import type { ChatTranslationDisplay, ChatTranslationSettings } from '../features/chat/conversationTranslationSettings'
-import UserAvatar from '../shared/ui/UserAvatar'
+import type { Conversation } from './types'
+import type { LanguageOption } from '../i18n/languages'
+import type { ChatTranslationDisplay, ChatTranslationSettings } from './conversationTranslationSettings'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 type Props = {
   conversation: Conversation

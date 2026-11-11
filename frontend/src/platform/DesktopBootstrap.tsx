@@ -3,7 +3,7 @@ import App from '../app/App'
 import DesktopScreenPicker from './DesktopScreenPicker'
 import { parseSession, type Session } from '../features/auth/session'
 import { clearChatPersistence, configureChatPersistenceStore } from '../features/chat/chatPersistence'
-import { clearChatOutbox } from '../chatOutbox'
+import { clearChatOutbox } from '../features/chat/chatOutbox'
 import { API } from '../shared/lib/config'
 import { desktopBridge, initializeDesktopPlatform } from './desktop'
 

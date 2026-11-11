@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import { Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings, ShoppingBag, UserRoundCheck } from 'lucide-react'
-import type { Tab } from './types'
-import UserAvatar from '../shared/ui/UserAvatar'
+import type { Tab } from '../types'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 type Props = {
   tab: Tab

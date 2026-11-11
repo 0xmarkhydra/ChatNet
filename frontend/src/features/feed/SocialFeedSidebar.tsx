@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Languages, MessageCircle, TrendingUp, UserPlus, UsersRound } from 'lucide-react'
-import type { Post } from '../features/feed/types'
-import type { FriendConnection, FriendSearchResult } from '../features/contacts/types'
-import UserAvatar from '../shared/ui/UserAvatar'
+import type { Post } from './types'
+import type { FriendConnection, FriendSearchResult } from '../contacts/types'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 type Props = {
   username: string

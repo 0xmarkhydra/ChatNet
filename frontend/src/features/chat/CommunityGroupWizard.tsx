@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Plus, Search, ShieldCheck, Users, X } from 'lucide-react'
-import type { FriendConnection } from '../features/contacts/types'
-import UserAvatar from '../shared/ui/UserAvatar'
+import type { FriendConnection } from '../contacts/types'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 export type CommunityCreationExtras = { description: string; topic: string; rules: string; visibility: 'public' | 'private' }
 

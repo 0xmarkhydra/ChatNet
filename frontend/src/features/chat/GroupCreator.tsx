@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { X } from 'lucide-react'
-import '../../styles/connection-tools.css'
+import '../../shared/ui/connection-tools.css'
 
 type Member = { id: number; username: string; displayName: string }
 

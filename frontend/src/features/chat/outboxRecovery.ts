@@ -2,7 +2,7 @@ import { clearPendingSend, loadPendingSend } from './chatPersistence'
 import {
   enqueueChatMessage, loadChatOutbox, persistChatOutboxChange,
   type QueuedChatMessage,
-} from '../../chatOutbox'
+} from './chatOutbox'
 
 // Preserve an ambiguous legacy POST's original clientId during the migration.
 export function restoreChatOutbox(userId: number, sessionId: string): QueuedChatMessage[] {
