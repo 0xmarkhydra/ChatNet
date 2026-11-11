@@ -1343,7 +1343,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	s.sendPushAsync(recipients, onesignalx.Notification{
 		Title: "ChatNet",
 		Body:  notificationBody,
-		URL:   fmt.Sprintf("https://chat.codelocal.cloud/?conversation=%d", conversationID),
+		URL:   fmt.Sprintf("https://chat.codelocal.cloud/?conversation=%d&message=%d", conversationID, m.ID),
 		Data:  map[string]any{"type": "message", "conversationId": conversationID, "messageId": m.ID},
 	})
 

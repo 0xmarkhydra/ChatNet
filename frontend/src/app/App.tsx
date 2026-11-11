@@ -1179,7 +1179,20 @@ export default function App({
         `[data-message-id="${jump.messageId}"]`,
       );
       if (!target) return;
-      target.scrollIntoView({ block: "center", behavior: "smooth" });
+      target.scrollIntoView({
+        block: "center",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      });
+      // A transient highlight makes the notification's exact message easy to locate.
+      if (target instanceof HTMLElement && typeof target.animate === "function") {
+        target.animate(
+          [
+            { outline: "2px solid var(--accent, #318a65)", outlineOffset: "3px", backgroundColor: "rgba(49,138,101,0.16)" },
+            { outline: "2px solid transparent", outlineOffset: "3px", backgroundColor: "transparent" },
+          ],
+          { duration: 2200, easing: "ease-out" },
+        );
+      }
       lastScrolledSearchJump.current = jump.revision;
     });
     return () => window.cancelAnimationFrame(frame);
@@ -2607,20 +2620,45 @@ export default function App({
   useEffect(() => {
     if (!session?.token) return;
 
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("tab") === "feed") {
-      setTab("feed");
-    } else if (params.get("tab") === "contacts") {
-      setTab("contacts");
-    }
-    const conversationID = Number(params.get("conversation"));
-    if (Number.isInteger(conversationID) && conversationID > 0) {
-      setTab("chat");
-      setActiveConversationId(conversationID);
-    }
-    if (params.has("tab") || params.has("conversation")) {
-      window.history.replaceState({}, "", window.location.pathname);
-    }
+    const openNotificationTarget = () => {
+      const url = new URL(window.location.href);
+      const params = url.searchParams;
+      if (params.get("tab") === "feed") {
+        setTab("feed");
+      } else if (params.get("tab") === "contacts") {
+        setTab("contacts");
+      }
+      const conversationID = Number(params.get("conversation"));
+      const messageID = Number(params.get("message"));
+      if (Number.isSafeInteger(conversationID) && conversationID > 0) {
+        setTab("chat");
+        setDesktopSection(null);
+        setChatSearchJump(
+          Number.isSafeInteger(messageID) && messageID > 0
+            ? {
+                conversationId: conversationID,
+                messageId: messageID,
+                revision: ++chatSearchJumpRevision.current,
+              }
+            : null,
+        );
+        setActiveConversationId(conversationID);
+      }
+      // Keep unrelated query parameters (e.g., invite links) intact.
+      if (params.has("tab") || params.has("conversation") || params.has("message")) {
+        params.delete("tab");
+        params.delete("conversation");
+        params.delete("message");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      }
+    };
+    openNotificationTarget();
+    window.addEventListener("popstate", openNotificationTarget);
+    window.addEventListener("pageshow", openNotificationTarget);
+    return () => {
+      window.removeEventListener("popstate", openNotificationTarget);
+      window.removeEventListener("pageshow", openNotificationTarget);
+    };
   }, [session?.token]);
 
   useEffect(() => {
