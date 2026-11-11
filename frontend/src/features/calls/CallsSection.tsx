@@ -13,8 +13,8 @@ export type CallsSectionProps = {
   friendQuery: string;
   session: Session;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
-  setContactsScreen: Dispatch<SetStateAction<FriendsScreen>>;
-  setDesktopSection: Dispatch<SetStateAction<"groups" | "calls" | null>>;
+  setContactsScreen: (next: FriendsScreen) => void;
+  setDesktopSection: (next: "groups" | "calls" | null) => void;
   setFriendQuery: Dispatch<SetStateAction<string>>;
   switchTab: (nextTab: Tab) => void;
   targetLanguage: string;
@@ -45,7 +45,7 @@ export default function CallsSection({
             directoryQuery={friendQuery}
             onDirectoryQueryChange={setFriendQuery}
             onDirectoryOpen={() => setContactsScreen("directory")}
-            onNavigate={(destination) => { switchTab(destination); setDesktopSection(null); }}
+            onNavigate={(destination) => switchTab(destination)}
             onOpenChat={(id) => { setDesktopSection(null); setActiveConversationId(id); }}
 
           />

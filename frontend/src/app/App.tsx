@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { TAB_PATH, tabFromPath } from "./routes";
+import { ROUTE, TAB_PATH, tabFromPath } from "./routes";
 import ProfileNote from "../features/profile/ProfileNote";
 import ConversationCategories, {
   CategoryAssignment,
@@ -306,10 +306,28 @@ export default function App({
   const navigate = useNavigate();
   const pathnameRef = useRef(location.pathname);
   pathnameRef.current = location.pathname;
+  // Path requested earlier in the same event; lets sequential setters coalesce
+  // into a single history entry before the router has re-rendered.
+  const pendingPathRef = useRef<string | null>(null);
+  pendingPathRef.current = null;
+  const currentPath = () => pendingPathRef.current ?? pathnameRef.current;
+  const navigateTo = (path: string) => {
+    if (currentPath() === path) return;
+    pendingPathRef.current = path;
+    navigate(path);
+  };
   const tab: Tab = tabFromPath(location.pathname) ?? "chat";
-  const setTab = (next: Tab) => {
-    const path = TAB_PATH[next];
-    navigate(path, { replace: pathnameRef.current === path });
+  const setTab = (next: Tab) => navigateTo(TAB_PATH[next]);
+  const desktopSection: "groups" | "calls" | null =
+    location.pathname === ROUTE.calls ? ("calls" as const) : (null as "groups" | null);
+  const setDesktopSection = (next: "groups" | "calls" | null) => {
+    if (next === "calls") navigateTo(ROUTE.calls);
+    else if (currentPath() === ROUTE.calls) navigateTo(TAB_PATH.chat);
+  };
+  const desktopProfileSettings = location.pathname === ROUTE.settings;
+  const setDesktopProfileSettings = (next: boolean) => {
+    if (next) navigateTo(ROUTE.settings);
+    else if (currentPath() === ROUTE.settings) navigateTo(TAB_PATH.profile);
   };
   useEffect(() => {
     if (tabFromPath(location.pathname) !== null) return;
@@ -515,7 +533,16 @@ export default function App({
   const preferenceRevision = useRef(0);
   const [newChatMode, setNewChatMode] = useState<NewChatMode>("none");
   const [friendQuery, setFriendQuery] = useState("");
-  const [contactsScreen, setContactsScreen] = useState<FriendsScreen>("directory");
+  const [localContactsScreen, setLocalContactsScreen] = useState<FriendsScreen>("directory");
+  // On the contacts route the screen lives in the URL; inside Calls it stays local.
+  const contactsScreen: FriendsScreen =
+    tab === "contacts"
+      ? location.pathname === ROUTE.invitations ? "invitations" : "directory"
+      : localContactsScreen;
+  const setContactsScreen = (next: FriendsScreen) => {
+    if (tab === "contacts") navigateTo(next === "invitations" ? ROUTE.invitations : TAB_PATH.contacts);
+    else setLocalContactsScreen(next);
+  };
   const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([]);
   const [friendSearching, setFriendSearching] = useState(false);
   const [friendSearchError, setFriendSearchError] = useState(false);
@@ -548,9 +575,6 @@ export default function App({
   const [blockedError, setBlockedError] = useState("");
   const [directUsername, setDirectUsername] = useState("");
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
-  const [desktopSection, setDesktopSection] = useState<
-    "groups" | "calls" | null
-  >(null);
   const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);
   useEffect(() => {
     if (translationSettingsConversationId !== null &&
@@ -571,7 +595,6 @@ export default function App({
   const nearbyRequest = useRef(0);
 
   const [profileTimelineOpen, setProfileTimelineOpen] = useState(false);
-  const [desktopProfileSettings, setDesktopProfileSettings] = useState(false);
   const [isProfileDesktop, setIsProfileDesktop] = useState(
     () => window.matchMedia("(min-width: 761px)").matches,
   );
@@ -2674,7 +2697,6 @@ export default function App({
       const messageID = Number(params.get("message"));
       if (Number.isSafeInteger(conversationID) && conversationID > 0) {
         targetPath = TAB_PATH.chat;
-        setDesktopSection(null);
         setChatSearchJump(
           Number.isSafeInteger(messageID) && messageID > 0
             ? {
@@ -5162,15 +5184,10 @@ export default function App({
     setTranslations({});
     setTranslationOriginals({});
   };
-  const switchTab = (nextTab: Tab) => {
-    setDesktopSection(null);
+  const switchTab = (nextTab: Tab, path: string = TAB_PATH[nextTab]) => {
     setFeedCommunitiesOpen(false);
     setTranslationSettingsConversationId(null);
-    if (nextTab === "contacts") setContactsScreen("directory");
-    if (nextTab === "profile") {
-      setDesktopProfileSettings(false);
-      setProfileEditorOpen(false);
-    }
+    if (nextTab === "profile") setProfileEditorOpen(false);
     if (activePostId !== null) {
       setActivePostId(null);
       feedScrollBeforeComments.current = null;
@@ -5182,7 +5199,7 @@ export default function App({
     }
     if (nextTab === "feed") setFeedFilter("all");
     setQuickSearchOpen(false);
-    setTab(nextTab);
+    navigateTo(path);
     setQuickCreateOpen(false);
     setGlobalSearch("");
     if (nextTab !== "chat") setActiveConversationId(null);
@@ -5487,18 +5504,14 @@ export default function App({
         unreadTotal={unreadTotal}
         feedSaved={feedFilter === "saved"}
         onNavigate={switchTab}
-        onCalls={() => {
-          switchTab("chat");
-          setDesktopSection("calls");
-        }}
+        onCalls={() => switchTab("chat", ROUTE.calls)}
         onSaved={() => {
           switchTab("feed");
           setFeedFilter("saved");
           void loadSavedPosts();
         }}
         onSettings={() => {
-          switchTab("profile");
-          setDesktopProfileSettings(true);
+          switchTab("profile", ROUTE.settings);
           setProfileTimelineOpen(false);
         }}
       />
@@ -5980,8 +5993,6 @@ export default function App({
           globalSearch={globalSearch}
           openVisitor={openVisitor}
           setActiveConversationId={setActiveConversationId}
-          setContactsScreen={setContactsScreen}
-          setDesktopProfileSettings={setDesktopProfileSettings}
           setProfileTimelineOpen={setProfileTimelineOpen}
           switchTab={switchTab}
         />
@@ -6374,7 +6385,7 @@ export default function App({
         tab={tab}
         t={t}
         switchTab={switchTab}
-        onCalls={() => { switchTab("chat"); setDesktopSection("calls"); }}
+        onCalls={() => switchTab("chat", ROUTE.calls)}
         callsActive={tab === "chat" && desktopSection === "calls"}
         unreadTotal={unreadTotal}
         pushEnabled={pushEnabled}

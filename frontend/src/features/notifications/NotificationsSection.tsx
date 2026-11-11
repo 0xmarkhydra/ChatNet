@@ -1,3 +1,4 @@
+import { ROUTE } from "../../app/routes";
 import NotificationsPage from "./NotificationsPage";
 import type { FriendSearchResult, FriendConnection } from "../contacts/types";
 import { type Conversation } from "../chat/types";
@@ -15,10 +16,8 @@ export type NotificationsSectionProps = {
   globalSearch: string;
   openVisitor: (username: string) => void;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
-  setContactsScreen: Dispatch<SetStateAction<FriendsScreen>>;
-  setDesktopProfileSettings: Dispatch<SetStateAction<boolean>>;
   setProfileTimelineOpen: Dispatch<SetStateAction<boolean>>;
-  switchTab: (nextTab: Tab) => void;
+  switchTab: (nextTab: Tab, path?: string) => void;
 };
 
 export default function NotificationsSection({
@@ -30,8 +29,6 @@ export default function NotificationsSection({
   globalSearch,
   openVisitor,
   setActiveConversationId,
-  setContactsScreen,
-  setDesktopProfileSettings,
   setProfileTimelineOpen,
   switchTab,
 }: NotificationsSectionProps) {
@@ -48,13 +45,11 @@ export default function NotificationsSection({
               setActiveConversationId(id);
             }}
             onOpenInvitations={() => {
-              switchTab("contacts");
-              setContactsScreen("invitations");
+              switchTab("contacts", ROUTE.invitations);
             }}
             onOpenFriend={openVisitor}
             onSettings={() => {
-              switchTab("profile");
-              setDesktopProfileSettings(true);
+              switchTab("profile", ROUTE.settings);
               setProfileTimelineOpen(false);
             }}
           />

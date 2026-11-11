@@ -79,7 +79,7 @@ export type ProfileSectionProps = {
   sessionsError: string;
   sessionsOpen: boolean;
   setBlockedOpen: Dispatch<SetStateAction<boolean>>;
-  setDesktopProfileSettings: Dispatch<SetStateAction<boolean>>;
+  setDesktopProfileSettings: (next: boolean) => void;
   setGlobalSearch: Dispatch<SetStateAction<string>>;
   setLocalePickerOpen: Dispatch<SetStateAction<boolean>>;
   setLocaleSearch: Dispatch<SetStateAction<string>>;
