@@ -23,6 +23,9 @@ import {
   type ChatQuickHit,
 } from "../features/chat/useChatQuickSearch";
 import ChatQuickSearch from "../features/chat/ChatQuickSearch";
+import AppHeader, { AppHeaderActions } from "./AppHeader";
+import AppLayout from "./AppLayout";
+import HeaderSearch from "./HeaderSearch";
 import { useContactData } from "../features/contacts/useContactData";
 import { useFeedData } from "../features/feed/useFeedData";
 import { usePostSearch } from "../features/feed/usePostSearch";
@@ -5372,7 +5375,7 @@ export default function App({
   // Render the same quick-search control at only one location per viewport.
   // Its globalSearch state, keyboard behavior and results stay unchanged.
   const quickSearchControl = (
-        <div className="appbar-search-anchor" ref={quickSearchAnchorRef}>
+        <HeaderSearch anchorRef={quickSearchAnchorRef}>
           <label className="appbar-search">
             <UiIcon name="search" size={27} />
             <input
@@ -5447,11 +5450,11 @@ export default function App({
               onHit={openChatQuickHit}
             />
           )}
-        </div>
+        </HeaderSearch>
   );
 
   return (
-    <main
+    <AppLayout
       className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
     >
       <AppSidebar
@@ -5564,8 +5567,8 @@ export default function App({
           }}
         />
       )}
-      <header
-        className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
+      <AppHeader
+        className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header" : ""}`}
       >
         <div className="app-page-heading">
           <strong>
@@ -5619,7 +5622,11 @@ export default function App({
           <strong>SocCO</strong>
         </div>
         {!searchInConversationList && quickSearchControl}
-        <div className="appbar-actions">
+        <AppHeaderActions account={tab === "profile" ? null : (
+          <button className="social-feed-header-account" type="button" aria-label="Mở trang cá nhân" onClick={() => switchTab("profile")}>
+            <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="social-feed-header-avatar" />
+          </button>
+        )}>
           {tab === "chat" && (
             <>
               {desktopSection === "groups" && <button type="button" className="appbar-icon-button notification-appbar" aria-label="Mở thông báo" onClick={() => switchTab("notifications")}>
@@ -5714,9 +5721,6 @@ export default function App({
                   </>
                 )}
               </div>
-              {desktopSection === "groups" && <button type="button" className="social-feed-header-account" aria-label="Mở trang cá nhân" onClick={() => switchTab("profile")}>
-                <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="social-feed-header-avatar"/>
-              </button>}
             </>
           )}
 
@@ -5749,21 +5753,6 @@ export default function App({
                 {notificationItemCount > 0 && (
                   <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>
                 )}
-              </button>
-              <button
-                className="social-feed-header-account"
-                type="button"
-                aria-label="Mở trang cá nhân"
-                onClick={() => switchTab("profile")}
-              >
-                <UserAvatar
-                  username={name}
-                  name={userLabel(
-                    profileMedia?.displayName || session.user.displayName,
-                    name,
-                  )}
-                  className="social-feed-header-avatar"
-                />
               </button>
             </>
           )}
@@ -5837,16 +5826,6 @@ export default function App({
               >
                 <UiIcon name="plus" size={31} />
               </button>
-              <button
-                className="social-feed-header-account"
-                type="button"
-                aria-label="Mở trang cá nhân"
-                onClick={() => switchTab("profile")}
-              >
-                <UserAvatar username={name}
-                  name={userLabel(profileMedia?.displayName || session.user.displayName, name)}
-                  className="social-feed-header-avatar" />
-              </button>
             </>
           )}
 
@@ -5877,8 +5856,8 @@ export default function App({
               </button>
             </>
           )}
-        </div>
-      </header>
+        </AppHeaderActions>
+      </AppHeader>
 
       {pushPrompt && !pushPromptDismissed && !pushEnabled && (
         <section
@@ -8750,6 +8729,6 @@ export default function App({
         unreadTotal={unreadTotal}
         pushEnabled={pushEnabled}
       />
-    </main>
+    </AppLayout>
   );
 }

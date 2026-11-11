@@ -1,0 +1,80 @@
+- generic [ref=e6]:
+  - banner [ref=e8]:
+    - generic [ref=e10]:
+      - button "Log in" [ref=e11] [cursor=pointer]
+      - button "Sign up for free" [ref=e12] [cursor=pointer]
+  - generic [ref=e14]:
+    - main [ref=e15]:
+      - region "Conversation chat-61e57a42-5e14-4f8f-8261-2049782ef88d" [ref=e17]:
+        - generic [ref=e20]:
+          - generic:
+            - generic:
+              - generic:
+                - list "Conversation"
+    - generic [ref=e23]:
+      - navigation "Sidebar shortcuts":
+        - button "ChatGPT" [ref=e24] [cursor=pointer]
+        - navigation "Sidebar" [ref=e29]:
+          - link "New chat" [ref=e30] [cursor=pointer]:
+            - /url: /?noauth_recent_chat_failed=1
+          - link "Images" [ref=e36] [cursor=pointer]:
+            - /url: /images
+          - link "Plugins" [ref=e44] [cursor=pointer]:
+            - /url: /plugins?plugins_landing=1
+          - link "See plans and pricing" [ref=e49] [cursor=pointer]:
+            - /url: https://openai.com/chatgpt/pricing/
+          - link "Help" [ref=e59] [cursor=pointer]:
+            - /url: https://help.openai.com
+          - button "Deep research" [ref=e68] [cursor=pointer]
+          - link "Settings" [ref=e73] [cursor=pointer]:
+            - /url: /settings
+      - complementary "Sidebar" [ref=e79]:
+        - button "Close sidebar" [disabled] [ref=e83]
+        - generic [ref=e88]:
+          - heading "Get responses tailored to you" [level=2] [ref=e89]
+          - paragraph [ref=e90]: Log in to get answers based on saved chats, plus create images and upload files.
+          - button "Log in" [ref=e91] [cursor=pointer]
+  - generic [ref=e94]:
+    - contentinfo [ref=e95]:
+      - generic [ref=e100]:
+        - heading "Where should we begin?" [level=1] [ref=e102]
+        - generic [ref=e103]:
+          - button "What can you do?" [ref=e109] [cursor=pointer]
+          - generic [ref=e117]:
+            - generic [ref=e121]:
+              - generic [ref=e122]: Chat with ChatGPT
+              - textbox "Chat with ChatGPT" [ref=e125]:
+                - /placeholder: Ask ChatGPT
+            - generic [ref=e126]:
+              - button "Add files and more" [ref=e128] [cursor=pointer]
+              - generic [ref=e131]:
+                - button "Start dictation" [ref=e133] [cursor=pointer]
+                - button "Send message" [disabled] [ref=e137]
+    - paragraph [ref=e144]:
+      - generic [ref=e145]:
+        - text: ChatGPT is AI. By using it, you agree to our
+        - link "Terms" [ref=e146] [cursor=pointer]:
+          - /url: https://openai.com/terms
+        - text: "&"
+        - link "Privacy Policy" [ref=e147] [cursor=pointer]:
+          - /url: https://openai.com/privacy
+        - text: . Chats may be reviewed and used to improve our AI models.
+        - link "Learn more about how your data is used to improve AI models" [ref=e148] [cursor=pointer]:
+          - /url: https://help.openai.com/en/articles/5722486-how-your-data-is-used-to-improve-model-performance
+          - text: Learn more
+  - generic [ref=e150]:
+    - dialog "We use cookies":
+      - group "We use cookies" [ref=e151]:
+        - generic [ref=e152]:
+          - heading "We use cookies" [level=2] [ref=e153]
+          - paragraph [ref=e154]:
+            - text: Cookies help this site function, measure usage, and support marketing.
+            - link "Manage" [ref=e155] [cursor=pointer]:
+              - /url: /privacy?returnTo=%2F
+            - text: your cookie preferences anytime. Learn more about our
+            - link "cookie policy" [ref=e156] [cursor=pointer]:
+              - /url: https://openai.com/policies/cookie-policy/
+            - text: .
+        - generic [ref=e157]:
+          - button "Reject non-essential" [ref=e158] [cursor=pointer]
+          - button "Accept all" [ref=e159] [cursor=pointer]

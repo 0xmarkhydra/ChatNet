@@ -1,0 +1,14 @@
+- complementary [ref=f16e6]:
+  - generic [ref=f16e12]:
+    - button "Hide sidebar" [expanded] [ref=f16e15] [cursor=pointer]
+    - navigation "Settings" [ref=f16e20]:
+      - generic [ref=f16e21]:
+        - generic [ref=f16e22]:
+          - link "Back to app" [ref=f16e23] [cursor=pointer]
+          - generic [ref=f16e31]:
+            - generic [ref=f16e35]: Search settings
+            - searchbox "Search settings" [active] [ref=f16e36]
+        - status [ref=f16e38]:
+          - generic [ref=f16e39]: Loading sidebar…
+  - generic:
+    - separator

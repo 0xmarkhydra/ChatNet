@@ -307,10 +307,4 @@
 @media (max-width:360px) {
   .call-center-tabs button { gap:3px; font-size:10px; }
 }
-@media(min-width:761px) {
-  .modern-shell.app-layout:has(.call-center.is-embedded) > .chatnet-appbar {display:none;}
-}
-@media(max-width:760px) {
-  .app-shell:has(.call-center.is-embedded) > .chatnet-appbar {display:none;}
-}
 @media(max-width:760px) { .modern-shell .bottom-navigation { grid-template-columns: repeat(6,minmax(0,1fr)); } }

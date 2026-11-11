@@ -6,6 +6,7 @@ import type { MediaAttachment } from '../../shared/lib/media'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../shared/ui/MediaAttachmentsView'
 import UiIcon from '../../shared/ui/UiIcon'
+import PrivacyPicker from './PrivacyPicker'
 
 type Props = {
   name: string
@@ -76,15 +77,7 @@ export default function PostComposer({
     return () => window.removeEventListener('resize', resize)
   }, [popup, postText, postBackground, postComposerRef])
 
-  const postAudience = (
-    <label>Ai có thể xem?
-      <select disabled={!!pendingPost} value={postVisibility} onChange={event => setPostVisibility(event.target.value as typeof postVisibility)}>
-        <option value="public">🌐 Công khai</option>
-        <option value="friends">👥 Bạn bè</option>
-        <option value="private">🔒 Chỉ mình tôi</option>
-      </select>
-    </label>
-  )
+  const postAudience = <PrivacyPicker disabled={!!pendingPost} value={postVisibility} onChange={setPostVisibility} />
   return (
     <form className={`post-box zalo-post-composer ${popup ? 'profile-popup-composer' : ''}`} onSubmit={createPost}>
       <div className="post-prompt compact-post-prompt">
@@ -110,6 +103,7 @@ export default function PostComposer({
         className="hidden-media-input"
         type="file"
         accept="image/*"
+        multiple
         onChange={(event) => {
           const files = Array.from(event.currentTarget.files || [])
           event.currentTarget.value = ''

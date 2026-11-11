@@ -1,0 +1,24 @@
+- generic [ref=f11e5]:
+  - complementary [ref=f11e6]:
+    - generic [ref=f11e12]:
+      - generic [ref=f11e13]:
+        - generic [ref=f11e14]: ChatGPT
+        - generic [ref=f11e20]:
+          - button "Search" [ref=f11e21] [cursor=pointer]
+          - button "Hide sidebar" [expanded] [ref=f11e29] [cursor=pointer]
+      - navigation "Chat history" [ref=f11e34]:
+        - button "New chat" [ref=f11e38] [cursor=pointer]
+        - generic [ref=f11e51]:
+          - button "Scheduled" [ref=f11e52] [cursor=pointer]
+          - button "Library" [ref=f11e61] [cursor=pointer]
+          - button "Plugins" [ref=f11e69] [cursor=pointer]
+          - button "Explore" [ref=f11e78] [cursor=pointer]
+      - button "Open profile menu" [disabled] [ref=f11e96]:
+        - generic [ref=f11e97]:
+          - status [ref=f11e98]: Loading profile
+          - generic [ref=f11e102]:
+            - generic [ref=f11e103]: JEI
+            - generic [ref=f11e104]: Plus
+    - generic:
+      - separator
+  - main [ref=f11e109]

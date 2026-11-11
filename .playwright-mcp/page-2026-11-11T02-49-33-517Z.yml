@@ -1,0 +1,1400 @@
+- generic [ref=f20e1]:
+  - generic [ref=f20e359]:
+    - link "Skip to content" [ref=f20e361] [cursor=pointer]:
+      - /url: "#_r_3a_"
+    - generic [ref=f20e363]:
+      - complementary [ref=f20e364]:
+        - generic [ref=f20e370]:
+          - generic [ref=f20e371]:
+            - 'button "Switch mode, current mode: ChatGPT" [ref=f20e372] [cursor=pointer]':
+              - generic [ref=f20e373]: ChatGPT
+            - generic [ref=f20e381]:
+              - button "Search" [ref=f20e382] [cursor=pointer]
+              - button "Hide sidebar" [expanded] [ref=f20e390] [cursor=pointer]
+          - navigation "Chat history" [ref=f20e395]:
+            - button "New chat" [ref=f20e399] [cursor=pointer]
+            - generic [ref=f20e409]:
+              - generic [ref=f20e412]:
+                - button "Scheduled" [ref=f20e413] [cursor=pointer]
+                - button "Library" [ref=f20e422] [cursor=pointer]
+                - button "Plugins" [ref=f20e430] [cursor=pointer]
+                - button "Explore" [ref=f20e439] [cursor=pointer]
+              - generic [ref=f20e450]:
+                - generic [ref=f20e453]:
+                  - generic [ref=f20e454]:
+                    - button "Projects" [expanded] [ref=f20e457] [cursor=pointer]
+                    - generic:
+                      - generic:
+                        - generic:
+                          - button "Project sidebar options"
+                          - button "Add new project" [ref=f20e462] [cursor=pointer]
+                  - list [ref=f20e472]:
+                    - listitem [ref=f20e473]: No projects
+                - generic [ref=f20e477]:
+                  - generic [ref=f20e478]:
+                    - button "Recents" [expanded] [ref=f20e481] [cursor=pointer]
+                    - generic:
+                      - generic:
+                        - generic:
+                          - button "Chat sidebar options"
+                          - button "New chat"
+                  - list [ref=f20e491]:
+                    - listitem [ref=f20e492]: No chats
+          - generic [ref=f20e500] [cursor=pointer]:
+            - button "Open profile menu" [ref=f20e501]
+            - generic:
+              - generic:
+                - generic:
+                  - generic: JEI
+                  - generic: Plus
+        - generic:
+          - separator
+      - generic [ref=f20e503]:
+        - main [ref=f20e505]:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - tablist "Browse plugins or skills":
+                    - tab "Plugins" [selected] [ref=f20e506] [cursor=pointer]
+                    - tab "Skills" [ref=f20e507] [cursor=pointer]
+                  - generic:
+                    - link "Manage" [ref=f20e509] [cursor=pointer]:
+                      - /url: /settings/plugins-settings
+                    - button "Add" [expanded] [ref=f20e513] [cursor=pointer]
+          - generic [ref=f20e528]:
+            - generic [ref=f20e532]:
+              - heading "Plugins" [level=1] [ref=f20e533]
+              - generic [ref=f20e534]: Connect plugins to let ChatGPT work across your tools
+            - generic [ref=f20e539]:
+              - generic [ref=f20e543]: Search plugins
+              - textbox "Search plugins" [ref=f20e544]
+            - generic [ref=f20e546]:
+              - generic [ref=f20e580]:
+                - heading [level=2] [ref=f20e582]:
+                  - link "Installed" [ref=f20e583] [cursor=pointer]:
+                    - /url: /settings/plugins-settings
+                - link "Plugin Creator" [ref=f20e588] [cursor=pointer]:
+                  - /url: /plugins/plugin_connector_1p_e1a10c53223481918a42f1510ec46c1e
+                  - generic [aria-hidden]: Plugin Creator
+              - tablist "Plugin directory" [ref=f20e558]:
+                - tab "Public" [selected] [ref=f20e560] [cursor=pointer]
+              - generic [ref=f20e590]:
+                - heading [level=2] [ref=f20e592]:
+                  - link "Popular" [ref=f20e593] [cursor=pointer]:
+                    - /url: /plugins?category=featured
+                - generic [ref=f20e598]:
+                  - generic [ref=f20e599] [cursor=pointer]:
+                    - link "Gmail" [ref=f20e600]:
+                      - /url: /plugins/plugin_connector_1p_95d39881713c8191931482a62d6edff9
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Gmail"
+                      - generic:
+                        - generic:
+                          - generic: Gmail
+                          - generic: Read and manage Gmail
+                        - button "Install Gmail" [ref=f20e602]
+                  - generic [ref=f20e605] [cursor=pointer]:
+                    - link "Google Drive" [ref=f20e606]:
+                      - /url: /plugins/plugin_connector_1p_ab21a553bfbc81919ea8fd1858e3ffa7
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Google Drive"
+                      - generic:
+                        - generic:
+                          - generic: Google Drive
+                          - generic: Drive, Docs, Sheets or Slides
+                        - button "Install Google Drive" [ref=f20e608]
+                  - generic [ref=f20e611] [cursor=pointer]:
+                    - link "Health" [ref=f20e612]:
+                      - /url: /plugins/plugin_connector_1p_e569f8b8dfd08191903c9bd2cd7da9ac
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Health"
+                      - generic:
+                        - generic:
+                          - generic: Health
+                          - generic: Explore your health data in ChatGPT
+                        - img "Unavailable" [ref=f20e614]
+                  - generic [ref=f20e617] [cursor=pointer]:
+                    - link "GitHub" [ref=f20e618]:
+                      - /url: /plugins/plugin_connector_1p_1a69035c238881919c4190932b2df699
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "GitHub"
+                      - generic:
+                        - generic:
+                          - generic: GitHub
+                          - generic: Triage PRs, issues, CI, and publish flows
+                        - button "Install GitHub" [ref=f20e620]
+                  - generic [ref=f20e623] [cursor=pointer]:
+                    - link "Remote Desktop Commander" [ref=f20e624]:
+                      - /url: /plugins/plugin_asdk_app_6a057d268ebc81919918d37eec718425
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Remote Desktop Commander"
+                      - generic:
+                        - generic:
+                          - generic: Remote Desktop Commander
+                          - generic: Use your computer from chat
+                        - button "Install Remote Desktop Commander" [ref=f20e626]
+                  - generic [ref=f20e629] [cursor=pointer]:
+                    - link "Supabase" [ref=f20e630]:
+                      - /url: /plugins/plugin_asdk_app_69d3e5ee6a708191baa733f7b8931995
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Supabase"
+                      - generic:
+                        - generic:
+                          - generic: Supabase
+                          - generic: Manage and query databases
+                        - button "Install Supabase" [ref=f20e632]
+              - generic [ref=f20e635]:
+                - heading [level=2] [ref=f20e637]:
+                  - link "New & Noteworthy" [ref=f20e638] [cursor=pointer]:
+                    - /url: /plugins?category=new-and-noteworthy
+                - generic [ref=f20e643]:
+                  - generic [ref=f20e644] [cursor=pointer]:
+                    - link "iCloud Mail" [ref=f20e645]:
+                      - /url: /plugins/plugin_connector_6a99cb6846448190875813bf1e8e5504
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "iCloud Mail"
+                      - generic:
+                        - generic:
+                          - generic: iCloud Mail
+                          - generic: Read and manage iCloud email
+                        - button "Install iCloud Mail" [ref=f20e647]
+                  - generic [ref=f20e650] [cursor=pointer]:
+                    - link "iCloud Calendar" [ref=f20e651]:
+                      - /url: /plugins/plugin_connector_6a99cb684648819088fe4d6a0e373614
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "iCloud Calendar"
+                      - generic:
+                        - generic:
+                          - generic: iCloud Calendar
+                          - generic: Read and manage iCloud events
+                        - button "Install iCloud Calendar" [ref=f20e653]
+                  - generic [ref=f20e656] [cursor=pointer]:
+                    - link "ElevenLabs" [ref=f20e657]:
+                      - /url: /plugins/plugin_asdk_app_6a8d784b60cc81919aeafbfaeda5fbcf
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "ElevenLabs"
+                      - generic:
+                        - generic:
+                          - generic: ElevenLabs
+                          - generic: Voice agents and media
+                        - button "Install ElevenLabs" [ref=f20e659]
+                  - generic [ref=f20e662] [cursor=pointer]:
+                    - link "Tripsy" [ref=f20e663]:
+                      - /url: /plugins/plugin_asdk_app_6a03b72913d88191b464189e99b02d38
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Tripsy"
+                      - generic:
+                        - generic:
+                          - generic: Tripsy
+                          - generic: Plan and organize your trips
+                        - button "Install Tripsy" [ref=f20e665]
+                  - generic [ref=f20e668] [cursor=pointer]:
+                    - link "Sonos" [ref=f20e669]:
+                      - /url: /plugins/plugin_asdk_app_6aa1cd6835e48191b9ade73ac9fcd180
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Sonos"
+                      - generic:
+                        - generic:
+                          - generic: Sonos
+                          - generic: Control your Sonos system
+                        - button "Install Sonos" [ref=f20e671]
+                  - generic [ref=f20e674] [cursor=pointer]:
+                    - link "Hevy" [ref=f20e675]:
+                      - /url: /plugins/plugin_asdk_app_6a47ca602a648191b777ecea734e4b9d
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Hevy"
+                      - generic:
+                        - generic:
+                          - generic: Hevy
+                          - generic: Gym workout plans and insights
+                        - button "Install Hevy" [ref=f20e677]
+              - generic [ref=f20e680]:
+                - heading [level=2] [ref=f20e682]:
+                  - link "Small Business" [ref=f20e683] [cursor=pointer]:
+                    - /url: /plugins?category=small-business
+                - generic [ref=f20e688]:
+                  - generic [ref=f20e689] [cursor=pointer]:
+                    - link "Dropbox" [ref=f20e690]:
+                      - /url: /plugins/plugin_asdk_app_69b31dc2110c8191b8b47dc98fe5a052
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Dropbox"
+                      - generic:
+                        - generic:
+                          - generic: Dropbox
+                          - generic: Find, create, and take action
+                        - button "Install Dropbox" [ref=f20e692]
+                  - generic [ref=f20e695] [cursor=pointer]:
+                    - link "HubSpot" [ref=f20e696]:
+                      - /url: /plugins/plugin_asdk_app_697acb8e53d88191bf7a79e62012ae14
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "HubSpot"
+                      - generic:
+                        - generic:
+                          - generic: HubSpot
+                          - generic: Insights to action in HubSpot
+                        - button "Install HubSpot" [ref=f20e698]
+                  - generic [ref=f20e701] [cursor=pointer]:
+                    - link "Stripe" [ref=f20e702]:
+                      - /url: /plugins/plugin_connector_690ab09fa43c8191bca40280e4563238
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Stripe"
+                      - generic:
+                        - generic:
+                          - generic: Stripe
+                          - generic: Accept payments, grow revenue.
+                        - button "Install Stripe" [ref=f20e704]
+                  - generic [ref=f20e707] [cursor=pointer]:
+                    - link "Canva" [ref=f20e708]:
+                      - /url: /plugins/plugin_connector_68df33b1a2d081918778431a9cfca8ba
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Canva"
+                      - generic:
+                        - generic:
+                          - generic: Canva
+                          - generic: Create, review, edit designs
+                        - button "Install Canva" [ref=f20e710]
+                  - generic [ref=f20e713] [cursor=pointer]:
+                    - link "Gusto" [ref=f20e714]:
+                      - /url: /plugins/plugin_asdk_app_6941e1d349208191b984b93cb344be5b
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Gusto"
+                      - generic:
+                        - generic:
+                          - generic: Gusto
+                          - generic: People and payroll, made easy
+                        - button "Install Gusto" [ref=f20e716]
+                  - generic [ref=f20e719] [cursor=pointer]:
+                    - link "ChatGPT Ads Manager" [ref=f20e720]:
+                      - /url: /plugins/plugin_connector_1p_2eb0f69766cc81919c6912b2a2e0755a
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "ChatGPT Ads Manager"
+                      - generic:
+                        - generic:
+                          - generic: ChatGPT Ads Manager
+                          - generic: Manage ads and performance
+                        - button "Install ChatGPT Ads Manager" [ref=f20e722]
+              - generic [ref=f20e725]:
+                - heading [level=2] [ref=f20e727]:
+                  - link "Productivity" [ref=f20e728] [cursor=pointer]:
+                    - /url: /plugins?category=productivity
+                - generic [ref=f20e733]:
+                  - generic [ref=f20e734] [cursor=pointer]:
+                    - link "Notion" [ref=f20e735]:
+                      - /url: /plugins/plugin_asdk_app_69c18c28f1188191bf5b8445c4ab0a2e
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Notion"
+                      - generic:
+                        - generic:
+                          - generic: Notion
+                          - generic: Create docs, tasks, databases
+                        - button "Install Notion" [ref=f20e737]
+                  - generic [ref=f20e740] [cursor=pointer]:
+                    - link "Google Calendar" [ref=f20e741]:
+                      - /url: /plugins/plugin_connector_1p_f8509de903288191b14a160c6c5d20b0
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Google Calendar"
+                      - generic:
+                        - generic:
+                          - generic: Google Calendar
+                          - generic: Manage Google Calendar events
+                        - button "Install Google Calendar" [ref=f20e743]
+                  - generic [ref=f20e746] [cursor=pointer]:
+                    - link "Writing Style" [ref=f20e747]:
+                      - /url: /plugins/plugin_connector_1p_8ad8b138a8dc8191a1087a834cb737cd
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Writing Style"
+                      - generic:
+                        - generic:
+                          - generic: Writing Style
+                          - generic: Write with context from your own writing
+                        - button "Install Writing Style" [ref=f20e749]
+                  - generic [ref=f20e752] [cursor=pointer]:
+                    - link "Metricool" [ref=f20e753]:
+                      - /url: /plugins/plugin_asdk_app_69d73fc8aa5c8191bec1583760b130c7
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Metricool"
+                      - generic:
+                        - generic:
+                          - generic: Metricool
+                          - generic: Analyze and schedule posts
+                        - button "Install Metricool" [ref=f20e755]
+                  - generic [ref=f20e758] [cursor=pointer]:
+                    - link "Dropbox" [ref=f20e759]:
+                      - /url: /plugins/plugin_asdk_app_69b31dc2110c8191b8b47dc98fe5a052
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Dropbox"
+                      - generic:
+                        - generic:
+                          - generic: Dropbox
+                          - generic: Find, create, and take action
+                        - button "Install Dropbox" [ref=f20e761]
+                  - generic [ref=f20e764] [cursor=pointer]:
+                    - link "Outlook Calendar" [ref=f20e765]:
+                      - /url: /plugins/plugin_connector_1p_fd0f4f41caa88191a9456514bbffa06d
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Outlook Calendar"
+                      - generic:
+                        - generic:
+                          - generic: Outlook Calendar
+                          - generic: Manage Outlook schedules
+                        - button "Install Outlook Calendar" [ref=f20e767]
+              - generic [ref=f20e770]:
+                - heading [level=2] [ref=f20e772]:
+                  - link "Communication" [ref=f20e773] [cursor=pointer]:
+                    - /url: /plugins?category=communication
+                - generic [ref=f20e778]:
+                  - generic [ref=f20e779] [cursor=pointer]:
+                    - link "Outlook Email" [ref=f20e780]:
+                      - /url: /plugins/plugin_connector_1p_6bcb5879c73c819196abc70016166099
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Outlook Email"
+                      - generic:
+                        - generic:
+                          - generic: Outlook Email
+                          - generic: Triage Outlook inboxes
+                        - button "Install Outlook Email" [ref=f20e782]
+                  - generic [ref=f20e785] [cursor=pointer]:
+                    - link "Slack" [ref=f20e786]:
+                      - /url: /plugins/plugin_asdk_app_69a1d78e929881919bba0dbda1f6436d
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Slack"
+                      - generic:
+                        - generic:
+                          - generic: Slack
+                          - generic: Read and manage Slack
+                        - button "Install Slack" [ref=f20e788]
+                  - generic [ref=f20e791] [cursor=pointer]:
+                    - link "Hostinger Mail" [ref=f20e792]:
+                      - /url: /plugins/plugin_asdk_app_6a323a8a890c819190480c9044395170
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Hostinger Mail"
+                      - generic:
+                        - generic:
+                          - generic: Hostinger Mail
+                          - generic: Use Hostinger Mail
+                        - button "Install Hostinger Mail" [ref=f20e794]
+                  - generic [ref=f20e797] [cursor=pointer]:
+                    - link "Teams" [ref=f20e798]:
+                      - /url: /plugins/plugin_connector_1p_eba8b52fe53881918408d4b46b957644
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Teams"
+                      - generic:
+                        - generic:
+                          - generic: Teams
+                          - generic: Summarize Teams and follow up
+                        - button "Install Teams" [ref=f20e800]
+                  - generic [ref=f20e803] [cursor=pointer]:
+                    - link "Zoom" [ref=f20e804]:
+                      - /url: /plugins/plugin_asdk_app_69373a13116c819189d046aea1278836
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Zoom"
+                      - generic:
+                        - generic:
+                          - generic: Zoom
+                          - generic: Insights from Zoom
+                        - button "Install Zoom" [ref=f20e806]
+                  - generic [ref=f20e809] [cursor=pointer]:
+                    - link "Rhythm AI Personality Tuner" [ref=f20e810]:
+                      - /url: /plugins/plugin_asdk_app_6a5a888639c88191bdce50fdcf90c1b5
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Rhythm AI Personality Tuner"
+                      - generic:
+                        - generic:
+                          - generic: Rhythm AI Personality Tuner
+                          - generic: Tune how ChatGPT talks to you
+                        - button "Install Rhythm AI Personality Tuner" [ref=f20e812]
+              - generic [ref=f20e815]:
+                - heading [level=2] [ref=f20e817]:
+                  - link "Creativity" [ref=f20e818] [cursor=pointer]:
+                    - /url: /plugins?category=creativity
+                - generic [ref=f20e823]:
+                  - generic [ref=f20e824] [cursor=pointer]:
+                    - link "Canva" [ref=f20e825]:
+                      - /url: /plugins/plugin_connector_68df33b1a2d081918778431a9cfca8ba
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Canva"
+                      - generic:
+                        - generic:
+                          - generic: Canva
+                          - generic: Create, review, edit designs
+                        - button "Install Canva" [ref=f20e827]
+                  - generic [ref=f20e830] [cursor=pointer]:
+                    - link "Higgsfield" [ref=f20e831]:
+                      - /url: /plugins/plugin_asdk_app_6a3293e129088191abf0875820e839da
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Higgsfield"
+                      - generic:
+                        - generic:
+                          - generic: Higgsfield
+                          - generic: Every image and video model
+                        - button "Install Higgsfield" [ref=f20e833]
+                  - generic [ref=f20e836] [cursor=pointer]:
+                    - link "Figma" [ref=f20e837]:
+                      - /url: /plugins/plugin_connector_68df038e0ba48191908c8434991bbac2
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Figma"
+                      - generic:
+                        - generic:
+                          - generic: Figma
+                          - generic: Create designs, ship to code
+                        - button "Install Figma" [ref=f20e839]
+                  - generic [ref=f20e842] [cursor=pointer]:
+                    - link "Runway" [ref=f20e843]:
+                      - /url: /plugins/plugin_asdk_app_6a05e3b201788191be12b590b43e6ce3
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Runway"
+                      - generic:
+                        - generic:
+                          - generic: Runway
+                          - generic: Generate with every AI model
+                        - button "Install Runway" [ref=f20e845]
+                  - generic [ref=f20e848] [cursor=pointer]:
+                    - link "Product Design" [ref=f20e849]:
+                      - /url: /plugins/Plugin_fa77aec24fc08191bc6e57f377126d76
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Product Design"
+                      - generic:
+                        - generic:
+                          - generic: Product Design
+                          - generic: Explore and prototype ideas
+                        - button "Install Product Design" [ref=f20e851]
+                  - generic [ref=f20e854] [cursor=pointer]:
+                    - link "HeyGen" [ref=f20e855]:
+                      - /url: /plugins/plugin_asdk_app_69418aad55e08191aa5e437b649ca2e4
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "HeyGen"
+                      - generic:
+                        - generic:
+                          - generic: HeyGen
+                          - generic: Create videos, voice & avatars
+                        - button "Install HeyGen" [ref=f20e857]
+              - generic [ref=f20e860]:
+                - heading [level=2] [ref=f20e862]:
+                  - link "Developer Tools" [ref=f20e863] [cursor=pointer]:
+                    - /url: /plugins?category=developer-tools
+                - generic [ref=f20e868]:
+                  - generic [ref=f20e869] [cursor=pointer]:
+                    - link "Vercel" [ref=f20e870]:
+                      - /url: /plugins/plugin_connector_690a90ec05c881918afb6a55dc9bbaa1
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Vercel"
+                      - generic:
+                        - generic:
+                          - generic: Vercel
+                          - generic: Build and deploy apps
+                        - button "Install Vercel" [ref=f20e872]
+                  - generic [ref=f20e875] [cursor=pointer]:
+                    - link "TinyFish" [ref=f20e876]:
+                      - /url: /plugins/plugin_asdk_app_695325bae7348191b58ae9349a963d22
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "TinyFish"
+                      - generic:
+                        - generic:
+                          - generic: TinyFish
+                          - generic: Find and complete web tasks
+                        - button "Install TinyFish" [ref=f20e878]
+                  - generic [ref=f20e881] [cursor=pointer]:
+                    - link "Exa" [ref=f20e882]:
+                      - /url: /plugins/plugin_asdk_app_69ea4ed2cf7c8191b742ef3622479ddd
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Exa"
+                      - generic:
+                        - generic:
+                          - generic: Exa
+                          - generic: Web search for AI agents
+                        - button "Install Exa" [ref=f20e884]
+                  - generic [ref=f20e887] [cursor=pointer]:
+                    - link "Lovable" [ref=f20e888]:
+                      - /url: /plugins/plugin_asdk_app_693a0a79ffe48191901173077edcf914
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Lovable"
+                      - generic:
+                        - generic:
+                          - generic: Lovable
+                          - generic: Build full-stack apps by chat
+                        - button "Install Lovable" [ref=f20e890]
+                  - generic [ref=f20e893] [cursor=pointer]:
+                    - link "WPVibe" [ref=f20e894]:
+                      - /url: /plugins/plugin_asdk_app_6a244fb509e481918985fee76373b0f9
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "WPVibe"
+                      - generic:
+                        - generic:
+                          - generic: WPVibe
+                          - generic: AI WordPress tools
+                        - button "Install WPVibe" [ref=f20e896]
+                  - generic [ref=f20e899] [cursor=pointer]:
+                    - link "Base44" [ref=f20e900]:
+                      - /url: /plugins/plugin_asdk_app_6952514760dc8191ab148f77c5794d46
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Base44"
+                      - generic:
+                        - generic:
+                          - generic: Base44
+                          - generic: Build Apps & Websites with AI
+                        - button "Install Base44" [ref=f20e902]
+              - generic [ref=f20e905]:
+                - heading [level=2] [ref=f20e907]:
+                  - link "Healthcare" [ref=f20e908] [cursor=pointer]:
+                    - /url: /plugins?category=healthcare
+                - generic [ref=f20e913]:
+                  - generic [ref=f20e914] [cursor=pointer]:
+                    - link "Fitness AI Connector" [ref=f20e915]:
+                      - /url: /plugins/plugin_asdk_app_69beacb8780c81919104bb111b56346b
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Fitness AI Connector"
+                      - generic:
+                        - generic:
+                          - generic: Fitness AI Connector
+                          - generic: AI coach for your Garmin data
+                        - button "Install Fitness AI Connector" [ref=f20e917]
+                  - generic [ref=f20e920] [cursor=pointer]:
+                    - link "COROS" [ref=f20e921]:
+                      - /url: /plugins/plugin_asdk_app_6a0694cbb2608191bbefb74ba810ab68
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "COROS"
+                      - generic:
+                        - generic:
+                          - generic: COROS
+                          - generic: Know your training. Plan ahead
+                        - button "Install COROS" [ref=f20e923]
+                  - generic [ref=f20e926] [cursor=pointer]:
+                    - link "Hevy" [ref=f20e927]:
+                      - /url: /plugins/plugin_asdk_app_6a47ca602a648191b777ecea734e4b9d
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Hevy"
+                      - generic:
+                        - generic:
+                          - generic: Hevy
+                          - generic: Gym workout plans and insights
+                        - button "Install Hevy" [ref=f20e929]
+                  - generic [ref=f20e932] [cursor=pointer]:
+                    - link "Tredict" [ref=f20e933]:
+                      - /url: /plugins/plugin_asdk_app_69aef5b699a0819184512d57743fc1cd
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Tredict"
+                      - generic:
+                        - generic:
+                          - generic: Tredict
+                          - generic: Analyze workouts, create plans
+                        - button "Install Tredict" [ref=f20e935]
+                  - generic [ref=f20e938] [cursor=pointer]:
+                    - link "freddy health" [ref=f20e939]:
+                      - /url: /plugins/plugin_asdk_app_6a322b52a82c8191b7fb653f9e9f7891
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "freddy health"
+                      - generic:
+                        - generic:
+                          - generic: freddy health
+                          - generic: Ask your body anything
+                        - button "Install freddy health" [ref=f20e941]
+                  - generic [ref=f20e944] [cursor=pointer]:
+                    - link "Calorie Tracker" [ref=f20e945]:
+                      - /url: /plugins/plugin_asdk_app_69b5c48a72348191b3ad5abf6ec5dbfb
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Calorie Tracker"
+                      - generic:
+                        - generic:
+                          - generic: Calorie Tracker
+                          - generic: Track your food and calories
+                        - button "Install Calorie Tracker" [ref=f20e947]
+              - generic [ref=f20e950]:
+                - heading [level=2] [ref=f20e952]:
+                  - link "Finance" [ref=f20e953] [cursor=pointer]:
+                    - /url: /plugins?category=finance
+                - generic [ref=f20e958]:
+                  - generic [ref=f20e959] [cursor=pointer]:
+                    - link "Interactive Brokers (IBKR)" [ref=f20e960]:
+                      - /url: /plugins/plugin_asdk_app_69bc11db874881918718abaca20b68ce
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Interactive Brokers (IBKR)"
+                      - generic:
+                        - generic:
+                          - generic: Interactive Brokers (IBKR)
+                          - generic: Analyze global markets
+                        - button "Install Interactive Brokers (IBKR)" [ref=f20e962]
+                  - generic [ref=f20e965] [cursor=pointer]:
+                    - link "Public Equity Investing" [ref=f20e966]:
+                      - /url: /plugins/Plugin_b31b1ece54648191a6760ea4580bba3e
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Public Equity Investing"
+                      - generic:
+                        - generic:
+                          - generic: Public Equity Investing
+                          - generic: Public equity research
+                        - button "Install Public Equity Investing" [ref=f20e968]
+                  - generic [ref=f20e971] [cursor=pointer]:
+                    - link "Binance" [ref=f20e972]:
+                      - /url: /plugins/plugin_asdk_app_6965faefe2b081919a998e14aa25f738
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Binance"
+                      - generic:
+                        - generic:
+                          - generic: Binance
+                          - generic: Explore Binance market data
+                        - button "Install Binance" [ref=f20e974]
+                  - generic [ref=f20e977] [cursor=pointer]:
+                    - link "Longbridge" [ref=f20e978]:
+                      - /url: /plugins/plugin_asdk_app_6a2baf2fad748191812393c3e00308ef
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Longbridge"
+                      - generic:
+                        - generic:
+                          - generic: Longbridge
+                          - generic: Stock quotes, financial data
+                        - button "Install Longbridge" [ref=f20e980]
+                  - generic [ref=f20e983] [cursor=pointer]:
+                    - link "Stripe" [ref=f20e984]:
+                      - /url: /plugins/plugin_connector_690ab09fa43c8191bca40280e4563238
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Stripe"
+                      - generic:
+                        - generic:
+                          - generic: Stripe
+                          - generic: Accept payments, grow revenue.
+                        - button "Install Stripe" [ref=f20e986]
+                  - generic [ref=f20e989] [cursor=pointer]:
+                    - link "Bigdata.com" [ref=f20e990]:
+                      - /url: /plugins/plugin_asdk_app_69491eceef3c8191beb70788b7840429
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Bigdata.com"
+                      - generic:
+                        - generic:
+                          - generic: Bigdata.com
+                          - generic: Finance research, news & data
+                        - button "Install Bigdata.com" [ref=f20e992]
+              - generic [ref=f20e995]:
+                - heading [level=2] [ref=f20e997]:
+                  - link "Travel" [ref=f20e998] [cursor=pointer]:
+                    - /url: /plugins?category=travel
+                - generic [ref=f20e1003]:
+                  - generic [ref=f20e1004] [cursor=pointer]:
+                    - link "Booking.com" [ref=f20e1005]:
+                      - /url: /plugins/plugin_asdk_app_69272cb413a081919685ec3c88d1744e
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Booking.com"
+                      - generic:
+                        - generic:
+                          - generic: Booking.com
+                          - generic: Find all best stays and more.
+                        - button "Install Booking.com" [ref=f20e1007]
+                  - generic [ref=f20e1010] [cursor=pointer]:
+                    - link "Skyscanner" [ref=f20e1011]:
+                      - /url: /plugins/plugin_asdk_app_694546cd042881919bb746a8dc300f38
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Skyscanner"
+                      - generic:
+                        - generic:
+                          - generic: Skyscanner
+                          - generic: Find cheap flights
+                        - button "Install Skyscanner" [ref=f20e1013]
+                  - generic [ref=f20e1016] [cursor=pointer]:
+                    - link "Trip.com" [ref=f20e1017]:
+                      - /url: /plugins/plugin_asdk_app_69c4d4163c8c819183a9bdcf6d2ac262
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Trip.com"
+                      - generic:
+                        - generic:
+                          - generic: Trip.com
+                          - generic: All-in-one Travel Companion
+                        - button "Install Trip.com" [ref=f20e1019]
+                  - generic [ref=f20e1022] [cursor=pointer]:
+                    - link "Flight Network" [ref=f20e1023]:
+                      - /url: /plugins/plugin_asdk_app_69848e517d0c819191695bf9b23f0208
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Flight Network"
+                      - generic:
+                        - generic:
+                          - generic: Flight Network
+                          - generic: Search and book flights
+                        - button "Install Flight Network" [ref=f20e1025]
+                  - generic [ref=f20e1028] [cursor=pointer]:
+                    - link "Tripadvisor" [ref=f20e1029]:
+                      - /url: /plugins/plugin_asdk_app_69050bf6de9c8191b3968f2cc08d33d6
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Tripadvisor"
+                      - generic:
+                        - generic:
+                          - generic: Tripadvisor
+                          - generic: Book top-rated hotels
+                        - button "Install Tripadvisor" [ref=f20e1031]
+                  - generic [ref=f20e1034] [cursor=pointer]:
+                    - link "Wikiloc" [ref=f20e1035]:
+                      - /url: /plugins/plugin_asdk_app_69c1784c29208191a35b4ddef3c7e6d5
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Wikiloc"
+                      - generic:
+                        - generic:
+                          - generic: Wikiloc
+                          - generic: Your perfect trail. Just ask.
+                        - button "Install Wikiloc" [ref=f20e1037]
+              - generic [ref=f20e1040]:
+                - heading [level=2] [ref=f20e1042]:
+                  - link "Entertainment" [ref=f20e1043] [cursor=pointer]:
+                    - /url: /plugins?category=entertainment
+                - generic [ref=f20e1048]:
+                  - generic [ref=f20e1049] [cursor=pointer]:
+                    - link "Daily Tarot" [ref=f20e1050]:
+                      - /url: /plugins/plugin_asdk_app_6943a2c078b0819188de39e4fe168d9b
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Daily Tarot"
+                      - generic:
+                        - generic:
+                          - generic: Daily Tarot
+                          - generic: Draw cards and reflect
+                        - button "Install Daily Tarot" [ref=f20e1052]
+                  - generic [ref=f20e1055] [cursor=pointer]:
+                    - link "Flaim Fantasy" [ref=f20e1056]:
+                      - /url: /plugins/plugin_asdk_app_69a8f78087e081919e52cacacf00ff36
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Flaim Fantasy"
+                      - generic:
+                        - generic:
+                          - generic: Flaim Fantasy
+                          - generic: Your fantasy sports leagues
+                        - button "Install Flaim Fantasy" [ref=f20e1058]
+                  - generic [ref=f20e1061] [cursor=pointer]:
+                    - link "Spotify" [ref=f20e1062]:
+                      - /url: /plugins/plugin_asdk_app_68de829bf7648191acd70a907364c67c
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Spotify"
+                      - generic:
+                        - generic:
+                          - generic: Spotify
+                          - generic: Music and podcasts for you
+                        - button "Install Spotify" [ref=f20e1064]
+                  - generic [ref=f20e1067] [cursor=pointer]:
+                    - link "Apple Music" [ref=f20e1068]:
+                      - /url: /plugins/plugin_asdk_app_6938a94a61d881918ef32cb999ff937c
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Apple Music"
+                      - generic:
+                        - generic:
+                          - generic: Apple Music
+                          - generic: Build playlists and find music
+                        - button "Install Apple Music" [ref=f20e1070]
+                  - generic [ref=f20e1073] [cursor=pointer]:
+                    - link "Steer Astro" [ref=f20e1074]:
+                      - /url: /plugins/plugin_asdk_app_69655fed917081918a100b069ceb963f
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Steer Astro"
+                      - generic:
+                        - generic:
+                          - generic: Steer Astro
+                          - generic: Your Personal AI Astrologer
+                        - button "Install Steer Astro" [ref=f20e1076]
+                  - generic [ref=f20e1079] [cursor=pointer]:
+                    - link "FantasyBot Sports" [ref=f20e1080]:
+                      - /url: /plugins/plugin_asdk_app_69d319ffb64c8191a1c1abcd30fae202
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "FantasyBot Sports"
+                      - generic:
+                        - generic:
+                          - generic: FantasyBot Sports
+                          - generic: AI Start/Sit, Waivers & Trades
+                        - button "Install FantasyBot Sports" [ref=f20e1082]
+              - generic [ref=f20e1085]:
+                - heading [level=2] [ref=f20e1087]:
+                  - link "Education" [ref=f20e1088] [cursor=pointer]:
+                    - /url: /plugins?category=education-and-research
+                - generic [ref=f20e1093]:
+                  - generic [ref=f20e1094] [cursor=pointer]:
+                    - link "Consensus" [ref=f20e1095]:
+                      - /url: /plugins/plugin_asdk_app_6943e6f4a928819195962de16fb9ffe4
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Consensus"
+                      - generic:
+                        - generic:
+                          - generic: Consensus
+                          - generic: Search peer-reviewed research
+                        - button "Install Consensus" [ref=f20e1097]
+                  - generic [ref=f20e1100] [cursor=pointer]:
+                    - link "SciSpace" [ref=f20e1101]:
+                      - /url: /plugins/plugin_asdk_app_69439d715a7c8191aed9e2f6649e105f
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "SciSpace"
+                      - generic:
+                        - generic:
+                          - generic: SciSpace
+                          - generic: For science and research
+                        - button "Install SciSpace" [ref=f20e1103]
+                  - generic [ref=f20e1106] [cursor=pointer]:
+                    - link "Zotero" [ref=f20e1107]:
+                      - /url: /plugins/Plugin_a572ec6bf27481919ce6fa6e5651eb7b
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Zotero"
+                      - generic:
+                        - generic:
+                          - generic: Zotero
+                          - generic: Find papers and add citations from Zotero
+                        - button "Install Zotero" [ref=f20e1109]
+                  - generic [ref=f20e1112] [cursor=pointer]:
+                    - link "Acumen by Talarion" [ref=f20e1113]:
+                      - /url: /plugins/plugin_asdk_app_6a0bcefe6dbc8191acf88ce22e2eef3a
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Acumen by Talarion"
+                      - generic:
+                        - generic:
+                          - generic: Acumen by Talarion
+                          - generic: Keep your AI up to date.
+                        - button "Install Acumen by Talarion" [ref=f20e1115]
+                  - generic [ref=f20e1118] [cursor=pointer]:
+                    - link "Sider Scholar" [ref=f20e1119]:
+                      - /url: /plugins/plugin_asdk_app_6948b485f5bc8191adb4df13f369cec7
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Sider Scholar"
+                      - generic:
+                        - generic:
+                          - generic: Sider Scholar
+                          - generic: Search Papers & Research
+                        - button "Install Sider Scholar" [ref=f20e1121]
+                  - generic [ref=f20e1124] [cursor=pointer]:
+                    - link "Scite" [ref=f20e1125]:
+                      - /url: /plugins/plugin_asdk_app_6952b3a3f1e881918951582d59483c78
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Scite"
+                      - generic:
+                        - generic:
+                          - generic: Scite
+                          - generic: Search scientific literature
+                        - button "Install Scite" [ref=f20e1127]
+              - generic [ref=f20e1130]:
+                - heading [level=2] [ref=f20e1132]:
+                  - link "Business & Operations" [ref=f20e1133] [cursor=pointer]:
+                    - /url: /plugins?category=business-and-operations
+                - generic [ref=f20e1138]:
+                  - generic [ref=f20e1139] [cursor=pointer]:
+                    - link "Shopify" [ref=f20e1140]:
+                      - /url: /plugins/plugin_asdk_app_69e65c430b3081919aa4d962ab5d1698
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Shopify"
+                      - generic:
+                        - generic:
+                          - generic: Shopify
+                          - generic: Create and manage your store
+                        - button "Install Shopify" [ref=f20e1142]
+                  - generic [ref=f20e1145] [cursor=pointer]:
+                    - link "Sales" [ref=f20e1146]:
+                      - /url: /plugins/Plugin_af5b4b796b588191b3f2c610aa093799
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Sales"
+                      - generic:
+                        - generic:
+                          - generic: Sales
+                          - generic: Practical workflows for sales
+                        - button "Install Sales" [ref=f20e1148]
+                  - generic [ref=f20e1151] [cursor=pointer]:
+                    - link "vidIQ" [ref=f20e1152]:
+                      - /url: /plugins/plugin_asdk_app_69dd11f3e50c8191b1ca48d03cf7e2ad
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "vidIQ"
+                      - generic:
+                        - generic:
+                          - generic: vidIQ
+                          - generic: Grow on YouTube, IG & TikTok
+                        - button "Install vidIQ" [ref=f20e1154]
+                  - generic [ref=f20e1157] [cursor=pointer]:
+                    - link "Windsor.ai" [ref=f20e1158]:
+                      - /url: /plugins/plugin_asdk_app_694a52cfaa3c819192bea84eaa254968
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Windsor.ai"
+                      - generic:
+                        - generic:
+                          - generic: Windsor.ai
+                          - generic: Report on and manage campaigns
+                        - button "Install Windsor.ai" [ref=f20e1160]
+                  - generic [ref=f20e1163] [cursor=pointer]:
+                    - link "Wix" [ref=f20e1164]:
+                      - /url: /plugins/plugin_asdk_app_6947eaa4edd081919561e4ee3a2e5dcc
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Wix"
+                      - generic:
+                        - generic:
+                          - generic: Wix
+                          - generic: Create your own website
+                        - button "Install Wix" [ref=f20e1166]
+                  - generic [ref=f20e1169] [cursor=pointer]:
+                    - link "HubSpot" [ref=f20e1170]:
+                      - /url: /plugins/plugin_asdk_app_697acb8e53d88191bf7a79e62012ae14
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "HubSpot"
+                      - generic:
+                        - generic:
+                          - generic: HubSpot
+                          - generic: Insights to action in HubSpot
+                        - button "Install HubSpot" [ref=f20e1172]
+              - generic [ref=f20e1175]:
+                - heading [level=2] [ref=f20e1177]:
+                  - link "Data & Analytics" [ref=f20e1178] [cursor=pointer]:
+                    - /url: /plugins?category=data-and-analytics
+                - generic [ref=f20e1183]:
+                  - generic [ref=f20e1184] [cursor=pointer]:
+                    - link "Data" [ref=f20e1185]:
+                      - /url: /plugins/Plugin_fc9843a6fb34819195d6c7802398a8a7
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Data"
+                      - generic:
+                        - generic:
+                          - generic: Data
+                          - generic: Answer questions with data
+                        - button "Install Data" [ref=f20e1187]
+                  - generic [ref=f20e1190] [cursor=pointer]:
+                    - link "GSC Wizard - SEO analysis" [ref=f20e1191]:
+                      - /url: /plugins/plugin_asdk_app_6a258ab1e0908191aa647c33299ad14c
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "GSC Wizard - SEO analysis"
+                      - generic:
+                        - generic:
+                          - generic: GSC Wizard - SEO analysis
+                          - generic: Search Console, Bing and GA4
+                        - button "Install GSC Wizard - SEO analysis" [ref=f20e1193]
+                  - generic [ref=f20e1196] [cursor=pointer]:
+                    - link "PostHog" [ref=f20e1197]:
+                      - /url: /plugins/plugin_asdk_app_699caef2d680819188727b0ddbb349dd
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "PostHog"
+                      - generic:
+                        - generic:
+                          - generic: PostHog
+                          - generic: Analyze your product data
+                        - button "Install PostHog" [ref=f20e1199]
+                  - generic [ref=f20e1202] [cursor=pointer]:
+                    - link "Blockscout Blockchain Data" [ref=f20e1203]:
+                      - /url: /plugins/plugin_asdk_app_69a880b0d024819182db60f36cb48420
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Blockscout Blockchain Data"
+                      - generic:
+                        - generic:
+                          - generic: Blockscout Blockchain Data
+                          - generic: Find & analyze blockchain data
+                        - button "Install Blockscout Blockchain Data" [ref=f20e1205]
+                  - generic [ref=f20e1208] [cursor=pointer]:
+                    - link "Helium 10" [ref=f20e1209]:
+                      - /url: /plugins/plugin_asdk_app_69b9f38bfa248191877ad584f5608b92
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Helium 10"
+                      - generic:
+                        - generic:
+                          - generic: Helium 10
+                          - generic: Access your Helium 10 data
+                        - button "Install Helium 10" [ref=f20e1211]
+                  - generic [ref=f20e1214] [cursor=pointer]:
+                    - link "Microsoft Power BI" [ref=f20e1215]:
+                      - /url: /plugins/Plugin_52b7f269362c819190348f32a2f9e7a9
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Microsoft Power BI"
+                      - generic:
+                        - generic:
+                          - generic: Microsoft Power BI
+                          - generic: Explore and author analytics in your browser
+                        - link "Open Microsoft Power BI (desktop only)" [ref=f20e1217]:
+                          - /url: /plugins/Plugin_52b7f269362c819190348f32a2f9e7a9
+              - generic [ref=f20e1220]:
+                - heading [level=2] [ref=f20e1222]:
+                  - link "Scientific Research" [ref=f20e1223] [cursor=pointer]:
+                    - /url: /plugins?category=scientific-research
+                - generic [ref=f20e1228]:
+                  - generic [ref=f20e1229] [cursor=pointer]:
+                    - link "Undermind" [ref=f20e1230]:
+                      - /url: /plugins/plugin_asdk_app_6a60df60877081919ad4a8109d27535d
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Undermind"
+                      - generic:
+                        - generic:
+                          - generic: Undermind
+                          - generic: Find and read research papers
+                        - button "Install Undermind" [ref=f20e1232]
+                  - generic [ref=f20e1235] [cursor=pointer]:
+                    - link "Life Sciences Literature" [ref=f20e1236]:
+                      - /url: /plugins/Plugin_3d180245a1a881918476af7b5061e1e4
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Life Sciences Literature"
+                      - generic:
+                        - generic:
+                          - generic: Life Sciences Literature
+                          - generic: Find biomedical papers, preprints, and open-access full text
+                        - button "Install Life Sciences Literature" [ref=f20e1238]
+                  - generic [ref=f20e1241] [cursor=pointer]:
+                    - link "NGS Analysis Workbench" [ref=f20e1242]:
+                      - /url: /plugins/Plugin_32edf73dc4f48191980d50e2cad2b3e4
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "NGS Analysis Workbench"
+                      - generic:
+                        - generic:
+                          - generic: NGS Analysis Workbench
+                          - generic: Analyze sequencing data
+                        - link "Open NGS Analysis Workbench (desktop only)" [ref=f20e1244]:
+                          - /url: /plugins/Plugin_32edf73dc4f48191980d50e2cad2b3e4
+                  - generic [ref=f20e1247] [cursor=pointer]:
+                    - link "Life Sciences Databases" [ref=f20e1248]:
+                      - /url: /plugins/Plugin_054ff933a434819187c4f95db80afc7f
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Life Sciences Databases"
+                      - generic:
+                        - generic:
+                          - generic: Life Sciences Databases
+                          - generic: Query structured public life-science databases
+                        - button "Install Life Sciences Databases" [ref=f20e1250]
+                  - generic [ref=f20e1253] [cursor=pointer]:
+                    - link "Molecular Structure Viewer" [ref=f20e1254]:
+                      - /url: /plugins/Plugin_915f0ebef1348191bdb283c643ee98ec
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Molecular Structure Viewer"
+                      - generic:
+                        - generic:
+                          - generic: Molecular Structure Viewer
+                          - generic: Visualize and interact with molecular structures.
+                        - link "Open Molecular Structure Viewer (desktop only)" [ref=f20e1256]:
+                          - /url: /plugins/Plugin_915f0ebef1348191bdb283c643ee98ec
+                  - generic [ref=f20e1259] [cursor=pointer]:
+                    - link "Tamarind Bio" [ref=f20e1260]:
+                      - /url: /plugins/plugin_asdk_app_6a5fc156fad88191a3977b60131d7391
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Tamarind Bio"
+                      - generic:
+                        - generic:
+                          - generic: Tamarind Bio
+                          - generic: Protein and molecular design
+                        - button "Install Tamarind Bio" [ref=f20e1262]
+              - generic [ref=f20e1265]:
+                - heading [level=2] [ref=f20e1267]:
+                  - link "Security" [ref=f20e1268] [cursor=pointer]:
+                    - /url: /plugins?category=security
+                - generic [ref=f20e1273]:
+                  - generic [ref=f20e1274] [cursor=pointer]:
+                    - link "Codex Security" [ref=f20e1275]:
+                      - /url: /plugins/Plugin_1e648473be9c8191a91ac3947151af55
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Codex Security"
+                      - generic:
+                        - generic:
+                          - generic: Codex Security
+                          - generic: Security scanning for your codebase
+                        - link "Open Codex Security (desktop only)" [ref=f20e1277]:
+                          - /url: /plugins/Plugin_1e648473be9c8191a91ac3947151af55
+                  - generic [ref=f20e1280] [cursor=pointer]:
+                    - link "Malwarebytes" [ref=f20e1281]:
+                      - /url: /plugins/plugin_asdk_app_6943d1778c8c81918f4c9ddf4849ca41
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Malwarebytes"
+                      - generic:
+                        - generic:
+                          - generic: Malwarebytes
+                          - generic: Verify links, domains, phones.
+                        - button "Install Malwarebytes" [ref=f20e1283]
+                  - generic [ref=f20e1286] [cursor=pointer]:
+                    - link "PrivacyHawk" [ref=f20e1287]:
+                      - /url: /plugins/plugin_asdk_app_69ac8cc11bf48191816e305e37953f06
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "PrivacyHawk"
+                      - generic:
+                        - generic:
+                          - generic: PrivacyHawk
+                          - generic: Protect your personal data
+                        - button "Install PrivacyHawk" [ref=f20e1289]
+                  - generic [ref=f20e1292] [cursor=pointer]:
+                    - link "AJAXX Data Scrubber" [ref=f20e1293]:
+                      - /url: /plugins/plugin_asdk_app_698d2bdf0eb08191890a55606150ecc2
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "AJAXX Data Scrubber"
+                      - generic:
+                        - generic:
+                          - generic: AJAXX Data Scrubber
+                          - generic: Remove exposed personal data
+                        - button "Install AJAXX Data Scrubber" [ref=f20e1295]
+                  - generic [ref=f20e1298] [cursor=pointer]:
+                    - link "Soluvery" [ref=f20e1299]:
+                      - /url: /plugins/plugin_asdk_app_69c6417ce320819192d4b9edf3daf4ce
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Soluvery"
+                      - generic:
+                        - generic:
+                          - generic: Soluvery
+                          - generic: Audit Google Drive Permissions
+                        - button "Install Soluvery" [ref=f20e1301]
+                  - generic [ref=f20e1304] [cursor=pointer]:
+                    - link "Ansvar Gateway" [ref=f20e1305]:
+                      - /url: /plugins/plugin_asdk_app_6a6109bb0d3081919f5cd03b3085e944
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Ansvar Gateway"
+                      - generic:
+                        - generic:
+                          - generic: Ansvar Gateway
+                          - generic: Laws, Security and Compliance
+                        - button "Install Ansvar Gateway" [ref=f20e1307]
+              - generic [ref=f20e1310]:
+                - heading [level=2] [ref=f20e1312]:
+                  - link "Other" [ref=f20e1313] [cursor=pointer]:
+                    - /url: /plugins?category=other
+                - generic [ref=f20e1318]:
+                  - generic [ref=f20e1319] [cursor=pointer]:
+                    - link "LinkedIn" [ref=f20e1320]:
+                      - /url: /plugins/plugin_asdk_app_69949aa62bf48191be5e57a01202beca
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "LinkedIn"
+                      - generic:
+                        - generic:
+                          - generic: LinkedIn
+                          - generic: Find the right professional
+                        - button "Install LinkedIn" [ref=f20e1322]
+                  - generic [ref=f20e1325] [cursor=pointer]:
+                    - link "Kleinanzeigen" [ref=f20e1326]:
+                      - /url: /plugins/plugin_asdk_app_694a63a053f081918b9a3738bd3640c9
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Kleinanzeigen"
+                      - generic:
+                        - generic:
+                          - generic: Kleinanzeigen
+                          - generic: Echte Deals. Echte Menschen.
+                        - button "Install Kleinanzeigen" [ref=f20e1328]
+                  - generic [ref=f20e1331] [cursor=pointer]:
+                    - link "Etsy" [ref=f20e1332]:
+                      - /url: /plugins/plugin_asdk_app_69dfa26ad60081919fb9e3a1a50e3e53
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Etsy"
+                      - generic:
+                        - generic:
+                          - generic: Etsy
+                          - generic: Shop Home, Style & More
+                        - button "Install Etsy" [ref=f20e1334]
+                  - generic [ref=f20e1337] [cursor=pointer]:
+                    - link "Ask Tarot Cards" [ref=f20e1338]:
+                      - /url: /plugins/plugin_asdk_app_69fde861d3988191a7157df33544f855
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Ask Tarot Cards"
+                      - generic:
+                        - generic:
+                          - generic: Ask Tarot Cards
+                          - generic: Tarot card readings
+                        - button "Install Ask Tarot Cards" [ref=f20e1340]
+                  - generic [ref=f20e1343] [cursor=pointer]:
+                    - link "Astrologic" [ref=f20e1344]:
+                      - /url: /plugins/plugin_asdk_app_6944733e4ddc8191bd617f781ff93d51
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Astrologic"
+                      - generic:
+                        - generic:
+                          - generic: Astrologic
+                          - generic: Birth charts and horoscopes
+                        - button "Install Astrologic" [ref=f20e1346]
+                  - generic [ref=f20e1349] [cursor=pointer]:
+                    - link "Homey" [ref=f20e1350]:
+                      - /url: /plugins/plugin_asdk_app_6946bbc90ca4819188f817f992348b98
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img "Homey"
+                      - generic:
+                        - generic:
+                          - generic: Homey
+                          - generic: A better smart home.
+                        - button "Install Homey" [ref=f20e1352]
+        - status [ref=f20e578]
+  - status [ref=f20e579]
+  - menu "Add" [active] [ref=f20e1358]:
+    - menuitem "Create plugin" [ref=f20e1359] [cursor=pointer]
+    - menuitem "Upload plugin archive" [ref=f20e1365] [cursor=pointer]
+    - menuitem "Add custom MCP server" [ref=f20e1371] [cursor=pointer]
