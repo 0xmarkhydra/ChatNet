@@ -82,6 +82,7 @@ import FeedPostCard from "../features/feed/FeedPostCard";
 import FeedReactionControl from "../features/feed/FeedReactionControl";
 import StoryViewer from "../features/feed/StoryViewer";
 import MessageActions from "../features/chat/MessageActions";
+import LinkPreview from "../features/chat/LinkPreview";
 import { GroupActivityComposerMenu, GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/GroupActivities";
 import { messageReactionLabel } from "../features/chat/messageReactions";
 import {
@@ -6705,6 +6706,7 @@ export default function App({
                                         : <Fragment key={index}>{part.text}</Fragment>)}
                                     </span>
                                   )}
+                                  <LinkPreview text={message.text} cacheScope={session?.sessionId || ""} request={apiFetch} />
                                   {reactionControls}
                                   {!isTranslating && !effectiveAutoTranslate && translationView.mode === 'dual' && (
                                     <button type="button" className="chat-translation-action"
