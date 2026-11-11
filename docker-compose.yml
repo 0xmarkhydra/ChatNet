@@ -39,6 +39,7 @@ services:
       CHATNET_EMAIL_FROM: ${CHATNET_EMAIL_FROM:-}
       AI_PROVIDER: ${AI_PROVIDER:-partner}
       AI_API_KEY: ${AI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       AI_BASE_URL: ${AI_BASE_URL:-}
       AI_MODEL: ${AI_MODEL:-}
       AI_API_STYLE: ${AI_API_STYLE:-auto}

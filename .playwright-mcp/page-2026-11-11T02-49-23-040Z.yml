@@ -1,0 +1,23 @@
+- generic [active] [ref=f20e1]:
+  - generic [ref=f20e3]:
+    - link "Skip to content" [ref=f20e5] [cursor=pointer]:
+      - /url: "#_r_0_"
+    - generic [ref=f20e7]:
+      - complementary [ref=f20e8]:
+        - generic:
+          - separator
+      - generic [ref=f20e20]:
+        - main [ref=f20e22]:
+          - generic [ref=f20e32]:
+            - generic [ref=f20e35]:
+              - generic [ref=f20e36]:
+                - heading "Plugins" [level=1] [ref=f20e37]
+                - generic [ref=f20e38]: Manage your plugins, connected accounts, and permissions
+              - button "Browse directory" [ref=f20e40] [cursor=pointer]
+            - generic [ref=f20e42]:
+              - generic [ref=f20e46]: Search installed plugins
+              - searchbox "Search installed plugins" [ref=f20e47]
+            - status [ref=f20e51]:
+              - generic [ref=f20e52]: Loading settings…
+        - status [ref=f20e94]
+  - status [ref=f20e95]: Loading chats
