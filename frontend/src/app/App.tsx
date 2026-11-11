@@ -100,6 +100,7 @@ import BottomNavigation from "./BottomNavigation";
 import AppSidebar from "./AppSidebar";
 import { countNotificationItems, formatNotificationBadge } from "./notification-count";
 import NotificationsPage from "./NotificationsPage";
+import type { PostMentionNotification } from "../features/feed/postMentionNotifications";
 import ConversationDetailsPanel from "./ConversationDetailsPanel";
 import ChatTranslationSettingsPage from './ChatTranslationSettingsPage';
 import {
@@ -114,6 +115,8 @@ import SettingsWorkspace from "./SettingsWorkspace";
 import SocialFeedComposer from "./SocialFeedComposer";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import SocialFeedStories from "./SocialFeedStories";
+import StoryComposer from "../features/feed/StoryComposer";
+import { parsePostExtras, composePostContent } from "../features/feed/postExtras";
 import PostCommentsPage from "./PostCommentsPage";
 import CommunicationHub from "./CommunicationHub";
 import CallCenter from "../features/calls/CallCenter";
@@ -592,6 +595,41 @@ export default function App({
   >("all");
   const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
   const [feedComposerOpen, setFeedComposerOpen] = useState(false);
+  const [postMentions, setPostMentions] = useState<PostMentionNotification[]>([]);
+  useEffect(() => {
+    if (!session?.sessionId) {
+      setPostMentions([]);
+      return;
+    }
+    let live = true;
+    const controller = new AbortController();
+    const refresh = async () => {
+      try {
+        const response = await apiFetch("/api/feed/mentions", { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) return;
+        const items: unknown = await response.json();
+        if (live && Array.isArray(items)) {
+          setPostMentions(items.filter((item): item is PostMentionNotification =>
+            item && Number.isSafeInteger(item.id) && Number.isSafeInteger(item.postId)
+            && typeof item.author === "string" && typeof item.createdAt === "string"));
+        }
+      } catch {
+        // A temporary network outage must not clear already received alerts.
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), tab === "notifications" ? 12000 : 30000);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      live = false;
+      controller.abort();
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [session?.sessionId, tab === "notifications"]);
   const [feedCheckInOpen, setFeedCheckInOpen] = useState(false);
   const [feedCheckInLocation, setFeedCheckInLocation] = useState("");
   useEffect(() => {
@@ -599,6 +637,7 @@ export default function App({
       setFeedComposerOpen(false);
       setFeedCheckInOpen(false);
       setFeedCheckInLocation("");
+      setStoryDraftFile(null);
     }
   }, [tab]);
   const feedViewRef = useRef<HTMLDivElement>(null);
@@ -667,16 +706,32 @@ export default function App({
   }, [session?.token]);
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null);
   const [storyBusy, setStoryBusy] = useState(false);
+  const [storyDraftFile, setStoryDraftFile] = useState<File | null>(null);
   const [commentEditors, setCommentEditors] = useState<
     Record<number, DiscussionDraft>
   >({});
   const [postText, setPostText] = useState("");
+  const [postTaggedFriends, setPostTaggedFriends] = useState<Array<{ id: number; username: string; displayName: string }>>([]);
+  const [postFeelingId, setPostFeelingId] = useState("");
   const [postVisibility, setPostVisibility] = useState<
     "public" | "friends" | "private"
   >("public");
   const [postBackground, setPostBackground] = useState("");
   const [showPostBackgrounds, setShowPostBackgrounds] = useState(false);
   const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([]);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [postEditBusy, setPostEditBusy] = useState(false);
+  const draftBeforeEdit = useRef<{
+    text: string;
+    tags: typeof postTaggedFriends;
+    feelingId: string;
+    visibility: typeof postVisibility;
+    background: string;
+    showBackgrounds: boolean;
+    attachments: MediaAttachment[];
+    checkInOpen: boolean;
+    location: string;
+  } | null>(null);
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -867,8 +922,6 @@ export default function App({
     };
   }, []);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
-  const feedImageInputRef = useRef<HTMLInputElement>(null);
-  const feedVideoInputRef = useRef<HTMLInputElement>(null);
   const feedAlbumInputRef = useRef<HTMLInputElement>(null);
   const storyFileInputRef = useRef<HTMLInputElement>(null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
@@ -1273,6 +1326,10 @@ export default function App({
     ? friendRelationship(chatFriend.id)
     : "none";
 
+  const friendTaggedNames = useMemo(
+    () => Object.fromEntries(friends.map(friend => [friend.username, friend.displayName || friend.username])),
+    [friends],
+  );
   const visiblePosts = posts.map((post) =>
     likePreviews[post.id] === undefined
       ? post
@@ -2214,9 +2271,13 @@ export default function App({
       setNotice("Mỗi bài viết tối đa 12 ảnh/video.");
       return;
     }
-    const selected = files.slice(0, remaining);
-    if (selected.length < files.length)
-      setNotice("Mỗi bài viết tối đa 12 ảnh/video.");
+    const selected = files.slice(0, remaining).filter(
+      (file) => file.size > 0 && (file.type.startsWith("image/") || file.type.startsWith("video/")),
+    );
+    if (selected.length < Math.min(files.length, remaining))
+      setNotice("Chỉ hỗ trợ ảnh/video hợp lệ và không rỗng.");
+    if (remaining < files.length) setNotice("Mỗi bài viết tối đa 12 ảnh/video.");
+    if (!selected.length) return;
     try {
       const uploaded = await uploadMediaFiles(selected, "feed");
       if (sessionRef.current?.sessionId !== sessionId) return;
@@ -2252,6 +2313,8 @@ export default function App({
         ...current.filter((item) => item.id !== result.id),
       ]);
       setActiveStoryId(result.id);
+      setStoryDraftFile(null);
+      setNotice("Đã đăng Story.", "success");
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId)
         setNotice(
@@ -3785,6 +3848,11 @@ export default function App({
     setFriendMenuId(null);
     setFriendPreview(null);
     setPostText("");
+    setPostTaggedFriends([]);
+    setPostFeelingId("");
+    setEditingPost(null);
+    setPostEditBusy(false);
+    draftBeforeEdit.current = null;
     setPosts([]);
     setSavedPosts([]);
     setHasMoreSavedPosts(false);
@@ -4715,27 +4783,123 @@ export default function App({
     }
   }
 
+  function openEditPost(post: Post) {
+    if (post.author !== name || pendingPost || postEditBusy || mediaUploading) return;
+    const extras = parsePostExtras(post.content);
+    draftBeforeEdit.current = {
+      text: postText,
+      tags: [...postTaggedFriends],
+      feelingId: postFeelingId,
+      visibility: postVisibility,
+      background: postBackground,
+      showBackgrounds: showPostBackgrounds,
+      attachments: [...postAttachments],
+      checkInOpen: feedCheckInOpen,
+      location: feedCheckInLocation,
+    };
+    setEditingPost(post);
+    setPostSubmitError("");
+    setPostText(extras.caption);
+    setPostTaggedFriends(extras.taggedUsernames.map((username, index) => {
+      const friend = friends.find(item => item.username === username);
+      return { id: friend?.id ?? -(index + 1), username,
+        displayName: friend?.displayName || username };
+    }));
+    setPostFeelingId(extras.feelingId);
+    setFeedCheckInLocation(extras.location);
+    setFeedCheckInOpen(Boolean(extras.location));
+    setPostVisibility(post.visibility || "public");
+    setPostBackground(post.background || "");
+    setShowPostBackgrounds(false);
+    setPostAttachments(post.attachments || []);
+    if (tab === "profile") setProfileComposerOpen(true);
+    else setFeedComposerOpen(true);
+  }
+
+  function restoreDraftAfterEdit() {
+    const previous = draftBeforeEdit.current;
+    if (previous) {
+      setPostText(previous.text);
+      setPostTaggedFriends(previous.tags);
+      setPostFeelingId(previous.feelingId);
+      setPostVisibility(previous.visibility);
+      setPostBackground(previous.background);
+      setShowPostBackgrounds(previous.showBackgrounds);
+      setPostAttachments(previous.attachments);
+      setFeedCheckInOpen(previous.checkInOpen);
+      setFeedCheckInLocation(previous.location);
+    }
+    draftBeforeEdit.current = null;
+    setEditingPost(null);
+    setPostSubmitError("");
+  }
+
   async function createPost(event: FormEvent) {
     event.preventDefault();
     if (
       !session ||
       actionLocks.current.has("feed:create") ||
+      postEditBusy ||
       mediaUploading ||
       (!postText.trim() &&
         postAttachments.length === 0 &&
+        postTaggedFriends.length === 0 &&
+        !postFeelingId &&
         !(feedCheckInOpen && feedCheckInLocation.trim()))
     )
       return;
 
     setPostSubmitError("");
+    if (feedCheckInOpen && !feedCheckInLocation.trim()) {
+      setPostSubmitError("Vui lòng nhập địa điểm check-in.");
+      return;
+    }
     const locationText = feedCheckInOpen ? feedCheckInLocation.trim() : "";
-    const content = [locationText ? `📍 ${locationText}` : "", postText.trim()]
-      .filter(Boolean)
-      .join("\n");
+    const content = composePostContent({
+      caption: postText,
+      location: locationText,
+      taggedUsernames: postTaggedFriends.map(friend => friend.username),
+      feelingId: postFeelingId,
+    });
+    if (Array.from(content).length > 5000) {
+      setPostSubmitError("Nội dung và địa điểm vượt quá 5.000 ký tự.");
+      return;
+    }
     const attachments = postAttachments;
     const visibility = postVisibility;
     const background = postBackground;
     const sessionId = session.sessionId;
+    if (editingPost) {
+      const key = `feed:edit:${editingPost.id}`;
+      if (actionLocks.current.has(key)) return;
+      actionLocks.current.add(key);
+      setPostEditBusy(true);
+      try {
+        const response = await apiFetch(`/api/posts/${editingPost.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content, visibility, background }),
+        });
+        const updated = await response.json().catch(() => null) as (Post & { error?: string }) | null;
+        if (sessionRef.current?.sessionId !== sessionId) return;
+        if (!response.ok || !updated || updated.id !== editingPost.id) {
+          throw new Error(updated?.error || "Không cập nhật được bài viết.");
+        }
+        syncFeedPost(updated);
+        restoreDraftAfterEdit();
+        setFeedComposerOpen(false);
+        setProfileComposerOpen(false);
+        setNotice("Đã cập nhật bài viết.", "success");
+      } catch (error) {
+        if (sessionRef.current?.sessionId === sessionId) {
+          setPostSubmitError(error instanceof Error ? error.message : "Không cập nhật được bài viết.");
+        }
+      } finally {
+        actionLocks.current.delete(key);
+        if (sessionRef.current?.sessionId === sessionId) setPostEditBusy(false);
+      }
+      return;
+    }
     actionLocks.current.add("feed:create");
     ++feedRevision.current;
     setPendingPost({
@@ -4775,6 +4939,8 @@ export default function App({
         ...current.filter((item) => item.id !== post.id),
       ]);
       setPostText("");
+      setPostTaggedFriends([]);
+      setPostFeelingId("");
       setPostAttachments([]);
       setPostBackground("");
       setShowPostBackgrounds(false);
@@ -4999,7 +5165,8 @@ export default function App({
     (sum, conversation) => sum + conversation.unreadCount,
     0,
   );
-  const notificationItemCount = countNotificationItems(friendRequests, conversations);
+  const notificationItemCount = countNotificationItems(friendRequests, conversations)
+    + postMentions.filter(mention => !mention.readAt).length;
   const notificationBadgeText = formatNotificationBadge(notificationItemCount);
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase("vi-VN");
   // The conversation sidebar is independent of the keyword. Only the dropdown searches.
@@ -5117,6 +5284,40 @@ export default function App({
     setTranslations({});
     setTranslationOriginals({});
   };
+  async function readPostMention(id: number) {
+    const mention = postMentions.find(item => item.id === id);
+    if (!mention || mention.readAt) return;
+    try {
+      const response = await apiFetch(`/api/feed/mentions/${id}/read`, { method: "POST" });
+      if (!response.ok) throw new Error("Không đánh dấu được thông báo.");
+      setPostMentions(current => current.map(item => item.id === id
+        ? { ...item, readAt: new Date().toISOString() } : item));
+    } catch {
+      setNotice("Không đánh dấu được thông báo. Vui lòng thử lại.", "error");
+    }
+  }
+
+  async function openMentionPost(mention: PostMentionNotification) {
+    try {
+      const response = await apiFetch(`/api/posts/${mention.postId}`, { cache: "no-store" });
+      if (!response.ok) throw new Error(response.status === 404
+        ? "Bài viết không tồn tại hoặc bạn không còn quyền xem."
+        : "Không mở được bài viết.");
+      const post = await response.json() as Post;
+      setPosts(current => [post, ...current.filter(item => item.id !== post.id)]);
+      setFeedCommunitiesOpen(false);
+      setTab("feed");
+      setActivePostId(post.id);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", "feed");
+      url.searchParams.set("post", String(post.id));
+      window.history.pushState({ ...window.history.state, postId: post.id }, "", url);
+      void readPostMention(mention.id);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Không mở được bài viết.", "error");
+    }
+  }
+
   const switchTab = (nextTab: Tab) => {
     setDesktopSection(null);
     setFeedCommunitiesOpen(false);
@@ -5180,13 +5381,18 @@ export default function App({
     <PostComposer
       name={name}
       createPost={createPost}
+      editingPost={editingPost}
+      editBusy={postEditBusy}
       postComposerRef={postComposerRef}
       postBackground={postBackground}
       pendingPost={pendingPost}
       postText={postText}
       setPostText={setPostText}
-      feedImageInputRef={feedImageInputRef}
-      feedVideoInputRef={feedVideoInputRef}
+      taggableFriends={friends.filter((friend) => friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther)}
+      taggedFriends={postTaggedFriends}
+      setTaggedFriends={setPostTaggedFriends}
+      feelingId={postFeelingId}
+      setFeelingId={setPostFeelingId}
       feedAlbumInputRef={feedAlbumInputRef}
       addFeedFiles={addFeedFiles}
       postAttachments={postAttachments}
@@ -5202,9 +5408,12 @@ export default function App({
         profileMedia?.displayName || session.user.displayName || name
       }
       submitError={postSubmitError}
-      checkInOpen={feedComposerOpen && feedCheckInOpen}
+      checkInOpen={feedCheckInOpen}
       checkInLocation={feedCheckInLocation}
       setCheckInLocation={setFeedCheckInLocation}
+      setCheckInOpen={setFeedCheckInOpen}
+      uploadProgress={mediaUploadProgress}
+      cancelUpload={() => mediaUploadAbort.current?.abort()}
     />
   );
   function openFeedPostDetails(id: number) {
@@ -5297,6 +5506,8 @@ export default function App({
         showSave={showSave}
         likePreviews={likePreviews}
         like={like}
+        onEditPost={openEditPost}
+        taggedNames={friendTaggedNames}
       />
     ));
 
@@ -5545,6 +5756,9 @@ export default function App({
             setActivePostId(post.id);
           }}
           onUpdated={syncFeedPost}
+          onUserOpen={openVisitor}
+          onEditPost={openEditPost}
+          taggedNames={friendTaggedNames}
           updates={posts}
           onDeleted={removeFeedPost}
           feedback={setNotice}
@@ -7058,6 +7272,9 @@ export default function App({
           <NotificationsPage
             requests={friendRequests}
             conversations={conversations}
+            mentions={postMentions}
+            onReadMention={(id) => void readPostMention(id)}
+            onOpenMention={(mention) => void openMentionPost(mention)}
             search={globalSearch}
             busyFriendIds={friendBusyIds}
             onAccept={(friend) => void actOnFriend(friend)}
@@ -7138,6 +7355,8 @@ export default function App({
             likeBusy={likePreviews[activePost.id] !== undefined}
             onLike={(post, emoji) => like(post, emoji)}
             onUpdated={syncFeedPost}
+            onEditPost={openEditPost}
+            taggedNames={friendTaggedNames}
             onFeedback={(message, kind) => setNotice(message, kind)}
           >
             {postDiscussion}
@@ -7184,7 +7403,7 @@ export default function App({
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
                 event.currentTarget.value = "";
-                void createStory(file);
+                if (file) setStoryDraftFile(file);
               }}
             />
             <div className="social-feed-grid">
@@ -7271,23 +7490,21 @@ export default function App({
                   </>
                 )}
 
-                {isProfileDesktop ? (
-                  <SocialFeedComposer
+                <SocialFeedComposer
                     username={name}
                     displayName={userLabel(
                       profileMedia?.displayName || session.user.displayName,
                       name,
                     )}
                     draft={postText}
-                    pending={Boolean(pendingPost)}
+                    pending={Boolean(pendingPost) || mediaUploading === "feed"}
                     storyBusy={storyBusy || mediaUploading === "story"}
                     onCreatePost={() => {
-                      setFeedCheckInOpen(false);
                       setFeedComposerOpen(true);
                     }}
-                    onCreateMediaPost={() => {
-                      setFeedCheckInOpen(false);
+                    onCreateMediaPost={(files) => {
                       setFeedComposerOpen(true);
+                      void addFeedFiles(files);
                     }}
                     onCreateStory={() => storyFileInputRef.current?.click()}
                     onCheckIn={() => {
@@ -7295,9 +7512,6 @@ export default function App({
                       setFeedComposerOpen(true);
                     }}
                   />
-                ) : (
-                  postComposer
-                )}
                 </>)}
 
                 {!feedCommunitiesOpen && (isProfileDesktop ? (
@@ -8672,13 +8886,22 @@ export default function App({
         )}
       </section>
 
-      {feedComposerOpen && tab === "feed" && isProfileDesktop && (
+      {storyDraftFile && tab === "feed" && (
+        <ProfileOverlay title="Tạo Story" busy={storyBusy || mediaUploading === "story"}
+          onClose={() => setStoryDraftFile(null)}>
+          <StoryComposer file={storyDraftFile} busy={storyBusy || mediaUploading === "story"}
+            onPublish={() => void createStory(storyDraftFile)}
+            onChangeFile={setStoryDraftFile} />
+        </ProfileOverlay>
+      )}
+      {feedComposerOpen && tab === "feed" && (
         <ProfileOverlay
-          title="Tạo bài viết"
-          busy={!!pendingPost || mediaUploading === "feed"}
+          title={editingPost ? "Chỉnh sửa bài viết" : "Tạo bài viết"}
+          busy={!!pendingPost || postEditBusy || mediaUploading === "feed"}
           onClose={() => {
             setFeedComposerOpen(false);
-            setFeedCheckInOpen(false);
+            if (editingPost) restoreDraftAfterEdit();
+            else setFeedCheckInOpen(false);
           }}
         >
           {postComposer}
@@ -8688,9 +8911,12 @@ export default function App({
         tab === "profile" &&
         (profileTimelineOpen || desktopProfileOverview) && (
           <ProfileOverlay
-            title="Tạo bài viết"
-            busy={!!pendingPost || mediaUploading === "feed"}
-            onClose={() => setProfileComposerOpen(false)}
+            title={editingPost ? "Chỉnh sửa bài viết" : "Tạo bài viết"}
+            busy={!!pendingPost || postEditBusy || mediaUploading === "feed"}
+            onClose={() => {
+              setProfileComposerOpen(false);
+              if (editingPost) restoreDraftAfterEdit();
+            }}
           >
             {postComposer}
           </ProfileOverlay>

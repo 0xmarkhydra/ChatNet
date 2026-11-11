@@ -32,6 +32,7 @@
     "check:voice": "node --experimental-strip-types scripts/voice-media-check.mjs",
     "check:ui": "node scripts/run-ui-layout.mjs",
     "check:social-ui": "node scripts/check-social-ui.mjs",
+    "check:smart-composer": "node scripts/check-social-ui.mjs --smart-composer-only",
     "check:friends-redesign": "node scripts/check-friends-redesign.mjs",
     "check:groups-redesign": "node scripts/check-groups-redesign.mjs",
     "check:auth-redesign": "node scripts/check-auth-redesign.mjs",

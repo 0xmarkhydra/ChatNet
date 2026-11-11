@@ -4,6 +4,8 @@ import FeedLikeButton from '../features/feed/FeedLikeButton'
 import type { Post } from '../features/feed/types'
 import { FeedText } from '../features/feed/FeedDiscussion'
 import FeedPostActions, { FeedShareAction } from '../features/feed/FeedPostActions'
+import PostExtrasView from '../features/feed/PostExtrasView'
+import { parsePostExtras } from '../features/feed/postExtras'
 import UserAvatar from '../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../shared/ui/MediaAttachmentsView'
 import { userLabel } from '../shared/lib/userLabel'
@@ -25,6 +27,8 @@ type Props = {
   onDeleted: (id: number) => void
   onFeedback: (message: string, kind?: ToastKind) => void
   onAuthorOpen: (username: string) => void
+  onEditPost?: (post: Post) => void
+  taggedNames?: Record<string, string>
   sortOrder: SortOrder
   onSortChange: (value: SortOrder) => void
   children: ReactNode
@@ -42,7 +46,7 @@ function relativeDate(value: string): string {
 
 export default function PostCommentsPage({
   post, username, ownDisplayName, token, targetLanguage, likeBusy,
-  request, onLike, onUpdated, onDeleted, onFeedback, onAuthorOpen,
+  request, onLike, onUpdated, onDeleted, onFeedback, onAuthorOpen, onEditPost, taggedNames,
   sortOrder, onSortChange, children,
 }: Props) {
   const page = useRef<HTMLElement>(null)
@@ -52,6 +56,7 @@ export default function PostCommentsPage({
   const shares = (post as Post & { shares?: number }).shares
   const sharesLabel = typeof shares === 'number' && Number.isFinite(shares) ? ` • ${shares.toLocaleString('vi-VN')} chia sẻ` : ' • Chia sẻ'
   const visibility = post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'
+  const extras = parsePostExtras(post.content)
 
   return (
     <section ref={page} tabIndex={-1} className="post-comments-page" aria-label="Bình luận bài viết">
@@ -65,12 +70,13 @@ export default function PostCommentsPage({
                 <button type="button" className="post-comments-author-name" onClick={() => onAuthorOpen(post.author)}>{authorName}</button>
                 <span>{relativeDate(post.createdAt)} · {visibility}</span>
               </div>
-              <FeedPostActions post={post} mine={post.author === username} request={request}
+              <FeedPostActions onEdit={onEditPost} post={post} mine={post.author === username} request={request}
                 onUpdated={onUpdated} onDeleted={onDeleted} onFeedback={onFeedback} />
             </header>
-            {post.content && (
+            <PostExtrasView extras={extras} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
+            {extras.caption && (
               <div className="post-comments-content">
-                <FeedText api={API} token={token} target={targetLanguage} text={post.content} />
+                <FeedText api={API} token={token} target={targetLanguage} text={extras.caption} />
               </div>
             )}
             {Boolean(post.attachments?.length) && (

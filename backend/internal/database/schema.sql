@@ -220,6 +220,19 @@ ALTER TABLE posts ADD COLUMN IF NOT EXISTS background VARCHAR(16) NOT NULL DEFAU
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 CREATE INDEX IF NOT EXISTS idx_posts_visibility_id ON posts(visibility,id DESC);
 
+-- Durable per-user notification for an explicit friend tag on a post.
+-- Uniqueness prevents duplicate alerts when the post is edited repeatedly.
+CREATE TABLE IF NOT EXISTS post_mentions (
+    id BIGSERIAL PRIMARY KEY,
+    post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    read_at TIMESTAMPTZ,
+    UNIQUE(post_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_post_mentions_recipient
+ON post_mentions(user_id, id DESC);
+
 CREATE TABLE IF NOT EXISTS saved_posts (
     post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

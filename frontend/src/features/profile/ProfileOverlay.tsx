@@ -15,7 +15,7 @@ export default function ProfileOverlay({ title, drawer = false, busy = false, on
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const element = dialog.current
     element?.showModal()
-    element?.querySelector<HTMLElement>('.profile-overlay-body textarea, .profile-overlay-body input')?.focus({ preventScroll: true })
+    element?.querySelector<HTMLElement>('.profile-overlay-body textarea, .profile-overlay-body input:not([type="file"]), .profile-overlay-body button:not([disabled])')?.focus({ preventScroll: true })
     return () => {
       element?.close()
       previous?.focus({ preventScroll: true })
@@ -25,7 +25,13 @@ export default function ProfileOverlay({ title, drawer = false, busy = false, on
   return (
     <dialog ref={dialog} className={drawer ? 'profile-overlay profile-edit-drawer' : 'profile-overlay profile-post-dialog'}
       aria-label={title} aria-modal="true"
-      onCancel={event => { event.preventDefault(); if (!busy) onClose() }}
+      onCancel={event => {
+        // The native file picker dispatches a bubbling `cancel` event on its input
+        // when the user selects Cancel. Only the dialog’s own Escape should close it.
+        if (event.target !== event.currentTarget) return
+        event.preventDefault()
+        if (!busy) onClose()
+      }}
       onClick={event => {
         if (event.target !== event.currentTarget || busy) return
         const bounds = event.currentTarget.getBoundingClientRect()

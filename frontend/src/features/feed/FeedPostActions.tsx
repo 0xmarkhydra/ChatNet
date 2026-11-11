@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Bookmark, Check, Copy, Ellipsis, Flag, Pencil, Share2, Trash2, X } from 'lucide-react'
+import { Bookmark, Copy, Ellipsis, Flag, Pencil, Share2, Trash2, X } from 'lucide-react'
 import './feed-actions.css'
 
 export type FeedActionPost = {
@@ -20,13 +20,8 @@ type Props<P extends FeedActionPost> = {
   onUpdated: (post: P) => void
   onDeleted: (id: number) => void
   onFeedback: Feedback
+  onEdit?: (post: P) => void
 }
-const privacy = [
-  { value: 'public', label: '🌐 Công khai' },
-  { value: 'friends', label: '👥 Bạn bè' },
-  { value: 'private', label: '🔒 Chỉ mình tôi' },
-] as const
-const backgrounds = ['', 'violet', 'blue', 'sunset', 'mint', 'night']
 const reasons = ['Nội dung spam', 'Quấy rối hoặc xúc phạm', 'Lừa đảo hoặc giả mạo', 'Thông tin gây hiểu lầm', 'Nội dung không phù hợp']
 
 function postUrl(id: number) {
@@ -90,14 +85,11 @@ export function FeedShareAction({ postId, onFeedback }: { postId: number; onFeed
   )
 }
 
-export default function FeedPostActions<P extends FeedActionPost>({ post, mine, request, onUpdated, onDeleted, onFeedback }: Props<P>) {
+export default function FeedPostActions<P extends FeedActionPost>({ post, mine, request, onUpdated, onDeleted, onFeedback, onEdit }: Props<P>) {
   const trigger = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
   const [screenPosition, setScreenPosition] = useState({ top: 0, left: 0 })
-  const [screen, setScreen] = useState<'options' | 'edit' | 'report' | 'delete'>('options')
-  const [content, setContent] = useState(post.content)
-  const [visibility, setVisibility] = useState(post.visibility || 'public')
-  const [background, setBackground] = useState(post.background || '')
+  const [screen, setScreen] = useState<'options' | 'report' | 'delete'>('options')
   const [reason, setReason] = useState(reasons[0])
   const [busy, setBusy] = useState(false)
 
@@ -126,10 +118,8 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
     setOpen(true)
   }
   function startEdit() {
-    setContent(post.content)
-    setVisibility(post.visibility || 'public')
-    setBackground(post.background || '')
-    setScreen('edit')
+    close()
+    onEdit?.(post)
   }
   async function send(path: string, options: RequestInit) {
     const response = await request(path, options)
@@ -145,19 +135,6 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
     try { await action() }
     catch (error) { onFeedback(error instanceof Error ? error.message : 'Thao tác thất bại.', 'error') }
     finally { setBusy(false) }
-  }
-  async function saveEdit() {
-    if (!content.trim() && !post.attachments?.length) return
-    await act(async () => {
-      const response = await send('/api/posts/' + post.id, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content.trim(), visibility, background }),
-      })
-      onUpdated(await response.json() as P)
-      close()
-      onFeedback('Đã cập nhật bài viết.', 'success')
-    })
   }
   async function deletePost() {
     await act(async () => {
@@ -201,37 +178,10 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
             style={{ top: screenPosition.top, left: screenPosition.left }}>
             <div className="feed-actions-grabber" aria-hidden="true" />
             <div className="feed-actions-header">
-              <strong>{screen === 'edit' ? 'Chỉnh sửa bài viết' : screen === 'report' ? 'Báo cáo bài viết' : screen === 'delete' ? 'Xác nhận xóa' : 'Tùy chọn bài viết'}</strong>
+              <strong>{screen === 'report' ? 'Báo cáo bài viết' : screen === 'delete' ? 'Xác nhận xóa' : 'Tùy chọn bài viết'}</strong>
               <button type="button" onClick={close} aria-label="Đóng"><X size={19} /></button>
             </div>
-            {screen === 'edit' ? (
-              <div className="feed-actions-editor">
-                <label>Nội dung bài viết
-                  <textarea rows={5} maxLength={5000} value={content} onChange={event => setContent(event.target.value)} />
-                </label>
-                <label>Ai có thể xem?
-                  <select value={visibility} onChange={event => setVisibility(event.target.value as typeof visibility)}>
-                    {privacy.map(value => <option value={value.value} key={value.value}>{value.label}</option>)}
-                  </select>
-                </label>
-                <span>Nền bài viết</span>
-                <div className="feed-background-palette">
-                  {backgrounds.map(value => (
-                    <button type="button" key={value || 'none'}
-                      className={'feed-palette-dot bg-' + (value || 'none')}
-                      aria-label={value || 'Không có nền'}
-                      aria-pressed={background === value} onClick={() => setBackground(value)}>
-                      {background === value && <Check size={15} />}
-                    </button>
-                  ))}
-                </div>
-                <div className="feed-actions-footer">
-                  <button type="button" onClick={() => setScreen('options')}>Hủy</button>
-                  <button type="button" disabled={busy || (!content.trim() && !post.attachments?.length)}
-                    onClick={() => void saveEdit()}>Lưu thay đổi</button>
-                </div>
-              </div>
-            ) : screen === 'delete' ? (
+            {screen === 'delete' ? (
               <div className="feed-actions-editor">
                 <p className="feed-delete-warning">Bài viết và các bình luận sẽ bị xóa vĩnh viễn. Bạn có chắc muốn xóa?</p>
                 <div className="feed-actions-footer">
@@ -266,7 +216,7 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
                 {mine ? (
                   <>
                     <div className="feed-actions-separator" />
-                    <button type="button" onClick={startEdit}><Pencil size={19} />Chỉnh sửa bài viết</button>
+                    {onEdit && <button type="button" onClick={startEdit}><Pencil size={19} />Chỉnh sửa bài viết</button>}
                     <button type="button" className="danger" onClick={() => setScreen('delete')}>
                       <Trash2 size={19} />Xóa bài viết
                     </button>
