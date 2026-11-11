@@ -1,3 +1,5 @@
+import { useLocation, useNavigate } from "react-router-dom";
+import { TAB_PATH, tabFromPath } from "./routes";
 import ProfileNote from "../features/profile/ProfileNote";
 import ConversationCategories, {
   CategoryAssignment,
@@ -300,7 +302,22 @@ export default function App({
     saveSession(next);
   });
 
-  const [tab, setTab] = useState<Tab>("chat");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const pathnameRef = useRef(location.pathname);
+  pathnameRef.current = location.pathname;
+  const tab: Tab = tabFromPath(location.pathname) ?? "chat";
+  const setTab = (next: Tab) => {
+    const path = TAB_PATH[next];
+    navigate(path, { replace: pathnameRef.current === path });
+  };
+  useEffect(() => {
+    if (tabFromPath(location.pathname) !== null) return;
+    navigate(
+      { pathname: TAB_PATH.chat, search: location.search, hash: location.hash },
+      { replace: true },
+    );
+  }, [location.pathname]);
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const [globalSearch, setGlobalSearch] = useState("");
@@ -1639,10 +1656,13 @@ export default function App({
     params.delete("connect");
     params.delete("invite");
     const nextSearch = params.toString();
-    window.history.replaceState(
-      {},
-      "",
-      `${window.location.pathname}${nextSearch ? "?" + nextSearch : ""}${window.location.hash}`,
+    navigate(
+      {
+        pathname: pathnameRef.current,
+        search: nextSearch ? "?" + nextSearch : "",
+        hash: window.location.hash,
+      },
+      { replace: true },
     );
   }, [session?.token]);
 
@@ -2644,15 +2664,16 @@ export default function App({
     const openNotificationTarget = () => {
       const url = new URL(window.location.href);
       const params = url.searchParams;
+      let targetPath = pathnameRef.current;
       if (params.get("tab") === "feed") {
-        setTab("feed");
+        targetPath = TAB_PATH.feed;
       } else if (params.get("tab") === "contacts") {
-        setTab("contacts");
+        targetPath = TAB_PATH.contacts;
       }
       const conversationID = Number(params.get("conversation"));
       const messageID = Number(params.get("message"));
       if (Number.isSafeInteger(conversationID) && conversationID > 0) {
-        setTab("chat");
+        targetPath = TAB_PATH.chat;
         setDesktopSection(null);
         setChatSearchJump(
           Number.isSafeInteger(messageID) && messageID > 0
@@ -2670,7 +2691,11 @@ export default function App({
         params.delete("tab");
         params.delete("conversation");
         params.delete("message");
-        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+        const search = params.toString();
+        navigate(
+          { pathname: targetPath, search: search ? "?" + search : "", hash: url.hash },
+          { replace: true },
+        );
       }
     };
     openNotificationTarget();

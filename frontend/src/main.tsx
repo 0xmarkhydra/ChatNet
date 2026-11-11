@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { BrowserRouter, HashRouter } from 'react-router-dom'
 import App from './app/App'
 import { PWAUpdate } from './features/pwa/PWAUpdate'
 import DesktopBootstrap from './platform/DesktopBootstrap'
@@ -40,9 +41,14 @@ if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)
 }
 
+// Desktop serves static files over app://, which has no SPA fallback for deep paths.
+const Router = isDesktopBuild ? HashRouter : BrowserRouter
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {isDesktopBuild ? <DesktopBootstrap /> : <App />}
-    {import.meta.env.PROD && !isDesktopBuild && <PWAUpdate />}
+    <Router useTransitions={false}>
+      {isDesktopBuild ? <DesktopBootstrap /> : <App />}
+      {import.meta.env.PROD && !isDesktopBuild && <PWAUpdate />}
+    </Router>
   </React.StrictMode>,
 )
