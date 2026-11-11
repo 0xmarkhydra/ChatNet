@@ -94,16 +94,7 @@ export default function FeedPostCard({
             <MediaAttachmentsView items={post.attachments} onImageClick={() => setActivePostId(post.id)} />
           </div>
         )}
-        <div className="post-engagement-summary feed-post-engagement">
-          <span className="feed-post-likes">
-            <Heart size={22} aria-hidden="true" />
-            <span>{formatCount(post.likes)} lượt thích</span>
-          </span>
-          <span className="feed-post-conversation-stats">
-            {commentsCount.toLocaleString('vi-VN')} bình luận · Chia sẻ
-          </span>
-        </div>
-        <div className="post-toolbar feed-post-toolbar">
+        <div className="post-toolbar feed-post-toolbar" aria-label="Tương tác bài viết">
           <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void like(post, emoji)} />
           <button type="button" className="post-stat post-detail-trigger"
             onClick={() => setActivePostId(post.id)}>
@@ -113,6 +104,15 @@ export default function FeedPostCard({
             onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
           <FeedSaveAction post={post} request={apiFetch} onUpdated={syncFeedPost}
             onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
+        </div>
+        <div className="post-engagement-summary feed-post-engagement" aria-label="Số lượt tương tác">
+          <span className="feed-post-likes">
+            <Heart size={16} aria-hidden="true" />
+            <span>{formatCount(post.likes)} lượt thích</span>
+          </span>
+          <span className="feed-post-conversation-stats">
+            {commentsCount.toLocaleString('vi-VN')} bình luận
+          </span>
         </div>
       </div>
     </article>

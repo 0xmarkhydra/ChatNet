@@ -286,7 +286,7 @@ try {
   const postCard = feedCards.first()
   const postActions = postCard.locator('.feed-post-toolbar > button')
   assert(await postActions.count() === 4,
-    'Post must show exactly four equal actions: Like, Comment, Share, Save')
+    'Post must expose Like, Comment, Share and Save with accessible labels')
   assert(await postCard.locator('.feed-reaction-control, .feed-reaction-picker').count() === 0,
     'Post must use a single heart reaction without a multi-reaction menu')
   const heartButton = postCard.getByRole('button', { name: 'Thích bài viết' })
@@ -315,9 +315,9 @@ try {
   })
   assert(postGeometry.reactionSummary
     && postGeometry.buttonWidths.length === 4
-    && postGeometry.buttonWidths.every(width => Math.abs(width - postGeometry.buttonWidths[0]) <= 2)
+    && postGeometry.buttonWidths.every(width => width >= 44 && width <= 52)
     && postGeometry.mediaWidth >= postGeometry.cardWidth - 70,
-    'Post card should align four action columns and show full-width media: ' + JSON.stringify(postGeometry))
+    'Post should use compact touch-friendly icon actions and full-width media: ' + JSON.stringify(postGeometry))
   const feedImage = postCard.locator('.feed-media-preview .media-count-1 .media-item img').first()
   await feedImage.evaluate(image => image.decode())
   async function verifyUncroppedFeedImage() {
@@ -473,10 +473,11 @@ try {
     }
   })
   assert(likeLayout.likesLeft - likeLayout.rowLeft < 20
-    && likeLayout.rowRight - likeLayout.commentsRight < 20
     && likeLayout.commentsLeft > likeLayout.likesRight
     && likeLayout.likesCentered,
-    'Post engagement count must align left and comments right in one row: ' + JSON.stringify(likeLayout))
+    'Post engagement counts must read as a compact line below the actions: ' + JSON.stringify(likeLayout))
+  assert(!(await postCard.locator('.feed-post-conversation-stats').innerText()).includes('Chia sẻ'),
+    'Do not invent a share metric when the API does not provide a count')
   if (process.argv.includes('--likes-only')) {
     const firstLike = postCard.getByRole('button', { name: 'Thích bài viết' })
     await firstLike.click()
@@ -533,6 +534,36 @@ try {
     await detailLike.click()
     await detail.getByRole('button', { name: 'Thích bài viết' }).waitFor()
     console.log('Like consistency PASS: summary alignment, heart icon in feed/detail, toggle/untoggle, equal action widths')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
+  if (process.argv.includes('--threads-only')) {
+    mkdirSync('output/playwright/layout', { recursive: true })
+    await page.screenshot({ path: 'output/playwright/layout/feed-threads-desktop-1586.png' })
+    await page.setViewportSize({ width: 390, height: 844 })
+    const mobileFeed = page.locator('.social-feed')
+    await mobileFeed.locator('.social-feed-mobile-launcher').waitFor({ state: 'visible' })
+    assert(await mobileFeed.locator('.zalo-post-composer').count() === 0,
+      'Mobile feed must not render the full composer in its timeline')
+    const button = mobileFeed.getByRole('button', { name: 'Bạn đang nghĩ gì?' })
+    await button.click()
+    const dialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    await dialog.waitFor({ state: 'visible' })
+    await dialog.getByRole('textbox', { name: 'Nội dung bài viết' }).waitFor()
+    await dialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+    await dialog.waitFor({ state: 'hidden' })
+    const mobileIconWidths = await mobileFeed.locator('.feed-post-toolbar > button').first().evaluate(button => {
+      const rect = button.getBoundingClientRect()
+      return { width: rect.width, height: rect.height }
+    })
+    assert(mobileIconWidths.width >= 44 && mobileIconWidths.height >= 44,
+      'Mobile feed actions must be touch friendly: ' + JSON.stringify(mobileIconWidths))
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+    assert(overflow <= 2, 'Mobile feed must not overflow viewport: ' + overflow)
+    await page.screenshot({ path: 'output/playwright/layout/feed-threads-mobile-390.png' })
+    console.log('Threads-inspired Newsfeed PASS: compact desktop actions, mobile dialog, 44px targets, no overflow')
     await browser.close()
     browser = null
     server.kill()
@@ -701,11 +732,16 @@ try {
     }
   })
   const near = (a,b,t=5) => Math.abs(a-b) <= t
-  assert(commentsLayout.sidebar && near(commentsLayout.sidebar.width,250) &&
-    commentsLayout.header && near(commentsLayout.header.x,250) &&
-    commentsLayout.post && near(commentsLayout.post.x,282) && near(commentsLayout.post.y,110) &&
+  // The sidebar can auto-collapse when pointer focus moves to the content.
+  const railWidth = commentsLayout.sidebar?.width ?? 0
+  const railExpanded = near(railWidth, 250)
+  const railCollapsed = near(railWidth, 76)
+  const frameShift = railCollapsed ? 87 : 0
+  assert(commentsLayout.sidebar && (railExpanded || railCollapsed) &&
+    commentsLayout.header && near(commentsLayout.header.x, railWidth) &&
+    commentsLayout.post && near(commentsLayout.post.x, 282 - frameShift) && near(commentsLayout.post.y,110) &&
     near(commentsLayout.post.width,821) && near(commentsLayout.post.height,841) &&
-    commentsLayout.comments && near(commentsLayout.comments.x,1123) && near(commentsLayout.comments.y,110) &&
+    commentsLayout.comments && near(commentsLayout.comments.x,1123 - frameShift) && near(commentsLayout.comments.y,110) &&
     near(commentsLayout.comments.width,428) && near(commentsLayout.comments.height,841),
     'Post comments frame mismatch: ' + JSON.stringify(commentsLayout))
   const commentsActions = commentsPage.locator('.post-comments-post-actions')
@@ -884,7 +920,15 @@ try {
     'Compact Social V4 rail should stack without overflow: ' + JSON.stringify(compactFeed))
   await page.setViewportSize({ width: 390, height: 844 })
   await feed.locator('.stories-row .story-card').first().waitFor({ state: 'visible' })
-  await feed.locator('.zalo-post-composer').waitFor({ state: 'visible' })
+  await feed.locator('.social-feed-mobile-launcher').waitFor({ state: 'visible' })
+  assert(await feed.locator('.zalo-post-composer').count() === 0,
+    'Mobile feed must keep the full composer in a dialog rather than occupying the timeline')
+  await feed.getByRole('button', { name: 'Bạn đang nghĩ gì?' }).click()
+  const mobileComposer = page.getByRole('dialog', { name: 'Tạo bài viết' })
+  await mobileComposer.waitFor({ state: 'visible' })
+  await mobileComposer.getByRole('textbox', { name: 'Nội dung bài viết' }).waitFor()
+  await mobileComposer.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+  await mobileComposer.waitFor({ state: 'hidden' })
   await feed.locator('.feed.zalo-feed .post.zalo-post').first().getByRole('button', { name: 'Bình luận', exact: true }).click()
   await page.getByRole('dialog', { name: /Chi tiết bài viết của/ }).waitFor({ state: 'visible' })
   await page.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()

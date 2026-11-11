@@ -7256,7 +7256,20 @@ export default function App({
                     }}
                   />
                 ) : (
-                  postComposer
+                  <div className="social-feed-mobile-launcher" aria-label="Tạo nội dung mới">
+                    <UserAvatar username={name}
+                      name={userLabel(profileMedia?.displayName || session.user.displayName, name)}
+                      className="social-feed-mobile-avatar" />
+                    <button type="button" className="social-feed-mobile-prompt"
+                      disabled={Boolean(pendingPost)} onClick={() => setFeedComposerOpen(true)}>
+                      {postText.trim() ? "Tiếp tục bản nháp..." : "Bạn đang nghĩ gì?"}
+                    </button>
+                    <button type="button" className="social-feed-mobile-media"
+                      disabled={Boolean(pendingPost)} aria-label="Thêm ảnh hoặc video vào bài viết"
+                      onClick={() => setFeedComposerOpen(true)}>
+                      <UiIcon name="photo" size={21} />
+                    </button>
+                  </div>
                 )}
                 </>)}
 
@@ -7448,7 +7461,7 @@ export default function App({
                                     : isProfileDesktop
                                       ? (setFeedCheckInOpen(false),
                                         setFeedComposerOpen(true))
-                                      : postComposerRef.current?.focus()
+                                      : setFeedComposerOpen(true)
                                 }
                               >
                                 {feedFilter === "following"
@@ -8632,7 +8645,7 @@ export default function App({
         )}
       </section>
 
-      {feedComposerOpen && tab === "feed" && isProfileDesktop && (
+      {feedComposerOpen && tab === "feed" && (
         <ProfileOverlay
           title="Tạo bài viết"
           busy={!!pendingPost || mediaUploading === "feed"}
