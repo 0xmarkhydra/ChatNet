@@ -5,6 +5,7 @@ import {
   Check,
   Eye,
   EyeOff,
+  Heart,
   Languages,
   LockKeyhole,
   Mail,
@@ -48,36 +49,38 @@ export default function AuthScreen({
 
       <aside className="auth-hero">
         <div className="auth-brand">
-          <div className="auth-brand-logo-wrap">
-            <svg className="auth-logo-svg" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <defs>
-                <linearGradient id="soco_logo_grad" x1="6%" x2="98%" y1="20%" y2="90%">
-                  <stop offset="0%" stopColor="#126df7" />
-                  <stop offset="34%" stopColor="#0988f5" />
-                  <stop offset="67%" stopColor="#8b5cf6" />
-                  <stop offset="84%" stopColor="#ef4dbb" />
-                  <stop offset="100%" stopColor="#ff9f0e" />
-                </linearGradient>
-              </defs>
-              <rect fill="#ffffff" height="96" rx="24" width="96" />
-              <path
-                d="M71 24C62 17 48 15 34 19C19 23 15 40 27 47C39 54 61 50 66 63C71 75 51 83 34 77C26 74 21 71 17 67"
-                fill="none"
-                stroke="url(#soco_logo_grad)"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="15"
-              />
-            </svg>
-          </div>
-          <div className="auth-brand-meta">
-            <div className="auth-brand-title-row">
-              <strong>SocCo</strong>
-              <span className="auth-online-dot" aria-hidden="true" />
+          <div className="auth-brand-identity">
+            <div className="auth-brand-logo-wrap">
+              <svg className="auth-logo-svg" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                  <linearGradient id="soco_logo_grad" x1="6%" x2="98%" y1="20%" y2="90%">
+                    <stop offset="0%" stopColor="#126df7" />
+                    <stop offset="34%" stopColor="#0988f5" />
+                    <stop offset="67%" stopColor="#8b5cf6" />
+                    <stop offset="84%" stopColor="#ef4dbb" />
+                    <stop offset="100%" stopColor="#ff9f0e" />
+                  </linearGradient>
+                </defs>
+                <rect fill="#ffffff" height="96" rx="24" width="96" />
+                <path
+                  d="M71 24C62 17 48 15 34 19C19 23 15 40 27 47C39 54 61 50 66 63C71 75 51 83 34 77C26 74 21 71 17 67"
+                  fill="none"
+                  stroke="url(#soco_logo_grad)"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="15"
+                />
+              </svg>
             </div>
-            <p className="auth-brand-sub">Mạng xã hội đa ngôn ngữ & Kết nối thời gian thực</p>
+            <div className="auth-brand-meta">
+              <div className="auth-brand-title-row">
+                <strong>SocCo</strong>
+                <span className="auth-online-dot" aria-hidden="true" />
+              </div>
+              <p className="auth-brand-sub">Mạng xã hội đa ngôn ngữ & Kết nối thời gian thực</p>
+            </div>
           </div>
-          <div className="auth-metric-pill" aria-label="120K+ người dùng năng động">
+          <div className="auth-brand-signal">
             <span className="auth-pulse-dot" aria-hidden="true" />
             <span>120K+ người dùng năng động</span>
           </div>
@@ -105,26 +108,48 @@ export default function AuthScreen({
                 </div>
                 <h1>
                   Understand.<br />
-                  <span className="auth-gradient-text">Connect.</span> Together.
+                  <span className="auth-gradient-text">Connect.</span><br />
+                  Together.
                 </h1>
                 <p>Khám phá nguồn cấp dữ liệu thông minh, phá vỡ rào cản ngôn ngữ bằng AI dịch tức thì và kết nối triệu trái tim trên toàn cầu.</p>
-                <div className="auth-feature-pills">
-                  <div className="auth-feature-pill">
-                    <Languages size={17} className="auth-pill-icon auth-pill-icon--blue" />
-                    <span>AI Dịch song ngữ 50+ thứ tiếng</span>
-                  </div>
-                  <div className="auth-feature-pill">
-                    <Zap size={17} className="auth-pill-icon auth-pill-icon--emerald" />
-                    <span>Tốc độ kết nối 10x</span>
-                  </div>
+                <div className="auth-feature-icons" aria-hidden="true">
+                  <span className="auth-feature-icon auth-feature-icon--blue"><Languages size={18} /></span>
+                  <span className="auth-feature-icon auth-feature-icon--emerald"><Zap size={18} /></span>
+                  <span className="auth-feature-icon auth-feature-icon--pink"><Heart size={18} /></span>
                 </div>
               </div>
 
               <div className="auth-hero-visual">
-                <div className="auth-hero-frame">
-                  <img src="/login-hero.png" alt="SocCo Member" className="auth-hero-img" />
-                  <div className="auth-hero-overlay" aria-hidden="true" />
+                <div className="auth-hero-halo" aria-hidden="true" />
+                <div className="auth-hero-rings" aria-hidden="true">
+                  <div className="auth-ring auth-ring--outer" />
+                  <div className="auth-ring auth-ring--inner" />
                 </div>
+
+                <img
+                  src="/login-hero.png"
+                  alt="SocCo Member"
+                  className="auth-hero-img"
+                />
+
+                {/* Floating Social & Feature Badges */}
+                <div className="auth-float-badge auth-float-badge--chat" aria-hidden="true">
+                  <MessageCircle size={20} color="#ffffff" />
+                </div>
+                <div className="auth-float-badge auth-float-badge--heart" aria-hidden="true">
+                  <Heart size={18} color="#ffffff" fill="#ffffff" />
+                </div>
+                <div className="auth-float-badge auth-float-badge--lang" aria-hidden="true">
+                  <Languages size={18} color="#ffffff" />
+                </div>
+
+                {/* Floating Chat Bubble */}
+                <div className="auth-float-bubble auth-float-bubble--msg" aria-hidden="true">
+                  <Sparkles size={13} className="auth-bubble-sparkle" />
+                  <span>AI dịch tức thì: 50+ ngôn ngữ</span>
+                </div>
+
+                {/* Preserved Floating Metrics Cards */}
                 <div className="auth-floating-card auth-floating-card--top">
                   <div className="auth-floating-icon auth-floating-icon--green">
                     <TrendingUp size={16} />
@@ -149,7 +174,7 @@ export default function AuthScreen({
         </div>
 
         <div className="auth-hero-footer">
-          <span>© SocCo • ChatNet Technology Ecosystem</span>
+          <span>© SocCo • ChatNet</span>
           <div className="auth-footer-links">
             <a href="#privacy">Quyền riêng tư</a>
             <span aria-hidden="true">•</span>
@@ -188,7 +213,7 @@ export default function AuthScreen({
             </p>
             {authError && <div className="auth-alert" role="alert">{authError}</div>}
             <button className="auth-submit" type="submit" disabled={authLoading || otpCode.length !== 6 || otpSecondsLeft <= 0}>
-              <Check size={18} /> Xác minh và tiếp tục
+              <Check size={18} /> <span>Xác minh và tiếp tục</span>
             </button>
             <div className="auth-otp-links">
               <button type="button" disabled={authLoading} onClick={() => void resendOTP()}>
@@ -204,7 +229,7 @@ export default function AuthScreen({
               <h2>{authMode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản SocCo'}</h2>
               <p>{authMode === 'login' ? 'Đăng nhập để khám phá cộng đồng SocCo.' : 'Bắt đầu kết nối cùng mọi người qua email.'}</p>
             </div>
-            <div className="auth-tabs" role="group" aria-label="Chọn đăng nhập hoặc đăng ký">
+            <div className={`auth-tabs auth-tabs--${authMode}`} role="group" aria-label="Chọn đăng nhập hoặc đăng ký">
               <button type="button" className={authMode === 'login' ? 'active' : ''} disabled={authLoading} onClick={() => switchMode('login')}>Đăng nhập</button>
               <button type="button" className={authMode === 'register' ? 'active' : ''} disabled={authLoading} onClick={() => switchMode('register')}>Tạo tài khoản</button>
             </div>
@@ -231,7 +256,7 @@ export default function AuthScreen({
                 <div className="auth-login-options">
                   <label className="auth-remember">
                     <input type="checkbox" checked={rememberEmail} onChange={(event) => setRememberEmail(event.target.checked)} />
-                    Ghi nhớ email
+                    <span>Ghi nhớ email</span>
                   </label>
                   <button type="button" onClick={() => { setLoginMethod('otp'); resetRegistration() }}>Quên mật khẩu?</button>
                 </div>

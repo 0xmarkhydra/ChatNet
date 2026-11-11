@@ -135,7 +135,7 @@ export default function AuthSetup({ onComplete }: { onComplete: (locale: string)
         {stage > 0 && <button className="auth-outline-button" type="button" onClick={() => setStage(stage - 1)}><ChevronLeft size={16} /> Quay lại</button>}
         <button className="auth-setup-skip" type="button" onClick={finish}>Để sau</button>
         <button className="auth-submit" type="button" onClick={() => stage === 2 ? finish() : setStage(stage + 1)}>
-          <Check size={17} /> {stage === 2 ? 'Hoàn tất thiết lập' : 'Tiếp tục'}
+          <Check size={17} /> <span>{stage === 2 ? 'Hoàn tất thiết lập' : 'Tiếp tục'}</span>
         </button>
       </div>
     </section>
