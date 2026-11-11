@@ -8,6 +8,7 @@
     "dev:railway": "CHATNET_API_PROXY_TARGET=https://api-chat.codelocal.cloud VITE_API_PROXY=1 vite --host 0.0.0.0 --port 5188 --strictPort",
     "build": "tsc --noEmit && vite build",
     "check:onesignal": "node --experimental-strip-types scripts/onesignal-init-check.mjs",
+    "check:push-deeplink": "node scripts/push-notification-deeplink-check.mjs",
     "check:incoming-sound": "node --experimental-strip-types scripts/incoming-sound-check.mjs",
     "check:pwa": "node --experimental-strip-types scripts/pwa-update-check.mjs",
     "check:session": "node --experimental-strip-types scripts/session-check.mjs",
