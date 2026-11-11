@@ -6,6 +6,8 @@ import type { ToastKind } from '../notifications/toast'
 import { API } from '../../shared/lib/config'
 import { FeedText } from './FeedDiscussion'
 import FeedPostActions, { FeedSaveAction, FeedShareAction } from './FeedPostActions'
+import PostExtrasView from './PostExtrasView'
+import { parsePostExtras } from './postExtras'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../shared/ui/MediaAttachmentsView'
 import UiIcon from '../../shared/ui/UiIcon'
@@ -26,6 +28,8 @@ type Props = {
   likePreviews: Record<number, boolean>;
   like: (post: Post, emoji?: string) => Promise<void>;
   showSave?: boolean;
+  onEditPost?: (post: Post) => void;
+  taggedNames?: Record<string, string>;
 };
 
 function formatCount(count: number): string {
@@ -59,10 +63,13 @@ export default function FeedPostCard({
   setActivePostId,
   likePreviews,
   like,
+  onEditPost,
+  taggedNames,
 }: Props) {
   const authorLabel = userLabel(post.author === name ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
   const likeBusy = likePreviews[post.id] !== undefined
   const commentsCount = post.comments?.length ?? 0
+  const extras = parsePostExtras(post.content)
 
   return (
     <article className="post zalo-post feed-post-card" key={post.id}>
@@ -74,6 +81,7 @@ export default function FeedPostCard({
             <small>{relativeDate(post.createdAt)} · {post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}</small>
           </div>
           <FeedPostActions
+            onEdit={onEditPost}
             post={post}
             mine={post.author === name}
             request={apiFetch}
@@ -82,11 +90,12 @@ export default function FeedPostCard({
             onFeedback={(text, kind) => setNotice(text, kind || "success")}
           />
         </div>
-        {post.content && (
+        <PostExtrasView extras={extras} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
+        {extras.caption && (
           <div className={post.background ? 'feed-text-background bg-' + post.background : 'feed-post-text'}>
             <FeedText api={API} token={token}
               target={translationPreferencesLoaded ? targetLanguage : ''}
-              text={post.content} maxLines={5} onExpand={() => setActivePostId(post.id)} />
+              text={extras.caption} maxLines={5} onExpand={() => setActivePostId(post.id)} />
           </div>
         )}
         {Boolean(post.attachments?.length) && (

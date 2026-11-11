@@ -50,6 +50,14 @@ const suggestions = [{id: 4, username:'phuonglinh', displayName:'Phương Linh',
 let followingRequests = 0
 let savedRequests = 0
 let lastFeedCreated = null
+let lastFeedEdited = null
+let mentionReadCalls = 0
+let incomingMention = { id: 401, postId: 88, author: 'minhanh', authorDisplayName: 'Minh Anh',
+  createdAt: '2026-11-11T08:00:00Z', readAt: null }
+let rejectNextEdit = false
+let createdFeedPost = null
+let lastStoryCreated = null
+let presignedUploads = 0
 let friendRequestsSent = 0
 let rejectStoryDirect = false
 const storyReplyRequests = []
@@ -69,6 +77,7 @@ try {
   const errors = []
   page.on('pageerror', err => errors.push(err.message))
   await page.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
+  await page.route('**/mock-upload**', route => route.fulfill({ status: 200, headers: cors, body: '' }))
   await page.route('**/api/**', route => {
     const req = route.request(), path = new URL(req.url()).pathname
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(body) })
@@ -123,7 +132,10 @@ try {
     if (path.endsWith('/members')) return json([{ id: 1, username: 'soco_user', displayName: 'SocCO Tester', role: 'owner', online: true }])
     if (path.endsWith('/group-settings')) return json({ requireApproval: false, adminCanInvite: true, adminCanApprove: true, adminCanEditInfo: true })
     if (/\/(invites|join-requests|admin-audit)$/.test(path)) return json([])
-    if (path === '/api/friends') return json([])
+    if (path === '/api/friends') return json(process.argv.includes('--smart-composer-only') ? [
+      { id: 24, username: 'minhanh', displayName: 'Minh Anh', online: true, status: 'accepted', updatedAt: '2026-11-01T00:00:00Z' },
+      { id: 25, username: 'anhthu', displayName: 'Anh Thư', online: false, status: 'accepted', updatedAt: '2026-11-01T00:00:00Z' },
+    ] : [])
     if (path === '/api/friends/requests') return json([])
     if (path === '/api/users/minhanh/profile') return json({
       id: 2, username: 'minhanh', displayName: 'Minh Anh',
@@ -133,6 +145,13 @@ try {
     if (path === '/api/users/suggestions') return json(suggestions)
     if (path === '/api/users/search') return json([])
     if (path === '/api/friends/4' && req.method() === 'POST') { friendRequestsSent++; return json({ ...suggestions[0], status:'pending', direction:'outgoing', updatedAt:new Date().toISOString() }) }
+    if (path === '/api/feed/mentions' && req.method() === 'GET') return json([incomingMention])
+    if (path === '/api/feed/mentions/401/read' && req.method() === 'POST') {
+      mentionReadCalls++
+      incomingMention = { ...incomingMention, readAt: new Date().toISOString() }
+      return route.fulfill({ status: 204, headers: cors })
+    }
+    if (path === '/api/posts/88' && req.method() === 'GET') return json({ ...fixturePost })
     if (path === '/api/posts/88/reactions' && req.method() === 'POST') {
       const selected = req.postDataJSON().emoji
       fixturePost.myReaction = fixturePost.myReaction === selected ? '' : selected
@@ -151,14 +170,26 @@ try {
       }]
       return json({ ...fixturePost })
     }
+    if (path === '/api/posts/101' && req.method() === 'PATCH') {
+      lastFeedEdited = req.postDataJSON()
+      if (rejectNextEdit) {
+        rejectNextEdit = false
+        return route.fulfill({ status: 500, contentType: 'application/json',
+          headers: cors, body: JSON.stringify({ error: 'Không lưu được bài thử nghiệm' }) })
+      }
+      createdFeedPost = { ...createdFeedPost, ...lastFeedEdited, updatedAt: new Date().toISOString() }
+      return json(createdFeedPost)
+    }
     if (path === '/api/posts') {
       const params = new URL(req.url()).searchParams
       if (req.method() === 'POST') {
         lastFeedCreated = req.postDataJSON()
-        return json({ id: 101, author: 'soco_user', authorDisplayName: 'SocCO Tester',
+        createdFeedPost = { id: 101, author: 'soco_user', authorDisplayName: 'SocCO Tester',
           content: lastFeedCreated.content, likes: 0, liked: false, saved: false, comments: [],
           attachments: [], visibility: lastFeedCreated.visibility || 'public',
-          createdAt: new Date().toISOString() })
+          background: lastFeedCreated.background || '',
+          createdAt: new Date().toISOString() }
+        return json(createdFeedPost)
       }
       if (params.get('scope') === 'following') { followingRequests++; return json(feedPosts) }
       if (params.get('scope') === 'saved') { savedRequests++; return json(feedPosts.filter(post=>post.saved)) }
@@ -175,6 +206,20 @@ try {
         createdAt: '2026-11-05T07:00:00Z',
       }])
       return json(feedPosts)
+    }
+    if (path === '/api/media/presign' && req.method() === 'POST') {
+      const input = req.postDataJSON()
+      presignedUploads++
+      return json({ uploadUrl: origin + '/mock-upload/' + presignedUploads,
+        storageRef: input.scope + '/1/' + presignedUploads, key: 'mock-' + presignedUploads,
+        expiresAt: '2099-01-01T00:00:00Z', kind: input.contentType.startsWith('video/') ? 'video' : 'image',
+        downloadUrl: origin + '/default-profile-cover.jpg' })
+    }
+    if (path === '/api/stories' && req.method() === 'POST') {
+      lastStoryCreated = req.postDataJSON()
+      return json({ id: 101, author: 'soco_user', authorDisplayName: 'SocCO Tester',
+        attachment: { ...lastStoryCreated.attachment, url: origin + '/default-profile-cover.jpg' },
+        createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() })
     }
     if (path === '/api/stories') return json([{
       id: 29, author: 'minhanh', authorDisplayName: 'Minh Anh',
@@ -262,8 +307,6 @@ try {
   for (const [selector, y] of [
     ['.social-feed-stories-card', 107],
     ['.social-feed-launcher', 286],
-    ['.social-feed-filter-bar', 410],
-    ['.social-feed-center .post.zalo-post', 474],
     ['.social-feed-suggestions', 107],
     ['.social-feed-trending', 425],
     ['.social-feed-translation', 702],
@@ -272,6 +315,16 @@ try {
     assert(rect && approx(rect.y, y),
       'Social feed vertical alignment mismatch ' + selector + ': ' + JSON.stringify(socialGeometry))
   }
+  const launcherRect = socialGeometry['.social-feed-launcher']
+  const filterRect = socialGeometry['.social-feed-filter-bar']
+  const firstPostRect = socialGeometry['.social-feed-center .post.zalo-post']
+  assert(launcherRect && launcherRect.height <= 85 && filterRect && firstPostRect
+    && filterRect.y >= launcherRect.y + launcherRect.height + 8
+    && filterRect.y <= launcherRect.y + launcherRect.height + 24
+    && firstPostRect.y >= filterRect.y + filterRect.height + 8
+    && firstPostRect.y <= filterRect.y + filterRect.height + 24,
+    'Compact single-row composer must retain spacing without overlapping feed: '
+      + JSON.stringify(socialGeometry))
   const centerRect = socialGeometry['.social-feed-stories-card']
   const sideRect = socialGeometry['.social-feed-suggestions']
   const centerWidth = centerRect.width
@@ -541,7 +594,7 @@ try {
   mkdirSync('output/playwright/layout', { recursive: true })
   await page.screenshot({ path: 'output/playwright/layout/feed-post-single-heart.png' })
   // The post editor should start short, expand with text, and shrink back without its own scrollbar.
-  await feed.locator('.social-feed-launcher-publish').click()
+  await feed.locator('.social-feed-launcher-prompt').click()
   const createDialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
   await createDialog.waitFor({ state: 'visible' })
   const postInput = createDialog.getByRole('textbox', { name: 'Nội dung bài viết' })
@@ -565,8 +618,423 @@ try {
   const shrunkComposer = await measureComposer()
   assert(Math.abs(shrunkComposer.height - shortComposer.height) < 3,
     'Post editor must shrink again when text is removed: ' + JSON.stringify(shrunkComposer))
+  // Native file-input cancel events bubble to the surrounding <dialog>. Canceling
+  // a picker must not be interpreted as a request to close the post composer.
+  const composerMediaInput = createDialog.locator('input[type="file"][aria-label="Chọn ảnh hoặc video cho bài viết"]')
+  await composerMediaInput.evaluate(input => {
+    input.dispatchEvent(new Event('cancel', { bubbles: true }))
+  })
+  assert(await createDialog.isVisible() && await postInput.inputValue() === 'xinh quá nhé',
+    'Canceling the media file picker must leave the create-post dialog open with the existing draft')
   await createDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
   await createDialog.waitFor({ state: 'detached' })
+  if (process.argv.includes('--smart-composer-only')) {
+    const launcher = feed.locator('.social-feed-launcher')
+    assert(await launcher.locator('.social-feed-launcher-publish').count() === 0,
+      'Feed must not show a separate create-post button')
+    const quickButtons = launcher.locator('.social-feed-launcher-shortcuts > button')
+    assert(await quickButtons.count() === 3
+      && await quickButtons.evaluateAll(buttons => buttons.every(button => !button.textContent.trim())),
+      'Media, Story and Check-in shortcuts must be three icon-only buttons')
+    const assertLauncherRow = async (label) => {
+      const layout = await launcher.evaluate(root => {
+        const prompt = root.querySelector('.social-feed-launcher-prompt').getBoundingClientRect()
+        const actions = [...root.querySelectorAll('.social-feed-launcher-shortcuts > button')]
+        const buttons = actions.map(button => button.getBoundingClientRect())
+        const rootRect = root.getBoundingClientRect()
+        return {
+          prompt: { right: prompt.right, centerY: prompt.y + prompt.height / 2 },
+          buttons: buttons.map(rect => ({ left: rect.left, right: rect.right, centerY: rect.y + rect.height / 2 })),
+          rootRight: rootRect.right,
+          colors: actions.map(button => getComputedStyle(button).color),
+        }
+      })
+      assert(layout.buttons.length === 3 && layout.buttons[0].left >= layout.prompt.right - 2
+        && layout.buttons[2].right <= layout.rootRight + 1
+        && layout.buttons.every(button => Math.abs(button.centerY - layout.prompt.centerY) <= 5),
+        label + ' prompt and actions must remain on the same row, icons on the right: ' + JSON.stringify(layout))
+      assert(new Set(layout.colors).size === 3,
+        label + ' must use three distinct accent colors: ' + JSON.stringify(layout.colors))
+    }
+    await assertLauncherRow('Desktop')
+    const storyShortcut = launcher.getByRole('button', { name: 'Story' })
+    await storyShortcut.hover()
+    await page.waitForFunction(() => {
+      const button = document.querySelector('.social-feed-launcher-shortcuts button[aria-label="Story"]')
+      return button && getComputedStyle(button, '::after').opacity === '1'
+    })
+    assert((await storyShortcut.evaluate(button => getComputedStyle(button, '::after').content)).includes('Tạo Story'),
+      'Hovering a shortcut icon must reveal its descriptive tooltip')
+    await launcher.getByRole('button', { name: 'Check-in' }).click()
+    const checkinDialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    await checkinDialog.waitFor({ state: 'visible' })
+    const locationInput = checkinDialog.getByRole('textbox', { name: 'Địa điểm check-in' })
+    assert(await locationInput.isVisible(), 'Check-in shortcut must open the location form')
+    const audienceTrigger = checkinDialog.getByRole('button', { name: 'Ai có thể xem bài viết' })
+    assert(await audienceTrigger.isVisible() && (await audienceTrigger.textContent()).includes('Công khai'),
+      'Audience selector should be a styled compact pill near the author')
+    await audienceTrigger.click()
+    const audienceMenu = checkinDialog.getByRole('menu', { name: 'Ai có thể xem bài viết' })
+    assert(await audienceMenu.isVisible() && await audienceMenu.getByRole('menuitemradio').count() === 3,
+      'Audience menu should show three clear privacy options')
+    await audienceMenu.getByRole('menuitemradio', { name: 'Bạn bè' }).click()
+    assert((await audienceTrigger.textContent()).includes('Bạn bè') && await audienceTrigger.getAttribute('aria-expanded') === 'false',
+      'Choosing friends must update audience and close the menu')
+    await audienceTrigger.click()
+    await audienceMenu.getByRole('menuitemradio', { name: 'Chỉ mình tôi' }).click()
+    assert((await audienceTrigger.textContent()).includes('Chỉ mình tôi'),
+      'Choosing private audience must update the compact trigger')
+    await audienceTrigger.click()
+    await audienceMenu.getByRole('menuitemradio', { name: 'Công khai' }).click()
+    await audienceTrigger.click()
+    await audienceMenu.getByRole('menuitemradio', { name: 'Công khai' }).press('Escape')
+    assert(await checkinDialog.isVisible() && await audienceMenu.count() === 0,
+      'Escape must only dismiss the audience menu, not the create-post dialog')
+    await audienceTrigger.press('ArrowDown')
+    const publicOption = audienceMenu.getByRole('menuitemradio', { name: 'Công khai' })
+    assert(await publicOption.evaluate(option => document.activeElement === option), 'Keyboard opening should focus the selected audience')
+    await publicOption.press('ArrowDown')
+    assert(await audienceMenu.getByRole('menuitemradio', { name: 'Bạn bè' }).evaluate(option => document.activeElement === option),
+      'ArrowDown should move keyboard focus between audience choices')
+    await audienceMenu.getByRole('menuitemradio', { name: 'Bạn bè' }).press('Escape')
+    assert(await audienceMenu.count() === 0 && await checkinDialog.isVisible(),
+      'Escape should dismiss audience menu without leaving the composer')
+    await audienceTrigger.click()
+    await checkinDialog.getByRole('heading', { name: 'Tạo bài viết' }).click()
+    assert(await audienceMenu.count() === 0 && await checkinDialog.isVisible(),
+      'Clicking outside audience dropdown should close only the dropdown')
+    const modalActions = checkinDialog.locator('.smart-composer-action-icons > button')
+    assert(await modalActions.count() === 5
+      && await modalActions.evaluateAll(buttons => buttons.every(button => !button.textContent.trim())),
+      'Composer must offer five consistent icon-only actions including tagging and feelings')
+    assert(await checkinDialog.locator('.smart-composer-actions').evaluate(toolbar => getComputedStyle(toolbar).overflowX === 'visible'),
+      'Composer toolbar must not clip its hover tooltips')
+    const feelingButton = checkinDialog.getByRole('button', { name: 'Cảm xúc', exact: true })
+    await feelingButton.hover()
+    await page.waitForFunction(() => {
+      const button = document.querySelector('.profile-post-dialog .smart-composer-action-icons button[aria-label="Cảm xúc"]')
+      return button && getComputedStyle(button, '::after').opacity === '1'
+    })
+    assert((await feelingButton.evaluate(button => getComputedStyle(button, '::after').content))
+      .includes('Bạn đang cảm thấy thế nào?'), 'Feeling tooltip must describe the icon clearly')
+    await feelingButton.click()
+    assert(await checkinDialog.locator('.social-feed-checkin-field').count() === 0
+      && await checkinDialog.locator('.smart-tag-picker').count() === 0,
+      'Opening feelings must hide other tool panels and dismiss an empty check-in')
+    const feelingPicker = checkinDialog.locator('.smart-feeling-picker')
+    await feelingPicker.getByRole('button', { name: 'vui vẻ', exact: true }).click()
+    assert(await feelingPicker.locator('.smart-feeling-selected').count() === 1,
+      'Selected feeling must appear as a removable chip')
+    await feelingPicker.getByRole('button', { name: 'Bỏ cảm xúc đã chọn' }).click()
+    assert(await feelingPicker.count() === 0, 'Removing the feeling must clear the current selection')
+    await feelingButton.click()
+    await feelingPicker.getByRole('button', { name: 'vui vẻ', exact: true }).click()
+    await checkinDialog.getByRole('button', { name: 'Gắn thẻ bạn bè' }).click()
+    assert(await feelingPicker.count() === 0 && await checkinDialog.locator('.smart-tag-picker').count() === 1,
+      'Choosing tagging must hide the previously selected feeling panel while preserving its value')
+    const tagSearch = checkinDialog.getByRole('searchbox', { name: 'Tìm bạn bè để gắn thẻ' })
+    await tagSearch.fill('Minh')
+    await checkinDialog.locator('.smart-tag-person').filter({ hasText: 'Minh Anh' }).click()
+    assert(await checkinDialog.locator('.smart-tag-chip').count() === 1,
+      'Tagging must show a removable selected person')
+    await checkinDialog.getByRole('button', { name: 'Bỏ gắn thẻ Minh Anh' }).click()
+    assert(await checkinDialog.locator('.smart-tag-chip').count() === 0,
+      'Tag chip remove must update current selection')
+    await checkinDialog.locator('.smart-tag-person').filter({ hasText: 'Minh Anh' }).click()
+    await checkinDialog.getByRole('button', { name: 'Nền chữ' }).click()
+    assert(await checkinDialog.locator('.smart-tag-picker').count() === 0
+      && await feelingPicker.count() === 0
+      && await checkinDialog.locator('.feed-background-palette').count() === 1,
+      'Opening background options must close tagging and feeling panels')
+    await checkinDialog.getByRole('button', { name: 'violet' }).click()
+    await checkinDialog.getByRole('button', { name: 'Check-in địa điểm' }).click()
+    assert(await checkinDialog.locator('.feed-background-palette').count() === 0
+      && await checkinDialog.locator('.smart-tag-picker').count() === 0
+      && await locationInput.isVisible(),
+      'Opening check-in must close background palette without clearing selected background')
+    const publish = checkinDialog.getByRole('button', { name: 'Đăng', exact: true })
+    assert(await publish.isDisabled(), 'Missing check-in location must block publishing')
+    await locationInput.fill('Hà Nội')
+    await checkinDialog.getByRole('button', { name: 'Gắn thẻ bạn bè' }).click()
+    assert(await checkinDialog.locator('.social-feed-checkin-field').count() === 0
+      && await checkinDialog.locator('.smart-tag-chip').count() === 1,
+      'Switching away from check-in must hide its panel while retaining its filled location and tags')
+    await checkinDialog.getByRole('button', { name: 'Check-in địa điểm' }).click()
+    assert(await locationInput.inputValue() === 'Hà Nội'
+      && await checkinDialog.locator('.smart-tag-picker').count() === 0,
+      'Reopening check-in must restore the selected location and hide tagging')
+    const caption = checkinDialog.getByRole('textbox', { name: 'Nội dung bài viết' })
+    await caption.fill('x'.repeat(5000))
+    assert(await publish.isDisabled(), 'Location and long caption must respect the server 5000-character limit')
+    await caption.fill('Ngày mới')
+    await publish.click()
+    await checkinDialog.waitFor({ state: 'detached' })
+    assert(lastFeedCreated?.content?.startsWith('📍 Hà Nội') && lastFeedCreated.content.includes('👥 Cùng với @minhanh')
+      && lastFeedCreated.content.includes('😊 Đang cảm thấy vui vẻ')
+      && lastFeedCreated.content.endsWith('Ngày mới') && lastFeedCreated.visibility === 'public'
+      && lastFeedCreated.background === 'violet',
+      'Selected feeling, friend tags, location and caption must persist in the post payload: ' + JSON.stringify(lastFeedCreated))
+
+    // Published extras must be real interactions, not lines of inert text.
+    const postedCard = feed.locator('.feed-post-card').filter({ hasText: 'Ngày mới' }).first()
+    await postedCard.waitFor({ state: 'visible' })
+    const postExtras = postedCard.locator('.feed-post-extras')
+    assert(await postExtras.count() === 1 && !(await postedCard.locator('.feed-post-text, .feed-text-background').innerText()).includes('👥 Cùng với'),
+      'Tags/location/feeling should be distinct interactive elements outside caption')
+    const locationLink = postExtras.getByRole('link', { name: 'Xem địa điểm Hà Nội trên bản đồ' })
+    assert((await locationLink.getAttribute('href')).includes('google.com/maps/search'),
+      'Check-in location must open an actual map search')
+    await postExtras.getByRole('button', { name: 'Xem cảm xúc vui vẻ' }).click()
+    assert(await postExtras.getByRole('status').isVisible(),
+      'Mood control must open a useful details disclosure')
+    await postExtras.getByRole('button', { name: 'Xem hồ sơ @minhanh' }).click()
+    const taggedProfile = page.getByRole('dialog', { name: 'Trang cá nhân người dùng' })
+    await taggedProfile.waitFor({ state: 'visible' })
+    await taggedProfile.getByRole('heading', { name: 'Minh Anh' }).waitFor({ state: 'visible' })
+    assert((await taggedProfile.textContent()).includes('@minhanh'),
+      'Tagged friend must open the matching profile')
+    await taggedProfile.getByRole('button', { name: 'Quay lại' }).click()
+    await taggedProfile.waitFor({ state: 'detached' })
+
+    const postMenu = async card => {
+      await card.getByRole('button', { name: 'Tùy chọn bài viết' }).click()
+      await page.getByRole('dialog', { name: 'Tùy chọn bài viết' })
+        .getByRole('button', { name: 'Chỉnh sửa bài viết' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Chỉnh sửa bài viết' })
+      await dialog.waitFor({ state: 'visible' })
+      return dialog
+    }
+    const editDialog = await postMenu(postedCard)
+    const editCaption = editDialog.getByRole('textbox', { name: 'Nội dung bài viết' })
+    assert(await editCaption.inputValue() === 'Ngày mới',
+      'Editing must restore the caption separately from metadata in the shared composer')
+    assert(await editDialog.locator('.feed-pending-media').count() === 0,
+      'Text-only post editor should not invent attachments')
+    const editLocation = editDialog.getByRole('textbox', { name: 'Địa điểm check-in' })
+    assert(await editLocation.inputValue() === 'Hà Nội',
+      'Editing must preload an existing check-in into its real input')
+    await editLocation.fill('Hồ Tây')
+    await editDialog.getByRole('button', { name: 'Gắn thẻ bạn bè' }).click()
+    assert(await editDialog.locator('.smart-tag-chip').count() === 1,
+      'Editing must retain selected tagged friends')
+    await editDialog.getByRole('button', { name: 'Cảm xúc', exact: true }).click()
+    assert((await editDialog.locator('.smart-feeling-selected').innerText()).includes('vui vẻ'),
+      'Editing must restore the previous feeling')
+    await editDialog.locator('.smart-feeling-options').getByRole('button', { name: 'hạnh phúc', exact: true }).click()
+    await editCaption.fill('Ngày mới đã chỉnh sửa')
+    rejectNextEdit = true
+    await editDialog.getByRole('button', { name: 'Lưu thay đổi' }).click()
+    await editDialog.getByRole('alert', { name: '' }).waitFor({ state: 'visible' })
+    assert(await editDialog.isVisible() && await editCaption.inputValue() === 'Ngày mới đã chỉnh sửa',
+      'Failed PATCH must keep the shared editor open and preserve the draft for retry')
+    await editDialog.getByRole('button', { name: 'Lưu thay đổi' }).click()
+    await editDialog.waitFor({ state: 'detached' })
+    assert(lastFeedEdited?.content?.includes('📍 Hồ Tây')
+      && lastFeedEdited.content.includes('👥 Cùng với @minhanh')
+      && lastFeedEdited.content.includes('🥰 Đang cảm thấy hạnh phúc')
+      && lastFeedEdited.content.endsWith('Ngày mới đã chỉnh sửa')
+      && lastFeedEdited.background === 'violet' && lastFeedEdited.visibility === 'public',
+      'Editing must PATCH the same post with all saved choices: ' + JSON.stringify(lastFeedEdited))
+    const editedCard = feed.locator('.feed-post-card').filter({ hasText: 'Ngày mới đã chỉnh sửa' }).first()
+    await editedCard.waitFor({ state: 'visible' })
+    assert(await editedCard.locator('.feed-post-extras').getByRole('link', { name: 'Xem địa điểm Hồ Tây trên bản đồ' }).count() === 1
+      && await editedCard.locator('.feed-post-extras').getByRole('button', { name: 'Xem cảm xúc hạnh phúc' }).count() === 1,
+      'Saved edits must refresh interactive extras on the existing card')
+    const cancelDialog = await postMenu(editedCard)
+    await cancelDialog.getByRole('textbox', { name: 'Nội dung bài viết' }).fill('Không lưu bản này')
+    await cancelDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+    await cancelDialog.waitFor({ state: 'detached' })
+    assert(await editedCard.isVisible() && lastFeedEdited.content.endsWith('Ngày mới đã chỉnh sửa'),
+      'Canceling edit must keep the previously published content unchanged')
+    await launcher.locator('.social-feed-launcher-prompt').click()
+    const unsentDialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    await unsentDialog.getByRole('textbox', { name: 'Nội dung bài viết' }).fill('Bản nháp chưa đăng')
+    await unsentDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+    const discardEditDialog = await postMenu(editedCard)
+    await discardEditDialog.getByRole('textbox', { name: 'Nội dung bài viết' }).fill('Bản sửa bỏ dở')
+    await discardEditDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+    await launcher.locator('.social-feed-launcher-prompt').click()
+    const restoredDraftDialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    const restoredDraftInput = restoredDraftDialog.getByRole('textbox', { name: 'Nội dung bài viết' })
+    assert(await restoredDraftInput.inputValue() === 'Bản nháp chưa đăng',
+      'Canceling an edit must restore the earlier, unpublished create-post draft')
+    await restoredDraftInput.fill('')
+    await restoredDraftDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+
+    const detailCard = feed.locator('.feed-post-card').filter({ hasText: 'Ngày mới đã chỉnh sửa' }).first()
+    await detailCard.getByRole('button', { name: 'Bình luận' }).click()
+    const detailPage = page.locator('.post-comments-page')
+    await detailPage.waitFor({ state: 'visible' })
+    assert(await detailPage.locator('.feed-post-extras').getByRole('link', { name: 'Xem địa điểm Hồ Tây trên bản đồ' }).count() === 1
+      && await detailPage.locator('.feed-post-extras').getByRole('button', { name: 'Xem hồ sơ @minhanh' }).count() === 1,
+      'Post details page must display the same interactive location/tag metadata')
+    await detailPage.getByRole('button', { name: 'Tùy chọn bài viết' }).click()
+    await page.getByRole('dialog', { name: 'Tùy chọn bài viết' })
+      .getByRole('button', { name: 'Chỉnh sửa bài viết' }).click()
+    const detailEdit = page.getByRole('dialog', { name: 'Chỉnh sửa bài viết' })
+    await detailEdit.waitFor({ state: 'visible' })
+    assert(await detailEdit.getByRole('textbox', { name: 'Nội dung bài viết' }).inputValue() === 'Ngày mới đã chỉnh sửa',
+      'Editing from the details screen must reuse the same full composer')
+    await detailEdit.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+    await page.goBack()
+    await detailPage.waitFor({ state: 'detached' })
+
+    await launcher.getByRole('button', { name: 'Ảnh / Video' }).waitFor()
+    await launcher.locator('.social-feed-launcher-prompt').click()
+    const standaloneFeelingDialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    const friendsAudienceTrigger = standaloneFeelingDialog.getByRole('button', { name: 'Ai có thể xem bài viết' })
+    await friendsAudienceTrigger.click()
+    await standaloneFeelingDialog.getByRole('menuitemradio', { name: 'Bạn bè' }).click()
+    await standaloneFeelingDialog.getByRole('button', { name: 'Cảm xúc', exact: true }).click()
+    await standaloneFeelingDialog.locator('.smart-feeling-options')
+      .getByRole('button', { name: 'mệt mỏi', exact: true }).click()
+    await standaloneFeelingDialog.getByRole('button', { name: 'Đăng', exact: true }).click()
+    await standaloneFeelingDialog.waitFor({ state: 'detached' })
+    assert(lastFeedCreated?.content === '😴 Đang cảm thấy mệt mỏi' && lastFeedCreated.visibility === 'friends',
+      'Audience choice must persist with the post, including a feeling-only post: ' + JSON.stringify(lastFeedCreated))
+
+    await launcher.locator('input[aria-label="Chọn ảnh hoặc video đăng bài"]').setInputFiles({
+      name: 'composer-test.png', mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWlMAAAAASUVORK5CYII=', 'base64'),
+    })
+    const mediaDialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    await mediaDialog.waitFor({ state: 'visible' })
+    assert(await mediaDialog.locator('.smart-feeling-selected').count() === 0,
+      'Successfully published feeling must reset for a new post')
+    await mediaDialog.locator('.feed-pending-media .media-attachments').waitFor({ state: 'visible' })
+    assert(presignedUploads > 0, 'Media launcher must select and upload the chosen file')
+    await mediaDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+
+    // Discovery rail stays pinned as the main feed scrolls; on short laptop
+    // screens it gets a separate scrollbar so the AI card stays reachable.
+    await page.setViewportSize({ width: 1240, height: 640 })
+    const railMeasurements = await feed.evaluate(root => {
+      const center = root.querySelector('.social-feed-center')
+      const rail = root.querySelector('.social-feed-side')
+      const feedRect = root.getBoundingClientRect()
+      const centerRect = center.getBoundingClientRect()
+      const railRect = rail.getBoundingClientRect()
+      return { position: getComputedStyle(rail).position, overflowY: getComputedStyle(rail).overflowY,
+        railTop: railRect.top, railRight: railRect.right, centerRight: centerRect.right,
+        viewportTop: feedRect.top, railClientHeight: rail.clientHeight,
+        railScrollHeight: rail.scrollHeight, feedScrollTop: root.scrollTop }
+    })
+    assert(railMeasurements.position === 'sticky' && railMeasurements.overflowY === 'auto'
+      && railMeasurements.railScrollHeight > railMeasurements.railClientHeight + 40
+      && railMeasurements.railClientHeight <= 640 - railMeasurements.viewportTop - 16
+      && railMeasurements.centerRight + 8 < railMeasurements.railRight,
+      'Compact laptop rail must remain beside posts with a separate scrollbar: ' + JSON.stringify(railMeasurements))
+    await feed.evaluate(root => { root.scrollTop = 240 })
+    const stickyMeasurement = await feed.evaluate(root => {
+      const railRect = root.querySelector('.social-feed-side').getBoundingClientRect()
+      return { feedScrollTop: root.scrollTop, railTop: railRect.top, viewportTop: root.getBoundingClientRect().top }
+    })
+    assert(stickyMeasurement.feedScrollTop >= 200
+      && stickyMeasurement.railTop >= stickyMeasurement.viewportTop + 10
+      && stickyMeasurement.railTop <= railMeasurements.railTop + 2,
+      'Rail should remain visible while feed scrolls: ' + JSON.stringify(stickyMeasurement))
+    await feed.locator('.social-feed-side').evaluate(rail => { rail.scrollTop = rail.scrollHeight })
+    const independentScroll = await feed.evaluate(root => {
+      const rail = root.querySelector('.social-feed-side')
+      const translation = rail.querySelector('.social-feed-translation').getBoundingClientRect()
+      const railRect = rail.getBoundingClientRect()
+      return { railScrollTop: rail.scrollTop, feedScrollTop: root.scrollTop,
+        translationBottom: translation.bottom, railBottom: railRect.bottom }
+    })
+    assert(independentScroll.railScrollTop > 0
+      && independentScroll.feedScrollTop === stickyMeasurement.feedScrollTop
+      && independentScroll.translationBottom <= independentScroll.railBottom + 2,
+      'The three menu cards must scroll independently to reveal Dịch AI: ' + JSON.stringify(independentScroll))
+    await feed.evaluate(root => { root.scrollTop = 0 })
+    await page.setViewportSize({ width: 1586, height: 992 })
+
+    await feed.locator('input[aria-label="Chọn ảnh hoặc video cho Story"]').setInputFiles({
+      name: 'story-test.png', mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWlMAAAAASUVORK5CYII=', 'base64'),
+    })
+    const storyComposer = page.getByRole('dialog', { name: 'Tạo Story' })
+    await storyComposer.waitFor({ state: 'visible' })
+    assert(await storyComposer.locator('.smart-story-frame img').isVisible() && !lastStoryCreated,
+      'Selecting Story media must show preview without publishing')
+    await page.setViewportSize({ width: 390, height: 844 })
+    const storyFrame = await storyComposer.locator('.smart-story-frame').boundingBox()
+    assert(storyFrame && storyFrame.width <= 391 && storyFrame.x >= 0,
+      'Mobile Story preview must fit inside the viewport: ' + JSON.stringify(storyFrame))
+    await storyComposer.getByRole('button', { name: 'Đăng Story' }).click()
+    await storyComposer.waitFor({ state: 'detached' })
+    assert(lastStoryCreated?.attachment?.storageRef?.startsWith('story/1/'),
+      'Story must be published only after confirmation')
+    await assertLauncherRow('Mobile 390px')
+    await feed.locator('.social-feed-launcher-prompt').click()
+    const mobilePostDialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    await mobilePostDialog.waitFor({ state: 'visible' })
+    const mobilePostFrame = await mobilePostDialog.boundingBox()
+    assert(mobilePostFrame && mobilePostFrame.x >= 0 && mobilePostFrame.x + mobilePostFrame.width <= 391,
+      'Mobile composer dialog must fit in the viewport: ' + JSON.stringify(mobilePostFrame))
+    await mobilePostDialog.getByRole('button', { name: 'Thêm ảnh hoặc video' }).waitFor()
+    await mobilePostDialog.getByRole('button', { name: 'Gắn thẻ bạn bè' }).click()
+    assert(await mobilePostDialog.locator('.smart-tag-picker').count() === 1,
+      'Mobile tagging panel must open')
+    await mobilePostDialog.getByRole('button', { name: 'Cảm xúc', exact: true }).click()
+    assert(await mobilePostDialog.locator('.smart-tag-picker').count() === 0
+      && await mobilePostDialog.locator('.smart-feeling-picker').count() === 1,
+      'Mobile feeling panel must replace the tagging panel')
+    await mobilePostDialog.getByRole('button', { name: 'Nền chữ' }).click()
+    assert(await mobilePostDialog.locator('.smart-feeling-picker').count() === 0
+      && await mobilePostDialog.locator('.feed-background-palette').count() === 1,
+      'Mobile background options must replace the feeling panel')
+    await mobilePostDialog.getByRole('button', { name: 'Check-in địa điểm' }).click()
+    assert(await mobilePostDialog.locator('.feed-background-palette').count() === 0
+      && await mobilePostDialog.locator('.social-feed-checkin-field').count() === 1,
+      'Mobile check-in must replace the background palette')
+    const fileChooserPromise = page.waitForEvent('filechooser')
+    await mobilePostDialog.getByRole('button', { name: 'Thêm ảnh hoặc video' }).click()
+    const fileChooser = await fileChooserPromise
+    await fileChooser.setFiles([])
+    assert(await mobilePostDialog.isVisible()
+      && await mobilePostDialog.locator('.social-feed-checkin-field').count() === 0
+      && await mobilePostDialog.locator('.smart-feeling-picker').count() === 0,
+      'Mobile media picker cancellation must leave the composer open with tool panels collapsed')
+    const mobileAudienceTrigger = mobilePostDialog.getByRole('button', { name: 'Ai có thể xem bài viết' })
+    await mobileAudienceTrigger.click()
+    const mobileAudienceMenu = mobilePostDialog.getByRole('menu', { name: 'Ai có thể xem bài viết' })
+    const mobileAudienceBounds = await mobileAudienceMenu.boundingBox()
+    assert(mobileAudienceBounds && mobileAudienceBounds.x >= 0
+      && mobileAudienceBounds.x + mobileAudienceBounds.width <= 391,
+      'Audience dropdown must fit completely on mobile 390px: ' + JSON.stringify(mobileAudienceBounds))
+    await mobileAudienceMenu.getByRole('menuitemradio', { name: 'Chỉ mình tôi' }).click()
+    assert((await mobileAudienceTrigger.textContent()).includes('Chỉ mình tôi'),
+      'Mobile audience choice should update without navigating away')
+    const mobileCaption = mobilePostDialog.getByRole('textbox', { name: 'Nội dung bài viết' })
+    await mobileCaption.fill('Bản nháp trên điện thoại')
+    await mobilePostDialog.locator('input[type="file"][aria-label="Chọn ảnh hoặc video cho bài viết"]')
+      .evaluate(input => input.dispatchEvent(new Event('cancel', { bubbles: true })))
+    assert(await mobilePostDialog.isVisible() && await mobileCaption.inputValue() === 'Bản nháp trên điện thoại',
+      'Mobile media picker cancellation must preserve the composer and its draft')
+    await mobilePostDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+    await mobilePostDialog.waitFor({ state: 'detached' })
+
+    await page.setViewportSize({ width: 1586, height: 992 })
+    await page.getByRole('button', { name: 'Mở thông báo' }).first().click()
+    const notificationScreen = page.getByLabel('Màn hình Thông báo')
+    await notificationScreen.waitFor({ state: 'visible' })
+    await notificationScreen.getByRole('tab', { name: 'Nhắc đến' }).click()
+    const taggedAlert = notificationScreen.locator('.np-notification-row').filter({ hasText: 'đã gắn thẻ bạn' })
+    await taggedAlert.waitFor({ state: 'visible' })
+    await taggedAlert.click()
+    await notificationScreen.getByRole('button', { name: 'Mở bài viết được gắn thẻ' }).click()
+    await page.waitForURL(url => url.searchParams.get('post') === '88' && url.searchParams.get('tab') === 'feed')
+    await page.locator('.post-comments-page').waitFor({ state: 'visible' })
+    assert(mentionReadCalls === 1 && incomingMention.readAt,
+      'Mentions must be marked read through the backend and navigate to the exact tagged post')
+
+    assert(errors.length === 0, 'Browser must not throw during Smart Composer: ' + JSON.stringify(errors))
+    console.log('Smart Composer PASS: tooltips unclipped, tagging + feelings + check-in, media upload, Story preview + publish, mobile layout')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   if (process.argv.includes('--post-only')) {
     await page.setViewportSize({ width: 390, height: 844 })
     await verifyUncroppedFeedImage()
@@ -844,7 +1312,7 @@ try {
   await feed.locator('.social-feed-trend').first().click()
   assert((await page.getByRole('searchbox', { name: 'Tìm bài viết' }).inputValue()).startsWith('#'), 'Trend click must search posts')
   await page.getByRole('searchbox', { name: 'Tìm bài viết' }).fill('')
-  await feed.locator('.social-feed-launcher-publish').click()
+  await feed.locator('.social-feed-launcher-prompt').click()
   const composer = page.getByRole('dialog', { name: 'Tạo bài viết' })
   await composer.waitFor({ state: 'visible' })
   await composer.getByRole('textbox', { name: 'Nội dung bài viết' }).fill('Bài đăng thử kiểm tra Social V4')
@@ -854,7 +1322,7 @@ try {
     'Compose must publish through existing API: ' + JSON.stringify(lastFeedCreated))
   await feed.locator('.social-feed-launcher-shortcuts').getByRole('button', { name: 'Ảnh / Video' }).click()
   await composer.waitFor({ state: 'visible' })
-  await composer.getByRole('button', { name: 'Ảnh', exact: true }).waitFor()
+  await composer.getByRole('button', { name: 'Thêm ảnh hoặc video' }).waitFor()
   await page.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
   await composer.waitFor({ state: 'hidden' })
   await feed.locator('.social-feed-launcher-shortcuts').getByRole('button', { name: 'Check-in' }).click()
