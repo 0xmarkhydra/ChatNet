@@ -63,6 +63,7 @@ export default function GroupChannelPicker({ conversationId, channels, selectedI
           aria-checked={channel.id === selectedId} className={channel.id === selectedId ? 'selected' : ''}
           onClick={() => { onSelect(channel.id); setOpen(false); setCreating(false) }}>
           <Hash size={16} aria-hidden="true" /><span>{channel.name}</span>
+          {channel.unreadCount > 0 && <b className="group-channel-menu-unread" aria-hidden="true">{channel.unreadCount > 99 ? '99+' : channel.unreadCount}</b>}
           {channel.id === selectedId && <span aria-hidden="true">✓</span>}
         </button>)}
         {canCreate && <div className="group-channel-creator">

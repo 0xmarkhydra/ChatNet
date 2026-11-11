@@ -9,9 +9,10 @@ import { isDesktopBuild } from '../../platform/desktop'
 import { refreshDesktopUnread } from '../../platform/useDesktopNotifications'
 
 type Options = Omit<AppDataContext, 'setStatus'> &
-  Pick<ReturnType<typeof useConversationData>, 'setConversations'> & {
+  Pick<ReturnType<typeof useConversationData>, 'setConversations' | 'refreshConversations'> & {
     activeConversationId: number | null
     activeChannelId: number
+    activeConversationType: 'group' | 'direct' | null
     activeChannelIdRef: RefObject<number>
     activeConversationIdRef: RefObject<number | null>
     translationPreferencesLoaded: boolean
@@ -35,6 +36,7 @@ export function useMessageData({
   setNotice,
   activeConversationId,
   activeChannelId,
+  activeConversationType,
   activeChannelIdRef,
   activeConversationIdRef,
   translationPreferencesLoaded,
@@ -44,6 +46,7 @@ export function useMessageData({
   pendingSend,
   setMessageDrafts,
   setConversations,
+  refreshConversations,
   tabRef,
   messagesScrollRef,
   purgeConversation,
@@ -143,10 +146,18 @@ export function useMessageData({
         }
         setTranslations(restored)
         if (!canMarkConversationRead(activeConversationIdRef.current, activeConversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) return
-        const read = await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
-        if (!read.ok) return
+        const read = activeConversationType === 'group'
+          ? await apiFetch(`/api/conversations/${activeConversationId}/channel-read`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ channelId: activeChannelId }),
+            })
+          : await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
+        if (!read.ok || cancelled) return
         refreshDesktopUnread()
-        if (!cancelled) {
+        if (activeConversationType === 'group') {
+          window.dispatchEvent(new CustomEvent('chatnet:channel-read',{detail:{conversationId:activeConversationId,channelId:activeChannelId}}))
+          void refreshConversations()
+        } else {
           setConversations((current) =>
             current.map((item) =>
               item.id === activeConversationId ? { ...item, unreadCount: 0 } : item,
@@ -164,6 +175,7 @@ export function useMessageData({
   }, [
     activeConversationId,
     activeChannelId,
+    activeConversationType,
     session?.token,
     targetLanguage,
     translationPreferencesLoaded,
@@ -177,13 +189,22 @@ export function useMessageData({
     const sessionId = session.sessionId
     const markWhenVisible = () => {
       if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) return
-      void apiFetch(`/api/conversations/${id}/read`, { method: 'POST' })
+      void apiFetch(activeConversationType === 'group'
+        ? `/api/conversations/${id}/channel-read` : `/api/conversations/${id}/read`, activeConversationType === 'group'
+        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelId: activeChannelId }) }
+        : { method: 'POST' })
         .then((response) => {
-          if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId) return
+          if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId ||
+            activeChannelIdRef.current !== activeChannelId) return
           refreshDesktopUnread()
-          setConversations((current) =>
-            current.map((item) => item.id === id ? { ...item, unreadCount: 0 } : item),
-          )
+          if (activeConversationType === 'group') {
+            window.dispatchEvent(new CustomEvent('chatnet:channel-read',{detail:{conversationId:id,channelId:activeChannelId}}))
+            void refreshConversations()
+          } else {
+            setConversations((current) =>
+              current.map((item) => item.id === id ? { ...item, unreadCount: 0 } : item),
+            )
+          }
         })
         .catch(() => undefined)
     }
@@ -193,7 +214,7 @@ export function useMessageData({
       window.removeEventListener('focus', markWhenVisible)
       document.removeEventListener('visibilitychange', markWhenVisible)
     }
-  }, [session?.sessionId, activeConversationId])
+  }, [session?.sessionId, activeConversationId, activeChannelId, activeConversationType])
 
   async function loadMissingMessages() {
     if (!session || !activeConversationId || !messageGapBefore || gapPagingBusy.current) return

@@ -41,6 +41,9 @@ var groupActivityPinsSQL string
 //go:embed migrations/005_chat_pins.sql
 var chatPinsSQL string
 
+//go:embed migrations/008_group_channel_reads.sql
+var groupChannelReadsSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -87,6 +90,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, groupActivityPinsSQL); err != nil {
 		return fmt.Errorf("apply group activity pins migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, groupChannelReadsSQL); err != nil {
+		return fmt.Errorf("apply group channel reads migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)

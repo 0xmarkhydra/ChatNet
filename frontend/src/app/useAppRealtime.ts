@@ -31,6 +31,7 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     groupSettingsOpen: boolean
     activeConversationIdRef: RefObject<number | null>
     activeChannelIdRef: RefObject<number>
+    activeConversationTypeRef: RefObject<'group' | 'direct' | null>
     refreshGroupMembers: (id: number) => Promise<void>
     refreshPinnedMessages: (id: number) => Promise<void>
     clearPinnedMessages: () => void
@@ -73,6 +74,7 @@ export function useAppRealtime({
   groupSettingsOpen,
   activeConversationIdRef,
   activeChannelIdRef,
+  activeConversationTypeRef,
   refreshGroupMembers,
   refreshPinnedMessages,
   clearPinnedMessages,
@@ -212,7 +214,8 @@ export function useAppRealtime({
       if (update.type === 'message.updated' && update.message) {
         responseCache.current.invalidate(['messages','conversations'])
         const changed = update.message
-        if (changed.channelId) window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'updated',message:changed}}))
+        if (activeConversationTypeRef.current === 'group' && activeConversationIdRef.current === changed.conversationId)
+          window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'updated',message:changed}}))
         messageChanges.current.add(changed.id)
         if ((changed.channelId || 0) === activeChannelIdRef.current && activeConversationIdRef.current === update.conversationId) {
           setMessages((current) => {
@@ -240,11 +243,13 @@ export function useAppRealtime({
       if (update.type === 'message' && update.message) {
         responseCache.current.invalidate(['messages','conversations'])
         const incoming = update.message
-        if (incoming.channelId) window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'message',message:incoming}}))
+        if (activeConversationTypeRef.current === 'group' && activeConversationIdRef.current === incoming.conversationId)
+          window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'message',message:incoming}}))
         // Only genuine, recent messages from other users make a sound. Loading
         // history, updating reactions and our own sends never trigger one.
         const viewingDesktopChat = isDesktopBuild && document.hasFocus() && document.visibilityState === 'visible' &&
-          tabRef.current === 'chat' && activeConversationIdRef.current === incoming.conversationId
+          tabRef.current === 'chat' && activeConversationIdRef.current === incoming.conversationId &&
+          (activeConversationTypeRef.current !== 'group' || activeChannelIdRef.current === (incoming.channelId || 0))
         messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current && !viewingDesktopChat)
         notifyDesktopMessage(session, incoming)
         messageChanges.current.add(incoming.id)
@@ -288,7 +293,8 @@ export function useAppRealtime({
                   lastMessageAt: incoming.createdAt,
                   unreadCount:
                     incoming.senderId !== session.user.id &&
-                      !canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())
+                      (!canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus()) ||
+                        (activeConversationTypeRef.current === 'group' && activeChannelIdRef.current !== (incoming.channelId || 0)))
                       ? item.unreadCount + 1
                       : item.unreadCount,
                 }
@@ -310,7 +316,19 @@ export function useAppRealtime({
           )
           if (incoming.senderId !== session.user.id &&
               canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) {
-            void apiFetch(`/api/conversations/${update.conversationId}/read`, { method: 'POST' })
+            const group = activeConversationTypeRef.current === 'group'
+            void apiFetch(group
+              ? `/api/conversations/${update.conversationId}/channel-read`
+              : `/api/conversations/${update.conversationId}/read`, group
+              ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ channelId: activeChannelIdRef.current }) }
+              : { method: 'POST' })
+              .then(response => {
+                if (response.ok && group)
+                  window.dispatchEvent(new CustomEvent('chatnet:channel-read',{detail:{
+                    conversationId:update.conversationId, channelId:incoming.channelId || 0,
+                  }}))
+              })
               .catch(() => setStatus('Đang kết nối lại...'))
           }
         }

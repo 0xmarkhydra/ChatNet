@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Ban, Bell, CalendarClock, ChevronDown, ChevronRight, ClipboardList, FileText, Images, Languages, Link2, MoreHorizontal, Hash, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
+import { Ban, Bell, CalendarClock, ChevronDown, ChevronRight, ClipboardList, FileText, Images, Languages, Link2, MoreHorizontal, Hash, Plus, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
 import type { GroupActivityKind } from '../features/chat/GroupActivities'
 import type { Conversation } from '../features/chat/types'
 import { CallHeaderActions } from '../features/calls/CallManager'
 import UserAvatar from '../shared/ui/UserAvatar'
 import type { GroupChannel } from '../features/chat/groupChannels'
+import GroupChannelCreateForm from '../features/chat/GroupChannelCreateForm'
 
 type Props = {
   conversation: Conversation
@@ -19,6 +20,9 @@ type Props = {
   channels: GroupChannel[]
   selectedChannelId: number
   onSelectChannel: (id: number) => void
+  canCreateChannel: boolean
+  channelCreateBusy: boolean
+  onCreateChannel: (name: string, description: string) => Promise<boolean>
   onBlock: () => void
   onUnblock: () => void
   onClearHistory: () => void
@@ -26,12 +30,14 @@ type Props = {
 
 export default function ConversationDetailsPanel({
   conversation, busy, onClose, onProfile, onSearch, onShared, onTranslate,
-  onNotifications, onCreateGroupActivity, channels, selectedChannelId, onSelectChannel, onBlock, onUnblock, onClearHistory,
+  onNotifications, onCreateGroupActivity, channels, selectedChannelId, onSelectChannel,
+  canCreateChannel, channelCreateBusy, onCreateChannel, onBlock, onUnblock, onClearHistory,
 }: Props) {
   const isGroup = conversation.type === 'group'
   const blocked = !isGroup && Boolean(conversation.blockedByMe || conversation.blockedByOther)
   const [groupOptionsOpen, setGroupOptionsOpen] = useState(false)
-  useEffect(() => { setGroupOptionsOpen(false) }, [conversation.id])
+  const [creatingChannel, setCreatingChannel] = useState(false)
+  useEffect(() => { setGroupOptionsOpen(false); setCreatingChannel(false) }, [conversation.id])
   const options = [
     { label: 'Thông báo', Icon: Bell, action: onNotifications },
     { label: 'Dịch AI', Icon: Languages, action: onTranslate },
@@ -88,7 +94,7 @@ export default function ConversationDetailsPanel({
               className="conversation-group-options-trigger"
               aria-expanded={groupOptionsOpen}
               aria-controls={`conversation-group-options-${conversation.id}`}
-              onClick={() => setGroupOptionsOpen(open => !open)}
+              onClick={() => { setGroupOptionsOpen(open => !open); setCreatingChannel(false) }}
             >
               <MoreHorizontal size={19} aria-hidden="true" />
               <span>Tùy chọn nhóm</span>
@@ -113,6 +119,17 @@ export default function ConversationDetailsPanel({
                     <span>{label}</span>
                   </button>
                 ))}
+                {canCreateChannel && !creatingChannel && (
+                  <button type="button"
+                    onClick={() => setCreatingChannel(true)} disabled={channelCreateBusy}>
+                    <Plus size={18} aria-hidden="true" />
+                    <span>Tạo kênh hội thoại</span>
+                  </button>
+                )}
+                {canCreateChannel && creatingChannel && (
+                  <GroupChannelCreateForm busy={channelCreateBusy}
+                    onCreate={onCreateChannel} onCancel={() => setCreatingChannel(false)} />
+                )}
               </div>
             )}
           </div>

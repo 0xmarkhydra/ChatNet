@@ -120,7 +120,7 @@ import FeedCommunitiesList from "./FeedCommunitiesList";
 import "./community-groups.css";
 import CommunityGroupWizard, { type CommunityCreationExtras } from "./CommunityGroupWizard";
 import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
-import GroupChannelPicker from "../features/chat/GroupChannelPicker";
+import GroupChannelSidebar from "../features/chat/GroupChannelSidebar";
 import { validGroupChannels, type GroupChannel } from "../features/chat/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/GroupInviteJoinDialog";
 import ContactsView, { type FriendsScreen } from "../features/contacts/ContactsView";
@@ -162,6 +162,7 @@ import {
   LogOut,
   MessageCircle,
   MoreHorizontal,
+  PanelLeft,
   Pin,
   ArrowLeft,
   Settings,
@@ -339,9 +340,13 @@ export default function App({
   const [channelSelection, setChannelSelection] = useState<{ conversationId: number | null; channelId: number }>({ conversationId: null, channelId: 0 });
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
   const activeChannelIdRef = useRef(selectedChannelId);
+  const activeConversationTypeRef = useRef<'group' | 'direct' | null>(null);
   activeChannelIdRef.current = selectedChannelId;
   const [groupChannelState, setGroupChannelState] = useState<{ conversationId: number | null; channels: GroupChannel[] }>({ conversationId: null, channels: [] });
   const [groupChannelBusy, setGroupChannelBusy] = useState(false);
+  const [channelUnreadAvailable, setChannelUnreadAvailable] = useState(true);
+  const [channelSidebarOpen, setChannelSidebarOpen] = useState(false);
+  useEffect(() => { setChannelSidebarOpen(false) }, [activeConversationId]);
   const groupChannels = groupChannelState.conversationId === activeConversationId
     ? groupChannelState.channels
     : validGroupChannels([], activeConversationId ?? 0);
@@ -1066,6 +1071,7 @@ export default function App({
     setNotice,
     activeConversationId,
     activeChannelId: selectedChannelId,
+    activeConversationType: conversations.find(item => item.id === activeConversationId)?.type ?? null,
     activeChannelIdRef,
     activeConversationIdRef,
     translationPreferencesLoaded,
@@ -1075,6 +1081,7 @@ export default function App({
     pendingSend,
     setMessageDrafts,
     setConversations,
+    refreshConversations,
     tabRef,
     messagesScrollRef,
     purgeConversation,
@@ -1197,20 +1204,35 @@ export default function App({
   const activeConversation =
     displayConversations.find((item) => item.id === activeConversationId) ||
     null;
+  activeConversationTypeRef.current = activeConversation?.type || null;
 
   // Channel selection stays inside the active group and never leaks into another conversation.
   useEffect(() => {
     const id = activeConversation?.type === 'group' ? activeConversation.id : null;
     setGroupChannelState({ conversationId: id, channels: validGroupChannels([], id ?? 0) });
+    setChannelUnreadAvailable(true);
     if (!id || !session?.token) return;
     const controller = new AbortController();
+    let reloadSequence = 0;
     const reload = async () => {
+      const sequence = ++reloadSequence;
       try {
         const response = await apiFetch(`/api/conversations/${id}/channels`, { signal: controller.signal });
         if (!response.ok) throw new Error('Không tải được kênh hội thoại.');
-        const channels = validGroupChannels(await response.json(), id);
-        if (!controller.signal.aborted) {
+        const payload: unknown = await response.json();
+        const channels = validGroupChannels(payload, id);
+        if (!controller.signal.aborted && sequence === reloadSequence) {
           setGroupChannelState({ conversationId: id, channels });
+          // The old cloud API may still list channels without unread metadata.
+          // Keep the old conversation badge and flag that channel counts are unavailable.
+          const hasUnreadMetrics = Array.isArray(payload) && payload.length > 0 && payload.every(item =>
+            typeof item?.unreadCount === 'number' && Number.isFinite(item.unreadCount));
+          setChannelUnreadAvailable(hasUnreadMetrics);
+          if (hasUnreadMetrics) {
+            const unreadCount = channels.reduce((sum, channel) => sum + channel.unreadCount, 0);
+            setConversations(current => current.map(item => item.id === id && item.unreadCount !== unreadCount
+              ? { ...item, unreadCount } : item));
+          }
           if (channelSelection.conversationId === id && !channels.some(channel => channel.id === channelSelection.channelId))
             setChannelSelection({ conversationId: id, channelId: 0 });
         }
@@ -1223,10 +1245,32 @@ export default function App({
       const value = (event as CustomEvent<{ conversationId: number }>).detail;
       if (value?.conversationId === id) void reload();
     };
+    let refreshTimer: number | null = null;
+    const onChannelMessage = (event: Event) => {
+      const value = (event as CustomEvent<{ message: Message }>).detail;
+      if (value?.message?.conversationId !== id) return;
+      // Debounce bursts of realtime updates without losing per-channel badge accuracy.
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void reload(), 180);
+    };
+    const onChannelRead = (event: Event) => {
+      const value = (event as CustomEvent<{ conversationId: number; channelId: number }>).detail;
+      if (value?.conversationId !== id) return;
+      setGroupChannelState(current => current.conversationId !== id ? current : {
+        ...current, channels: current.channels.map(channel =>
+          channel.id === value.channelId ? { ...channel, unreadCount: 0 } : channel),
+      });
+      void reload();
+    };
     window.addEventListener('chatnet:group-community-updated', onUpdate);
+    window.addEventListener('chatnet:group-channel-event', onChannelMessage);
+    window.addEventListener('chatnet:channel-read', onChannelRead);
     return () => {
       controller.abort();
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
       window.removeEventListener('chatnet:group-community-updated', onUpdate);
+      window.removeEventListener('chatnet:group-channel-event', onChannelMessage);
+      window.removeEventListener('chatnet:channel-read', onChannelRead);
     };
   }, [activeConversation?.id, activeConversation?.type, session?.token]);
   const conversationBlocked = Boolean(activeConversation?.type === 'direct' &&
@@ -3864,6 +3908,7 @@ export default function App({
     groupSettingsOpen,
     activeConversationIdRef,
     activeChannelIdRef,
+    activeConversationTypeRef,
     refreshGroupMembers,
     refreshPinnedMessages,
     clearPinnedMessages,
@@ -5907,7 +5952,7 @@ export default function App({
         className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
       >
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
-          <div className={`messenger-layout modern-messenger social-chat-layout ${activeConversation ? 'has-active' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
+          <div className={`messenger-layout modern-messenger social-chat-layout ${activeConversation ? 'has-active' : ''}${activeConversation?.type === 'group' ? ' group-channel-workspace' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
             <aside className="conversation-sidebar social-chat-list" aria-label="Danh sách cuộc trò chuyện">
               <div className="social-chat-list-header">
                 <div className="social-chat-list-title">
@@ -6157,6 +6202,19 @@ export default function App({
               </div>
             </aside>
 
+            {activeConversation?.type === 'group' && (
+              <>
+                <GroupChannelSidebar key={activeConversation.id} groupName={activeConversation.name}
+                  memberCount={activeConversation.memberCount} channels={groupChannels}
+                  selectedId={selectedChannelId} open={channelSidebarOpen}
+                  unreadAvailable={channelUnreadAvailable}
+                  onSelect={selectGroupChannel} onClose={() => setChannelSidebarOpen(false)}
+                  onBack={() => { setChannelSidebarOpen(false); setActiveConversationId(null) }} />
+                {channelSidebarOpen && <button type="button" className="group-channel-sidebar-overlay"
+                  aria-label="Đóng danh sách kênh" onClick={() => setChannelSidebarOpen(false)} />}
+              </>
+            )}
+
             <section
               onDragEnter={(event) => {
                 if (!transferHasFiles(event.dataTransfer)) return
@@ -6208,6 +6266,14 @@ export default function App({
                   <header className="chat-head">
                     <div className="room-info">
                       <button className="mobile-back" type="button" aria-label="Quay lại danh sách" onClick={() => setActiveConversationId(null)}>‹</button>
+                      {activeConversation.type === 'group' && (
+                        <button type="button" className="group-channel-sidebar-toggle"
+                          aria-label="Mở danh sách kênh hội thoại"
+                          aria-expanded={channelSidebarOpen}
+                          onClick={() => setChannelSidebarOpen(true)}>
+                          <PanelLeft size={19} aria-hidden="true" />
+                        </button>
+                      )}
                       <UserAvatar
                         username={activeConversation.otherUsername} name={activeConversation.name}
                         className="room-avatar"
@@ -6218,16 +6284,7 @@ export default function App({
                         {activeConversation.type === 'group' ? (
                           <>
                             <div className="group-room-title">
-                                <strong title={activeConversation.name}>{activeConversation.name}</strong>
-                                <GroupChannelPicker
-                                  conversationId={activeConversation.id}
-                                  channels={groupChannels}
-                                  selectedId={selectedChannelId}
-                                  canCreate={activeGroupMember?.role === 'owner'}
-                                  busy={groupChannelBusy}
-                                  onSelect={selectGroupChannel}
-                                  onCreate={createGroupChannel}
-                                />
+                              <strong title={activeConversation.name}>{activeConversation.name}</strong>
                             </div>
                             <div className="room-subtitle group-room-subtitle">
                               <button type="button" className="group-room-member-count"
@@ -6600,7 +6657,7 @@ export default function App({
                           )}
                         <article
                           data-message-id={message.id}
-                          className={mine ? 'message mine message-press-target' : 'message message-press-target'}
+                          className={`message message-press-target${mine ? ' mine' : ''}${activeConversation.type === 'group' && selectedChannelId !== 0 ? ' channel-message' : ''}`}
                           onPointerDown={(event) => {
                             suppressMessageClick.current = null
                             if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.pointerType, event.target)
@@ -6629,11 +6686,16 @@ export default function App({
                             openMessageActions(message, event.target)
                           }}
                         >
-                          {!mine && (
+                          {(!mine || (activeConversation.type === 'group' && selectedChannelId !== 0)) && (
                             <>
-                              <UserAvatar username={message.sender} name={userLabel(message.senderDisplayName, message.sender)}
-                                className="chat-message-sender-avatar" online={false} />
-                              <div className={activeConversation.type === 'group' ? 'message-meta' : 'message-meta chat-message-meta-direct'}>{userLabel(message.senderDisplayName, message.sender)}</div>
+                              <UserAvatar
+                                username={mine ? session.user.username : message.sender}
+                                name={mine ? userLabel(session.user.displayName, session.user.username) : userLabel(message.senderDisplayName, message.sender)}
+                                className={mine ? 'chat-message-sender-avatar channel-message-own-avatar' : 'chat-message-sender-avatar'}
+                                online={false} />
+                              <div className={activeConversation.type === 'group' ? 'message-meta' : 'message-meta chat-message-meta-direct'}>
+                                {mine ? 'Bạn' : userLabel(message.senderDisplayName, message.sender)}
+                              </div>
                             </>
                           )}
                           {message.replyToMessageId && (
@@ -6898,6 +6960,9 @@ export default function App({
                 channels={groupChannels}
                 selectedChannelId={selectedChannelId}
                 onSelectChannel={selectGroupChannel}
+                canCreateChannel={activeGroupMember?.role === 'owner'}
+                channelCreateBusy={groupChannelBusy}
+                onCreateChannel={createGroupChannel}
                 onProfile={() => {
                   if (activeConversation.type === 'group') {
                     setConversationDetailsOpen(false)

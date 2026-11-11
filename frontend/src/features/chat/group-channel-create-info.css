@@ -1,0 +1,36 @@
+/* The new-channel form lives inside the conversation information menu. */
+.conversation-info-panel .conversation-info-create-channel {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 7px 0 4px;
+  padding: 0;
+  border: 0;
+}
+.conversation-info-panel .conversation-info-create-channel .group-channel-create-form {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 10px;
+  border-radius: 12px;
+  background: #f8faff;
+}
+.conversation-info-panel .conversation-info-create-channel .group-channel-create-intro {
+  min-width: 0;
+}
+.conversation-info-panel .conversation-info-create-channel .group-channel-create-intro small {
+  line-height: 1.45;
+}
+.conversation-info-panel .conversation-info-create-channel .group-channel-create-actions {
+  flex-wrap: wrap;
+}
+.conversation-info-panel .conversation-info-create-channel .group-channel-create-actions > button {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.conversation-info-panel .conversation-info-create-channel .group-channel-create-field > input,
+.conversation-info-panel .conversation-info-create-channel .group-channel-create-field > textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}

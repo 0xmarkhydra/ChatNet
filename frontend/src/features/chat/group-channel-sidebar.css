@@ -1,0 +1,258 @@
+/* Light-theme three-pane group layout: channels → information → messages. */
+.modern-shell.app-layout .group-channel-workspace > .group-channel-sidebar {
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #e6ebf3;
+  border-radius: 15px;
+  background: #fff;
+  color: #23344e;
+}
+.group-channel-sidebar-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 15px 12px 11px;
+}
+.group-channel-sidebar-icon,
+.group-channel-sidebar-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #416dcb;
+  background: #eaf0ff;
+  border-radius: 13px;
+}
+.group-channel-sidebar-icon { width: 34px; height: 34px; }
+.group-channel-sidebar-avatar { width: 42px; height: 42px; }
+.group-channel-sidebar-intro { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
+.group-channel-sidebar-intro strong {
+  font-size:13px; font-weight:750; color:#1d3151;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.group-channel-sidebar-intro small { font-size:11px; color:#8c9ab0; }
+.group-channel-sidebar-back {
+  display:grid; flex:0 0 27px; width:27px; height:30px; place-items:center;
+  padding:0; border:0; border-radius:8px; background:transparent; color:#6a81a7; cursor:pointer;
+}
+.group-channel-sidebar-back:hover { background:#edf3ff; color:#3267cc; }
+.group-channel-sidebar-back:focus-visible { outline:2px solid #7fa5ea; outline-offset:1px; }
+.group-channel-sidebar-close {
+  display:none; flex:0 0 28px; width:28px; height:28px; place-items:center;
+  border:0; border-radius:8px; background:transparent; color:#6f829e; cursor:pointer;
+}
+.group-channel-sidebar-search {
+  display:flex; align-items:center; gap:8px;
+  margin:0 10px 13px; padding:0 11px; height:39px; min-height:39px;
+  border:1px solid #e5eaf4; border-radius:11px;
+  background:#f6f8fc; color:#7e90ac;
+}
+.group-channel-sidebar-search:focus-within { border-color:#a7bdf3; box-shadow:0 0 0 2px #e9efff; }
+.group-channel-sidebar-search input {
+  flex:1; min-width:0; border:0; outline:0; color:#293f60;
+  background:transparent; font:inherit; font-size:12px;
+}
+.group-channel-sidebar-search input::placeholder { color:#92a0b4; }
+.group-channel-sidebar-search button { display:grid; place-items:center; padding:3px; border:0; background:transparent; color:#8394aa; cursor:pointer; }
+.group-channel-sidebar-caption {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 14px 8px; color:#8290a6; font-size:10px; font-weight:750;
+  text-transform:uppercase; letter-spacing:.045em;
+}
+.group-channel-sidebar-caption small { font-size:11px; color:#8a9bb1; }
+.group-channel-sidebar-list {
+  display:flex; flex:1; flex-direction:column; gap:3px; min-height:0;
+  overflow:auto; overscroll-behavior:contain; padding:0 7px 12px;
+}
+.group-channel-sidebar-row {
+  display:flex; align-items:center; gap:9px; flex:0 0 auto;
+  width:100%; min-width:0; padding:9px 7px;
+  border:0; border-radius:11px; background:transparent;
+  color:#2e405b; font:inherit; text-align:left; cursor:pointer;
+}
+.group-channel-sidebar-row:hover { background:#f3f6fc; }
+.group-channel-sidebar-row.selected {
+  background:#eaf1ff;
+}
+.group-channel-sidebar-row.selected .group-channel-sidebar-avatar {
+  color:#fff; background:#477be2;
+}
+.group-channel-sidebar-row:focus-visible { outline:2px solid #6992e7; outline-offset:-2px; }
+.group-channel-sidebar-content { display:flex; flex:1; flex-direction:column; gap:5px; min-width:0; }
+.group-channel-sidebar-name-row,
+.group-channel-sidebar-meta-row { display:flex; align-items:center; justify-content:space-between; gap:6px; min-width:0; }
+.group-channel-sidebar-name-row strong {
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-weight:750; font-size:12px; color:#263d5b;
+}
+.group-channel-sidebar-name-row time {
+  flex-shrink:0; color:#9ba9bc; font-size:10px; font-weight:450;
+}
+.group-channel-sidebar-meta-row small {
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:#8798ad; font-size:11px;
+}
+.group-channel-unread {
+  display:grid; flex-shrink:0; place-items:center; padding:2px 5px;
+  min-width:21px; height:21px; box-sizing:border-box;
+  border-radius:12px; color:white; background:#4c81ea;
+  font-size:10px; font-weight:800; font-variant-numeric:tabular-nums;
+}
+.group-channel-sidebar-empty { padding:17px 10px; font-size:12px; color:#91a0b4; text-align:center; }
+.group-channel-unread-unavailable {
+  margin: 0 10px 10px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: #fff5e8;
+  color: #99602b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.group-channel-sidebar-toggle,
+.group-channel-sidebar-overlay { display:none; }
+/* Reuse the SAME messenger grid for direct chats and groups.
+   The original conversation list retains its grid slot while the channel list
+   takes that exact slot. The chat surface, header and composer do not move. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .conversation-sidebar {
+    grid-column: 1;
+    grid-row: 1;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-sidebar {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 3;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .conversation-panel.group-chat-panel {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+  }
+}
+@media (min-width: 1420px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.details-open > .conversation-info-panel.social-chat-details {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 32;
+    width: min(300px, 86vw);
+    height: 100%;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(-104%);
+    transition: transform .18s ease, visibility .18s ease;
+    box-shadow: 0 12px 32px rgba(31,48,77,.12);
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-sidebar.open {
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+  .group-channel-sidebar-close { display: grid; }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-sidebar-overlay {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 31;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: rgba(31,48,77,.18);
+    cursor: pointer;
+  }
+  .modern-shell.app-layout .group-channel-sidebar-toggle {
+    display: grid;
+    place-items: center;
+    flex: 0 0 30px;
+    width: 30px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: #eef3fc;
+    color: #4b6ea9;
+    cursor: pointer;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .conversation-panel.group-chat-panel {
+    min-width: 0;
+    width: 100%;
+  }
+}
+@media (max-width: 430px) {
+  .group-channel-sidebar-heading { padding: 13px 12px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .group-channel-workspace > .group-channel-sidebar { transition: none; }
+}
+
+/* Telegram-like member identity for every message in a group channel.
+   Unlike direct chats, show the actual sender's avatar on phones too. */
+.modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message:not(.mine) {
+  margin-left: 46px;
+}
+.modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine {
+  margin-right: 46px;
+}
+.modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message .chat-message-sender-avatar {
+  display: grid !important;
+  position: absolute;
+  top: 16px;
+  left: -44px;
+  width: 33px;
+  height: 33px;
+  min-width: 33px;
+  border-radius: 50%;
+  overflow: hidden;
+  z-index: 1;
+}
+.modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine .chat-message-sender-avatar {
+  left: auto;
+  right: -44px;
+}
+.modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine .message-meta {
+  text-align: right;
+  color: #647ca8;
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message:not(.mine) {
+    margin-left: 38px;
+  }
+  .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine {
+    margin-right: 38px;
+  }
+  .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message .chat-message-sender-avatar {
+    display: grid !important;
+    top: 12px;
+    left: -36px;
+    width: 29px;
+    height: 29px;
+    min-width: 29px;
+  }
+  .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine .chat-message-sender-avatar {
+    left: auto;
+    right: -36px;
+  }
+}

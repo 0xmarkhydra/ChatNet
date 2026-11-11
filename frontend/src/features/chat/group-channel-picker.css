@@ -129,6 +129,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.group-channel-menu-unread {
+  display:grid; place-items:center; flex-shrink:0;
+  min-width:19px; height:19px; padding:1px 4px;
+  border-radius:12px; background:#4c81ea; color:#fff;
+  font-size:10px; font-weight:800; font-variant-numeric:tabular-nums;
+}
 .group-channel-creator {
   margin-top: 5px;
   padding-top: 8px;
