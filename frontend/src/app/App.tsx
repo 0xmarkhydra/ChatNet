@@ -5667,6 +5667,18 @@ export default function App({
               >
                 <UiIcon name="plus" size={31} />
               </button>
+              <button
+                className="social-feed-header-account"
+                type="button"
+                aria-label="Mở trang cá nhân"
+                onClick={() => switchTab("profile")}
+              >
+                <UserAvatar
+                  username={name}
+                  name={userLabel(profileMedia?.displayName || session.user.displayName, name)}
+                  className="social-feed-header-avatar"
+                />
+              </button>
             </>
           )}
         </div>

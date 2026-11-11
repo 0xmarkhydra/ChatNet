@@ -1,0 +1,83 @@
+- generic [ref=f20e1]:
+  - generic [ref=f20e359]:
+    - link "Skip to content" [ref=f20e361] [cursor=pointer]:
+      - /url: "#_r_3a_"
+    - generic [ref=f20e363]:
+      - complementary [ref=f20e364]:
+        - generic [ref=f20e370]:
+          - generic [ref=f20e371]:
+            - 'button "Switch mode, current mode: ChatGPT" [ref=f20e372] [cursor=pointer]':
+              - generic [ref=f20e373]: ChatGPT
+            - generic [ref=f20e381]:
+              - button "Search" [ref=f20e382] [cursor=pointer]
+              - button "Hide sidebar" [expanded] [ref=f20e390] [cursor=pointer]
+          - navigation "Chat history" [ref=f20e395]:
+            - button "New chat" [ref=f20e399] [cursor=pointer]
+            - generic [ref=f20e409]:
+              - generic [ref=f20e412]:
+                - button "Scheduled" [ref=f20e413] [cursor=pointer]
+                - button "Library" [ref=f20e422] [cursor=pointer]
+                - button "Plugins" [ref=f20e430] [cursor=pointer]
+                - button "Explore" [ref=f20e439] [cursor=pointer]
+              - generic [ref=f20e450]:
+                - generic [ref=f20e453]:
+                  - generic [ref=f20e454]:
+                    - button "Projects" [expanded] [ref=f20e457] [cursor=pointer]
+                    - generic:
+                      - generic:
+                        - generic:
+                          - button "Project sidebar options"
+                          - button "Add new project" [ref=f20e462] [cursor=pointer]
+                  - list [ref=f20e472]:
+                    - listitem [ref=f20e473]: No projects
+                - generic [ref=f20e477]:
+                  - generic [ref=f20e478]:
+                    - button "Recents" [expanded] [ref=f20e481] [cursor=pointer]
+                    - generic:
+                      - generic:
+                        - generic:
+                          - button "Chat sidebar options"
+                          - button "New chat"
+                  - list [ref=f20e491]:
+                    - listitem [ref=f20e492]: No chats
+          - generic [ref=f20e500] [cursor=pointer]:
+            - button "Open profile menu" [ref=f20e501]
+            - generic:
+              - generic:
+                - generic:
+                  - generic: JEI
+                  - generic: Plus
+        - generic:
+          - separator
+      - generic [ref=f20e503]:
+        - main [ref=f20e505]:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - tablist "Browse plugins or skills":
+                    - tab "Plugins" [selected] [ref=f20e506] [cursor=pointer]
+                    - tab "Skills" [ref=f20e507] [cursor=pointer]
+                  - generic:
+                    - link "Manage" [ref=f20e509] [cursor=pointer]:
+                      - /url: /settings/plugins-settings
+                    - button "Add" [ref=f20e513] [cursor=pointer]
+          - generic [ref=f20e528]:
+            - generic [ref=f20e532]:
+              - heading "Plugins" [level=1] [ref=f20e533]
+              - generic [ref=f20e534]: Connect plugins to let ChatGPT work across your tools
+            - generic [ref=f20e539]:
+              - generic [ref=f20e543]: Search plugins
+              - textbox "Search plugins" [active] [ref=f20e544]
+            - generic [ref=f20e546]:
+              - status [ref=f20e547]:
+                - generic [ref=f20e548]: Loading plugins…
+              - tablist "Plugin directory" [ref=f20e558]:
+                - tab "Public" [selected] [ref=f20e560] [cursor=pointer]
+                - tab "Personal" [ref=f20e562] [cursor=pointer]
+              - generic [ref=f20e563]:
+                - heading [level=2] [ref=f20e565]
+                - status [ref=f20e568]:
+                  - generic [ref=f20e569]: Loading plugins…
+        - status [ref=f20e578]
+  - status [ref=f20e579]

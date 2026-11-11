@@ -25,7 +25,12 @@ export default function ProfileOverlay({ title, drawer = false, busy = false, on
   return (
     <dialog ref={dialog} className={drawer ? 'profile-overlay profile-edit-drawer' : 'profile-overlay profile-post-dialog'}
       aria-label={title} aria-modal="true"
-      onCancel={event => { event.preventDefault(); if (!busy) onClose() }}
+      onCancel={event => {
+        // A cancelled file picker fires a bubbling `cancel` on its <input>; only the dialog's own cancel may close it.
+        if (event.target !== event.currentTarget) return
+        event.preventDefault()
+        if (!busy) onClose()
+      }}
       onClick={event => {
         if (event.target !== event.currentTarget || busy) return
         const bounds = event.currentTarget.getBoundingClientRect()

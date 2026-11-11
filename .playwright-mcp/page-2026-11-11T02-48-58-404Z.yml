@@ -1,0 +1,143 @@
+- generic [ref=f6e3]:
+  - link "Skip to content" [ref=f6e297] [cursor=pointer]:
+    - /url: "#_r_64_"
+  - generic [ref=f6e7]:
+    - complementary [ref=f6e8]:
+      - generic [ref=f6e14]:
+        - button "Hide sidebar" [expanded] [ref=f6e17] [cursor=pointer]
+        - navigation "Settings" [ref=f6e22]:
+          - generic [ref=f6e23]:
+            - generic [ref=f6e24]:
+              - link "Back to app" [ref=f6e25] [cursor=pointer]
+              - generic [ref=f6e33]:
+                - generic [ref=f6e37]: Search settings
+                - searchbox "Search settings" [ref=f6e38]
+            - generic [ref=f6e39]:
+              - generic [ref=f6e40]:
+                - generic [ref=f6e41]: Personal
+                - generic [ref=f6e43]:
+                  - button "General" [ref=f6e44] [cursor=pointer]
+                  - button "Appearance" [ref=f6e52] [cursor=pointer]
+                  - button "Notifications" [ref=f6e67] [cursor=pointer]
+                  - button "Profile" [ref=f6e74] [cursor=pointer]
+                  - button "Security and login" [active] [ref=f6e84] [cursor=pointer]
+                  - button "Account" [ref=f6e92] [cursor=pointer]
+                  - button "Archived chats" [ref=f6e100] [cursor=pointer]
+                  - button "Parental controls" [ref=f6e108] [cursor=pointer]
+                  - button "Trusted contact" [ref=f6e115] [cursor=pointer]
+                  - button "Voice" [ref=f6e122] [cursor=pointer]
+                  - button "Storage" [ref=f6e130] [cursor=pointer]
+                  - button "Personalization" [ref=f6e136] [cursor=pointer]
+                  - button "Pets" [ref=f6e145] [cursor=pointer]
+                  - button "Keyboard" [ref=f6e154] [cursor=pointer]
+                  - button "Usage" [ref=f6e161] [cursor=pointer]
+                  - button "Billing" [ref=f6e170] [cursor=pointer]
+                  - button "Data controls" [ref=f6e176] [cursor=pointer]
+              - generic [ref=f6e183]:
+                - generic [ref=f6e184]: Integrations
+                - generic [ref=f6e186]:
+                  - button "Plugins" [ref=f6e187] [cursor=pointer]
+                  - button "Passwords" [ref=f6e193] [cursor=pointer]
+                  - button "Browser" [ref=f6e201] [cursor=pointer]
+                  - button "Cloud computer" [ref=f6e209] [cursor=pointer]
+              - generic [ref=f6e219]:
+                - generic [ref=f6e220]: Coding
+                - generic [ref=f6e222]:
+                  - button "Codex Cloud" [ref=f6e223] [cursor=pointer]
+                  - button "Code Review" [ref=f6e230] [cursor=pointer]
+      - generic:
+        - separator
+    - generic [ref=f6e299]:
+      - main [ref=f6e301]:
+        - generic [ref=f6e311]:
+          - heading "Security and login" [level=1] [ref=f6e316]
+          - generic [ref=f6e317]:
+            - generic [ref=f6e318]:
+              - generic [ref=f6e319]: Security recommendations
+              - generic [ref=f6e323]:
+                - button "Add a passkey Log in faster and more securely." [ref=f6e325] [cursor=pointer]:
+                  - generic [ref=f6e327]:
+                    - generic [ref=f6e328]: Add a passkey
+                    - generic [ref=f6e329]: Log in faster and more securely.
+                - button "Review where you’re logged in Log out of any devices you don’t recognize." [ref=f6e337] [cursor=pointer]:
+                  - generic [ref=f6e339]:
+                    - generic [ref=f6e340]: Review where you’re logged in
+                    - generic [ref=f6e341]: Log out of any devices you don’t recognize.
+            - generic [ref=f6e348]:
+              - generic [ref=f6e349]: How you log in
+              - generic [ref=f6e353]:
+                - button "Passkeys and security keys Use a phishing-resistant alternative to passwords Add" [ref=f6e355] [cursor=pointer]:
+                  - generic [ref=f6e357]:
+                    - generic [ref=f6e358]: Passkeys and security keys
+                    - generic [ref=f6e359]: Use a phishing-resistant alternative to passwords
+                  - generic [ref=f6e360]: Add
+                - button "Password Manage the password you use to log in Change" [ref=f6e364] [cursor=pointer]:
+                  - generic [ref=f6e366]:
+                    - generic [ref=f6e367]: Password
+                    - generic [ref=f6e368]: Manage the password you use to log in
+                  - generic [ref=f6e369]: Change
+            - button "Account PIN Control how you access your locked chats." [ref=f6e374] [cursor=pointer]:
+              - generic [ref=f6e376]:
+                - generic [ref=f6e377]: Account PIN
+                - generic [ref=f6e378]: Control how you access your locked chats.
+            - generic [ref=f6e382]:
+              - generic [ref=f6e383]: Multi-factor authentication (MFA)
+              - generic [ref=f6e386]:
+                - generic [ref=f6e387]: Add another method to prevent lockouts
+                - generic [ref=f6e397]:
+                  - generic [ref=f6e399]:
+                    - generic [ref=f6e400]: Authenticator app
+                    - generic [ref=f6e401]: Use one-time codes from an authenticator app
+                  - switch "Authenticator app" [checked] [ref=f6e403] [cursor=pointer]
+            - generic [ref=f6e406]:
+              - generic [ref=f6e407]: Sessions
+              - generic [ref=f6e411]:
+                - button "Active sessions View all devices that have accessed your account. You can review active sessions, remove trusted devices, or use Log out all to end all sessions. 4" [ref=f6e413] [cursor=pointer]:
+                  - generic [ref=f6e415]:
+                    - generic [ref=f6e416]: Active sessions
+                    - generic [ref=f6e417]: View all devices that have accessed your account. You can review active sessions, remove trusted devices, or use Log out all to end all sessions.
+                  - generic [ref=f6e418]: "4"
+                - button "Security history Review login activity and changes to your security settings." [ref=f6e422] [cursor=pointer]:
+                  - generic [ref=f6e424]:
+                    - generic [ref=f6e425]: Security history
+                    - generic [ref=f6e426]: Review login activity and changes to your security settings.
+            - generic [ref=f6e430]:
+              - generic [ref=f6e431]: Login connections
+              - button "Sign in with ChatGPT Review other apps and sites you’ve signed in to with ChatGPT, and manage what they can access 1" [ref=f6e437] [cursor=pointer]:
+                - generic [ref=f6e439]:
+                  - generic [ref=f6e440]: Sign in with ChatGPT
+                  - generic [ref=f6e441]: Review other apps and sites you’ve signed in to with ChatGPT, and manage what they can access
+                - generic [ref=f6e442]: "1"
+            - generic [ref=f6e445]:
+              - generic [ref=f6e446]: Advanced security
+              - generic [ref=f6e450]:
+                - generic [ref=f6e451]:
+                  - generic [ref=f6e453]:
+                    - generic [ref=f6e454]: Advanced account security
+                    - generic [ref=f6e455]: Use stronger sign-in protections and additional safeguards to help prevent unauthorized access to your account
+                  - link "Enroll" [ref=f6e457] [cursor=pointer]:
+                    - /url: /advanced-account-security
+                - generic [ref=f6e461]:
+                  - generic [ref=f6e463]:
+                    - generic [ref=f6e464]: Lockdown mode
+                    - generic [ref=f6e465]:
+                      - text: Helps protect sensitive data from prompt-injection attacks by limiting features that can connect to the web or external services.
+                      - link "Learn more" [ref=f6e466] [cursor=pointer]:
+                        - /url: https://help.openai.com/en/articles/20001061-lockdown-mode
+                  - switch "Lockdown mode" [ref=f6e468] [cursor=pointer]
+            - generic [ref=f6e471]:
+              - generic [ref=f6e472]: App security
+              - generic [ref=f6e477]:
+                - generic [ref=f6e479]:
+                  - generic [ref=f6e480]: Enforce CSP for custom apps
+                  - generic [ref=f6e481]:
+                    - text: When enabled, custom apps without a declared CSP get the same restricted default CSP they would in production instead of unrestricted network access.
+                    - link "Learn more" [ref=f6e482] [cursor=pointer]:
+                      - /url: https://developers.openai.com/apps-sdk/build/mcp-server#content-security-policy-csp
+                - switch "Enforce CSP for custom apps" [ref=f6e484] [cursor=pointer]
+            - generic [ref=f6e488]:
+              - generic [ref=f6e490]:
+                - generic [ref=f6e491]: Enable device code sign-in for Codex, Excel, PowerPoint, and Word
+                - generic [ref=f6e492]: Use device codes to sign in to Codex in remote or headless environments, or to ChatGPT in Excel, PowerPoint, and Word through your browser. Exercise caution, as device codes can be phished. Never share a device code.
+              - switch "Enable device code sign-in for Codex, Excel, PowerPoint, and Word" [ref=f6e494] [cursor=pointer]
+      - status [ref=f6e497]
