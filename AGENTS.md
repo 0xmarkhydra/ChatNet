@@ -9,6 +9,7 @@ Read this project policy and the relevant local skills before editing code.
 - Preserve private/group chat, feed/social interactions, notifications, calls and translations. Never put AI provider secrets, privileged Gemini calls or server-only translation logic into client bundles.
 - Retain server-side authorization, validation, API/data contracts, rate limits, migration integrity and safe error handling.
 - Respect unrelated dirty files, parallel agent worktrees and untracked assets. Only stage task files; never force-push or change deployments implicitly. Use a focused branch, verify, then integrate according to repository policy.
+- Write commit subjects as a single-line Conventional Commit in English; do not add a commit body unless requested.
 - Truthfully report PASS/FAIL/NOT RUN/BLOCKED and independently identify commit, push, merge, CI and deployment status.
 
 See `docs/AI_SKILLS_SETUP.md` for source provenance, dispatch and update instructions.
