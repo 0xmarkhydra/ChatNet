@@ -52,6 +52,8 @@
     "check:chat-api": "node scripts/chat-api-check.mjs",
     "check:chat-messaging-flow": "node scripts/chat-messaging-flow-check.mjs",
     "check:chat-conversation-flow": "node scripts/chat-conversation-flow-check.mjs",
+    "check:scoped-state": "node scripts/scoped-state-check.mjs",
+    "check:chat-scoped-ui-state": "node scripts/chat-scoped-ui-state-check.mjs",
     "build:desktop": "tsc --noEmit && vite build --mode desktop --base ./ --outDir ../desktop/dist/renderer --emptyOutDir"
   },
   "dependencies": {
