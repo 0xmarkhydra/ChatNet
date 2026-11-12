@@ -21,7 +21,7 @@
     "src/features/calls/components/CallManager.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/calls/hooks/useCallLanguages.ts|react-hooks/exhaustive-deps": 1,
     "src/features/calls/hooks/useCallOverlayDismiss.ts|react-hooks/exhaustive-deps": 1,
-    "src/features/calls/components/SecureCallRoom.tsx|react-hooks/exhaustive-deps": 1,
+    "src/features/calls/hooks/useCallRoomLifecycle.ts|react-hooks/exhaustive-deps": 1,
     "src/features/calls/components/SecureCallRoom.tsx|react-hooks/set-state-in-effect": 3,
     "src/features/calls/components/SecureCallRoom.tsx|unused-disable-directive": 1,
     "src/features/chat/components/ChatSection.tsx|react-hooks/immutability": 6,

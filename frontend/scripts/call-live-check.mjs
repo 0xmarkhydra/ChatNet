@@ -9,12 +9,15 @@ const ui = [
   read('src/features/calls/hooks/useCallVoiceConsent.ts'),
   read('src/features/calls/hooks/useCallRemoteConsent.ts'),
   read('src/features/calls/hooks/useCallInterpreterSessions.ts'),
+  read('src/features/calls/hooks/useCallRoomLifecycle.ts'),
   read('src/features/calls/components/CallRoomControls.tsx'),
   read('src/features/calls/components/CallRoomNotices.tsx'),
 ].join('\n')
 const voiceConsent = read('src/features/calls/hooks/useCallVoiceConsent.ts')
 const remoteConsent = read('src/features/calls/hooks/useCallRemoteConsent.ts')
 const interpreterSessions = read('src/features/calls/hooks/useCallInterpreterSessions.ts')
+const keySync = read('src/features/calls/lib/callE2EEKeySync.ts')
+const lifecycle = read('src/features/calls/hooks/useCallRoomLifecycle.ts')
 const transport = read('src/features/calls/lib/callMediaInterpreter.ts')
 const backend = read('../backend/cmd/call/translation.go')
 const callRoutes = read('../backend/cmd/call/main.go')
@@ -40,7 +43,18 @@ assert.ok(backend.includes('callTranslationConsentAllowed(') && backend.includes
 assert.ok(backend.includes('consentErr != nil || !consented'), 'AI streams must terminate after consent is revoked')
 // Static lifetime/permission regression guards; these do not prove actual media delivery.
 assert.ok(ui.includes('let disposed = false') && !ui.includes('disposed.current = false'), 'StrictMode setup cancellation must be effect-local')
-assert.ok(ui.includes('disposed || syncingHost') && ui.includes('disposed || syncingParticipant'), 'key sync must be bounded and stop after cleanup')
+assert.ok(keySync.includes('isDisposed() || syncingHost') && keySync.includes('isDisposed() || syncingParticipant') &&
+  lifecycle.includes('window.clearInterval(hostSyncTimer)') && lifecycle.includes('window.clearInterval(participantSyncTimer)'),
+  'key sync must be bounded and stop after cleanup')
+assert.ok(keySync.includes('hostWrappedKeys.get(record.userId) === fingerprint') &&
+  keySync.includes('hostWrappedKeys.set(record.userId, fingerprint)'),
+  'host must not resend an unchanged wrapped media key')
+assert.ok(keySync.includes('envelope.generation === getLastEnvelopeGeneration()') &&
+  keySync.includes('setLastEnvelopeGeneration(envelope.generation)'),
+  'participant must ignore a previously applied E2EE key generation')
+assert.ok(lifecycle.includes('hostSyncTimer = window.setInterval(') &&
+  lifecycle.includes('participantSyncTimer = window.setInterval(') &&
+  lifecycle.includes('1800'), 'E2EE polling cadence must remain unchanged')
 for (const [start, end] of [['async function toggleMic()', 'async function toggleCamera()'], ['async function toggleCamera()', 'async function toggleScreen()']]) {
   const handler = ui.slice(ui.indexOf(start), ui.indexOf(end))
   assert.ok(handler.includes("if (next && room.state !== 'connected') return"), 'mute/camera off must still work while reconnecting')
