@@ -304,6 +304,7 @@ import { usePostDetailNavigation } from "../features/feed/hooks/usePostDetailNav
 import { useInviteSharing } from "../features/profile/hooks/useInviteSharing";
 import { useStoryActions } from "../features/feed/hooks/useStoryActions";
 import { usePrivacySettings } from "../features/settings/hooks/usePrivacySettings";
+import { savePrivacySettings } from "../features/settings/api/privacy";
 import { useNearbyState } from "../features/discover/hooks/useNearbyState";
 import { useBlockedUsers } from "../features/contacts/hooks/useBlockedUsers";
 import { useFriendSearch } from "../features/contacts/hooks/useFriendSearch";
@@ -1857,11 +1858,7 @@ export default function AuthedApp({
     const sessionId = session.sessionId;
     setPrivacyBusy(true);
     try {
-      const response = await apiFetch("/api/privacy", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(next),
-      });
+      const response = await savePrivacySettings(apiFetch, next);
       const result = (await response
         .json()
         .catch(() => null)) as UserPrivacy | null;
