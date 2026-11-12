@@ -262,6 +262,23 @@ import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
 import HeaderTitle from "./header/HeaderTitle";
 import { searchLabels } from "./header/headerContext";
+import NotificationsSection from "../features/notifications/components/NotificationsSection";
+import DiscoverSection from "../features/discover/components/DiscoverSection";
+import MarketSection from "../features/discover/components/MarketSection";
+import CallsSection from "../features/calls/components/CallsSection";
+import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
+import FeedPostDetail from "../features/feed/components/FeedPostDetail";
+import FeedSection from "../features/feed/components/FeedSection";
+import ConversationActionDialog from "../features/chat/components/ConversationActionDialog";
+import MessageActionDialog from "../features/chat/components/MessageActionDialog";
+import PostDetailOverlay from "../features/feed/components/PostDetailOverlay";
+import StoryOverlay from "../features/feed/components/StoryOverlay";
+import ProfileOverviewSection from "../features/profile/components/ProfileOverviewSection";
+import ProfileSection from "../features/profile/components/ProfileSection";
+import ChatSection from "../features/chat/components/ChatSection";
+import StoryDraftOverlay from "../features/feed/components/StoryDraftOverlay";
+import FeedComposerOverlay from "../features/feed/components/FeedComposerOverlay";
+import ProfileComposerOverlay from "../features/profile/components/ProfileComposerOverlay";
 
 export default function App({
   initialSession,
@@ -5936,1622 +5953,356 @@ export default function App({
         className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
       >
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
-          <div className={`messenger-layout modern-messenger social-chat-layout ${activeConversation ? 'has-active' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
-            <aside className="conversation-sidebar social-chat-list" aria-label="Danh sách cuộc trò chuyện">
-              <div className="social-chat-list-header">
-                <div className="social-chat-list-title">
-                  <h2>Cuộc trò chuyện</h2>
-                  <button type="button" className="social-chat-new" aria-label="Tạo cuộc trò chuyện mới"
-                    title="Tạo cuộc trò chuyện" onClick={() => { setChatCreateError(''); setNewChatMode('direct') }}>
-                    <Plus size={20} aria-hidden="true" />
-                  </button>
-                </div>
-                {searchInConversationList ? quickSearchControl : (
-                  <label className="social-chat-list-search">
-                    <Search size={19} aria-hidden="true" />
-                    <input type="search" value={chatListQuery} onChange={(event) => setChatListQuery(event.target.value)}
-                      maxLength={120} placeholder="Tìm cuộc trò chuyện hoặc tin nhắn..."
-                      aria-label="Tìm kiếm toàn bộ cuộc trò chuyện" />
-                  </label>
-                )}
-                <div ref={chatFiltersPill.hostRef} className="social-chat-list-filters sliding-pill-host" role="group" aria-label="Lọc cuộc trò chuyện">
-                  <span ref={chatFiltersPill.pillRef} className="sliding-pill social-chat-active-pill" aria-hidden="true" />
-                  {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
-                    <button ref={chatListFilter === filter.key ? chatFiltersPill.activeRef : undefined} key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
-                      className={chatListFilter === filter.key ? 'is-active' : ''}
-                      onClick={() => setChatListFilter(filter.key)}>{filter.label}</button>
-                  ))}
-                </div>
-              </div>
-              {newChatMode === 'friends' && (
-                <div className="connect-modal-layer">
-                  <button
-                    type="button"
-                    className="connect-modal-scrim"
-                    aria-label="Đóng tìm và kết nối"
-                    onClick={() => { setNewChatMode('none'); setFriendQuery(''); setFriendResults([]) }}
-                  />
-                  <section
-                    className="friend-search-panel connect-modal"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="connect-modal-title"
-                  >
-                    <div className="connect-modal-handle" aria-hidden="true" />
-                    <div className="connect-ios-header">
-                      <div>
-                        <strong id="connect-modal-title">Kết nối</strong>
-                        <small>Tìm bạn bè trên SocCO</small>
-                      </div>
-                      <button
-                        type="button"
-                        className="friend-search-close"
-                        onClick={() => { setNewChatMode('none'); setFriendQuery(''); setFriendResults([]) }}
-                        aria-label="Đóng tìm và kết nối"
-                      >×</button>
-                    </div>
-
-                    <label className="friend-search-input-wrap connect-search-input">
-                      <UiIcon name="search" size={19} />
-                      <input
-                        value={friendQuery}
-                        onChange={(event) => setFriendQuery(event.target.value)}
-                        placeholder="Tên, @username hoặc email"
-                        aria-label="Tìm bạn bằng tên, username hoặc email"
-                        autoCapitalize="none"
-                        autoComplete="off"
-                        spellCheck={false}
-                        maxLength={254}
-                      />
-                      {friendQuery && (
-                        <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setFriendQuery('')}>×</button>
-                      )}
-                    </label>
-
-                    <div className="connect-identity-card">
-                      <UserAvatar username={session.user.username} name={userLabel(session.user.displayName, session.user.username)} className="connect-identity-avatar" online />
-                      <div className="connect-identity-copy">
-                        <strong>{session.user.displayName || session.user.username}</strong>
-                        <span>@{session.user.username}</span>
-                      </div>
-                      <div className="connect-identity-actions" aria-label="Chia sẻ hồ sơ">
-                        <button type="button" onClick={() => setQrOpen('mine')} aria-label="QR của tôi" title="QR của tôi"><UiIcon name="qr" size={20} /></button>
-                        <button type="button" onClick={() => void shareMyProfile()} aria-label="Chia sẻ hồ sơ của tôi" title="Chia sẻ">↗</button>
-                        <button type="button" onClick={() => void copyInviteLink()} aria-label="Sao chép link hồ sơ" title="Sao chép link">⧉</button>
-                      </div>
-                    </div>
-
-                    <div className="friend-search-results connect-results">
-
-                      {!friendSearching && !friendQuery.trim() && friendResults.length > 0 && (
-                        <div className="friend-suggestion-label">Người bạn có thể biết</div>
-                      )}
-                      {friendSearchError && !friendSearching && (
-                        <div className="friend-search-state" role="alert">Không tải được kết quả. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button></div>
-                      )}
-                      {!friendSearching && !friendSearchError && friendQuery.trim() && friendResults.length === 0 && (
-                        <div className="friend-search-state">
-                          <strong>Không tìm thấy người phù hợp</strong>
-                          <span>Thử tên khác, @username hoặc email chính xác.</span>
-                        </div>
-                      )}
-                      {friendResults.map((friend) => {
-                        const relationship = friendRelationship(friend.id)
-                        const actionLabel =
-                          relationship === 'accepted'
-                            ? 'Nhắn tin'
-                            : relationship === 'incoming'
-                              ? 'Chấp nhận'
-                              : relationship === 'outgoing'
-                                ? 'Hủy lời mời'
-                                : 'Kết bạn'
-                        return (
-                          <button
-                            type="button"
-                            className="friend-result connect-result"
-                            key={friend.id}
-                            onClick={() => void actOnFriend(friend)}
-                            disabled={friendBusyIds.has(friend.id)}
-                          >
-                            <UserAvatar username={friend.username} name={userLabel(friend.displayName, friend.username)} className="friend-avatar" online={friend.online} />
-                            <div className="friend-result-copy">
-                              <strong>{friend.displayName || friend.username}</strong>
-                              <span>
-                                @{friend.username}
-                                {friend.reason ? ` · ${friend.reason}` : friend.online ? ' · Đang hoạt động' : ''}
-                              </span>
-                            </div>
-                            <div className={`friend-result-action relationship-${relationship}`}>
-                              <small>{actionLabel}</small><span>{relationship === 'none' ? '＋' : '›'}</span>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </section>
-                </div>
-              )}
-
-              {newChatMode === 'direct' && (
-                <form className="new-chat-panel" onSubmit={createDirect}>
-                  <div className="panel-line"><strong>Tạo chat riêng</strong><button type="button" onClick={() => setNewChatMode('none')}>×</button></div>
-                  <input value={directUsername} onChange={(event) => setDirectUsername(event.target.value)} placeholder="Username người muốn chat" maxLength={64} autoFocus />
-                  <button>Tạo cuộc trò chuyện</button>
-                </form>
-              )}
-
-              {chatCreateError && newChatMode !== 'group' && <div className="inline-error">{chatCreateError}</div>}
-
-              <ConversationCategories key={session.sessionId} model={conversationCategories} />
-              <div className="conversation-list zalo-conversation-list" aria-busy={conversationListSearch.active && conversationListSearch.loading}>
-
-                {!conversationListSearch.active && conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
-                  {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>Thử lại</button>
-                </div>}
-
-                {conversationListSearch.active && conversationListSearch.error && (
-                  <p className="conversation-search-status" role="alert">
-                    {conversationListSearch.error}
-                    <button type="button" onClick={conversationListSearch.retry}>Thử lại</button>
-                  </p>
-                )}
-                {chatListConversations.length === 0 &&
-                  !conversationListSearch.loading && !conversationListSearch.error &&
-                  (conversationListSearch.active || (!conversationCategories.loading && !conversationCategories.listError)) && (
-                  <div className="conversation-list-empty">
-                    <SocoEmptyState
-                      kind="chat"
-                      title={conversationListSearch.active ? 'Không tìm thấy cuộc trò chuyện'
-                        : visibleConversations.length ? 'Không có hội thoại phù hợp' : 'Chưa có cuộc trò chuyện'}
-                      description={conversationListSearch.active || visibleConversations.length
-                        ? 'Thử thay đổi từ khóa hoặc chọn bộ lọc khác.'
-                        : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
-                      action={conversationListSearch.active || visibleConversations.length
-                        ? <SocoTextAction onClick={() => { setChatListQuery(''); setChatListFilter('all') }}>Xóa bộ lọc</SocoTextAction>
-                        : <SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
-                    />
-                  </div>
-                )}
-
-                {sortedChatListConversations.map((conversation) => (
-                  <div key={conversation.id} className="conversation-pin-entry"
-                    onPointerDown={(event) => {
-                      if (event.pointerType !== 'mouse') beginConversationLongPress(conversation.id, event.clientX, event.clientY)
-                    }}
-                    onPointerMove={(event) => moveConversationLongPress(event.clientX, event.clientY)}
-                    onPointerUp={cancelConversationLongPress}
-                    onPointerCancel={cancelConversationLongPress}
-                    onPointerLeave={cancelConversationLongPress}
-                    onContextMenu={(event) => {
-                      event.preventDefault()
-                      cancelConversationLongPress()
-                      const touchMenu = 'pointerType' in event.nativeEvent && event.nativeEvent.pointerType !== 'mouse'
-                      if (touchMenu) suppressConversationClick.current = conversation.id
-                      setConversationMenuPosition(touchMenu ? null : { x: event.clientX, y: event.clientY })
-                      setConversationActionId(conversation.id)
-                    }}>
-                    <button type="button"
-                      className={`conversation-item ${activeConversationId === conversation.id ? 'active' : ''} ${conversation.pinnedAt ? 'is-pinned' : ''}`}
-                      onClick={() => {
-                        if (suppressConversationClick.current === conversation.id) {
-                          suppressConversationClick.current = null
-                          return
-                        }
-                        if (conversationListSearch.active) {
-                          setConversations((current) => current.some((item) => item.id === conversation.id)
-                            ? current : [...current, conversation]);
-                        }
-                        setChatSearchJump(null)
-                        setQuickSearchOpen(false)
-                        setActiveConversationId(conversation.id)
-                        setTranslations({})
-                        setTranslationOriginals({})
-                        setTranslationMenuOpen(false)
-                      }}
-                    >
-                      <UserAvatar
-                        username={conversation.otherUsername} name={conversation.name}
-                        className="conversation-avatar"
-                        group={conversation.type === 'group'}
-                        online={conversation.type === 'direct' && conversation.online}
-                      />
-                      <div className="conversation-copy">
-                        <div>
-                          <span className="conversation-title">
-                            {conversation.pinnedAt && <Pin size={13} aria-label="Đã ghim" className="conversation-pin-indicator" />}
-                            <strong>{conversation.name}</strong>
-                            <CategoryBadge iconOnly category={conversationCategories.categories.find(c => c.id === conversation.categoryId)} />
-                          </span>
-                          <time>{formatTime(conversation.lastMessageAt) || (conversation.online ? 'online' : '')}</time>
-                        </div>
-                        <div>
-                          <span>{conversation.lastMessage || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
-                          {conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</b>}
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                ))}
-                {(conversationListSearch.active ? conversationListSearch.hasMore
-                  : conversationCategories.selected === null ? hasMoreConversations : conversationCategories.hasMore) && (
-                  <button type="button" className="soco-load-more soco-conversation-load-more"
-                    onClick={() => void (conversationListSearch.active ? conversationListSearch.loadMore()
-                      : conversationCategories.selected === null ? loadMoreConversations() : conversationCategories.load(true))}
-                    disabled={conversationListSearch.active ? conversationListSearch.loadingMore || Boolean(conversationListSearch.error)
-                      : conversationLoadingMore || conversationCategories.loading}
-                    aria-busy={conversationListSearch.active ? conversationListSearch.loadingMore : conversationLoadingMore || conversationCategories.loading}>
-                    <RefreshCw size={15} aria-hidden="true" />
-                    Tải thêm hội thoại
-                  </button>
-                )}
-              </div>
-            </aside>
-
-            <section
-              onDragEnter={(event) => {
-                if (!transferHasFiles(event.dataTransfer)) return
-                event.preventDefault()
-                if (conversationBlocked) return
-                chatDragDepth.current += 1
-                if (!chatDragActive) setChatDragActive(true)
-              }}
-              onDragOver={(event) => {
-                if (!transferHasFiles(event.dataTransfer)) return
-                event.preventDefault()
-                event.dataTransfer.dropEffect = conversationBlocked ? 'none' : 'copy'
-              }}
-              onDragLeave={(event) => {
-                if (chatDragDepth.current === 0) return
-                event.preventDefault()
-                chatDragDepth.current = Math.max(0, chatDragDepth.current - 1)
-                if (chatDragDepth.current === 0) setChatDragActive(false)
-              }}
-              onDrop={(event) => {
-                if (!transferHasFiles(event.dataTransfer)) return
-                event.preventDefault()
-                chatDragDepth.current = 0
-                setChatDragActive(false)
-                if (conversationBlocked) return
-                void addChatFiles(Array.from(event.dataTransfer.files))
-              }}
-              className={`conversation-panel${activeConversation?.type === 'group'
-                ? ' group-chat-panel'
-                : ''}${chatDragActive ? ' chat-file-drag-active' : ''}`}>
-              {chatDragActive && activeConversationId && !conversationBlocked && (
-                <div className="chat-file-drop-overlay" role="status" aria-live="polite">
-                  <div className="chat-file-drop-card">
-                    <Images size={32} aria-hidden="true" />
-                    <strong>Thả ảnh hoặc tệp vào đây</strong>
-                    <span>Tệp sẽ được thêm vào tin nhắn, chưa gửi ngay · Tối đa 10 tệp</span>
-                  </div>
-                </div>
-              )}
-              {!activeConversation ? (
-                <div className="conversation-empty">
-                  <SocoEmptyState kind="chat" title="Kết nối không biên giới"
-                    description="Chọn một cuộc trò chuyện để bắt đầu nhắn tin và dịch AI tự động."
-                    action={<SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn mới</SocoTextAction>}
-                  />
-                </div>
-              ) : (
-                <>
-                  <header className="chat-head">
-                    <div className="room-info">
-                      <button className="mobile-back" type="button" aria-label="Quay lại danh sách" onClick={() => setActiveConversationId(null)}>‹</button>
-                      <UserAvatar
-                        username={activeConversation.otherUsername} name={activeConversation.name}
-                        className="room-avatar"
-                        group={activeConversation.type === 'group'}
-                        online={activeConversation.type === 'direct' && activeConversation.online}
-                      />
-                      <div className={activeConversation.type === 'group' ? 'group-room-details' : ''}>
-                        {activeConversation.type === 'group' ? (
-                          <>
-                            <div className="group-room-title">
-                                <strong title={activeConversation.name}>{activeConversation.name}</strong>
-                                <GroupChannelPicker
-                                  conversationId={activeConversation.id}
-                                  channels={groupChannels}
-                                  selectedId={selectedChannelId}
-                                  canCreate={activeGroupMember?.role === 'owner'}
-                                  busy={groupChannelBusy}
-                                  onSelect={selectGroupChannel}
-                                  onCreate={createGroupChannel}
-                                />
-                            </div>
-                            <div className="room-subtitle group-room-subtitle">
-                              <button type="button" className="group-room-member-count"
-                                aria-label={`Xem danh sách ${activeConversation.memberCount} thành viên nhóm`}
-                                onClick={() => {
-                                  if (!groupSettingsOpen) openGroupSettings(activeConversation)
-                                  setGroupMemberViewOpen(true)
-                                }}>
-                                <Users size={15} aria-hidden="true" />
-                                <span>{activeConversation.memberCount} thành viên</span>
-                              </button>
-                              <CategoryAssignment model={conversationCategories}
-                                conversationId={activeConversation.id}
-                                categoryId={activeConversation.categoryId} />
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <strong>{activeConversation.otherUsername
-                              ? <button type="button" className="visitor-name-link"
-                                onClick={() => openVisitor(activeConversation.otherUsername!)}
-                                aria-label="Xem trang cá nhân">{activeConversation.name}</button>
-                              : activeConversation.name}</strong>
-                            <small className="room-subtitle">
-                              {conversationBlocked ? (activeConversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này') : activeConversation.online ? '● Đang hoạt động' : 'Chat riêng'}
-                              <CategoryAssignment model={conversationCategories}
-                                conversationId={activeConversation.id}
-                                categoryId={activeConversation.categoryId} />
-                            </small>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {activeConversation.type === 'group' && (
-                      <div className="group-mobile-actions">
-                        <CallHeaderActions conversationId={activeConversation.id} disabled={conversationBlocked} />
-                        <button type="button" className="group-more-trigger"
-                          aria-label="Tìm tin nhắn trong cuộc trò chuyện"
-                          onClick={() => setMessageSearchOpen(true)}>
-                          <Search size={20} aria-hidden="true" />
-                        </button>
-                        <div className="translation-hub">
-                          <button type="button" className="group-more-trigger translation-toolbar-toggle"
-                            aria-label={effectiveAutoTranslate ? 'Cài đặt dịch AI, đang bật' : 'Cài đặt dịch AI, đang tắt'}
-                            title="Cài đặt dịch AI"
-                            aria-expanded={translationMenuOpen}
-                            aria-controls="chat-translation-dialog"
-                            onClick={() => {
-                              setLanguageSearch('')
-                              setTranslationMenuOpen((open) => !open)
-                            }}>
-                            <Languages size={20} strokeWidth={1.9} aria-hidden="true" />
-                          </button>
-                        </div>
-                        <button type="button" className="group-more-trigger"
-                          aria-label="Thông tin hội thoại" aria-controls="conversation-details-panel"
-                          aria-expanded={conversationDetailsOpen}
-                          onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}>
-                          <MoreHorizontal size={23} aria-hidden="true" />
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="translate-controls">
-                      <CallHeaderActions conversationId={activeConversation.id} disabled={conversationBlocked} />
-                      <button type="button" className="group-settings-toggle" onClick={() => setMessageSearchOpen(true)} title="Tìm trong cuộc trò chuyện" aria-label="Tìm tin nhắn trong cuộc trò chuyện"><Search size={19} /></button>
-                      <div className="translation-hub">
-                        <button
-                          type="button"
-                          className={translationMenuOpen ? 'group-settings-toggle translation-toolbar-toggle active' : 'group-settings-toggle translation-toolbar-toggle'}
-                          aria-expanded={translationMenuOpen}
-                          aria-controls="chat-translation-dialog"
-                          aria-label={effectiveAutoTranslate ? 'Cài đặt dịch AI, đang bật' : 'Cài đặt dịch AI, đang tắt'}
-                          title="Cài đặt dịch AI"
-                          onClick={() => {
-                            setTranslationMenuOpen((current) => {
-                              const next = !current
-                              if (next) setLanguageSearch('')
-                              return next
-                            })
-                          }}
-                        >
-                          <Languages size={21} strokeWidth={1.9} aria-hidden="true" />
-                        </button>
-
-                        {translationMenuOpen && createPortal(
-                          <>
-                            <button
-                              type="button"
-                              className="translation-hub-scrim"
-                              aria-label="Đóng cài đặt dịch"
-                              onClick={() => setTranslationMenuOpen(false)}
-                            />
-                            <div id="chat-translation-dialog" className="translation-hub-popover translation-dialog-modal" role="dialog" aria-modal="true" aria-label="Cài đặt dịch AI">
-                              <div className="translation-hub-heading">
-                                <div>
-                                  <strong>{t('translation.title')}</strong>
-                                  <small>{t('translation.subtitle')}</small>
-                                </div>
-                                <div className="translation-dialog-actions">
-                                  <button
-                                    type="button"
-                                    className={effectiveAutoTranslate ? 'translation-hub-switch active' : 'translation-hub-switch'}
-                                    aria-label="Tự động dịch tin nhắn"
-                                    role="switch"
-                                    aria-checked={effectiveAutoTranslate}
-                                    onClick={() => changeAutoTranslate(!effectiveAutoTranslate)}
-                                  >
-                                    <span />
-                                  </button>
-                                  <button type="button" className="translation-dialog-close"
-                                    aria-label="Đóng cài đặt dịch" onClick={() => setTranslationMenuOpen(false)}>
-                                    <X size={19} aria-hidden="true" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              <label className="translation-language-search">
-                                <span aria-hidden="true">⌕</span>
-                                <input
-                                  type="search"
-                                  value={languageSearch}
-                                  onChange={(event) => setLanguageSearch(event.target.value)}
-                                  placeholder={t('translation.searchPlaceholder')}
-                                  autoComplete="off"
-                                  autoCapitalize="none"
-                                  spellCheck={false}
-                                  autoFocus
-                                />
-                                {languageSearch && (
-                                  <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setLanguageSearch('')}>×</button>
-                                )}
-                              </label>
-
-                              <div className="translation-language-count">
-                                <span>{visibleLanguageOptions.length} {t('translation.languageCount')}</span>
-                                <small>{t('translation.languageHint')}</small>
-                              </div>
-
-                              <div className="translation-language-list" aria-label="Chọn ngôn ngữ dịch">
-                                {visibleLanguageOptions.map((language) => (
-                                  <button
-                                    key={language.value}
-                                    type="button"
-                                    className={effectiveTargetLanguage === language.value ? 'active' : ''}
-                                    onClick={() => changeTargetLanguage(language.value)}
-                                  >
-                                    <span className="translation-language-flag" aria-hidden="true">{language.flag}</span>
-                                    <span className="translation-language-copy">
-                                      <strong>{language.localizedLanguage}</strong>
-                                      <small>{language.nativeLanguage}</small>
-                                      <em>{language.localizedRegion} · {language.nativeRegion}</em>
-                                    </span>
-                                    <b>{language.code}</b>
-                                    {effectiveTargetLanguage === language.value && <i aria-hidden="true">✓</i>}
-                                  </button>
-                                ))}
-                                {visibleLanguageOptions.length === 0 && (
-                                  <div className="translation-language-empty">
-                                    {t('translation.noResults')}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </>, document.body
-                        )}
-                      </div>
-                      <button type="button" className={conversationDetailsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
-                        onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}
-                        title="Thông tin hội thoại" aria-label="Thông tin hội thoại"
-                        aria-controls="conversation-details-panel" aria-expanded={conversationDetailsOpen}>
-                        <MoreHorizontal size={22} aria-hidden="true" />
-                      </button>
-                    </div>
-                  </header>
-
-                  {pinnedItems.length > 0 && (
-                    <div className="chat-pinned-panel" role="region" aria-label="Nội dung đã ghim">
-                      <div className="chat-pinned-heading">
-                        <Pin size={16} aria-hidden="true" />
-                        <strong>Nội dung đã ghim ({pinnedItems.length})</strong>
-                        {pinnedItems.length > 1 && (
-                          <button type="button" onClick={() => setPinnedExpanded((value) => !value)}
-                            aria-expanded={pinnedExpanded}>
-                            {pinnedExpanded ? 'Thu gọn' : 'Xem tất cả'}
-                          </button>
-                        )}
-                      </div>
-                      <div className="chat-pinned-items">
-                        {pinnedItems.slice(0, pinnedExpanded ? 200 : 1).map((pin) => (
-                          pin.type === 'message' ? (
-                            <div className="chat-pinned-item" key={`message-${pin.message.id}`}>
-                              <button type="button" className="chat-pinned-jump"
-                                title="Đi đến tin nhắn đã ghim"
-                                onClick={() => setChatSearchJump({
-                                  conversationId: activeConversation.id,
-                                  messageId: pin.message.id,
-                                  revision: ++chatSearchJumpRevision.current,
-                                })}>
-                                <strong>{userLabel(pin.message.senderDisplayName, pin.message.sender)}</strong>
-                                <span>{pin.message.text || attachmentLabel(pin.message.attachments) || 'Tin nhắn'}</span>
-                              </button>
-                              <button type="button" className="chat-pinned-remove" disabled={pinBusy}
-                                aria-label="Bỏ ghim tin nhắn" title="Bỏ ghim tin nhắn"
-                                onClick={() => void toggleMessagePin(pin.message)}>
-                                <X size={15} aria-hidden="true" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="chat-pinned-item" key={`activity-${pin.activity.id}`}>
-                              <button type="button" className="chat-pinned-jump"
-                                title="Xem hoạt động nhóm đã ghim"
-                                onClick={() => setGroupActivityViewedId(pin.activity.id)}>
-                                <strong>{pin.activity.kind === 'poll' ? 'Bình chọn' : pin.activity.kind === 'note' ? 'Ghi chú' : 'Nhắc hẹn'}</strong>
-                                <span>{pin.activity.body || (pin.activity.scheduledAt
-                                  ? new Date(pin.activity.scheduledAt).toLocaleString('vi-VN')
-                                  : 'Nhấn để xem chi tiết')}</span>
-                              </button>
-                              <button type="button" className="chat-pinned-remove"
-                                aria-label="Bỏ ghim hoạt động nhóm" title="Bỏ ghim hoạt động nhóm"
-                                onClick={() => void groupActivities.setPin(pin.activity.id, false)
-                                  .catch((error) => setNotice(error instanceof Error ? error.message : 'Không thể bỏ ghim.', 'error'))}>
-                                <X size={15} aria-hidden="true" />
-                              </button>
-                            </div>
-                          )
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-
-                  {chatFriend && chatFriendRelationship !== 'accepted' && (friendSyncError || friendSyncSessionId === session?.sessionId) && (
-                    <div className={`chat-friend-bar relationship-${chatFriendRelationship}`} aria-label="Kết bạn trong cuộc trò chuyện">
-                      <span role="status">
-                        <UserPlus size={18} aria-hidden="true" />
-                        {friendSyncError || (friendSyncSessionId !== session?.sessionId ? 'Đang tải trạng thái kết bạn...' :
-                          chatFriendRelationship === 'incoming' ? 'Bạn nhận được lời mời kết bạn' :
-                          chatFriendRelationship === 'outgoing' ? 'Đã gửi lời mời kết bạn' : 'Hai bạn chưa kết bạn')}
-                      </span>
-                      {friendSyncError ? (
-                        <button type="button" disabled={friendSyncBusy} onClick={() => void refreshFriendConnections()}>
-                          <RefreshCw size={16} aria-hidden="true" /> Thử lại
-                        </button>
-                      ) : friendSyncSessionId === session?.sessionId && (
-                        <div className="chat-friend-actions">
-                          <button
-                            type="button"
-                            className={chatFriendRelationship === 'outgoing' ? '' : 'primary'}
-                            disabled={friendBusyIds.has(chatFriend.id)}
-                            onClick={() => void actOnFriend(chatFriend)}
-                          >
-                            {chatFriendRelationship === 'incoming' ? <Check size={16} aria-hidden="true" /> :
-                              chatFriendRelationship === 'outgoing' ? <X size={16} aria-hidden="true" /> : <UserPlus size={16} aria-hidden="true" />}
-                            {chatFriendRelationship === 'incoming' ? 'Chấp nhận' : chatFriendRelationship === 'outgoing' ? 'Hủy lời mời' : 'Gửi lời mời kết bạn'}
-                          </button>
-                          {chatFriendRelationship === 'incoming' && (
-                            <button type="button" disabled={friendBusyIds.has(chatFriend.id)} onClick={() => void actOnFriend(chatFriend, true)}>
-                              <X size={16} aria-hidden="true" /> Từ chối
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {sharedContentOpen && (
-                    <SharedContent
-                      conversationId={activeConversation.id}
-                      channelId={selectedChannelId}
-                      request={apiFetch}
-                      onClose={() => setSharedContentOpen(false)}
-                    />
-                  )}
-
-                  {messageSearchOpen && (
-                    <MessageSearchPanel conversationId={activeConversation.id} channelId={selectedChannelId} request={apiFetch}
-                      onClose={() => setMessageSearchOpen(false)}
-                      onJump={async (result) => {
-                        if (activeConversationIdRef.current !== activeConversation.id) return
-                        // Both search entry points use the same history loader; never replace the current timeline.
-                        setChatSearchJump({
-                          conversationId: activeConversation.id,
-                          messageId: result.id,
-                          revision: ++chatSearchJumpRevision.current,
-                        })
-                      }}
-                    />
-                  )}
-                  <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
-                    const element = event.currentTarget
-                    messageScrollAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100
-                  }}>
-                    {hasMoreMessages && (
-                      <button type="button" className="soco-load-more soco-older-messages"
-                        onClick={() => void loadOlderMessages()} disabled={messagesLoadingMore}
-                        aria-busy={messagesLoadingMore}>
-                        <RefreshCw size={16} aria-hidden="true" />
-                        Tải thêm tin nhắn cũ
-                      </button>
-                    )}
-                    {visibleMessages.map((message, index) => {
-                      const messageDay = new Date(message.createdAt)
-                      const previousDay = index > 0 ? new Date(visibleMessages[index - 1].createdAt) : null
-                      const displayDay = !previousDay || messageDay.toDateString() !== previousDay.toDateString()
-                      const today = new Date()
-                      const yesterday = new Date(today)
-                      yesterday.setDate(yesterday.getDate() - 1)
-                      const dayLabel = messageDay.toDateString() === today.toDateString() ? 'Hôm nay'
-                        : messageDay.toDateString() === yesterday.toDateString() ? 'Hôm qua'
-                          : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(messageDay)
-                      const mine = message.senderId === session.user.id
-                      const translatedText = !message.deleted ? translations[message.id] : ''
-                      const photoOnly = !message.deleted && !message.text && message.attachments?.length === 1 && message.attachments[0].kind === 'image' && Boolean(message.attachments[0].url)
-                      const originalVisible = Boolean(translationOriginals[message.id])
-                      const translatedLanguage = languageOptions.find(option => option.value === effectiveTargetLanguage)?.localizedLanguage || effectiveTargetLanguage.toUpperCase()
-                      const translationEnabled = effectiveAutoTranslate || Boolean(manuallyTranslated[message.id])
-                      const translationView = getMessageTranslationView({
-                        originalText: message.text,
-                        translatedText,
-                        enabled: translationEnabled,
-                        showOriginal: originalVisible,
-                        display: activeChatTranslationSettings?.display,
-                      })
-                      const hasTranslation = Boolean(translatedText?.trim() && translatedText.trim() !== message.text.trim())
-                      const longTranslation = hasTranslation && translationEnabled && (activeChatTranslationSettings?.display === 'translated' ||
-                        (activeChatTranslationSettings?.display !== 'bilingual' && Array.from(message.text).length > 100))
-                      const isTranslating = Boolean(translationPending[message.id])
-                      const translationFailed = Boolean(translationFailures[message.id])
-                      const reactionControls = !conversationBlocked ? (
-                        <div className="message-reactions">
-                          {(message.reactions || []).map((reaction) => (
-                            <button
-                              key={reaction.emoji}
-                              type="button"
-                              disabled={reactionPreviews[message.id] !== undefined}
-                              aria-pressed={reaction.mine}
-                              className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
-                              onClick={() => void toggleReaction(message, reaction.emoji)}
-                              aria-label={`${messageReactionLabel(reaction.emoji)}: ${reaction.count} lượt`}
-                            >
-                              {reaction.emoji} {reaction.count}
-                            </button>
-                          ))}
-                          <button type="button" className="reaction-add"
-                            aria-label="Chọn cảm xúc cho tin nhắn"
-                            title="Thả cảm xúc"
-                            onClick={() => openMessageReactions(message)}>
-                            <SmilePlus size={16} aria-hidden="true" />
-                          </button>
-                        </div>
-                      ) : null
-                      return (
-                        <Fragment key={message.id}>
-                          {displayDay && <div className="day-divider"><span>{dayLabel}</span></div>}
-                          {activeConversation.type === 'group' && sortedGroupActivityEvents
-                            .filter(event => event.createdAt <= message.createdAt &&
-                              (index === 0 || event.createdAt > visibleMessages[index - 1].createdAt))
-                            .map(event => <GroupActivityMarker key={`activity-${event.id}`} event={event}
-                              activity={groupActivities.activities.find(item => item.id === event.activityId)}
-                              onOpen={() => setGroupActivityViewedId(event.activityId)} />)}
-                          {messageGapBefore === message.id && (
-                            <button type="button" className="soco-load-more soco-middle-messages"
-                              onClick={() => void loadMissingMessages()} disabled={messageGapLoading}
-                              aria-busy={messageGapLoading}>
-                              <RefreshCw size={15} aria-hidden="true" />
-                              Tải tin nhắn ở giữa
-                            </button>
-                          )}
-                        <article
-                          data-message-id={message.id}
-                          className={mine ? 'message mine message-press-target' : 'message message-press-target'}
-                          onPointerDown={(event) => {
-                            suppressMessageClick.current = null
-                            if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.pointerType, event.target)
-                          }}
-                          onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
-                          onPointerUp={cancelMessageLongPress}
-                          onPointerCancel={cancelMessageLongPress}
-                          onPointerLeave={cancelMessageLongPress}
-                          onClickCapture={(event) => {
-                            if (suppressMessageClick.current !== message.id) return
-                            event.preventDefault()
-                            event.stopPropagation()
-                            suppressMessageClick.current = null
-                          }}
-                          onContextMenu={(event) => {
-                            if (message.deleted || conversationBlocked) return
-                            // Keep native context-copy for text selected inside this message.
-                            const selection = window.getSelection()
-                            if (event.target instanceof Element &&
-                                event.target.closest('.message-selectable-text') &&
-                                !event.target.closest('a.message-inline-link') &&
-                                selection && !selection.isCollapsed &&
-                                event.currentTarget.contains(selection.anchorNode) &&
-                                event.currentTarget.contains(selection.focusNode)) return
-                            event.preventDefault()
-                            openMessageActions(message, event.target)
-                          }}
-                        >
-                          {!mine && (
-                            <>
-                              <UserAvatar username={message.sender} name={userLabel(message.senderDisplayName, message.sender)}
-                                className="chat-message-sender-avatar" online={false} />
-                              <div className={activeConversation.type === 'group' ? 'message-meta' : 'message-meta chat-message-meta-direct'}>{userLabel(message.senderDisplayName, message.sender)}</div>
-                            </>
-                          )}
-                          {message.replyToMessageId && (
-                            <div className="message-reply-quote">
-                              <strong>{userLabel(message.replyToDisplayName, message.replyToSender)}</strong>
-                              <span>{message.replyToText || 'Tin nhắn đã thu hồi'}</span>
-                            </div>
-                          )}
-                          {message.deleted ? (
-                            <div className="bubble recalled-message">Tin nhắn đã được thu hồi</div>
-                          ) : (
-                            <div className="message-content">
-                              {message.text && (
-                                <div className={`bubble${translationView.mode === 'dual' ? ' chat-translation-dual' : ''}${translationView.mode === 'translated' ? ' translated-bubble translation-flip-bubble' : ''}`}>
-                                  <span
-                                    key={`${message.id}-${translationView.mode}-${originalVisible ? 'original' : 'translated'}`}
-                                    className="translation-flip-content message-selectable-text"
-                                  >
-                                    {messageTextParts(translationView.primaryText).map((part, index) => part.kind === 'link'
-                                      ? <a key={index} className="message-inline-link" href={messageLinkHref(part.text)} target="_blank" rel="noopener noreferrer">{part.text}</a>
-                                      : <Fragment key={index}>{part.text}</Fragment>)}
-                                  </span>
-                                  {translationView.secondaryText !== null && (
-                                    <span className="chat-translation-original message-selectable-text">
-                                      {messageTextParts(translationView.secondaryText).map((part, index) => part.kind === 'link'
-                                        ? <a key={index} className="message-inline-link" href={messageLinkHref(part.text)} target="_blank" rel="noopener noreferrer">{part.text}</a>
-                                        : <Fragment key={index}>{part.text}</Fragment>)}
-                                    </span>
-                                  )}
-                                  <LinkPreview text={message.text} cacheScope={session?.sessionId || ""} request={apiFetch} />
-                                  {reactionControls}
-                                  {!isTranslating && !effectiveAutoTranslate && translationView.mode === 'dual' && (
-                                    <button type="button" className="chat-translation-action"
-                                      aria-label="Ẩn dịch" title="Ẩn dịch"
-                                      onClick={() => setManuallyTranslated((current) => ({ ...current, [message.id]: false }))}>
-                                      <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
-                                    </button>
-                                  )}
-                                  {!isTranslating && !effectiveAutoTranslate &&
-                                    (!manuallyTranslated[message.id] || !hasTranslation) && (
-                                    <button type="button" className="chat-translation-action"
-                                      aria-label={translationFailed ? 'Thử dịch lại' : 'Dịch'}
-                                      title={translationFailed ? 'Thử dịch lại' : 'Dịch'}
-                                      onClick={() => void translateMessage(message)}>
-                                      <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
-                                    </button>
-                                  )}
-                                  {!isTranslating && effectiveAutoTranslate && translationFailed && !hasTranslation && (
-                                    <button type="button" className="chat-translation-action"
-                                      aria-label="Thử dịch lại" title="Thử dịch lại"
-                                      onClick={() => void translateMessage(message)}>
-                                      <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                              {longTranslation && (
-                                <button
-                                  type="button"
-                                  className={originalVisible ? 'translation-flip-pill original' : 'translation-flip-pill translated'}
-                                  aria-label={originalVisible ? 'Hiện nội dung đã dịch' : 'Hiện tin nhắn gốc'}
-                                  onClick={() => setTranslationOriginals((current) => ({
-                                    ...current, [message.id]: !current[message.id],
-                                  }))}
-                                >
-                                  <span className="translation-flip-icon" aria-hidden="true">↔</span>
-                                  <b>{originalVisible ? 'DỊCH' : 'GỐC'}</b>
-                                  <small>{originalVisible ? translatedLanguage : 'Nguyên văn'}</small>
-                                  <span className="translation-flip-swap" aria-hidden="true">↔</span>
-                                </button>
-                              )}
-                              {isTranslating && (
-                                <span className="chat-translation-loading" role="status" aria-live="polite">
-                                  <LoaderCircle size={15} aria-hidden="true" />
-                                  Đang dịch tin nhắn…
-                                </span>
-                              )}
-                              {Boolean(message.attachments?.length) && (
-                                <div className={photoOnly ? 'chat-message-media chat-message-photo' : 'chat-message-media'}>
-                                  <MediaAttachmentsView items={message.attachments} />
-                                  {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt)}</span>}
-                                </div>
-                              )}
-                              {!message.text && reactionControls}
-                            </div>
-                          )}
-                          <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
-                            {formatTime(message.createdAt)}
-                            {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
-                            {mine && (message.readByUserIds?.length || 0) > 0
-                              ? activeConversation.type === 'group'
-                                ? ` · ${message.readByUserIds?.length} đã xem`
-                                : ' · Đã xem'
-                              : ''}
-                          </div>
-                        </article>
-                        </Fragment>
-                      )
-                    })}
-                    {activeConversation.type === 'group' && sortedGroupActivityEvents
-                      .filter(event => !visibleMessages.length || event.createdAt > visibleMessages[visibleMessages.length - 1].createdAt)
-                      .map(event => <GroupActivityMarker key={`activity-${event.id}`} event={event}
-                        activity={groupActivities.activities.find(item => item.id === event.activityId)}
-                        onOpen={() => setGroupActivityViewedId(event.activityId)} />)}
-                    {activeConversation.type === 'group' && groupActivities.error && (
-                      <button type="button" className="group-activity-marker" onClick={() => void groupActivities.refresh()}>
-                        Không tải được hoạt động nhóm. Nhấn để thử lại.
-                      </button>
-                    )}
-                    {chatOutbox.filter((item) => item.conversationId === activeConversationId && (item.channelId || 0) === selectedChannelId).map((item) => (
-                      <article className="message mine outgoing-preview chat-outbox-message" key={item.clientId} aria-busy={item.status !== 'failed'}>
-                        {item.replyToMessageId && (
-                          <div className="message-reply-quote">
-                            <strong>{item.replyToSender || 'Trả lời'}</strong><span>{item.replyToText}</span>
-                          </div>
-                        )}
-                        {item.text && <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>}
-                        <MediaAttachmentsView items={item.attachments} />
-                        <div className="chat-outbox-footer">
-                          {(item.status === 'failed' || !chatOnline) && (
-                            <span className={item.status === 'failed' ? 'message-stamp chat-outbox-error' : 'message-stamp'} role="status">
-                              {item.status === 'failed' ? item.error || 'Không gửi được' : 'Chờ có mạng'}
-                            </span>
-                          )}
-                          {!conversationBlocked && (item.status === 'failed' || (item.status === 'unconfirmed' && chatOnline)) && (
-                            <button type="button" className="chat-outbox-retry"
-                              aria-label={item.status === 'failed' ? 'Gửi lại tin nhắn bị lỗi' : 'Gửi lại tin nhắn đang chờ'}
-                              onClick={() => {
-                              updateChatOutbox((items) => items.map((old) =>
-                                old.clientId === item.clientId ? { ...old, status: 'queued', error: undefined } : old))
-                              void retryQueuedChatMessages()
-                            }}><RefreshCw size={14} /> Gửi lại</button>
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                    <div ref={bottomRef} />
-                  </div>
-
-                  {conversationBlocked ? (
-                    <div className="chat-blocked-composer" role="status" aria-live="polite">
-                      <Ban size={20} aria-hidden="true" />
-                      <div>
-                        <strong>{activeConversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này'}</strong>
-                        <span>Không thể nhắn tin, gọi điện hoặc gửi tệp trong cuộc trò chuyện này.</span>
-                      </div>
-                      {activeConversation.blockedByMe && !activeConversation.blockedByOther && activeConversation.otherUserId && (
-                        <button type="button" onClick={() => void unblockContact(activeConversation.otherUserId!)} disabled={blockedBusy}>
-                          Bỏ chặn
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                  <form className="composer media-composer" onSubmit={(event) => {
-                    void sendMessage(event)
-                    if (isDesktopBuild) messageInputRef.current?.focus()
-                  }}>
-                    <input
-                      ref={chatFileInputRef}
-                      className="hidden-media-input"
-                      type="file"
-                      multiple
-                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
-                      onChange={(event) => {
-                        const files = Array.from(event.currentTarget.files || [])
-                        event.currentTarget.value = ''
-                        void addChatFiles(files)
-                      }}
-                    />
-                    {replyingTo && (
-                      <div className="composer-reply-preview">
-                        <div>
-                          <strong>Đang trả lời {userLabel(replyingTo.senderDisplayName, replyingTo.sender)}</strong>
-                          <span>{replyingTo.deleted ? 'Tin nhắn đã thu hồi' : (replyingTo.text || attachmentLabel(replyingTo.attachments))}</span>
-                        </div>
-                        <button type="button" onClick={() => setReplyingTo(null)} aria-label="Hủy trả lời">×</button>
-                      </div>
-                    )}
-                    {messageAttachments.length > 0 && (
-                      <div className="composer-pending">
-                        <MediaAttachmentsView
-                          items={messageAttachments}
-                          pending
-                          onRemove={messageSending ? undefined : (index) => setMessageAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                        />
-                      </div>
-                    )}
-                    <button
-                      className="ghost-action attach-button"
-                      type="button"
-                      onClick={() => chatFileInputRef.current?.click()}
-                      disabled={Boolean(mediaUploading) || messageSending}
-                      aria-label="Đính kèm file"
-                    >
-                      <UiIcon name="attach" size={22} />
-                      <Plus className="chat-composer-plus" size={21} aria-hidden="true" />
-                    </button>
-                    <button className="ghost-action chat-composer-image" type="button"
-                      onClick={() => chatFileInputRef.current?.click()}
-                      disabled={Boolean(mediaUploading) || messageSending}
-                      aria-label="Đính kèm ảnh hoặc video" title="Chọn ảnh hoặc video">
-                      <Images size={19} aria-hidden="true" />
-                    </button>
-                    <VoiceRecorder
-                      key={`${session.sessionId}:${activeConversationId}`}
-                      disabled={Boolean(mediaUploading) || messageSending}
-                      onRecorded={(file) => { void addChatFiles([file]) }}
-                      onError={(message) => setNotice(message, 'error')}
-                    />
-                    {activeConversation.type === 'group' && (
-                      <GroupActivityComposerMenu
-                        key={activeConversation.id}
-                        onCreate={setGroupActivityCreateKind}
-                      />
-                    )}
-                    <textarea
-                      ref={messageInputRef}
-                      className="chat-message-input"
-                      rows={1}
-                      aria-label="Tin nhắn"
-                      placeholder={isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? selectedChannelId ? `Nhắn vào # ${groupChannels.find(channel => channel.id === selectedChannelId)?.name || 'kênh hội thoại'}...` : `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
-                      value={messageText}
-                      onChange={(event) => setMessageText(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (!shouldSendChatOnEnter(event.nativeEvent)) return;
-                        event.preventDefault();
-                        event.currentTarget.form?.requestSubmit();
-                      }}
-                      onPaste={(event) => {
-                        const files = chatFilesFromClipboard(event.clipboardData)
-                        if (files.length === 0) return // Preserve normal text paste (Cmd/Ctrl+V).
-                        event.preventDefault()
-                        void addChatFiles(files)
-                      }}
-                      title="Dán ảnh/tệp bằng Cmd/Ctrl+V hoặc kéo thả vào cuộc trò chuyện"
-                      maxLength={4000}
-                    />
-                    <button className="send-button polished-send" disabled={!canSend} aria-label="Gửi tin nhắn">
-                      <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>
-                    </button>
-                  </form>
-                  )}
-                </>
-              )}
-            </section>
-            {activeConversation && conversationDetailsOpen && (
-              <ConversationDetailsPanel
-                conversation={activeConversation}
-                busy={historyActionBusy || blockedBusy}
-                onUnblock={() => { if (activeConversation.otherUserId) void unblockContact(activeConversation.otherUserId) }}
-                onClose={() => setConversationDetailsOpen(false)}
-                onBlock={() => {
-                  if (activeConversation.otherUserId && activeConversation.otherUsername) {
-                    void blockContact({
-                      id: activeConversation.otherUserId,
-                      username: activeConversation.otherUsername,
-                      displayName: activeConversation.name,
-                    })
-                  }
-                }}
-                onClearHistory={() => { void clearActiveConversationHistory() }}
-                onCreateGroupActivity={setGroupActivityCreateKind}
-                channels={groupChannels}
-                selectedChannelId={selectedChannelId}
-                onSelectChannel={selectGroupChannel}
-                onProfile={() => {
-                  if (activeConversation.type === 'group') {
-                    setConversationDetailsOpen(false)
-                    setGroupMemberViewOpen(false)
-                    openGroupSettings(activeConversation)
-                  }
-                  else if (activeConversation.otherUsername) openVisitor(activeConversation.otherUsername)
-                  else setNotice('Không thể mở hồ sơ từ cuộc trò chuyện này.', 'warning')
-                }}
-                onSearch={() => { setConversationDetailsOpen(false); setMessageSearchOpen(true) }}
-                onShared={() => { setConversationDetailsOpen(false); setSharedContentOpen(true) }}
-                onTranslate={() => {
-                  setConversationDetailsOpen(false);
-                  setTranslationMenuOpen(false);
-                  setTranslationSettingsConversationId(activeConversation.id);
-                }}
-                onNotifications={() => { setConversationDetailsOpen(false); switchTab('notifications') }}
-              />
-            )}
-            {groupSettingsOpen && activeConversation?.type === 'group' && (
-              <>
-                <button type="button" className="group-sidebar-scrim"
-                  aria-label="Đóng thanh quản lý nhóm"
-                  onClick={() => setGroupSettingsOpen(false)} />
-                <aside className="group-settings-sidebar" id="group-settings-sidebar" aria-label="Thanh bên quản lý nhóm">
-                  <GroupSettingsPanel
-                    activeGroupMember={activeGroupMember}
-                    setGroupSettingsOpen={setGroupSettingsOpen}
-                    canManageActiveGroup={canManageActiveGroup}
-                    canInviteActiveGroup={canInviteActiveGroup}
-                    canEditGroup={canEditGroup}
-                    onOpenShared={() => { setGroupSettingsOpen(false); setSharedContentOpen(true) }}
-                    onOpenMemberProfile={(username) => {
-                      setGroupMemberViewOpen(false)
-                      setGroupSettingsOpen(false)
-                      openVisitor(username)
-                    }}
-                    memberFriendRelationship={friendRelationship}
-                    onMemberFriendAction={(member) => actOnFriend({
-                      id: member.id,
-                      username: member.username,
-                      displayName: member.displayName,
-                      online: member.online,
-                    })}
-                    friendBusyIds={friendBusyIds}
-                    memberViewOpen={groupMemberViewOpen}
-                    setMemberViewOpen={setGroupMemberViewOpen}
-                    groupBusy={groupBusy}
-                    activeConversation={activeConversation}
-                    groupInviteSelection={groupInviteSelection}
-                    groupInviteSearch={groupInviteSearch}
-                    setGroupInviteSearch={setGroupInviteSearch}
-                    groupInviteCandidates={groupInviteCandidates}
-                    friends={friends}
-                    setGroupInviteSelection={setGroupInviteSelection}
-                    inviteGroupMembers={inviteGroupMembers}
-                    groupMembers={groupMembers}
-                    userId={session.user.id}
-                    changeGroupMemberRole={changeGroupMemberRole}
-                    removeGroupMember={removeGroupMember}
-                    request={apiFetch}
-                    notify={(message) => setNotice(message)}
-                    onMembersChanged={() => refreshGroupMembers(activeConversation.id)}
-                  />
-                </aside>
-              </>
-            )}
-          </div>
+          <ChatSection
+          activeChatTranslationSettings={activeChatTranslationSettings}
+          activeConversation={activeConversation}
+          activeConversationId={activeConversationId}
+          activeConversationIdRef={activeConversationIdRef}
+          activeGroupMember={activeGroupMember}
+          actOnFriend={actOnFriend}
+          addChatFiles={addChatFiles}
+          apiFetch={apiFetch}
+          beginConversationLongPress={beginConversationLongPress}
+          beginMessageLongPress={beginMessageLongPress}
+          blockContact={blockContact}
+          blockedBusy={blockedBusy}
+          bottomRef={bottomRef}
+          cancelConversationLongPress={cancelConversationLongPress}
+          cancelMessageLongPress={cancelMessageLongPress}
+          canEditGroup={canEditGroup}
+          canInviteActiveGroup={canInviteActiveGroup}
+          canManageActiveGroup={canManageActiveGroup}
+          canSend={canSend}
+          changeAutoTranslate={changeAutoTranslate}
+          changeGroupMemberRole={changeGroupMemberRole}
+          changeTargetLanguage={changeTargetLanguage}
+          chatCreateError={chatCreateError}
+          chatDragActive={chatDragActive}
+          chatDragDepth={chatDragDepth}
+          chatFileInputRef={chatFileInputRef}
+          chatFiltersPill={chatFiltersPill}
+          chatFriend={chatFriend}
+          chatFriendRelationship={chatFriendRelationship}
+          chatListConversations={chatListConversations}
+          chatListFilter={chatListFilter}
+          chatListQuery={chatListQuery}
+          chatOnline={chatOnline}
+          chatOutbox={chatOutbox}
+          chatSearchJumpRevision={chatSearchJumpRevision}
+          clearActiveConversationHistory={clearActiveConversationHistory}
+          conversationBlocked={conversationBlocked}
+          conversationCategories={conversationCategories}
+          conversationDetailsOpen={conversationDetailsOpen}
+          conversationListSearch={conversationListSearch}
+          conversationLoadingMore={conversationLoadingMore}
+          copyInviteLink={copyInviteLink}
+          createDirect={createDirect}
+          createGroupChannel={createGroupChannel}
+          directUsername={directUsername}
+          effectiveAutoTranslate={effectiveAutoTranslate}
+          effectiveTargetLanguage={effectiveTargetLanguage}
+          friendBusyIds={friendBusyIds}
+          friendQuery={friendQuery}
+          friendRelationship={friendRelationship}
+          friendResults={friendResults}
+          friends={friends}
+          friendSearchError={friendSearchError}
+          friendSearching={friendSearching}
+          friendSyncBusy={friendSyncBusy}
+          friendSyncError={friendSyncError}
+          friendSyncSessionId={friendSyncSessionId}
+          groupActivities={groupActivities}
+          groupBusy={groupBusy}
+          groupChannelBusy={groupChannelBusy}
+          groupChannels={groupChannels}
+          groupInviteCandidates={groupInviteCandidates}
+          groupInviteSearch={groupInviteSearch}
+          groupInviteSelection={groupInviteSelection}
+          groupMembers={groupMembers}
+          groupMemberViewOpen={groupMemberViewOpen}
+          groupSettingsOpen={groupSettingsOpen}
+          hasMoreConversations={hasMoreConversations}
+          hasMoreMessages={hasMoreMessages}
+          historyActionBusy={historyActionBusy}
+          inviteGroupMembers={inviteGroupMembers}
+          isProfileDesktop={isProfileDesktop}
+          languageOptions={languageOptions}
+          languageSearch={languageSearch}
+          loadMissingMessages={loadMissingMessages}
+          loadMoreConversations={loadMoreConversations}
+          loadOlderMessages={loadOlderMessages}
+          manuallyTranslated={manuallyTranslated}
+          mediaUploading={mediaUploading}
+          messageAttachments={messageAttachments}
+          messageGapBefore={messageGapBefore}
+          messageGapLoading={messageGapLoading}
+          messageInputRef={messageInputRef}
+          messageScrollAtBottom={messageScrollAtBottom}
+          messageSearchOpen={messageSearchOpen}
+          messageSending={messageSending}
+          messagesLoadingMore={messagesLoadingMore}
+          messagesScrollRef={messagesScrollRef}
+          messageText={messageText}
+          moveConversationLongPress={moveConversationLongPress}
+          moveMessageLongPress={moveMessageLongPress}
+          newChatMode={newChatMode}
+          openConnectSurface={openConnectSurface}
+          openGroupSettings={openGroupSettings}
+          openMessageActions={openMessageActions}
+          openMessageReactions={openMessageReactions}
+          openVisitor={openVisitor}
+          pinBusy={pinBusy}
+          pinnedExpanded={pinnedExpanded}
+          pinnedItems={pinnedItems}
+          quickSearchControl={quickSearchControl}
+          reactionPreviews={reactionPreviews}
+          refreshFriendConnections={refreshFriendConnections}
+          refreshGroupMembers={refreshGroupMembers}
+          removeGroupMember={removeGroupMember}
+          replyingTo={replyingTo}
+          retryQueuedChatMessages={retryQueuedChatMessages}
+          searchInConversationList={searchInConversationList}
+          selectedChannelId={selectedChannelId}
+          selectGroupChannel={selectGroupChannel}
+          sendMessage={sendMessage}
+          session={session}
+          setActiveConversationId={setActiveConversationId}
+          setChatCreateError={setChatCreateError}
+          setChatDragActive={setChatDragActive}
+          setChatListFilter={setChatListFilter}
+          setChatListQuery={setChatListQuery}
+          setChatSearchJump={setChatSearchJump}
+          setConversationActionId={setConversationActionId}
+          setConversationDetailsOpen={setConversationDetailsOpen}
+          setConversationMenuPosition={setConversationMenuPosition}
+          setConversations={setConversations}
+          setDirectUsername={setDirectUsername}
+          setFriendQuery={setFriendQuery}
+          setFriendResults={setFriendResults}
+          setFriendSearchRetry={setFriendSearchRetry}
+          setGroupActivityCreateKind={setGroupActivityCreateKind}
+          setGroupActivityViewedId={setGroupActivityViewedId}
+          setGroupInviteSearch={setGroupInviteSearch}
+          setGroupInviteSelection={setGroupInviteSelection}
+          setGroupMemberViewOpen={setGroupMemberViewOpen}
+          setGroupSettingsOpen={setGroupSettingsOpen}
+          setLanguageSearch={setLanguageSearch}
+          setManuallyTranslated={setManuallyTranslated}
+          setMessageAttachments={setMessageAttachments}
+          setMessageSearchOpen={setMessageSearchOpen}
+          setMessageText={setMessageText}
+          setNewChatMode={setNewChatMode}
+          setNotice={setNotice}
+          setPinnedExpanded={setPinnedExpanded}
+          setQrOpen={setQrOpen}
+          setQuickSearchOpen={setQuickSearchOpen}
+          setReplyingTo={setReplyingTo}
+          setSharedContentOpen={setSharedContentOpen}
+          setTranslationMenuOpen={setTranslationMenuOpen}
+          setTranslationOriginals={setTranslationOriginals}
+          setTranslations={setTranslations}
+          setTranslationSettingsConversationId={setTranslationSettingsConversationId}
+          sharedContentOpen={sharedContentOpen}
+          shareMyProfile={shareMyProfile}
+          sortedChatListConversations={sortedChatListConversations}
+          sortedGroupActivityEvents={sortedGroupActivityEvents}
+          suppressConversationClick={suppressConversationClick}
+          suppressMessageClick={suppressMessageClick}
+          switchTab={switchTab}
+          t={t}
+          toggleMessagePin={toggleMessagePin}
+          toggleReaction={toggleReaction}
+          translateMessage={translateMessage}
+          translationFailures={translationFailures}
+          translationMenuOpen={translationMenuOpen}
+          translationOriginals={translationOriginals}
+          translationPending={translationPending}
+          translations={translations}
+          unblockContact={unblockContact}
+          updateChatOutbox={updateChatOutbox}
+          visibleConversations={visibleConversations}
+          visibleLanguageOptions={visibleLanguageOptions}
+          visibleMessages={visibleMessages}
+        />
         )}
 
 
         {tab === 'chat' && translationSettingsConversationId !== null &&
           activeConversation?.id === translationSettingsConversationId && (
-          <ChatTranslationSettingsPage
-            key={`${session.user.id}:${translationSettingsConversationId}`}
-            conversation={activeConversation}
-            languages={languageOptions}
-            initial={activeChatTranslationSettings ?? {
-              enabled: autoTranslate,
-              targetLanguage,
-              sourceLanguage: targetLanguage === 'en' ? 'vi' : 'en',
-              display: 'adaptive',
-            }}
-            onCancel={() => setTranslationSettingsConversationId(null)}
-            onSave={settings => {
-              if (saveConversationTranslationSettings(translationSettingsConversationId, settings)) {
-                setTranslationSettingsConversationId(null);
-                setNotice('Đã lưu cài đặt dịch cho cuộc trò chuyện.', 'success');
-              }
-            }}
-          />
+          <ChatTranslationSection
+          activeChatTranslationSettings={activeChatTranslationSettings}
+          activeConversation={activeConversation}
+          autoTranslate={autoTranslate}
+          languageOptions={languageOptions}
+          saveConversationTranslationSettings={saveConversationTranslationSettings}
+          session={session}
+          setNotice={setNotice}
+          setTranslationSettingsConversationId={setTranslationSettingsConversationId}
+          targetLanguage={targetLanguage}
+          translationSettingsConversationId={translationSettingsConversationId}
+        />
         )}
 
 
         {tab === "chat" && desktopSection === "calls" && (
-          <CallCenter
-            embedded
-            request={apiFetch}
-            userId={session.user.id}
-            token={session.token}
-            conversations={displayConversations}
-            targetLanguage={targetLanguage}
-            directoryContent={contactsContent}
-            directoryQuery={friendQuery}
-            onDirectoryQueryChange={setFriendQuery}
-            onDirectoryOpen={() => setContactsScreen("directory")}
-            onNavigate={(destination) => { switchTab(destination); setDesktopSection(null); }}
-            onOpenChat={(id) => { setDesktopSection(null); setActiveConversationId(id); }}
-
-          />
+          <CallsSection
+          apiFetch={apiFetch}
+          contactsContent={contactsContent}
+          displayConversations={displayConversations}
+          friendQuery={friendQuery}
+          session={session}
+          setActiveConversationId={setActiveConversationId}
+          setContactsScreen={setContactsScreen}
+          setDesktopSection={setDesktopSection}
+          setFriendQuery={setFriendQuery}
+          switchTab={switchTab}
+          targetLanguage={targetLanguage}
+        />
         )}
 
         {tab === "notifications" && (
-          <NotificationsPage
-            requests={friendRequests}
-            conversations={conversations}
-            mentions={postMentions}
-            onReadMention={(id) => void readPostMention(id)}
-            onOpenMention={(mention) => void openMentionPost(mention)}
-            search={globalSearch}
-            busyFriendIds={friendBusyIds}
-            onAccept={(friend) => void actOnFriend(friend)}
-            onDecline={(friend) => void declineFriendRequest(friend)}
-            onOpenConversation={(id) => {
-              switchTab("chat");
-              setActiveConversationId(id);
-            }}
-            onOpenInvitations={() => {
-              switchTab("contacts");
-              setContactsScreen("invitations");
-            }}
-            onOpenFriend={openVisitor}
-            onSettings={() => {
-              switchTab("profile");
-              setDesktopProfileSettings(true);
-              setProfileTimelineOpen(false);
-            }}
-          />
+          <NotificationsSection
+          actOnFriend={actOnFriend}
+          conversations={conversations}
+          declineFriendRequest={declineFriendRequest}
+          friendBusyIds={friendBusyIds}
+          friendRequests={friendRequests}
+          globalSearch={globalSearch}
+          openMentionPost={openMentionPost}
+          openVisitor={openVisitor}
+          postMentions={postMentions}
+          readPostMention={readPostMention}
+          setActiveConversationId={setActiveConversationId}
+          setContactsScreen={setContactsScreen}
+          setDesktopProfileSettings={setDesktopProfileSettings}
+          setProfileTimelineOpen={setProfileTimelineOpen}
+          switchTab={switchTab}
+        />
         )}
 
         {tab === "contacts" && contactsContent}
 
         {tab === "discover" && (
-          <Suspense fallback={null}>
-            <NearbyExplorer
-              query={globalSearch}
-              onQueryChange={setGlobalSearch}
-              users={nearbyUsers as NearbyUser[]}
-              peopleBusy={nearbyBusy}
-              peopleScanning={nearbyScanning}
-              peopleActive={nearbyUntil > 0}
-              peopleRadiusKm={nearbyRadiusKm}
-              resultRadiusKm={nearbyResultRadiusKm}
-              onPeopleRadiusChange={setNearbyRadiusKm}
-              onScanPeople={findNearby}
-              onStopPeople={stopNearby}
-              friendActionBusy={friendActionBusy}
-              onFriendAction={actOnFriend}
-              getFriendActionLabel={(friend) => {
-                const relationship = friendRelationship(friend.id);
-                return relationship === "accepted"
-                  ? "Nhắn tin"
-                  : relationship === "incoming"
-                    ? "Chấp nhận"
-                    : relationship === "outgoing"
-                      ? "Hủy lời mời"
-                      : "Kết bạn";
-              }}
-            />
-          </Suspense>
+          <DiscoverSection
+          actOnFriend={actOnFriend}
+          findNearby={findNearby}
+          friendActionBusy={friendActionBusy}
+          friendRelationship={friendRelationship}
+          globalSearch={globalSearch}
+          nearbyBusy={nearbyBusy}
+          nearbyRadiusKm={nearbyRadiusKm}
+          nearbyResultRadiusKm={nearbyResultRadiusKm}
+          nearbyScanning={nearbyScanning}
+          nearbyUntil={nearbyUntil}
+          nearbyUsers={nearbyUsers}
+          setGlobalSearch={setGlobalSearch}
+          setNearbyRadiusKm={setNearbyRadiusKm}
+          stopNearby={stopNearby}
+        />
         )}
 
         {tab === "market" && (
-          <Suspense fallback={null}>
-            <Marketplace
-              key={session.sessionId}
-              userId={session.user.id}
-              request={apiFetch}
-              onBack={() => switchTab("discover")}
-            />
-          </Suspense>
+          <MarketSection
+          apiFetch={apiFetch}
+          session={session}
+          switchTab={switchTab}
+        />
         )}
 
         {tab === "feed" && isProfileDesktop && activePost && (
-          <PostCommentsPage
-            key={activePost.id}
-            post={activePost}
-            username={name}
-            ownDisplayName={profileMedia?.displayName || session.user.displayName || name}
-            token={session.token}
-            targetLanguage={translationPreferencesLoaded ? targetLanguage : ""}
-            request={apiFetch}
-            sortOrder={commentSortOrder}
-            onSortChange={setCommentSortOrder}
-            onDeleted={(id) => { removeFeedPost(id); closeFeedPostDetails(); }}
-            onAuthorOpen={openVisitor}
-            likeBusy={likePreviews[activePost.id] !== undefined}
-            onLike={(post, emoji) => like(post, emoji)}
-            onUpdated={syncFeedPost}
-            onEditPost={openEditPost}
-            taggedNames={friendTaggedNames}
-            onFeedback={(message, kind) => setNotice(message, kind)}
-          >
-            {postDiscussion}
-          </PostCommentsPage>
+          <FeedPostDetail
+          activePost={activePost}
+          apiFetch={apiFetch}
+          closeFeedPostDetails={closeFeedPostDetails}
+          commentSortOrder={commentSortOrder}
+          friendTaggedNames={friendTaggedNames}
+          like={like}
+          likePreviews={likePreviews}
+          name={name}
+          openEditPost={openEditPost}
+          openVisitor={openVisitor}
+          postDiscussion={postDiscussion}
+          profileMedia={profileMedia}
+          removeFeedPost={removeFeedPost}
+          session={session}
+          setCommentSortOrder={setCommentSortOrder}
+          setNotice={setNotice}
+          syncFeedPost={syncFeedPost}
+          targetLanguage={targetLanguage}
+          translationPreferencesLoaded={translationPreferencesLoaded}
+        />
         )}
 
         {tab === "feed" && (!isProfileDesktop || !activePost || feedCommunitiesOpen) && (
-          <div
-            className="feed-view zalo-feed-view social-feed"
-            ref={feedViewRef}
-            onScroll={(event) => {
-              if (feedSearchActive && event.currentTarget.scrollTop > 0)
-                setSearchHasScrolled(true);
-            }}
-          >
-            <FeedModeration
-              request={apiFetch}
-              onRemoved={(type, id) => {
-                if (type === "post") {
-                  setPosts((current) =>
-                    current.filter((post) => post.id !== id),
-                  );
-                  setSavedPosts((current) =>
-                    current.filter((post) => post.id !== id),
-                  );
-                  postSearch.removePost(id);
-                  if (activePostId === id) setActivePostId(null);
-                } else if (type === "comment") {
-                  void refreshPosts();
-                } else {
-                  setStories((current) =>
-                    current.filter((story) => story.id !== id),
-                  );
-                  if (activeStoryId === id) setActiveStoryId(null);
-                }
-              }}
-            />
-            <input
-              ref={storyFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*,video/*"
-              aria-label="Chọn ảnh hoặc video cho Story"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                if (file) setStoryDraftFile(file);
-              }}
-            />
-            <div className="social-feed-grid">
-              <div className="social-feed-center">
-                {!feedCommunitiesOpen && (<>
-                {isProfileDesktop ? (
-                  <SocialFeedStories
-                    username={name}
-                    displayName={userLabel(
-                      profileMedia?.displayName || session.user.displayName,
-                      name,
-                    )}
-                    stories={stories}
-                    busy={storyBusy || mediaUploading === "story"}
-                    onCreate={() => storyFileInputRef.current?.click()}
-                    onOpen={setActiveStoryId}
-                  />
-                ) : (
-                  <>
-                    <div className="soco-feed-section-label">
-                      <strong>Khoảnh khắc</strong>
-                      <small>Story trong 24 giờ</small>
-                    </div>
-                    <div className="stories-row">
-                      <button
-                        type="button"
-                        className="story-card"
-                        disabled={storyBusy || mediaUploading === "story"}
-                        onClick={() => storyFileInputRef.current?.click()}
-                        aria-label="Tạo Story mới"
-                      >
-                        <div className="story-visual self-story">
-                          <span className="story-camera">
-                            <UiIcon name="plus" size={22} />
-                          </span>
-                        </div>
-                        <span>
-                          Tạo mới
-                        </span>
-                      </button>
-                      {stories.map((story) => (
-                        <button
-                          type="button"
-                          className="story-card"
-                          key={story.id}
-                          onClick={() => setActiveStoryId(story.id)}
-                          aria-label={`Xem Story của ${userLabel(story.authorDisplayName, story.author)}`}
-                        >
-                          <div className="story-visual">
-                            {story.attachment.kind === "video" ? (
-                              <video
-                                src={story.attachment.url}
-                                muted
-                                playsInline
-                                preload="metadata"
-                              />
-                            ) : (
-                              <img
-                                src={story.attachment.url}
-                                alt=""
-                                loading="lazy"
-                              />
-                            )}
-                            <UserAvatar
-                              className="story-avatar-mini"
-                              username={story.author}
-                              name={userLabel(
-                                story.authorDisplayName,
-                                story.author,
-                              )}
-                            />
-                          </div>
-                          <span>
-                            {story.author === name
-                              ? "Story của bạn"
-                              : userLabel(
-                                  story.authorDisplayName,
-                                  story.author,
-                                )}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                <SocialFeedComposer
-                    username={name}
-                    displayName={userLabel(
-                      profileMedia?.displayName || session.user.displayName,
-                      name,
-                    )}
-                    draft={postText}
-                    pending={Boolean(pendingPost) || mediaUploading === "feed"}
-                    storyBusy={storyBusy || mediaUploading === "story"}
-                    onCreatePost={() => {
-                      setFeedComposerOpen(true);
-                    }}
-                    onCreateMediaPost={(files) => {
-                      setFeedComposerOpen(true);
-                      void addFeedFiles(files);
-                    }}
-                    onCreateStory={() => storyFileInputRef.current?.click()}
-                    onCheckIn={() => {
-                      setFeedCheckInOpen(true);
-                      setFeedComposerOpen(true);
-                    }}
-                  />
-                </>)}
-
-                {!feedCommunitiesOpen && (isProfileDesktop ? (
-                  <div
-                    className="social-feed-filter-bar"
-                    role="group"
-                    aria-label="Lọc bảng tin"
-                  >
-                    <div className="social-feed-filter-options">
-                      <button
-                        type="button"
-                        aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
-                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
-                      >
-                        Dành cho bạn
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={!feedCommunitiesOpen && feedFilter === "following"}
-                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("following"); }}
-                      >
-                        Đang theo dõi
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={!feedCommunitiesOpen && feedFilter === "latest"}
-                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("latest"); }}
-                      >
-                        Mới nhất
-                      </button>
-                      {!feedCommunitiesOpen && feedFilter === "saved" && (
-                        <button type="button" aria-pressed={true}>
-                          Đã lưu
-                        </button>
-                      )}
-                    </div>
-                    {!feedCommunitiesOpen && <button
-                      className="social-feed-refresh"
-                      type="button"
-                      onClick={() => {
-                        if (feedFilter === "following") followingFeed.refresh();
-                        else if (feedFilter === "saved") void loadSavedPosts();
-                        else void refreshPosts();
-                      }}
-                    >
-                      <RefreshCw size={15} aria-hidden="true" />
-                      {feedFilter === "saved" ? "Bài đã lưu" : "Bài viết mới"}
-                    </button>}
-                  </div>
-                ) : (
-                  <>
-                    <div className="soco-feed-section-label soco-feed-posts-label">
-                      <strong>
-                        {feedCommunitiesOpen ? "Cộng đồng" : feedFilter === "saved"
-                          ? "Bài viết đã lưu"
-                          : "Bài viết mới"}
-                      </strong>
-                      <div
-                        ref={feedFiltersPill.hostRef}
-                        className="feed-filter-tabs sliding-pill-host"
-                        role="group"
-                        aria-label="Lọc bảng tin"
-                      >
-                        <span ref={feedFiltersPill.pillRef} className="sliding-pill feed-filter-active-pill" aria-hidden="true" />
-                        <button
-                          ref={!feedCommunitiesOpen && feedFilter === "all" ? feedFiltersPill.activeRef : undefined}
-                          type="button"
-                          aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
-                          onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
-                        >
-                          Mới nhất
-                        </button>
-                        <button
-                          ref={!feedCommunitiesOpen && feedFilter === "saved" ? feedFiltersPill.activeRef : undefined}
-                          type="button"
-                          aria-pressed={!feedCommunitiesOpen && feedFilter === "saved"}
-                          onClick={() => {
-                            setFeedCommunitiesOpen(false);
-                            setFeedFilter("saved");
-                            void loadSavedPosts();
-                          }}
-                        >
-                          Đã lưu
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ))}
-                <div className="feed zalo-feed">
-                  {feedCommunitiesOpen ? (
-                    <FeedCommunitiesList
-                      groups={conversations}
-                      onOpen={(id) => { switchTab("chat"); setChatListFilter("all"); setActiveConversationId(id); }}
-                      hasMore={hasMoreConversations}
-                      loadingMore={conversationLoadingMore}
-                      onLoadMore={() => void loadMoreConversations()}
-                    />
-                  ) : (<>
-                  {pendingPost && (
-                    <article
-                      className="post zalo-post outgoing-preview"
-                      aria-busy="true"
-                    >
-                      <UserAvatar
-                        username={pendingPost.author}
-                        name={userLabel(
-                          pendingPost.authorDisplayName,
-                          pendingPost.author,
-                        )}
-                        className="avatar"
-                      />
-                      <div className="post-body">
-                        <div className="post-author">
-                          <strong>
-                            {userLabel(
-                              pendingPost.authorDisplayName,
-                              pendingPost.author,
-                            )}
-                          </strong>
-                          <small>{pendingPost.visibility === "friends" ? "Bạn bè" : pendingPost.visibility === "private" ? "Chỉ mình tôi" : "Công khai"}</small>
-                        </div>
-                        <p className="pending-content">{pendingPost.content}</p>
-                        <MediaAttachmentsView items={pendingPost.attachments} />
-                      </div>
-                    </article>
-                  )}
-
-
-                  {renderPosts(searchedPosts, isProfileDesktop)}
-
-                  {feedPagingError && (
-                    <div role="alert" className="soco-feed-load-more">
-                      <span>
-                        {feedSearchActive
-                          ? postSearch.error
-                          : feedFilter === "following"
-                            ? followingFeed.error
-                            : "Không thể tải bài viết."}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (feedSearchActive) postSearch.retry();
-                          else if (feedFilter === "saved")
-                            void loadSavedPosts(savedPosts.length > 0);
-                          else if (feedFilter === "following")
-                            followingFeed.refresh();
-                          else if (posts.length === 0) void refreshPosts();
-                          else void loadMorePosts();
-                        }}
-                      >
-                        Thử lại
-                      </button>
-                    </div>
-                  )}
-                  <div
-                    ref={feedInfiniteScrollRef}
-                    aria-hidden="true"
-                    style={{ height: 1 }}
-                  />
-                  {searchedPosts.length === 0 &&
-                    !feedLoadingMore &&
-                    !(feedSearchActive && postSearch.loading) &&
-                    !(feedFilter === "following" && followingFeed.loading) &&
-                    !feedPagingError && (
-                      <div className="feed-empty">
-                        <SocoEmptyState
-                          title={
-                            normalizedSearch
-                              ? "Không tìm thấy bài viết"
-                              : feedFilter === "following"
-                                ? "Chưa có bài viết từ bạn bè"
-                                : "Chưa có bài viết"
-                          }
-                          description={
-                            normalizedSearch
-                              ? "Thử một từ khóa khác nhé."
-                              : feedFilter === "following"
-                                ? "Kết bạn để xem các bài viết được chia sẻ với bạn."
-                                : "Hãy chia sẻ khoảnh khắc đầu tiên của bạn."
-                          }
-                          action={
-                            !normalizedSearch && (
-                              <SocoTextAction
-                                onClick={() =>
-                                  feedFilter === "following"
-                                    ? switchTab("contacts")
-                                    : isProfileDesktop
-                                      ? (setFeedCheckInOpen(false),
-                                        setFeedComposerOpen(true))
-                                      : postComposerRef.current?.focus()
-                                }
-                              >
-                                {feedFilter === "following"
-                                  ? "Tìm bạn bè"
-                                  : "Tạo bài viết"}
-                              </SocoTextAction>
-                            )
-                          }
-                        />
-                      </div>
-                    )}
-                  </>)}
-                </div>
-              </div>
-              {!feedCommunitiesOpen && isProfileDesktop && (
-                <SocialFeedSidebar
-                  username={name}
-                  sessionId={session.sessionId}
-                  posts={posts}
-                  friends={friends}
-                  friendRequests={friendRequests}
-                  friendBusyIds={friendBusyIds}
-                  request={apiFetch}
-                  onFriend={(friend) => {
-                    void actOnFriend(friend);
-                  }}
-                  onViewUser={openVisitor}
-                  onViewContacts={() => switchTab("contacts")}
-                  onSearchTag={(tag) => {
-                    setFeedFilter("all");
-                    setGlobalSearch(tag);
-                  }}
-                  onOpenChat={() => switchTab("chat")}
-                />
-              )}
-            </div>
-          </div>
+          <FeedSection
+          activePostId={activePostId}
+          activeStoryId={activeStoryId}
+          actOnFriend={actOnFriend}
+          addFeedFiles={addFeedFiles}
+          apiFetch={apiFetch}
+          conversationLoadingMore={conversationLoadingMore}
+          conversations={conversations}
+          feedCommunitiesOpen={feedCommunitiesOpen}
+          feedFilter={feedFilter}
+          feedFiltersPill={feedFiltersPill}
+          feedInfiniteScrollRef={feedInfiniteScrollRef}
+          feedLoadingMore={feedLoadingMore}
+          feedPagingError={feedPagingError}
+          feedSearchActive={feedSearchActive}
+          feedViewRef={feedViewRef}
+          followingFeed={followingFeed}
+          friendBusyIds={friendBusyIds}
+          friendRequests={friendRequests}
+          friends={friends}
+          hasMoreConversations={hasMoreConversations}
+          isProfileDesktop={isProfileDesktop}
+          loadMoreConversations={loadMoreConversations}
+          loadMorePosts={loadMorePosts}
+          loadSavedPosts={loadSavedPosts}
+          mediaUploading={mediaUploading}
+          name={name}
+          normalizedSearch={normalizedSearch}
+          openVisitor={openVisitor}
+          pendingPost={pendingPost}
+          postComposerRef={postComposerRef}
+          posts={posts}
+          postSearch={postSearch}
+          postText={postText}
+          profileMedia={profileMedia}
+          refreshPosts={refreshPosts}
+          renderPosts={renderPosts}
+          savedPosts={savedPosts}
+          searchedPosts={searchedPosts}
+          session={session}
+          setActiveConversationId={setActiveConversationId}
+          setActivePostId={setActivePostId}
+          setActiveStoryId={setActiveStoryId}
+          setChatListFilter={setChatListFilter}
+          setFeedCheckInOpen={setFeedCheckInOpen}
+          setFeedCommunitiesOpen={setFeedCommunitiesOpen}
+          setFeedComposerOpen={setFeedComposerOpen}
+          setFeedFilter={setFeedFilter}
+          setGlobalSearch={setGlobalSearch}
+          setPosts={setPosts}
+          setSavedPosts={setSavedPosts}
+          setSearchHasScrolled={setSearchHasScrolled}
+          setStories={setStories}
+          setStoryDraftFile={setStoryDraftFile}
+          stories={stories}
+          storyBusy={storyBusy}
+          storyFileInputRef={storyFileInputRef}
+          switchTab={switchTab}
+        />
         )}
 
         {activeConversationAction && (
-          <div className={conversationMenuPosition ? 'conversation-context-backdrop' : 'message-context-backdrop'}
-            role="dialog" aria-modal="true"
-            aria-label={`Tùy chọn cuộc trò chuyện ${activeConversationAction.name}`}
-            onMouseDown={(event) => {
-              if (event.currentTarget === event.target) setConversationActionId(null)
-            }}
-            onKeyDown={(event) => { if (event.key === 'Escape') setConversationActionId(null) }}>
-            <section
-              className={conversationMenuPosition ? 'conversation-context-menu' : 'message-context-sheet'}
-              style={conversationMenuPosition ? {
-                left: Math.max(8, Math.min(conversationMenuPosition.x, window.innerWidth - 252)),
-                top: Math.max(8, Math.min(conversationMenuPosition.y, window.innerHeight - 72)),
-              } : undefined}
-            >
-              {!conversationMenuPosition && (
-                <div className="conversation-pin-dialog-title">
-                  <strong>{activeConversationAction.name}</strong>
-                  <span>Thiết lập riêng cho tài khoản của bạn</span>
-                </div>
-              )}
-              <div className={conversationMenuPosition ? 'conversation-context-actions' : 'message-context-actions'}>
-                <button type="button" autoFocus disabled={pinBusy}
-                  onClick={() => {
-                    setConversationActionId(null)
-                    void toggleConversationPin(activeConversationAction)
-                  }}>
-                  <span aria-hidden="true"><Pin size={19} /></span>
-                  <b>{activeConversationAction.pinnedAt ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}</b>
-                </button>
-              </div>
-              {!conversationMenuPosition && (
-                <button type="button" className="message-context-cancel"
-                  onClick={() => setConversationActionId(null)}>Đóng</button>
-              )}
-            </section>
-          </div>
+          <ConversationActionDialog
+          activeConversationAction={activeConversationAction}
+          conversationMenuPosition={conversationMenuPosition}
+          pinBusy={pinBusy}
+          setConversationActionId={setConversationActionId}
+          toggleConversationPin={toggleConversationPin}
+        />
         )}
 
         {activeConversation?.type === 'group' && (groupActivityCreateKind !== null || groupActivityViewedId !== null) && (
@@ -7566,1133 +6317,219 @@ export default function App({
           />
         )}
         {activeMessageAction && (
-          <MessageActions
-            mode={messageActionMode}
-            activeMessageAction={activeMessageAction}
-            userId={session.user.id}
-            isPinned={pinnedMessages.some((pin) => pin.message.id === activeMessageAction.id)}
-            toggleMessagePin={toggleMessagePin}
-            setMessageActionId={setMessageActionId}
-            toggleReaction={toggleReaction}
-            setReplyingTo={setReplyingTo}
-            copyTarget={messageCopyTarget}
-            copyMessageContent={copyMessageContent}
-            translateMessage={translateMessage}
-            editOwnMessage={editOwnMessage}
-            recallOwnMessage={recallOwnMessage}
-          />
+          <MessageActionDialog
+          activeMessageAction={activeMessageAction}
+          copyMessageContent={copyMessageContent}
+          editOwnMessage={editOwnMessage}
+          messageActionMode={messageActionMode}
+          messageCopyTarget={messageCopyTarget}
+          pinnedMessages={pinnedMessages}
+          recallOwnMessage={recallOwnMessage}
+          session={session}
+          setMessageActionId={setMessageActionId}
+          setReplyingTo={setReplyingTo}
+          toggleMessagePin={toggleMessagePin}
+          toggleReaction={toggleReaction}
+          translateMessage={translateMessage}
+        />
         )}
 
         {activePost && !(tab === "feed" && isProfileDesktop) && (
-          <div
-            className="post-detail-backdrop"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Chi tiết bài viết của ${userLabel(activePost.authorDisplayName, activePost.author)}`}
-            onMouseDown={(event) => {
-              if (event.currentTarget === event.target) setActivePostId(null);
-            }}
-          >
-            <section className="post-detail-modal">
-              <header className="post-detail-header">
-                <div>
-                  <strong>Chi tiết bài viết</strong>
-                  <small>@{activePost.author}</small>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Đóng chi tiết bài viết"
-                  onClick={() => setActivePostId(null)}
-                >
-                  ×
-                </button>
-              </header>
-              <div className="post-detail-scroll">
-                <article className="post zalo-post post-detail-post">
-                  <UserAvatar
-                    username={activePost.author}
-                    name={userLabel(
-                      activePost.authorDisplayName,
-                      activePost.author,
-                    )}
-                    className="avatar"
-                  />
-                  <div className="post-body">
-                    <div className="post-author">
-                      <div>
-                        <strong>
-                          {userLabel(
-                            activePost.authorDisplayName,
-                            activePost.author,
-                          )}
-                        </strong>
-                        <small>
-                          {new Date(activePost.createdAt).toLocaleString(
-                            "vi-VN",
-                          )}
-                        </small>
-                      </div>
-                    </div>
-                    {activePost.content && (
-                      <FeedText
-                        api={API}
-                        token={session.token}
-                        target={
-                          translationPreferencesLoaded ? targetLanguage : ""
-                        }
-                        text={activePost.content}
-                      />
-                    )}
-                    <MediaAttachmentsView items={activePost.attachments} />
-                    <div className="post-toolbar">
-                      <FeedReactionControl
-                        post={activePost}
-                        busy={likePreviews[activePost.id] !== undefined}
-                        react={like}
-                        showCount
-                      />
-                      <span className="post-stat">
-                        <UiIcon name="comment" size={21} />
-                        {activePost.comments?.length || 0} bình luận
-                      </span>
-                    </div>
-                    {postDiscussion}
-                  </div>
-                </article>
-              </div>
-            </section>
-          </div>
+          <PostDetailOverlay
+          activePost={activePost}
+          like={like}
+          likePreviews={likePreviews}
+          postDiscussion={postDiscussion}
+          session={session}
+          setActivePostId={setActivePostId}
+          targetLanguage={targetLanguage}
+          translationPreferencesLoaded={translationPreferencesLoaded}
+        />
         )}
 
         {activeStory && (
-          <StoryViewer
-            activeStory={activeStory}
-            stories={stories}
-            name={name}
-            storyBusy={storyBusy}
-            deleteStory={deleteStory}
-            setActiveStoryId={setActiveStoryId}
-            onReply={replyToStory}
-            onProfile={(username) => {
-              setActiveStoryId(null);
-              openVisitor(username);
-            }}
-            onShare={(story) => void shareStory(story)}
-            onReport={(story) => void reportStory(story)}
-          />
+          <StoryOverlay
+          activeStory={activeStory}
+          deleteStory={deleteStory}
+          name={name}
+          openVisitor={openVisitor}
+          replyToStory={replyToStory}
+          reportStory={reportStory}
+          setActiveStoryId={setActiveStoryId}
+          shareStory={shareStory}
+          stories={stories}
+          storyBusy={storyBusy}
+        />
         )}
 
         {tab === "profile" && desktopProfileOverview && (
-          <>
-            <input
-              ref={avatarFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh đại diện"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("avatar", file);
-              }}
-            />
-            <input
-              ref={coverFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh bìa"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("cover", file);
-              }}
-            />
-            {profileEditorOpen ? (
-              <ProfileEditorPage
-                username={name}
-                displayName={
-                  profileMedia?.displayName || session.user.displayName || name
-                }
-                profile={profileMedia}
-                coverUrl={
-                  profileMedia?.coverSet
-                    ? profileAssetUrl(name, "cover", profileMedia.updatedAt)
-                    : undefined
-                }
-                displayNameDraft={profileDisplayNameDraft}
-                setDisplayNameDraft={setProfileDisplayNameDraft}
-                usernameDraft={profileUsernameDraft}
-                setUsernameDraft={setProfileUsernameDraft}
-                bioDraft={profileBioDraft}
-                setBioDraft={setProfileBioDraft}
-                cityDraft={profileCityDraft}
-                setCityDraft={setProfileCityDraft}
-                profileSaving={profileSaving}
-                mediaBusy={profileBusy !== null || mediaUploading === "profile"}
-                privacy={privacy}
-                privacyBusy={privacyBusy}
-                privacyLoading={privacyLoading}
-                privacyError={privacyError}
-                retryPrivacy={() => setPrivacyRetry((n) => n + 1)}
-                changePrivacy={changePrivacy}
-                onSave={saveProfileIdentity}
-                onDiscard={discardDesktopProfileEdits}
-                onChangeAvatar={() => avatarFileInputRef.current?.click()}
-                onChangeCover={() => coverFileInputRef.current?.click()}
-              />
-            ) : (
-              <ProfilePage
-                username={name}
-                displayName={
-                  profileMedia?.displayName || session.user.displayName || name
-                }
-                email={session.user.email}
-                bio={profileMedia?.bio}
-                city={profileMedia?.city}
-                coverUrl={
-                  profileMedia?.coverSet
-                    ? profileAssetUrl(name, "cover", profileMedia.updatedAt)
-                    : undefined
-                }
-                coverSet={Boolean(profileMedia?.coverSet)}
-                editBusy={profileBusy !== null || mediaUploading === "profile"}
-                friends={friends}
-                posts={profilePosts}
-                pendingPost={pendingPost}
-                postsBusy={profilePostsBusy}
-                postsError={profilePostsError}
-                hasMorePosts={profileHasMore}
-                postCards={renderPosts(visibleProfilePosts)}
-                profileNote={
-                  <ProfileNote
-                    key={session.sessionId + ":desktop-note"}
-                    username={name}
-                    owner
-                    request={apiFetch}
-                  />
-                }
-                onEditProfile={() => setProfileEditorOpen(true)}
-                onChangeAvatar={() => avatarFileInputRef.current?.click()}
-                onChangeCover={() => coverFileInputRef.current?.click()}
-                onCreatePost={() => setProfileComposerOpen(true)}
-                onReloadPosts={() => void loadProfilePosts(false, true)}
-                onLoadMorePosts={() => void loadProfilePosts(true)}
-                onViewFriend={openVisitor}
-                onOpenContacts={() => switchTab("contacts")}
-                onOpenPost={setActivePostId}
-              />
-            )}
-          </>
+          <ProfileOverviewSection
+          apiFetch={apiFetch}
+          avatarFileInputRef={avatarFileInputRef}
+          changePrivacy={changePrivacy}
+          coverFileInputRef={coverFileInputRef}
+          discardDesktopProfileEdits={discardDesktopProfileEdits}
+          friends={friends}
+          loadProfilePosts={loadProfilePosts}
+          mediaUploading={mediaUploading}
+          name={name}
+          openVisitor={openVisitor}
+          pendingPost={pendingPost}
+          privacy={privacy}
+          privacyBusy={privacyBusy}
+          privacyError={privacyError}
+          privacyLoading={privacyLoading}
+          profileBioDraft={profileBioDraft}
+          profileBusy={profileBusy}
+          profileCityDraft={profileCityDraft}
+          profileDisplayNameDraft={profileDisplayNameDraft}
+          profileEditorOpen={profileEditorOpen}
+          profileHasMore={profileHasMore}
+          profileMedia={profileMedia}
+          profilePosts={profilePosts}
+          profilePostsBusy={profilePostsBusy}
+          profilePostsError={profilePostsError}
+          profileSaving={profileSaving}
+          profileUsernameDraft={profileUsernameDraft}
+          renderPosts={renderPosts}
+          saveProfileIdentity={saveProfileIdentity}
+          session={session}
+          setActivePostId={setActivePostId}
+          setPrivacyRetry={setPrivacyRetry}
+          setProfileBioDraft={setProfileBioDraft}
+          setProfileCityDraft={setProfileCityDraft}
+          setProfileComposerOpen={setProfileComposerOpen}
+          setProfileDisplayNameDraft={setProfileDisplayNameDraft}
+          setProfileEditorOpen={setProfileEditorOpen}
+          setProfileUsernameDraft={setProfileUsernameDraft}
+          switchTab={switchTab}
+          updateProfileImage={updateProfileImage}
+          visibleProfilePosts={visibleProfilePosts}
+        />
         )}
 
         {tab === "profile" && !desktopProfileOverview && (
-          <div
-            className={`simple-view profile-view ${profileTimelineOpen ? "personal-timeline-view" : ""} ${isProfileDesktop && desktopProfileSettings ? "settings-workspace-open" : ""}`}
-          >
-            {isProfileDesktop && desktopProfileSettings && (
-              <SettingsWorkspace
-                privacy={privacy}
-                privacyLoading={privacyLoading}
-                privacyBusy={privacyBusy}
-                privacyError={privacyError}
-                onPrivacyRetry={() => setPrivacyRetry((value) => value + 1)}
-                onSavePrivacy={savePrivacy}
-                account={
-                  <div className="settings-workspace-account">
-                    <div className="settings-workspace-account-details">
-                      <strong>{profileMedia?.displayName || session.user.displayName || name}</strong>
-                      <span>@{session.user.username}</span>
-                      <span>{session.user.email}</span>
-                    </div>
-                    <button type="button" className="settings-workspace-action" onClick={() => {
-                      setDesktopProfileSettings(false);
-                      setProfileEditorOpen(true);
-                    }}>
-                      <PencilLine size={16} aria-hidden="true" /> Chỉnh sửa hồ sơ
-                    </button>
-                    {!isStandalone && (
-                      <button type="button" className="settings-workspace-action" onClick={() => void installApp()}>
-                        <Download size={16} aria-hidden="true" /> {t("profile.install")}
-                      </button>
-                    )}
-                    <button type="button" className="settings-workspace-action" onClick={() => logout()}>
-                      <LogOut size={16} aria-hidden="true" /> {t("profile.logout")}
-                    </button>
-                  </div>
-                }
-                security={
-                  <div className="settings-card">
-                    <BlockedUsersPanel
-                      blockedBusy={blockedBusy}
-                      blockedOpen={blockedOpen}
-                      setBlockedOpen={setBlockedOpen}
-                      loadBlockedUsers={loadBlockedUsers}
-                      blockedError={blockedError}
-                      blockedUsers={blockedUsers}
-                      unblockContact={unblockContact}
-                    />
-                  </div>
-                }
-                notifications={
-                  <div className="settings-card">
-                    <div className="settings-row">
-                      <div>
-                        <strong>{isDesktopBuild ? "Thông báo Desktop" : t("profile.notifications")}</strong>
-                        <small>{isDesktopBuild
-                          ? "Nhận thông báo khi SocCo còn đang chạy."
-                          : t("profile.notificationsHint")}</small>
-                      </div>
-                      <button type="button" role="switch"
-                        className={"switch-button" + ((isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? " on" : "")}
-                        aria-checked={isDesktopBuild ? nativeNotifications.enabled : pushEnabled}
-                        aria-label={isDesktopBuild ? "Thông báo Desktop" : t("profile.notifications")}
-                        disabled={!isDesktopBuild && pushBusy}
-                        onClick={() => isDesktopBuild ? nativeNotifications.toggle() : void togglePush()}
-                      ><span /></button>
-                    </div>
-                    {isDesktopBuild && nativeNotifications.warning && (
-                      <div className="settings-row" role="status"><small>{nativeNotifications.warning}</small></div>
-                    )}
-                    {!isDesktopBuild && (
-                      <div className="settings-row">
-                        <div><strong>{t("profile.testNotification")}</strong><small>{t("profile.testNotificationHint")}</small></div>
-                        <button type="button" className="settings-action"
-                          disabled={pushBusy || !pushEnabled} onClick={() => void sendTestPush()}>
-                          {t("common.test")}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                }
-                language={
-                  <div className="settings-card">
-                    <button type="button" className="settings-row settings-row-button app-locale-row"
-                      onClick={() => { setLocaleSearch(""); setLocalePickerOpen(true); }}>
-                      <div><strong>{t("profile.appLanguage")}</strong><small>{t("profile.appLanguageHint")}</small></div>
-                      <span className="settings-current-locale">
-                        <span>{appLocale === "auto" ? t("common.auto") : selectedAppLanguage?.localizedLanguage}</span>
-                        <ChevronDown size={16} aria-hidden="true" />
-                      </span>
-                    </button>
-                    <div className="settings-row">
-                      <div><strong>{t("profile.autoTranslate")}</strong></div>
-                      <button type="button" role="switch" aria-checked={autoTranslate}
-                        aria-label={t("profile.autoTranslate")}
-                        className={"switch-button" + (autoTranslate ? " on" : "")}
-                        onClick={() => changeAutoTranslate(!autoTranslate)}><span /></button>
-                    </div>
-                    <button type="button" className="settings-row settings-row-button translation-locale-row"
-                      onClick={() => { setTranslationSettingsSearch(""); setTranslationPickerOpen(true); }}>
-                      <div><strong>{t("profile.translationLanguage")}</strong><small>{t("profile.translationLanguageHint")}</small></div>
-                      <span className="settings-current-locale">
-                        <span>{selectedLanguage?.localizedLanguage || targetLanguage.toUpperCase()}</span>
-                        <ChevronDown size={16} aria-hidden="true" />
-                      </span>
-                    </button>
-                  </div>
-                }
-                messages={
-                  <div className="settings-card">
-                    <div className="settings-row message-sound-row">
-                      <div><strong>{t("profile.messageSound")}</strong><small>{t("profile.messageSoundHint")}</small></div>
-                      <button type="button" role="switch" aria-checked={messageSoundEnabled}
-                        aria-label={t("profile.messageSound")}
-                        className={"switch-button" + (messageSoundEnabled ? " on" : "")}
-                        onClick={toggleMessageSound}><span /></button>
-                    </div>
-                    {messageSoundEnabled && (
-                      <div className="settings-row message-sound-preview-row">
-                        <div><strong>{t("profile.soundPreview")}</strong><small>{t("profile.soundPreviewHint")}</small></div>
-                        <button type="button" className="settings-action message-sound-preview-button"
-                          onClick={() => void previewMessageSound()}>
-                          <Volume2 size={17} aria-hidden="true" /> {t("profile.soundPreview")}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                }
-                appearance={
-                  <p className="settings-workspace-empty-note">
-                    Giao diện SocCo hiện sử dụng bộ màu sáng thống nhất trên web và desktop.
-                  </p>
-                }
-                storage={
-                  <div className="settings-workspace-account">
-                    <p className="settings-workspace-empty-note">
-                      Bạn có thể quản lý ảnh, video và tệp đã chia sẻ trong từng cuộc trò chuyện.
-                    </p>
-                    <button type="button" className="settings-workspace-action" onClick={() => switchTab("chat")}>
-                      Mở tin nhắn
-                    </button>
-                  </div>
-                }
-                devices={
-                  <div className="settings-card">
-                    <AccountSessionsPanel
-                      sessionsBusy={sessionsBusy}
-                      canManageSessions={isDesktopBuild || Boolean(session.refreshToken)}
-                      sessionsOpen={sessionsOpen}
-                      setSessionsOpen={setSessionsOpen}
-                      fetchAccountSessions={fetchAccountSessions}
-                      sessionsError={sessionsError}
-                      managedSessions={managedSessions}
-                      revokeAccountSessions={revokeAccountSessions}
-                    />
-                  </div>
-                }
-              />
-            )}
-            <input
-              ref={avatarFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh đại diện"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("avatar", file);
-              }}
-            />
-            <input
-              ref={coverFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh bìa"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("cover", file);
-              }}
-            />
-
-            {profileTimelineOpen && (
-              <header className="personal-timeline-header">
-                <button
-                  type="button"
-                  onClick={closeProfileTimeline}
-                  aria-label="Quay lại hồ sơ"
-                >
-                  <ArrowLeft size={20} />
-                </button>
-                <h1 ref={profileHeadingRef} tabIndex={-1}>
-                  Trang cá nhân
-                </h1>
-                <button
-                  type="button"
-                  onClick={() => setProfileEditorOpen(true)}
-                >
-                  <Settings size={18} />
-                  <span>Chỉnh sửa</span>
-                </button>
-              </header>
-            )}
-            <section className="profile-hero">
-              <div
-                className={`profile-cover-art ${profileMedia?.coverSet ? "has-cover" : ""}`}
-              >
-                <div className="profile-cover-placeholder">
-                  <strong>SocCO</strong>
-                  <small>Understand. Connect. Together.</small>
-                </div>
-                {profileMedia?.coverSet && (
-                  <img
-                    src={profileAssetUrl(name, "cover", profileMedia.updatedAt)}
-                    alt="Ảnh bìa"
-                    draggable={false}
-                    onError={(event) => {
-                      event.currentTarget.hidden = true;
-                      event.currentTarget.parentElement?.classList.remove(
-                        "has-cover",
-                      );
-                    }}
-                  />
-                )}
-                <button
-                  type="button"
-                  className="profile-cover-edit"
-                  disabled={
-                    profileBusy !== null || mediaUploading === "profile"
-                  }
-                  onClick={() => coverFileInputRef.current?.click()}
-                >
-                  <UiIcon name="photo" size={17} />
-                  {profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover")}
-                </button>
-              </div>
-
-              <div
-                className="profile-identity"
-                onClick={(event) => {
-                  if (
-                    !profileTimelineOpen &&
-                    !(event.target as HTMLElement).closest("button")
-                  ) {
-                    setProfileTimelineOpen(true);
-                    setGlobalSearch("");
-                  }
-                }}
-              >
-                <div className="profile-avatar-editor">
-                  <ProfileNote
-                    key={session.sessionId + ":note"}
-                    username={name}
-                    owner
-                    request={apiFetch}
-                  />
-                  <UserAvatar
-                    username={name}
-                    name={userLabel(
-                      profileMedia?.displayName || session.user.displayName,
-                      name,
-                    )}
-                    className="profile-avatar"
-                    online
-                  />
-                  <button
-                    type="button"
-                    className="profile-avatar-edit"
-                    aria-label="Đổi ảnh đại diện"
-                    title="Đổi ảnh đại diện"
-                    disabled={
-                      profileBusy !== null || mediaUploading === "profile"
-                    }
-                    onClick={() => avatarFileInputRef.current?.click()}
-                  >
-                    <UiIcon name="photo" size={17} />
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  ref={profileIdentityRef}
-                  className="profile-identity-copy profile-identity-link"
-                  aria-label="Mở trang cá nhân"
-                  disabled={profileTimelineOpen}
-                  onClick={() => {
-                    setProfileTimelineOpen(true);
-                    setGlobalSearch("");
-                  }}
-                >
-                  <strong>
-                    {profileMedia?.displayName ||
-                      session.user.displayName ||
-                      name}
-                  </strong>
-                  <span>@{name}</span>
-                  <small className="profile-email">{session.user.email}</small>
-                  {!profileTimelineOpen && (
-                    <small className="profile-media-hint">
-                      Xem trang cá nhân · Dòng thời gian ›
-                    </small>
-                  )}
-                </button>
-              </div>
-            </section>
-
-            {profileTimelineOpen ? (
-              <section
-                className="personal-timeline-content"
-                aria-label="Dòng thời gian cá nhân"
-              >
-                <div className="personal-timeline-intro">
-                  <div>
-                    <strong>Khoảnh khắc của bạn</strong>
-                    <p>Lưu giữ và chia sẻ những câu chuyện mỗi ngày.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setProfileComposerOpen(true)}
-                  >
-                    <PencilLine size={18} />
-                    Đăng bài
-                  </button>
-                </div>
-                <div className="profile-post-launcher">
-                  <UserAvatar
-                    username={name}
-                    name={userLabel(
-                      profileMedia?.displayName || session.user.displayName,
-                      name,
-                    )}
-                    className="avatar self-avatar"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setProfileComposerOpen(true)}
-                  >
-                    {postText.trim()
-                      ? "Tiếp tục bản nháp của bạn..."
-                      : "Bạn đang nghĩ gì?"}
-                  </button>
-                  <button
-                    type="button"
-                    className="profile-post-photo"
-                    aria-label="Tạo bài viết có ảnh hoặc video"
-                    onClick={() => setProfileComposerOpen(true)}
-                  >
-                    <Images size={23} />
-                  </button>
-                </div>
-                <div className="personal-timeline-label">
-                  <h2>Dòng thời gian</h2>
-                  <button
-                    type="button"
-                    aria-label="Tải lại dòng thời gian"
-                    disabled={profilePostsBusy || !!pendingPost}
-                    onClick={() => void loadProfilePosts(false, true)}
-                  >
-                    <RefreshCw size={18} />
-                  </button>
-                </div>
-                {profilePostsError && (
-                  <div className="personal-timeline-error" role="alert">
-                    <p>{profilePostsError}</p>
-                    <button
-                      type="button"
-                      disabled={profilePostsBusy}
-                      onClick={() =>
-                        void loadProfilePosts(profilePosts.length > 0, true)
-                      }
-                    >
-                      Thử lại
-                    </button>
-                  </div>
-                )}
-
-                <div className="feed zalo-feed">
-                  {pendingPost && (
-                    <article
-                      className="post zalo-post outgoing-preview"
-                      aria-busy="true"
-                    >
-                      <UserAvatar
-                        username={name}
-                        name={userLabel(
-                          profileMedia?.displayName || session.user.displayName,
-                          name,
-                        )}
-                        className="avatar"
-                      />
-                      <div className="post-body">
-                        <strong>{userLabel(profileMedia?.displayName || session.user.displayName, name)}</strong>
-                        <p>{pendingPost.content}</p>
-                        <MediaAttachmentsView items={pendingPost.attachments} />
-                      </div>
-                    </article>
-                  )}
-                  {renderPosts(visibleProfilePosts)}
-                </div>
-                {!profilePostsBusy &&
-                  !profilePostsError &&
-                  profilePosts.length === 0 &&
-                  !pendingPost && (
-                    <SocoEmptyState
-                      title="Chưa có bài viết nào"
-                      description="Chia sẻ khoảnh khắc đầu tiên lên trang cá nhân của bạn."
-                      action={
-                        <SocoTextAction
-                          onClick={() => setProfileComposerOpen(true)}
-                        >
-                          Đăng bài đầu tiên
-                        </SocoTextAction>
-                      }
-                    />
-                  )}
-                {profileHasMore && (
-                  <button
-                    type="button"
-                    className="soco-load-more soco-feed-load-more"
-                    disabled={profilePostsBusy || !!pendingPost}
-                    onClick={() => void loadProfilePosts(true)}
-                  >
-                    Xem bài viết cũ hơn
-                  </button>
-                )}
-              </section>
-            ) : (
-              <>
-                {isProfileDesktop && desktopProfileSettings ? (
-                  <section className="profile-editor-settings-entry">
-                    <div>
-                      <strong>Thông tin hồ sơ</strong>
-                      <p>
-                        Thay đổi tên, tên người dùng, tiểu sử, thành phố và ảnh
-                        hồ sơ trong trang chỉnh sửa.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDesktopProfileSettings(false);
-                        setProfileEditorOpen(true);
-                      }}
-                    >
-                      Chỉnh sửa hồ sơ
-                    </button>
-                  </section>
-                ) : (
-                  profileIdentityForm
-                )}
-
-                <div className="soco-profile-section-label">
-                  TÙY CHỌN & CÀI ĐẶT
-                </div>
-                <section className="settings-card">
-                  {profilePrivacyControls}
-                  <AccountSessionsPanel
-                    sessionsBusy={sessionsBusy}
-                    canManageSessions={
-                      isDesktopBuild || Boolean(session.refreshToken)
-                    }
-                    sessionsOpen={sessionsOpen}
-                    setSessionsOpen={setSessionsOpen}
-                    fetchAccountSessions={fetchAccountSessions}
-                    sessionsError={sessionsError}
-                    managedSessions={managedSessions}
-                    revokeAccountSessions={revokeAccountSessions}
-                  />
-                  <BlockedUsersPanel
-                    blockedBusy={blockedBusy}
-                    blockedOpen={blockedOpen}
-                    setBlockedOpen={setBlockedOpen}
-                    loadBlockedUsers={loadBlockedUsers}
-                    blockedError={blockedError}
-                    blockedUsers={blockedUsers}
-                    unblockContact={unblockContact}
-                  />
-                  <button
-                    type="button"
-                    className="settings-row settings-row-button app-locale-row"
-                    onClick={() => {
-                      setLocaleSearch("");
-                      setLocalePickerOpen(true);
-                    }}
-                  >
-                    <div>
-                      <strong>{t("profile.appLanguage")}</strong>
-                      <small>{t("profile.appLanguageHint")}</small>
-                    </div>
-                    <span className="settings-current-locale">
-                      <b aria-hidden="true">
-                        {selectedAppLanguage?.flag || "🌐"}
-                      </b>
-                      <span>
-                        {appLocale === "auto"
-                          ? t("common.auto")
-                          : selectedAppLanguage?.localizedLanguage}
-                        {uiLocaleLoading ? " · …" : ""}
-                      </span>
-                      <i aria-hidden="true">›</i>
-                    </span>
-                  </button>
-
-                  <div className="settings-row">
-                    <div>
-                      <strong>
-                        {isDesktopBuild
-                          ? "Thông báo Desktop"
-                          : t("profile.notifications")}
-                      </strong>
-                      <small>
-                        {isDesktopBuild
-                          ? "Ẩn nội dung và tên người gửi. Nhận khi SocCO còn chạy; thoát hẳn sẽ dừng thông báo."
-                          : t("profile.notificationsHint")}
-                      </small>
-                    </div>
-                    <button
-                      type="button"
-                      className={`switch-button ${(isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? "on" : ""}`}
-                      onClick={() =>
-                        isDesktopBuild
-                          ? nativeNotifications.toggle()
-                          : void togglePush()
-                      }
-                      disabled={!isDesktopBuild && pushBusy}
-                      aria-label={
-                        (
-                          isDesktopBuild
-                            ? nativeNotifications.enabled
-                            : pushEnabled
-                        )
-                          ? "Tắt thông báo"
-                          : "Bật thông báo"
-                      }
-                      role="switch"
-                      aria-checked={
-                        isDesktopBuild
-                          ? nativeNotifications.enabled
-                          : pushEnabled
-                      }
-                    >
-                      <span />
-                    </button>
-                  </div>
-                  {isDesktopBuild && nativeNotifications.warning && (
-                    <div className="settings-row" role="status">
-                      <small>{nativeNotifications.warning}</small>
-                    </div>
-                  )}
-                  <div className="settings-row message-sound-row">
-                    <div>
-                      <strong>{t("profile.messageSound")}</strong>
-                      <small>{t("profile.messageSoundHint")}</small>
-                    </div>
-                    <button
-                      type="button"
-                      className={`switch-button ${messageSoundEnabled ? "on" : ""}`}
-                      onClick={toggleMessageSound}
-                      aria-label={
-                        messageSoundEnabled
-                          ? t("profile.soundOff")
-                          : t("profile.soundOn")
-                      }
-                      role="switch"
-                      aria-checked={messageSoundEnabled}
-                    >
-                      <span />
-                    </button>
-                  </div>
-                  {messageSoundEnabled && (
-                    <div className="settings-row message-sound-preview-row">
-                      <div>
-                        <strong>{t("profile.soundPreview")}</strong>
-                        <small>{t("profile.soundPreviewHint")}</small>
-                      </div>
-                      <button
-                        type="button"
-                        className="settings-action message-sound-preview-button"
-                        onClick={() => void previewMessageSound()}
-                        aria-label={t("profile.soundPreview")}
-                      >
-                        <Volume2 size={17} aria-hidden="true" />
-                        {t("profile.soundPreview")}
-                      </button>
-                    </div>
-                  )}
-                  {!isDesktopBuild && (
-                    <div className="settings-row">
-                      <div>
-                        <strong>{t("profile.testNotification")}</strong>
-                        <small>{t("profile.testNotificationHint")}</small>
-                      </div>
-                      <button
-                        type="button"
-                        className="settings-action"
-                        onClick={() => void sendTestPush()}
-                        disabled={pushBusy || !pushEnabled}
-                      >
-                        {t("common.test")}
-                      </button>
-                    </div>
-                  )}
-                  <div className="settings-row">
-                    <div>
-                      <strong>{t("profile.autoTranslate")}</strong>
-                    </div>
-                    <button
-                      type="button"
-                      className={`switch-button ${autoTranslate ? "on" : ""}`}
-                      onClick={() => changeAutoTranslate(!autoTranslate)}
-                      aria-label={t("profile.autoTranslate")}
-                      role="switch"
-                      aria-checked={autoTranslate}
-                    >
-                      <span />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className="settings-row settings-row-button translation-locale-row"
-                    onClick={() => {
-                      setTranslationSettingsSearch("");
-                      setTranslationPickerOpen(true);
-                    }}
-                  >
-                    <div>
-                      <strong>{t("profile.translationLanguage")}</strong>
-                      <small>{t("profile.translationLanguageHint")}</small>
-                    </div>
-                    <span className="settings-current-locale">
-                      <b aria-hidden="true">{selectedLanguage?.flag || "🌐"}</b>
-                      <span>
-                        {selectedLanguage?.localizedLanguage ||
-                          targetLanguage.toUpperCase()}
-                      </span>
-                      <i aria-hidden="true">›</i>
-                    </span>
-                  </button>
-                  {!isStandalone && (
-                    <button
-                      type="button"
-                      className="settings-row settings-row-button settings-install-row"
-                      onClick={() => void installApp()}
-                    >
-                      <span className="settings-account-label">
-                        <Download size={19} aria-hidden="true" />
-                        {t("profile.install")}
-                      </span>
-                      <span
-                        className="settings-account-chevron"
-                        aria-hidden="true"
-                      >
-                        ›
-                      </span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="settings-row settings-row-button settings-logout-row"
-                    onClick={() => logout()}
-                  >
-                    <span className="settings-account-label">
-                      <LogOut size={19} aria-hidden="true" />
-                      {t("profile.logout")}
-                    </span>
-                    <span
-                      className="settings-account-chevron"
-                      aria-hidden="true"
-                    >
-                      ›
-                    </span>
-                  </button>
-                </section>
-              </>
-            )}
-
-            {translationPickerOpen && (
-              <div
-                className="locale-picker-overlay"
-                role="dialog"
-                aria-modal="true"
-                aria-label={t("profile.translationLanguage")}
-              >
-                <button
-                  type="button"
-                  className="locale-picker-backdrop"
-                  aria-label={t("common.close")}
-                  onClick={() => setTranslationPickerOpen(false)}
-                />
-                <section className="locale-picker-sheet">
-                  <header>
-                    <div>
-                      <strong>{t("profile.translationLanguage")}</strong>
-                      <small>{t("translation.subtitle")}</small>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={t("common.close")}
-                      onClick={() => setTranslationPickerOpen(false)}
-                    >
-                      ×
-                    </button>
-                  </header>
-
-                  <label className="locale-picker-search">
-                    <span aria-hidden="true">⌕</span>
-                    <input
-                      type="search"
-                      value={translationSettingsSearch}
-                      onChange={(event) =>
-                        setTranslationSettingsSearch(event.target.value)
-                      }
-                      placeholder={t("translation.searchPlaceholder")}
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                    />
-                    {translationSettingsSearch && (
-                      <button
-                        type="button"
-                        aria-label="Xóa tìm kiếm"
-                        onClick={() => setTranslationSettingsSearch("")}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </label>
-
-                  <div className="locale-picker-list">
-                    {visibleTranslationSettingsOptions.map((language) => (
-                      <button
-                        key={language.value}
-                        type="button"
-                        className={`locale-option ${targetLanguage === language.value ? "active" : ""}`}
-                        onClick={() => changeTargetLanguage(language.value)}
-                      >
-                        <span className="locale-option-flag" aria-hidden="true">
-                          {language.flag}
-                        </span>
-                        <span className="locale-option-copy">
-                          <strong>{language.localizedLanguage}</strong>
-                          <small>{language.nativeLanguage}</small>
-                          <em>
-                            {language.localizedRegion} · {language.nativeRegion}
-                          </em>
-                        </span>
-                        <b>{language.code}</b>
-                        {targetLanguage === language.value && (
-                          <i aria-hidden="true">✓</i>
-                        )}
-                      </button>
-                    ))}
-                    {visibleTranslationSettingsOptions.length === 0 && (
-                      <div className="locale-picker-empty">
-                        {t("translation.noResults")}
-                      </div>
-                    )}
-                  </div>
-
-                  <footer>{t("translation.languageHint")}</footer>
-                </section>
-              </div>
-            )}
-
-            {localePickerOpen && (
-              <div
-                className="locale-picker-overlay"
-                role="dialog"
-                aria-modal="true"
-                aria-label={t("locale.title")}
-              >
-                <button
-                  type="button"
-                  className="locale-picker-backdrop"
-                  aria-label={t("common.close")}
-                  onClick={() => setLocalePickerOpen(false)}
-                />
-                <section className="locale-picker-sheet">
-                  <header>
-                    <div>
-                      <strong>{t("locale.title")}</strong>
-                      <small>{t("locale.subtitle")}</small>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={t("common.close")}
-                      onClick={() => setLocalePickerOpen(false)}
-                    >
-                      ×
-                    </button>
-                  </header>
-
-                  <label className="locale-picker-search">
-                    <span aria-hidden="true">⌕</span>
-                    <input
-                      type="search"
-                      value={localeSearch}
-                      onChange={(event) => setLocaleSearch(event.target.value)}
-                      placeholder={t("locale.searchPlaceholder")}
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                    />
-                    {localeSearch && (
-                      <button
-                        type="button"
-                        aria-label="Xóa tìm kiếm"
-                        onClick={() => setLocaleSearch("")}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </label>
-
-                  {!localeSearch && (
-                    <button
-                      type="button"
-                      className={`locale-option locale-auto-option ${appLocale === "auto" ? "active" : ""}`}
-                      onClick={() => void changeAppLocale("auto")}
-                    >
-                      <span className="locale-option-flag" aria-hidden="true">
-                        ⚙️
-                      </span>
-                      <span className="locale-option-copy">
-                        <strong>{t("locale.device")}</strong>
-                        <small>{t("locale.deviceHint")}</small>
-                        <em>
-                          {selectedAppLanguage?.flag}{" "}
-                          {selectedAppLanguage?.localizedLanguage}
-                        </em>
-                      </span>
-                      {appLocale === "auto" && <i aria-hidden="true">✓</i>}
-                    </button>
-                  )}
-
-                  <div className="locale-picker-list">
-                    {visibleLocaleOptions.map((language) => (
-                      <button
-                        key={language.value}
-                        type="button"
-                        className={`locale-option ${appLocale === language.value ? "active" : ""}`}
-                        onClick={() => void changeAppLocale(language.value)}
-                      >
-                        <span className="locale-option-flag" aria-hidden="true">
-                          {language.flag}
-                        </span>
-                        <span className="locale-option-copy">
-                          <strong>{language.localizedLanguage}</strong>
-                          <small>{language.nativeLanguage}</small>
-                          <em>
-                            {language.localizedRegion} · {language.nativeRegion}
-                          </em>
-                        </span>
-                        <b>{language.code}</b>
-                        {appLocale === language.value && (
-                          <i aria-hidden="true">✓</i>
-                        )}
-                      </button>
-                    ))}
-                    {visibleLocaleOptions.length === 0 && (
-                      <div className="locale-picker-empty">
-                        {t("locale.noResults")}
-                      </div>
-                    )}
-                  </div>
-
-                  <footer>{t("locale.dynamicHint")}</footer>
-                </section>
-              </div>
-            )}
-          </div>
+          <ProfileSection
+          apiFetch={apiFetch}
+          appLocale={appLocale}
+          autoTranslate={autoTranslate}
+          avatarFileInputRef={avatarFileInputRef}
+          blockedBusy={blockedBusy}
+          blockedError={blockedError}
+          blockedOpen={blockedOpen}
+          blockedUsers={blockedUsers}
+          changeAppLocale={changeAppLocale}
+          changeAutoTranslate={changeAutoTranslate}
+          changeTargetLanguage={changeTargetLanguage}
+          closeProfileTimeline={closeProfileTimeline}
+          coverFileInputRef={coverFileInputRef}
+          desktopProfileSettings={desktopProfileSettings}
+          fetchAccountSessions={fetchAccountSessions}
+          installApp={installApp}
+          isProfileDesktop={isProfileDesktop}
+          isStandalone={isStandalone}
+          loadBlockedUsers={loadBlockedUsers}
+          loadProfilePosts={loadProfilePosts}
+          localePickerOpen={localePickerOpen}
+          localeSearch={localeSearch}
+          logout={logout}
+          managedSessions={managedSessions}
+          mediaUploading={mediaUploading}
+          messageSoundEnabled={messageSoundEnabled}
+          name={name}
+          nativeNotifications={nativeNotifications}
+          pendingPost={pendingPost}
+          postText={postText}
+          previewMessageSound={previewMessageSound}
+          privacy={privacy}
+          privacyBusy={privacyBusy}
+          privacyError={privacyError}
+          privacyLoading={privacyLoading}
+          profileBusy={profileBusy}
+          profileHasMore={profileHasMore}
+          profileHeadingRef={profileHeadingRef}
+          profileIdentityForm={profileIdentityForm}
+          profileIdentityRef={profileIdentityRef}
+          profileMedia={profileMedia}
+          profilePosts={profilePosts}
+          profilePostsBusy={profilePostsBusy}
+          profilePostsError={profilePostsError}
+          profilePrivacyControls={profilePrivacyControls}
+          profileTimelineOpen={profileTimelineOpen}
+          pushBusy={pushBusy}
+          pushEnabled={pushEnabled}
+          renderPosts={renderPosts}
+          revokeAccountSessions={revokeAccountSessions}
+          savePrivacy={savePrivacy}
+          selectedAppLanguage={selectedAppLanguage}
+          selectedLanguage={selectedLanguage}
+          sendTestPush={sendTestPush}
+          session={session}
+          sessionsBusy={sessionsBusy}
+          sessionsError={sessionsError}
+          sessionsOpen={sessionsOpen}
+          setBlockedOpen={setBlockedOpen}
+          setDesktopProfileSettings={setDesktopProfileSettings}
+          setGlobalSearch={setGlobalSearch}
+          setLocalePickerOpen={setLocalePickerOpen}
+          setLocaleSearch={setLocaleSearch}
+          setPrivacyRetry={setPrivacyRetry}
+          setProfileComposerOpen={setProfileComposerOpen}
+          setProfileEditorOpen={setProfileEditorOpen}
+          setProfileTimelineOpen={setProfileTimelineOpen}
+          setSessionsOpen={setSessionsOpen}
+          setTranslationPickerOpen={setTranslationPickerOpen}
+          setTranslationSettingsSearch={setTranslationSettingsSearch}
+          switchTab={switchTab}
+          t={t}
+          targetLanguage={targetLanguage}
+          toggleMessageSound={toggleMessageSound}
+          togglePush={togglePush}
+          translationPickerOpen={translationPickerOpen}
+          translationSettingsSearch={translationSettingsSearch}
+          uiLocaleLoading={uiLocaleLoading}
+          unblockContact={unblockContact}
+          updateProfileImage={updateProfileImage}
+          visibleLocaleOptions={visibleLocaleOptions}
+          visibleProfilePosts={visibleProfilePosts}
+          visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
+        />
         )}
       </section>
 
       {storyDraftFile && tab === "feed" && (
-        <ProfileOverlay title="Tạo Story" busy={storyBusy || mediaUploading === "story"}
-          onClose={() => setStoryDraftFile(null)}>
-          <StoryComposer file={storyDraftFile} busy={storyBusy || mediaUploading === "story"}
-            onPublish={() => void createStory(storyDraftFile)}
-            onChangeFile={setStoryDraftFile} />
-        </ProfileOverlay>
-      )}
+          <StoryDraftOverlay
+          createStory={createStory}
+          mediaUploading={mediaUploading}
+          setStoryDraftFile={setStoryDraftFile}
+          storyBusy={storyBusy}
+          storyDraftFile={storyDraftFile}
+        />
+        )}
       {feedComposerOpen && tab === "feed" && (
-        <ProfileOverlay
-          title={editingPost ? "Chỉnh sửa bài viết" : "Tạo bài viết"}
-          busy={!!pendingPost || postEditBusy || mediaUploading === "feed"}
-          onClose={() => {
-            setFeedComposerOpen(false);
-            if (editingPost) restoreDraftAfterEdit();
-            else setFeedCheckInOpen(false);
-          }}
-        >
-          {postComposer}
-        </ProfileOverlay>
-      )}
+          <FeedComposerOverlay
+          editingPost={editingPost}
+          mediaUploading={mediaUploading}
+          pendingPost={pendingPost}
+          postComposer={postComposer}
+          postEditBusy={postEditBusy}
+          restoreDraftAfterEdit={restoreDraftAfterEdit}
+          setFeedCheckInOpen={setFeedCheckInOpen}
+          setFeedComposerOpen={setFeedComposerOpen}
+        />
+        )}
       {profileComposerOpen &&
         tab === "profile" &&
         (profileTimelineOpen || desktopProfileOverview) && (
-          <ProfileOverlay
-            title={editingPost ? "Chỉnh sửa bài viết" : "Tạo bài viết"}
-            busy={!!pendingPost || postEditBusy || mediaUploading === "feed"}
-            onClose={() => {
-              setProfileComposerOpen(false);
-              if (editingPost) restoreDraftAfterEdit();
-            }}
-          >
-            {postComposer}
-          </ProfileOverlay>
+          <ProfileComposerOverlay
+          editingPost={editingPost}
+          mediaUploading={mediaUploading}
+          pendingPost={pendingPost}
+          postComposer={postComposer}
+          postEditBusy={postEditBusy}
+          restoreDraftAfterEdit={restoreDraftAfterEdit}
+          setProfileComposerOpen={setProfileComposerOpen}
+        />
         )}
       {profileEditorOpen &&
         !isProfileDesktop &&
