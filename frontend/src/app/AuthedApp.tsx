@@ -404,7 +404,9 @@ export default function AuthedApp({
   const activeChannelIdRef = useRef(selectedChannelId);
   activeChannelIdRef.current = selectedChannelId;
   const activeConversationTypeRef = useRef<'group' | 'direct' | null>(null);
-  const [groupChannelUnreadAvailable, setGroupChannelUnreadAvailable] = useState(true);
+  const [groupChannelUnreadStatus, setGroupChannelUnreadStatus] = useState<{ conversationId: number; available: boolean } | null>(null);
+  const groupChannelUnreadAvailable = groupChannelUnreadStatus?.conversationId === activeConversationId
+    ? groupChannelUnreadStatus.available : true;
   const groupChannels = groupChannelState.conversationId === activeConversationId
     ? groupChannelState.channels
     : validGroupChannels([], activeConversationId ?? 0);
@@ -1117,7 +1119,6 @@ export default function AuthedApp({
   useEffect(() => {
     const id = activeConversation?.type === 'group' ? activeConversation.id : null;
     setGroupChannelState({ conversationId: id, channels: validGroupChannels([], id ?? 0) });
-    setGroupChannelUnreadAvailable(true);
     if (!id || !session?.token) return;
     const controller = new AbortController();
     const reload = async () => {
@@ -1127,7 +1128,7 @@ export default function AuthedApp({
         const raw = await response.json();
         const channels = validGroupChannels(raw, id);
         if (!controller.signal.aborted) {
-          setGroupChannelUnreadAvailable(Array.isArray(raw) && raw.every(channel => typeof channel.unreadCount === 'number'));
+          setGroupChannelUnreadStatus({ conversationId: id, available: Array.isArray(raw) && raw.every(channel => typeof channel.unreadCount === 'number') });
           setGroupChannelState({ conversationId: id, channels });
           if (channelSelection.conversationId === id && !channels.some(channel => channel.id === channelSelection.channelId))
             setChannelSelection({ conversationId: id, channelId: 0 });

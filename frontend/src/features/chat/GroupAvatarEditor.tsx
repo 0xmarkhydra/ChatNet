@@ -48,12 +48,7 @@ export default function GroupAvatarEditor({ target, busy, onSave, onClose }: Pro
   useEffect(() => {
     chooseRef.current?.focus()
   }, [])
-  useEffect(() => {
-    if (!file) { setPreview(''); return }
-    const url = URL.createObjectURL(file)
-    setPreview(url)
-    return () => URL.revokeObjectURL(url)
-  }, [file])
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
   useEffect(() => {
     if (busy) return
     const handleEscape = (event: KeyboardEvent) => {
@@ -72,6 +67,7 @@ export default function GroupAvatarEditor({ target, busy, onSave, onClose }: Pro
     const validation = photoFileError(selected)
     if (validation) {
       setFile(null)
+      setPreview('')
       setRemove(false)
       setError(validation)
       return
@@ -79,6 +75,7 @@ export default function GroupAvatarEditor({ target, busy, onSave, onClose }: Pro
     setError('')
     setRemove(false)
     setImageError(false)
+    setPreview(URL.createObjectURL(selected))
     setFile(selected)
   }
   const onDrop = (event: DragEvent<HTMLButtonElement>) => {
@@ -93,6 +90,7 @@ export default function GroupAvatarEditor({ target, busy, onSave, onClose }: Pro
     choose(dropped[0])
   }
   const reset = () => {
+    setPreview('')
     setFile(null)
     setRemove(false)
     setImageError(false)
@@ -140,7 +138,7 @@ export default function GroupAvatarEditor({ target, busy, onSave, onClose }: Pro
           {target.avatarUrl && (file || remove) && <button type="button" disabled={busy} onClick={reset}
             aria-label="Hoàn tác thay đổi ảnh"><RotateCcw size={16} /> Hoàn tác</button>}
           {target.avatarUrl && !remove && <button type="button" disabled={busy}
-            onClick={() => { setFile(null); setRemove(true); setError(''); setImageError(false) }}>
+            onClick={() => { setFile(null); setPreview(''); setRemove(true); setError(''); setImageError(false) }}>
             <Trash2 size={16} /> Gỡ ảnh
           </button>}
           <button className="group-photo-save" type="button" disabled={busy || (!file && !remove)}
