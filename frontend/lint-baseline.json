@@ -1,8 +1,8 @@
 {
-  "total": 117,
+  "total": 115,
   "byRule": {
     "react-hooks/exhaustive-deps": 64,
-    "react-hooks/set-state-in-effect": 53
+    "react-hooks/set-state-in-effect": 51
   },
   "counts": {
     "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
@@ -22,7 +22,6 @@
     "src/features/chat/components/ConversationDetailsPanel.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/chat/components/GroupActivities.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/chat/components/GroupActivities.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/chat/components/GroupChannelPicker.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/chat/components/GroupGovernancePanel.tsx|react-hooks/set-state-in-effect": 3,
     "src/features/chat/components/GroupManagementDetails.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/chat/components/GroupSettingsPanel.tsx|react-hooks/exhaustive-deps": 1,
@@ -66,7 +65,6 @@
     "src/features/settings/hooks/usePrivacySettings.ts|react-hooks/exhaustive-deps": 1,
     "src/features/settings/hooks/usePrivacySettings.ts|react-hooks/set-state-in-effect": 1,
     "src/platform/DesktopScreenPicker.tsx|react-hooks/exhaustive-deps": 1,
-    "src/shared/ui/MediaViewer.tsx|react-hooks/set-state-in-effect": 1,
-    "src/shared/ui/UserAvatar.tsx|react-hooks/set-state-in-effect": 1
+    "src/shared/ui/MediaViewer.tsx|react-hooks/set-state-in-effect": 1
   }
 }

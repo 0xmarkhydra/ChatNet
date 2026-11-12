@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { ChevronDown, Hash, Plus, X } from 'lucide-react'
 import type { GroupChannel } from '../utils/groupChannels'
 import '../styles/group-channel-picker.css'
@@ -14,13 +15,12 @@ type Props = {
 }
 
 export default function GroupChannelPicker({ conversationId, channels, selectedId, canCreate, busy, onSelect, onCreate }: Props) {
-  const [open, setOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
+  const [open, setOpen] = useScopedState(conversationId, false)
+  const [creating, setCreating] = useScopedState(conversationId, false)
+  const [name, setName] = useScopedState(conversationId, '')
+  const [description, setDescription] = useScopedState(conversationId, '')
   const root = useRef<HTMLDivElement>(null)
   const selected = channels.find(channel => channel.id === selectedId)
-  useEffect(() => { setOpen(false); setCreating(false); setName(''); setDescription('') }, [conversationId])
   useEffect(() => {
     if (!open) return
     const onPointer = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) { setOpen(false); setCreating(false) } }
@@ -28,7 +28,7 @@ export default function GroupChannelPicker({ conversationId, channels, selectedI
     document.addEventListener('pointerdown', onPointer)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey) }
-  }, [open])
+  }, [open, setOpen, setCreating])
 
   async function create(event: FormEvent) {
     event.preventDefault()
