@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { Session } from '../../auth/lib/session'
 import type { Conversation, Message } from '../types'
 import { desktopBridge, isDesktopBuild } from '../../../platform/desktop'
+import { findConversation, getUnreadSummary } from '../api/conversations'
 
 const unreadEvent = 'soco:unread-refresh'
 const unavailableEvent = 'soco:notification-unavailable'
@@ -75,7 +76,7 @@ export function useDesktopNotifications(options: Options) {
       if (busy) { dirty = true; return }
       busy = true
       try {
-        const response = await current.current.apiFetch('/api/conversations/unread', { cache: 'no-store', signal: requestSignal() })
+        const response = await getUnreadSummary(current.current.apiFetch, requestSignal())
         if (!response.ok) throw new Error(response.status === 404 ? 'backend-update' : 'network')
         const data = await response.json() as { unreadCount?: unknown }
         if (!Number.isSafeInteger(data.unreadCount) || Number(data.unreadCount) < 0) throw new Error('invalid-count')
@@ -98,7 +99,7 @@ export function useDesktopNotifications(options: Options) {
       void (async () => {
         // The native click contains no message content and grants no membership rights.
         if (!await current.current.checkSession() || !matches() || revision !== accessRevision) return
-        const response = await current.current.apiFetch(`/api/conversations?limit=1&id=${input.conversationId}`, { cache: 'no-store', signal: requestSignal() })
+        const response = await findConversation(current.current.apiFetch, input.conversationId, requestSignal())
         if (!response.ok) throw new Error('unavailable')
         const data = await response.json() as Conversation[]
         if (!matches() || revision !== accessRevision) return

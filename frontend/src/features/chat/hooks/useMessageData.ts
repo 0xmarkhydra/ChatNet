@@ -3,6 +3,7 @@ import type { AppDataContext } from '../../../shared/types/api'
 import type { Tab } from '../../../shared/types/navigation'
 import type { useConversationData } from './useConversationData'
 import { MESSAGE_PAGE_SIZE, type Message, type MessageDraft } from '../types'
+import { listMessages, markChannelRead, markConversationRead } from '../api/messages'
 import { clearPendingSend, loadPendingSend } from '../lib/chatPersistence'
 import { canMarkConversationRead } from '../utils/conversationRead'
 import { isDesktopBuild } from '../../../platform/desktop'
@@ -83,11 +84,10 @@ export function useMessageData({
     const jump = jumpToMessage?.conversationId === activeConversationId ? jumpToMessage : null
     setMessageGapBefore(null)
     const pageSize = jump ? 80 : MESSAGE_PAGE_SIZE
-    const before = jump ? `&before=${jump.messageId + 1}` : ''
-    const basePath = `/api/conversations/${activeConversationId}/messages?target=${encodeURIComponent(targetLanguage)}&channelId=${activeChannelId}`
+    const page = { conversationId: activeConversationId, target: targetLanguage, channelId: activeChannelId }
     const requestedPages = [
-      apiFetch(`${basePath}&limit=${pageSize}${before}`),
-      ...(jump ? [apiFetch(`${basePath}&limit=200`)] : []),
+      listMessages(apiFetch, { ...page, limit: pageSize, before: jump ? jump.messageId + 1 : undefined }),
+      ...(jump ? [listMessages(apiFetch, { ...page, limit: 200 })] : []),
     ]
     Promise.all(requestedPages)
       .then(async (responses) => {
@@ -147,11 +147,8 @@ export function useMessageData({
         setTranslations(restored)
         if (!canMarkConversationRead(activeConversationIdRef.current, activeConversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) return
         const read = activeConversationType === 'group'
-          ? await apiFetch(`/api/conversations/${activeConversationId}/channel-read`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ channelId: activeChannelId }),
-            })
-          : await apiFetch(`/api/conversations/${activeConversationId}/read`, { method: 'POST' })
+          ? await markChannelRead(apiFetch, activeConversationId, activeChannelId)
+          : await markConversationRead(apiFetch, activeConversationId)
         if (!read.ok || cancelled) return
         refreshDesktopUnread()
         if (activeConversationType === 'group') {
@@ -189,10 +186,9 @@ export function useMessageData({
     const sessionId = session.sessionId
     const markWhenVisible = () => {
       if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) return
-      void apiFetch(activeConversationType === 'group'
-        ? `/api/conversations/${id}/channel-read` : `/api/conversations/${id}/read`, activeConversationType === 'group'
-        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelId: activeChannelId }) }
-        : { method: 'POST' })
+      void (activeConversationType === 'group'
+        ? markChannelRead(apiFetch, id, activeChannelId)
+        : markConversationRead(apiFetch, id))
         .then((response) => {
           if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId ||
             activeChannelIdRef.current !== activeChannelId) return
@@ -224,9 +220,7 @@ export function useMessageData({
     gapPagingBusy.current = true
     setMessageGapLoading(true)
     try {
-      const response = await apiFetch(
-        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&channelId=${activeChannelId}&limit=80&before=${before}`,
-      )
+      const response = await listMessages(apiFetch, { conversationId, target: targetLanguage, channelId: activeChannelId, limit: 80, before })
       if (!response.ok) throw new Error('Không tải được tin nhắn ở giữa')
       const data = (await response.json()) as Message[]
       if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId || activeChannelIdRef.current !== activeChannelId) return
@@ -264,9 +258,7 @@ export function useMessageData({
     messagesPagingBusy.current = true
     setMessagesLoadingMore(true)
     try {
-      const response = await apiFetch(
-        `/api/conversations/${conversationId}/messages?target=${encodeURIComponent(targetLanguage)}&channelId=${activeChannelId}&limit=${MESSAGE_PAGE_SIZE}&before=${before}`,
-      )
+      const response = await listMessages(apiFetch, { conversationId, target: targetLanguage, channelId: activeChannelId, limit: MESSAGE_PAGE_SIZE, before })
       if (!response.ok) throw new Error('Không tải thêm được lịch sử tin nhắn')
       const data = (await response.json()) as Message[]
       if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId || activeChannelIdRef.current !== activeChannelId) return

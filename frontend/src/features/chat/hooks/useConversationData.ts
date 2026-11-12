@@ -1,5 +1,6 @@
 import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { AppDataContext } from '../../../shared/types/api'
+import { listConversations, listMembershipIds } from '../api/conversations'
 import { CHAT_LIST_PAGE_SIZE, type Conversation, type MessageDraft } from '../types'
 type Options = AppDataContext & {
   activeConversationIdRef: RefObject<number | null>
@@ -37,7 +38,7 @@ export function useConversationData({
       // Fetch only IDs, not full message metadata. Never prune on partial
       // snapshots: a failed page is not proof of lost group membership.
       for (let page = 0; page < 200; page += 1) {
-        const response = await apiFetch(`/api/conversations/memberships?limit=500&after=${after}`)
+        const response = await listMembershipIds(apiFetch, after)
         if (!response.ok) return
         const data = (await response.json()) as { ids: number[]; nextAfter: number | null }
         if (!Array.isArray(data.ids) || data.ids.length > 500 ||
@@ -71,7 +72,7 @@ export function useConversationData({
   async function refreshConversations() {
     const sessionId = session?.sessionId
     try {
-      const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}`)
+      const response = await listConversations(apiFetch, CHAT_LIST_PAGE_SIZE)
       if (!response.ok) return
       const data = ((await response.json()) as Conversation[])
         .filter((item) => !revokedConversationIds.current.has(item.id) &&
@@ -94,7 +95,7 @@ export function useConversationData({
     conversationPagingBusy.current = true
     setConversationLoadingMore(true)
     try {
-      const response = await apiFetch(`/api/conversations?limit=${CHAT_LIST_PAGE_SIZE}&offset=${conversationOffset.current}`)
+      const response = await listConversations(apiFetch, CHAT_LIST_PAGE_SIZE, conversationOffset.current)
       if (!response.ok) throw new Error('Không tải thêm được hội thoại')
       const data = (await response.json()) as Conversation[]
       if (sessionRef.current?.sessionId !== sessionId) return

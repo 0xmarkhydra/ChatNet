@@ -2,6 +2,7 @@ import { type SetStateAction } from "react";
 import { type MediaAttachment, type PresignedUpload } from "../../../shared/utils/media";
 import { emptyDraft, type MessageDraft } from "../types";
 import { uploadPresignedFile } from "../lib/mediaUpload";
+import { presignUpload, relayUpload } from "../api/media";
 import { type Post } from "../../feed/types";
 import { type Session } from "../../auth/lib/session";
 import { type ToastKind } from "../../../shared/utils/toast";
@@ -123,17 +124,11 @@ export function useMediaUploads({
 
             const file = files[index];
             const contentType = file.type || "application/octet-stream";
-            const presignResponse = await apiFetch("/api/media/presign", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                scope,
-                name: file.name,
-                sizeBytes: file.size,
-                contentType,
-              }),
-              signal: controller.signal,
-            });
+            const presignResponse = await presignUpload(
+              apiFetch,
+              { scope, name: file.name, sizeBytes: file.size, contentType },
+              controller.signal,
+            );
             if (controller.signal.aborted)
               throw new DOMException("Đã hủy tải tệp.", "AbortError");
             const ticket = (await presignResponse.json().catch(() => null)) as
@@ -158,17 +153,10 @@ export function useMediaUploads({
                   : undefined,
                 uploadThroughAPI: ticket.relayToken
                   ? async () => {
-                      const response = await apiFetch(
-                        '/api/media/relay?ref=' + encodeURIComponent(ticket.storageRef),
-                        {
-                          method: 'PUT',
-                          headers: {
-                            'Content-Type': contentType,
-                            'X-ChatNet-Relay-Token': ticket.relayToken!,
-                          },
-                          body: file,
-                          signal: controller.signal,
-                        },
+                      const response = await relayUpload(
+                        apiFetch,
+                        { storageRef: ticket.storageRef, relayToken: ticket.relayToken!, contentType, body: file },
+                        controller.signal,
                       );
                       if (!response.ok) {
                         const data = (await response.json().catch(() => null)) as { error?: string } | null;

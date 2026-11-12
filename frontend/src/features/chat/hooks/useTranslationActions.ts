@@ -1,6 +1,7 @@
 import { useRef, type SetStateAction } from "react";
 import { isSupportedLanguageCode } from "../../i18n/utils/languages";
 import { saveAppLocalePreference } from "../../i18n/lib/i18n";
+import { savePreferences as savePreferencesRequest, translateText } from "../api/translation";
 import { type ChatTranslationSettings, persistConversationTranslationSettings, type ConversationTranslationSettingsMap } from "../lib/conversationTranslationSettings";
 import { type Message } from "../types";
 import { type Session } from "../../auth/lib/session";
@@ -101,14 +102,10 @@ export function useTranslationActions({
         revision !== preferenceRevision.current
       )
         return;
-      const response = await apiFetch("/api/preferences", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetLanguage: nextTarget,
-          autoTranslate: nextAuto,
-          appLocale: nextAppLocale,
-        }),
+      const response = await savePreferencesRequest(apiFetch, {
+        targetLanguage: nextTarget,
+        autoTranslate: nextAuto,
+        appLocale: nextAppLocale,
       });
       if (
         !response.ok &&
@@ -189,14 +186,10 @@ export function useTranslationActions({
     void saveTranslationPreferences(next, autoTranslate);
   }
   async function requestTranslation(text: string, messageId?: number, showError = true) {
-    const response = await apiFetch("/api/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text,
-        target: effectiveTargetLanguage,
-        ...(messageId ? { messageId } : {}),
-      }),
+    const response = await translateText(apiFetch, {
+      text,
+      target: effectiveTargetLanguage,
+      messageId,
     });
     const result = await response.json().catch(() => null);
     if (sessionRef.current?.sessionId !== session?.sessionId) return null;
