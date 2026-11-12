@@ -39,6 +39,7 @@ import type { GroupActivity } from "./GroupActivities";
 import type { GroupActivityEvent } from "./GroupActivities";
 import type { LanguageOption } from "../../i18n/utils/languages";
 import type { Dispatch, RefObject, ReactNode } from "react";
+import { getGroupAvatarCapability, saveGroupAvatar } from "../api/avatar";
 
 export type ChatSectionProps = {
   activeChatTranslationSettings: ChatTranslationSettings | undefined;
@@ -398,9 +399,7 @@ export default function ChatSection({
     const groupId = activeConversation.id;
     setGroupPhotoBusy(true);
     try {
-      const capabilityResponse = await apiFetch('/api/conversations/' + groupId + '/avatar', {
-        method: 'GET', cache: 'no-store',
-      });
+      const capabilityResponse = await getGroupAvatarCapability(apiFetch, groupId);
       const capability = await capabilityResponse.json().catch(() => null) as
         { canUpdateAvatar?: boolean; error?: string } | null;
       if (capabilityResponse.status === 404 || capabilityResponse.status === 405 ||
@@ -412,11 +411,7 @@ export default function ChatSection({
 
       const [attachment] = file ? await uploadMediaFiles([file], 'profile') : [null];
       if (file && !attachment) throw new Error('Không tải được ảnh.');
-      const response = await apiFetch('/api/conversations/' + groupId + '/avatar', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachment: attachment ? attachmentRequestBody(attachment) : null }),
-      });
+      const response = await saveGroupAvatar(apiFetch, groupId, attachment ? attachmentRequestBody(attachment) : null);
       const data = await response.json().catch(() => null) as
         { conversationId?: number; avatarUrl?: string; avatarSet?: boolean; error?: string } | null;
       if (response.status === 404 || response.status === 405) {

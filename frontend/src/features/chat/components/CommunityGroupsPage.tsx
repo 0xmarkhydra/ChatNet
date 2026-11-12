@@ -7,6 +7,8 @@ import type { FriendConnection } from '../../contacts/types'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../../shared/ui/MediaAttachmentsView'
 import GroupGovernancePanel from './GroupGovernancePanel'
+import { createGroupChannel } from '../api/conversations'
+import { deleteChannel, getCommunity, getNotificationSettings, joinPublicGroup, listChannelMessages, listChannels, listPublicGroups, saveNotificationSettings, sendChannelMessage as sendChannelMessageRequest, updateChannel, updateCommunity } from '../api/community'
 import '../styles/community-groups.css'
 
 export type GroupWorkspaceMode = 'list' | 'create' | 'manage' | 'channel'
@@ -103,9 +105,9 @@ export default function CommunityGroupsPage({
     let cancelled=false
     const load=async()=>{
       const responses=await Promise.allSettled([
-        requestRef.current('/api/conversations/'+groupId+'/community'),
-        requestRef.current('/api/conversations/'+groupId+'/channels'),
-        requestRef.current('/api/conversations/'+groupId+'/notification-settings'),
+        getCommunity(requestRef.current,groupId),
+        listChannels(requestRef.current,groupId),
+        getNotificationSettings(requestRef.current,groupId),
       ])
       if(cancelled)return
       if(responses[0].status==='fulfilled'&&responses[0].value.ok){
@@ -132,7 +134,7 @@ export default function CommunityGroupsPage({
     if(mode!=='list'){setPublicGroups([]);return}
     const ctrl=new AbortController()
     setPublicLoading(true)
-    void requestRef.current('/api/groups/public?limit=30&q='+encodeURIComponent(query),{signal:ctrl.signal}).then(async response=>{
+    void listPublicGroups(requestRef.current,query,ctrl.signal).then(async response=>{
       if(!response.ok)throw new Error('Không tải được nhóm công khai')
       const value=await response.json() as CommunityMetadata[]
       if(!ctrl.signal.aborted)setPublicGroups(Array.isArray(value)?value:[])
@@ -146,7 +148,7 @@ export default function CommunityGroupsPage({
     setChannelUnconfirmed(null)
     if(!groupId||activeChannelId===0)return
     let cancelled=false
-    void requestRef.current('/api/conversations/'+groupId+'/messages?channelId='+activeChannelId+'&limit=100')
+    void listChannelMessages(requestRef.current,groupId,activeChannelId)
       .then(async response=>{if(!response.ok)throw new Error('Không tải được tin kênh');return await response.json() as Message[]})
       .then(value=>{if(!cancelled)setChannelMessages(Array.isArray(value)?value:[])})
       .catch(()=>{if(!cancelled)setChannelError('Không tải được tin nhắn. Thử chọn lại kênh.')})
@@ -158,7 +160,7 @@ export default function CommunityGroupsPage({
     const onChange=(event:Event)=>{
       const id=(event as CustomEvent<{conversationId:number}>).detail?.conversationId
       if(id!==groupId)return
-      void requestRef.current('/api/conversations/'+groupId+'/channels').then(async r=>{
+      void listChannels(requestRef.current,groupId).then(async r=>{
         if(r.ok){const value=await r.json() as Channel[];setChannels(Array.isArray(value)?value:[])}
       }).catch(()=>undefined)
     }
@@ -183,7 +185,7 @@ export default function CommunityGroupsPage({
     if(joiningId!==null)return
     setJoiningId(id)
     try{
-      const response=await request('/api/groups/'+id+'/join',{method:'POST'})
+      const response=await joinPublicGroup(request,id)
       const result=await response.json().catch(()=>null) as {status?:string;error?:string}|null
       if(!response.ok)throw new Error(result?.error||'Không tham gia được cộng đồng.')
       if(result?.status==='member'){notify('Đã tham gia cộng đồng.');await onJoinedGroup(id)}
@@ -196,9 +198,7 @@ export default function CommunityGroupsPage({
     if(!groupId||!canEdit||settingsBusy)return
     setSettingsBusy(true)
     try{
-      const response=await request('/api/conversations/'+groupId+'/community',{
-        method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(metadataDraft)
-      })
+      const response=await updateCommunity(request,groupId,metadataDraft)
       const value=await response.json().catch(()=>null) as CommunityMetadata|null
       if(!response.ok||!value)throw new Error('Không cập nhật được thông tin nhóm.')
       setMetadata(value)
@@ -210,9 +210,7 @@ export default function CommunityGroupsPage({
     if(!groupId||settingsBusy)return
     setSettingsBusy(true)
     try{
-      const response=await request('/api/conversations/'+groupId+'/notification-settings',{
-        method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(preferences)
-      })
+      const response=await saveNotificationSettings(request,groupId,preferences)
       if(!response.ok)throw new Error('Không lưu được tùy chọn thông báo.')
       setPreferences(await response.json() as NotificationPreferences)
       notify('Đã lưu tùy chọn thông báo.')
@@ -220,7 +218,7 @@ export default function CommunityGroupsPage({
     finally{setSettingsBusy(false)}
   }
   async function refreshChannels(id:number) {
-    const response=await request('/api/conversations/'+id+'/channels')
+    const response=await listChannels(request,id)
     if(!response.ok)throw new Error('Không tải được kênh')
     const value=await response.json() as Channel[]
     setChannels(value)
@@ -229,9 +227,7 @@ export default function CommunityGroupsPage({
     if(!groupId||!canEdit||channelBusy||!newChannelName.trim())return
     setChannelBusy(true);setChannelError('')
     try{
-      const response=await request('/api/conversations/'+groupId+'/channels',{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:newChannelName.trim(),description:newChannelDescription.trim()})
-      })
+      const response=await createGroupChannel(request,groupId,{name:newChannelName.trim(),description:newChannelDescription.trim()})
       const result=await response.json().catch(()=>null) as (Channel&{error?:string})|null
       if(!response.ok||!result?.id)throw new Error(result?.error||'Không tạo được kênh.')
       await refreshChannels(groupId)
@@ -247,9 +243,7 @@ export default function CommunityGroupsPage({
     if(name===null||!name.trim())return
     setChannelBusy(true)
     try{
-      const response=await request('/api/conversations/'+groupId+'/channels/'+channel.id,{
-        method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),description:channel.description})
-      })
+      const response=await updateChannel(request,groupId,channel.id,{name:name.trim(),description:channel.description})
       if(!response.ok)throw new Error('Không đổi được tên kênh.')
       await refreshChannels(groupId)
       notify('Đã đổi tên kênh.')
@@ -260,7 +254,7 @@ export default function CommunityGroupsPage({
     if(!groupId||!canEdit||channel.id===0||!window.confirm('Xóa kênh trống "'+channel.name+'"?'))return
     setChannelBusy(true)
     try{
-      const response=await request('/api/conversations/'+groupId+'/channels/'+channel.id,{method:'DELETE'})
+      const response=await deleteChannel(request,groupId,channel.id)
       if(!response.ok)throw new Error('Không thể xóa kênh chứa tin nhắn.')
       await refreshChannels(groupId)
       if(activeChannelId===channel.id)setActiveChannelId(0)
@@ -277,10 +271,7 @@ export default function CommunityGroupsPage({
     setChannelSendBusy(true);setChannelError('')
     setChannelUnconfirmed({clientId,text})
     try{
-      const response=await request('/api/conversations/'+groupId+'/messages',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({text,clientId,channelId:activeChannelId,attachments:[]})
-      })
+      const response=await sendChannelMessageRequest(request,groupId,{text,clientId,channelId:activeChannelId})
       const result=await response.json().catch(()=>null) as Message|null
       if(!response.ok||!result?.id)throw new Error('Chưa xác nhận được tin nhắn, kiểm tra trước khi gửi lại.')
       setChannelMessages(current=>[...current.filter(m=>m.id!==result.id),result].sort((a,b)=>a.id-b.id))

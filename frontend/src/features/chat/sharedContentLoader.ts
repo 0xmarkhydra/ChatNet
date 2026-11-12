@@ -1,3 +1,5 @@
+import { getHistoryBatch, getSharedContent } from './api/shared'
+
 // Prefer the indexed shared-content API. Older deployments can return no
 // results for messages whose channel_id is NULL; recover from chat history.
 export type SharedKind = 'media' | 'files' | 'links'
@@ -48,11 +50,9 @@ export async function loadSharedContent({
   request: RequestFn
   signal?: AbortSignal
 }): Promise<SharedPage> {
-  const suffix = before ? '&before=' + before : ''
-  const url = '/api/conversations/' + conversationId + '/shared?kind=' + kind + '&channelId=' + channelId + '&limit=' + limit + suffix
   let originalError = ''
   try {
-    const response = await request(url, { signal, cache: 'no-store' })
+    const response = await getSharedContent(request, { conversationId, channelId, kind, limit, before }, signal)
     cancelled(signal)
     if (response.status === 401 || response.status === 403) {
       throw new Error('Bạn không có quyền xem nội dung được chia sẻ trong cuộc trò chuyện này.')
@@ -77,9 +77,7 @@ export async function loadSharedContent({
   try {
     for (let pageIndex = 0; pageIndex < MAX_HISTORY_BATCHES; pageIndex += 1) {
       cancelled(signal)
-      const historyUrl = '/api/conversations/' + conversationId + '/messages?channelId=' + channelId +
-        '&limit=' + HISTORY_BATCH + (cursor ? '&before=' + cursor : '')
-      const response = await request(historyUrl, { signal, cache: 'no-store' })
+      const response = await getHistoryBatch(request, { conversationId, channelId, limit: HISTORY_BATCH, cursor }, signal)
       cancelled(signal)
       if (!response.ok) throw new Error('Không thể đọc lịch sử tin nhắn (HTTP ' + response.status + ')')
       const messages = await response.json() as SharedMessage[]

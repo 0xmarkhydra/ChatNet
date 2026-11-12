@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, FileArchive, FileCode2, FileText, Search, UserRound, X } from 'lucide-react'
 import type { GroupMember, Message } from '../types'
+import { listGroupMembers } from '../api/groups'
+import { listChannelSharedFiles, listSharedFilesBefore, searchMessages, searchMoreMessages } from '../api/search'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { userLabel } from '../../../shared/utils/userLabel'
 import '../styles/message-search-panel.css'
@@ -92,7 +94,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
   useEffect(() => {
     let alive = true
     setMembers([])
-    void requestRef.current('/api/conversations/' + conversationId + '/members')
+    void listGroupMembers(requestRef.current, conversationId)
       .then(async (response) => response.ok ? await response.json() as GroupMember[] : [])
       .then((items) => { if (alive && Array.isArray(items)) setMembers(items) })
       .catch(() => { /* Some direct conversations do not expose a members list. */ })
@@ -116,7 +118,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
         if (to) params.set('to', to)
         params.set('tzOffset', String(new Date().getTimezoneOffset()))
         const query = params.toString()
-        const response = await requestRef.current('/api/conversations/' + conversationId + '/messages?' + query)
+        const response = await searchMessages(requestRef.current, conversationId, query)
         if (!response.ok) throw new Error('Không thể tìm tin nhắn. Vui lòng thử lại.')
         const items = await response.json() as Message[]
         if (sequence.current !== id) return
@@ -143,7 +145,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
     setLoadingFiles(true)
     const timer = window.setTimeout(async () => {
       try {
-        const response = await requestRef.current('/api/conversations/' + conversationId + '/shared?kind=files&channelId=' + channelId + '&limit=48')
+        const response = await listChannelSharedFiles(requestRef.current, conversationId, channelId)
         if (!response.ok) throw new Error('Không tải được danh sách file')
         const page = await response.json() as SharedPage
         if (fileSequence.current !== id) return
@@ -196,7 +198,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
     const cursor = Math.min(...results.map((message) => message.id))
     setLoadingMore(true)
     try {
-      const response = await requestRef.current('/api/conversations/' + conversationId + '/messages?' + queryRef.current + '&before=' + cursor)
+      const response = await searchMoreMessages(requestRef.current, conversationId, queryRef.current, cursor)
       if (!response.ok) throw new Error('Không thể tải thêm kết quả')
       const more = await response.json() as Message[]
       setResults((current) => {
@@ -213,7 +215,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
     if (!nextFilesBefore || loadingMore) return
     setLoadingMore(true)
     try {
-      const response = await requestRef.current('/api/conversations/' + conversationId + '/shared?kind=files&limit=48&before=' + nextFilesBefore)
+      const response = await listSharedFilesBefore(requestRef.current, conversationId, nextFilesBefore)
       if (!response.ok) throw new Error('Không thể tải thêm file')
       const page = await response.json() as SharedPage
       setFileMessages((current) => [...current, ...(Array.isArray(page.items) ? page.items : [])])
