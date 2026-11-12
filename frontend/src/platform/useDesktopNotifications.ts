@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import type { Session } from '../features/auth/session'
+import type { Session } from '../features/auth/lib/session'
 import type { Conversation, Message } from '../features/chat/types'
 import { desktopBridge, isDesktopBuild } from './desktop'
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { shouldSendChatOnEnter } from '../src/features/chat/composerKeyboard.ts'
+import { shouldSendChatOnEnter } from '../src/features/chat/utils/composerKeyboard.ts'
 
 const enter = { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, isComposing: false }
 assert.equal(shouldSendChatOnEnter(enter), true, 'Enter sends the message')

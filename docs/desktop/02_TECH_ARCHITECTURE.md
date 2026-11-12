@@ -88,7 +88,7 @@ Các event Main → Renderer chỉ gồm: `notification-clicked(conversationId)`
 
 ## 5. Auth & secure storage — rào chắn P0
 
-**Hiện trạng cần xử lý:** `frontend/src/features/auth/session.ts` và UI vẫn dùng `localStorage('chatnet-session')` chứa session/refresh token. Không được coi đóng gói React nguyên trạng là production-secure Desktop.
+**Hiện trạng cần xử lý:** `frontend/src/features/auth/lib/session.ts` và UI vẫn dùng `localStorage('chatnet-session')` chứa session/refresh token. Không được coi đóng gói React nguyên trạng là production-secure Desktop.
 
 Lộ trình triển khai:
 1. Tách một `SessionStorageAdapter` / boundary tối thiểu mà **Web vẫn giữ cơ chế tương thích**; không thay backend auth contract.
