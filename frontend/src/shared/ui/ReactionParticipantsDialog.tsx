@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { messageReactionLabel } from '../../features/chat/utils/messageReactions'
 import UserAvatar from './UserAvatar'
+import { useScopedState } from '../hooks/useScopedState'
 import { userLabel } from '../utils/userLabel'
 import './reaction-participants.css'
 
@@ -36,10 +37,11 @@ export default function ReactionParticipantsDialog({
   onClose: () => void
 }) {
   const [selectedEmoji, setSelectedEmoji] = useState(initialEmoji)
-  const [users, setUsers] = useState<ReactionUser[]>([])
-  const [hasMore, setHasMore] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const reactionScope = `${kind}:${id}:${selectedEmoji}`
+  const [users, setUsers] = useScopedState<ReactionUser[]>(reactionScope, [])
+  const [hasMore, setHasMore] = useScopedState(reactionScope, false)
+  const [loading, setLoading] = useScopedState(reactionScope, true)
+  const [error, setError] = useScopedState(reactionScope, '')
   const pending = useRef<AbortController | null>(null)
   const requestRef = useRef(request)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -81,7 +83,7 @@ export default function ReactionParticipantsDialog({
         setLoading(false)
       }
     }
-  }, [kind, id, selectedEmoji])
+  }, [kind, id, selectedEmoji, setLoading, setError, setUsers, setHasMore])
 
   useEffect(() => {
     const previousFocus = document.activeElement
@@ -95,14 +97,8 @@ export default function ReactionParticipantsDialog({
   useEffect(() => {
     pending.current?.abort()
     pending.current = null
-    let cancelled = false
-    queueMicrotask(() => {
-      if (cancelled) return
-      setUsers([])
-      setHasMore(false)
-      void loadPage(0)
-    })
-    return () => { cancelled = true; pending.current?.abort() }
+    void loadPage(0)
+    return () => { pending.current?.abort() }
   }, [loadPage])
 
   const total = reactions.reduce((sum, item) => sum + item.count, 0)

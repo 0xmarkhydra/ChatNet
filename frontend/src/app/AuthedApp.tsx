@@ -311,6 +311,7 @@ import { useTranslationState } from "../features/chat/hooks/useTranslationState"
 import { useProfileState } from "../features/profile/hooks/useProfileState";
 import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
 import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
+import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
 import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
@@ -460,20 +461,11 @@ export default function AuthedApp({
   const [reactionPreviews, setReactionPreviews] = useState<
     Record<number, MessageReaction[]>
   >({});
-  const [forwardSource, setForwardSource] = useState<Message | null>(null);
-  const [reactionTarget, setReactionTarget] = useState<{
+  const [forwardSource, setForwardSource] = useScopedState<Message | null>(session?.sessionId ?? null, null);
+  const [reactionTarget, setReactionTarget] = useScopedState<{
     kind: "message" | "post"; id: number; initialEmoji?: string;
     reactions?: { emoji: string; count: number }[];
-  } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setReactionTarget(null);
-      setForwardSource(null);
-    });
-    return () => { cancelled = true; };
-  }, [session?.sessionId]);
+  } | null>(session?.sessionId ?? null, null);
   const messageChanges = useRef(new Set<number>());
   const actionLocks = useRef(new Set<string>());
   const messageReceipts = useRef(new Map<string, Message | null>());
