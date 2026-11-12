@@ -27,6 +27,8 @@ import { isDesktopBuild } from '../../../platform/desktop'
 import { requireDesktopMedia } from '../../../platform/desktopMedia'
 import CallDeviceSettings from './CallDeviceSettings'
 import { ParticipantTile, RemoteAudioSinks, identityLabel } from './CallMediaTracks'
+import { appendCallCaption, type CallCaption } from '../lib/callCaptions'
+import { waitForEnvelope } from '../lib/waitForCallEnvelope'
 import type { CallLaunchDetail } from './CallHeaderActions'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { notifyDesktopCall, dismissDesktopCall } from '../../chat/hooks/useDesktopNotifications'
@@ -45,13 +47,6 @@ type CallManagerProps = {
   conversations: ConversationLite[]
 }
 
-type CallCaption = {
-  id: string
-  speakerId: string
-  original: string
-  translated: string
-  updatedAt: number
-}
 const CONSENT_TOPIC = 'chatnet.call.translation.consent.v1'
 export { default as CallHeaderActions } from './CallHeaderActions'
 
@@ -1131,53 +1126,6 @@ function SecureCallRoom({
       </div>
     </div>
   )
-}
-
-function appendCallCaption(current: CallCaption[], update: InterpreterUpdate): CallCaption[] {
-  const text = (update.translated || update.original || '').trim()
-  if (!text) return current
-  const now = Date.now()
-  const previous = current.at(-1)
-  if (previous && previous.speakerId === update.speakerId && now - previous.updatedAt < 3500) {
-    const field = update.translated ? 'translated' : 'original'
-    const last = previous[field]
-    const nextText = text.startsWith(last) ? text : (last ? last + ' ' : '') + text
-    return [...current.slice(0, -1), { ...previous, [field]: nextText.slice(-1200), updatedAt: now }]
-  }
-  return [...current, {
-    id: crypto.randomUUID(),
-    speakerId: update.speakerId,
-    original: update.original || '',
-    translated: update.translated || '',
-    updatedAt: now,
-  }].slice(-80)
-}
-
-async function waitForEnvelope(
-  request: CallRequest,
-  callId: string,
-  userId: number,
-  keyPair: EphemeralCallKeyPair,
-  timeoutMs: number,
-): Promise<{ key: Uint8Array; generation: string }> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const result = await getE2EEEnvelope(request, callId)
-    const envelope = result.envelope
-    if (envelope) {
-      const keys = await listE2EEPublicKeys(request, callId)
-      const sender = keys.find((item) => item.userId === envelope.senderUserId)
-      if (sender) {
-        const key = await unwrapMediaKey(
-          envelope.iv, envelope.ciphertext, keyPair.privateKey, sender.publicKey,
-          callId, envelope.senderUserId, userId,
-        )
-        return { key, generation: envelope.generation }
-      }
-    }
-    await new Promise((resolve) => window.setTimeout(resolve, 550))
-  }
-  throw new Error('Không nhận được khóa E2EE từ host. Cuộc gọi không được hạ xuống chế độ kém an toàn.')
 }
 
 function friendlyCallError(error: unknown) {

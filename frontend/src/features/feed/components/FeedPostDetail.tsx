@@ -14,6 +14,7 @@ export type FeedPostDetailProps = {
   friendTaggedNames: { [k: string]: string; };
   like: (post: Post, emoji?: string) => Promise<void>;
   likePreviews: Record<number, boolean>;
+  onReactionUsers: (post: Post) => void;
   name: string;
   openEditPost: (post: Post) => void;
   openVisitor: (username: string) => void;
@@ -36,6 +37,7 @@ export default function FeedPostDetail({
   friendTaggedNames,
   like,
   likePreviews,
+  onReactionUsers,
   name,
   openEditPost,
   openVisitor,
@@ -64,6 +66,7 @@ export default function FeedPostDetail({
             onAuthorOpen={openVisitor}
             likeBusy={likePreviews[activePost.id] !== undefined}
             onLike={(post, emoji) => like(post, emoji)}
+            onReactionUsers={onReactionUsers}
             onUpdated={syncFeedPost}
             onEditPost={openEditPost}
             taggedNames={friendTaggedNames}

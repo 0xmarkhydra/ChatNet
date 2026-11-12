@@ -27,6 +27,7 @@ type Props = {
   setActivePostId: (id: number) => void;
   likePreviews: Record<number, boolean>;
   like: (post: Post, emoji?: string) => Promise<void>;
+  onReactionUsers: (post: Post) => void;
   showSave?: boolean;
   onEditPost?: (post: Post) => void;
   taggedNames?: Record<string, string>;
@@ -63,6 +64,7 @@ export default function FeedPostCard({
   setActivePostId,
   likePreviews,
   like,
+  onReactionUsers,
   onEditPost,
   taggedNames,
 }: Props) {
@@ -104,10 +106,12 @@ export default function FeedPostCard({
           </div>
         )}
         <div className="post-engagement-summary feed-post-engagement">
-          <span className="feed-post-likes">
+          <button type="button" className="feed-post-likes feed-reaction-users-trigger"
+            disabled={post.likes === 0} aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`}
+            onClick={() => onReactionUsers(post)}>
             <Heart size={22} aria-hidden="true" />
             <span>{formatCount(post.likes)} lượt thích</span>
-          </span>
+          </button>
           <span className="feed-post-conversation-stats">
             {commentsCount.toLocaleString('vi-VN')} bình luận · Chia sẻ
           </span>

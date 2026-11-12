@@ -8,6 +8,7 @@ import type { Dispatch } from "react";
 
 export type MessageActionDialogProps = {
   activeMessageAction: Message;
+  onForwardMessage: (message: Message) => void;
   copyMessageContent: (message: Message, target: MessageCopyTarget) => Promise<void>;
   editOwnMessage: (message: Message) => Promise<void>;
   messageActionMode: "reactions" | "actions";
@@ -24,6 +25,7 @@ export type MessageActionDialogProps = {
 
 export default function MessageActionDialog({
   activeMessageAction,
+  onForwardMessage,
   copyMessageContent,
   editOwnMessage,
   messageActionMode,
@@ -40,6 +42,7 @@ export default function MessageActionDialog({
   return (
       <MessageActions
             mode={messageActionMode}
+            onForwardMessage={onForwardMessage}
             activeMessageAction={activeMessageAction}
             userId={session.user.id}
             isPinned={pinnedMessages.some((pin) => pin.message.id === activeMessageAction.id)}
