@@ -10,6 +10,7 @@
     "lint": "node scripts/lint-ratchet.mjs",
     "lint:report": "eslint src",
     "lint:baseline": "node scripts/lint-ratchet.mjs --update",
+    "test:unit": "vitest run",
     "check:onesignal": "node --experimental-strip-types scripts/onesignal-init-check.mjs",
     "check:push-deeplink": "node scripts/push-notification-deeplink-check.mjs",
     "check:incoming-sound": "node --experimental-strip-types scripts/incoming-sound-check.mjs",
@@ -77,9 +78,11 @@
     "@vitejs/plugin-react": "^5.0.4",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "jsdom": "^27.4.0",
     "playwright": "^1.64.1",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.72.2",
-    "vite": "7.3.7"
+    "vite": "7.3.7",
+    "vitest": "^4.1.12"
   }
 }
