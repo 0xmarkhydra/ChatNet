@@ -1,4 +1,5 @@
 import { useFriendActions } from "./useFriendActions";
+import { updateContactMetadata, findDirectConversation } from "../api/contacts";
 import { useContactModeration } from "./useContactModeration";
 import type { FriendSearchResult, FriendConnection } from "../types";
 import type { UseContactActionsDeps } from "./contactActionTypes";
@@ -110,11 +111,7 @@ export function useContactActions({
     setFriendMenuId(null);
     setFriendBusyIds((ids) => new Set(ids).add(friend.id));
     try {
-      const response = await apiFetch(`/api/contacts/${friend.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(next),
-      });
+      const response = await updateContactMetadata(apiFetch, friend.id, next);
       const result = (await response.json().catch(() => null)) as {
         error?: string;
         id?: number;
@@ -149,7 +146,7 @@ export function useContactActions({
       if (username) {
         try {
           // The chat may be on a later page of the paginated conversation list.
-          const response = await apiFetch(`/api/conversations?type=direct&q=${encodeURIComponent(username)}&limit=100`, { cache: 'no-store' });
+          const response = await findDirectConversation(apiFetch, username);
           if (response.ok) {
             const data = (await response.json()) as Conversation[];
             direct = data.find((item) => item.type === 'direct' && item.otherUserId === userId);

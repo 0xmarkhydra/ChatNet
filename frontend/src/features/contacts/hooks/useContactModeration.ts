@@ -1,4 +1,5 @@
 import type { FriendConnection, FriendSearchResult } from "../types";
+import { blockUser, unblockUser, listBlockedUsers, reportUser } from "../api/contacts";
 import type { UseContactActionsDeps } from "./contactActionTypes";
 
 type UseContactModerationDeps = Pick<UseContactActionsDeps,
@@ -56,9 +57,7 @@ export function useContactModeration({
     setFriendBusyIds((old) => new Set(old).add(friend.id));
     setFriendMenuId(null);
     try {
-      const response = await apiFetch(`/api/users/${friend.id}/block`, {
-        method: "POST",
-      });
+      const response = await blockUser(apiFetch, friend.id);
       const result = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
@@ -133,11 +132,7 @@ export function useContactModeration({
     }
     setFriendMenuId(null);
     try {
-      const response = await apiFetch(`/api/users/${friend.id}/report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason, details: details.trim() }),
-      });
+      const response = await reportUser(apiFetch, friend.id, reason, details.trim());
       const result = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
@@ -159,7 +154,7 @@ export function useContactModeration({
     setBlockedBusy(true);
     setBlockedError("");
     try {
-      const response = await apiFetch("/api/users/blocked");
+      const response = await listBlockedUsers(apiFetch);
       if (!response.ok) throw new Error();
       const data = (await response.json()) as Array<{
         id: number;
@@ -184,9 +179,7 @@ export function useContactModeration({
     setBlockedBusy(true);
     setBlockedError("");
     try {
-      const response = await apiFetch(`/api/users/${userId}/block`, {
-        method: "DELETE",
-      });
+      const response = await unblockUser(apiFetch, userId);
       if (!response.ok) throw new Error();
       if (sessionRef.current?.sessionId === sid) {
         setBlockedUsers((old) => old.filter((item) => item.id !== userId));

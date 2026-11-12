@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { AppDataContext } from '../../../shared/types/api'
 import type { FriendConnection } from '../types'
+import { listFriendRequests, listContactMetadata, listFriends } from '../api/contacts'
 type Options = AppDataContext
 export function useContactData({
   session,
@@ -39,13 +40,13 @@ export function useContactData({
       // requests/metadata endpoint must not delay friends on mobile.
       const isCurrent = () =>
         sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current
-      void apiFetch('/api/friends/requests', { cache: 'no-store' })
+      void listFriendRequests(apiFetch)
         .then(async (response) => {
           if (!response.ok) return
           const items: unknown = await response.json().catch(() => null)
           if (isCurrent() && Array.isArray(items)) setFriendRequests(items as FriendConnection[])
         }).catch(() => undefined)
-      void apiFetch('/api/contacts', { cache: 'no-store' })
+      void listContactMetadata(apiFetch)
         .then(async (response) => {
           if (!response.ok) return
           const records: unknown = await response.json().catch(() => null)
@@ -58,7 +59,7 @@ export function useContactData({
             ))
           }
         }).catch(() => undefined)
-      const friendsResponse = await apiFetch('/api/friends', { cache: 'no-store' })
+      const friendsResponse = await listFriends(apiFetch)
       if (!isCurrent()) return
       if (!friendsResponse.ok) {
         throw new Error('Không thể tải danh sách bạn bè. Kiểm tra kết nối và thử lại.')
