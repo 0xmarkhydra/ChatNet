@@ -1,7 +1,7 @@
 import { lazy } from "react";
 import { Suspense } from "react";
 import { type Session } from "../../auth/lib/session";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 
 const Marketplace = lazy(() => import("./Marketplace"));
 

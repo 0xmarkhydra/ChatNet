@@ -7,7 +7,7 @@ import type { FriendConnection } from "../../contacts/types";
 import { type Session } from "../../auth/lib/session";
 import { type ToastKind } from "../../notifications/utils/toast";
 import { type FeedComment } from "../components/FeedDiscussion";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject } from "react";
 
 export type UseFeedActionsDeps = {

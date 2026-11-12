@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import type { Session } from '../features/auth/lib/session'
-import type { Conversation, Message } from '../features/chat/types'
-import { desktopBridge, isDesktopBuild } from './desktop'
+import type { Session } from '../../auth/lib/session'
+import type { Conversation, Message } from '../types'
+import { desktopBridge, isDesktopBuild } from '../../../platform/desktop'
 
 const unreadEvent = 'soco:unread-refresh'
 const unavailableEvent = 'soco:notification-unavailable'

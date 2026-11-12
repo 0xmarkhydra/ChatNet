@@ -7,7 +7,7 @@ import type { FriendConnection } from "../../contacts/types";
 import { type Post } from "../../feed/types";
 import { FormEvent, type SetStateAction } from "react";
 import { type Session } from "../../auth/lib/session";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject, ReactNode } from "react";
 
 export type ProfileOverviewSectionProps = {

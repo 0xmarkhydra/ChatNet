@@ -1,4 +1,6 @@
-export type ToastKind = 'success' | 'error' | 'warning' | 'info'
+import type { ToastKind } from '../../../shared/types/notice'
+
+export type { ToastKind }
 export type ToastNotice = { id: number; message: string; kind: ToastKind }
 
 

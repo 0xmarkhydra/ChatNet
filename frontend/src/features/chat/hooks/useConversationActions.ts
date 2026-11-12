@@ -6,7 +6,7 @@ import { SessionResponseCache } from "../../../shared/lib/sessionCache";
 import { type Session } from "../../auth/lib/session";
 import type { FriendSearchResult } from "../../contacts/types";
 import { type ToastKind } from "../../notifications/utils/toast";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject } from "react";
 
 export type UseConversationActionsDeps = {

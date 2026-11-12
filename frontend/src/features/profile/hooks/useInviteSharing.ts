@@ -2,7 +2,7 @@ import { type Session } from "../../auth/lib/session";
 import { type SetStateAction } from "react";
 import { type NewChatMode } from "../../chat/types";
 import { type ToastKind } from "../../notifications/utils/toast";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch } from "react";
 
 export type UseInviteSharingDeps = {

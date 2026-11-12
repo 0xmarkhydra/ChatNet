@@ -14,7 +14,7 @@ import { type Post } from "../../feed/types";
 import type { UserPrivacy, ProfileMediaState } from "../types";
 import { type Session } from "../../auth/lib/session";
 import { type SetStateAction } from "react";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 import { UI_MESSAGES } from "../../i18n/lib/i18n";
 import type { LanguageOption } from "../../i18n/utils/languages";
 import type { Dispatch, RefObject, ReactNode } from "react";

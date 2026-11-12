@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
-import type { Tab } from '../types'
+import type { Tab } from '../../shared/types/navigation'
 import type { UI_MESSAGES } from '../../features/i18n/lib/i18n'
 import UiIcon from '../../shared/ui/UiIcon'
 import { PhoneCall } from 'lucide-react'

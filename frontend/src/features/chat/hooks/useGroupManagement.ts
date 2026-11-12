@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type RefObject } from 'react'
 import type { Session } from '../../auth/lib/session'
-import type { Tab } from '../../../app/types'
+import type { Tab } from '../../../shared/types/navigation'
 import type { FriendConnection } from '../../contacts/types'
 import type { Conversation, GroupMember } from '../types'
 import type { ToastKind } from '../../notifications/utils/toast'

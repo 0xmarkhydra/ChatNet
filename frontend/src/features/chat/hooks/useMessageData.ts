@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
-import type { AppDataContext } from '../../../app/dataTypes'
-import type { Tab } from '../../../app/types'
+import type { AppDataContext } from '../../../shared/types/api'
+import type { Tab } from '../../../shared/types/navigation'
 import type { useConversationData } from './useConversationData'
 import { MESSAGE_PAGE_SIZE, type Message, type MessageDraft } from '../types'
 import { clearPendingSend, loadPendingSend } from '../lib/chatPersistence'
 import { canMarkConversationRead } from '../utils/conversationRead'
 import { isDesktopBuild } from '../../../platform/desktop'
-import { refreshDesktopUnread } from '../../../platform/useDesktopNotifications'
+import { refreshDesktopUnread } from './useDesktopNotifications'
 
 type Options = Omit<AppDataContext, 'setStatus'> &
   Pick<ReturnType<typeof useConversationData>, 'setConversations'> & {
