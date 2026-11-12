@@ -1,12 +1,12 @@
 {
-  "total": 114,
+  "total": 113,
   "byRule": {
     "react-hooks/exhaustive-deps": 64,
-    "react-hooks/set-state-in-effect": 50
+    "react-hooks/set-state-in-effect": 49
   },
   "counts": {
     "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
-    "src/app/AuthedApp.tsx|react-hooks/set-state-in-effect": 8,
+    "src/app/AuthedApp.tsx|react-hooks/set-state-in-effect": 7,
     "src/app/DesktopBootstrap.tsx|react-hooks/set-state-in-effect": 1,
     "src/app/hooks/useAppRealtime.ts|react-hooks/exhaustive-deps": 1,
     "src/features/auth/hooks/useSessionsPanel.ts|react-hooks/set-state-in-effect": 1,
