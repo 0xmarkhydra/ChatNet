@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useScopedState } from "../../../shared/hooks/useScopedState";
 import type { ApiRequest } from "../../../shared/types/api";
 import type { Post } from "../types";
 import { useLatest } from "../../../shared/hooks/useLatest";
@@ -49,8 +50,10 @@ export function usePostSearch({
   const requestRef = useLatest(request);
   const controller = useRef<AbortController | null>(null);
   const pagingBusy = useRef(false);
-  const [state, setState] = useState<SearchState>(emptyState);
   const [retryNumber, setRetryNumber] = useState(0);
+  // A search and each retry owns a fresh result set. The previous query never
+  // leaks into the next render, and stale request callbacks cannot update it.
+  const [state, setState] = useScopedState<SearchState>(JSON.stringify([key, retryNumber]), emptyState);
 
   const baseUrl =
     "/api/posts?limit=" +
@@ -66,7 +69,6 @@ export function usePostSearch({
 
     const abort = new AbortController();
     controller.current = abort;
-    setState({ ...emptyState, key, loading: true });
 
     const timer = window.setTimeout(async () => {
       try {
@@ -99,7 +101,7 @@ export function usePostSearch({
       window.clearTimeout(timer);
       controller.current?.abort();
     };
-  }, [key, baseUrl, retryNumber, requestRef, currentKey]);
+  }, [key, baseUrl, retryNumber, requestRef, currentKey, setState]);
 
   const current =
     state.key === key ? state : { ...emptyState, loading: Boolean(key) };
