@@ -5,6 +5,7 @@ const read = (file) => readFileSync(new URL(file, root), 'utf8')
 const ui = [
   read('src/features/calls/components/CallManager.tsx'),
   read('src/features/calls/components/SecureCallRoom.tsx'),
+  read('src/features/calls/hooks/useCallMediaControls.ts'),
   read('src/features/calls/components/CallRoomControls.tsx'),
   read('src/features/calls/components/CallRoomNotices.tsx'),
 ].join('\n')

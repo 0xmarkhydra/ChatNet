@@ -14,9 +14,6 @@ import {
   mediaKeyBuffer, unwrapMediaKey, wrapMediaKey, type EphemeralCallKeyPair,
 } from '../lib/callCrypto'
 import { startCallMediaInterpreter, type InterpreterSession, type InterpreterUpdate } from '../lib/callMediaInterpreter'
-import { buildLanguageOptions } from '../../i18n/utils/languages'
-import { isDesktopBuild } from '../../../platform/desktop'
-import { requireDesktopMedia } from '../../../platform/desktopMedia'
 import { RemoteAudioSinks } from './CallMediaTracks'
 import { CallGroupPanel, CallTranslationPanel } from './CallRoomPanels'
 import CallRoomNotices from './CallRoomNotices'
@@ -25,6 +22,10 @@ import { CallRoomTopbar, CallRoomMediaStage } from './CallRoomStage'
 import { appendCallCaption, type CallCaption } from '../lib/callCaptions'
 import { waitForEnvelope } from '../lib/waitForCallEnvelope'
 import { friendlyCallError } from '../lib/callErrors'
+import { deriveCallRoomDisplay } from '../lib/callRoomDisplay'
+import { useCallMediaControls } from '../hooks/useCallMediaControls'
+import { useCallLanguages } from '../hooks/useCallLanguages'
+import { useCallOverlayDismiss } from '../hooks/useCallOverlayDismiss'
 
 const CONSENT_TOPIC = 'chatnet.call.translation.consent.v1'
 
@@ -69,10 +70,7 @@ export default function SecureCallRoom({
   const moreRef = useRef<HTMLDivElement>(null)
   const [mediaPermissionError, setMediaPermissionError] = useState('')
   const [permissionRetrying, setPermissionRetrying] = useState(false)
-  const [callTargetLanguage, setCallTargetLanguage] = useState<string>(() => {
-    const lang = (localStorage.getItem('chatnet.call.target-language.v1') || targetLanguage).toLowerCase().split('-')[0]
-    return lang === 'zh' ? 'zh-Hans' : lang === 'pt' ? 'pt-BR' : lang === 'tl' ? 'fil' : lang
-  })
+  const { callTargetLanguage, setCallTargetLanguage, languageOptions } = useCallLanguages(request, sourceLanguage, targetLanguage)
   const [captionMode] = useState(() => localStorage.getItem('chatnet.call.subtitle-mode.v1') || 'both')
   const [translationError, setTranslationError] = useState('')
   const [translationRetryEpoch, setTranslationRetryEpoch] = useState(0)
@@ -81,58 +79,15 @@ export default function SecureCallRoom({
   const [consentError, setConsentError] = useState('')
   const consentUpdating = useRef(false)
   const consentRevision = useRef(0)
-  const [availableLanguages, setAvailableLanguages] = useState<string[]>([])
   const [consentRequested, setConsentRequested] = useState(false)
   const [remoteConsent, setRemoteConsent] = useState<Record<string, boolean>>({})
   const [translatingIds, setTranslatingIds] = useState<string[]>([])
   const [captions, setCaptions] = useState<CallCaption[]>([])
   const interpreters = useRef(new Map<string, InterpreterSession>())
   const interpreterPending = useRef(new Set<string>())
-  useEffect(() => {
-    let mounted = true
-    request('/api/calls/translation/languages').then(async (response) => {
-      if (!response.ok) return
-      const body = await response.json() as { languages?: string[] }
-      if (mounted && Array.isArray(body.languages)) {
-        setAvailableLanguages(body.languages)
-        if (!body.languages.includes(callTargetLanguage)) {
-          setCallTargetLanguage(body.languages.includes(targetLanguage.split('-')[0]) ? targetLanguage.split('-')[0] : 'en')
-        }
-      }
-    }).catch(() => undefined)
-    return () => { mounted = false }
-  }, [request])
-
-  const languageOptions = useMemo(() => {
-    const catalog = buildLanguageOptions(sourceLanguage)
-    return availableLanguages.map((value) => {
-      const option = catalog.find((item) => item.code === value.split('-')[0])
-      const fallback = new Intl.DisplayNames([sourceLanguage], { type: 'language' }).of(value) || value
-      return { value, label: (option?.flag || '🌐') + ' ' + (option?.localizedLanguage || fallback) +
-        (value.includes('-') ? ' (' + value + ')' : '') + ' · ' + (option?.nativeLanguage || value) }
-    }).sort((a,b) => a.label.localeCompare(b.label, sourceLanguage))
-  }, [sourceLanguage, availableLanguages])
-
   const [ending, setEnding] = useState(false)
 
-  useEffect(() => {
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      if (moreOpen) setMoreOpen(false)
-      else if (translationSheetOpen) setTranslationSheetOpen(false)
-    }
-    const closeMenuOutside = (event: PointerEvent) => {
-      if (moreOpen && event.target instanceof Node && !moreRef.current?.contains(event.target)) {
-        setMoreOpen(false)
-      }
-    }
-    window.addEventListener('keydown', onEscape)
-    window.addEventListener('pointerdown', closeMenuOutside)
-    return () => {
-      window.removeEventListener('keydown', onEscape)
-      window.removeEventListener('pointerdown', closeMenuOutside)
-    }
-  }, [moreOpen, translationSheetOpen])
+  useCallOverlayDismiss(moreOpen, translationSheetOpen, moreRef, setMoreOpen, setTranslationSheetOpen)
 
   // Consent is scoped to the current call. Never carry an AI voice grant to a new room.
   useEffect(() => {
@@ -447,20 +402,8 @@ export default function SecureCallRoom({
     ).catch(() => undefined)
   }, [room, translationOn])
 
-  const remoteTracks = participants.flatMap((participant) =>
-    participant === room?.localParticipant ? [] : Array.from(participant.audioTrackPublications.values())
-      .filter((publication) => publication.track && !publication.isMuted)
-      .map((publication) => ({
-        speakerId: participant.identity,
-        track: (publication.track as RemoteTrack).mediaStreamTrack,
-        trackSid: publication.trackSid,
-      })),
-  )
-  const remoteTrackKey = remoteTracks.map((entry) => entry.speakerId + ':' + entry.trackSid).join('|')
-  const remoteConsentKey = JSON.stringify(remoteConsent)
-  const latestCaption = [...captions].reverse().find((item) => item.translated.trim())
-  const waitingConsentCount = Math.max(0, participants.length - 1 - Object.values(remoteConsent).filter(Boolean).length)
-  const statusLabel = phase === 'connected' ? 'Bảo mật' : phase === 'reconnecting' ? 'Đang nối lại' : phase === 'error' ? 'Đã ngắt' : 'Đang kết nối'
+  const { remoteTrackKey, remoteConsentKey, latestCaption, waitingConsentCount, statusLabel } =
+    deriveCallRoomDisplay(participants, room?.localParticipant, captions, remoteConsent, phase)
   useEffect(() => {
     let cancelled = false
     const stopAll = () => {
@@ -513,82 +456,10 @@ export default function SecureCallRoom({
     }
   }, [translationOn])
 
-  async function requestCallMediaPermission() {
-    if (!room || permissionRetrying || ending) return
-    setPermissionRetrying(true)
-    try {
-      if (!micOn) {
-        await requireDesktopMedia('microphone')
-        if (room.state !== 'connected') return
-        await room.localParticipant.setMicrophoneEnabled(true)
-        setMicOn(true)
-      }
-      if (call.mediaType === 'video' && !cameraOn) {
-        await requireDesktopMedia('camera')
-        if (room.state !== 'connected') return
-        await room.localParticipant.setCameraEnabled(true)
-        setCameraOn(true)
-      }
-      setMediaPermissionError('')
-    } catch (err) {
-      setMediaPermissionError(friendlyCallError(err))
-    } finally {
-      setPermissionRetrying(false)
-    }
-  }
-
-  async function toggleMic() {
-    if (!room || ending || permissionRetrying) return
-    setPermissionRetrying(true)
-    try {
-      const next = !micOn
-      if (next) await requireDesktopMedia('microphone')
-      if (next && room.state !== 'connected') return
-      await room.localParticipant.setMicrophoneEnabled(next)
-      setMicOn(next)
-      setMediaPermissionError('')
-    } catch (err) { setMediaPermissionError(friendlyCallError(err)) }
-    finally { setPermissionRetrying(false) }
-  }
-
-  async function toggleCamera() {
-    if (!room || ending || permissionRetrying) return
-    setPermissionRetrying(true)
-    try {
-      const next = !cameraOn
-      if (next) await requireDesktopMedia('camera')
-      if (next && room.state !== 'connected') return
-      await room.localParticipant.setCameraEnabled(next)
-      setCameraOn(next)
-      setMediaPermissionError('')
-    } catch (err) { setMediaPermissionError(friendlyCallError(err)) }
-    finally { setPermissionRetrying(false) }
-  }
-
-  async function toggleScreen() {
-    if (!room || ending) return
-    try {
-      const next = !screenOn
-      // Desktop grants video only; system audio is not implicitly shared.
-      await room.localParticipant.setScreenShareEnabled(next, isDesktopBuild ? { audio: false } : undefined)
-      setScreenOn(room.localParticipant.isScreenShareEnabled)
-    } catch (err) { onError(friendlyCallError(err)) }
-  }
-
-  async function toggleSound() {
-    if (!room) return
-    const next = !soundOn
-    for (const participant of room.remoteParticipants.values()) {
-      for (const publication of participant.audioTrackPublications.values()) {
-        const element = publication.track?.attachedElements?.[0] as HTMLMediaElement | undefined
-        if (element) element.muted = !next
-      }
-    }
-    if (next) {
-      try { await room.startAudio() } catch { onError('Trình duyệt đang chặn phát âm thanh. Hãy chạm lại nút loa.') }
-    }
-    setSoundOn(next)
-  }
+  const { requestCallMediaPermission, toggleMic, toggleCamera, toggleScreen, toggleSound } = useCallMediaControls({
+    room, mediaType: call.mediaType, ending, permissionRetrying, micOn, cameraOn, screenOn, soundOn,
+    setPermissionRetrying, setMicOn, setCameraOn, setScreenOn, setSoundOn, setMediaPermissionError, onError,
+  })
 
   async function closeCall(endForEveryone: boolean) {
     if (ending) return
