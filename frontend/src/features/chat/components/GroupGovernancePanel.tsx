@@ -94,6 +94,11 @@ export default function GroupGovernancePanel({
   const [maxUses, setMaxUses] = useState(0);
   const [createdUrl, setCreatedUrl] = useState("");
   const [invites, setInvites] = useState<Invite[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [audit, setAudit] = useState<Audit[]>([]);
   const [before, setBefore] = useState<number | null>(null);
@@ -436,7 +441,7 @@ export default function GroupGovernancePanel({
           {invites.map((link) => {
             const available =
               !link.revokedAt &&
-              new Date(link.expiresAt).getTime() > Date.now() &&
+              new Date(link.expiresAt).getTime() > now &&
               (link.maxUses === null || link.useCount < link.maxUses);
             return (
               <div className="group-governance-entry" key={link.id}>

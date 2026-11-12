@@ -20,7 +20,12 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
  const alive = useRef(false)
  const seq = useRef(0)
  const writing = useRef(false)
- const currentNote = note && Date.parse(note.expiresAt)>Date.now() ? note : null
+ const [now,setNow] = useState(() => Date.now())
+ useEffect(()=>{
+  const timer=window.setInterval(()=>setNow(Date.now()),30_000)
+  return()=>window.clearInterval(timer)
+ },[])
+ const currentNote = note && Date.parse(note.expiresAt)>now ? note : null
  const count = Array.from(draft.trim()).length
  const path = owner ? '/api/profile/note' : '/api/users/'+encodeURIComponent(username)+'/note'
  async function load(force=false) {
