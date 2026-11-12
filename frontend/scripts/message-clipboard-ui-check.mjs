@@ -11,8 +11,8 @@ const server = await createServer({
   logLevel: 'error',
 })
 try {
-  const { default: MessageActions } = await server.ssrLoadModule('/src/features/chat/MessageActions.tsx')
-  const { resolveMessageCopyTarget } = await server.ssrLoadModule('/src/features/chat/messageCopyTarget.ts')
+  const { default: MessageActions } = await server.ssrLoadModule('/src/features/chat/components/MessageActions.tsx')
+  const { resolveMessageCopyTarget } = await server.ssrLoadModule('/src/features/chat/utils/messageCopyTarget.ts')
   const render = (message, target = resolveMessageCopyTarget(message, null), pin = {}, mode = 'actions') =>
     renderToStaticMarkup(React.createElement(MessageActions, {
       mode, activeMessageAction: message, userId: 1, setMessageActionId() {},
@@ -96,7 +96,7 @@ try {
   assert.doesNotMatch(allowed, /class="message-context-reactions"/)
   assert.match(allowed, /Trả lời|Sao chép|Dịch/)
   const { readFileSync } = await import('node:fs')
-  const appSource = readFileSync(fileURLToPath(new URL('../src/app/App.tsx', import.meta.url)), 'utf8')
+  const appSource = ['../src/app/App.tsx', '../src/app/AuthedApp.tsx', '../src/features/chat/components/ChatSection.tsx', '../src/features/chat/hooks/useMessageLongPress.ts'].map((file) => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8')).join('\n')
   assert.match(appSource, /onClick=\{\(\) => openMessageReactions\(message\)\}/)
   assert.match(appSource, /openMessageActions\(message, event\.target\)/)
   assert.match(appSource, /openMessageActions\(message, target\)/)

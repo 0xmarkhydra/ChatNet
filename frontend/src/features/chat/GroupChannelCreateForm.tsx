@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Hash, Plus, X } from 'lucide-react'
-import './group-channel-picker.css'
+import './styles/group-channel-picker.css'
 import './group-channel-create-info.css'
 
 type Props = {

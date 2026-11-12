@@ -336,8 +336,12 @@
   }
   .modern-shell.app-layout .social-chat-list-filters button.is-active {
     border-color: #dce7ff;
-    background: #eaf1ff;
+    background: transparent;
     color: #2563eb;
+  }
+  .modern-shell.app-layout .social-chat-list-filters .social-chat-active-pill {
+    background: #eaf1ff;
+    border-radius: 999px;
   }
   .modern-shell.app-layout .social-chat-list > .zalo-conversation-list {
     flex: 1 1 auto;

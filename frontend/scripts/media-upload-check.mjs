@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { uploadPresignedFile } from '../src/features/chat/mediaUpload.ts'
+import { uploadPresignedFile } from '../src/features/chat/lib/mediaUpload.ts'
 import { allowedChatNetUploadURL } from '../dev/chatMediaUploadProxy.ts'
 
 class FakeXHR {

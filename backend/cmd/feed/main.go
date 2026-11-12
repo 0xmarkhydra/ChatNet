@@ -104,9 +104,12 @@ func main() {
 	mux.Handle("PATCH /api/posts/{id}/comments/{commentId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editComment)))
 	mux.Handle("DELETE /api/posts/{id}/comments/{commentId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteComment)))
 	mux.Handle("POST /api/feed/reports", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reportFeed)))
+	mux.Handle("GET /api/feed/moderation/me", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getModerationMe)))
 	mux.Handle("GET /api/feed/moderation/reports", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listModerationReports)))
 	mux.Handle("PATCH /api/feed/moderation/reports/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reviewModerationReport)))
 	mux.Handle("POST /api/posts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.create)))
+	mux.Handle("GET /api/feed/mentions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPostMentions)))
+	mux.Handle("POST /api/feed/mentions/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.readPostMention)))
 	mux.Handle("POST /api/posts/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.like)))
 	mux.Handle("POST /api/posts/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.react)))
 	mux.Handle("POST /api/posts/{id}/comments", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.addComment)))
@@ -340,10 +343,16 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	newMentions, err := s.syncPostMentions(r.Context(), tx, p.ID, claims.UserID, p.Content, p.Visibility)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot save post mentions")
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot save post")
 		return
 	}
+	s.pushPostMentions(p.ID, p.AuthorDisplayName, newMentions)
 
 	p.Comments = []comment{}
 	httpx.JSON(w, http.StatusCreated, p)

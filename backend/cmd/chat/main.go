@@ -167,6 +167,7 @@ func main() {
 	mux.Handle("PUT /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveCategory)))
 	mux.Handle("DELETE /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteCategory)))
 	mux.Handle("PUT /api/conversations/{id}/category", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.assignCategory)))
+	mux.Handle("GET /api/link-preview", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getLinkPreview)))
 	mux.Handle("GET /api/conversations", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversations)))
 	mux.Handle("PUT /api/conversations/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setConversationPin)))
 	mux.Handle("DELETE /api/conversations/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setConversationPin)))
@@ -1363,7 +1364,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	s.sendPushAsync(recipients, onesignalx.Notification{
 		Title: "ChatNet",
 		Body:  notificationBody,
-		URL:   fmt.Sprintf("https://chat.codelocal.cloud/?conversation=%d", conversationID),
+		URL:   fmt.Sprintf("https://chat.codelocal.cloud/?conversation=%d&message=%d", conversationID, m.ID),
 		Data:  map[string]any{"type": "message", "conversationId": conversationID, "messageId": m.ID},
 	})
 

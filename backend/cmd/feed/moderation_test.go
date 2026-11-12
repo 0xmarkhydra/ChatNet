@@ -77,6 +77,7 @@ func TestModerationThreeAccountsIntegration(t *testing.T) {
 
 	s := &server{db: db}
 	mux := http.NewServeMux()
+	mux.Handle("GET /api/feed/moderation/me", authx.Middleware(secret, http.HandlerFunc(s.getModerationMe)))
 	mux.Handle("GET /api/feed/moderation/reports", authx.Middleware(secret, http.HandlerFunc(s.listModerationReports)))
 	mux.Handle("PATCH /api/feed/moderation/reports/{id}", authx.Middleware(secret, http.HandlerFunc(s.reviewModerationReport)))
 	mux.Handle("GET /api/posts/{id}", authx.Middleware(secret, http.HandlerFunc(s.detailPost)))
@@ -93,6 +94,14 @@ func TestModerationThreeAccountsIntegration(t *testing.T) {
 	}
 	queue := "/api/feed/moderation/reports"
 	item := fmt.Sprintf("%s/%d", queue, reportID)
+	me0 := call(0, "GET", "/api/feed/moderation/me", "", 200)
+	if !strings.Contains(me0, `"moderator":false`) {
+		t.Fatalf("actor 0 want moderator false, got: %s", me0)
+	}
+	me1 := call(1, "GET", "/api/feed/moderation/me", "", 200)
+	if !strings.Contains(me1, `"moderator":true`) {
+		t.Fatalf("actor 1 want moderator true, got: %s", me1)
+	}
 	call(0, "GET", queue, "", 403)
 	call(2, "PATCH", item, `{"decision":"remove"}`, 403)
 	raw := call(1, "GET", queue, "", 200)

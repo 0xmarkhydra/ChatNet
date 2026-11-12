@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { formatDuration, latestCallDuration } from '../src/features/calls/call-history.ts'
+import { formatDuration, latestCallDuration } from '../src/features/calls/utils/call-history.ts'
 
 const connected = {
   id: 'successful', conversationId: 1, createdBy: 1, mediaType: 'audio',

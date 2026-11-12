@@ -1,0 +1,876 @@
+/* Smart Composer uses the existing post-dialog and feed design tokens. */
+.smart-checkin-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.smart-checkin-heading strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.smart-checkin-heading button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  border-radius: 8px;
+  color: #536887;
+  background: transparent;
+  cursor: pointer;
+}
+.smart-checkin-heading button:hover { background: #e9effc; }
+.smart-composer-error, .smart-composer-hint { margin: 4px 0; font-size: 12px; line-height: 1.5; }
+.smart-composer-error { color: #ad2840; }
+.smart-composer-hint { color: #697d9b; }
+.smart-upload-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  background: #eff5ff;
+  border-radius: 10px;
+  color: #31518a;
+  font-size: 12px;
+}
+.smart-upload-progress progress { flex: 1 1 120px; min-width: 80px; accent-color: #3264df; }
+.smart-upload-progress button {
+  border: none;
+  color: #315ec4;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+.smart-story-composer { display: grid; gap: 15px; width: 100%; min-width: 0; }
+.smart-story-frame {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 220px;
+  max-height: min(62dvh, 520px);
+  border-radius: 13px;
+  overflow: hidden;
+  background: #18213e;
+}
+.smart-story-frame img, .smart-story-frame video {
+  display: block;
+  max-width: 100%;
+  max-height: min(62dvh, 520px);
+  object-fit: contain;
+}
+.smart-story-note { margin: 0; color: #75849e; font-size: 12px; line-height: 1.5; }
+.smart-story-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.smart-story-actions button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  min-height: 41px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 660;
+  cursor: pointer;
+}
+.smart-story-change { background: #f1f5ff; color: #385c9a; border: 1px solid #e4ecfb; }
+.smart-story-publish { background: #2563eb; color: white; border: 1px solid #2563eb; }
+.smart-story-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.smart-story-actions button:focus-visible, .smart-checkin-heading button:focus-visible {
+  outline: 3px solid #a8c2ff; outline-offset: 2px;
+}
+.zalo-post-composer .composer-shortcuts { flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .smart-story-actions button { flex: 1 1 125px; }
+  .zalo-post-composer .composer-shortcuts { gap: 6px 12px; }
+  .zalo-post-composer .composer-shortcuts > button { min-height: 40px; }
+  .social-feed-checkin-field { margin: 8px 0; }
+}
+
+/* Consistent, icon-first feed composer on desktop and mobile PWA. */
+.modern-shell.app-layout .social-feed-launcher {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: auto;
+  min-height: 0;
+  padding: 12px 16px;
+  border: 1px solid #e5eaf2;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 3px 16px rgba(30, 51, 96, .035);
+}
+.social-feed-launcher .social-feed-launcher-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 42px;
+  width: 100%;
+  min-width: 0;
+}
+.social-feed-launcher .social-feed-me-avatar {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+}
+.social-feed-launcher .social-feed-launcher-prompt {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 41px;
+  height: auto;
+  padding: 8px 17px;
+  border: 1px solid #eef0f4;
+  border-radius: 999px;
+  background: #f3f5f8;
+  color: #687487;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 480;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease;
+}
+.social-feed-launcher .social-feed-launcher-prompt:hover {
+  background: #edf1f7;
+  border-color: #e2e7f0;
+}
+.social-feed-launcher .social-feed-launcher-bottom {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding-top: 6px;
+  border-top: 1px solid #edf0f5;
+}
+.social-feed-launcher .social-feed-launcher-shortcuts {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  min-width: 0;
+}
+.social-feed-launcher .social-feed-launcher-shortcuts > button {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: #f5f7fa;
+  color: #526987;
+  cursor: pointer;
+  transition: background-color .16s ease, color .16s ease, border-color .16s ease;
+}
+.social-feed-launcher .social-feed-launcher-shortcuts > button svg {
+  display: block;
+  color: inherit;
+}
+.social-feed-launcher .social-feed-launcher-shortcuts > button:hover {
+  color: #2563eb;
+  background: #edf3ff;
+  border-color: #dae7ff;
+}
+.social-feed-launcher :is(button):disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.social-feed-launcher :is(button):focus-visible,
+.smart-post-composer :is(button, select, textarea):focus-visible {
+  outline: 2px solid #7ca7f8;
+  outline-offset: 3px;
+}
+
+/* Facebook-like compact publishing dialog with a single set of action icons. */
+.profile-post-dialog {
+  width: min(530px, calc(100vw - 28px));
+  border-radius: 18px;
+  box-shadow: 0 24px 76px rgba(18, 34, 65, .2);
+}
+.profile-post-dialog .profile-overlay-heading {
+  min-height: 62px;
+  padding: 12px 62px;
+}
+.profile-post-dialog .profile-overlay-heading h2 {
+  font-size: 19px;
+  font-weight: 720;
+  letter-spacing: -.25px;
+}
+.profile-post-dialog .profile-overlay-heading > button {
+  top: 13px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  color: #5b687c;
+  background: #f0f2f5;
+}
+.profile-post-dialog .profile-overlay-heading > button svg { width: 20px; height: 20px; }
+.modern-shell .profile-post-dialog .profile-popup-composer {
+  gap: 12px;
+  padding: 16px 20px 20px;
+}
+.profile-popup-composer .post-prompt { order: 1; gap: 11px; }
+.profile-popup-composer .self-avatar { width: 43px; height: 43px; }
+.profile-popup-composer .profile-post-author { gap: 5px; }
+.profile-popup-composer .profile-post-author strong { font-size: 14px; line-height: 1.25; }
+.smart-composer-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* Audience picker: compact in the author header, detailed when opened. */
+.smart-post-composer .smart-composer-audience {
+  position: relative;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+.smart-post-composer .smart-audience-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: 29px;
+  padding: 5px 9px;
+  border: 1px solid #e1e8f2;
+  border-radius: 8px;
+  background: #f3f6fa;
+  color: #526882;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 660;
+  line-height: 1.25;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.smart-post-composer .smart-audience-trigger svg { flex-shrink: 0; }
+.smart-post-composer .smart-audience-trigger:hover,
+.smart-post-composer .smart-audience-trigger[aria-expanded="true"] {
+  background: #eaf1ff;
+  border-color: #d7e4ff;
+  color: #315fc1;
+}
+.smart-post-composer .smart-audience-trigger:disabled { opacity: .55; cursor: not-allowed; }
+.smart-audience-chevron { margin-left: 1px; transition: transform .16s ease; }
+.smart-audience-chevron.is-open { transform: rotate(180deg); }
+.smart-post-composer .smart-audience-menu {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 0;
+  z-index: 100;
+  box-sizing: border-box;
+  width: min(310px, calc(100vw - 96px));
+  max-width: calc(100vw - 40px);
+  padding: 8px;
+  border: 1px solid #e1e8f2;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(29, 48, 83, .16), 0 2px 7px rgba(29, 48, 83, .05);
+  color: #293e5a;
+}
+.smart-audience-menu-heading {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px 11px;
+  border-bottom: 1px solid #eef1f6;
+  margin-bottom: 5px;
+}
+.smart-audience-menu-heading strong {
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.35;
+  color: #273c58;
+}
+.smart-audience-menu-heading small {
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1.4;
+  color: #7b8aa0;
+}
+.smart-post-composer .smart-audience-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 53px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #344964;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color .14s ease, border-color .14s ease;
+}
+.smart-post-composer .smart-audience-choice:hover,
+.smart-post-composer .smart-audience-choice:focus-visible,
+.smart-post-composer .smart-audience-choice[aria-checked="true"] {
+  background: #f1f5ff;
+  border-color: #e2eafd;
+}
+.smart-audience-choice-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #eef2f8;
+  color: #58708e;
+}
+.smart-audience-choice[aria-checked="true"] .smart-audience-choice-icon {
+  background: #e2ecff;
+  color: #2e63ce;
+}
+.smart-audience-choice-copy {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.smart-audience-choice-copy strong {
+  color: #283e59;
+  font-size: 12.5px;
+  font-weight: 690;
+  line-height: 1.3;
+}
+.smart-audience-choice-copy small {
+  color: #77879e;
+  font-size: 11px;
+  font-weight: 440;
+  line-height: 1.4;
+}
+.smart-audience-choice-check { flex: 0 0 auto; color: #3169d5; }
+@media (max-width: 480px) {
+  .smart-post-composer .smart-audience-menu {
+    width: min(302px, calc(100vw - 92px));
+    padding: 6px;
+    border-radius: 12px;
+  }
+  .smart-post-composer .smart-audience-choice { min-height: 50px; padding: 7px; gap: 8px; }
+  .smart-audience-choice-icon { flex-basis: 32px; width: 32px; height: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .smart-post-composer .smart-audience-trigger,
+  .smart-post-composer .smart-audience-choice,
+  .smart-audience-chevron { transition: none; }
+}
+.modern-shell .profile-popup-composer .post-prompt textarea {
+  min-height: 54px;
+  padding: 9px 0 4px;
+  color: #25344d;
+  font-size: 19px;
+  font-weight: 420;
+  line-height: 1.5;
+}
+.modern-shell .profile-popup-composer .post-prompt textarea::placeholder { color: #8995a6; }
+.profile-popup-composer .social-feed-checkin-field {
+  order: 2;
+  padding: 10px 12px;
+  background: #f8faff;
+  border-color: #e6ecf7;
+}
+.profile-popup-composer .feed-pending-media { order: 3; }
+.profile-popup-composer .smart-upload-progress { order: 4; }
+.modern-shell .profile-popup-composer .composer-shortcuts {
+  order: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 12px;
+  margin: 0;
+  padding: 9px 11px;
+  /* The shared shortcut strip scrolls horizontally by default, which
+     clips the hover tooltip above each icon. This modal strip fits inline. */
+  overflow: visible;
+  position: relative;
+  z-index: 2;
+  border: 1px solid #e6ebf3;
+  border-radius: 12px;
+  background: #fff;
+}
+.profile-popup-composer .composer-shortcuts::before { content: none; display: none; }
+.smart-composer-actions-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #384760;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+.smart-composer-action-icons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  flex: 0 0 39px;
+  width: 39px;
+  height: 39px;
+  min-height: 39px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #536989;
+  background: #f3f6fa;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+.profile-popup-composer .smart-composer-action-icons > button svg { color: inherit; }
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button:hover,
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button[aria-pressed="true"] {
+  color: #235dd4;
+  background: #eaf1ff;
+  border-color: #d7e4ff;
+}
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button:disabled { opacity: .45; cursor: not-allowed; }
+.profile-popup-composer .feed-composer-settings { order: 6; }
+.profile-popup-composer .feed-background-palette {
+  padding: 7px 10px;
+  border-radius: 11px;
+  background: #f7f9fd;
+}
+.profile-popup-composer .smart-composer-count,
+.profile-popup-composer .smart-composer-error,
+.profile-popup-composer .smart-composer-hint,
+.profile-popup-composer .profile-post-error { order: 7; }
+.smart-composer-count { margin: 0; color: #65768b; font-size: 12px; text-align: right; }
+.modern-shell .profile-popup-composer .feed-submit {
+  order: 8;
+  width: 100%;
+  min-height: 43px;
+  margin: 0;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  background: #2563eb;
+  box-shadow: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 680;
+}
+.modern-shell .profile-popup-composer .feed-submit:not(:disabled):hover { background: #1d55d5; }
+.modern-shell .profile-popup-composer .feed-submit:disabled {
+  color: #95a0b1;
+  background: #e9edf3;
+  box-shadow: none;
+}
+
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-feed-launcher {
+    width: 100%;
+    margin: 0 0 13px;
+    padding: 11px 12px;
+    border-radius: 14px;
+  }
+  .social-feed-launcher .social-feed-launcher-top { gap: 8px; }
+  .social-feed-launcher .social-feed-me-avatar { flex-basis: 36px; width: 36px; height: 36px; }
+  .social-feed-launcher .social-feed-launcher-prompt { min-height: 40px; padding: 8px 11px; font-size: 12px; }
+  .social-feed-launcher .social-feed-launcher-shortcuts { gap: 4px; }
+  .social-feed-launcher .social-feed-launcher-shortcuts > button { width: 34px; height: 38px; min-height: 38px; }
+  .social-feed-launcher .social-feed-launcher-shortcuts > button svg { width: 19px; height: 19px; }
+}
+@media (max-width: 480px) {
+  .profile-post-dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 16px; }
+  .profile-post-dialog .profile-overlay-heading { min-height: 59px; padding: 10px 52px; }
+  .profile-post-dialog .profile-overlay-heading h2 { font-size: 18px; }
+  .profile-post-dialog .profile-overlay-heading > button { top: 11px; right: 11px; }
+  .modern-shell .profile-post-dialog .profile-popup-composer { gap: 11px; padding: 13px 14px 16px; }
+  .modern-shell .profile-popup-composer .post-prompt textarea { min-height: 52px; font-size: 18px; }
+  .modern-shell .profile-popup-composer .composer-shortcuts { gap: 8px; padding: 8px 9px; }
+  .smart-composer-actions-title { font-size: 12px; }
+  .smart-composer-action-icons { gap: 4px; }
+  .modern-shell .profile-popup-composer .smart-composer-action-icons > button { flex-basis: 36px; width: 36px; height: 36px; min-height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .social-feed-launcher .social-feed-launcher-prompt,
+  .social-feed-launcher .social-feed-launcher-shortcuts > button,
+  .modern-shell .profile-popup-composer .smart-composer-action-icons > button { transition: none; }
+}
+
+/* Launcher: independent accent colors, all three actions alongside the prompt. */
+.modern-shell.app-layout .social-feed-launcher .social-feed-launcher-shortcuts > button[aria-label="Ảnh / Video"] {
+  color: #168658;
+  background: #e9f8ef;
+  border-color: #e0f0e6;
+}
+.modern-shell.app-layout .social-feed-launcher .social-feed-launcher-shortcuts > button[aria-label="Story"] {
+  color: #8250cb;
+  background: #f3edfe;
+  border-color: #ebe1fc;
+}
+.modern-shell.app-layout .social-feed-launcher .social-feed-launcher-shortcuts > button[aria-label="Check-in"] {
+  color: #d47a26;
+  background: #fff3e6;
+  border-color: #f9e7d3;
+}
+.modern-shell.app-layout .social-feed-launcher .social-feed-launcher-shortcuts > button:hover {
+  filter: brightness(.965);
+}
+.modern-shell.app-layout .social-feed-launcher .social-feed-launcher-shortcuts > button svg {
+  color: currentColor;
+}
+/* Match the same photo / palette / location accents inside the dialog. */
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button[aria-label="Thêm ảnh hoặc video"] {
+  color: #168658;
+  background: #e9f8ef;
+  border-color: #e0f0e6;
+}
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button[aria-label="Nền chữ"] {
+  color: #8250cb;
+  background: #f3edfe;
+  border-color: #ebe1fc;
+}
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button[aria-label="Check-in địa điểm"] {
+  color: #d47a26;
+  background: #fff3e6;
+  border-color: #f9e7d3;
+}
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button:hover {
+  filter: brightness(.96);
+}
+
+/* Accessible descriptive tooltips for icon-only actions: mouse hover and keyboard focus. */
+.social-feed-launcher .social-feed-launcher-shortcuts > button[data-tooltip],
+.profile-popup-composer .smart-composer-action-icons > button[data-tooltip] {
+  position: relative;
+}
+.social-feed-launcher .social-feed-launcher-shortcuts > button[data-tooltip]::after,
+.profile-popup-composer .smart-composer-action-icons > button[data-tooltip]::after {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  z-index: 30;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(220px, 60vw);
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #29344b;
+  box-shadow: 0 5px 18px rgba(19, 34, 57, .19);
+  color: #fff;
+  content: attr(data-tooltip);
+  font-size: 12px;
+  font-weight: 580;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 3px);
+  transition: opacity .12s ease, transform .12s ease, visibility .12s ease;
+}
+.social-feed-launcher .social-feed-launcher-shortcuts > button[data-tooltip]:is(:hover, :focus-visible)::after,
+.profile-popup-composer .smart-composer-action-icons > button[data-tooltip]:is(:hover, :focus-visible)::after {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.social-feed-launcher .social-feed-launcher-shortcuts > button[data-tooltip]:last-of-type::after,
+.profile-popup-composer .smart-composer-action-icons > button[data-tooltip]:last-child::after {
+  left: auto;
+  right: 0;
+  transform: translateY(3px);
+}
+.social-feed-launcher .social-feed-launcher-shortcuts > button[data-tooltip]:last-of-type:is(:hover, :focus-visible)::after,
+.profile-popup-composer .smart-composer-action-icons > button[data-tooltip]:last-child:is(:hover, :focus-visible)::after {
+  transform: translateY(0);
+}
+
+/* Friend tagging picker follows the same compact card and control rhythm. */
+.profile-popup-composer .smart-tag-picker {
+  order: 2;
+}
+.smart-tag-picker {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e4eaf3;
+  border-radius: 12px;
+  background: #fafbfe;
+  min-width: 0;
+}
+.smart-tag-picker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.smart-tag-picker-heading strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #344864;
+  font-size: 13px;
+  font-weight: 680;
+}
+.smart-tag-picker-heading > button,
+.smart-tag-chip button {
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #5f718a;
+  cursor: pointer;
+}
+.smart-tag-picker-heading > button {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+.smart-tag-picker-heading > button:hover { background: #ecf1f8; }
+.smart-tag-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.smart-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 5px 5px 10px;
+  border-radius: 999px;
+  background: #e9f0fc;
+  color: #32558f;
+  font-size: 12px;
+  font-weight: 640;
+}
+.smart-tag-chip button {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+.smart-tag-chip button:hover { background: #d5e2f7; }
+.smart-tag-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid #dfe6f1;
+  border-radius: 10px;
+  background: #fff;
+  color: #8191a8;
+}
+.smart-tag-search:focus-within { border-color: #89b0f4; box-shadow: 0 0 0 2px #dceaff; }
+.smart-tag-search input {
+  flex: 1;
+  min-width: 0;
+  min-height: 37px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #283b56;
+  font: inherit;
+  font-size: 13px;
+}
+.smart-tag-results {
+  display: grid;
+  gap: 3px;
+  max-height: 200px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.smart-tag-person {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 49px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #253957;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.smart-tag-person:hover, .smart-tag-person[aria-pressed="true"] {
+  border-color: #e0e9fa;
+  background: #eef4ff;
+}
+.smart-tag-person:disabled { cursor: not-allowed; opacity: .52; }
+.smart-tag-person .smart-tag-avatar {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+.smart-tag-person > span { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.smart-tag-person > span strong { font-size: 12px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smart-tag-person > span small { color: #71819a; font-size: 11px; }
+.smart-tag-selected-icon { flex-shrink: 0; color: #2863d8; }
+.smart-tag-empty, .smart-tag-hint {
+  margin: 0;
+  color: #7a89a1;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.smart-tag-empty { padding: 12px 5px; text-align: center; }
+@media (max-width: 480px) {
+  .modern-shell .profile-popup-composer .smart-composer-action-icons > button {
+    flex-basis: 34px;
+    width: 34px;
+    height: 36px;
+    min-height: 36px;
+  }
+  .profile-popup-composer .smart-composer-action-icons { gap: 3px; }
+  .smart-tag-picker { padding: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .social-feed-launcher .social-feed-launcher-shortcuts > button[data-tooltip]::after,
+  .profile-popup-composer .smart-composer-action-icons > button[data-tooltip]::after {
+    transition: none;
+  }
+}
+/* Tag action shares the existing colored icon language. */
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button[aria-label="Gắn thẻ bạn bè"] {
+  color: #3366c5;
+  background: #eaf1ff;
+  border-color: #dce7fb;
+}
+
+/* Feeling picker: a compact, consistent extension of the post composer. */
+.profile-popup-composer .smart-feeling-picker { order: 2; }
+.smart-feeling-picker {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e5eaf4;
+  border-radius: 12px;
+  background: #fafbfe;
+}
+.smart-feeling-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+.smart-feeling-heading strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #344864;
+  font-size: 13px;
+  font-weight: 680;
+}
+.smart-feeling-heading > button,
+.smart-feeling-selected > button {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: #65768b;
+  background: transparent;
+  cursor: pointer;
+}
+.smart-feeling-heading > button:hover,
+.smart-feeling-selected > button:hover { background: #e7edf5; }
+.smart-feeling-selected {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  max-width: 100%;
+  gap: 6px;
+  padding: 3px 5px 3px 11px;
+  border-radius: 999px;
+  color: #9b6019;
+  background: #fff0d9;
+  font-size: 12px;
+  font-weight: 630;
+  line-height: 1.45;
+}
+.smart-feeling-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.smart-feeling-options > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #e6ebf4;
+  border-radius: 10px;
+  background: #fff;
+  color: #3c4b65;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.smart-feeling-options > button span:first-child { font-size: 19px; line-height: 1; }
+.smart-feeling-options > button:hover,
+.smart-feeling-options > button[aria-pressed="true"] {
+  color: #986020;
+  border-color: #f4d6a9;
+  background: #fff5e6;
+}
+.smart-feeling-options > button svg { margin-left: auto; flex-shrink: 0; }
+.smart-feeling-options > button:disabled { opacity: .55; cursor: not-allowed; }
+.modern-shell .profile-popup-composer .smart-composer-action-icons > button[aria-label="Cảm xúc"] {
+  color: #ba7b13;
+  background: #fff3d9;
+  border-color: #f8e6bd;
+}
+@media (max-width: 480px) {
+  .smart-feeling-picker { padding: 10px; }
+  .smart-feeling-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .smart-feeling-options > button { min-height: 42px; }
+}
+@media (max-width: 360px) {
+  .modern-shell .profile-popup-composer .smart-composer-action-icons > button {
+    flex-basis: 30px;
+    width: 30px;
+    min-width: 30px;
+    height: 35px;
+    min-height: 35px;
+  }
+  .profile-popup-composer .smart-composer-action-icons { gap: 2px; }
+}

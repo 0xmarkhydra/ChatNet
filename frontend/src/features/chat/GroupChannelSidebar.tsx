@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Search, UsersRound, X } from 'lucide-react'
-import type { GroupChannel } from './groupChannels'
+import type { GroupChannel } from './utils/groupChannels'
 import './group-channel-sidebar.css'
 
 type Props = {

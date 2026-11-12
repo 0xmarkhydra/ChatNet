@@ -33,6 +33,16 @@ type moderationReport struct {
 	ReviewedAt *time.Time `json:"reviewedAt,omitempty"`
 }
 
+func (s *server) getModerationMe(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	allowed, err := s.isFeedModerator(r, claims.UserID)
+	if err != nil {
+		httpx.Error(w, 503, "moderation unavailable")
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]bool{"moderator": allowed})
+}
+
 func (s *server) listModerationReports(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	allowed, err := s.isFeedModerator(r, claims.UserID)

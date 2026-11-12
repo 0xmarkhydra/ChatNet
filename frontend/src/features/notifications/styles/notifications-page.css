@@ -1,0 +1,117 @@
+/* Numeric unread badge shared by the notification bells across SocCo. */
+.appbar-icon-button.notification-appbar .appbar-badge-count {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #f58622;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+/* Full-page notifications for the SocCo desktop layout. */
+.np-screen{
+ --np-ink:#1a2c4b;--np-muted:#8290ad;
+ box-sizing:border-box;width:100%;height:100%;min-height:0;overflow:auto;
+ padding:21px 25px 29px;background:#f7f8fd;color:var(--np-ink);
+ font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.np-screen *{box-sizing:border-box}
+.np-screen h2,.np-screen h3,.np-screen p{margin:0}
+.np-screen button{font:inherit;cursor:pointer}
+.np-screen button:disabled{opacity:.5;cursor:not-allowed}
+.np-screen button:focus-visible{outline:3px solid #91b2fb;outline-offset:2px}
+.np-layout{
+ display:grid;grid-template-columns:minmax(0,1.95fr) minmax(285px,.96fr);
+ gap:16px;align-items:stretch;min-height:100%;
+}
+.np-card{background:#fff;border:1px solid #eef1fa;border-radius:17px;padding:20px;box-shadow:0 6px 23px #23386d08;min-width:0}
+.np-card>h2{font-size:17px;line-height:1.4;font-weight:800;color:#1e2f4e;margin-bottom:18px}
+.np-list-pane{display:flex;flex-direction:column;min-height:0}
+.np-filters{display:flex;align-items:center;gap:7px;margin:0 0 18px}
+.np-filters button{border:0;background:transparent;color:#788cad;padding:9px 16px;border-radius:12px;font-size:12px;min-width:82px}
+.np-filters button.active{font-weight:770;color:#2763e7;background:transparent}
+.np-filters .notifications-active-pill{background:#eaf0ff;border-radius:12px}
+.np-filters button:hover:not(.active){background:#f5f7fc}
+.np-notification-list{min-height:0;overflow:auto;display:grid;align-content:start;gap:8px}
+.np-notification-row{
+ width:100%;min-height:80px;border:0;border-radius:14px;background:transparent;
+ display:flex;align-items:center;gap:13px;text-align:left;padding:12px 12px;
+}
+.np-notification-row.selected{background:#eaf0ff}
+.np-notification-row:not(.selected):hover{background:#f5f7ff}
+.np-notification-row.is-read:not(.selected){opacity:.75}
+.np-avatar{height:49px!important;width:49px!important;flex:0 0 49px;border-radius:50%!important}
+.np-group-avatar{height:49px;width:49px;flex:0 0 49px;border-radius:50%;display:grid;place-items:center;background:#eef2ff;color:#2563eb}
+.np-notification-copy{display:grid;gap:4px;flex:1;min-width:0}
+.np-notification-copy strong{font-size:13px;color:#192d4f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.np-notification-copy>span{font-size:12px;color:#495e82;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.np-notification-copy small{font-size:11px;color:#93a1ba}
+.np-row-icon{width:28px;flex:0 0 28px;display:grid;place-items:center;color:#2764ed}
+.np-empty{display:grid;justify-items:center;gap:11px;text-align:center;color:#7e8eaa;padding:62px 18px}
+.np-empty svg{color:#7e9aea}
+.np-empty strong{font-size:13px;color:#263955}
+.np-empty p{font-size:12px;max-width:310px;line-height:1.6}
+.np-unread-hint{color:#8f9fbb;font-size:11px;margin-top:auto;padding:12px}
+.np-detail-pane{display:flex;flex-direction:column;min-height:560px;gap:0}
+.np-detail-person{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:30px 4px 35px;border-bottom:1px solid #e8ecf6}
+.np-detail-avatar{width:98px!important;height:98px!important;flex:0 0 98px;border-radius:50%!important}
+.np-detail-group-avatar{width:98px;height:98px;flex:0 0 98px;border-radius:50%;background:#eef2ff;color:#2563eb;display:grid;place-items:center}
+.np-detail-person h3{font-size:17px;font-weight:800;color:#192b4d;margin-top:8px}
+.np-detail-person p{font-size:12px;color:#7f90ad}
+.np-detail-description{display:grid;gap:14px;padding:21px 3px 20px}
+.np-detail-description p{font-size:12px;color:#5f7294;line-height:1.5}
+.np-detail-description p strong{font-size:13px;color:#243b60}
+.np-message-preview{padding:12px;border-radius:10px;background:#f8faff;overflow-wrap:anywhere}
+.np-detail-actions{display:grid;gap:9px;padding:6px 0 20px}
+.np-primary,.np-secondary{
+ border:0;min-height:42px;width:100%;padding:10px 12px;border-radius:10px;
+ font-size:12px;font-weight:750;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+}
+.np-primary{color:#fff;background:#2563eb}
+.np-primary:hover:not(:disabled){background:#1d53cf}
+.np-secondary{color:#2563eb;background:#eaf0ff}
+.np-secondary:hover:not(:disabled){background:#dfe8ff}
+.np-text-link,.np-invites-link{border:0;background:transparent;color:#315fd0;font-size:11px;font-weight:690;padding:8px}
+.np-detail-empty{display:grid;justify-items:center;align-content:center;gap:12px;padding:70px 12px;flex:1;text-align:center;color:#8ba1c0}
+.np-detail-empty h3{font-size:15px;color:#293b5e}
+.np-detail-empty p{font-size:12px}
+.np-settings{margin-top:auto;width:100%;min-height:89px;border:0;border-radius:12px;background:#edf2ff;display:flex;align-items:flex-start;gap:13px;padding:18px 15px;text-align:left;color:#2862e9}
+.np-settings span{display:grid;gap:8px}
+.np-settings strong{font-size:12px;color:#1e3354}
+.np-settings small{font-size:11px;color:#8091af;line-height:1.55}
+.np-invites-link{align-self:flex-start;margin-top:9px}
+@media(min-width:761px) and (max-width:1160px){
+ .np-screen{padding:15px}
+ .np-layout{grid-template-columns:minmax(0,1.5fr) minmax(245px,.9fr);gap:10px}
+ .np-card{padding:14px}
+}
+@media(max-width:760px){
+ .np-screen{height:auto;min-height:100%;padding:12px}
+ .np-layout{grid-template-columns:minmax(0,1fr);gap:12px}
+ .np-card{padding:15px}
+ .np-list-pane{min-height:330px}
+ .np-notification-list{overflow:visible}
+ .np-detail-pane{min-height:360px}
+ .np-detail-person{padding:15px 4px 20px}
+ .np-detail-avatar,.np-detail-group-avatar{height:78px!important;width:78px!important;flex-basis:78px}
+ .np-detail-actions{padding-bottom:12px}
+ .np-settings{margin-top:16px}
+}
+@media(max-width:390px){
+ .np-filters{gap:3px}
+ .np-filters button{min-width:0;padding:8px 10px}
+}

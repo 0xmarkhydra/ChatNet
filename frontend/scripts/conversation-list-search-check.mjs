@@ -61,7 +61,7 @@ try {
     const fold = value => String(value || '').toLocaleLowerCase('vi-VN')
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
     let failOnce = false
-    await page.route('**/api/**', async route => {
+    await page.route(url => url.pathname.startsWith('/api/'), async route => {
       const url = new URL(route.request().url()), path = url.pathname
       const json = (body, status = 200) => route.fulfill({
         status, contentType: 'application/json',

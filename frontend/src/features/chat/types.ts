@@ -1,4 +1,4 @@
-import type { MediaAttachment } from '../../shared/lib/media'
+import type { MediaAttachment } from '../../shared/utils/media'
 
 export type MessageReaction = {
   emoji: string
