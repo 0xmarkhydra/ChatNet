@@ -1,3 +1,5 @@
+import { useFriendActions } from "./useFriendActions";
+import { useContactModeration } from "./useContactModeration";
 import type { FriendSearchResult, FriendConnection } from "../types";
 import { type Conversation } from "../../chat/types";
 import { type Session } from "../../auth/lib/session";
@@ -73,103 +75,47 @@ export function useContactActions({
   setNotice,
   setTab,
 }: UseContactActionsDeps) {
-  async function actOnFriend(
-    friend: FriendSearchResult | FriendConnection,
-    decline = false,
-  ) {
-    const sessionId = session?.sessionId;
-    if (
-      !sessionId ||
-      friendActionRef.current.has(friend.id) ||
-      friend.id === session.user.id
-    )
-      return;
-    const relationship = friendRelationship(friend.id);
-    if (decline && relationship !== "incoming") return;
-    if (relationship === "accepted") {
-      const contact = friends.find((item) => item.id === friend.id);
-      if (contact?.blockedByMe || contact?.blockedByOther) {
-        await openBlockedFriendConversation(friend.id);
-      } else if (friend.username) {
-        await openDirectByUsername(friend.username);
-      }
-      return;
-    }
+  const moderationActions = useContactModeration({
+    apiFetch,
+    blockedBusy,
+    friendBusyIds,
+    refreshConversations,
+    refreshFriendConnections,
+    session,
+    sessionRef,
+    setBlockedBusy,
+    setBlockedError,
+    setBlockedOpen,
+    setBlockedUsers,
+    setConversations,
+    setFriendBusyIds,
+    setFriendMenuId,
+    setFriendPreview,
+    setFriendRequests,
+    setFriendResults,
+    setFriends,
+    setNotice,
+  });
+  const friendActions = useFriendActions({
+    apiFetch,
+    friendActionRef,
+    friendRelationship,
+    friends,
+    friendSyncRequest,
+    openDirectByUsername,
+    refreshFriendConnections,
+    session,
+    sessionRef,
+    setFriendActionBusy,
+    setFriendBusyIds,
+    setFriendMenuId,
+    setFriendPreview,
+    setFriendRequests,
+    setFriends,
+    setNotice,
+    openBlockedFriendConversation,
+  });
 
-    friendActionRef.current.add(friend.id);
-    setFriendBusyIds((current) => new Set(current).add(friend.id));
-    ++friendSyncRequest.current;
-    setFriendActionBusy(friend.id);
-    try {
-      const removing = decline || relationship === "outgoing";
-      const method = removing ? "DELETE" : "POST";
-      const path = removing
-        ? `/api/friends/${friend.id}?direction=${relationship}`
-        : relationship === "incoming"
-          ? `/api/friends/${friend.id}/accept`
-          : `/api/friends/${friend.id}`;
-      const response = await apiFetch(path, { method });
-      const result = (await response.json().catch(() => null)) as
-        | (FriendConnection & { error?: string })
-        | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      ++friendSyncRequest.current;
-      if (!response.ok) {
-        setNotice(result?.error || "Không cập nhật được lời mời kết bạn");
-        await refreshFriendConnections();
-        return;
-      }
-      const label = friend.displayName || `@${friend.username}`;
-      if (removing) {
-        setFriendRequests((current) =>
-          current.filter((item) => item.id !== friend.id),
-        );
-        setNotice(
-          decline ? "Đã từ chối lời mời kết bạn" : "Đã hủy lời mời kết bạn",
-        );
-      } else if (result?.id === friend.id && result.status === "accepted") {
-        setFriends((current) => [
-          ...current.filter((item) => item.id !== friend.id),
-          result,
-        ]);
-        setFriendRequests((current) =>
-          current.filter((item) => item.id !== friend.id),
-        );
-        setNotice(`Đã kết bạn với ${label}`);
-      } else if (result?.id === friend.id && result.status === "pending") {
-        setFriendRequests((current) => [
-          ...current.filter((item) => item.id !== friend.id),
-          result,
-        ]);
-        setNotice(
-          result.direction === "incoming"
-            ? `${label} cũng đã gửi lời mời. Bạn có thể chấp nhận ngay.`
-            : `Đã gửi lời mời kết bạn tới ${label}`,
-        );
-      } else {
-        await refreshFriendConnections();
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) {
-        setNotice(
-          "Không cập nhật được lời mời kết bạn. Kiểm tra kết nối rồi thử lại.",
-        );
-        await refreshFriendConnections();
-      }
-    } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        friendActionRef.current.delete(friend.id);
-        setFriendBusyIds((current) => {
-          const next = new Set(current);
-          next.delete(friend.id);
-          return next;
-        });
-        setFriendActionBusy(
-          friendActionRef.current.values().next().value ?? null,
-        );
-      }
-    }
-  }
   async function changePersonalContact(
     friend: FriendConnection,
     field: "nickname" | "note" | "favorite",
@@ -223,232 +169,12 @@ export function useContactActions({
       if (sessionRef.current?.sessionId === sid)
         setNotice("Không thể lưu liên hệ. Hãy thử lại.", "error");
     } finally {
-      setFriendBusyIds((ids) => {
-        const nextIDs = new Set(ids);
-        nextIDs.delete(friend.id);
-        return nextIDs;
-      });
-    }
-  }
-  async function blockContact(friend: Pick<FriendSearchResult, 'id' | 'username' | 'displayName'>) {
-    const sid = session?.sessionId;
-    if (!sid || friendBusyIds.has(friend.id)) return;
-    if (
-      !window.confirm(
-        `Chặn @${friend.username}? Hai bạn sẽ không thể nhắn tin, gọi điện hoặc kết bạn với nhau.`,
-      )
-    )
-      return;
-    setFriendBusyIds((old) => new Set(old).add(friend.id));
-    setFriendMenuId(null);
-    try {
-      const response = await apiFetch(`/api/users/${friend.id}/block`, {
-        method: "POST",
-      });
-      const result = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      if (sessionRef.current?.sessionId !== sid) return;
-      if (!response.ok) {
-        setNotice(result?.error || "Không thể chặn người dùng.", "error");
-        return;
-      }
-      // Blocking a contact must not remove an accepted friend from the directory.
-      setFriends((old) => old.map((item) => item.id === friend.id
-        ? { ...item, blockedByMe: true, online: false }
-        : item));
-      setFriendRequests((old) => old.filter((item) => item.id !== friend.id));
-      setFriendResults((old) => old.filter((item) => item.id !== friend.id));
-      setBlockedUsers((old) => [
-        ...old.filter((item) => item.id !== friend.id),
-        {
-          id: friend.id,
-          username: friend.username,
-          displayName: friend.displayName,
-        },
-      ]);
-      setFriendPreview(null);
-      setConversations((old) =>
-        old.map((item) => item.type === 'direct' && item.otherUserId === friend.id
-          ? { ...item, blockedByMe: true, online: false }
-          : item),
-      );
-      window.dispatchEvent(new Event('chatnet:privacy-updated'));
-      setNotice(`Đã chặn @${friend.username}.`);
-      await refreshFriendConnections();
-      void refreshConversations();
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setNotice("Không thể chặn người dùng. Hãy thử lại.", "error");
-    } finally {
-      setFriendBusyIds((old) => {
-        const next = new Set(old);
-        next.delete(friend.id);
-        return next;
-      });
-    }
-  }
-  async function reportContact(friend: FriendSearchResult | FriendConnection) {
-    const sid = session?.sessionId;
-    if (!sid) return;
-    const answer = window.prompt(
-      "Lý do báo cáo: 1 - Spam, 2 - Quấy rối, 3 - Giả mạo, 4 - Khác",
-    );
-    if (answer === null) return;
-    const reason = (
-      {
-        "1": "spam",
-        "2": "harassment",
-        "3": "impersonation",
-        "4": "other",
-      } as Record<string, string>
-    )[answer.trim()];
-    if (!reason) {
-      setNotice("Vui lòng chọn lý do từ 1 đến 4.", "warning");
-      return;
-    }
-    const details = window.prompt(
-      "Mô tả sự việc (không quá 1000 ký tự, có thể để trống):",
-    );
-    if (details === null) return;
-    if (details.length > 1000) {
-      setNotice("Mô tả không được quá 1000 ký tự.", "warning");
-      return;
-    }
-    setFriendMenuId(null);
-    try {
-      const response = await apiFetch(`/api/users/${friend.id}/report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason, details: details.trim() }),
-      });
-      const result = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      if (sessionRef.current?.sessionId !== sid) return;
-      setNotice(
-        response.ok
-          ? "Đã gửi báo cáo. Cảm ơn bạn."
-          : result?.error || "Không thể gửi báo cáo.",
-        response.ok ? "success" : "error",
-      );
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setNotice("Không thể gửi báo cáo. Hãy thử lại.", "error");
-    }
-  }
-  async function loadBlockedUsers() {
-    const sid = session?.sessionId;
-    if (!sid || blockedBusy) return;
-    setBlockedBusy(true);
-    setBlockedError("");
-    try {
-      const response = await apiFetch("/api/users/blocked");
-      if (!response.ok) throw new Error();
-      const data = (await response.json()) as Array<{
-        id: number;
-        username: string;
-        displayName: string;
-      }>;
       if (sessionRef.current?.sessionId === sid) {
-        setBlockedUsers(data);
-        setBlockedOpen(true);
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setBlockedError("Không tải được danh sách chặn.");
-    } finally {
-      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false);
-    }
-  }
-  async function unblockContact(userId: number) {
-    const sid = session?.sessionId;
-    if (!sid || blockedBusy || !window.confirm("Bỏ chặn người dùng này?"))
-      return;
-    setBlockedBusy(true);
-    setBlockedError("");
-    try {
-      const response = await apiFetch(`/api/users/${userId}/block`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error();
-      if (sessionRef.current?.sessionId === sid) {
-        setBlockedUsers((old) => old.filter((item) => item.id !== userId));
-        setFriends((old) => old.map((item) => item.id === userId
-          ? { ...item, blockedByMe: false }
-          : item));
-        void refreshFriendConnections();
-        setConversations((old) => old.map((item) =>
-          item.type === 'direct' && item.otherUserId === userId
-            ? { ...item, blockedByMe: false }
-            : item));
-        window.dispatchEvent(new Event('chatnet:privacy-updated'));
-        void refreshConversations();
-        setNotice("Đã bỏ chặn người dùng.");
-      }
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setBlockedError("Không thể bỏ chặn. Hãy thử lại.");
-    } finally {
-      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false);
-    }
-  }
-  async function declineFriendRequest(friend: FriendConnection) {
-    await actOnFriend(friend, true);
-  }
-  async function removeAcceptedFriend(friend: FriendConnection) {
-    const sessionId = session?.sessionId;
-    if (
-      !sessionId ||
-      friendRelationship(friend.id) !== "accepted" ||
-      friendActionRef.current.has(friend.id)
-    )
-      return;
-    if (
-      !window.confirm(
-        `Hủy kết bạn với ${friend.displayName || "@" + friend.username}?`,
-      )
-    )
-      return;
-    friendActionRef.current.add(friend.id);
-    setFriendBusyIds((current) => new Set(current).add(friend.id));
-    setFriendActionBusy(friend.id);
-    setFriendMenuId(null);
-    try {
-      const response = await apiFetch(
-        `/api/friends/${friend.id}?direction=accepted`,
-        { method: "DELETE" },
-      );
-      const result = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (!response.ok) {
-        setNotice(result?.error || "Không thể hủy kết bạn. Vui lòng thử lại.");
-      } else {
-        setFriends((current) =>
-          current.filter((item) => item.id !== friend.id),
-        );
-        setFriendPreview(null);
-        setNotice("Đã hủy kết bạn");
-      }
-      await refreshFriendConnections();
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) {
-        setNotice("Mạng gián đoạn. Đang đồng bộ lại danh sách bạn bè.");
-        await refreshFriendConnections();
-      }
-    } finally {
-      friendActionRef.current.delete(friend.id);
-      if (sessionRef.current?.sessionId === sessionId) {
-        setFriendBusyIds((current) => {
-          const next = new Set(current);
-          next.delete(friend.id);
-          return next;
+        setFriendBusyIds((ids) => {
+          const nextIDs = new Set(ids);
+          nextIDs.delete(friend.id);
+          return nextIDs;
         });
-        setFriendActionBusy(
-          friendActionRef.current.values().next().value ?? null,
-        );
       }
     }
   }
@@ -483,14 +209,9 @@ export function useContactActions({
   }
 
   return {
-    actOnFriend,
-    blockContact,
+    ...moderationActions,
+    ...friendActions,
     changePersonalContact,
-    declineFriendRequest,
-    loadBlockedUsers,
     openBlockedFriendConversation,
-    removeAcceptedFriend,
-    reportContact,
-    unblockContact,
   };
 }
