@@ -15,7 +15,7 @@ export default function ConversationSharedPreview({
   onOpen: (tab?: 'media' | 'files' | 'links') => void
 }) {
   const requestRef = useRef(request)
-  requestRef.current = request
+  useEffect(() => { requestRef.current = request }, [request])
   const [items, setItems] = useState<PreviewItem[]>([])
   const [mediaCount, setMediaCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -25,12 +25,6 @@ export default function ConversationSharedPreview({
 
   useEffect(() => {
     const controller = new AbortController()
-    setItems([])
-    setViewerIndex(null)
-    setMediaCount(0)
-    setLoading(true)
-    setError(false)
-
     void loadSharedContent({
       conversationId, channelId, kind: 'media', limit: 24,
       request: requestRef.current, signal: controller.signal,
@@ -73,7 +67,7 @@ export default function ConversationSharedPreview({
           ))}
         </div>
       ) : (
-        <button type="button" className="conversation-shared-preview-empty" onClick={() => error ? setRetryKey(key => key + 1) : onOpen('media')}>
+        <button type="button" className="conversation-shared-preview-empty" onClick={() => { if (error) { setItems([]); setViewerIndex(null); setMediaCount(0); setLoading(true); setError(false); setRetryKey(key => key + 1) } else onOpen('media') }}>
           {loading ? 'Đang tải phương tiện...' : error
             ? 'Không tải được ảnh xem trước. Nhấn để thử lại.'
             : 'Chưa có ảnh hoặc video được chia sẻ'}

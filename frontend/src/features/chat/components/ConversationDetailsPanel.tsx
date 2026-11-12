@@ -94,7 +94,7 @@ export default function ConversationDetailsPanel({
           : conversation.online ? '● Đang hoạt động' : 'Chat riêng'}</span>
       </div>
 
-      <ConversationSharedPreview conversationId={conversation.id}
+      <ConversationSharedPreview key={`${conversation.id}:${isGroup ? selectedChannelId : 0}`} conversationId={conversation.id}
         channelId={isGroup ? selectedChannelId : 0}
         request={request} onOpen={onShared} />
 
