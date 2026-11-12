@@ -40,7 +40,7 @@ try {
     class Events extends EventTarget { constructor() { super(); setTimeout(() => this.onopen?.(), 50) } close() {} }
     window.EventSource = Events
   }, session)
-  await page.route('**/api/**', async (route) => {
+  await page.route(url => url.pathname.startsWith('/api/'), async (route) => {
     const req = route.request()
     const url = new URL(req.url())
     const path = url.pathname

@@ -216,3 +216,18 @@ Trong ứng dụng đã đăng nhập, hook và component lấy các dịch vụ
 | `useNotice()` | `notice`, `setNotice`, `dismissNotice` | `shared/context/NoticeContext.tsx` |
 
 Provider được gắn ở `app/providers/AuthedProviders.tsx` (trong `App.tsx`, bên trong `AuthedApp`). Hook mới nên dùng các hook trên; đã chuyển mẫu `useStoryActions` và `useInviteSharing`. Các hook cũ vẫn nhận `session`, `apiFetch`, `setNotice` qua tham số và sẽ được chuyển dần. `toast.ts` (`inferToastKind`, `ToastKind`) nay ở `shared/utils/toast.ts`.
+
+## Feed: api và hook theo trách nhiệm
+
+`features/feed/api/` chứa các hàm dựng request tới Backend (đường dẫn, method, header, body); chúng nhận `apiFetch` làm tham số và để hook xử lý response. Hợp đồng request được khoá bằng `npm run check:feed-api`.
+
+| Hook | Trách nhiệm |
+|---|---|
+| `usePostSync` | đồng bộ một bài viết vào mọi bộ nhớ đệm (bảng tin, đang theo dõi, tìm kiếm, hồ sơ) |
+| `useProfilePosts` | tải dòng thời gian bài viết của chính mình |
+| `usePostComposer` | sở hữu state bản nháp bài viết; đăng và sửa bài |
+| `usePostReactions` | thích và cảm xúc |
+| `usePostComments` | thêm, sửa, xóa, báo cáo bình luận |
+| `usePostDetailNavigation` | mở/đóng chi tiết bài viết và URL `?post=` |
+
+`useFeedActions` đã được gỡ; các hook trên thay thế. Tên tham số ref theo quy ước hậu tố `Ref` (`feedRevisionRef`, …).

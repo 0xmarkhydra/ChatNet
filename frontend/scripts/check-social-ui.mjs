@@ -78,7 +78,7 @@ try {
   page.on('pageerror', err => errors.push(err.message))
   await page.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
   await page.route('**/mock-upload**', route => route.fulfill({ status: 200, headers: cors, body: '' }))
-  await page.route('**/api/**', route => {
+  await page.route(url => url.pathname.startsWith('/api/'), route => {
     const req = route.request(), path = new URL(req.url()).pathname
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(body) })
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })

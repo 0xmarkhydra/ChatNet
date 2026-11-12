@@ -286,7 +286,12 @@ import { useContactActions } from "../features/contacts/hooks/useContactActions"
 import { useTranslationActions } from "../features/chat/hooks/useTranslationActions";
 import { useChatMessaging } from "../features/chat/hooks/useChatMessaging";
 import { useConversationActions } from "../features/chat/hooks/useConversationActions";
-import { useFeedActions } from "../features/feed/hooks/useFeedActions";
+import { usePostSync } from "../features/feed/hooks/usePostSync";
+import { useProfilePosts } from "../features/feed/hooks/useProfilePosts";
+import { usePostComposer } from "../features/feed/hooks/usePostComposer";
+import { usePostReactions } from "../features/feed/hooks/usePostReactions";
+import { usePostComments } from "../features/feed/hooks/usePostComments";
+import { usePostDetailNavigation } from "../features/feed/hooks/usePostDetailNavigation";
 import { useInviteSharing } from "../features/profile/hooks/useInviteSharing";
 import { useStoryActions } from "../features/feed/hooks/useStoryActions";
 import { usePrivacySettings } from "../features/settings/hooks/usePrivacySettings";
@@ -343,7 +348,7 @@ export default function AuthedApp({
 
 
   const [tab, setTab] = useState<Tab>("chat");
-  const { activePostId, activeStoryId, commentEditors, commentSortOrder, draftBeforeEdit, editingPost, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, postAttachments, postBackground, postEditBusy, postFeelingId, postTaggedFriends, postText, postVisibility, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setEditingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostTaggedFriends, setPostText, setPostVisibility, setSearchHasScrolled, setShowPostBackgrounds, setStoryBusy, setStoryDraftFile, showPostBackgrounds, storyBusy, storyDraftFile } = useFeedUiState({ tab });
+  const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraftFile, storyBusy, storyDraftFile } = useFeedUiState({ tab });
 
   const tabRef = useRef(tab);
   tabRef.current = tab;
@@ -1256,7 +1261,12 @@ export default function AuthedApp({
 
   const { connectUrl, copyInviteLink, openConnectSurface, shareMyProfile } = useInviteSharing({ setActiveConversationId, setFriendQuery, setNewChatMode, setQuickCreateOpen, setTab });
 
-  const { addComment, closeFeedPostDetails, createPost, like, loadProfilePosts, manageFeedComment, openEditPost, openFeedPostDetails, removeFeedPost, reportFeedComment, restoreDraftAfterEdit, syncFeedPost } = useFeedActions({ actionLocks, apiFetch, draftBeforeEdit, editingPost, feedCheckInLocation, feedCheckInOpen, feedRevision, feedScrollBeforeComments, feedViewRef, followingFeed, friends, isProfileDesktop, mediaUploading, name, pendingPost, postAttachments, postBackground, postEditBusy, postFeelingId, postSearch, postTaggedFriends, postText, postVisibility, profileLoadSequence, profilePagingBusy, profilePosts, refreshPosts, removeFeedDataPost, session, sessionRef, setActivePostId, setEditingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setLikePreviews, setNotice, setPendingComments, setPendingPost, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPosts, setPostSubmitError, setPostTaggedFriends, setPostText, setPostVisibility, setProfileComposerOpen, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setSavedPosts, setShowPostBackgrounds, showPostBackgrounds, syncFeedDataPost, tab });
+  const { removeFeedPost, syncFeedPost } = usePostSync({ feedRevisionRef: feedRevision, followingFeed, postSearch, removeFeedDataPost, setProfilePosts, syncFeedDataPost });
+  const { loadProfilePosts } = useProfilePosts({ feedRevisionRef: feedRevision, profileLoadSequenceRef: profileLoadSequence, profilePagingBusyRef: profilePagingBusy, profilePosts, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError });
+  const { createPost, draftBeforeEdit, editingPost, openEditPost, postAttachments, postBackground, postEditBusy, postFeelingId, postTaggedFriends, postText, postVisibility, restoreDraftAfterEdit, setEditingPost, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostTaggedFriends, setPostText, setPostVisibility, setShowPostBackgrounds, showPostBackgrounds } = usePostComposer({ actionLocks, feedCheckInLocation, feedCheckInOpen, feedRevisionRef: feedRevision, friends, mediaUploading, name, pendingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setPendingPost, setPosts, setPostSubmitError, setProfileComposerOpen, setProfilePosts, syncFeedPost, tab });
+  const { like } = usePostReactions({ actionLocks, feedRevisionRef: feedRevision, followingFeed, postSearch, refreshPosts, setLikePreviews, setPosts, setProfilePosts, setSavedPosts });
+  const { addComment, manageFeedComment, reportFeedComment } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
+  const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ feedScrollBeforeComments, feedViewRef, isProfileDesktop, setActivePostId, tab });
 
   const { clearActiveConversationHistory, createDirect, createGroup, createGroupChannel, openDirectByUsername, selectGroupChannel } = useConversationActions({ actionLocks, activeChannelIdRef, activeConversation, activeConversationId, activeConversationIdRef, activeGroupMember, apiFetch, conversations, directUsername, groupChannelBusy, groupChannels, historyActionBusy, membershipEventSequence, membershipSnapshot, messageScrollAtBottom, refreshConversations, responseCache, revokedConversationIds, session, sessionRef, setActiveConversationId, setChannelSelection, setChatCreateError, setChatSearchJump, setConversationDetailsOpen, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setHistoryActionBusy, setMessageActionId, setMessages, setMessageSearchOpen, setNewChatMode, setNotice, setReplyingTo, setSharedContentOpen, setTab, setTranslations });
 
