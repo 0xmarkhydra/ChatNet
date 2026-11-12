@@ -53,6 +53,7 @@
     "check:chat-api": "node scripts/chat-api-check.mjs",
     "check:contacts-api": "node --experimental-strip-types scripts/contacts-api-check.mjs",
     "check:settings-notifications-api": "node --experimental-strip-types scripts/settings-notifications-api-check.mjs",
+    "check:architecture": "node scripts/architecture-boundaries-check.mjs",
     "check:chat-messaging-flow": "node scripts/chat-messaging-flow-check.mjs",
     "check:chat-conversation-flow": "node scripts/chat-conversation-flow-check.mjs",
     "check:scoped-state": "node scripts/scoped-state-check.mjs",
