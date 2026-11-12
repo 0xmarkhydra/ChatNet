@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Ban, Bell, CalendarClock, ChevronDown, ChevronRight, ClipboardList, FileText, Images, Languages, Link2, MoreHorizontal, Hash, Plus, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
+import {
+  Ban, CalendarClock, ChevronDown, ChevronRight, ClipboardList, Clock3,
+  FileText, Camera, Info, MoreHorizontal, Plus, ScrollText, Search,
+  ShieldCheck, Trash2, Users, X,
+} from 'lucide-react'
 import type { GroupActivityKind } from '../features/chat/GroupActivities'
 import type { Conversation } from '../features/chat/types'
-import { CallHeaderActions } from '../features/calls/CallManager'
+import type { GroupManagementSection } from '../features/chat/GroupSettingsPanel'
 import UserAvatar from '../shared/ui/UserAvatar'
-import type { GroupChannel } from '../features/chat/groupChannels'
 import GroupChannelCreateForm from '../features/chat/GroupChannelCreateForm'
+import GroupAvatarEditor, { type GroupPhotoTarget } from '../features/chat/GroupAvatarEditor'
+import ConversationSharedPreview from '../features/chat/ConversationSharedPreview'
 
 type Props = {
   conversation: Conversation
@@ -13,117 +18,135 @@ type Props = {
   onClose: () => void
   onProfile: () => void
   onSearch: () => void
-  onShared: () => void
-  onTranslate: () => void
-  onNotifications: () => void
-  onCreateGroupActivity: (kind: GroupActivityKind) => void
-  channels: GroupChannel[]
+  onShared: (tab?: 'media' | 'files' | 'links') => void
+  request: (path: string, init?: RequestInit) => Promise<Response>
   selectedChannelId: number
-  onSelectChannel: (id: number) => void
+  onGroupManagement: (section: GroupManagementSection) => void
+  canManageGroup: boolean
+  onCreateGroupActivity: (kind: GroupActivityKind) => void
   canCreateChannel: boolean
   channelCreateBusy: boolean
   onCreateChannel: (name: string, description: string) => Promise<boolean>
+  canEditGroupPhotos: boolean
+  photoBusy: boolean
+  onSavePhoto: (target: GroupPhotoTarget, file: File | null) => Promise<boolean>
   onBlock: () => void
   onUnblock: () => void
   onClearHistory: () => void
 }
 
+const groupManagementLinks = [
+  { section: 'members', label: 'Thành viên', Icon: Users, manager: false },
+  { section: 'details', label: 'Thông tin cộng đồng', Icon: Info, manager: false },
+  { section: 'permissions', label: 'Quyền quản trị', Icon: ShieldCheck, manager: true },
+  { section: 'requests', label: 'Yêu cầu tham gia', Icon: Clock3, manager: true },
+  { section: 'rules', label: 'Nội quy nhóm', Icon: ScrollText, manager: false },
+  { section: 'activity', label: 'Nhật ký hoạt động', Icon: FileText, manager: true },
+] as const
+
 export default function ConversationDetailsPanel({
-  conversation, busy, onClose, onProfile, onSearch, onShared, onTranslate,
-  onNotifications, onCreateGroupActivity, channels, selectedChannelId, onSelectChannel,
-  canCreateChannel, channelCreateBusy, onCreateChannel, onBlock, onUnblock, onClearHistory,
+  conversation, busy, onClose, onProfile, onSearch, onShared, request,
+  selectedChannelId, onGroupManagement, canManageGroup, onCreateGroupActivity,
+  canCreateChannel, channelCreateBusy, onCreateChannel,
+  canEditGroupPhotos, photoBusy, onSavePhoto, onBlock, onUnblock, onClearHistory,
 }: Props) {
   const isGroup = conversation.type === 'group'
   const blocked = !isGroup && Boolean(conversation.blockedByMe || conversation.blockedByOther)
   const [groupOptionsOpen, setGroupOptionsOpen] = useState(false)
   const [creatingChannel, setCreatingChannel] = useState(false)
-  useEffect(() => { setGroupOptionsOpen(false); setCreatingChannel(false) }, [conversation.id])
-  const options = [
-    { label: 'Thông báo', Icon: Bell, action: onNotifications },
-    { label: 'Dịch AI', Icon: Languages, action: onTranslate },
-    { label: 'Ảnh & video', Icon: Images, action: onShared },
-    { label: 'Tệp tin', Icon: FileText, action: onShared },
-    { label: 'Liên kết', Icon: Link2, action: onShared },
-    { label: 'Tìm tin nhắn', Icon: Search, action: onSearch },
-  ]
+  const [photoTarget, setPhotoTarget] = useState<GroupPhotoTarget | null>(null)
+  useEffect(() => {
+    setGroupOptionsOpen(false)
+    setCreatingChannel(false)
+    setPhotoTarget(null)
+  }, [conversation.id])
+
   return (
     <aside className="conversation-info-panel social-chat-details" id="conversation-details-panel" aria-label="Thông tin hội thoại">
       <div className="conversation-details-heading">
         <h2>Thông tin hội thoại</h2>
-        <button type="button" className="sidebar-panel-close" onClick={onClose} aria-label="Đóng thông tin hội thoại" title="Đóng">
+        <button type="button" className="sidebar-panel-close" onClick={onClose}
+          aria-label="Đóng thông tin hội thoại" title="Đóng">
           <X size={19} aria-hidden="true" />
         </button>
       </div>
+
       <div className="conversation-info-panel-identity social-chat-details-identity">
-        <UserAvatar username={conversation.otherUsername} name={conversation.name}
-          className="conversation-info-panel-avatar social-chat-details-avatar" group={isGroup}
-          online={!isGroup && conversation.online} />
+        {isGroup ? (
+          <div className="group-photo-avatar-wrap">
+            <UserAvatar name={conversation.name}
+              className="conversation-info-panel-avatar social-chat-details-avatar"
+              group imageUrl={conversation.avatarUrl} />
+            {canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
+              aria-label="Đổi ảnh nhóm" title="Đổi ảnh nhóm"
+              onClick={() => setPhotoTarget({ name: conversation.name, avatarUrl: conversation.avatarUrl })}>
+              <Camera size={17} aria-hidden="true" />
+            </button>}
+          </div>
+        ) : (
+          <UserAvatar username={conversation.otherUsername} name={conversation.name}
+            className="conversation-info-panel-avatar social-chat-details-avatar"
+            online={conversation.online} />
+        )}
         <strong title={conversation.name}>{conversation.name}</strong>
-        <span>{blocked ? (conversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này') : isGroup ? `${conversation.memberCount} thành viên` : conversation.online ? '● Đang hoạt động' : 'Chat riêng'}</span>
+        <span>{blocked ? (conversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này')
+          : isGroup ? `${conversation.memberCount} thành viên`
+          : conversation.online ? '● Đang hoạt động' : 'Chat riêng'}</span>
       </div>
-      <div className="conversation-info-panel-actions social-chat-details-actions">
-        <CallHeaderActions conversationId={conversation.id} disabled={blocked} />
-        <button type="button" onClick={onProfile}>
-          <Users size={20} aria-hidden="true" />
-          <span>{isGroup ? 'Quản lý nhóm' : 'Hồ sơ'}</span>
-        </button>
-      </div>
+
+      <ConversationSharedPreview conversationId={conversation.id}
+        channelId={isGroup ? selectedChannelId : 0}
+        request={request} onOpen={onShared} />
+
       <nav className="conversation-info-panel-links social-chat-details-links" aria-label="Tùy chọn hội thoại">
-        {options.map(({ label, Icon, action }) => (
-          <button type="button" key={label} onClick={action}>
-            <Icon size={19} aria-hidden="true" />
-            <span>{label}</span>
-            <ChevronRight size={16} aria-hidden="true" />
+        {!isGroup && (
+          <button type="button" onClick={onProfile}>
+            <Users size={19} aria-hidden="true" />
+            <span>Hồ sơ</span><ChevronRight size={16} aria-hidden="true" />
           </button>
-        ))}
+        )}
+        <button type="button" onClick={onSearch}>
+          <Search size={19} aria-hidden="true" />
+          <span>Tìm tin nhắn</span><ChevronRight size={16} aria-hidden="true" />
+        </button>
+
+        {isGroup && groupManagementLinks.filter(item => !item.manager || canManageGroup)
+          .map(({ section, label, Icon }) => (
+            <button type="button" key={section} onClick={() => onGroupManagement(section)}>
+              <Icon size={19} aria-hidden="true" />
+              <span>{label}</span><ChevronRight size={16} aria-hidden="true" />
+            </button>
+          ))}
+
         {isGroup && (
           <div className="conversation-group-options">
-            <div className="conversation-channel-list" aria-label="Danh sách kênh hội thoại">
-              <strong className="conversation-channel-list-header">Kênh hội thoại</strong>
-              {channels.map(channel => (
-                <button key={channel.id} type="button" aria-current={channel.id === selectedChannelId}
-                  onClick={() => onSelectChannel(channel.id)}>
-                  <Hash size={17} aria-hidden="true" />
-                  <span>{channel.name}</span>
-                  {channel.id === selectedChannelId && <span aria-hidden="true">✓</span>}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="conversation-group-options-trigger"
+            <button type="button" className="conversation-group-options-trigger"
               aria-expanded={groupOptionsOpen}
               aria-controls={`conversation-group-options-${conversation.id}`}
-              onClick={() => { setGroupOptionsOpen(open => !open); setCreatingChannel(false) }}
-            >
+              onClick={() => { setGroupOptionsOpen(open => !open); setCreatingChannel(false) }}>
               <MoreHorizontal size={19} aria-hidden="true" />
               <span>Tùy chọn nhóm</span>
               {groupOptionsOpen ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
             </button>
             {groupOptionsOpen && (
-              <div className="conversation-group-options-list" id={`conversation-group-options-${conversation.id}`} role="group" aria-label="Công cụ nhóm">
+              <div className="conversation-group-options-list"
+                id={`conversation-group-options-${conversation.id}`}
+                role="group" aria-label="Công cụ nhóm">
                 {([
                   { kind: 'poll', label: 'Bình chọn', Icon: ClipboardList },
                   { kind: 'note', label: 'Ghi chú', Icon: FileText },
                   { kind: 'reminder', label: 'Nhắc hẹn', Icon: CalendarClock },
                 ] as const).map(({ kind, label, Icon }) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    onClick={() => {
-                      setGroupOptionsOpen(false)
-                      onCreateGroupActivity(kind)
-                    }}
-                  >
-                    <Icon size={18} aria-hidden="true" />
-                    <span>{label}</span>
+                  <button type="button" key={kind} onClick={() => {
+                    setGroupOptionsOpen(false)
+                    onCreateGroupActivity(kind)
+                  }}>
+                    <Icon size={18} aria-hidden="true" /><span>{label}</span>
                   </button>
                 ))}
                 {canCreateChannel && !creatingChannel && (
-                  <button type="button"
-                    onClick={() => setCreatingChannel(true)} disabled={channelCreateBusy}>
-                    <Plus size={18} aria-hidden="true" />
-                    <span>Tạo kênh hội thoại</span>
+                  <button type="button" disabled={channelCreateBusy} onClick={() => setCreatingChannel(true)}>
+                    <Plus size={18} aria-hidden="true" /><span>Tạo kênh hội thoại</span>
                   </button>
                 )}
                 {canCreateChannel && creatingChannel && (
@@ -134,20 +157,26 @@ export default function ConversationDetailsPanel({
             )}
           </div>
         )}
+
         {!isGroup && conversation.otherUserId && !conversation.blockedByOther && (
-          <button type="button" className="conversation-options-danger" disabled={busy} onClick={conversation.blockedByMe ? onUnblock : onBlock}>
+          <button type="button" className="conversation-options-danger" disabled={busy}
+            onClick={conversation.blockedByMe ? onUnblock : onBlock}>
             <Ban size={19} aria-hidden="true" />
             <span>{conversation.blockedByMe ? 'Bỏ chặn người dùng' : 'Chặn tin nhắn và cuộc gọi'}</span>
             <ChevronRight size={16} aria-hidden="true" />
           </button>
         )}
         <button type="button" className="conversation-options-danger" disabled={busy} onClick={onClearHistory}>
-          <Trash2 size={19} aria-hidden="true" />
-          <span>Xóa lịch sử trò chuyện</span>
+          <Trash2 size={19} aria-hidden="true" /><span>Xóa lịch sử trò chuyện</span>
           <ChevronRight size={16} aria-hidden="true" />
         </button>
       </nav>
-      <p className="conversation-info-panel-privacy social-chat-details-privacy"><ShieldCheck size={19} aria-hidden="true" /> Nội dung được hiển thị theo quyền truy cập hội thoại của bạn.</p>
+      {photoTarget && <GroupAvatarEditor key={conversation.id} target={photoTarget}
+        busy={photoBusy} onSave={onSavePhoto} onClose={() => setPhotoTarget(null)} />}
+      <p className="conversation-info-panel-privacy social-chat-details-privacy">
+        <ShieldCheck size={19} aria-hidden="true" />
+        Nội dung được hiển thị theo quyền truy cập hội thoại của bạn.
+      </p>
     </aside>
   )
 }

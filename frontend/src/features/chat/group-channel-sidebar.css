@@ -256,3 +256,21 @@
     right: -36px;
   }
 }
+
+.group-channel-sidebar-icon,.group-channel-sidebar-avatar{position:relative;overflow:hidden}
+.group-channel-sidebar-icon img,.group-channel-sidebar-avatar img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
+/* Channel list: name, topic and message preview always occupy distinct lines. */
+.group-channel-sidebar-row{align-items:flex-start;min-height:91px;padding:11px 9px;gap:10px}
+.group-channel-sidebar-avatar{flex:0 0 43px;width:43px;height:43px;margin-top:1px;overflow:hidden;border-radius:14px;font-size:14px;font-weight:800;letter-spacing:.02em}
+.group-channel-sidebar-content{gap:5px}
+.group-channel-sidebar-topic-row{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#5e7191;font-size:11.5px;font-weight:600;line-height:16px}
+.group-channel-sidebar-meta-row{min-height:19px}
+.group-channel-sidebar-meta-row small{line-height:17px}
+.group-channel-sidebar-avatar.topic-tone-0{background:#eaf0ff;color:#477be2}
+.group-channel-sidebar-avatar.topic-tone-1{background:#fcece8;color:#ca7264}
+.group-channel-sidebar-avatar.topic-tone-2{background:#e7f6ed;color:#449b71}
+.group-channel-sidebar-avatar.topic-tone-3{background:#f3edfb;color:#9870c4}
+.group-channel-sidebar-avatar.topic-tone-4{background:#fff2db;color:#b78a44}
+.group-channel-sidebar-avatar.topic-tone-5{background:#e6f4f8;color:#478ca1}
+.group-channel-sidebar-row.selected .group-channel-sidebar-avatar{background:#477be2;color:#fff}
+@media(max-width:430px){.group-channel-sidebar-row{min-height:88px;padding:10px 7px}}

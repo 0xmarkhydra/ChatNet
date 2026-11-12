@@ -48,6 +48,7 @@ export type Conversation = {
   otherUsername?: string
   memberCount: number
   unreadCount: number
+  avatarUrl?: string
   lastMessage: string
   lastMessageAt?: string
   online: boolean

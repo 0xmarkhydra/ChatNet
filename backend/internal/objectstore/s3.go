@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -143,6 +144,40 @@ func (c *Client) Owns(storageRef, scope string, userID int64) bool {
 	}
 	expected := fmt.Sprintf("%s/%s/%d/", prefix, scope, userID)
 	return strings.HasPrefix(key, expected)
+}
+
+// Upload relays an already authorized object from the API to object storage.
+// The caller must validate a short-lived, authenticated upload ticket before
+// invoking this method. Bytes stream through; they are not stored in memory.
+func (c *Client) Put(ctx context.Context, storageRef, contentType string, size int64, body io.Reader) error {
+	key, ok := c.keyFromRef(storageRef)
+	if !ok || size <= 0 {
+		return errors.New("invalid upload reference or size")
+	}
+	signed, err := c.signedURL(http.MethodPut, key, time.Now().UTC().Add(2*time.Minute))
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, signed, body)
+	if err != nil {
+		return err
+	}
+	req.ContentLength = size
+	req.Header.Set("Content-Type", contentType)
+	client := c.stream
+	if client == nil {
+		client = &http.Client{Timeout: 2 * time.Minute}
+	}
+	response, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1024))
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("storage upload rejected (HTTP %d)", response.StatusCode)
+	}
+	return nil
 }
 
 func (c *Client) Inspect(ctx context.Context, storageRef string) (ObjectInfo, error) {

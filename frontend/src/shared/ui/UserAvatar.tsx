@@ -29,15 +29,17 @@ export default function UserAvatar({
   className = 'avatar',
   online = false,
   group = false,
+  imageUrl: suppliedImageUrl,
 }: {
   name: string
   username?: string
   className?: string
   online?: boolean
   group?: boolean
+  imageUrl?: string
 }) {
   const version = avatarRefreshVersions.get(username)
-  const imageUrl = group ? '' : profileAssetUrl(username, 'avatar', version)
+  const imageUrl = group ? (suppliedImageUrl || '') : profileAssetUrl(username, 'avatar', version)
   const [imageFailed, setImageFailed] = useState(false)
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function UserAvatar({
       title={name}
     >
       <span className="avatar-initials">{group ? '👥' : avatarInitials(name)}</span>
-      {!group && !imageFailed && (
+      {imageUrl && !imageFailed && (
         <img
           className="avatar-photo"
           src={imageUrl}

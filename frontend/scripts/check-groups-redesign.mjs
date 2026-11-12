@@ -30,8 +30,13 @@ try {
   const members=[{id:1,username:'tester',displayName:'Tài khoản của tôi',role:'owner',online:true},
     {id:2,username:'linhanh',displayName:'Linh Anh',role:'admin',online:true},
     {id:3,username:'david',displayName:'David Chen',role:'member',online:false}]
+  const personalProfile={username:'tester',displayName:'Tài khoản của tôi',avatarSet:false,coverSet:false,updatedAt:'2026-11-06'}
+  const personalPhotoUpdates=[]
   const groupSettings={requireApproval:true,adminCanInvite:true,adminCanApprove:true,adminCanEditInfo:true}
   const profile={id:91,name:'Team ChatNet',description:'Cộng đồng kỹ thuật',topic:'Công nghệ',rules:'Tôn trọng mọi thành viên',visibility:'private',memberCount:3}
+  const groupPhotoUpdates=[]
+  let groupPhotoCapabilityEnabled=true
+  const mockAvatar='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg=='
   const channels=[
     {id:0,conversationId:91,name:'Thảo luận chung',description:'Kênh mặc định',unreadCount:2,lastMessage:'Tin nhắn trong thảo luận chung',lastMessageAt:'2026-11-11T09:08:00Z'},
     {id:202,conversationId:91,name:'Thiết kế giao diện',description:'Trao đổi về UI/UX',unreadCount:3,lastMessage:'Cập nhật bản thiết kế mới',lastMessageAt:'2026-11-11T09:09:00Z'},
@@ -43,6 +48,7 @@ try {
   const sampleMsg={id:44,conversationId:91,senderId:2,sender:'linhanh',senderDisplayName:'Linh Anh',
     text:'Chào mọi người, đây là nhóm ChatNet.',createdAt:'2026-11-06T09:30:00Z',attachments:[],reactions:[]}
   const calls=[]
+  let legacySharedResponse = false
   const channelMessages=[]
   const json=data=>({status:200,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},contentType:'application/json',body:JSON.stringify(data)})
   await context.route('http://localhost:8080/**',async route=>{
@@ -50,6 +56,32 @@ try {
     calls.push(method+' '+path)
     if(method==='OPTIONS')return route.fulfill({status:204,headers:{'access-control-allow-origin':'*','access-control-allow-methods':'*','access-control-allow-headers':'*'}})
     if(path==='/api/events')return route.fulfill({status:200,headers:{'access-control-allow-origin':'*'},contentType:'text/event-stream',body:': ready\n\n'})
+    if(path==='/api/media/presign'&&method==='POST'){
+      const body=JSON.parse(req.postData()||'{}')
+      assert.equal(body.scope,'profile')
+      return route.fulfill(json({uploadUrl:'http://localhost:8080/_mock_upload_group_image',
+        storageRef:'s3://mock/chatnet/profile/1/avatar.png',key:'avatar.png',
+        kind:'image',expiresAt:'2099-01-01T00:00:00Z',downloadUrl:mockAvatar}))
+    }
+    if(path==='/_mock_upload_group_image'&&method==='PUT')return route.fulfill({
+      status:200,headers:{'access-control-allow-origin':'*','access-control-allow-methods':'PUT','access-control-allow-headers':'*'},body:''
+    })
+    if(path==='/api/profile/media'&&method==='PUT'){
+      const data=JSON.parse(req.postData()||'{}');personalPhotoUpdates.push(data)
+      personalProfile[data.kind==='avatar'?'avatarSet':'coverSet']=!!data.attachment
+      personalProfile.updatedAt=new Date(Date.now()+personalPhotoUpdates.length*1000).toISOString()
+      return route.fulfill(json(personalProfile))
+    }
+    if(path==='/api/conversations/91/avatar'&&method==='GET'){
+      return route.fulfill(groupPhotoCapabilityEnabled?json({canUpdateAvatar:true}):
+        {status:404,contentType:'text/plain',body:'Not Found'})
+    }
+    if(path==='/api/conversations/91/avatar'&&method==='PUT'){
+      const body=JSON.parse(req.postData()||'{}');groupPhotoUpdates.push(body)
+      const photo=body.attachment ? mockAvatar : ''
+      groups[0].avatarUrl=photo||undefined
+      return route.fulfill(json({conversationId:91,avatarUrl:photo,avatarSet:!!photo}))
+    }
     if(path==='/api/conversations/groups'&&method==='POST'){
       const body=JSON.parse(req.postData()||'{}');payloads.push(body)
       const created=group(120,body.name,1+body.usernames.length);created.unreadCount=0
@@ -63,6 +95,25 @@ try {
     if(path==='/api/conversations/120/community'&&method==='GET')return route.fulfill(json({id:120,name:'SocCo Product Community',description:'Chia sẻ ý tưởng và sản phẩm',topic:'',rules:'',visibility:'public',memberCount:3}))
     if(path.endsWith('/notification-settings')&&method==='GET')return route.fulfill(json(prefs))
     if(path.endsWith('/notification-settings')&&method==='PUT'){Object.assign(prefs,JSON.parse(req.postData()||'{}'));return route.fulfill(json(prefs))}
+    if(path==='/api/conversations/91/shared'&&method==='GET') {
+      if(legacySharedResponse)return route.fulfill(json({items:[]}))
+      const kind=url.searchParams.get('kind')
+      if(kind==='files')return route.fulfill(json({items:[{
+        id:810,sender:'linhanh',createdAt:'2026-11-11T09:00:00Z',text:'',
+        attachments:[{id:610,kind:'file',name:'Tài liệu nhóm.pdf',url:'https://example.com/file.pdf',
+          storageRef:'mock-file',sizeBytes:12000,contentType:'application/pdf'}],
+      }]}))
+      if(kind==='links')return route.fulfill(json({items:[{
+        id:811,sender:'linhanh',createdAt:'2026-11-11T09:00:00Z',text:'https://example.com/group',
+        attachments:[],
+      }]}))
+      const media=Array.from({length:4},(_,index)=>({
+        id:800+index,text:'',sender:'linhanh',createdAt:'2026-11-11T09:00:00Z',
+        attachments:[{id:500+index,kind:'image',name:'Ảnh '+(index+1)+'.png',url:mockAvatar,
+          storageRef:'mock-'+index,sizeBytes:68,contentType:'image/png'}],
+      }))
+      return route.fulfill(json({items:media}))
+    }
     if(path==='/api/conversations/91/channels'&&method==='GET')return route.fulfill(json(channelUnreadMetricsEnabled
       ? channels : channels.map(({unreadCount, ...channel})=>channel)))
     if(path==='/api/conversations/91/channels'&&method==='POST'){const body=JSON.parse(req.postData()||'{}');const c={id:201,conversationId:91,...body,unreadCount:0,lastMessage:''};channels.push(c);return route.fulfill(json(c))}
@@ -90,6 +141,18 @@ try {
     if(path.endsWith('/admin-audit')&&method==='GET')return route.fulfill(json([]))
     if(path==='/api/conversations/91/members/3'&&method==='PATCH')return route.fulfill(json({}))
     if(path==='/api/conversations/91/members'&&method==='POST')return route.fulfill(json({}))
+    if(path==='/api/conversations/91/messages'&&method==='GET'&&url.searchParams.get('limit')==='200') {
+      const legacyItems=[
+        {id:815,sender:'linhanh',text:'https://example.com/group',createdAt:'2026-11-11T09:00:00Z',attachments:[]},
+        {id:814,sender:'linhanh',text:'',createdAt:'2026-11-11T09:00:00Z',attachments:[
+          {id:612,kind:'video',name:'Video trong nhóm.mp4',url:mockAvatar,storageRef:'mock-video',sizeBytes:99,contentType:'video/mp4'}]},
+        {id:813,sender:'linhanh',text:'',createdAt:'2026-11-11T09:00:00Z',attachments:[
+          {id:611,kind:'file',name:'Tài liệu nhóm.pdf',url:'https://example.com/file.pdf',storageRef:'mock-file',sizeBytes:12000,contentType:'application/pdf'}]},
+        {id:812,sender:'linhanh',text:'',createdAt:'2026-11-11T09:00:00Z',attachments:[
+          {id:610,kind:'image',name:'Ảnh cũ.png',url:mockAvatar,storageRef:'mock-image',sizeBytes:68,contentType:'image/png'}]},
+      ]
+      return route.fulfill(json(url.searchParams.has('before')?[]:legacyItems))
+    }
     if(path.includes('/messages')&&method==='GET')return route.fulfill(json(url.searchParams.get('channelId')==='201'?channelMessages:url.searchParams.get('channelId')==='202'?[{...sampleMsg,id:47,channelId:202,text:'Cập nhật bản thiết kế mới'}]:path.includes('/91/')?[sampleMsg]:[]))
     if(path.includes('/messages')&&method==='POST'){
       const body=JSON.parse(req.postData()||'{}');payloads.push(body)
@@ -101,7 +164,7 @@ try {
       path==='/api/friends'?friends:
       path==='/api/friends/requests'||path==='/api/stories'||path==='/api/posts'||path==='/api/conversation-categories'||path==='/api/calls/current'||path==='/api/contacts'?[]:
       path==='/api/users/suggestions'||path==='/api/users/search'?friends:
-      path==='/api/profile'?{username:'tester',displayName:'Tài khoản của tôi',avatarSet:false,coverSet:false,updatedAt:'2026-11-06'}:{}
+      path==='/api/profile'?personalProfile:{}
     await route.fulfill(json(data))
   })
   await context.addInitScript(() => {
@@ -233,6 +296,33 @@ try {
   assert.ok(await channelSidebar.isVisible(),'Group channel navigation must remain visible on desktop')
   const designChannel=channelSidebar.getByRole('button',{name:/Mở kênh Thiết kế giao diện/})
   assert.match((await designChannel.innerText()),/3/,'Unread count of another channel must remain visible')
+
+  assert.ok(await designChannel.locator('.group-channel-sidebar-topic-row').getByText('Trao đổi về UI/UX').isVisible(),
+    'Channel topic must have its own line')
+  assert.ok(await designChannel.locator('.group-channel-sidebar-meta-row').getByText('Cập nhật bản thiết kế mới').isVisible(),
+    'Message preview must appear on a separate line below the topic')
+  assert.equal(await designChannel.locator('img').count(),0,'Channel preview is generated from topic, not uploaded photos')
+  assert.ok((await designChannel.locator('.group-channel-sidebar-avatar').innerText()).trim().length>0,
+    'Channel initials preview must be generated from its topic')
+  for(const width of [390, 768, 1478]) {
+    await page.setViewportSize({width,height:850})
+    if(width<760) {
+      await page.getByRole('button',{name:'Mở danh sách kênh hội thoại'}).click()
+    }
+    const order = await designChannel.evaluate(row=>{
+      const elements=['.group-channel-sidebar-name-row','.group-channel-sidebar-topic-row','.group-channel-sidebar-meta-row']
+        .map(selector=>row.querySelector(selector))
+      return elements.map(element=>element ? {top:element.getBoundingClientRect().top,
+        bottom:element.getBoundingClientRect().bottom} : null)
+    })
+    assert.ok(order.every(Boolean) && order[0].bottom<=order[1].top+2 &&
+      order[1].bottom<=order[2].top+2,
+      'Channel must show name, topic, then latest message at '+width+'px: '+JSON.stringify(order))
+    if(width<760) await channelSidebar.getByRole('button',{name:'Đóng danh sách kênh'}).click()
+  }
+  await page.setViewportSize({width:1478,height:850})
+  console.log('PASS channel topic and message previews occupy separate lines at all widths')
+
   await channelSidebar.getByRole('searchbox',{name:'Tìm kênh hội thoại'}).fill('thiết kế')
   assert.equal(await channelSidebar.locator('.group-channel-sidebar-row').count(),1,
     'Sidebar search must filter by channel name')
@@ -259,6 +349,8 @@ try {
   }),{...sampleMsg,id:999,channelId:202,senderId:2,text:'Tin mới từ kênh thiết kế',createdAt:design.lastMessageAt})
   await channelSidebar.locator('.group-channel-sidebar-row').filter({hasText:'Thiết kế giao diện'})
     .locator('.group-channel-unread').getByText('1').waitFor()
+  assert.equal(await designChannel.locator('.group-channel-sidebar-topic-row').innerText(),'Trao đổi về UI/UX',
+    'Incoming messages must never replace channel topics')
   assert.ok(await page.locator('.messages').getByText('Chào mọi người, đây là nhóm ChatNet.').isVisible(),
     'Receiving a message in another channel must not change the current chat')
   console.log('PASS inactive-channel realtime unread badge without leaving the active channel')
@@ -305,6 +397,60 @@ try {
   await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
   const details=page.locator('#conversation-details-panel')
   await details.getByRole('heading',{name:'Thông tin hội thoại'}).waitFor()
+
+  assert.equal(await details.getByRole('button',{name:/Đổi ảnh kênh/}).count(),0,
+    'No channel photo editing controls should remain')
+  assert.ok(await details.getByRole('button',{name:'Đổi ảnh nhóm'}).isVisible(),
+    'Group owners can change the group avatar')
+  await details.getByRole('button',{name:'Đổi ảnh nhóm'}).click()
+  const photoModal=page.locator('.group-photo-modal')
+  await photoModal.getByRole('heading',{name:'Đổi ảnh nhóm'}).count().then(count=>{
+    assert.equal(count,0,'Group editor uses a compact title without changing the page')
+  })
+  assert.ok(await photoModal.getByText('Đổi ảnh nhóm').isVisible())
+  const groupAvatarIcon=details.getByRole('button',{name:'Đổi ảnh nhóm'})
+  assert.equal((await groupAvatarIcon.innerText()).trim(),'','Group photo action must be icon only')
+  assert.equal(await groupAvatarIcon.locator('svg').count(),1,'Camera icon must be present')
+  await photoModal.getByLabel('Tệp ảnh nhóm').setInputFiles({
+    name:'large-photo.png',mimeType:'image/png',buffer:Buffer.alloc(13*1024*1024,1)
+  })
+  await photoModal.getByRole('alert').getByText(/vượt quá giới hạn 12 MB/).waitFor()
+  assert.ok(await photoModal.getByRole('button',{name:'Lưu ảnh'}).isDisabled(),
+    'Oversized images must never be uploaded')
+  assert.equal(groupPhotoUpdates.length,0,'Oversized image must not reach the backend')
+  await photoModal.getByLabel('Tệp ảnh nhóm').setInputFiles({
+    name:'group-avatar.png',mimeType:'image/png',
+    buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==','base64')
+  })
+  groupPhotoCapabilityEnabled=false
+  const uploadsBefore=calls.filter(call=>call==='POST /api/media/presign').length
+  await photoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  await page.getByText(/Backend hiện tại chưa hỗ trợ lưu ảnh nhóm/).waitFor()
+  assert.equal(groupPhotoUpdates.length,0,'The unsupported backend must not receive a photo update')
+  assert.equal(calls.filter(call=>call==='POST /api/media/presign').length,uploadsBefore,
+    'Do not upload an orphan image to S3 when the backend cannot save it')
+  assert.ok(await photoModal.isVisible(),'Keep the selected photo when the backend is too old')
+  groupPhotoCapabilityEnabled=true
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/conversations/91/avatar')&&response.request().method()==='PUT'),
+    photoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(groupPhotoUpdates.length,1,'Group avatar update should be persisted')
+  assert.ok(groupPhotoUpdates[0].attachment?.storageRef,'Uploaded image reference should be sent to backend')
+  assert.equal(await photoModal.count(),0,'Editor closes only after successful save')
+  await channelSidebar.locator('.group-channel-sidebar-icon img').waitFor()
+  assert.equal(await details.locator('.conversation-info-panel-avatar img').count(),1,'The group info avatar refreshes')
+  await details.getByRole('button',{name:'Đổi ảnh nhóm'}).click()
+  await photoModal.getByRole('button',{name:'Gỡ ảnh'}).click()
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/conversations/91/avatar')&&response.request().method()==='PUT'),
+    photoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(groupPhotoUpdates.length,2)
+  assert.equal(groupPhotoUpdates[1].attachment,null,'Removing group image clears the saved reference')
+  await channelSidebar.locator('.group-channel-sidebar-icon img').waitFor({state:'detached'})
+  console.log('PASS group avatar upload, preview, remove, fallback and no channel photo editor')
+
   for (const width of [1478, 1024, 390]) {
     await page.setViewportSize({width,height:850})
     assert.ok(await details.isVisible(),'Conversation information sidebar stays accessible at '+width+'px')
@@ -337,10 +483,74 @@ try {
   await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
   await details.getByRole('heading',{name:'Thông tin hội thoại'}).waitFor()
   assert.ok(await details.getByRole('button',{name:'Tùy chọn nhóm'}).isVisible(),'Original group information menu must remain')
-  assert.ok(await details.getByRole('button',{name:'Ảnh & video'}).isVisible(),'Shared content menu must remain')
-  assert.ok(await details.getByRole('button',{name:'Tìm tin nhắn'}).isVisible(),'Search menu must remain')
-  const groupChannelList=details.locator('.conversation-channel-list')
-  assert.ok(await groupChannelList.getByRole('button',{name:'Thảo luận chung'}).isVisible(),'Info menu must list channels')
+  assert.ok(await details.getByRole('button',{name:/File phương tiện, liên kết/}).isVisible(),
+    'Media, files and links must have one shared entry')
+  await details.locator('.conversation-shared-preview-grid img').first().waitFor()
+  assert.equal(await details.locator('.conversation-shared-preview-grid img').count(),4,
+    'Show four actual shared images in Facebook-like thumbnails')
+  const mediaCols=await details.locator('.conversation-shared-preview-grid').evaluate(el=>
+    getComputedStyle(el).gridTemplateColumns.split(' ').length)
+  assert.equal(mediaCols,2,'Facebook-like album preview shows 2 columns with 2 rows')
+  assert.ok(await details.locator('.conversation-shared-preview-grid img').first().evaluate(img => img.complete && img.naturalWidth > 0),
+    'Preview thumbnail must load an actual image')
+  await details.locator('.conversation-shared-preview-grid button').first().click()
+  await page.getByRole('dialog',{name:'Xem ảnh và video'}).waitFor()
+  await page.getByRole('button',{name:'Đóng trình xem ảnh'}).click()
+  assert.ok(await details.isVisible(),'Closing the image viewer returns to conversation details')
+  assert.equal(await details.locator('.conversation-shared-preview-types').count(),0,
+    'No extra image, file, or link shortcuts below the preview')
+  const previewAboveTitle=await details.locator('.conversation-shared-preview').evaluate(el => {
+    const preview=el.querySelector('.conversation-shared-preview-grid, .conversation-shared-preview-empty')
+    const title=el.querySelector('.conversation-shared-preview-title')
+    return Boolean(preview && title && preview.getBoundingClientRect().bottom <= title.getBoundingClientRect().top)
+  })
+  assert.ok(previewAboveTitle,'The media preview must be above the File phương tiện, liên kết row')
+  await details.getByRole('button',{name:'File phương tiện, liên kết'}).click()
+  const shared=page.getByRole('dialog',{name:'Nội dung đã chia sẻ'})
+  await shared.getByRole('button',{name:'Tệp',exact:true}).click()
+  await shared.getByText('Tài liệu nhóm.pdf').waitFor()
+  await shared.getByRole('button',{name:'Liên kết',exact:true}).click()
+  await shared.getByText('https://example.com/group').first().waitFor()
+  await shared.getByRole('button',{name:'Đóng',exact:true}).click()
+  assert.equal(await shared.count(),0,'Closing shared content dismisses only the media dialog')
+  await details.getByRole('button',{name:'Tùy chọn nhóm'}).waitFor()
+  console.log('PASS media preview above the single shared content entry, without extra shortcuts')
+  // A deployed backend may return [] for older messages with a NULL channel_id.
+  // Both thumbnail and dialog must recover actual chat attachments/links.
+  legacySharedResponse = true
+  await details.getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
+  await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
+  await details.locator('.conversation-shared-preview-grid img').first().waitFor()
+  assert.equal(await details.locator('.conversation-shared-preview-grid img').count(),1,
+    'Legacy shared-content fallback finds an image preview in chat history')
+  assert.equal(await details.locator('.conversation-shared-preview-grid video').count(),1,
+    'Legacy shared-content fallback finds a video preview in chat history')
+  await details.getByRole('button',{name:'File phương tiện, liên kết'}).click()
+  const recovered=page.getByRole('dialog',{name:'Nội dung đã chia sẻ'})
+  await recovered.locator('.shared-media-card').first().waitFor()
+  assert.equal(await recovered.locator('.shared-media-card').count(),2,
+    'Legacy shared-content fallback restores image and video in the media dialog')
+  await recovered.getByRole('button',{name:'Tệp',exact:true}).click()
+  await recovered.getByText('Tài liệu nhóm.pdf').waitFor()
+  await recovered.getByRole('button',{name:'Liên kết',exact:true}).click()
+  await recovered.getByText('https://example.com/group').first().waitFor()
+  await recovered.getByRole('button',{name:'Đóng',exact:true}).click()
+  assert.ok(await details.isVisible(),'Close shared content to return to conversation info after fallback')
+  legacySharedResponse = false
+  console.log('PASS fallback to chat history restores older image, video, file and link')
+  assert.equal(await details.locator('.conversation-channel-list').count(),0,
+    'Channels must stay in the left channel sidebar and not in Conversation Info')
+  for (const removed of ['Gọi thoại','Gọi video','Thông báo','Dịch AI','Ảnh & video','Tệp tin','Liên kết','Quản lý nhóm']) {
+    assert.equal(await details.getByRole('button',{name:removed,exact:true}).count(),0,
+      removed+' must not appear as a separate option in Conversation Info')
+  }
+  for (const required of ['Tìm tin nhắn','Thành viên','Thông tin cộng đồng','Quyền quản trị',
+    'Yêu cầu tham gia','Nội quy nhóm','Nhật ký hoạt động','Tùy chọn nhóm']) {
+    assert.ok(await details.getByRole('button',{name:required,exact:true}).isVisible(),
+      required+' must be directly accessible from Conversation Info')
+  }
+  assert.ok(await details.getByRole('button',{name:'Tùy chọn nhóm'}).isVisible(),'Group options remain available')
+  console.log('PASS compact group info management links and shared media preview')
   assert.equal(await details.getByRole('button',{name:'Tạo kênh hội thoại'}).count(),0,'Creation is inside Group options, not on the header')
   const groupOptions=details.getByRole('button',{name:'Tùy chọn nhóm'})
   await groupOptions.click()
@@ -403,13 +613,13 @@ try {
   await page.locator('.messages').getByText('Tin nhắn trong kênh riêng').waitFor()
   const ownAvatar=page.locator('.messages .message.channel-message.mine .chat-message-sender-avatar')
   await ownAvatar.waitFor({state:'visible'})
-  await groupChannelList.getByRole('button',{name:'Thảo luận chung'}).click()
+  await channelSidebar.getByRole('button',{name:/Mở kênh Thảo luận chung/}).click()
   await page.locator('.messages').getByText('Chào mọi người, đây là nhóm ChatNet.').waitFor()
   assert.equal(await page.locator('.messages').getByText('Tin nhắn trong kênh riêng').count(),0)
   console.log('PASS owner creates channels inside group information options, no header dropdown')
 
   await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
-  await details.getByRole('button',{name:'Backend API'}).click()
+  await channelSidebar.getByRole('button',{name:/Mở kênh Backend API/}).click()
   await page.locator('.messages').getByText('Tin nhắn trong kênh riêng').waitFor()
   const realtimeMessage={...sampleMsg,id:991,channelId:201,senderId:2,text:'Realtime trong kênh Backend API',createdAt:new Date().toISOString()}
   channelMessages.push(realtimeMessage)
@@ -431,12 +641,12 @@ try {
   await page.setViewportSize({width:1478,height:850})
   console.log('PASS realtime message is rendered with its sender avatar in the active channel')
 
-  console.log('PASS three-dot info menu lists channels and switches the full chat timeline')
+  console.log('PASS channel sidebar switches timelines independently of information panel')
 
   await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
-  await details.getByRole('button',{name:'Thảo luận chung'}).click()
+  await channelSidebar.getByRole('button',{name:/Mở kênh Thảo luận chung/}).click()
   await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
-  await details.getByRole('button',{name:'Quản lý nhóm'}).click()
+  await details.getByRole('button',{name:'Thành viên',exact:true}).click()
   const sidebar=page.locator('.group-settings-sidebar')
   await sidebar.getByRole('button',{name:/Xem danh sách 3 thành viên nhóm/}).waitFor()
   assert.equal(await sidebar.locator('.group-settings-tabs').count(),0,'Original group management layout must remain unchanged')
@@ -571,6 +781,55 @@ try {
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('chatnet:group-community-updated',{detail:{conversationId:91}})))
   await page.locator('.group-channel-sidebar').getByText('Số tin chưa đọc theo kênh chưa khả dụng. Cần cập nhật backend.').waitFor()
   console.log('PASS old backend without per-channel unread metadata is clearly identified instead of showing false badges')
+  // Photo picker shared with both personal avatar and cover. Canceling never uploads.
+  await page.locator('.app-sidebar').getByRole('button',{name:'Cá nhân'}).click()
+  await page.locator('.profile-page-avatar-action').waitFor()
+  await page.locator('.profile-page-avatar-action').click()
+  const personalPhotoModal=page.locator('.group-photo-modal')
+  assert.ok(await personalPhotoModal.getByText('Đổi ảnh đại diện').isVisible())
+  await personalPhotoModal.getByLabel('Tệp ảnh đại diện').setInputFiles({
+    name:'oversized.png',mimeType:'image/png',buffer:Buffer.alloc(13*1024*1024,2)
+  })
+  await personalPhotoModal.getByRole('alert').getByText(/vượt quá giới hạn 12 MB/).waitFor()
+  assert.ok(await personalPhotoModal.getByRole('button',{name:'Lưu ảnh'}).isDisabled())
+  assert.equal(personalPhotoUpdates.length,0,'Oversized personal avatar must not upload')
+  await personalPhotoModal.getByRole('button',{name:'Hủy'}).click()
+  assert.equal(await personalPhotoModal.count(),0,'Cancel should close personal avatar editor')
+  assert.equal(personalPhotoUpdates.length,0,'Cancel must never modify personal photos')
+  await page.locator('.profile-page-cover-action').click()
+  assert.ok(await personalPhotoModal.getByText('Đổi ảnh bìa').isVisible())
+  assert.ok(await personalPhotoModal.locator('.group-photo-preview.cover').isVisible())
+  await personalPhotoModal.getByLabel('Tệp ảnh bìa').setInputFiles({
+    name:'cover.png',mimeType:'image/png',
+    buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==','base64')
+  })
+  assert.equal(personalPhotoUpdates.length,0,'Selecting a file must not upload until Save')
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/profile/media')&&response.request().method()==='PUT'),
+    personalPhotoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(personalPhotoUpdates[0].kind,'cover')
+  assert.ok(personalPhotoUpdates[0].attachment?.storageRef)
+  await page.locator('.profile-page-avatar-action').click()
+  await personalPhotoModal.getByLabel('Tệp ảnh đại diện').setInputFiles({
+    name:'avatar.png',mimeType:'image/png',
+    buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==','base64')
+  })
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/profile/media')&&response.request().method()==='PUT'),
+    personalPhotoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(personalPhotoUpdates[1].kind,'avatar')
+  await page.locator('.profile-page-avatar-action').click()
+  await personalPhotoModal.getByRole('button',{name:'Gỡ ảnh'}).click()
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/profile/media')&&response.request().method()==='PUT'),
+    personalPhotoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(personalPhotoUpdates[2].attachment,null)
+  assert.equal(personalProfile.avatarSet,false)
+  console.log('PASS shared profile avatar/cover picker, oversized warning, cancel and remove')
+
   assert.deepEqual(errors,[])
   console.log('PASS all revised Feed communities and Chat group menu checks')
   await context.close()

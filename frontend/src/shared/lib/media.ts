@@ -20,4 +20,5 @@ export type PresignedUpload = {
   expiresAt: string
   kind: MediaAttachment['kind']
   downloadUrl: string
+  relayToken?: string
 }

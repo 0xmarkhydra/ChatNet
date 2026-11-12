@@ -58,21 +58,22 @@ type messageReaction struct {
 }
 
 type conversation struct {
-	BlockedByMe   bool      `json:"blockedByMe,omitempty"`
-	BlockedByOther bool      `json:"blockedByOther,omitempty"`
-	CategoryID    *int64     `json:"categoryId,omitempty"`
-	PinnedAt      *time.Time `json:"pinnedAt,omitempty"`
-	ID            int64      `json:"id"`
-	Type          string     `json:"type"`
-	Name          string     `json:"name"`
-	OtherUserID   *int64     `json:"otherUserId,omitempty"`
-	OtherUsername string     `json:"otherUsername,omitempty"`
-	MemberCount   int        `json:"memberCount"`
-	UnreadCount   int        `json:"unreadCount"`
-	LastMessage   string     `json:"lastMessage"`
-	LastMessageAt *time.Time `json:"lastMessageAt,omitempty"`
-	Online        bool       `json:"online"`
-	CreatedAt     time.Time  `json:"createdAt"`
+	BlockedByMe    bool       `json:"blockedByMe,omitempty"`
+	BlockedByOther bool       `json:"blockedByOther,omitempty"`
+	CategoryID     *int64     `json:"categoryId,omitempty"`
+	PinnedAt       *time.Time `json:"pinnedAt,omitempty"`
+	ID             int64      `json:"id"`
+	Type           string     `json:"type"`
+	Name           string     `json:"name"`
+	OtherUserID    *int64     `json:"otherUserId,omitempty"`
+	OtherUsername  string     `json:"otherUsername,omitempty"`
+	MemberCount    int        `json:"memberCount"`
+	UnreadCount    int        `json:"unreadCount"`
+	LastMessage    string     `json:"lastMessage"`
+	LastMessageAt  *time.Time `json:"lastMessageAt,omitempty"`
+	AvatarURL      string     `json:"avatarUrl,omitempty"`
+	Online         bool       `json:"online"`
+	CreatedAt      time.Time  `json:"createdAt"`
 }
 
 type realtimeEvent struct {
@@ -128,6 +129,7 @@ func main() {
 	mux.Handle("DELETE /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deletePushSubscription)))
 	mux.Handle("POST /api/push/test", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.testPushNotification)))
 	mux.Handle("POST /api/media/presign", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.presignMedia)))
+	mux.Handle("PUT /api/media/relay", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.relayMediaUpload)))
 	mux.HandleFunc("GET /api/media/chat/{id}", s.serveChatMedia)
 	mux.Handle("GET /api/users/{username}/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getUserProfile)))
 	mux.Handle("GET /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfileNote)))
@@ -180,6 +182,8 @@ func main() {
 	mux.Handle("PATCH /api/conversations/{id}/community", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.patchCommunityProfile)))
 	mux.Handle("GET /api/conversations/{id}/notification-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getGroupNotificationPreferences)))
 	mux.Handle("PUT /api/conversations/{id}/notification-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.putGroupNotificationPreferences)))
+	mux.Handle("GET /api/conversations/{id}/avatar", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.groupAvatarCapability)))
+	mux.Handle("PUT /api/conversations/{id}/avatar", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupAvatar)))
 	mux.Handle("GET /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupChannels)))
 	mux.Handle("POST /api/conversations/{id}/channel-read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markGroupChannelRead)))
 	mux.Handle("POST /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupChannel)))
@@ -246,6 +250,7 @@ func (s *server) presignMedia(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, status, err.Error())
 		return
 	}
+	ticket.RelayToken = s.mediaRelayToken(claims.UserID, ticket.StorageRef, body.SizeBytes, body.ContentType, ticket.ExpiresAt)
 	httpx.JSON(w, http.StatusOK, ticket)
 }
 
@@ -637,7 +642,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
                WHERE gcr.conversation_id=c.id AND gcr.user_id=$1 AND gcr.channel_id=COALESCE(m.channel_id,0)
              ),cm.last_read_message_id) ELSE cm.last_read_message_id END
              AND m.id>cm.cleared_through_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0)
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0), COALESCE(c.group_avatar_ref,'')
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
@@ -681,13 +686,17 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var c conversation
 		var lastRead, memberCount, unreadCount int64
+		var groupAvatarRef string
 		var lastMessageAt time.Time
-		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount); err != nil {
+		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef); err != nil {
 			continue
 		}
 		c.MemberCount = int(memberCount)
 		c.UnreadCount = int(unreadCount)
 		c.LastMessageAt = &lastMessageAt
+		if c.Type == "group" && groupAvatarRef != "" && s.storage != nil && s.storage.Configured() {
+			c.AvatarURL, _ = s.storage.SignedGetURL(groupAvatarRef, time.Hour)
+		}
 
 		if c.Type == "direct" {
 			var otherID int64

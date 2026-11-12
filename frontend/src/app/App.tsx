@@ -119,8 +119,9 @@ import type { GroupWorkspaceMode } from "./CommunityGroupsPage";
 import FeedCommunitiesList from "./FeedCommunitiesList";
 import "./community-groups.css";
 import CommunityGroupWizard, { type CommunityCreationExtras } from "./CommunityGroupWizard";
-import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
+import GroupSettingsPanel, { type GroupManagementSection } from "../features/chat/GroupSettingsPanel";
 import GroupChannelSidebar from "../features/chat/GroupChannelSidebar";
+import GroupAvatarEditor, { photoFileError, type GroupPhotoTarget } from "../features/chat/GroupAvatarEditor";
 import { validGroupChannels, type GroupChannel } from "../features/chat/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/GroupInviteJoinDialog";
 import ContactsView, { type FriendsScreen } from "../features/contacts/ContactsView";
@@ -378,8 +379,10 @@ export default function App({
   const suppressMessageClick = useRef<number | null>(null);
 
   const [sharedContentOpen, setSharedContentOpen] = useState(false);
+  const [sharedContentInitialTab, setSharedContentInitialTab] = useState<'media' | 'files' | 'links'>('media');
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
   const [conversationDetailsOpen, setConversationDetailsOpen] = useState(false);
+  const [groupManagementSection, setGroupManagementSection] = useState<GroupManagementSection>("members");
   const [historyActionBusy, setHistoryActionBusy] = useState(false);
   useEffect(() => {
     setMessageSearchOpen(false);
@@ -692,6 +695,8 @@ export default function App({
   const [profileBusy, setProfileBusy] = useState<"avatar" | "cover" | null>(
     null,
   );
+  const [groupPhotoBusy, setGroupPhotoBusy] = useState(false);
+  const [profilePhotoTarget, setProfilePhotoTarget] = useState<GroupPhotoTarget | null>(null);
   const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState("");
   const [profileUsernameDraft, setProfileUsernameDraft] = useState("");
   const [profileBioDraft, setProfileBioDraft] = useState("");
@@ -872,8 +877,6 @@ export default function App({
   const feedVideoInputRef = useRef<HTMLInputElement>(null);
   const feedAlbumInputRef = useRef<HTMLInputElement>(null);
   const storyFileInputRef = useRef<HTMLInputElement>(null);
-  const avatarFileInputRef = useRef<HTMLInputElement>(null);
-  const coverFileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     apiFetch,
@@ -1876,55 +1879,65 @@ export default function App({
     }
   }
 
-  async function updateProfileImage(kind: "avatar" | "cover", file?: File) {
-    if (!session || profileBusy) return;
-    if (!file || !file.type.toLowerCase().startsWith("image/")) {
-      setNotice("Chỉ hỗ trợ file ảnh cho ảnh đại diện và ảnh bìa.", "error");
-      return;
+  function openProfilePhoto(kind: "avatar" | "cover") {
+    if (!session || profileBusy || mediaUploading === "profile") return;
+    const username = profileMedia?.username || session.user.username;
+    const imagePresent = kind === "avatar" ? profileMedia?.avatarSet : profileMedia?.coverSet;
+    setProfilePhotoTarget({
+      kind,
+      name: profileMedia?.displayName || session.user.displayName || username,
+      avatarUrl: imagePresent
+        ? profileAssetUrl(username, kind, profileMedia?.updatedAt)
+        : undefined,
+    });
+  }
+
+  async function updateProfileImage(kind: "avatar" | "cover", file: File | null): Promise<boolean> {
+    if (!session || profileBusy || mediaUploading === "profile") return false;
+    if (file) {
+      const validation = photoFileError(file);
+      if (validation) {
+        setNotice(validation, "error");
+        return false;
+      }
     }
     setProfileBusy(kind);
     try {
-      const [attachment] = await uploadMediaFiles([file], "profile");
-      if (sessionRef.current?.sessionId !== session.sessionId) return;
-      if (!attachment) throw new Error("Không upload được ảnh.");
+      const [attachment] = file ? await uploadMediaFiles([file], "profile") : [null];
+      if (sessionRef.current?.sessionId !== session.sessionId) return false;
+      if (file && !attachment) throw new Error("Không upload được ảnh.");
 
       const response = await apiFetch("/api/profile/media", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kind,
-          attachment: {
-            storageRef: attachment.storageRef,
-            name: attachment.name,
-            sizeBytes: attachment.sizeBytes,
-            contentType: attachment.contentType,
-            kind: attachment.kind,
-          },
+          attachment: attachment ? attachmentRequestBody(attachment) : null,
         }),
       });
       const result = (await response.json().catch(() => null)) as
         | (ProfileMediaState & { error?: string })
         | null;
-      if (sessionRef.current?.sessionId !== session.sessionId) return;
+      if (sessionRef.current?.sessionId !== session.sessionId) return false;
       if (!response.ok || !result) {
         throw new Error(result?.error || "Không cập nhật được ảnh hồ sơ.");
       }
       avatarRefreshVersions.set(result.username, result.updatedAt);
       setProfileMedia(result);
       setNotice(
-        kind === "avatar"
-          ? "Đã cập nhật ảnh đại diện."
-          : "Đã cập nhật ảnh bìa.",
+        file
+          ? kind === "avatar" ? "Đã cập nhật ảnh đại diện." : "Đã cập nhật ảnh bìa."
+          : kind === "avatar" ? "Đã gỡ ảnh đại diện." : "Đã gỡ ảnh bìa.",
         "success",
       );
+      return true;
     } catch (error) {
       if (sessionRef.current?.sessionId === session.sessionId)
         setNotice(
-          error instanceof Error
-            ? error.message
-            : "Không cập nhật được ảnh hồ sơ.",
+          error instanceof Error ? error.message : "Không cập nhật được ảnh hồ sơ.",
           "error",
         );
+      return false;
     } finally {
       if (sessionRef.current?.sessionId === session.sessionId)
         setProfileBusy(null);
@@ -2130,6 +2143,32 @@ export default function App({
               contentType,
               controller.signal,
               (loaded) => trackProgress(index, loaded),
+              {
+                devFallbackUrl: import.meta.env.DEV
+                  ? "/__chatnet_s3_upload?url=" + encodeURIComponent(ticket.uploadUrl)
+                  : undefined,
+                uploadThroughAPI: ticket.relayToken
+                  ? async () => {
+                      const response = await apiFetch(
+                        "/api/media/relay?ref=" + encodeURIComponent(ticket.storageRef),
+                        {
+                          method: "PUT",
+                          headers: {
+                            "Content-Type": contentType,
+                            "X-ChatNet-Relay-Token": ticket.relayToken!,
+                          },
+                          body: file,
+                          signal: controller.signal,
+                        },
+                      );
+                      if (!response.ok) {
+                        const data = (await response.json().catch(() => null)) as { error?: string } | null;
+                        throw new Error(data?.error ||
+                          "Máy chủ không thể chuyển ảnh lên S3 (HTTP " + response.status + ").");
+                      }
+                    }
+                  : undefined,
+              },
             );
             if (controller.signal.aborted)
               throw new DOMException("Đã hủy tải tệp.", "AbortError");
@@ -4103,6 +4142,61 @@ export default function App({
       return false;
     } finally {
       setGroupChannelBusy(false);
+    }
+  }
+
+  async function saveGroupPhoto(target: GroupPhotoTarget, file: File | null): Promise<boolean> {
+    if (!session || activeConversation?.type !== 'group' || !canEditGroup || groupPhotoBusy) return false;
+    const groupId = activeConversation.id;
+    const sessionId = session.sessionId;
+    setGroupPhotoBusy(true);
+    try {
+      // Check server support before putting bytes onto S3. An older Railway
+      // deployment without the group-avatar route cannot persist the image.
+      const capabilityResponse = await apiFetch(`/api/conversations/${groupId}/avatar`, {
+        method: "GET",
+        cache: "no-store",
+      });
+      const capability = await capabilityResponse.json().catch(() => null) as
+        { canUpdateAvatar?: boolean; error?: string } | null;
+      if (capabilityResponse.status === 404 || capabilityResponse.status === 405 ||
+          (capabilityResponse.ok && capability?.canUpdateAvatar !== true)) {
+        throw new Error("Backend hiện tại chưa hỗ trợ lưu ảnh nhóm. Cần cập nhật backend Railway trước khi đổi ảnh.");
+      }
+      if (!capabilityResponse.ok) {
+        throw new Error(capability?.error ||
+          `Không kiểm tra được quyền đổi ảnh nhóm (HTTP ${capabilityResponse.status}).`);
+      }
+      const [attachment] = file ? await uploadMediaFiles([file], "profile") : [null];
+      if (sessionRef.current?.sessionId !== sessionId) return false;
+      if (file && !attachment) throw new Error('Không tải được ảnh.');
+      const response = await apiFetch(`/api/conversations/${groupId}/avatar`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attachment: attachment ? attachmentRequestBody(attachment) : null }),
+      });
+      const data = await response.json().catch(() => null) as
+        { conversationId?: number; avatarUrl?: string; avatarSet?: boolean; error?: string } | null;
+      if (response.status === 404 || response.status === 405) {
+        throw new Error("Backend chưa hỗ trợ lưu ảnh nhóm hoặc nhóm không còn tồn tại. Hãy kiểm tra bản triển khai Railway.");
+      }
+      if (!response.ok) {
+        throw new Error(data?.error || `Không lưu được ảnh nhóm (HTTP ${response.status}).`);
+      }
+      if (data?.conversationId !== groupId || typeof data.avatarSet !== "boolean") {
+        throw new Error("Phản hồi lưu ảnh nhóm không hợp lệ. Vui lòng thử lại.");
+      }
+      if (sessionRef.current?.sessionId !== sessionId) return false;
+      setConversations(current => current.map(item => item.id === groupId
+        ? { ...item, avatarUrl: data.avatarUrl || undefined } : item));
+      setNotice('Đã cập nhật ảnh nhóm.', 'success');
+      return true;
+    } catch (error) {
+      if (sessionRef.current?.sessionId === sessionId)
+        setNotice(error instanceof Error ? error.message : 'Không lưu được ảnh.', 'error');
+      return false;
+    } finally {
+      if (sessionRef.current?.sessionId === sessionId) setGroupPhotoBusy(false);
     }
   }
 
@@ -6167,6 +6261,7 @@ export default function App({
                       <UserAvatar
                         username={conversation.otherUsername} name={conversation.name}
                         className="conversation-avatar"
+                        imageUrl={conversation.type === 'group' ? conversation.avatarUrl : undefined}
                         group={conversation.type === 'group'}
                         online={conversation.type === 'direct' && conversation.online}
                       />
@@ -6205,7 +6300,7 @@ export default function App({
             {activeConversation?.type === 'group' && (
               <>
                 <GroupChannelSidebar key={activeConversation.id} groupName={activeConversation.name}
-                  memberCount={activeConversation.memberCount} channels={groupChannels}
+                  memberCount={activeConversation.memberCount} groupAvatarUrl={activeConversation.avatarUrl} channels={groupChannels}
                   selectedId={selectedChannelId} open={channelSidebarOpen}
                   unreadAvailable={channelUnreadAvailable}
                   onSelect={selectGroupChannel} onClose={() => setChannelSidebarOpen(false)}
@@ -6277,6 +6372,7 @@ export default function App({
                       <UserAvatar
                         username={activeConversation.otherUsername} name={activeConversation.name}
                         className="room-avatar"
+                        imageUrl={activeConversation.type === 'group' ? activeConversation.avatarUrl : undefined}
                         group={activeConversation.type === 'group'}
                         online={activeConversation.type === 'direct' && activeConversation.online}
                       />
@@ -6556,6 +6652,7 @@ export default function App({
                     <SharedContent
                       conversationId={activeConversation.id}
                       channelId={selectedChannelId}
+                      initialTab={sharedContentInitialTab}
                       request={apiFetch}
                       onClose={() => setSharedContentOpen(false)}
                     />
@@ -6957,12 +7054,21 @@ export default function App({
                 }}
                 onClearHistory={() => { void clearActiveConversationHistory() }}
                 onCreateGroupActivity={setGroupActivityCreateKind}
-                channels={groupChannels}
                 selectedChannelId={selectedChannelId}
-                onSelectChannel={selectGroupChannel}
+                request={apiFetch}
+                canManageGroup={Boolean(activeGroupMember && activeGroupMember.role !== 'member')}
+                onGroupManagement={(section) => {
+                  setGroupManagementSection(section)
+                  setConversationDetailsOpen(false)
+                  setGroupMemberViewOpen(false)
+                  openGroupSettings(activeConversation)
+                }}
                 canCreateChannel={activeGroupMember?.role === 'owner'}
                 channelCreateBusy={groupChannelBusy}
                 onCreateChannel={createGroupChannel}
+                canEditGroupPhotos={canEditGroup}
+                photoBusy={groupPhotoBusy || Boolean(mediaUploading)}
+                onSavePhoto={saveGroupPhoto}
                 onProfile={() => {
                   if (activeConversation.type === 'group') {
                     setConversationDetailsOpen(false)
@@ -6973,13 +7079,7 @@ export default function App({
                   else setNotice('Không thể mở hồ sơ từ cuộc trò chuyện này.', 'warning')
                 }}
                 onSearch={() => { setConversationDetailsOpen(false); setMessageSearchOpen(true) }}
-                onShared={() => { setConversationDetailsOpen(false); setSharedContentOpen(true) }}
-                onTranslate={() => {
-                  setConversationDetailsOpen(false);
-                  setTranslationMenuOpen(false);
-                  setTranslationSettingsConversationId(activeConversation.id);
-                }}
-                onNotifications={() => { setConversationDetailsOpen(false); switchTab('notifications') }}
+                onShared={(kind = 'media') => { setSharedContentInitialTab(kind); setSharedContentOpen(true) }}
               />
             )}
             {groupSettingsOpen && activeConversation?.type === 'group' && (
@@ -6989,6 +7089,7 @@ export default function App({
                   onClick={() => setGroupSettingsOpen(false)} />
                 <aside className="group-settings-sidebar" id="group-settings-sidebar" aria-label="Thanh bên quản lý nhóm">
                   <GroupSettingsPanel
+                    initialSection={groupManagementSection}
                     activeGroupMember={activeGroupMember}
                     setGroupSettingsOpen={setGroupSettingsOpen}
                     canManageActiveGroup={canManageActiveGroup}
@@ -7712,32 +7813,18 @@ export default function App({
           />
         )}
 
+        {tab === "profile" && profilePhotoTarget && (
+          <GroupAvatarEditor
+            key={profilePhotoTarget.kind}
+            target={profilePhotoTarget}
+            busy={profileBusy !== null || mediaUploading === "profile"}
+            onSave={(target, file) => updateProfileImage(target.kind === "cover" ? "cover" : "avatar", file)}
+            onClose={() => setProfilePhotoTarget(null)}
+          />
+        )}
+
         {tab === "profile" && desktopProfileOverview && (
           <>
-            <input
-              ref={avatarFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh đại diện"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("avatar", file);
-              }}
-            />
-            <input
-              ref={coverFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh bìa"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("cover", file);
-              }}
-            />
             {profileEditorOpen ? (
               <ProfileEditorPage
                 username={name}
@@ -7768,8 +7855,8 @@ export default function App({
                 changePrivacy={changePrivacy}
                 onSave={saveProfileIdentity}
                 onDiscard={discardDesktopProfileEdits}
-                onChangeAvatar={() => avatarFileInputRef.current?.click()}
-                onChangeCover={() => coverFileInputRef.current?.click()}
+                onChangeAvatar={() => openProfilePhoto("avatar")}
+                onChangeCover={() => openProfilePhoto("cover")}
               />
             ) : (
               <ProfilePage
@@ -7803,8 +7890,8 @@ export default function App({
                   />
                 }
                 onEditProfile={() => setProfileEditorOpen(true)}
-                onChangeAvatar={() => avatarFileInputRef.current?.click()}
-                onChangeCover={() => coverFileInputRef.current?.click()}
+                onChangeAvatar={() => openProfilePhoto("avatar")}
+                onChangeCover={() => openProfilePhoto("cover")}
                 onCreatePost={() => setProfileComposerOpen(true)}
                 onReloadPosts={() => void loadProfilePosts(false, true)}
                 onLoadMorePosts={() => void loadProfilePosts(true)}
@@ -7973,30 +8060,6 @@ export default function App({
                 }
               />
             )}
-            <input
-              ref={avatarFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh đại diện"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("avatar", file);
-              }}
-            />
-            <input
-              ref={coverFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh bìa"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("cover", file);
-              }}
-            />
 
             {profileTimelineOpen && (
               <header className="personal-timeline-header">
@@ -8046,7 +8109,7 @@ export default function App({
                   disabled={
                     profileBusy !== null || mediaUploading === "profile"
                   }
-                  onClick={() => coverFileInputRef.current?.click()}
+                  onClick={() => openProfilePhoto("cover")}
                 >
                   <UiIcon name="photo" size={17} />
                   {profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover")}
@@ -8089,7 +8152,7 @@ export default function App({
                     disabled={
                       profileBusy !== null || mediaUploading === "profile"
                     }
-                    onClick={() => avatarFileInputRef.current?.click()}
+                    onClick={() => openProfilePhoto("avatar")}
                   >
                     <UiIcon name="photo" size={17} />
                   </button>

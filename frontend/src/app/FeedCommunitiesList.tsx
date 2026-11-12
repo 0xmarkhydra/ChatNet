@@ -36,7 +36,7 @@ export default function FeedCommunitiesList({ groups, onOpen, hasMore, loadingMo
         {communities.map(group => (
           <button type="button" key={group.id} className="feed-community-row"
             onClick={() => onOpen(group.id)} aria-label={`Mở cuộc trò chuyện ${group.name}`}>
-            <UserAvatar name={group.name} className="feed-community-avatar" group />
+            <UserAvatar name={group.name} className="feed-community-avatar" imageUrl={group.avatarUrl} group />
             <span className="feed-community-row-copy">
               <strong>{group.name}</strong>
               <small><UsersRound size={13} aria-hidden="true" /> {group.memberCount} thành viên{group.unreadCount > 0 ? ` · ${group.unreadCount} tin chưa đọc` : ''}</small>

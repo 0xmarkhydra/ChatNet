@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Hash, Search, UsersRound, X } from 'lucide-react'
+import { ArrowLeft, Search, UsersRound, X } from 'lucide-react'
 import type { GroupChannel } from './groupChannels'
 import './group-channel-sidebar.css'
 
 type Props = {
   groupName: string
   memberCount: number
+  groupAvatarUrl?: string
   channels: GroupChannel[]
   selectedId: number
   unreadAvailable: boolean
@@ -13,6 +14,22 @@ type Props = {
   onSelect: (id: number) => void
   onClose: () => void
   onBack: () => void
+}
+
+/** The channel thumbnail derives from its topic and never needs an image upload. */
+export const channelTopicPreview = (name: string, topic: string) => {
+  const value = (topic.trim() || name.trim()).normalize('NFC')
+  const words = value.split(/\s+/).filter(Boolean)
+  return words.length > 1
+    ? (words[0][0] + words[words.length - 1][0]).toLocaleUpperCase('vi-VN')
+    : (words[0] || '#').slice(0, 2).toLocaleUpperCase('vi-VN')
+}
+
+export const channelTopicTone = (name: string, topic: string) => {
+  const text = topic.trim() || name.trim()
+  let hash = 0
+  for (const point of text) hash = (hash * 31 + point.codePointAt(0)!) >>> 0
+  return hash % 6
 }
 
 const formatChannelTime = (timestamp?: string) => {
@@ -25,10 +42,10 @@ const formatChannelTime = (timestamp?: string) => {
     : date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
 }
 
-export default function GroupChannelSidebar({ groupName, memberCount, channels, selectedId, unreadAvailable, open, onSelect, onClose, onBack }: Props) {
+export default function GroupChannelSidebar({ groupName, memberCount, groupAvatarUrl, channels, selectedId, unreadAvailable, open, onSelect, onClose, onBack }: Props) {
   const [search, setSearch] = useState('')
   const filtered = useMemo(() => channels.filter(channel =>
-    (channel.name + ' ' + channel.description).toLocaleLowerCase('vi-VN')
+    (channel.name + ' ' + channel.description + ' ' + channel.lastMessage).toLocaleLowerCase('vi-VN')
       .includes(search.trim().toLocaleLowerCase('vi-VN'))), [channels, search])
 
   return (
@@ -38,7 +55,7 @@ export default function GroupChannelSidebar({ groupName, memberCount, channels, 
         <button type="button" className="group-channel-sidebar-back" aria-label="Quay lại danh sách hội thoại" onClick={onBack}>
           <ArrowLeft size={19} aria-hidden="true" />
         </button>
-        <span className="group-channel-sidebar-icon"><UsersRound size={19} aria-hidden="true" /></span>
+        <span className="group-channel-sidebar-icon">{groupAvatarUrl ? <img src={groupAvatarUrl} alt="" onError={event => { event.currentTarget.style.display = "none" }} /> : <UsersRound size={19} aria-hidden="true" />}</span>
         <div className="group-channel-sidebar-intro">
           <strong title={groupName}>{groupName}</strong>
           <small>{memberCount} thành viên · {channels.length} kênh</small>
@@ -70,15 +87,20 @@ export default function GroupChannelSidebar({ groupName, memberCount, channels, 
             aria-current={channel.id === selectedId ? 'page' : undefined}
             aria-label={`Mở kênh ${channel.name}${channel.unreadCount ? `, ${channel.unreadCount} tin chưa đọc` : ''}`}
             onClick={() => { onSelect(channel.id); onClose() }}>
-            <span className="group-channel-sidebar-avatar"><Hash size={20} aria-hidden="true" /></span>
+            <span className={`group-channel-sidebar-avatar topic-tone-${channelTopicTone(channel.name, channel.description)}`} aria-hidden="true">
+              {channelTopicPreview(channel.name, channel.description)}
+            </span>
             <span className="group-channel-sidebar-content">
               <span className="group-channel-sidebar-name-row">
                 <strong>{channel.name}</strong>
                 <time>{formatChannelTime(channel.lastMessageAt)}</time>
               </span>
+              <span className="group-channel-sidebar-topic-row" title={channel.description || 'Chưa đặt chủ đề'}>
+                {channel.description || 'Chưa đặt chủ đề'}
+              </span>
               <span className="group-channel-sidebar-meta-row">
-                <small title={channel.lastMessage || channel.description || 'Chưa có tin nhắn'}>
-                  {channel.lastMessage || channel.description || 'Chưa có tin nhắn'}
+                <small title={channel.lastMessage || 'Chưa có tin nhắn'}>
+                  {channel.lastMessage || 'Chưa có tin nhắn'}
                 </small>
                 {channel.unreadCount > 0 && (
                   <b className="group-channel-unread" aria-label={`${channel.unreadCount} tin chưa đọc`}>

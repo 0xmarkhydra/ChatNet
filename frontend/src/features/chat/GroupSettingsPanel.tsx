@@ -7,7 +7,10 @@ import GroupGovernancePanel from './GroupGovernancePanel'
 import GroupManagementDetails from './GroupManagementDetails'
 import './group-management-workspace.css'
 
+export type GroupManagementSection = 'members' | 'details' | 'permissions' | 'requests' | 'rules' | 'notifications' | 'files' | 'activity'
+
 type Props = {
+  initialSection?: GroupManagementSection
   activeGroupMember: GroupMember | null
   setGroupSettingsOpen: (open: boolean) => void
   canManageActiveGroup: boolean
@@ -40,6 +43,7 @@ type Props = {
 
 export default function GroupSettingsPanel({
   activeGroupMember,
+  initialSection = 'members',
   setGroupSettingsOpen,
   canManageActiveGroup,
   canInviteActiveGroup,
@@ -70,10 +74,10 @@ export default function GroupSettingsPanel({
 }: Props) {
   const [openMemberMenu, setOpenMemberMenu] = useState<number | null>(null)
   const [menuDirection, setMenuDirection] = useState<'down' | 'up'>('down')
-  const [activeSection, setActiveSection] = useState<'members' | 'details' | 'permissions' | 'requests' | 'rules' | 'notifications' | 'files' | 'activity'>('members')
+  const [activeSection, setActiveSection] = useState<GroupManagementSection>(initialSection)
   const [memberSearch, setMemberSearch] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { setActiveSection('members'); setMemberSearch(''); setOpenMemberMenu(null) }, [activeConversation.id])
+  useEffect(() => { setActiveSection(initialSection); setMemberSearch(''); setOpenMemberMenu(null) }, [activeConversation.id, initialSection])
   const filteredMembers = groupMembers.filter(member => `${member.displayName} ${member.username}`.toLocaleLowerCase('vi-VN').includes(memberSearch.trim().toLocaleLowerCase('vi-VN')))
   const isOwner = activeGroupMember?.role === 'owner'
   const isManager = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
