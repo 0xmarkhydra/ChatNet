@@ -4,7 +4,10 @@ import type { Tab } from '../../../shared/types/navigation'
 import type { FriendConnection } from '../../contacts/types'
 import type { Conversation, GroupMember } from '../types'
 import type { ToastKind } from '../../../shared/utils/toast'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { addGroupMembers, getGroupSettings, listGroupMembers, removeGroupMember as removeGroupMemberRequest, setGroupMemberRole } from '../api/groups'
+
+const NO_SELECTION: number[] = []
 
 type Options = {
   session: Session | null
@@ -39,10 +42,10 @@ export function useGroupManagement({
   setNotice,
   actionLocks,
 }: Options) {
-  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
+  const [groupSettingsOpen, setGroupSettingsOpen] = useScopedState(activeConversationId, false)
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
-  const [groupInviteSearch, setGroupInviteSearch] = useState('')
-  const [groupInviteSelection, setGroupInviteSelection] = useState<number[]>([])
+  const [groupInviteSearch, setGroupInviteSearch] = useScopedState(activeConversationId, '')
+  const [groupInviteSelection, setGroupInviteSelection] = useScopedState<number[]>(activeConversationId, NO_SELECTION)
   const [groupBusy, setGroupBusy] = useState(false)
   const [groupPolicy, setGroupPolicy] = useState<{ adminCanInvite: boolean; adminCanEditInfo: boolean } | null>(null)
   const groupRequestRef = useRef(apiFetch)

@@ -1344,27 +1344,14 @@ export default function AuthedApp({
     activeConversationIdRef.current = activeConversationId;
     messageScrollAtBottom.current = true;
     cancelMessageLongPress();
-    setMessageActionId(null);
-    setConversationActionId(null);
-    setPinnedExpanded(false);
     setMessages([]);
     setHasMoreMessages(false);
     setMessagesLoadingMore(false);
     messagesPagingBusy.current = false;
-    setReplyingTo(null);
-    setGroupSettingsOpen(false);
-    setGroupMemberViewOpen(false);
-    setSharedContentOpen(false);
     setGroupMembers([]);
-    setGroupInviteSearch("");
-    setGroupInviteSelection([]);
   }, [activeConversationId]);
 
   useEffect(() => {
-    setReplyingTo(null);
-    setMessageActionId(null);
-    setMessageSearchOpen(false);
-    setSharedContentOpen(false);
     messageScrollAtBottom.current = true;
   }, [selectedChannelId]);
 
