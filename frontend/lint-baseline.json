@@ -1,9 +1,9 @@
 {
-  "total": 189,
+  "total": 187,
   "byRule": {
     "react-hooks/exhaustive-deps": 65,
     "react-hooks/set-state-in-effect": 61,
-    "react-hooks/refs": 48,
+    "react-hooks/refs": 46,
     "unused-disable-directive": 1,
     "react-hooks/immutability": 12,
     "react-hooks/purity": 2
@@ -44,7 +44,7 @@
     "src/features/chat/components/MessageSearchPanel.tsx|react-hooks/refs": 1,
     "src/features/chat/components/MessageSearchPanel.tsx|react-hooks/set-state-in-effect": 3,
     "src/features/chat/components/SharedContent.tsx|react-hooks/exhaustive-deps": 1,
-    "src/features/chat/components/SharedContent.tsx|react-hooks/refs": 3,
+    "src/features/chat/components/SharedContent.tsx|react-hooks/refs": 1,
     "src/features/chat/components/SharedContent.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/chat/components/VoiceRecorder.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/chat/hooks/useChatPanelState.ts|react-hooks/set-state-in-effect": 2,
