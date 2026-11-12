@@ -49,6 +49,7 @@
     "check:cache": "node --experimental-strip-types scripts/session-cache-check.mjs",
     "check:feed-api": "node scripts/feed-api-check.mjs",
     "check:chat-api": "node scripts/chat-api-check.mjs",
+    "check:chat-messaging-flow": "node scripts/chat-messaging-flow-check.mjs",
     "build:desktop": "tsc --noEmit && vite build --mode desktop --base ./ --outDir ../desktop/dist/renderer --emptyOutDir"
   },
   "dependencies": {

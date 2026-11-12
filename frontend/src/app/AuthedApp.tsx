@@ -284,7 +284,10 @@ import { useMessageClipboard } from "../features/chat/hooks/useMessageClipboard"
 import { useMediaUploads } from "../features/chat/hooks/useMediaUploads";
 import { useContactActions } from "../features/contacts/hooks/useContactActions";
 import { useTranslationActions } from "../features/chat/hooks/useTranslationActions";
-import { useChatMessaging } from "../features/chat/hooks/useChatMessaging";
+import { useMessageEdits } from "../features/chat/hooks/useMessageEdits";
+import { useMessageReactions } from "../features/chat/hooks/useMessageReactions";
+import { useMessageSender } from "../features/chat/hooks/useMessageSender";
+import { useOutboxDelivery } from "../features/chat/hooks/useOutboxDelivery";
 import { useConversationActions } from "../features/chat/hooks/useConversationActions";
 import { usePostSync } from "../features/feed/hooks/usePostSync";
 import { useProfilePosts } from "../features/feed/hooks/useProfilePosts";
@@ -2328,7 +2331,10 @@ export default function AuthedApp({
       messageSending,
     ],
   );
-  const { editOwnMessage, recallOwnMessage, retryQueuedChatMessages, sendMessage, toggleReaction } = useChatMessaging({ actionLocks, activeChannelIdRef, activeConversationId, activeConversationIdRef, apiFetch, canSend, channelDraftKey, chatOutboxRef, chatOutboxSession, draft, messageAttachments, messageChanges, messageText, ownSendScrollConversation, refreshConversations, replyingTo, retryOutboxBusy, selectedChannelId, sendingClientIDs, sendingRef, session, sessionRef, setChannelDrafts, setChatOnline, setMessageDrafts, setMessages, setNotice, setReactionPreviews, setReplyingTo, setTranslations, updateChatOutbox });
+  const { retryQueuedChatMessages } = useOutboxDelivery({ activeChannelIdRef, activeConversationIdRef, chatOutboxRef, chatOutboxSession, messageChanges, refreshConversations, retryOutboxBusyRef: retryOutboxBusy, sendingClientIDs, setMessages, updateChatOutbox });
+  const { sendMessage } = useMessageSender({ activeConversationId, canSend, channelDraftKey, draft, messageAttachments, messageText, ownSendScrollConversationRef: ownSendScrollConversation, replyingTo, retryQueuedChatMessages, selectedChannelId, sendingRef, setChannelDrafts, setChatOnline, setMessageDrafts, setReplyingTo, updateChatOutbox });
+  const { editOwnMessage, recallOwnMessage } = useMessageEdits({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReplyingTo, setTranslations });
+  const { toggleReaction } = useMessageReactions({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReactionPreviews });
   const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraftFile, storyBusy, updateChatOutbox, uploadMediaFiles });
 
   const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
