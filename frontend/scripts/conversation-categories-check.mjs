@@ -34,7 +34,7 @@ try{
    let categories=[{id:1,name:'Gia đình',color:'indigo'}], nextId=2, fail=false
    const conversations=Array.from({length:28},(_,i)=>({id:100+i,type:'group',name:'Hội thoại '+i,memberCount:3,unreadCount:0,lastMessage:'Tin nhắn',createdAt:'2026-01-01',categoryId:1}))
    conversations.push({id:200,type:'group',name:'Hội thoại chưa phân loại',memberCount:2,unreadCount:0,lastMessage:'Xin chào',createdAt:'2026-01-01'})
-   await page.route('**/api/**',async route=>{
+   await page.route(url => url.pathname.startsWith('/api/'),async route=>{
     const req=route.request(),u=new URL(req.url()),p=u.pathname,method=req.method()
     if(method==='GET') counts.set(p,(counts.get(p)||0)+1)
     const json=(data,status=200)=>route.fulfill({status,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},contentType:'application/json',body:JSON.stringify(data)})

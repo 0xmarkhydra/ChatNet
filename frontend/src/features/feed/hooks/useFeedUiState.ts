@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { type DiscussionDraft } from "../components/FeedDiscussion";
-import { type MediaAttachment } from "../../../shared/utils/media";
-import { type Post } from "../types";
 import type { Tab } from "../../../shared/types/navigation";
 
 export type UseFeedUiStateDeps = {
@@ -43,36 +41,12 @@ export function useFeedUiState({
   const [commentEditors, setCommentEditors] = useState<
     Record<number, DiscussionDraft>
   >({});
-  const [postText, setPostText] = useState("");
-  const [postTaggedFriends, setPostTaggedFriends] = useState<Array<{ id: number; username: string; displayName: string }>>([]);
-  const [postFeelingId, setPostFeelingId] = useState("");
-  const [postVisibility, setPostVisibility] = useState<
-    "public" | "friends" | "private"
-  >("public");
-  const [postBackground, setPostBackground] = useState("");
-  const [showPostBackgrounds, setShowPostBackgrounds] = useState(false);
-  const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([]);
-  const [editingPost, setEditingPost] = useState<Post | null>(null);
-  const [postEditBusy, setPostEditBusy] = useState(false);
-  const draftBeforeEdit = useRef<{
-    text: string;
-    tags: typeof postTaggedFriends;
-    feelingId: string;
-    visibility: typeof postVisibility;
-    background: string;
-    showBackgrounds: boolean;
-    attachments: MediaAttachment[];
-    checkInOpen: boolean;
-    location: string;
-  } | null>(null);
 
   return {
     activePostId,
     activeStoryId,
     commentEditors,
     commentSortOrder,
-    draftBeforeEdit,
-    editingPost,
     feedCheckInLocation,
     feedCheckInOpen,
     feedCommunitiesOpen,
@@ -80,36 +54,19 @@ export function useFeedUiState({
     feedFilter,
     feedScrollBeforeComments,
     feedViewRef,
-    postAttachments,
-    postBackground,
-    postEditBusy,
-    postFeelingId,
-    postTaggedFriends,
-    postText,
-    postVisibility,
     searchHasScrolled,
     setActivePostId,
     setActiveStoryId,
     setCommentEditors,
     setCommentSortOrder,
-    setEditingPost,
     setFeedCheckInLocation,
     setFeedCheckInOpen,
     setFeedCommunitiesOpen,
     setFeedComposerOpen,
     setFeedFilter,
-    setPostAttachments,
-    setPostBackground,
-    setPostEditBusy,
-    setPostFeelingId,
-    setPostTaggedFriends,
-    setPostText,
-    setPostVisibility,
     setSearchHasScrolled,
-    setShowPostBackgrounds,
     setStoryBusy,
     setStoryDraftFile,
-    showPostBackgrounds,
     storyBusy,
     storyDraftFile,
   };

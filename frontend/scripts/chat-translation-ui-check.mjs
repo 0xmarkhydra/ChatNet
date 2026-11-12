@@ -71,7 +71,7 @@ try {
       senderDisplayName:'Linh Anh',text:'không',createdAt:now,
       attachments:[],readByUserIds:[] })
     const requests = []
-    await ctx.route('**/api/**', async route => {
+    await ctx.route(url => url.pathname.startsWith('/api/'), async route => {
       const req = route.request(), p = new URL(req.url()).pathname
       const json = (data, status=200) => route.fulfill({status, contentType:'application/json',
         headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},body:JSON.stringify(data)})

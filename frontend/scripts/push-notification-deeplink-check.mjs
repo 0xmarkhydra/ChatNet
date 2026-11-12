@@ -42,7 +42,7 @@ try {
       return original?.apply(this, args)
     }
   }, session)
-  await page.route('**/api/**', async (route) => {
+  await page.route(url => url.pathname.startsWith('/api/'), async (route) => {
     const req = route.request()
     const url = new URL(req.url())
     const path = url.pathname

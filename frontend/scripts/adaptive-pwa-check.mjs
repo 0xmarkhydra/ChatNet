@@ -63,7 +63,7 @@ try {
     let callHistoryRevision = 0
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
-    await page.route('**/api/**', async route => {
+    await page.route(url => url.pathname.startsWith('/api/'), async route => {
       const req = route.request()
       const path = new URL(req.url()).pathname
       const json = (payload, status = 200) => route.fulfill({ status, contentType: 'application/json', headers: cors, body: JSON.stringify(payload) })
