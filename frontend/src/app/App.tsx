@@ -165,7 +165,6 @@ import {
   ChevronDown,
   Plus,
   LogOut,
-  MessageCircle,
   MoreHorizontal,
   Pin,
   ArrowLeft,
@@ -256,6 +255,13 @@ import {
 } from "../features/notifications/lib/onesignal";
 
 import { desktopBridge, isDesktopBuild } from "../platform/desktop";
+import AppHeader, { AppHeaderActions } from "./header/AppHeader";
+import AppLayout from "./layouts/AppLayout";
+import HeaderSearch from "./header/HeaderSearch";
+import HeaderActions from "./header/HeaderActions";
+import HeaderAccount from "./header/HeaderAccount";
+import HeaderTitle from "./header/HeaderTitle";
+import { searchLabels } from "./header/headerContext";
 
 export default function App({
   initialSession,
@@ -5581,92 +5587,67 @@ export default function App({
 
   const searchInConversationList = phoneSearchLayout && tab === "chat" &&
     desktopSection === null && translationSettingsConversationId === null;
-  // Render the same quick-search control at only one location per viewport.
-  // Its globalSearch state, keyboard behavior and results stay unchanged.
+  const showHeaderAccount =
+    tab === "profile" ||
+    tab === "feed" ||
+    tab === "notifications" ||
+    (tab === "chat" && desktopSection === "groups");
+  const searchText = searchLabels(tab);
   const quickSearchControl = (
-        <div className="appbar-search-anchor" ref={quickSearchAnchorRef}>
-          <label className="appbar-search">
-            <UiIcon name="search" size={27} />
-            <input
-              value={tab === "contacts" ? friendQuery : globalSearch}
-              maxLength={tab === "feed" || tab === "chat" ? 120 : undefined}
-              type="search"
-              onKeyDown={(event) => {
-                if (tab === "chat" && event.key === "Escape") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setQuickSearchOpen(false);
-                }
-              }}
-              aria-expanded={
-                tab === "chat" && conversationSearching && quickSearchOpen
-              }
-              aria-controls={
-                tab === "chat" ? "chat-quick-search-results" : undefined
-              }
-              onFocus={() => {
-                if (tab === "chat" && globalSearch.trim())
-                  setQuickSearchOpen(true);
-              }}
-              onClick={() => {
-                if (tab === "chat" && globalSearch.trim())
-                  setQuickSearchOpen(true);
-              }}
-              onChange={(event) => {
-                if (tab === "contacts") setFriendQuery(event.target.value);
-                else if (tab === "profile") {
-                  setFeedFilter("all");
-                  setGlobalSearch(event.target.value);
-                  setTab("feed");
-                } else {
-                  setGlobalSearch(event.target.value);
-                  if (tab === "chat")
-                    setQuickSearchOpen(Boolean(event.target.value.trim()));
-                }
-              }}
-              placeholder={
-                tab === "notifications"
-                  ? "Tìm kiếm thông báo..."
-                  : tab === "contacts"
-                  ? "Tên, @username hoặc email"
-                  : tab === "profile"
-                    ? "Tìm kiếm trên SocCo..."
-                    : tab === "feed"
-                      ? "Tìm tác giả hoặc nội dung bài viết"
-                      : "Tìm liên hệ, tin nhắn, file"
-              }
-              aria-label={
-                tab === "notifications"
-                  ? "Tìm thông báo..."
-                  : tab === "contacts"
-                  ? "Tìm bạn bằng tên, username hoặc email"
-                  : tab === "profile"
-                    ? "Tìm bài viết trên SocCo"
-                    : tab === "feed"
-                      ? "Tìm bài viết"
-                      : "Tìm cuộc trò chuyện"
-              }
-            />
-          </label>
-          {tab === "chat" && conversationSearching && quickSearchOpen && (
-            <ChatQuickSearch
-              results={chatQuickSearch.results}
-              loading={chatQuickSearch.loading}
-              error={chatQuickSearch.error}
-              onRetry={chatQuickSearch.retry}
-              onClose={() => setQuickSearchOpen(false)}
-              onContact={openChatQuickContact}
-              onHit={openChatQuickHit}
-            />
-          )}
-        </div>
+    <HeaderSearch
+      anchorRef={quickSearchAnchorRef}
+      icon={<UiIcon name="search" size={27} />}
+      value={tab === "contacts" ? friendQuery : globalSearch}
+      maxLength={tab === "feed" || tab === "chat" ? 120 : undefined}
+      placeholder={searchText.placeholder}
+      ariaLabel={searchText.ariaLabel}
+      expanded={tab === "chat" && conversationSearching && quickSearchOpen}
+      controls={tab === "chat" ? "chat-quick-search-results" : undefined}
+      onKeyDown={(event) => {
+        if (tab === "chat" && event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          setQuickSearchOpen(false);
+        }
+      }}
+      onFocus={() => {
+        if (tab === "chat" && globalSearch.trim()) setQuickSearchOpen(true);
+      }}
+      onClick={() => {
+        if (tab === "chat" && globalSearch.trim()) setQuickSearchOpen(true);
+      }}
+      onChange={(value) => {
+        if (tab === "contacts") setFriendQuery(value);
+        else if (tab === "profile") {
+          setFeedFilter("all");
+          setGlobalSearch(value);
+          setTab("feed");
+        } else {
+          setGlobalSearch(value);
+          if (tab === "chat") setQuickSearchOpen(Boolean(value.trim()));
+        }
+      }}
+      results={
+        tab === "chat" && conversationSearching && quickSearchOpen ? (
+          <ChatQuickSearch
+            results={chatQuickSearch.results}
+            loading={chatQuickSearch.loading}
+            error={chatQuickSearch.error}
+            onRetry={chatQuickSearch.retry}
+            onClose={() => setQuickSearchOpen(false)}
+            onContact={openChatQuickContact}
+            onHit={openChatQuickHit}
+          />
+        ) : undefined
+      }
+    />
   );
 
   return (
-    <main
+    <AppLayout
       className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
-    >
-      <AppSidebar
+      sidebar={
+        <AppSidebar
         tab={tab}
         section={tab === "chat" ? desktopSection : null}
         username={session.user.username}
@@ -5693,7 +5674,10 @@ export default function App({
           setProfileTimelineOpen(false);
         }}
       />
-      {qrOpen && (
+      }
+      overlays={
+        <>
+          {qrOpen && (
         <Suspense fallback={null}>
           <ProfileQr
             username={session.user.username}
@@ -5708,7 +5692,7 @@ export default function App({
           />
         </Suspense>
       )}
-      {mediaUploading && mediaUploadProgress && (
+          {mediaUploading && mediaUploadProgress && (
         <div className="media-upload-progress" role="status" aria-live="polite">
           <span>
             Đang tải tệp:{" "}
@@ -5732,7 +5716,7 @@ export default function App({
           </button>
         </div>
       )}
-      {visitorUsername && (
+          {visitorUsername && (
         <VisitorProfile
           key={session.sessionId + ":" + visitorUsername}
           username={visitorUsername}
@@ -5764,7 +5748,7 @@ export default function App({
           feedback={setNotice}
         />
       )}
-      {newChatMode === "group" && (
+          {newChatMode === "group" && (
         <GroupCreator
           ownerId={session.user.id}
           friends={friends.filter((friend) => friend.status === "accepted")}
@@ -5779,323 +5763,112 @@ export default function App({
           }}
         />
       )}
-      <header
-        className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
-      >
-        <div className="app-page-heading">
-          <strong>
-            {tab === "chat" && translationSettingsConversationId !== null
-              ? "Ngôn ngữ & dịch AI"
-              : tab === "chat" && desktopSection === "groups"
-                ? groupWorkspaceMode === "create" ? groupCreateStep === 1 ? "Tạo cộng đồng mới" : "Tạo nhóm mới" : groupWorkspaceMode === "manage" ? "Quản trị nhóm" : groupWorkspaceMode === "channel" ? activeConversation?.name || "Kênh trò chuyện nhóm" : "Nhóm & cộng đồng"
-              : tab === "chat" && desktopSection === "calls"
-                ? "Cuộc gọi"
-                : (
-                    {
-                      chat: "Tin nhắn",
-                      contacts: contactsScreen === "directory" ? "Bạn bè" : "Lời mời kết bạn",
-                      notifications: "Thông báo",
-                      discover: "Khám phá",
-                      market: "Marketplace",
-                      feed: isProfileDesktop && activePost ? "Bình luận" : "Bảng tin",
-                      profile:
-                        desktopProfileSettings && isProfileDesktop
-                          ? "Cài đặt"
-                          : desktopProfileOverview && profileEditorOpen
-                            ? "Chỉnh sửa hồ sơ"
-                            : "Hồ sơ cá nhân",
-                    } as Record<Tab, string>
-                  )[tab]}
-          </strong>
-          <small>
-            {
-              (
-                {
-                  chat: translationSettingsConversationId !== null
-                    ? "Chọn ngôn ngữ và quyền dịch của cuộc trò chuyện"
-                    : desktopSection === "groups" ? (groupWorkspaceMode === "create" ? groupCreateStep === 1 ? "Thiết lập không gian riêng cho nhóm" : "Bước " + groupCreateStep + "/3 · Chọn thành viên và xác nhận" : groupWorkspaceMode === "manage" ? "Phân quyền, thành viên và cài đặt cộng đồng" : groupWorkspaceMode === "channel" ? "Kênh và trò chuyện nhóm" : "Quản lý các nhóm của bạn") : "Trò chuyện gần đây và kết nối bạn bè",
-                  contacts: contactsScreen === "directory" ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
-                  notifications: "Cập nhật những hoạt động quan trọng",
-                  discover: "Khám phá và kết nối cộng đồng",
-                  market: "Khám phá sản phẩm và cửa hàng",
-                  feed: isProfileDesktop && activePost ? "Tương tác với mọi người trong cộng đồng" : "Khoảnh khắc và cộng đồng dành cho bạn",
-                  profile: desktopProfileSettings
-                    ? "Cài đặt tài khoản và quyền riêng tư"
-                    : desktopProfileOverview && profileEditorOpen
-                      ? "Thông tin cá nhân và quyền hiển thị"
-                      : "Trang cá nhân, bài viết và thông tin của bạn",
-                } as Record<Tab, string>
-              )[tab]
+        </>
+      }
+      header={
+        <AppHeader
+          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
+        >
+          <HeaderTitle
+            tab={tab}
+            desktopSection={desktopSection}
+            translationSettingsOpen={translationSettingsConversationId !== null}
+            groupWorkspaceMode={groupWorkspaceMode}
+            groupCreateStep={groupCreateStep}
+            activeConversationName={activeConversation?.name}
+            contactsDirectory={contactsScreen === "directory"}
+            feedPostOpenOnDesktop={Boolean(isProfileDesktop && activePost)}
+            profileSettings={desktopProfileSettings}
+            profileDesktop={isProfileDesktop}
+            profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
+          />
+          <div className="appbar-brand">
+            <img src="/soco-mark.svg" width="32" height="32" alt="" />
+            <strong>SocCO</strong>
+          </div>
+          {!searchInConversationList && quickSearchControl}
+          <AppHeaderActions
+            account={
+              showHeaderAccount ? (
+              <HeaderAccount
+                variant={tab === "profile" ? "settings" : "profile"}
+                username={name}
+                displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
+                onClick={
+                  tab === "profile"
+                    ? () => {
+                        setDesktopProfileSettings(true);
+                        setProfileTimelineOpen(false);
+                      }
+                    : () => switchTab("profile")
+                }
+              />
+              ) : null
             }
-          </small>
-        </div>
-        <div className="appbar-brand">
-          <img src="/soco-mark.svg" width="32" height="32" alt="" />
-          <strong>SocCO</strong>
-        </div>
-        {!searchInConversationList && quickSearchControl}
-        <div className="appbar-actions">
-          {tab === "chat" && (
-            <>
-              {desktopSection === "groups" && <button type="button" className="appbar-icon-button notification-appbar" aria-label="Mở thông báo" onClick={() => switchTab("notifications")}>
-                <Bell size={22} aria-hidden="true" />
-                {notificationItemCount > 0 && <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>}
-              </button>}
-              {desktopSection !== "groups" && <button
-                className="appbar-icon-button"
-                type="button"
-                aria-label="Quét QR"
-                onClick={() => setQrOpen("scan")}
-              >
-                <UiIcon name="qr" size={28} />
-              </button>}
-              <div className="appbar-create-anchor">
-                <button
-                  className={
-                    quickCreateOpen
-                      ? "appbar-icon-button appbar-create-trigger active"
-                      : "appbar-icon-button appbar-create-trigger"
-                  }
-                  type="button"
-                  aria-label={desktopSection === "groups" ? "Tạo cộng đồng mới" : "Tạo mới"}
-                  aria-expanded={desktopSection === "groups" ? false : quickCreateOpen}
-                  aria-haspopup={desktopSection === "groups" ? undefined : "menu"}
-                  onClick={() => { if (desktopSection === "groups") { setChatCreateError(""); setGroupCreateStep(1); setGroupWorkspaceMode("create"); setQuickCreateOpen(false); } else setQuickCreateOpen((current) => !current); }}
-                >
-                  <UiIcon name="plus" size={29} />
-                </button>
-                {quickCreateOpen && desktopSection !== "groups" && (
-                  <>
-                    <button
-                      type="button"
-                      className="quick-create-dismiss"
-                      aria-label="Đóng menu tạo mới"
-                      onClick={() => setQuickCreateOpen(false)}
-                    />
-                    <div
-                      className="quick-create-menu"
-                      role="menu"
-                      aria-label="Tạo cuộc trò chuyện mới"
-                    >
-                      <div className="quick-create-caption">TẠO MỚI</div>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => openConnectSurface()}
-                      >
-                        <span className="quick-create-symbol">
-                          <Search size={19} aria-hidden="true" />
-                        </span>
-                        <div>
-                          <strong>Tìm & kết nối</strong>
-                          <small>Tìm bạn bè bằng tên hoặc @username</small>
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setNewChatMode("direct");
-                          setQuickCreateOpen(false);
-                        }}
-                      >
-                        <span className="quick-create-symbol">
-                          <MessageCircle size={19} aria-hidden="true" />
-                        </span>
-                        <div>
-                          <strong>Chat riêng</strong>
-                          <small>Bắt đầu cuộc trò chuyện 1-1</small>
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setFriendQuery("");
-                          setChatCreateError("");
-                          setNewChatMode("group");
-                          setQuickCreateOpen(false);
-                        }}
-                      >
-                        <span className="quick-create-symbol">
-                          <Users size={19} aria-hidden="true" />
-                        </span>
-                        <div>
-                          <strong>Tạo nhóm</strong>
-                          <small>Trò chuyện cùng nhiều người</small>
-                        </div>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-              {desktopSection === "groups" && <button type="button" className="social-feed-header-account" aria-label="Mở trang cá nhân" onClick={() => switchTab("profile")}>
-                <UserAvatar username={name} name={userLabel(profileMedia?.displayName || session.user.displayName, name)} className="social-feed-header-avatar"/>
-              </button>}
-            </>
-          )}
-
-          {tab === "feed" && (
-            <>
-              <button
-                className="appbar-icon-button social-feed-header-community"
-                type="button"
-                aria-label="Cộng đồng"
-                title="Cộng đồng"
-                aria-pressed={feedCommunitiesOpen}
-                onClick={() => {
+          >
+            <HeaderActions
+              tab={tab}
+              desktopSection={desktopSection}
+              notificationCount={notificationItemCount}
+              notificationBadgeText={notificationBadgeText}
+              onOpenNotifications={() => switchTab("notifications")}
+              chat={{
+                quickCreateOpen,
+                onScanQr: () => setQrOpen("scan"),
+                onCreateCommunity: () => {
+                  setChatCreateError("");
+                  setGroupCreateStep(1);
+                  setGroupWorkspaceMode("create");
+                  setQuickCreateOpen(false);
+                },
+                onToggleQuickCreate: () => setQuickCreateOpen((current) => !current),
+                onCloseQuickCreate: () => setQuickCreateOpen(false),
+                onConnect: () => openConnectSurface(),
+                onNewDirect: () => {
+                  setNewChatMode("direct");
+                  setQuickCreateOpen(false);
+                },
+                onNewGroup: () => {
+                  setFriendQuery("");
+                  setChatCreateError("");
+                  setNewChatMode("group");
+                  setQuickCreateOpen(false);
+                },
+              }}
+              feed={{
+                communitiesOpen: feedCommunitiesOpen,
+                onToggleCommunities: () => {
                   if (!feedCommunitiesOpen) {
                     setActivePostId(null);
                     setFeedComposerOpen(false);
                     setFeedCheckInOpen(false);
                   }
-                  setFeedCommunitiesOpen(current => !current);
-                }}
-              >
-                <Users size={23} aria-hidden="true" />
-              </button>
-              <button
-                className="appbar-icon-button notification-appbar"
-                type="button"
-                aria-label="Mở thông báo"
-                onClick={() => switchTab("notifications")}
-              >
-                <UiIcon name="bell" size={27} />
-                {notificationItemCount > 0 && (
-                  <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>
-                )}
-              </button>
-              <button
-                className="social-feed-header-account"
-                type="button"
-                aria-label="Mở trang cá nhân"
-                onClick={() => switchTab("profile")}
-              >
-                <UserAvatar
-                  username={name}
-                  name={userLabel(
-                    profileMedia?.displayName || session.user.displayName,
-                    name,
-                  )}
-                  className="social-feed-header-avatar"
-                />
-              </button>
-            </>
-          )}
-
-          {tab === "profile" && (
-            <>
-              <button
-                className="appbar-icon-button notification-appbar"
-                type="button"
-                aria-label="Mở thông báo"
-                onClick={() => switchTab("notifications")}
-              >
-                <Bell size={21} aria-hidden="true" />
-                {notificationItemCount > 0 && (
-                  <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>
-                )}
-              </button>
-              <button
-                className="appbar-icon-button profile-page-header-new"
-                type="button"
-                aria-label="Tạo bài viết"
-                onClick={() => {
+                  setFeedCommunitiesOpen((current) => !current);
+                },
+              }}
+              profile={{
+                onNewPost: () => {
                   setDesktopProfileSettings(false);
                   setProfileComposerOpen(true);
-                }}
-              >
-                <PencilLine size={21} aria-hidden="true" />
-              </button>
-              <button
-                className="profile-page-header-account"
-                type="button"
-                aria-label="Mở cài đặt tài khoản"
-                onClick={() => {
-                  setDesktopProfileSettings(true);
-                  setProfileTimelineOpen(false);
-                }}
-              >
-                <UserAvatar
-                  username={name}
-                  name={userLabel(
-                    profileMedia?.displayName || session.user.displayName,
-                    name,
-                  )}
-                  className="profile-page-header-avatar"
-                />
-              </button>
-            </>
-          )}
-
-          {tab === "notifications" && (
-            <>
-              <button
-                className="appbar-icon-button notification-appbar"
-                type="button"
-                aria-label="Trang Thông báo"
-                aria-current="page"
-              >
-                <Bell size={22} aria-hidden="true" />
-                {notificationItemCount > 0 && (
-                  <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>
-                )}
-              </button>
-              <button
-                className="appbar-icon-button"
-                type="button"
-                aria-label="Tạo bài viết mới"
-                onClick={() => {
+                },
+              }}
+              notifications={{
+                onNewPost: () => {
                   switchTab("feed");
                   setFeedComposerOpen(true);
-                }}
-              >
-                <UiIcon name="plus" size={31} />
-              </button>
-              <button
-                className="social-feed-header-account"
-                type="button"
-                aria-label="Mở trang cá nhân"
-                onClick={() => switchTab("profile")}
-              >
-                <UserAvatar username={name}
-                  name={userLabel(profileMedia?.displayName || session.user.displayName, name)}
-                  className="social-feed-header-avatar" />
-              </button>
-            </>
-          )}
-
-          {tab === "contacts" && (
-            <>
-              <button
-                className="appbar-icon-button notification-appbar"
-                type="button"
-                aria-label="Mở trang Thông báo"
-                title="Thông báo"
-                onClick={() => switchTab("notifications")}
-              >
-                <Bell size={22} aria-hidden="true" />
-                {notificationItemCount > 0 && (
-                  <span className="appbar-badge appbar-badge-count" aria-hidden="true">{notificationBadgeText}</span>
-                )}
-              </button>
-              <button
-                className="appbar-icon-button"
-                type="button"
-                aria-label="Thêm bạn"
-                onClick={() => {
+                },
+              }}
+              contacts={{
+                onAddFriend: () => {
                   setTab("chat");
                   setNewChatMode("friends");
-                }}
-              >
-                <UiIcon name="plus" size={31} />
-              </button>
-            </>
-          )}
-        </div>
-      </header>
-
-      {pushPrompt && !pushPromptDismissed && !pushEnabled && (
+                },
+              }}
+            />
+          </AppHeaderActions>
+        </AppHeader>
+      }
+    >{pushPrompt && !pushPromptDismissed && !pushEnabled && (
         <section
           className="push-onboarding"
           aria-label="Thông báo tin nhắn"
@@ -8978,6 +8751,6 @@ export default function App({
         unreadTotal={unreadTotal}
         pushEnabled={pushEnabled}
       />
-    </main>
+    </AppLayout>
   );
 }
