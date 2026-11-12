@@ -1,4 +1,4 @@
-import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash } from "lucide-react";
+import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { userLabel } from "../../../shared/utils/userLabel";
@@ -139,6 +139,8 @@ export type ChatSectionProps = {
   openGroupSettings: (conversation: Conversation) => void;
   openMessageActions: (message: Message, target?: EventTarget | null) => void;
   openMessageReactions: (message: Message) => void;
+  onReactionUsers: (message: Message, emoji: string) => void;
+  onForwardMessage: (message: Message) => void;
   openVisitor: (username: string) => void;
   pinBusy: boolean;
   pinnedExpanded: boolean;
@@ -313,6 +315,8 @@ export default function ChatSection({
   openGroupSettings,
   openMessageActions,
   openMessageReactions,
+  onReactionUsers,
+  onForwardMessage,
   openVisitor,
   pinBusy,
   pinnedExpanded,
@@ -1120,10 +1124,9 @@ export default function ChatSection({
                               key={reaction.emoji}
                               type="button"
                               disabled={reactionPreviews[message.id] !== undefined}
-                              aria-pressed={reaction.mine}
                               className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
-                              onClick={() => void toggleReaction(message, reaction.emoji)}
-                              aria-label={`${messageReactionLabel(reaction.emoji)}: ${reaction.count} lượt`}
+                              onClick={() => onReactionUsers(message, reaction.emoji)}
+                              aria-label={`Xem ${reaction.count} người thả ${messageReactionLabel(reaction.emoji)}`}
                             >
                               {reaction.emoji} {reaction.count}
                             </button>
@@ -1201,6 +1204,9 @@ export default function ChatSection({
                             <div className="bubble recalled-message">Tin nhắn đã được thu hồi</div>
                           ) : (
                             <div className="message-content">
+                              {message.forwarded && (
+                                <span className="chat-forwarded-caption">Đã chuyển tiếp 1 tin nhắn</span>
+                              )}
                               {message.text && (
                                 <div className={`bubble${translationView.mode === 'dual' ? ' chat-translation-dual' : ''}${translationView.mode === 'translated' ? ' translated-bubble translation-flip-bubble' : ''}`}>
                                   <span
@@ -1273,6 +1279,29 @@ export default function ChatSection({
                                 </div>
                               )}
                               {!message.text && reactionControls}
+                              {!conversationBlocked && (
+                                <div className="chat-message-hover-toolbar" role="group" aria-label="Thao tác tin nhắn">
+                                  <button type="button" title="Trả lời" aria-label="Trả lời tin nhắn"
+                                    onClick={() => { setReplyingTo(message); messageInputRef.current?.focus() }}>
+                                    <CornerUpLeft size={18} strokeWidth={2} aria-hidden="true" />
+                                  </button>
+                                  <button type="button" title="Chuyển tiếp" aria-label="Chuyển tiếp tin nhắn"
+                                    onClick={() => onForwardMessage(message)}>
+                                    <Forward size={18} aria-hidden="true" />
+                                  </button>
+                                  {Boolean(message.text.trim()) && (
+                                    <button type="button" title="Dịch" aria-label="Dịch tin nhắn"
+                                      disabled={isTranslating}
+                                      onClick={() => void translateMessage(message)}>
+                                      <Languages size={18} aria-hidden="true" />
+                                    </button>
+                                  )}
+                                  <button type="button" title="Thêm tùy chọn" aria-label="Thêm tùy chọn tin nhắn"
+                                    onClick={(event) => openMessageActions(message, event.currentTarget)}>
+                                    <MoreHorizontal size={18} aria-hidden="true" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
                           <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>

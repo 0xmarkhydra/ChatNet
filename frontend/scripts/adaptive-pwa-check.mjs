@@ -32,8 +32,17 @@ const messages = [
   { id: 202, conversationId: 101, senderId: 1, sender: 'viewer', senderDisplayName: 'Người xem', text: 'Chào bạn!', createdAt: now, attachments: [], readByUserIds: [2] },
   { id: 203, conversationId: 101, senderId: 2, sender: 'linhanh', senderDisplayName: 'Linh Anh', text: 'Ừ', createdAt: now, attachments: [], readByUserIds: [],
     reactions: [{ emoji: '👍', count: 2, mine: false }, { emoji: '❤️', count: 1, mine: false }] },
-  { id: 204, conversationId: 101, senderId: 1, sender: 'viewer', senderDisplayName: 'Người xem', text: 'a', createdAt: now, attachments: [], readByUserIds: [2],
+  { id: 204, conversationId: 101, senderId: 1, sender: 'viewer', senderDisplayName: 'Người xem', text: 'a', forwarded: true, createdAt: now, attachments: [], readByUserIds: [2],
     reactions: [{ emoji: '👍', count: 2, mine: true }, { emoji: '❤️', count: 1, mine: false }, { emoji: '😂', count: 3, mine: false }, { emoji: '🔥', count: 1, mine: false }] },
+]
+const reactionUsers = [
+  { userId: 2, username: 'linhanh', displayName: 'Linh Anh', emoji: '❤️' },
+  { userId: 1, username: 'viewer', displayName: 'Người xem', emoji: '❤️' },
+]
+const feedPosts = [
+  { id: 301, author: 'viewer', authorDisplayName: 'Người xem', content: 'Bài viết thử nghiệm',
+    likes: 2, liked: true, myReaction: '❤️', reactions: [{ emoji: '❤️', count: 2 }],
+    comments: [], attachments: [], visibility: 'public', createdAt: now },
 ]
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization, Content-Type', 'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS' }
 let browser
@@ -61,6 +70,7 @@ try {
     let failFriendsOnce = false
     let optionalContactsFinished = width !== 320
     let callHistoryRevision = 0
+    let forwardedPayload = null
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
     await page.route(url => url.pathname.startsWith('/api/'), async route => {
@@ -76,6 +86,14 @@ try {
         ...(callHistoryRevision ? [{ id: 'call-203', conversationId: 101, createdBy: 1, mediaType: 'audio', status: 'ended',
           createdAt: now, startedAt: now, endedAt: now, joined: true, declined: false, isGroup: false, participantCount: 2 }] : []),
       ])
+      if (/^\/api\/messages\/\d+\/reactions$/.test(path) && req.method() === 'GET')
+        return json({ items: reactionUsers.map(user => ({ ...user, emoji: '👍' })), hasMore: false })
+      if (/^\/api\/posts\/\d+\/reactions$/.test(path) && req.method() === 'GET')
+        return json({ items: reactionUsers, hasMore: false })
+      if (/^\/api\/conversations\/\d+\/messages$/.test(path) && req.method() === 'POST') {
+        forwardedPayload = JSON.parse(req.postData() || '{}')
+        return json({ id: 999 }, 201)
+      }
       if (path === '/api/conversations') return json(conversations)
       if (path === '/api/conversations/memberships') return json({ ids: conversations.map(c => c.id), nextAfter: null })
       if (path === '/api/conversation-categories') return json([])
@@ -94,7 +112,8 @@ try {
       if (path === '/api/push/config') return json({ configured: false })
       if (path === '/api/friends/requests') return json([{ id: 11, username: 'linh2', displayName: 'Linh Trần', status: 'pending', direction: 'incoming' }, { id: 12, username: 'nam2', displayName: 'Nam Nguyễn', status: 'pending', direction: 'outgoing' }])
       if (path === '/api/profile') return json({ username: 'viewer', displayName: 'Người xem', avatarSet: false, coverSet: false })
-      if (path === '/api/posts' || path === '/api/stories' || path === '/api/friends/requests' || path === '/api/groups/public') return json([])
+      if (path === '/api/posts') return json(feedPosts)
+      if (path === '/api/stories' || path === '/api/friends/requests' || path === '/api/groups/public') return json([])
       return json([])
     })
     await page.goto(origin)
@@ -203,6 +222,13 @@ try {
         a.iconWidth === 20 && a.iconHeight === 20 && a.dx <= 2 && a.dy <= 2),
         width + 'px: file, image and microphone buttons must have matching shape and centered icons: ' +
         JSON.stringify(actionShapes))
+      assert.equal(await page.locator('[data-message-id="204"] .chat-forwarded-caption').textContent(),
+        'Đã chuyển tiếp 1 tin nhắn', width + ': forwarded label must render above the message bubble')
+      assert.equal(await page.locator('[data-message-id="203"] .chat-forwarded-caption').count(), 0,
+        width + ': ordinary messages must not display forwarding label')
+      assert.equal(await page.locator('[data-message-id="204"] .chat-forwarded-caption').evaluate(
+        el => el.nextElementSibling?.classList.contains('bubble'),
+      ), true, width + ': forwarded label must be immediately above the message bubble')
       const reactions = await page.evaluate(() => [203, 204].map(id => {
         const message = document.querySelector('[data-message-id="' + id + '"]')
         const scroll = document.querySelector('.social-chat-layout .messages')?.getBoundingClientRect()
@@ -225,6 +251,30 @@ try {
         assert.ok(Math.abs(react.row.right - react.bubble.right) <= 2 || (!react.isMine && react.row.right >= react.bubble.right),
           width + 'px: reaction must stay anchored to its short bubble: ' + JSON.stringify(react))
       }
+      if (width === 390) {
+        await page.locator('[data-message-id="203"] .reaction-chip').first().click()
+        const dialog = page.getByRole('dialog', { name: 'Cảm xúc tin nhắn' })
+        await dialog.waitFor({ state: 'visible' })
+        await dialog.locator('.reaction-users-person').first().waitFor()
+        assert.equal(await dialog.locator('.reaction-users-person').count(), 2,
+          'Chat reaction should show users who reacted to the selected message')
+        assert.ok(await dialog.getByText('Linh Anh', { exact: true }).isVisible())
+        await dialog.getByRole('button', { name: 'Đóng danh sách cảm xúc' }).click()
+        await dialog.waitFor({ state: 'hidden' })
+        console.log('PASS: chat reaction participant list on PWA phone')
+        const mobileBubble = page.locator('[data-message-id="203"] .bubble')
+        const mobileBounds = await mobileBubble.boundingBox()
+        const touch = { pointerType: 'touch', button: 0, clientX: mobileBounds.x + 15, clientY: mobileBounds.y + 15 }
+        await mobileBubble.dispatchEvent('pointerdown', touch)
+        await page.waitForTimeout(550)
+        const actions = page.getByRole('dialog', { name: 'Tùy chọn tin nhắn' })
+        await actions.waitFor({ state: 'visible' })
+        assert.equal(await actions.getByRole('button', { name: 'Chuyển tiếp' }).count(), 1,
+          'Mobile long-press must offer the same forward action')
+        await mobileBubble.dispatchEvent('pointerup', touch)
+        await actions.getByRole('button', { name: 'Đóng' }).click()
+        console.log('PASS: PWA mobile long-press includes forwarding')
+      }
       await page.screenshot({ path: 'output/playwright/layout/adaptive-chat-detail-' + width + '.png' })
       await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
       assert.equal(await bottom.isVisible(), true, width + ': bottom tabs restored on back')
@@ -237,6 +287,96 @@ try {
       await page.locator('.conversation-panel').waitFor({ state: 'visible' })
       const split = await page.locator('.social-chat-layout').evaluate(el => getComputedStyle(el).gridTemplateColumns)
       assert.ok(split.split(' ').length >= 2, width + ': desktop must have split columns: ' + split)
+      if (width === 1440) {
+        const message = page.locator('[data-message-id="203"]')
+        const bubble = message.locator('.bubble')
+        const toolbar = message.locator('.chat-message-hover-toolbar')
+        assert.equal(await toolbar.evaluate(el => getComputedStyle(el).visibility), 'hidden',
+          'Action toolbar must be hidden until hovering')
+        await bubble.hover()
+        await page.waitForTimeout(240)
+        assert.equal(await toolbar.evaluate(el => getComputedStyle(el).visibility), 'visible',
+          'Hovering the message should reveal quick actions')
+        assert.equal(await message.locator('.reaction-add').evaluate(el => getComputedStyle(el).opacity), '1',
+          'Reaction picker should appear on bubble hover')
+        for (const action of ['Trả lời tin nhắn', 'Chuyển tiếp tin nhắn', 'Dịch tin nhắn', 'Thêm tùy chọn tin nhắn']) {
+          assert.equal(await toolbar.getByRole('button', { name: action }).count(), 1,
+            'Missing desktop hover action: ' + action)
+        }
+        const toolbarBox = await toolbar.boundingBox()
+        const bubbleBox = await bubble.boundingBox()
+        const scrollerBox = await page.locator('.social-chat-layout .messages').boundingBox()
+        assert.ok(toolbarBox.x >= scrollerBox.x - 1 && toolbarBox.x + toolbarBox.width <= scrollerBox.x + scrollerBox.width + 1,
+          'Hover toolbar must fit inside conversation viewport')
+        assert.ok(toolbarBox.height >= 37 && toolbarBox.height <= 41 && toolbarBox.width < 170,
+          'Keep the quick-action toolbar compact while expanding only its invisible hover bridge: ' + JSON.stringify(toolbarBox))
+        assert.equal(await toolbar.getByRole('button', { name: 'Trả lời tin nhắn' }).locator('svg.lucide-corner-up-left').count(), 1,
+          'Reply should use the corner-up-left icon')
+        const buttonSize = await toolbar.getByRole('button', { name: 'Trả lời tin nhắn' }).boundingBox()
+        assert.ok(buttonSize.width === 31 && buttonSize.height === 31,
+          'Keep the original 31px toolbar button size')
+        // Crossing the gap should not collapse the hover state: the hitbox
+        // bridge spans the bubble edge and the toolbar's near side.
+        const crossY = toolbarBox.y + toolbarBox.height / 2
+        await page.mouse.move(bubbleBox.x + bubbleBox.width - 2, crossY)
+        const gapX = (bubbleBox.x + bubbleBox.width + toolbarBox.x) / 2
+        await page.mouse.move(gapX, crossY)
+        assert.equal(await toolbar.evaluate(el => getComputedStyle(el).visibility), 'visible',
+          'Hover must survive moving across the bubble-toolbar gap')
+        await page.mouse.move(toolbarBox.x + 22, crossY)
+        assert.equal(await toolbar.evaluate(el => getComputedStyle(el).visibility), 'visible',
+          'Toolbar should stay open when the pointer reaches its first button')
+
+        // Own messages show the toolbar on the opposite side, with the
+        // action order visually mirrored and enough room for a 40px click.
+        const ownMessage = page.locator('[data-message-id="204"]')
+        await ownMessage.locator('.bubble').hover()
+        const ownToolbar = ownMessage.locator('.chat-message-hover-toolbar')
+        const ownBar = await ownToolbar.boundingBox()
+        const ownBubble = await ownMessage.locator('.bubble').boundingBox()
+        assert.ok(ownBar.x + ownBar.width <= ownBubble.x + 1,
+          'Own message quick actions should appear left of its bubble')
+        assert.equal(await ownToolbar.evaluate(el => getComputedStyle(el).flexDirection), 'row-reverse',
+          'Own message action order must mirror incoming messages')
+        assert.ok(ownBar.height >= 37 && ownBar.height <= 41 && ownBar.width < 170,
+          'Own-message toolbar must stay compact')
+        const ownCrossY = ownBar.y + ownBar.height / 2
+        await page.mouse.move(ownBubble.x + 2, ownCrossY)
+        await page.mouse.move((ownBubble.x + ownBar.x + ownBar.width) / 2, ownCrossY)
+        assert.equal(await ownToolbar.evaluate(el => getComputedStyle(el).visibility), 'visible',
+          'Own message hover must survive crossing the mirrored gap')
+        await page.mouse.move(ownBar.x + ownBar.width - 22, ownCrossY)
+        assert.equal(await ownToolbar.evaluate(el => getComputedStyle(el).visibility), 'visible',
+          'Own message toolbar should stay open under the pointer')
+        await bubble.hover()
+        await toolbar.getByRole('button', { name: 'Trả lời tin nhắn' }).click()
+        const cancelReply = page.getByRole('button', { name: 'Hủy trả lời' })
+        await cancelReply.waitFor({ state: 'visible' })
+        await cancelReply.click()
+        await page.mouse.move(0, 0)
+        await page.waitForTimeout(180)
+        assert.equal(await toolbar.evaluate(el => getComputedStyle(el).visibility), 'hidden')
+        assert.equal(await message.locator('.reaction-chip').first().isVisible(), true,
+          'Existing reactions must stay visible after mouse leaves')
+        await bubble.hover()
+        await toolbar.getByRole('button', { name: 'Thêm tùy chọn tin nhắn' }).click()
+        const menu = page.getByRole('dialog', { name: 'Tùy chọn tin nhắn' })
+        await menu.waitFor({ state: 'visible' })
+        assert.equal(await menu.getByRole('button', { name: 'Ghim tin nhắn' }).count(), 1,
+          'The ellipsis menu must reuse the right-click actions')
+        assert.equal(await menu.getByRole('button', { name: 'Chuyển tiếp' }).count(), 1,
+          'The ellipsis menu must include forwarding')
+        await menu.getByRole('button', { name: 'Đóng' }).click()
+        await bubble.hover()
+        await toolbar.getByRole('button', { name: 'Chuyển tiếp tin nhắn' }).click()
+        const picker = page.getByRole('dialog', { name: 'Chuyển tiếp tin nhắn' })
+        await picker.waitFor({ state: 'visible' })
+        await picker.getByRole('button', { name: /SocCo Design Team/ }).click()
+        await picker.waitFor({ state: 'hidden' })
+        assert.equal(forwardedPayload?.text, 'Ừ', 'Forward should send the original message to another conversation')
+        assert.equal(forwardedPayload?.forwarded, true, 'Forward request must persist forwarding metadata')
+        console.log('PASS: compact desktop hover toolbar, expanded hit area, mirrored controls and forwarding')
+      }
       await page.screenshot({ path: 'output/playwright/layout/adaptive-chat-desktop-' + width + '.png' })
     }
     if (phone) await bottom.locator('button').nth(2).click()
@@ -371,6 +511,20 @@ try {
     }
     await page.screenshot({ path: 'output/playwright/layout/adaptive-calls-' + width + '.png' })
     console.log('PASS: call history and filters at ' + width + 'px')
+    if (width === 390) {
+      await bottom.locator('button').nth(4).click()
+      const likes = page.locator('.feed-post-card .feed-reaction-users-trigger').first()
+      await likes.waitFor({ state: 'visible' })
+      await likes.click()
+      const dialog = page.getByRole('dialog', { name: 'Cảm xúc bài viết' })
+      await dialog.waitFor({ state: 'visible' })
+      await dialog.locator('.reaction-users-person').first().waitFor()
+      assert.equal(await dialog.locator('.reaction-users-person').count(), 2,
+        'Newsfeed likes should show users who reacted to the post')
+      await dialog.getByRole('button', { name: 'Đóng danh sách cảm xúc' }).click()
+      await dialog.waitFor({ state: 'hidden' })
+      console.log('PASS: newsfeed reaction participant list on PWA phone')
+    }
     assert.deepEqual(errors, [], width + ': unexpected browser JS errors')
     console.log('PASS: adaptive SocCo layout at ' + width + 'px')
     await context.close()

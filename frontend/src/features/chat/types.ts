@@ -15,6 +15,7 @@ export type Message = {
   sender: string
   senderDisplayName?: string
   text: string
+  forwarded?: boolean
   replyToMessageId?: number
   replyToSender?: string
   replyToDisplayName?: string

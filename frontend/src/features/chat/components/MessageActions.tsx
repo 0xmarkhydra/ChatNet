@@ -3,11 +3,12 @@ import type { Message } from '../types'
 import { messageReactions } from '../utils/messageReactions'
 import { attachmentLabel, formatTime } from '../../../shared/utils/format'
 import type { MessageCopyTarget } from '../utils/messageCopyTarget'
-import { Copy, Languages, Pin, Reply } from 'lucide-react'
+import { Copy, Forward, Languages, Pin, Reply } from 'lucide-react'
 
 type Props = {
   mode?: 'reactions' | 'actions'
   activeMessageAction: Message
+  onForwardMessage: (message: Message) => void
   userId: number
   isPinned: boolean
   toggleMessagePin: (message: Message) => Promise<void>
@@ -24,6 +25,7 @@ type Props = {
 export default function MessageActions({
   mode = 'actions',
   activeMessageAction,
+  onForwardMessage,
   userId,
   isPinned,
   toggleMessagePin,
@@ -98,6 +100,16 @@ export default function MessageActions({
             <span aria-hidden="true"><Reply size={21} strokeWidth={2} /></span>
             <b>Trả lời</b>
           </button>
+
+          {!activeMessageAction.deleted && (
+            <button type="button" onClick={() => {
+              setMessageActionId(null)
+              onForwardMessage(activeMessageAction)
+            }}>
+              <span aria-hidden="true"><Forward size={20} strokeWidth={2} /></span>
+              <b>Chuyển tiếp</b>
+            </button>
+          )}
 
           {copyTarget && (
             <button type="button" onClick={() => void copyMessageContent(activeMessageAction, copyTarget)}>
