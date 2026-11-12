@@ -17,6 +17,7 @@ import {
 import { createPortal } from "react-dom";
 import "../styles/group-activities.css";
 import { createActivity, listActivities, setActivityPinned, voteActivity } from "../api/activities";
+import { useLatest } from "../../../shared/hooks/useLatest";
 
 export type GroupActivityKind = "poll" | "note" | "reminder";
 export type GroupActivity = {
@@ -69,10 +70,8 @@ export function useGroupActivities(
   sessionKey: string | undefined,
   request: Request,
 ) {
-  const requestRef = useRef(request);
-  requestRef.current = request;
-  const activeRef = useRef({ conversationId, sessionKey });
-  activeRef.current = { conversationId, sessionKey };
+  const requestRef = useLatest(request);
+  const activeRef = useLatest({ conversationId, sessionKey });
   const [data, setData] = useState<ActivityData>({
     conversationId: null,
     activities: [],
@@ -107,7 +106,7 @@ export function useGroupActivities(
         e instanceof Error ? e.message : "Không tải được hoạt động của nhóm.",
       );
     }
-  }, [conversationId, sessionKey]);
+  }, [activeRef, conversationId, requestRef, sessionKey]);
 
   useEffect(() => {
     setData({ conversationId, sessionKey, activities: [], events: [] });

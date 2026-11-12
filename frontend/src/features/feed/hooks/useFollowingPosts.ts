@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ApiRequest } from '../../../shared/types/api'
 import { FEED_PAGE_SIZE, type Post } from '../types'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import { appendUniquePosts } from '../utils/feedRequestState'
 
 type State = {
@@ -26,8 +27,7 @@ export function useFollowingPosts({
   const [refreshVersion, setRefreshVersion] = useState(0)
   const revision = useRef(0)
   const busy = useRef(false)
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const current = state.sessionId === sessionId ? state : { ...empty(sessionId || ''), loading: enabled }
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function useFollowingPosts({
       }
     })()
     return () => { cancelled = true; abort.abort(); ++revision.current; busy.current = false }
-  }, [enabled, sessionId, refreshVersion])
+  }, [enabled, sessionId, refreshVersion, requestRef])
 
   async function loadMore() {
     if (!enabled || !sessionId || current.loading || current.loadingMore || !current.hasMore || busy.current || !current.posts.length) return

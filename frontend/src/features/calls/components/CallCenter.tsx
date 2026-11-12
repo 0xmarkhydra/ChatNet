@@ -10,6 +10,7 @@ import useSlidingPill from '../../../shared/ui/useSlidingPill'
 import { CallHeaderActions } from './CallManager'
 import { getCallHistory, type CallHistoryEntry, type CallRequest } from '../lib/calls'
 import { formatDuration, latestCallDuration } from '../utils/call-history'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/call-center.css'
 
 type View = 'history' | 'directory' | 'settings'
@@ -44,13 +45,12 @@ function outcome(entry: CallHistoryEntry, userId: number) {
 }
 
 export default function CallCenter({ request, userId, token, conversations, targetLanguage, directoryContent, directoryQuery, onDirectoryQueryChange, onDirectoryOpen, onNavigate, onOpenChat, embedded = false }: Props) {
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const [view, setView] = useState<View>('history')
   const previousViewRef = useRef<Exclude<View, 'settings'>>('history')
   const [filter, setFilter] = useState<Filter>('all')
-  const viewPill = useSlidingPill<HTMLDivElement>(view === 'directory' ? 'directory' : 'history')
-  const filterPill = useSlidingPill<HTMLDivElement>(filter)
+  const { hostRef: viewPillSetHost, activeRef: viewPillSetActive, pillRef: viewPillSetPill } = useSlidingPill<HTMLDivElement>(view === 'directory' ? 'directory' : 'history')
+  const { hostRef: filterPillSetHost, activeRef: filterPillSetActive, pillRef: filterPillSetPill } = useSlidingPill<HTMLDivElement>(filter)
   const [query, setQuery] = useState('')
   const [entries, setEntries] = useState<CallHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -86,7 +86,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
       if (!cancelled) setError(cause instanceof Error ? cause.message : 'Không thể tải lịch sử cuộc gọi.')
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [token, refreshId])
+  }, [token, refreshId, requestRef])
 
   useEffect(() => {
     let cancelled = false
@@ -96,7 +96,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
       if (!cancelled && Array.isArray(body.languages)) setAvailableLanguages(body.languages)
     }).catch(() => undefined)
     return () => { cancelled = true }
-  }, [token])
+  }, [requestRef, token])
 
   const conversationMap = useMemo(() => new Map(conversations.map((item) => [item.id, item])), [conversations])
   const missed = (item: CallHistoryEntry) => outcome(item, userId) === 'Gọi nhỡ'
@@ -169,10 +169,10 @@ export default function CallCenter({ request, userId, token, conversations, targ
             <p>{view === 'history' ? 'Cuộc gọi nhỡ, đã nhận và đã thực hiện' : view === 'directory' ? 'Bạn bè, nhóm và các cuộc trò chuyện' : 'Điều chỉnh phụ đề trong cuộc gọi'}</p>
           </div>
           <div className="call-center-header-actions">
-            <div ref={viewPill.hostRef} className="call-center-tabs sliding-pill-host" role="group" aria-label="Chọn màn cuộc gọi">
-              {view !== 'settings' && <span ref={viewPill.pillRef} className="sliding-pill call-tabs-active-pill" aria-hidden="true" />}
-              <button ref={view === 'history' ? viewPill.activeRef : undefined} type="button" className={view === 'history' ? 'active' : ''} aria-pressed={view === 'history'} onClick={() => showView('history')}><Clock3 size={15} /> Lịch sử</button>
-              <button ref={view === 'directory' ? viewPill.activeRef : undefined} type="button" className={view === 'directory' ? 'active' : ''} aria-pressed={view === 'directory'} onClick={() => showView('directory')}><BookUser size={15} /> Danh bạ</button>
+            <div ref={viewPillSetHost} className="call-center-tabs sliding-pill-host" role="group" aria-label="Chọn màn cuộc gọi">
+              {view !== 'settings' && <span ref={viewPillSetPill} className="sliding-pill call-tabs-active-pill" aria-hidden="true" />}
+              <button ref={view === 'history' ? viewPillSetActive : undefined} type="button" className={view === 'history' ? 'active' : ''} aria-pressed={view === 'history'} onClick={() => showView('history')}><Clock3 size={15} /> Lịch sử</button>
+              <button ref={view === 'directory' ? viewPillSetActive : undefined} type="button" className={view === 'directory' ? 'active' : ''} aria-pressed={view === 'directory'} onClick={() => showView('directory')}><BookUser size={15} /> Danh bạ</button>
             </div>
             {view !== 'settings' && <label className={'call-center-search' + (view === 'directory' ? ' call-center-directory-search' : '')}><Search size={18} /><input value={view === 'directory' ? directoryQuery : query} onChange={(event) => view === 'directory' ? onDirectoryQueryChange(event.target.value) : setQuery(event.target.value)} placeholder={view === 'directory' ? 'Tìm kiếm trong danh bạ...' : 'Tìm kiếm trên SocCo...'} aria-label={view === 'directory' ? 'Tìm trong danh bạ' : 'Tìm cuộc trò chuyện'} />{(view === 'directory' ? directoryQuery : query) && <button type="button" onClick={() => view === 'directory' ? onDirectoryQueryChange('') : setQuery('')} aria-label="Xóa tìm kiếm"><X size={14} /></button>}</label>}
             <button type="button" className="call-center-settings-trigger" onClick={() => showView(view === 'settings' ? previousViewRef.current : 'settings')} title={view === 'settings' ? 'Quay lại lịch sử' : 'Cài đặt dịch AI'} aria-label={view === 'settings' ? 'Quay lại lịch sử' : 'Cài đặt dịch AI'}>{view === 'settings' ? <ArrowLeft size={20} /> : <Settings2 size={20} />}</button>
@@ -188,10 +188,10 @@ export default function CallCenter({ request, userId, token, conversations, targ
               <div><strong className="danger">{missedCount}</strong><span>Cuộc gọi nhỡ</span></div>
               <div><strong className="teal">{latestCallDuration(entries)}</strong><span>Thời lượng cuộc gọi gần nhất</span></div>
             </section>
-            <div ref={filterPill.hostRef} className="call-center-filters sliding-pill-host" role="group" aria-label="Lọc lịch sử">
-              <span ref={filterPill.pillRef} className="sliding-pill call-filters-active-pill" aria-hidden="true" />
+            <div ref={filterPillSetHost} className="call-center-filters sliding-pill-host" role="group" aria-label="Lọc lịch sử">
+              <span ref={filterPillSetPill} className="sliding-pill call-filters-active-pill" aria-hidden="true" />
               {([['all', 'Tất cả'], ['missed', 'Gọi nhỡ'], ['outgoing', 'Đã gọi'], ['group', 'Gọi nhóm']] as const).map(([id, label]) =>
-                <button ref={filter === id ? filterPill.activeRef : undefined} key={id} type="button" className={filter === id ? 'active' : ''} aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>)}
+                <button ref={filter === id ? filterPillSetActive : undefined} key={id} type="button" className={filter === id ? 'active' : ''} aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>)}
               <button type="button" className="call-center-refresh" onClick={() => setRefreshId((n) => n + 1)} disabled={loading} aria-label="Tải lại lịch sử" title="Tải lại lịch sử"><RefreshCw size={17} /></button>
             </div>
             <div className="call-history-layout">

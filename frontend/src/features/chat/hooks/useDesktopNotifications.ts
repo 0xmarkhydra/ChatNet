@@ -3,6 +3,7 @@ import type { Session } from '../../auth/lib/session'
 import type { Conversation, Message } from '../types'
 import { desktopBridge, isDesktopBuild } from '../../../platform/desktop'
 import { findConversation, getUnreadSummary } from '../api/conversations'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 const unreadEvent = 'soco:unread-refresh'
 const unavailableEvent = 'soco:notification-unavailable'
@@ -49,8 +50,7 @@ type Options = {
 }
 
 export function useDesktopNotifications(options: Options) {
-  const current = useRef(options)
-  current.current = options
+  const current = useLatest(options)
   const sessionId = options.session?.sessionId
   const userId = options.session?.user.id || 0
   const [setting, setSetting] = useState(() => ({ userId, enabled: readEnabled(userId) }))
@@ -129,7 +129,7 @@ export function useDesktopNotifications(options: Options) {
       unreadCount, enabled, sound: options.sound }).catch(() => {
       if (current.current.sessionRef.current?.sessionId === sessionId) setNativeWarning('Không đồng bộ được thông báo với Desktop. Hãy khởi động lại ứng dụng.')
     })
-  }, [sessionId, options.activeConversationId, options.tab, options.sound, enabled, unreadCount])
+  }, [sessionId, options.activeConversationId, options.tab, options.sound, enabled, unreadCount, current])
 
   function toggle() {
     const session = current.current.sessionRef.current

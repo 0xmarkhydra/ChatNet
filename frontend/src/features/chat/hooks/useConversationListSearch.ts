@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ApiRequest } from '../../../shared/types/api'
 import { CHAT_LIST_PAGE_SIZE, type Conversation } from '../types'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 export type ConversationListFilter = 'all' | 'unread' | 'groups'
 
@@ -33,8 +34,7 @@ export function useConversationListSearch({
   const key = enabled && sessionId && keyword
     ? JSON.stringify([sessionId, keyword, filter, categoryId])
     : ''
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const [state, setState] = useState<SearchState>(initialState)
   const [retry, setRetry] = useState(0)
   const pageController = useRef<AbortController | null>(null)

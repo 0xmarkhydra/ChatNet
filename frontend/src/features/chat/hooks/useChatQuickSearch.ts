@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ApiRequest } from '../../../shared/types/api'
 import type { Conversation } from '../types'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 export type ChatQuickContact = {
   id: number
@@ -38,8 +39,7 @@ export function useChatQuickSearch({
 }) {
   const query = keyword.trim()
   const key = enabled && sessionId && query ? JSON.stringify([sessionId, query]) : ''
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const [state, setState] = useState({
     key: '', results: empty, loading: false, error: '',
   })
@@ -64,7 +64,7 @@ export function useChatQuickSearch({
       }
     }, 500)
     return () => { window.clearTimeout(timer); controller.abort() }
-  }, [key, query, retry])
+  }, [key, query, requestRef, retry])
 
   return {
     results: state.key === key ? state.results : empty,

@@ -2,6 +2,7 @@ import BubbleTextarea from '../../../shared/ui/BubbleTextarea'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, Plus, Trash2, X, LockKeyhole, Users, Globe, RefreshCw } from 'lucide-react'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/profile-note.css'
 type Note = { content: string; visibility: 'friends'|'public'|'private'; version: string; createdAt: string; expiresAt: string }
 type Props = { username: string; owner?: boolean; refreshKey?: string; request: (path: string, init?: RequestInit) => Promise<Response> }
@@ -15,7 +16,7 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
  const [confirm,setConfirm] = useState(false)
  const dialog = useRef<HTMLDialogElement>(null)
  const trigger = useRef<HTMLButtonElement>(null)
- const api = useRef(request); api.current=request
+ const api = useLatest(request)
  const alive = useRef(false)
  const seq = useRef(0)
  const writing = useRef(false)

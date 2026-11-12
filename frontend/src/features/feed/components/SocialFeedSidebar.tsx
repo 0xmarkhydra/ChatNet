@@ -3,6 +3,7 @@ import { ArrowRight, Languages, MessageCircle, TrendingUp, UserPlus, UsersRound 
 import type { Post } from '../types'
 import type { FriendConnection, FriendSearchResult } from '../../contacts/types'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 type Props = {
   username: string
@@ -38,8 +39,7 @@ export default function SocialFeedSidebar({
   username, sessionId, posts, friends, friendRequests, friendBusyIds,
   request, onFriend, onViewUser, onViewContacts, onSearchTag, onOpenChat,
 }: Props) {
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const [suggestions, setSuggestions] = useState<FriendSearchResult[]>([])
   const [suggestionsBusy, setSuggestionsBusy] = useState(true)
   const [suggestionsError, setSuggestionsError] = useState(false)
@@ -63,7 +63,7 @@ export default function SocialFeedSidebar({
       .catch(() => { if (active) setSuggestionsError(true) })
       .finally(() => { if (active) setSuggestionsBusy(false) })
     return () => { active = false; controller.abort() }
-  }, [sessionId, revision])
+  }, [sessionId, revision, requestRef])
 
   return (
     <aside className="social-feed-side" aria-label="Khám phá và gợi ý trên bảng tin">

@@ -393,6 +393,7 @@ export default function ChatSection({
   visibleLanguageOptions,
   visibleMessages,
 }: ChatSectionProps) {
+  const { hostRef: chatFiltersPillSetHost, activeRef: chatFiltersPillSetActive, pillRef: chatFiltersPillSetPill } = chatFiltersPill;
   const [readersTarget, setReadersTarget] = useState<{ message: Message; sessionId: string } | null>(null);
   const readersMessage = readersTarget?.sessionId === session.sessionId ? readersTarget.message : null;
   const messageReaderMembers = useMemo(() => {
@@ -497,10 +498,10 @@ export default function ChatSection({
                       aria-label="Tìm kiếm toàn bộ cuộc trò chuyện" />
                   </label>
                 )}
-                <div ref={chatFiltersPill.hostRef} className="social-chat-list-filters sliding-pill-host" role="group" aria-label="Lọc cuộc trò chuyện">
-                  <span ref={chatFiltersPill.pillRef} className="sliding-pill social-chat-active-pill" aria-hidden="true" />
+                <div ref={chatFiltersPillSetHost} className="social-chat-list-filters sliding-pill-host" role="group" aria-label="Lọc cuộc trò chuyện">
+                  <span ref={chatFiltersPillSetPill} className="sliding-pill social-chat-active-pill" aria-hidden="true" />
                   {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
-                    <button ref={chatListFilter === filter.key ? chatFiltersPill.activeRef : undefined} key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
+                    <button ref={chatListFilter === filter.key ? chatFiltersPillSetActive : undefined} key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
                       className={chatListFilter === filter.key ? 'is-active' : ''}
                       onClick={() => setChatListFilter(filter.key)}>{filter.label}</button>
                   ))}
