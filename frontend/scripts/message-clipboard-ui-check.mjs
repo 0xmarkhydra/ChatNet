@@ -96,7 +96,7 @@ try {
   assert.doesNotMatch(allowed, /class="message-context-reactions"/)
   assert.match(allowed, /Trả lời|Sao chép|Dịch/)
   const { readFileSync } = await import('node:fs')
-  const appSource = ['../src/app/App.tsx', '../src/features/chat/components/ChatSection.tsx', '../src/features/chat/hooks/useMessageLongPress.ts'].map((file) => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8')).join('\n')
+  const appSource = ['../src/app/App.tsx', '../src/app/AuthedApp.tsx', '../src/features/chat/components/ChatSection.tsx', '../src/features/chat/hooks/useMessageLongPress.ts'].map((file) => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8')).join('\n')
   assert.match(appSource, /onClick=\{\(\) => openMessageReactions\(message\)\}/)
   assert.match(appSource, /openMessageActions\(message, event\.target\)/)
   assert.match(appSource, /openMessageActions\(message, target\)/)
