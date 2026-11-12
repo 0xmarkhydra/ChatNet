@@ -288,7 +288,10 @@ import { useMessageEdits } from "../features/chat/hooks/useMessageEdits";
 import { useMessageReactions } from "../features/chat/hooks/useMessageReactions";
 import { useMessageSender } from "../features/chat/hooks/useMessageSender";
 import { useOutboxDelivery } from "../features/chat/hooks/useOutboxDelivery";
-import { useConversationActions } from "../features/chat/hooks/useConversationActions";
+import { useConversationHistory } from "../features/chat/hooks/useConversationHistory";
+import { useGroupChannels } from "../features/chat/hooks/useGroupChannels";
+import { useDirectConversations } from "../features/chat/hooks/useDirectConversations";
+import { useGroupCreation } from "../features/chat/hooks/useGroupCreation";
 import { usePostSync } from "../features/feed/hooks/usePostSync";
 import { useProfilePosts } from "../features/feed/hooks/useProfilePosts";
 import { usePostComposer } from "../features/feed/hooks/usePostComposer";
@@ -1297,7 +1300,10 @@ export default function AuthedApp({
   const { addComment, manageFeedComment, reportFeedComment } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
   const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ feedScrollBeforeComments, feedViewRef, isProfileDesktop, setActivePostId, tab });
 
-  const { clearActiveConversationHistory, createDirect, createGroup, createGroupChannel, openDirectByUsername, selectGroupChannel } = useConversationActions({ actionLocks, activeChannelIdRef, activeConversation, activeConversationId, activeConversationIdRef, activeGroupMember, apiFetch, conversations, directUsername, groupChannelBusy, groupChannels, historyActionBusy, membershipEventSequence, membershipSnapshot, messageScrollAtBottom, refreshConversations, responseCache, revokedConversationIds, session, sessionRef, setActiveConversationId, setChannelSelection, setChatCreateError, setChatSearchJump, setConversationDetailsOpen, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setHistoryActionBusy, setMessageActionId, setMessages, setMessageSearchOpen, setNewChatMode, setNotice, setReplyingTo, setSharedContentOpen, setTab, setTranslations });
+  const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
+  const { createGroupChannel, selectGroupChannel } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setMessages, setReplyingTo });
+  const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
+  const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
 
   const { changeAppLocale, changeAutoTranslate, changeTargetLanguage, saveConversationTranslationSettings, translateMessage } = useTranslationActions({ activeChatTranslationSettings, activeConversationId, activeConversationIdRef, apiFetch, appLocale, autoTranslate, conversationTranslationOverrides, effectiveTargetLanguage, preferenceRevision, session, sessionRef, setAppLocale, setAutoTranslate, setConversationTranslationOverrides, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setManuallyTranslated, setNotice, setTargetLanguage, setTranslationFailures, setTranslationMenuOpen, setTranslationOriginals, setTranslationPending, setTranslationPickerOpen, setTranslations, setTranslationSettingsSearch, targetLanguage, translationAttempted, translationFailures, translationLanguageRef, translations });
 
