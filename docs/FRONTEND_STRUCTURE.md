@@ -239,3 +239,17 @@ Provider được gắn ở `app/providers/AuthedProviders.tsx` (trong `App.tsx`
 Component Chat đặt trong `features/chat/components/`, CSS trong `features/chat/styles/`, logic hỗ trợ trong `features/chat/lib/`; không đặt thêm file ứng dụng ở gốc `features/chat/` ngoài `types.ts`. Các file `ConversationSharedPreview`, `GroupAvatarEditor`, `GroupChannelCreateForm`, `GroupChannelSidebar` và `sharedContentLoader` đã được chuyển đúng lớp; các import tương đối cần tính từ đường dẫn mới.
 
 `shared/hooks/useScopedState.ts` quản lý state UI theo hội thoại/kênh và chống callback từ lần mở scope cũ (kể cả A → B → A) bằng epoch. Không áp dụng tự động cho state dữ liệu realtime, bản nháp hoặc outbox.
+
+## Ranh giới phụ thuộc và kiểm thử kiến trúc
+
+Chạy `npm run check:architecture` để kiểm tra các import tương đối và cấu trúc source. Quy tắc hiện áp dụng:
+
+- `shared/` và `platform/` không được import từ `features/`.
+- `features/` không được import các module thuộc `app/`.
+- Gốc `features/chat/` chỉ chứa `types.ts`; component/CSS/logic vào đúng `components/`, `styles/`, `lib/`.
+
+Quy tắc trên không tự cấm các import chéo giữa mọi feature vì dự án còn các contract loại dữ liệu chung chưa tách. Những cặp phụ thuộc còn lại cần được xử lý từng PR có test; không thêm barrel `index.ts` khi chưa quy định public API.
+
+`shared/hooks/useLatest.ts` dùng để giữ callback/ref mới nhất khi làm việc với các listener hoặc callback bất đồng bộ; không được thay thế việc khai báo dependency chính xác trong các effect.
+
+API layer hiện có ở Chat, Feed và Contacts. Khi chuyển request, các module `api/` chỉ tạo request và nhận `apiFetch`, còn hook phụ trách xử lý response và state. Các contract checks: `check:chat-api`, `check:feed-api`, `check:contacts-api`.
