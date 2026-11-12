@@ -19,6 +19,7 @@ export function usePrivacySettings({
   useEffect(() => {
     if (!session?.token) {
       setPrivacy(null);
+      setPrivacyBusy(false);
       setPrivacyError("");
       setPrivacyLoading(false);
       return;

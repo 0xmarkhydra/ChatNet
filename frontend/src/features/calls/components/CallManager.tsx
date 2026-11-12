@@ -4,11 +4,8 @@ import {
   isE2EESupported,
   Room,
   RoomEvent,
-  Track,
-  type LocalTrack,
   type Participant,
   type RemoteTrack,
-  type TrackPublication,
 } from 'livekit-client'
 import {
   Languages, Mic, MicOff, MonitorUp, MonitorX, Phone, PhoneOff, ShieldCheck,
@@ -29,12 +26,13 @@ import { buildLanguageOptions } from '../../i18n/utils/languages'
 import { isDesktopBuild } from '../../../platform/desktop'
 import { requireDesktopMedia } from '../../../platform/desktopMedia'
 import CallDeviceSettings from './CallDeviceSettings'
+import { ParticipantTile, RemoteAudioSinks, identityLabel } from './CallMediaTracks'
+import type { CallLaunchDetail } from './CallHeaderActions'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { notifyDesktopCall, dismissDesktopCall } from '../../chat/hooks/useDesktopNotifications'
 import '../styles/call.css'
 
 type ConversationLite = { id: number; name: string; type: 'direct' | 'group'; otherUsername?: string; blocked?: boolean }
-type CallLaunchDetail = { conversationId: number; mediaType: CallMediaType }
 
 type CallManagerProps = {
   request: CallRequest
@@ -55,23 +53,7 @@ type CallCaption = {
   updatedAt: number
 }
 const CONSENT_TOPIC = 'chatnet.call.translation.consent.v1'
-export function CallHeaderActions({ conversationId, disabled = false }: { conversationId: number; disabled?: boolean }) {
-  const start = (mediaType: CallMediaType) => {
-    window.dispatchEvent(new CustomEvent<CallLaunchDetail>('chatnet:start-call', {
-      detail: { conversationId, mediaType },
-    }))
-  }
-  return (
-    <div className="call-header-actions" aria-label="Gọi điện">
-      <button type="button" aria-label="Gọi thoại" title={disabled ? "Không thể gọi khi hội thoại bị chặn" : "Gọi thoại"} disabled={disabled} onClick={() => start('audio')}>
-        <Phone size={19} />
-      </button>
-      <button type="button" aria-label="Gọi video" title={disabled ? "Không thể gọi khi hội thoại bị chặn" : "Gọi video"} disabled={disabled} onClick={() => start('video')}>
-        <Video size={20} />
-      </button>
-    </div>
-  )
-}
+export { default as CallHeaderActions } from './CallHeaderActions'
 
 export default function CallManager({
   request, apiBase, token, sessionId, userId, sourceLanguage, targetLanguage, conversations,
@@ -1196,66 +1178,6 @@ async function waitForEnvelope(
     await new Promise((resolve) => window.setTimeout(resolve, 550))
   }
   throw new Error('Không nhận được khóa E2EE từ host. Cuộc gọi không được hạ xuống chế độ kém an toàn.')
-}
-
-function ParticipantTile({ participant, local }: { participant: Participant; local: boolean }) {
-  const camera = participant.getTrackPublication(Track.Source.Camera)
-  const screen = participant.getTrackPublication(Track.Source.ScreenShare)
-  const videoPublication = screen?.track ? screen : camera
-  const muted = !videoPublication?.track || videoPublication.isMuted
-  return (
-    <div className={`call-participant-tile ${screen?.track ? 'screen-tile' : ''} ${participant.isSpeaking ? 'is-speaking' : ''}`}>
-      {!muted && videoPublication?.track ? (
-        <VideoTrackView publication={videoPublication} mirror={local && videoPublication.source === Track.Source.Camera} />
-      ) : (
-        <div className="call-avatar-fallback"><span>{identityLabel(participant.identity)}</span></div>
-      )}
-      <div className="call-participant-label">
-        <span>{local ? 'Bạn' : identityLabel(participant.identity)}</span>
-        {participant.isSpeaking && <i className="call-speaking-dot" />}
-      </div>
-    </div>
-  )
-}
-
-function VideoTrackView({ publication, mirror }: { publication: TrackPublication; mirror: boolean }) {
-  const ref = useRef<HTMLVideoElement>(null)
-  useEffect(() => {
-    const element = ref.current
-    const track = publication.track as LocalTrack | RemoteTrack | undefined
-    if (!element || !track) return
-    track.attach(element)
-    return () => { track.detach(element) }
-  }, [publication.track])
-  return <video ref={ref} autoPlay playsInline muted={mirror} className={mirror ? 'mirror' : ''} />
-}
-
-function RemoteAudioSinks({ room, muted, volume, revision }: { room: Room; muted: boolean; volume: number; revision: number }) {
-  revision
-  const tracks = Array.from(room.remoteParticipants.values()).flatMap((participant) =>
-    Array.from(participant.audioTrackPublications.values()).filter((publication) => publication.track),
-  )
-  return <>{tracks.map((publication) => <AudioTrackSink key={publication.trackSid} publication={publication} muted={muted} volume={volume} />)}</>
-}
-
-function AudioTrackSink({ publication, muted, volume }: { publication: TrackPublication; muted: boolean; volume: number }) {
-  const ref = useRef<HTMLAudioElement>(null)
-  useEffect(() => {
-    if (ref.current) ref.current.volume = volume
-  }, [volume])
-  useEffect(() => {
-    const element = ref.current
-    const track = publication.track as RemoteTrack | undefined
-    if (!element || !track) return
-    track.attach(element)
-    return () => { track.detach(element) }
-  }, [publication.track])
-  return <audio ref={ref} autoPlay muted={muted} />
-}
-
-function identityLabel(identity: string) {
-  const id = identity.startsWith('u_') ? identity.slice(2) : identity
-  return `U${id}`
 }
 
 function friendlyCallError(error: unknown) {

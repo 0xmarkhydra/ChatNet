@@ -5,20 +5,8 @@ import type { Conversation } from '../../chat/types'
 import type { PostMentionNotification } from '../../feed/utils/postMentionNotifications'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
-import { isIncomingFriendRequest, hasUnreadConversation } from '../utils/notification-count'
+import { buildNotificationItems } from '../utils/notification-items'
 import '../styles/notifications-page.css'
-
-type Notification = {
-  key: string
-  kind: 'friend' | 'message' | 'mention'
-  name: string
-  subtitle: string
-  date: string
-  username?: string
-  friend?: FriendConnection
-  conversation?: Conversation
-  mention?: PostMentionNotification
-}
 
 type Props = {
   requests: FriendConnection[]
@@ -51,25 +39,7 @@ export default function NotificationsPage({
   const filtersPill = useSlidingPill<HTMLDivElement>(filter)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [readKeys, setReadKeys] = useState<Set<string>>(() => new Set())
-  const notifications = useMemo<Notification[]>(() => {
-    const pending = requests.filter(isIncomingFriendRequest).map(friend => ({
-      key: 'friend:' + friend.id, kind: 'friend' as const, name: friend.displayName || friend.username,
-      subtitle: 'đã gửi lời mời kết bạn', date: friend.updatedAt || '',
-      username: friend.username, friend,
-    }))
-    const unreadChats = conversations.filter(hasUnreadConversation).map(c => ({
-      key: 'chat:' + c.id, kind: 'message' as const, name: c.name,
-      subtitle: 'có ' + c.unreadCount + ' tin nhắn chưa đọc',
-      date: c.lastMessageAt || c.createdAt || '', conversation: c,
-    }))
-    const taggedPosts = mentions.map(mention => ({
-      key: 'mention:' + mention.id, kind: 'mention' as const,
-      name: mention.authorDisplayName || mention.author,
-      subtitle: 'đã gắn thẻ bạn trong một bài viết',
-      date: mention.createdAt, username: mention.author, mention,
-    }))
-    return [...pending, ...unreadChats, ...taggedPosts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-  }, [requests, conversations, mentions])
+  const notifications = useMemo(() => buildNotificationItems(requests, conversations, mentions), [requests, conversations, mentions])
 
   const filtered = notifications.filter(item => {
     if (filter === 'mentions' && item.kind !== 'mention') return false

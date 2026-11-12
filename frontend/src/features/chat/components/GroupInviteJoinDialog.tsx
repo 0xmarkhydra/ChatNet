@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link2, X, Users } from 'lucide-react'
 import '../styles/group-governance.css'
+import { joinGroupInvite, previewGroupInvite } from '../api/invites'
 
 type Preview = {
   conversationId: number
@@ -32,7 +33,7 @@ export default function GroupInviteJoinDialog({ request, onJoined, notify }: Pro
     current.searchParams.delete('groupInvite')
     window.history.replaceState(window.history.state, '', current.pathname + current.search + current.hash)
     let alive = true
-    void requestRef.current(`/api/group-invites/${token}`)
+    void previewGroupInvite(requestRef.current, token)
       .then(async response => {
         const value = await response.json() as Preview & { error?: string }
         if (!response.ok) throw new Error(value.error || 'Link mời hết hạn hoặc đã bị thu hồi.')
@@ -59,7 +60,7 @@ export default function GroupInviteJoinDialog({ request, onJoined, notify }: Pro
     setBusy(true)
     setError('')
     try {
-      const response = await request(`/api/group-invites/${token}/join`, { method: 'POST' })
+      const response = await joinGroupInvite(request, token)
       const value = await response.json() as { error?: string; status?: string; conversationId?: number }
       if (!response.ok) throw new Error(value.error || 'Không thể tham gia nhóm.')
       if (value.status === 'pending') {
