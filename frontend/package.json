@@ -42,6 +42,7 @@
     "check:call-ux": "node scripts/call-ux-check.mjs",
     "check:call-translation": "node --experimental-strip-types scripts/call-translation-check.mjs",
     "check:call-live": "node scripts/call-live-check.mjs",
+    "check:call-room-display": "node --experimental-strip-types scripts/call-room-display-check.mjs",
     "preview": "vite preview",
     "check:categories": "node scripts/conversation-categories-check.mjs",
     "check:conversation-search": "node scripts/conversation-list-search-check.mjs",
