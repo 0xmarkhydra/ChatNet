@@ -1,6 +1,7 @@
 import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { AppDataContext } from '../../../shared/types/api'
 import { FEED_PAGE_SIZE, type Post, type Story } from '../types'
+import { appendUniquePosts, isCurrentFeedRefresh } from '../utils/feedRequestState'
 type Options = AppDataContext & {
   actionLocks: RefObject<Set<string>>
   setActivePostId: Dispatch<SetStateAction<number | null>>
@@ -34,15 +35,18 @@ export function useFeedData({
     const revision = feedRevision.current
     const request = ++feedLoads.current
     const sessionId = session?.sessionId
+    const isCurrentRefresh = () => isCurrentFeedRefresh(
+      { sessionId, revision, sequence: request },
+      { sessionId: sessionRef.current?.sessionId, revision: feedRevision.current, sequence: feedLoads.current },
+    )
     try {
       const response = await apiFetch(`/api/posts?limit=${FEED_PAGE_SIZE}`)
       if (!response.ok) {
-        if (postsLengthRef.current === 0) setPostsPagingError(true)
+        if (isCurrentRefresh() && postsLengthRef.current === 0) setPostsPagingError(true)
         return
       }
       const data = (await response.json()) as Post[]
-      if (sessionRef.current?.sessionId !== sessionId ||
-        revision !== feedRevision.current || request !== feedLoads.current ||
+      if (!isCurrentRefresh() ||
         [...actionLocks.current].some((key) => key.startsWith('feed:'))) return
       setPosts((current) => {
         const ids = new Set(data.map((item) => item.id))
@@ -52,6 +56,7 @@ export function useFeedData({
       if (data.length < FEED_PAGE_SIZE) setHasMorePosts(false)
       else if (postsLengthRef.current === 0) setHasMorePosts(true)
     } catch {
+      if (!isCurrentRefresh()) return
       if (postsLengthRef.current === 0) setPostsPagingError(true)
       setStatus('Đang kết nối lại...')
     }
@@ -70,10 +75,7 @@ export function useFeedData({
       const data = (await response.json()) as Post[]
       if (sessionRef.current?.sessionId !== sessionId) return
       setHasMorePosts(data.length === FEED_PAGE_SIZE)
-      setPosts((current) => {
-        const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id))]
-      })
+      setPosts(current => appendUniquePosts(current, data))
     } catch {
       if (sessionRef.current?.sessionId === sessionId) {
         setPostsPagingError(true)
@@ -99,8 +101,7 @@ export function useFeedData({
       if (sessionRef.current?.sessionId !== sessionId) return
       setSavedPosts(current => {
         if (!more) return data
-        const ids = new Set(current.map(p => p.id))
-        return [...current, ...data.filter(p => !ids.has(p.id))]
+        return appendUniquePosts(current, data)
       })
       setHasMoreSavedPosts(data.length === FEED_PAGE_SIZE)
     } catch (error) {
