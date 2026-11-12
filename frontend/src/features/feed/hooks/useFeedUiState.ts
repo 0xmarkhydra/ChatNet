@@ -16,6 +16,7 @@ export function useFeedUiState({
   const [feedComposerOpen, setFeedComposerOpen] = useState(false);
   const [feedCheckInOpen, setFeedCheckInOpen] = useState(false);
   const [feedCheckInLocation, setFeedCheckInLocation] = useState("");
+  const [storyDraftFile, setStoryDraftFile] = useState<File | null>(null);
   useEffect(() => {
     if (tab !== "feed") {
       setFeedComposerOpen(false);
@@ -37,7 +38,6 @@ export function useFeedUiState({
   }, [activePostId, tab]);
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null);
   const [storyBusy, setStoryBusy] = useState(false);
-  const [storyDraftFile, setStoryDraftFile] = useState<File | null>(null);
   const [commentEditors, setCommentEditors] = useState<
     Record<number, DiscussionDraft>
   >({});

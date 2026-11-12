@@ -1,7 +1,7 @@
 import { useRef, type SetStateAction } from "react";
 import { type Message } from "../types";
 import { resolveMessageCopyTarget, type MessageCopyTarget } from "../utils/messageCopyTarget";
-import type { Dispatch, RefObject } from "react";
+import type { Dispatch } from "react";
 
 export type UseMessageLongPressDeps = {
   setConversationActionId: Dispatch<SetStateAction<number | null>>;
@@ -9,8 +9,6 @@ export type UseMessageLongPressDeps = {
   setMessageActionId: Dispatch<SetStateAction<number | null>>;
   setMessageActionMode: Dispatch<SetStateAction<"reactions" | "actions">>;
   setMessageCopyTarget: Dispatch<SetStateAction<MessageCopyTarget | null>>;
-  suppressConversationClick: RefObject<number | null>;
-  suppressMessageClick: RefObject<number | null>;
 };
 
 export function useMessageLongPress({
@@ -19,9 +17,9 @@ export function useMessageLongPress({
   setMessageActionId,
   setMessageActionMode,
   setMessageCopyTarget,
-  suppressConversationClick,
-  suppressMessageClick,
 }: UseMessageLongPressDeps) {
+  const suppressConversationClick = useRef<number | null>(null);
+  const suppressMessageClick = useRef<number | null>(null);
   const conversationLongPress = useRef<{ id: number; x: number; y: number; timer: number } | null>(null);
   const messageLongPressTimer = useRef<number | null>(null);
   const messageLongPressStart = useRef<{
@@ -128,5 +126,7 @@ export function useMessageLongPress({
     moveMessageLongPress,
     openMessageActions,
     openMessageReactions,
+    suppressConversationClick,
+    suppressMessageClick,
   };
 }

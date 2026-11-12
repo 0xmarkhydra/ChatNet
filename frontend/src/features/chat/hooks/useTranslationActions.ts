@@ -18,6 +18,7 @@ export type UseTranslationActionsDeps = {
   conversationTranslationOverrides: ConversationTranslationSettingsMap;
   effectiveTargetLanguage: string;
   preferenceRevision: RefObject<number>;
+  advancePreferenceRevision: () => number;
   session: Session | null;
   sessionRef: RefObject<Session | null>;
   setAppLocale: Dispatch<SetStateAction<string>>;
@@ -53,6 +54,7 @@ export function useTranslationActions({
   conversationTranslationOverrides,
   effectiveTargetLanguage,
   preferenceRevision,
+  advancePreferenceRevision,
   session,
   sessionRef,
   setAppLocale,
@@ -86,7 +88,7 @@ export function useTranslationActions({
   ) {
     if (!session?.token) return;
     const sessionId = session.sessionId;
-    const revision = ++preferenceRevision.current;
+    const revision = advancePreferenceRevision();
     const preferenceKey = `chatnet-preferences:${session.user.id}`;
     localStorage.setItem(
       preferenceKey,
