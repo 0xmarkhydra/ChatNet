@@ -6,7 +6,7 @@ import type { UserPrivacy, ProfileMediaState } from "../types";
 import type { FriendConnection } from "../../contacts/types";
 import { type Post } from "../../feed/types";
 import { FormEvent, useState, type SetStateAction } from "react";
-import GroupAvatarEditor from "../../chat/GroupAvatarEditor";
+import GroupAvatarEditor from "../../chat/components/GroupAvatarEditor";
 import { type Session } from "../../auth/lib/session";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject, ReactNode } from "react";

@@ -6,7 +6,7 @@ import ConversationCategories, { CategoryBadge, CategoryAssignment } from "./Con
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
 import { formatTime, attachmentLabel } from "../../../shared/utils/format";
 import { transferHasFiles, chatFilesFromClipboard } from "../utils/chatFileTransfer";
-import GroupChannelSidebar from "../GroupChannelSidebar";
+import GroupChannelSidebar from "./GroupChannelSidebar";
 import { CallHeaderActions } from "../../calls/components/CallManager";
 import { createPortal } from "react-dom";
 import SharedContent from "./SharedContent";
@@ -24,7 +24,7 @@ import VoiceRecorder from "./VoiceRecorder";
 import { shouldSendChatOnEnter } from "../utils/composerKeyboard";
 import ConversationDetailsPanel from "./ConversationDetailsPanel";
 import GroupSettingsPanel, { type GroupManagementSection } from "./GroupSettingsPanel";
-import type { GroupPhotoTarget } from "../GroupAvatarEditor";
+import type { GroupPhotoTarget } from "./GroupAvatarEditor";
 import { type ChatTranslationSettings } from "../lib/conversationTranslationSettings";
 import { type GroupMember, type Message, type Conversation, type NewChatMode, type MessageReaction } from "../types";
 import type { FriendSearchResult, FriendConnection } from "../../contacts/types";

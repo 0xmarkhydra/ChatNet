@@ -2,7 +2,7 @@ import { userLabel } from '../../../shared/utils/userLabel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, Images, Link2, X } from 'lucide-react'
 import MediaViewer from '../../../shared/ui/MediaViewer'
-import { loadSharedContent } from '../sharedContentLoader'
+import { loadSharedContent } from '../lib/sharedContentLoader'
 import { useLatest } from '../../../shared/hooks/useLatest'
 
 type MediaAttachment = {
