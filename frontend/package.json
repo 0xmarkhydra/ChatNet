@@ -7,6 +7,9 @@
     "dev": "vite",
     "dev:railway": "CHATNET_API_PROXY_TARGET=https://api-chat.codelocal.cloud VITE_API_PROXY=1 vite --host 0.0.0.0 --port 5188 --strictPort",
     "build": "tsc --noEmit && vite build",
+    "lint": "node scripts/lint-ratchet.mjs",
+    "lint:report": "eslint src",
+    "lint:baseline": "node scripts/lint-ratchet.mjs --update",
     "check:onesignal": "node --experimental-strip-types scripts/onesignal-init-check.mjs",
     "check:push-deeplink": "node scripts/push-notification-deeplink-check.mjs",
     "check:incoming-sound": "node --experimental-strip-types scripts/incoming-sound-check.mjs",
@@ -60,8 +63,11 @@
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "playwright": "^1.64.1",
     "typescript": "^5.9.2",
+    "typescript-eslint": "^8.72.2",
     "vite": "7.3.7"
   }
 }
