@@ -104,7 +104,7 @@ try {
   page.on('pageerror', e => errors.push(e.message))
   await page.route(origin + '/mock-story-upload', route =>
     route.fulfill({ status: 200, body: '' }))
-  await page.route('**/api/**', route => {
+  await page.route(url => url.pathname.startsWith('/api/'), route => {
     const req = route.request()
     const currentURL = new URL(req.url())
     const path = currentURL.pathname

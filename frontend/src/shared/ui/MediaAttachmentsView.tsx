@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { MediaAttachment } from '../lib/media'
-import { formatBytes } from '../lib/format'
+import type { MediaAttachment } from '../utils/media'
+import { formatBytes } from '../utils/format'
 import MediaViewer from './MediaViewer'
 
 const previewable = (item: MediaAttachment): item is MediaAttachment & { url: string } =>

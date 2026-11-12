@@ -89,6 +89,15 @@ func TestClearConversationHistoryIntegration(t *testing.T) {
 	}
 	readCount(0, 2)
 	readCount(1, 2)
+	// Existing messages can have NULL channel_id; shared content still belongs
+	// to the default channel and must be readable before history is cleared.
+	var legacyShared sharedContentPage
+	if err := json.Unmarshal(request(0, "GET", "shared?kind=links&channelId=0", 200).Body.Bytes(), &legacyShared); err != nil {
+		t.Fatal(err)
+	}
+	if len(legacyShared.Items) != 2 {
+		t.Fatalf("shared links from legacy messages: got %d want 2", len(legacyShared.Items))
+	}
 	request(2, "DELETE", "history", 403)
 	request(0, "DELETE", "history", 200)
 	readCount(0, 0)

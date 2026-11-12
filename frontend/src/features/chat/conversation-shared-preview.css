@@ -1,0 +1,119 @@
+/* Facebook-like compact shared-media album, kept inside the original info sidebar. */
+.conversation-shared-preview {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 4px 0 12px;
+  padding: 11px;
+  border: 1px solid #e7ecf5;
+  border-radius: 15px;
+  background: #fafcff;
+}
+.conversation-shared-preview-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 33px;
+  margin-top: 9px;
+  padding: 2px 1px;
+  border: 0;
+  background: transparent;
+  color: #344766;
+  text-align: left;
+  cursor: pointer;
+}
+.conversation-shared-preview-title strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-weight: 750;
+}
+.conversation-shared-preview-title > svg:last-child {
+  flex: 0 0 auto;
+  color: #92a2bd;
+}
+.conversation-shared-preview-title-icon {
+  display: grid;
+  flex: 0 0 30px;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #e7eefc;
+  color: #497bd1;
+}
+.conversation-shared-preview-title:hover strong { color: #2863c4; }
+.conversation-shared-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.conversation-shared-preview-grid button {
+  display: block;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1.24 / 1;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #e6edf7;
+  cursor: pointer;
+}
+.conversation-shared-preview-grid img,
+.conversation-shared-preview-grid video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .16s ease;
+}
+.conversation-shared-preview-grid button:hover img,
+.conversation-shared-preview-grid button:hover video { transform: scale(1.06); }
+.conversation-shared-preview-grid button:focus-visible {
+  outline: 2px solid #3978d2;
+  outline-offset: -2px;
+}
+.conversation-shared-preview-video {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  color: white;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.7));
+}
+.conversation-shared-preview-overflow {
+  display: grid;
+  position: absolute;
+  inset: 0;
+  place-items: center;
+  background: rgba(19,35,61,.6);
+  color: white;
+  font-size: 21px;
+  font-weight: 800;
+}
+.conversation-shared-preview-empty {
+  width: 100%;
+  min-height: 70px;
+  margin: 2px 0;
+  padding: 12px 8px;
+  border: 1px dashed #d5e0f1;
+  border-radius: 10px;
+  background: #f5f8fd;
+  color: #8193ae;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .conversation-shared-preview { padding: 10px; }
+  .conversation-shared-preview-grid button { aspect-ratio: 1.45 / 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conversation-shared-preview-grid img,
+  .conversation-shared-preview-grid video { transition: none; }
+}

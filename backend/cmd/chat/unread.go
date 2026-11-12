@@ -20,7 +20,13 @@ func (s *server) unreadSummary(w http.ResponseWriter, r *http.Request) {
 		SELECT COUNT(*)
 		FROM conversation_members cm
 		JOIN conversations c ON c.id=cm.conversation_id
-		JOIN messages m ON m.conversation_id=c.id AND m.id>GREATEST(cm.last_read_message_id,cm.cleared_through_message_id)
+		JOIN messages m ON m.conversation_id=c.id
+          AND m.id>GREATEST(cm.cleared_through_message_id,
+            CASE WHEN c.type='group' THEN COALESCE((
+              SELECT gcr.last_read_message_id FROM group_channel_reads gcr
+              WHERE gcr.conversation_id=c.id AND gcr.user_id=cm.user_id
+                AND gcr.channel_id=COALESCE(m.channel_id,0)
+            ),cm.last_read_message_id) ELSE cm.last_read_message_id END)
 		WHERE cm.user_id=$1 AND m.user_id<>$1
 		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		    (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR

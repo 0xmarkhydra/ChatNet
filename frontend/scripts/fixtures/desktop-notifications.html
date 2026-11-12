@@ -3,7 +3,7 @@
 <script type="module">
 import React, { useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { useDesktopNotifications, refreshDesktopUnread } from '../../src/platform/useDesktopNotifications'
+import { useDesktopNotifications, refreshDesktopUnread } from '../../src/features/chat/hooks/useDesktopNotifications'
 const initial = { sessionId: 'a7ce5309-8fb5-4f57-861c-ef54c75db291', token: 'fixture-access-only', user: { id: 7, email: 'qa@example.invalid', username: 'qa', displayName: 'QA' } }
 let clicked
 const state = window.qa = {

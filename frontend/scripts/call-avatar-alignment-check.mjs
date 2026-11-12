@@ -6,7 +6,7 @@ const read = (file) => readFileSync(new URL(file, import.meta.url), 'utf8')
 const styles = [
   read('../src/styles/styles.css'),
   read('../src/styles/zalo-inspired.css'),
-  read('../src/features/calls/call-center.css'),
+  read('../src/features/calls/styles/call-center.css'),
 ].join('\n')
 const browser = await chromium.launch({ headless: true })
 try {

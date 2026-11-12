@@ -1,4 +1,4 @@
-import type { MediaAttachment } from '../../shared/lib/media'
+import type { MediaAttachment } from '../../shared/utils/media'
 
 export type MessageReaction = {
   emoji: string
@@ -48,6 +48,7 @@ export type Conversation = {
   otherUsername?: string
   memberCount: number
   unreadCount: number
+  avatarUrl?: string
   lastMessage: string
   lastMessageAt?: string
   online: boolean

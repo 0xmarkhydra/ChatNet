@@ -18,7 +18,10 @@ try {
     user:{id:1,username:'tester',displayName:'Tài khoản của tôi',email:'test@example.invalid'} }
   await context.addInitScript(data=>localStorage.setItem('chatnet-session',JSON.stringify(data)),session)
   const group=(id,name,count=3)=>({id,type:'group',name,memberCount:count,unreadCount:1,lastMessage:'Tin nhắn trước',lastMessageAt:'2026-11-06T09:30:00Z',online:true,createdAt:'2026-11-01T09:30:00Z'})
-  const groups=[group(91,'Team ChatNet')]
+  const groups=[group(91,'Team ChatNet'), group(92,'Nhóm thiết kế',5),
+    {id:93,type:'direct',name:'Linh Anh',otherUsername:'linhanh',otherUserId:2,
+      memberCount:2,unreadCount:0,lastMessage:'Chào bạn',lastMessageAt:'2026-11-06T09:15:00Z',
+      online:true,createdAt:'2026-11-01T09:30:00Z'}]
   const friends=[
     {id:2,username:'linhanh',displayName:'Linh Anh',status:'accepted',online:true,updatedAt:'2026-11-06'},
     {id:3,username:'david',displayName:'David Chen',status:'accepted',online:true,updatedAt:'2026-11-06'},
@@ -27,14 +30,25 @@ try {
   const members=[{id:1,username:'tester',displayName:'Tài khoản của tôi',role:'owner',online:true},
     {id:2,username:'linhanh',displayName:'Linh Anh',role:'admin',online:true},
     {id:3,username:'david',displayName:'David Chen',role:'member',online:false}]
+  const personalProfile={username:'tester',displayName:'Tài khoản của tôi',avatarSet:false,coverSet:false,updatedAt:'2026-11-06'}
+  const personalPhotoUpdates=[]
   const groupSettings={requireApproval:true,adminCanInvite:true,adminCanApprove:true,adminCanEditInfo:true}
   const profile={id:91,name:'Team ChatNet',description:'Cộng đồng kỹ thuật',topic:'Công nghệ',rules:'Tôn trọng mọi thành viên',visibility:'private',memberCount:3}
-  const channels=[{id:0,conversationId:91,name:'Thảo luận chung',description:'Kênh mặc định'}]
+  const groupPhotoUpdates=[]
+  let groupPhotoCapabilityEnabled=true
+  const mockAvatar='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg=='
+  const channels=[
+    {id:0,conversationId:91,name:'Thảo luận chung',description:'Kênh mặc định',unreadCount:2,lastMessage:'Tin nhắn trong thảo luận chung',lastMessageAt:'2026-11-11T09:08:00Z'},
+    {id:202,conversationId:91,name:'Thiết kế giao diện',description:'Trao đổi về UI/UX',unreadCount:3,lastMessage:'Cập nhật bản thiết kế mới',lastMessageAt:'2026-11-11T09:09:00Z'},
+  ]
+  groups[0].unreadCount=channels.reduce((count,channel)=>count+channel.unreadCount,0)
+  let channelUnreadMetricsEnabled = true
   const prefs={messageNotifications:true,mentionNotifications:true}
   const payloads=[]
   const sampleMsg={id:44,conversationId:91,senderId:2,sender:'linhanh',senderDisplayName:'Linh Anh',
     text:'Chào mọi người, đây là nhóm ChatNet.',createdAt:'2026-11-06T09:30:00Z',attachments:[],reactions:[]}
   const calls=[]
+  let legacySharedResponse = false
   const channelMessages=[]
   const json=data=>({status:200,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},contentType:'application/json',body:JSON.stringify(data)})
   await context.route('http://localhost:8080/**',async route=>{
@@ -42,6 +56,32 @@ try {
     calls.push(method+' '+path)
     if(method==='OPTIONS')return route.fulfill({status:204,headers:{'access-control-allow-origin':'*','access-control-allow-methods':'*','access-control-allow-headers':'*'}})
     if(path==='/api/events')return route.fulfill({status:200,headers:{'access-control-allow-origin':'*'},contentType:'text/event-stream',body:': ready\n\n'})
+    if(path==='/api/media/presign'&&method==='POST'){
+      const body=JSON.parse(req.postData()||'{}')
+      assert.equal(body.scope,'profile')
+      return route.fulfill(json({uploadUrl:'http://localhost:8080/_mock_upload_group_image',
+        storageRef:'s3://mock/chatnet/profile/1/avatar.png',key:'avatar.png',
+        kind:'image',expiresAt:'2099-01-01T00:00:00Z',downloadUrl:mockAvatar}))
+    }
+    if(path==='/_mock_upload_group_image'&&method==='PUT')return route.fulfill({
+      status:200,headers:{'access-control-allow-origin':'*','access-control-allow-methods':'PUT','access-control-allow-headers':'*'},body:''
+    })
+    if(path==='/api/profile/media'&&method==='PUT'){
+      const data=JSON.parse(req.postData()||'{}');personalPhotoUpdates.push(data)
+      personalProfile[data.kind==='avatar'?'avatarSet':'coverSet']=!!data.attachment
+      personalProfile.updatedAt=new Date(Date.now()+personalPhotoUpdates.length*1000).toISOString()
+      return route.fulfill(json(personalProfile))
+    }
+    if(path==='/api/conversations/91/avatar'&&method==='GET'){
+      return route.fulfill(groupPhotoCapabilityEnabled?json({canUpdateAvatar:true}):
+        {status:404,contentType:'text/plain',body:'Not Found'})
+    }
+    if(path==='/api/conversations/91/avatar'&&method==='PUT'){
+      const body=JSON.parse(req.postData()||'{}');groupPhotoUpdates.push(body)
+      const photo=body.attachment ? mockAvatar : ''
+      groups[0].avatarUrl=photo||undefined
+      return route.fulfill(json({conversationId:91,avatarUrl:photo,avatarSet:!!photo}))
+    }
     if(path==='/api/conversations/groups'&&method==='POST'){
       const body=JSON.parse(req.postData()||'{}');payloads.push(body)
       const created=group(120,body.name,1+body.usernames.length);created.unreadCount=0
@@ -55,13 +95,43 @@ try {
     if(path==='/api/conversations/120/community'&&method==='GET')return route.fulfill(json({id:120,name:'SocCo Product Community',description:'Chia sẻ ý tưởng và sản phẩm',topic:'',rules:'',visibility:'public',memberCount:3}))
     if(path.endsWith('/notification-settings')&&method==='GET')return route.fulfill(json(prefs))
     if(path.endsWith('/notification-settings')&&method==='PUT'){Object.assign(prefs,JSON.parse(req.postData()||'{}'));return route.fulfill(json(prefs))}
-    if(path==='/api/conversations/91/channels'&&method==='GET')return route.fulfill(json(channels))
-    if(path==='/api/conversations/91/channels'&&method==='POST'){const body=JSON.parse(req.postData()||'{}');const c={id:201,conversationId:91,...body};channels.push(c);return route.fulfill(json(c))}
+    if(path==='/api/conversations/91/shared'&&method==='GET') {
+      if(legacySharedResponse)return route.fulfill(json({items:[]}))
+      const kind=url.searchParams.get('kind')
+      if(kind==='files')return route.fulfill(json({items:[{
+        id:810,sender:'linhanh',createdAt:'2026-11-11T09:00:00Z',text:'',
+        attachments:[{id:610,kind:'file',name:'Tài liệu nhóm.pdf',url:'https://example.com/file.pdf',
+          storageRef:'mock-file',sizeBytes:12000,contentType:'application/pdf'}],
+      }]}))
+      if(kind==='links')return route.fulfill(json({items:[{
+        id:811,sender:'linhanh',createdAt:'2026-11-11T09:00:00Z',text:'https://example.com/group',
+        attachments:[],
+      }]}))
+      const media=Array.from({length:4},(_,index)=>({
+        id:800+index,text:'',sender:'linhanh',createdAt:'2026-11-11T09:00:00Z',
+        attachments:[{id:500+index,kind:'image',name:'Ảnh '+(index+1)+'.png',url:mockAvatar,
+          storageRef:'mock-'+index,sizeBytes:68,contentType:'image/png'}],
+      }))
+      return route.fulfill(json({items:media}))
+    }
+    if(path==='/api/conversations/91/channels'&&method==='GET')return route.fulfill(json(channelUnreadMetricsEnabled
+      ? channels : channels.map(({unreadCount, ...channel})=>channel)))
+    if(path==='/api/conversations/91/channels'&&method==='POST'){const body=JSON.parse(req.postData()||'{}');const c={id:201,conversationId:91,...body,unreadCount:0,lastMessage:''};channels.push(c);return route.fulfill(json(c))}
+    if(path==='/api/conversations/91/channel-read'&&method==='POST'){
+      const body=JSON.parse(req.postData()||'{}')
+      const ch=channels.find(value=>value.id===body.channelId)
+      if(ch)ch.unreadCount=0
+      groups[0].unreadCount=channels.reduce((count,channel)=>count+channel.unreadCount,0)
+      return route.fulfill(json({conversationId:91,channelId:body.channelId,lastReadMessageId:999}))
+    }
     if(path==='/api/conversations/120/channels'&&method==='GET')return route.fulfill(json([{id:0,conversationId:120,name:'Thảo luận chung',description:'Kênh mặc định'}]))
+    if(path==='/api/conversations/92/channels'&&method==='GET')return route.fulfill(json([{id:0,conversationId:92,name:'Thảo luận chung',description:'Kênh mặc định',unreadCount:0,lastMessage:''}]))
+    if(path==='/api/conversations/92/channel-read'&&method==='POST')return route.fulfill(json({conversationId:92,channelId:0,lastReadMessageId:0}))
     if(path==='/api/conversations/91/channels/201'&&method==='PATCH'){Object.assign(channels[1],JSON.parse(req.postData()||'{}'));return route.fulfill(json(channels[1]))}
     if(path==='/api/conversations/91/channels/201'&&method==='DELETE'){channels.pop();return route.fulfill(json({ok:true}))}
     if(path==='/api/conversations/91/members'&&method==='GET')return route.fulfill(json(members))
     if(path==='/api/conversations/120/members'&&method==='GET')return route.fulfill(json([{id:1,username:'tester',displayName:'Tài khoản của tôi',role:'owner',online:true}]))
+    if(path==='/api/conversations/92/members'&&method==='GET')return route.fulfill(json(members))
     if(path.endsWith('/pins')&&method==='GET')return route.fulfill(json([]))
     if(path.endsWith('/activities')&&method==='GET')return route.fulfill(json([]))
     if(path.endsWith('/group-settings')&&method==='GET')return route.fulfill(json(groupSettings))
@@ -71,7 +141,19 @@ try {
     if(path.endsWith('/admin-audit')&&method==='GET')return route.fulfill(json([]))
     if(path==='/api/conversations/91/members/3'&&method==='PATCH')return route.fulfill(json({}))
     if(path==='/api/conversations/91/members'&&method==='POST')return route.fulfill(json({}))
-    if(path.includes('/messages')&&method==='GET')return route.fulfill(json(url.searchParams.get('channelId')==='201'?channelMessages:path.includes('/91/')?[sampleMsg]:[]))
+    if(path==='/api/conversations/91/messages'&&method==='GET'&&url.searchParams.get('limit')==='200') {
+      const legacyItems=[
+        {id:815,sender:'linhanh',text:'https://example.com/group',createdAt:'2026-11-11T09:00:00Z',attachments:[]},
+        {id:814,sender:'linhanh',text:'',createdAt:'2026-11-11T09:00:00Z',attachments:[
+          {id:612,kind:'video',name:'Video trong nhóm.mp4',url:mockAvatar,storageRef:'mock-video',sizeBytes:99,contentType:'video/mp4'}]},
+        {id:813,sender:'linhanh',text:'',createdAt:'2026-11-11T09:00:00Z',attachments:[
+          {id:611,kind:'file',name:'Tài liệu nhóm.pdf',url:'https://example.com/file.pdf',storageRef:'mock-file',sizeBytes:12000,contentType:'application/pdf'}]},
+        {id:812,sender:'linhanh',text:'',createdAt:'2026-11-11T09:00:00Z',attachments:[
+          {id:610,kind:'image',name:'Ảnh cũ.png',url:mockAvatar,storageRef:'mock-image',sizeBytes:68,contentType:'image/png'}]},
+      ]
+      return route.fulfill(json(url.searchParams.has('before')?[]:legacyItems))
+    }
+    if(path.includes('/messages')&&method==='GET')return route.fulfill(json(url.searchParams.get('channelId')==='201'?channelMessages:url.searchParams.get('channelId')==='202'?[{...sampleMsg,id:47,channelId:202,text:'Cập nhật bản thiết kế mới'}]:path.includes('/91/')?[sampleMsg]:[]))
     if(path.includes('/messages')&&method==='POST'){
       const body=JSON.parse(req.postData()||'{}');payloads.push(body)
       const message={...sampleMsg,id:65+payloads.length,senderId:1,sender:'tester',channelId:body.channelId||0,clientId:body.clientId,text:body.text}
@@ -82,7 +164,7 @@ try {
       path==='/api/friends'?friends:
       path==='/api/friends/requests'||path==='/api/stories'||path==='/api/posts'||path==='/api/conversation-categories'||path==='/api/calls/current'||path==='/api/contacts'?[]:
       path==='/api/users/suggestions'||path==='/api/users/search'?friends:
-      path==='/api/profile'?{username:'tester',displayName:'Tài khoản của tôi',avatarSet:false,coverSet:false,updatedAt:'2026-11-06'}:{}
+      path==='/api/profile'?personalProfile:{}
     await route.fulfill(json(data))
   })
   await context.addInitScript(() => {
@@ -113,6 +195,46 @@ try {
   assert.equal(await page.locator('.app-sidebar').getByRole('button',{name:'Nhóm & cộng đồng'}).count(),0)
   await page.locator('.social-chat-list-filters').getByRole('button',{name:'Nhóm'}).click()
   assert.equal(await page.locator('.social-chat-list-filters').getByRole('button',{name:'Nhóm'}).getAttribute('aria-pressed'),'true')
+
+  // Switching a direct conversation to a group must reuse the same chat frame,
+  // with the channel navigator occupying exactly the previous sidebar slot.
+  await page.locator('.social-chat-list-filters').getByRole('button',{name:'Tất cả'}).click()
+  for (const width of [768,1024,1478]) {
+    await page.setViewportSize({width,height:850})
+    await page.locator('.conversation-item').filter({hasText:'Linh Anh'}).click()
+    await page.locator('.chat-head').waitFor()
+    const before=await page.evaluate(()=>{
+      const box=selector=>document.querySelector(selector)?.getBoundingClientRect().toJSON()
+      window.__chatnetStableFrame=document.querySelector('.social-chat-layout')
+      window.__chatnetStableChat=document.querySelector('.conversation-panel')
+      return {frame:box('.social-chat-layout'),
+        sidebar:box('.conversation-sidebar'),chat:box('.conversation-panel')}
+    })
+    await page.locator('.conversation-item').filter({hasText:'Team ChatNet'}).click()
+    await page.locator('.group-channel-sidebar').getByRole('searchbox',{name:'Tìm kênh hội thoại'}).waitFor()
+    const after=await page.evaluate(()=>{
+      const box=selector=>document.querySelector(selector)?.getBoundingClientRect().toJSON()
+      return {frame:box('.social-chat-layout'),sidebar:box('.group-channel-sidebar'),
+        chat:box('.conversation-panel'),
+        sameFrame:window.__chatnetStableFrame===document.querySelector('.social-chat-layout'),
+        sameChat:window.__chatnetStableChat===document.querySelector('.conversation-panel')}
+    })
+    assert.ok(after.sameFrame && after.sameChat,'Direct → group must reuse the same frame and chat panel at '+width+'px')
+    for (const [label,a,b] of [['frame',before.frame,after.frame],
+      ['sidebar',before.sidebar,after.sidebar],['chat',before.chat,after.chat]]) {
+      assert.ok(a && b && ['x','y','width','height'].every(key=>Math.abs(a[key]-b[key])<=2),
+        label+' must retain its geometry while changing conversations at '+width+'px: '+
+        JSON.stringify({before:a,after:b}))
+    }
+    assert.equal(await page.locator('.conversation-sidebar').isVisible(),false)
+    await page.locator('.group-channel-sidebar').getByRole('button',{name:'Quay lại danh sách hội thoại'}).click()
+    assert.ok(await page.locator('.conversation-sidebar').isVisible(),
+      'Back to conversations restores the original sidebar in place at '+width+'px')
+    console.log('PASS seamless direct/group frame and sidebar geometry at '+width+'px')
+  }
+  await page.setViewportSize({width:1478,height:850})
+  await page.locator('.social-chat-list-filters').getByRole('button',{name:'Nhóm'}).click()
+
   await page.locator('.app-sidebar').getByRole('button',{name:'Bảng tin'}).click()
   const communityButton=page.locator('.chatnet-appbar').getByRole('button',{name:'Cộng đồng'})
   assert.ok(await communityButton.isVisible(),'Community icon must be in the Feed top toolbar')
@@ -164,73 +286,324 @@ try {
   await page.getByRole('button',{name:'Mở cuộc trò chuyện Team ChatNet'}).click()
   await page.locator('.group-chat-panel').waitFor()
   assert.ok(await page.locator('.chat-head').isVisible(),'Clicking community must open the Messages conversation')
-  // Channel picker must stay visually separate from the group name, at desktop and phone sizes.
+  assert.equal(await page.locator('.group-avatar-rail').count(),0,
+    'Opening a group must not show the additional group-avatar rail')
+  assert.equal(await page.locator('#conversation-details-panel').count(),0,
+    'Group information must stay closed until the information button is clicked')
+  console.log('PASS group opens with channels and messages, while conversation info stays closed')
+  const channelSidebar=page.locator('.group-channel-sidebar')
+  await channelSidebar.getByRole('searchbox',{name:'Tìm kênh hội thoại'}).waitFor()
+  assert.ok(await channelSidebar.isVisible(),'Group channel navigation must remain visible on desktop')
+  const designChannel=channelSidebar.getByRole('button',{name:/Mở kênh Thiết kế giao diện/})
+  assert.match((await designChannel.innerText()),/3/,'Unread count of another channel must remain visible')
+
+  assert.ok(await designChannel.locator('.group-channel-sidebar-topic-row').getByText('Trao đổi về UI/UX').isVisible(),
+    'Channel topic must have its own line')
+  assert.ok(await designChannel.locator('.group-channel-sidebar-meta-row').getByText('Cập nhật bản thiết kế mới').isVisible(),
+    'Message preview must appear on a separate line below the topic')
+  assert.equal(await designChannel.locator('img').count(),0,'Channel preview is generated from topic, not uploaded photos')
+  assert.ok((await designChannel.locator('.group-channel-sidebar-avatar').innerText()).trim().length>0,
+    'Channel initials preview must be generated from its topic')
+  for(const width of [390, 768, 1478]) {
+    await page.setViewportSize({width,height:850})
+    if(width<760) {
+      await page.getByRole('button',{name:'Mở danh sách kênh hội thoại'}).click()
+    }
+    const order = await designChannel.evaluate(row=>{
+      const elements=['.group-channel-sidebar-name-row','.group-channel-sidebar-topic-row','.group-channel-sidebar-meta-row']
+        .map(selector=>row.querySelector(selector))
+      return elements.map(element=>element ? {top:element.getBoundingClientRect().top,
+        bottom:element.getBoundingClientRect().bottom} : null)
+    })
+    assert.ok(order.every(Boolean) && order[0].bottom<=order[1].top+2 &&
+      order[1].bottom<=order[2].top+2,
+      'Channel must show name, topic, then latest message at '+width+'px: '+JSON.stringify(order))
+    if(width<760) await channelSidebar.getByRole('button',{name:'Đóng danh sách kênh'}).click()
+  }
+  await page.setViewportSize({width:1478,height:850})
+  console.log('PASS channel topic and message previews occupy separate lines at all widths')
+
+  await channelSidebar.getByRole('searchbox',{name:'Tìm kênh hội thoại'}).fill('thiết kế')
+  assert.equal(await channelSidebar.locator('.group-channel-sidebar-row').count(),1,
+    'Sidebar search must filter by channel name')
+  await channelSidebar.getByRole('searchbox',{name:'Tìm kênh hội thoại'}).fill('')
+  assert.equal(await channelSidebar.locator('.group-channel-sidebar-row').count(),2)
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/conversations/91/channel-read')&&
+      response.request().method()==='POST'&&response.request().postDataJSON().channelId===202),
+    designChannel.click(),
+  ])
+  await page.locator('.messages').getByText('Cập nhật bản thiết kế mới').waitFor()
+  await page.waitForFunction(()=>!document.querySelector('.group-channel-sidebar-row.selected .group-channel-unread'))
+  assert.equal(channels.find(channel=>channel.id===202)?.unreadCount,0,
+    'Opening channel 202 should mark only channel 202 as read')
+  await channelSidebar.getByRole('button',{name:/Mở kênh Thảo luận chung/}).click()
+  await page.locator('.messages').getByText('Chào mọi người, đây là nhóm ChatNet.').waitFor()
+  const design=channels.find(item=>item.id===202)
+  design.unreadCount=1
+  groups[0].unreadCount=channels.reduce((count,channel)=>count+channel.unreadCount,0)
+  design.lastMessage='Tin mới từ kênh thiết kế'
+  design.lastMessageAt=new Date().toISOString()
+  await page.evaluate(message=>window.__chatnetTestSSE.emit('update',{
+    type:'message',conversationId:91,message,
+  }),{...sampleMsg,id:999,channelId:202,senderId:2,text:'Tin mới từ kênh thiết kế',createdAt:design.lastMessageAt})
+  await channelSidebar.locator('.group-channel-sidebar-row').filter({hasText:'Thiết kế giao diện'})
+    .locator('.group-channel-unread').getByText('1').waitFor()
+  assert.equal(await designChannel.locator('.group-channel-sidebar-topic-row').innerText(),'Trao đổi về UI/UX',
+    'Incoming messages must never replace channel topics')
+  assert.ok(await page.locator('.messages').getByText('Chào mọi người, đây là nhóm ChatNet.').isVisible(),
+    'Receiving a message in another channel must not change the current chat')
+  console.log('PASS inactive-channel realtime unread badge without leaving the active channel')
+  console.log('PASS light channel sidebar, channel search, independent unread badges and read acknowledgement')
+
+  for(const width of [320,390]) {
+    await page.setViewportSize({width,height:850})
+    const toggle=page.getByRole('button',{name:'Mở danh sách kênh hội thoại'})
+    assert.ok(await toggle.isVisible(),'Channel drawer toggle should be visible at '+width+'px')
+    await toggle.click()
+    assert.ok(await channelSidebar.isVisible(),'Mobile/tablet channel drawer opens at '+width+'px')
+    await channelSidebar.getByRole('searchbox',{name:'Tìm kênh hội thoại'}).fill('thiết')
+    assert.equal(await channelSidebar.locator('.group-channel-sidebar-row').count(),1)
+    await channelSidebar.getByRole('button',{name:'Đóng danh sách kênh'}).click()
+    await channelSidebar.getByRole('searchbox',{name:'Tìm kênh hội thoại'}).fill('')
+    console.log('PASS compact channel drawer and search at '+width+'px')
+  }
+  for(const width of [768,1024,1478]) {
+    await page.setViewportSize({width,height:850})
+    await channelSidebar.waitFor({state:'visible'})
+    assert.ok(await page.locator('.group-channel-sidebar-row').first().isVisible(),'Desktop persistent channel list at '+width+'px')
+    assert.equal(await page.locator('.social-chat-layout.group-channel-workspace > .conversation-sidebar').isVisible(),false,'Group channels must replace the regular conversation sidebar at '+width+'px')
+    const cols=await page.evaluate(()=>{
+      const nav=document.querySelector('.group-channel-sidebar').getBoundingClientRect()
+      const chat=document.querySelector('.group-chat-panel .chat-head').getBoundingClientRect()
+      return {navLeft:nav.left,navRight:nav.right,chatLeft:chat.left,chatRight:chat.right}
+    })
+    assert.ok(cols.navRight<=cols.chatLeft+2,
+      'Channels must precede chat at '+width+'px: '+JSON.stringify(cols))
+    assert.equal(await page.locator('#conversation-details-panel').count(),0,
+      'Group information must stay closed at '+width+'px')
+    console.log('PASS channel and chat columns without permanently open info at '+width+'px')
+  }
+  await page.screenshot({path:resolve(dir,'group-channels-desktop.png'),fullPage:true})
   for (const width of [320, 375, 390, 768, 1024, 1478]) {
     await page.setViewportSize({width, height:850})
-    const metrics = await page.evaluate(() => {
-      const title = document.querySelector('.group-room-title > strong')
-      const picker = document.querySelector('.group-channel-picker')
-      const trigger = document.querySelector('.group-channel-selector')
-      if (!title || !picker || !trigger) return null
-      const a = title.getBoundingClientRect()
-      const b = picker.getBoundingClientRect()
-      const style = getComputedStyle(trigger)
-      const overlapWidth = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
-      const overlapHeight = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))
-      return { titleWidth:a.width, pickerWidth:b.width, overlapWidth, overlapHeight,
-        sameRow:overlapHeight > 0, spacing:b.left-a.right,
-        border:style.borderTopWidth, fontSize:parseFloat(getComputedStyle(document.querySelector('.group-channel-current-name')).fontSize),
-        scrollWidth:document.documentElement.scrollWidth, viewport:innerWidth }
-    })
-    assert.ok(metrics && metrics.titleWidth > 8 && metrics.pickerWidth > 30, 'Header title and picker visible at '+width+'px: '+JSON.stringify(metrics))
-    assert.ok(metrics.overlapWidth === 0 || metrics.overlapHeight === 0, 'Channel selector must not overlap the group name at '+width+'px: '+JSON.stringify(metrics))
-    if (metrics.sameRow) assert.ok(metrics.spacing >= 7, 'Channel selector needs spacing from group name at '+width+'px: '+JSON.stringify(metrics))
-    assert.equal(metrics.border, '0px', 'Channel selector should have no border at '+width+'px')
-    assert.ok(metrics.fontSize <= 11, 'Channel label should stay compact at '+width+'px')
-    assert.ok(metrics.scrollWidth <= metrics.viewport+3, 'No horizontal overflow at '+width+'px')
-    console.log('PASS channel selector spacing, no border and compact text at '+width+'px')
+    assert.equal(await page.locator('.group-channel-selector').count(),0,
+      'Group header must not contain a channel dropdown at '+width+'px')
+    assert.equal(await page.locator('.group-channel-picker').count(),0,
+      'Obsolete header channel picker must be removed at '+width+'px')
+    assert.ok(await page.locator('.group-room-title').getByText('Team ChatNet').isVisible())
+    console.log('PASS group header has no channel dropdown at '+width+'px')
   }
   await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
   const details=page.locator('#conversation-details-panel')
   await details.getByRole('heading',{name:'Thông tin hội thoại'}).waitFor()
-  assert.ok(await details.getByRole('button',{name:'Tùy chọn nhóm'}).isVisible(),'Original group information menu must remain')
-  assert.ok(await details.getByRole('button',{name:'Ảnh & video'}).isVisible(),'Shared content menu must remain')
-  assert.ok(await details.getByRole('button',{name:'Tìm tin nhắn'}).isVisible(),'Search menu must remain')
-  const groupChannelList=details.locator('.conversation-channel-list')
-  assert.ok(await groupChannelList.getByRole('button',{name:'Thảo luận chung'}).isVisible(),'Info menu must list channels')
-  assert.equal(await details.getByRole('button',{name:'Tạo kênh hội thoại'}).count(),0,'Info menu must not create channels')
+
+  assert.equal(await details.getByRole('button',{name:/Đổi ảnh kênh/}).count(),0,
+    'No channel photo editing controls should remain')
+  assert.ok(await details.getByRole('button',{name:'Đổi ảnh nhóm'}).isVisible(),
+    'Group owners can change the group avatar')
+  await details.getByRole('button',{name:'Đổi ảnh nhóm'}).click()
+  const photoModal=page.locator('.group-photo-modal')
+  await photoModal.getByRole('heading',{name:'Đổi ảnh nhóm'}).count().then(count=>{
+    assert.equal(count,0,'Group editor uses a compact title without changing the page')
+  })
+  assert.ok(await photoModal.getByText('Đổi ảnh nhóm').isVisible())
+  const groupAvatarIcon=details.getByRole('button',{name:'Đổi ảnh nhóm'})
+  assert.equal((await groupAvatarIcon.innerText()).trim(),'','Group photo action must be icon only')
+  assert.equal(await groupAvatarIcon.locator('svg').count(),1,'Camera icon must be present')
+  await photoModal.getByLabel('Tệp ảnh nhóm').setInputFiles({
+    name:'large-photo.png',mimeType:'image/png',buffer:Buffer.alloc(13*1024*1024,1)
+  })
+  await photoModal.getByRole('alert').getByText(/vượt quá giới hạn 12 MB/).waitFor()
+  assert.ok(await photoModal.getByRole('button',{name:'Lưu ảnh'}).isDisabled(),
+    'Oversized images must never be uploaded')
+  assert.equal(groupPhotoUpdates.length,0,'Oversized image must not reach the backend')
+  await photoModal.getByLabel('Tệp ảnh nhóm').setInputFiles({
+    name:'group-avatar.png',mimeType:'image/png',
+    buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==','base64')
+  })
+  groupPhotoCapabilityEnabled=false
+  const uploadsBefore=calls.filter(call=>call==='POST /api/media/presign').length
+  await photoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  await page.getByText(/Backend hiện tại chưa hỗ trợ lưu ảnh nhóm/).waitFor()
+  assert.equal(groupPhotoUpdates.length,0,'The unsupported backend must not receive a photo update')
+  assert.equal(calls.filter(call=>call==='POST /api/media/presign').length,uploadsBefore,
+    'Do not upload an orphan image to S3 when the backend cannot save it')
+  assert.ok(await photoModal.isVisible(),'Keep the selected photo when the backend is too old')
+  groupPhotoCapabilityEnabled=true
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/conversations/91/avatar')&&response.request().method()==='PUT'),
+    photoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(groupPhotoUpdates.length,1,'Group avatar update should be persisted')
+  assert.ok(groupPhotoUpdates[0].attachment?.storageRef,'Uploaded image reference should be sent to backend')
+  assert.equal(await photoModal.count(),0,'Editor closes only after successful save')
+  await channelSidebar.locator('.group-channel-sidebar-icon img').waitFor()
+  assert.equal(await details.locator('.conversation-info-panel-avatar img').count(),1,'The group info avatar refreshes')
+  await details.getByRole('button',{name:'Đổi ảnh nhóm'}).click()
+  await photoModal.getByRole('button',{name:'Gỡ ảnh'}).click()
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/conversations/91/avatar')&&response.request().method()==='PUT'),
+    photoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(groupPhotoUpdates.length,2)
+  assert.equal(groupPhotoUpdates[1].attachment,null,'Removing group image clears the saved reference')
+  await channelSidebar.locator('.group-channel-sidebar-icon img').waitFor({state:'detached'})
+  console.log('PASS group avatar upload, preview, remove, fallback and no channel photo editor')
+
+  for (const width of [1478, 1024, 390]) {
+    await page.setViewportSize({width,height:850})
+    assert.ok(await details.isVisible(),'Conversation information sidebar stays accessible at '+width+'px')
+    const layout = await page.evaluate(() => {
+      const group = document.querySelector('.group-chat-panel')?.getBoundingClientRect()
+      const nav = document.querySelector('.group-channel-sidebar')?.getBoundingClientRect()
+      const chat = document.querySelector('.group-chat-panel .chat-head')?.getBoundingClientRect()
+      const info = document.querySelector('.conversation-info-panel.social-chat-details')?.getBoundingClientRect()
+      return { group:group?.toJSON(),nav:nav?.toJSON(),chat:chat?.toJSON(),info:info?.toJSON(),
+        width: document.documentElement.scrollWidth,viewport:innerWidth }
+    })
+    assert.ok(layout.info && layout.info.width>225,'Conversation information panel must have usable width: '+JSON.stringify(layout))
+    assert.ok(layout.width<=layout.viewport+3,'Info sidebar cannot cause horizontal scrolling at '+width+'px')
+    if (width >= 1420) {
+      assert.ok(layout.nav.right<=layout.chat.left+2,'Channels precede the chat: '+JSON.stringify(layout))
+      assert.ok(layout.chat.right<=layout.info.left+2,
+        'Conversation info must be on the right of the messages: '+JSON.stringify(layout))
+      assert.ok(layout.info.right<=layout.viewport+1,'Conversation info stays within viewport')
+    } else {
+      assert.ok(layout.info.right<=layout.viewport+1,
+        'Conversation info uses the existing overlay at '+width+'px: '+JSON.stringify(layout))
+    }
+    console.log('PASS original right-side conversation info at '+width+'px')
+  }
+  await page.setViewportSize({width:1478,height:850})
+  await page.screenshot({path:resolve(dir,'group-channels-with-conversation-info.png'),fullPage:true})
   await details.getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
-  const picker=page.locator('.group-channel-picker')
-  assert.equal(await page.locator('.group-room-edit').count(),0, 'Group rename must not be available from the header')
-  assert.ok(await picker.getByRole('button',{name:/Chọn kênh hội thoại: Thảo luận chung/}).isVisible())
-  await picker.locator('.group-channel-current-name').hover()
-  const idleBackground=await picker.locator('.group-channel-selector').evaluate(el=>getComputedStyle(el).backgroundColor)
-  await picker.locator('.group-channel-current-name').click()
-  assert.equal(await picker.locator('.group-channel-selector').getAttribute('aria-expanded'),'false','Channel label must not toggle the dropdown')
-  await picker.locator('.group-channel-selector').hover()
-  await page.waitForTimeout(220)
-  const hoverBackground=await picker.locator('.group-channel-selector').evaluate(el=>getComputedStyle(el).backgroundColor)
-  assert.notEqual(hoverBackground,idleBackground,'Only dropdown arrow should highlight on hover')
-  assert.equal(await picker.locator('.group-channel-current-name').evaluate(el=>getComputedStyle(el).cursor),'default','Channel name must have no hover action')
-  assert.equal(await picker.locator('.group-channel-selector').evaluate(el=>getComputedStyle(el).cursor),'pointer','Only dropdown arrow should be interactive')
-  console.log('PASS channel name is static and hover belongs to the dropdown arrow')
-  assert.ok(await page.locator('.messages').getByText('Chào mọi người, đây là nhóm ChatNet.').isVisible())
-  await picker.locator('.group-channel-selector').click()
-  await picker.getByRole('button',{name:'Tạo kênh hội thoại'}).click()
-  assert.ok(await picker.getByText('Chủ nhóm tạo kênh để thảo luận theo chủ đề.').isVisible())
-  assert.ok(await picker.getByRole('button',{name:'Hủy',exact:true}).isVisible())
-  assert.ok(await picker.getByRole('textbox',{name:'Mô tả kênh mới'}).isVisible())
-  await page.screenshot({path:resolve(dir,'create-channel-form.png'),fullPage:true})
-  await picker.getByRole('textbox',{name:'Tên kênh mới'}).fill('Backend API')
-  await picker.getByRole('textbox',{name:'Mô tả kênh mới'}).fill('Tài liệu backend')
+  assert.equal(await page.locator('#conversation-details-panel').count(),0,
+    'Closing conversation info must restore the wider chat')
+  await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
+  await details.getByRole('heading',{name:'Thông tin hội thoại'}).waitFor()
+  assert.ok(await details.getByRole('button',{name:'Tùy chọn nhóm'}).isVisible(),'Original group information menu must remain')
+  assert.ok(await details.getByRole('button',{name:/File phương tiện, liên kết/}).isVisible(),
+    'Media, files and links must have one shared entry')
+  await details.locator('.conversation-shared-preview-grid img').first().waitFor()
+  assert.equal(await details.locator('.conversation-shared-preview-grid img').count(),4,
+    'Show four actual shared images in Facebook-like thumbnails')
+  const mediaCols=await details.locator('.conversation-shared-preview-grid').evaluate(el=>
+    getComputedStyle(el).gridTemplateColumns.split(' ').length)
+  assert.equal(mediaCols,2,'Facebook-like album preview shows 2 columns with 2 rows')
+  assert.ok(await details.locator('.conversation-shared-preview-grid img').first().evaluate(img => img.complete && img.naturalWidth > 0),
+    'Preview thumbnail must load an actual image')
+  await details.locator('.conversation-shared-preview-grid button').first().click()
+  await page.getByRole('dialog',{name:'Xem ảnh và video'}).waitFor()
+  await page.getByRole('button',{name:'Đóng trình xem ảnh'}).click()
+  assert.ok(await details.isVisible(),'Closing the image viewer returns to conversation details')
+  assert.equal(await details.locator('.conversation-shared-preview-types').count(),0,
+    'No extra image, file, or link shortcuts below the preview')
+  const previewAboveTitle=await details.locator('.conversation-shared-preview').evaluate(el => {
+    const preview=el.querySelector('.conversation-shared-preview-grid, .conversation-shared-preview-empty')
+    const title=el.querySelector('.conversation-shared-preview-title')
+    return Boolean(preview && title && preview.getBoundingClientRect().bottom <= title.getBoundingClientRect().top)
+  })
+  assert.ok(previewAboveTitle,'The media preview must be above the File phương tiện, liên kết row')
+  await details.getByRole('button',{name:'File phương tiện, liên kết'}).click()
+  const shared=page.getByRole('dialog',{name:'Nội dung đã chia sẻ'})
+  await shared.getByRole('button',{name:'Tệp',exact:true}).click()
+  await shared.getByText('Tài liệu nhóm.pdf').waitFor()
+  await shared.getByRole('button',{name:'Liên kết',exact:true}).click()
+  await shared.getByText('https://example.com/group').first().waitFor()
+  await shared.getByRole('button',{name:'Đóng',exact:true}).click()
+  assert.equal(await shared.count(),0,'Closing shared content dismisses only the media dialog')
+  await details.getByRole('button',{name:'Tùy chọn nhóm'}).waitFor()
+  console.log('PASS media preview above the single shared content entry, without extra shortcuts')
+  // A deployed backend may return [] for older messages with a NULL channel_id.
+  // Both thumbnail and dialog must recover actual chat attachments/links.
+  legacySharedResponse = true
+  await details.getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
+  await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
+  await details.locator('.conversation-shared-preview-grid img').first().waitFor()
+  assert.equal(await details.locator('.conversation-shared-preview-grid img').count(),1,
+    'Legacy shared-content fallback finds an image preview in chat history')
+  assert.equal(await details.locator('.conversation-shared-preview-grid video').count(),1,
+    'Legacy shared-content fallback finds a video preview in chat history')
+  await details.getByRole('button',{name:'File phương tiện, liên kết'}).click()
+  const recovered=page.getByRole('dialog',{name:'Nội dung đã chia sẻ'})
+  await recovered.locator('.shared-media-card').first().waitFor()
+  assert.equal(await recovered.locator('.shared-media-card').count(),2,
+    'Legacy shared-content fallback restores image and video in the media dialog')
+  await recovered.getByRole('button',{name:'Tệp',exact:true}).click()
+  await recovered.getByText('Tài liệu nhóm.pdf').waitFor()
+  await recovered.getByRole('button',{name:'Liên kết',exact:true}).click()
+  await recovered.getByText('https://example.com/group').first().waitFor()
+  await recovered.getByRole('button',{name:'Đóng',exact:true}).click()
+  assert.ok(await details.isVisible(),'Close shared content to return to conversation info after fallback')
+  legacySharedResponse = false
+  console.log('PASS fallback to chat history restores older image, video, file and link')
+  assert.equal(await details.locator('.conversation-channel-list').count(),0,
+    'Channels must stay in the left channel sidebar and not in Conversation Info')
+  for (const removed of ['Gọi thoại','Gọi video','Thông báo','Dịch AI','Ảnh & video','Tệp tin','Liên kết','Quản lý nhóm']) {
+    assert.equal(await details.getByRole('button',{name:removed,exact:true}).count(),0,
+      removed+' must not appear as a separate option in Conversation Info')
+  }
+  for (const required of ['Tìm tin nhắn','Thành viên','Thông tin cộng đồng','Quyền quản trị',
+    'Yêu cầu tham gia','Nội quy nhóm','Nhật ký hoạt động','Tùy chọn nhóm']) {
+    assert.ok(await details.getByRole('button',{name:required,exact:true}).isVisible(),
+      required+' must be directly accessible from Conversation Info')
+  }
+  assert.ok(await details.getByRole('button',{name:'Tùy chọn nhóm'}).isVisible(),'Group options remain available')
+  console.log('PASS compact group info management links and shared media preview')
+  assert.equal(await details.getByRole('button',{name:'Tạo kênh hội thoại'}).count(),0,'Creation is inside Group options, not on the header')
+  const groupOptions=details.getByRole('button',{name:'Tùy chọn nhóm'})
+  await groupOptions.click()
+  const createTrigger=details.getByRole('button',{name:'Tạo kênh hội thoại'})
+  assert.ok(await createTrigger.isVisible(),'Only group owner can create from Conversation Info menu')
+
+  for (const width of [390, 1478]) {
+    await page.setViewportSize({width,height:850})
+    const styles=await details.evaluate(root=>{
+      const controls=[...root.querySelectorAll('.conversation-group-options-list > button')]
+      const standard=controls.find(element=>element.textContent?.includes('Bình chọn'))
+      const create=controls.find(element=>element.textContent?.includes('Tạo kênh hội thoại'))
+      if (!standard || !create) return null
+      const inspect=el=>{
+        const style=getComputedStyle(el)
+        const icon=el.querySelector('svg')
+        return {
+          height:el.getBoundingClientRect().height,
+          padding:style.padding,
+          background:style.backgroundColor,
+          color:style.color,
+          radius:style.borderRadius,
+          fontSize:style.fontSize,
+          fontWeight:style.fontWeight,
+          gap:style.gap,
+          iconWidth:icon?.getBoundingClientRect().width,
+          iconColor:icon ? getComputedStyle(icon).color : null,
+        }
+      }
+      return {standard:inspect(standard),create:inspect(create)}
+    })
+    assert.ok(styles,'Both group option buttons must be present')
+    assert.deepEqual(styles.create,styles.standard,'Create channel action must match other options at '+width+'px')
+    console.log('PASS create channel matches sibling option styles at '+width+'px')
+  }
+  await page.setViewportSize({width:1478,height:850})
+  await createTrigger.click()
+  const createForm=details.locator('.conversation-info-create-channel')
+  assert.ok(await createForm.getByText('Chỉ trưởng nhóm có quyền tạo kênh.').isVisible())
+  assert.ok(await createForm.getByRole('button',{name:'Hủy'}).isVisible())
+  assert.ok(await createForm.getByRole('textbox',{name:'Mô tả kênh mới'}).isVisible())
+  await page.screenshot({path:resolve(dir,'create-channel-form-info-menu.png'),fullPage:true})
+  await createForm.getByRole('textbox',{name:'Tên kênh mới'}).fill('Backend API')
+  await createForm.getByRole('textbox',{name:'Mô tả kênh mới'}).fill('Tài liệu backend')
   await Promise.all([
     page.waitForResponse(response=>response.url().endsWith('/api/conversations/91/channels')&&response.request().method()==='POST'),
-    picker.getByRole('button',{name:'Tạo kênh',exact:true}).click(),
+    createForm.getByRole('button',{name:'Tạo kênh',exact:true}).click(),
   ])
-  await picker.getByRole('button',{name:/Chọn kênh hội thoại: Backend API/}).waitFor()
+  const backendChannel=channelSidebar.getByRole('button',{name:/Mở kênh Backend API/})
+  await backendChannel.waitFor()
+  assert.equal(await backendChannel.getAttribute('aria-current'),'page','New channel is automatically selected')
   assert.ok(calls.includes('POST /api/conversations/91/channels'))
-  assert.equal(await page.locator('.messages').getByText('Chào mọi người, đây là nhóm ChatNet.').count(),0,'Main chat messages must be hidden inside the channel')
-  assert.ok(calls.some(item=>item==='GET /api/conversations/91/messages'))
+  assert.equal(await page.locator('.messages').getByText('Chào mọi người, đây là nhóm ChatNet.').count(),0,'General chat messages cannot leak into a private channel')
   await page.getByRole('textbox',{name:'Tin nhắn',exact:true}).fill('Tin nhắn trong kênh riêng')
   await Promise.all([
     page.waitForResponse(response=>response.url().includes('/api/conversations/91/messages')&&response.request().method()==='POST'),
@@ -238,28 +611,42 @@ try {
   ])
   assert.equal(payloads.find(item=>item.channelId===201)?.text,'Tin nhắn trong kênh riêng')
   await page.locator('.messages').getByText('Tin nhắn trong kênh riêng').waitFor()
-  await picker.locator('.group-channel-selector').click()
-  await picker.getByRole('menuitemradio',{name:'Thảo luận chung'}).click()
+  const ownAvatar=page.locator('.messages .message.channel-message.mine .chat-message-sender-avatar')
+  assert.equal(await ownAvatar.count(),0,'Own group messages must not render an avatar')
+  await channelSidebar.getByRole('button',{name:/Mở kênh Thảo luận chung/}).click()
   await page.locator('.messages').getByText('Chào mọi người, đây là nhóm ChatNet.').waitFor()
   assert.equal(await page.locator('.messages').getByText('Tin nhắn trong kênh riêng').count(),0)
-  console.log('PASS owner creates a channel from group-title dropdown, full message UI stays scoped by channel')
+  console.log('PASS owner creates channels inside group information options, no header dropdown')
 
   await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
-  await details.getByRole('button',{name:'Backend API'}).click()
-  await picker.getByRole('button',{name:/Chọn kênh hội thoại: Backend API/}).waitFor()
+  await channelSidebar.getByRole('button',{name:/Mở kênh Backend API/}).click()
   await page.locator('.messages').getByText('Tin nhắn trong kênh riêng').waitFor()
   const realtimeMessage={...sampleMsg,id:991,channelId:201,senderId:2,text:'Realtime trong kênh Backend API',createdAt:new Date().toISOString()}
   channelMessages.push(realtimeMessage)
   await page.evaluate(message=>window.__chatnetTestSSE.emit('update',{type:'message',conversationId:91,message:message}),realtimeMessage)
   await page.locator('.messages').getByText('Realtime trong kênh Backend API').waitFor()
-  console.log('PASS realtime message is rendered in the active channel')
+  const otherAvatar=page.locator('.messages .message.channel-message:not(.mine) .chat-message-sender-avatar')
+  for (const width of [320, 390, 768, 1478]) {
+    await page.setViewportSize({width,height:850})
+    assert.equal(await ownAvatar.count(),0,'Own message must not have an avatar at '+width+'px')
+    assert.ok(await otherAvatar.isVisible(),'Member avatar should be visible in channel at '+width+'px')
+    const measures=await page.evaluate(() => {
+      const entries=[...document.querySelectorAll('.message.channel-message .chat-message-sender-avatar')]
+      return entries.map(el=>({display:getComputedStyle(el).display,width:el.getBoundingClientRect().width}))
+    })
+    assert.ok(measures.length>=1 && measures.every(m=>m.display!=='none' && m.width>=25),
+      'Incoming member avatar must remain visible at '+width+'px: '+JSON.stringify(measures))
+    console.log('PASS sender avatars only on incoming group messages at '+width+'px')
+  }
+  await page.setViewportSize({width:1478,height:850})
+  console.log('PASS realtime message is rendered with its sender avatar in the active channel')
 
-  console.log('PASS three-dot info menu lists channels and switches the full chat timeline')
+  console.log('PASS channel sidebar switches timelines independently of information panel')
 
-  await picker.locator('.group-channel-selector').click()
-  await picker.getByRole('menuitemradio',{name:'Thảo luận chung'}).click()
   await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
-  await details.getByRole('button',{name:'Quản lý nhóm'}).click()
+  await channelSidebar.getByRole('button',{name:/Mở kênh Thảo luận chung/}).click()
+  await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
+  await details.getByRole('button',{name:'Thành viên',exact:true}).click()
   const sidebar=page.locator('.group-settings-sidebar')
   await sidebar.getByRole('button',{name:/Xem danh sách 3 thành viên nhóm/}).waitFor()
   assert.equal(await sidebar.locator('.group-settings-tabs').count(),0,'Original group management layout must remain unchanged')
@@ -347,12 +734,102 @@ try {
   members[0].role='admin'
   members[1].role='owner'
   await page.reload({waitUntil:'domcontentloaded'})
-  await page.locator('.conversation-item').getByText('Team ChatNet').first().click()
-  await page.locator('.group-channel-picker .group-channel-selector').click()
-  await page.getByRole('menuitemradio',{name:'Backend API'}).waitFor()
-  assert.equal(await page.locator('.group-channel-picker').getByRole('button',{name:'Tạo kênh hội thoại'}).count(),0,
-    'Admin must not have the owner-only create channel control')
+  await page.waitForFunction(() => document.querySelector('.group-avatar-rail') ||
+    [...document.querySelectorAll('.conversation-item')].some(el => el.textContent?.includes('Team ChatNet')))
+  if (await page.locator('.group-avatar-rail').isVisible()) {
+    const target=page.locator('.group-avatar-rail').getByRole('button',{name:/Mở nhóm Team ChatNet/})
+    if (await target.getAttribute('aria-current')!=='page') await target.click()
+  } else {
+    await page.locator('.conversation-item').getByText('Team ChatNet').first().click()
+  }
+  await page.locator('.translate-controls').getByRole('button',{name:'Thông tin hội thoại'}).click()
+  await page.locator('#conversation-details-panel').getByRole('button',{name:'Tùy chọn nhóm'}).click()
+  assert.equal(await page.locator('#conversation-details-panel').getByRole('button',{name:'Tạo kênh hội thoại'}).count(),0,
+    'Admin must not see owner-only create channel in Conversation Info')
+  assert.ok(await page.locator('#conversation-details-panel').isVisible(),
+    'Conversation information remains available on the right when requested')
+  await page.locator('#conversation-details-panel').getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
+  assert.equal(await page.locator('#conversation-details-panel').count(),0,
+    'Conversation information closes when requested')
   console.log('PASS only the group owner can see the create-channel action')
+  await page.setViewportSize({width:1478,height:850})
+  await page.getByRole('button',{name:'Quay lại danh sách hội thoại'}).click()
+  assert.equal(await page.locator('.social-chat-layout.group-channel-workspace').count(),0,
+    'Back button must exit the group channel workspace')
+  assert.ok(await page.locator('.social-chat-layout > .conversation-sidebar').isVisible(),
+    'Back button must restore the conversation list')
+  console.log('PASS back navigation from group channels to regular conversation list')
+  const listRow=page.locator('.conversation-item').filter({hasText:'Team ChatNet'})
+  await page.waitForFunction(() => {
+    const row=[...document.querySelectorAll('.conversation-item')].find(el=>el.textContent.includes('Team ChatNet'))
+    return row?.querySelector('.conversation-copy b')?.textContent==='1'
+  })
+  assert.equal((await listRow.locator('.conversation-copy b').innerText()),'1',
+    'Conversation sidebar badge must match the remaining unread count from inactive channels')
+  await listRow.click()
+  await page.locator('.group-channel-sidebar').getByRole('button',{name:/Mở kênh Thiết kế giao diện/}).click()
+  await page.waitForFunction(() => !document.querySelector('.group-channel-sidebar-row.selected .group-channel-unread'))
+  await page.getByRole('button',{name:'Quay lại danh sách hội thoại'}).click()
+  await page.waitForFunction(() => {
+    const row=[...document.querySelectorAll('.conversation-item')].find(el=>el.textContent.includes('Team ChatNet'))
+    return row && !row.querySelector('.conversation-copy b')
+  })
+  assert.equal(groups[0].unreadCount,0,'Reading the remaining channel must clear the group sidebar unread')
+  console.log('PASS group sidebar unread badge decreases to zero after reading the remaining channel')
+  channelUnreadMetricsEnabled = false
+  await listRow.click()
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('chatnet:group-community-updated',{detail:{conversationId:91}})))
+  await page.locator('.group-channel-sidebar').getByText('Số tin chưa đọc theo kênh chưa khả dụng. Cần cập nhật backend.').waitFor()
+  console.log('PASS old backend without per-channel unread metadata is clearly identified instead of showing false badges')
+  // Photo picker shared with both personal avatar and cover. Canceling never uploads.
+  await page.locator('.app-sidebar').getByRole('button',{name:'Cá nhân'}).click()
+  await page.locator('.profile-page-avatar-action').waitFor()
+  await page.locator('.profile-page-avatar-action').click()
+  const personalPhotoModal=page.locator('.group-photo-modal')
+  assert.ok(await personalPhotoModal.getByText('Đổi ảnh đại diện').isVisible())
+  await personalPhotoModal.getByLabel('Tệp ảnh đại diện').setInputFiles({
+    name:'oversized.png',mimeType:'image/png',buffer:Buffer.alloc(13*1024*1024,2)
+  })
+  await personalPhotoModal.getByRole('alert').getByText(/vượt quá giới hạn 12 MB/).waitFor()
+  assert.ok(await personalPhotoModal.getByRole('button',{name:'Lưu ảnh'}).isDisabled())
+  assert.equal(personalPhotoUpdates.length,0,'Oversized personal avatar must not upload')
+  await personalPhotoModal.getByRole('button',{name:'Hủy'}).click()
+  assert.equal(await personalPhotoModal.count(),0,'Cancel should close personal avatar editor')
+  assert.equal(personalPhotoUpdates.length,0,'Cancel must never modify personal photos')
+  await page.locator('.profile-page-cover-action').click()
+  assert.ok(await personalPhotoModal.getByText('Đổi ảnh bìa').isVisible())
+  assert.ok(await personalPhotoModal.locator('.group-photo-preview.cover').isVisible())
+  await personalPhotoModal.getByLabel('Tệp ảnh bìa').setInputFiles({
+    name:'cover.png',mimeType:'image/png',
+    buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==','base64')
+  })
+  assert.equal(personalPhotoUpdates.length,0,'Selecting a file must not upload until Save')
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/profile/media')&&response.request().method()==='PUT'),
+    personalPhotoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(personalPhotoUpdates[0].kind,'cover')
+  assert.ok(personalPhotoUpdates[0].attachment?.storageRef)
+  await page.locator('.profile-page-avatar-action').click()
+  await personalPhotoModal.getByLabel('Tệp ảnh đại diện').setInputFiles({
+    name:'avatar.png',mimeType:'image/png',
+    buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==','base64')
+  })
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/profile/media')&&response.request().method()==='PUT'),
+    personalPhotoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(personalPhotoUpdates[1].kind,'avatar')
+  await page.locator('.profile-page-avatar-action').click()
+  await personalPhotoModal.getByRole('button',{name:'Gỡ ảnh'}).click()
+  await Promise.all([
+    page.waitForResponse(response=>response.url().endsWith('/api/profile/media')&&response.request().method()==='PUT'),
+    personalPhotoModal.getByRole('button',{name:'Lưu ảnh'}).click()
+  ])
+  assert.equal(personalPhotoUpdates[2].attachment,null)
+  assert.equal(personalProfile.avatarSet,false)
+  console.log('PASS shared profile avatar/cover picker, oversized warning, cancel and remove')
+
   assert.deepEqual(errors,[])
   console.log('PASS all revised Feed communities and Chat group menu checks')
   await context.close()

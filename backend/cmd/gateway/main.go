@@ -55,6 +55,7 @@ func main() {
 	})
 	mux.Handle("GET /__chatnet_copy_image", mediax.ClipboardImageHandler(nil))
 	mux.Handle("/api/auth/", authProxy)
+	mux.Handle("GET /api/link-preview", chatProxy)
 	mux.Handle("/api/messages", chatProxy)
 	mux.Handle("/api/messages/", chatProxy)
 	mux.Handle("/api/events", chatProxy)
@@ -144,7 +145,7 @@ func spaHandler(staticDir string) http.Handler {
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-ChatNet-Relay-Token")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

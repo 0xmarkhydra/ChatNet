@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mergeById, toggleCount, toggleMessageReactionCount } from '../src/shared/lib/optimistic.ts'
+import { mergeById, toggleCount, toggleMessageReactionCount } from '../src/shared/utils/optimistic.ts'
 
 const original = [{ emoji: 'like', count: 2, mine: false }]
 assert.deepEqual(toggleCount(original, 'like'), [{ emoji: 'like', count: 3, mine: true }])

@@ -7,7 +7,11 @@
     "dev": "vite",
     "dev:railway": "CHATNET_API_PROXY_TARGET=https://api-chat.codelocal.cloud VITE_API_PROXY=1 vite --host 0.0.0.0 --port 5188 --strictPort",
     "build": "tsc --noEmit && vite build",
+    "lint": "node scripts/lint-ratchet.mjs",
+    "lint:report": "eslint src",
+    "lint:baseline": "node scripts/lint-ratchet.mjs --update",
     "check:onesignal": "node --experimental-strip-types scripts/onesignal-init-check.mjs",
+    "check:push-deeplink": "node scripts/push-notification-deeplink-check.mjs",
     "check:incoming-sound": "node --experimental-strip-types scripts/incoming-sound-check.mjs",
     "check:pwa": "node --experimental-strip-types scripts/pwa-update-check.mjs",
     "check:session": "node --experimental-strip-types scripts/session-check.mjs",
@@ -31,6 +35,7 @@
     "check:voice": "node --experimental-strip-types scripts/voice-media-check.mjs",
     "check:ui": "node scripts/run-ui-layout.mjs",
     "check:social-ui": "node scripts/check-social-ui.mjs",
+    "check:smart-composer": "node scripts/check-social-ui.mjs --smart-composer-only",
     "check:friends-redesign": "node scripts/check-friends-redesign.mjs",
     "check:groups-redesign": "node scripts/check-groups-redesign.mjs",
     "check:auth-redesign": "node scripts/check-auth-redesign.mjs",
@@ -42,6 +47,10 @@
     "check:conversation-search": "node scripts/conversation-list-search-check.mjs",
     "check:profile-note": "node scripts/profile-note-check.mjs",
     "check:cache": "node --experimental-strip-types scripts/session-cache-check.mjs",
+    "check:feed-api": "node scripts/feed-api-check.mjs",
+    "check:chat-api": "node scripts/chat-api-check.mjs",
+    "check:chat-messaging-flow": "node scripts/chat-messaging-flow-check.mjs",
+    "check:chat-conversation-flow": "node scripts/chat-conversation-flow-check.mjs",
     "build:desktop": "tsc --noEmit && vite build --mode desktop --base ./ --outDir ../desktop/dist/renderer --emptyOutDir"
   },
   "dependencies": {
@@ -58,8 +67,11 @@
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "playwright": "^1.64.1",
     "typescript": "^5.9.2",
+    "typescript-eslint": "^8.72.2",
     "vite": "7.3.7"
   }
 }

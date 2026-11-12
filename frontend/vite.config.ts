@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { chatCopyImageDevProxy } from './dev/chatCopyImageProxy'
+import { chatMediaUploadDevProxy } from './dev/chatMediaUploadProxy'
 
 export default defineConfig({
   // Ignore nested frontend/output snapshots when discovering app dependencies.
@@ -11,6 +12,7 @@ export default defineConfig({
   plugins: [
     react(),
     chatCopyImageDevProxy(),
+    chatMediaUploadDevProxy(),
     {
       name: 'version-service-worker',
       apply: 'build',

@@ -60,7 +60,7 @@ try {
       const page = await ctx.newPage()
       const jsErrors = []
       page.on('pageerror', error => jsErrors.push(error.message))
-      await page.route('**/api/**', async route => {
+      await page.route(url => url.pathname.startsWith('/api/'), async route => {
         const req = route.request(), u = new URL(req.url()), p = u.pathname
         const json = (payload, status=200) => route.fulfill({status,contentType:'application/json',
           headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},body:JSON.stringify(payload)})

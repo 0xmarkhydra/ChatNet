@@ -72,11 +72,11 @@ func (s *server) listSharedContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.channel_id,m.user_id,u.username,u.display_name,m.text,m.created_at
+		SELECT m.id,m.conversation_id,COALESCE(m.channel_id,0),m.user_id,u.username,u.display_name,m.text,m.created_at
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
 		JOIN conversation_members viewer ON viewer.conversation_id=m.conversation_id AND viewer.user_id=$5
-		WHERE m.conversation_id=$1 AND m.channel_id=$6 AND m.id>viewer.cleared_through_message_id
+		WHERE m.conversation_id=$1 AND COALESCE(m.channel_id,0)=$6 AND m.id>viewer.cleared_through_message_id
 		  AND m.deleted_at IS NULL
 		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR

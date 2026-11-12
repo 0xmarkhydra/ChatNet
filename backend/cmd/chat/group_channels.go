@@ -10,13 +10,17 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type groupChannel struct {
-	ID             int64  `json:"id"`
-	ConversationID int64  `json:"conversationId"`
-	Name           string `json:"name"`
-	Description    string `json:"description"`
+	ID             int64      `json:"id"`
+	ConversationID int64      `json:"conversationId"`
+	Name           string     `json:"name"`
+	Description    string     `json:"description"`
+	UnreadCount    int64      `json:"unreadCount"`
+	LastMessage    string     `json:"lastMessage"`
+	LastMessageAt  *time.Time `json:"lastMessageAt,omitempty"`
 }
 type channelFields struct {
 	Name        string `json:"name"`
@@ -34,6 +38,9 @@ func (s *server) groupChannelExists(ctx context.Context, groupID, channelID int6
 	err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM group_channels WHERE conversation_id=$1 AND id=$2)`, groupID, channelID).Scan(&exists)
 	return err == nil && exists
 }
+
+// listGroupChannels returns real per-channel unread counts and latest-message previews
+// for the authenticated member. Read cursors are isolated by channel_id, including 0.
 func (s *server) listGroupChannels(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	id, ok := parseID(w, r.PathValue("id"))
@@ -41,29 +48,122 @@ func (s *server) listGroupChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := s.groupRole(r.Context(), id, claims.UserID); err != nil {
-		httpx.Error(w, 403, "not a group member")
+		httpx.Error(w, http.StatusForbidden, "not a group member")
 		return
 	}
-	rows, err := s.db.Query(r.Context(), `SELECT id,conversation_id,name,description FROM group_channels WHERE conversation_id=$1 ORDER BY id LIMIT 30`, id)
+	rows, err := s.db.Query(r.Context(), `
+WITH rooms AS (
+  SELECT 0::BIGINT id, $1::BIGINT conversation_id,
+    'Thảo luận chung'::TEXT name, 'Kênh mặc định của nhóm'::TEXT description
+  UNION ALL SELECT gc.id,gc.conversation_id,gc.name::TEXT,gc.description::TEXT
+    FROM group_channels gc WHERE gc.conversation_id=$1
+)
+SELECT rooms.id,rooms.conversation_id,rooms.name,rooms.description,
+  (SELECT COUNT(*) FROM messages m
+    WHERE m.conversation_id=$1 AND COALESCE(m.channel_id,0)=rooms.id
+      AND m.user_id<>$2
+      AND m.id > GREATEST(COALESCE((
+        SELECT gcr.last_read_message_id FROM group_channel_reads gcr
+        WHERE gcr.conversation_id=$1 AND gcr.user_id=$2 AND gcr.channel_id=rooms.id
+      ),cm.last_read_message_id),cm.cleared_through_message_id)
+      AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+        (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR
+        (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+  ) unread_count,
+  COALESCE((
+    SELECT CASE WHEN BTRIM(m.text)<>'' THEN m.text
+      ELSE CASE WHEN EXISTS(SELECT 1 FROM message_attachments ma WHERE ma.message_id=m.id)
+        THEN '[Tệp đính kèm]' ELSE '' END END
+    FROM messages m WHERE m.conversation_id=$1 AND COALESCE(m.channel_id,0)=rooms.id
+      AND m.id>cm.cleared_through_message_id
+      AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+        (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR
+        (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+    ORDER BY m.id DESC LIMIT 1
+  ),'') last_message,
+  (SELECT m.created_at FROM messages m
+    WHERE m.conversation_id=$1 AND COALESCE(m.channel_id,0)=rooms.id
+      AND m.id>cm.cleared_through_message_id
+      AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+        (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR
+        (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+    ORDER BY m.id DESC LIMIT 1
+  ) last_message_at
+FROM rooms
+JOIN conversation_members cm ON cm.conversation_id=$1 AND cm.user_id=$2
+ORDER BY rooms.id LIMIT 31
+`, id, claims.UserID)
 	if err != nil {
 		httpx.Error(w, 500, "cannot load channels")
 		return
 	}
 	defer rows.Close()
-	list := []groupChannel{{ID: 0, ConversationID: id, Name: "Thảo luận chung", Description: "Kênh mặc định của nhóm"}}
+	list := []groupChannel{}
 	for rows.Next() {
-		var c groupChannel
-		if rows.Scan(&c.ID, &c.ConversationID, &c.Name, &c.Description) != nil {
+		var item groupChannel
+		if err := rows.Scan(&item.ID, &item.ConversationID, &item.Name, &item.Description,
+			&item.UnreadCount, &item.LastMessage, &item.LastMessageAt); err != nil {
 			httpx.Error(w, 500, "cannot load channels")
 			return
 		}
-		list = append(list, c)
+		list = append(list, item)
 	}
 	if rows.Err() != nil {
 		httpx.Error(w, 500, "cannot load channels")
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	httpx.JSON(w, 200, list)
+}
+
+// markGroupChannelRead marks ONLY the selected room. It never advances another
+// channel's cursor, and it cannot be used by someone outside the group.
+func (s *server) markGroupChannelRead(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	id, ok := parseID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	var body struct {
+		ChannelID int64 `json:"channelId"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256)).Decode(&body); err != nil || body.ChannelID < 0 {
+		httpx.Error(w, 400, "invalid channel id")
+		return
+	}
+	if _, err := s.groupRole(r.Context(), id, claims.UserID); err != nil {
+		httpx.Error(w, 403, "not a group member")
+		return
+	}
+	if !s.groupChannelExists(r.Context(), id, body.ChannelID) {
+		httpx.Error(w, 404, "channel not found")
+		return
+	}
+	var lastRead int64
+	err := s.db.QueryRow(r.Context(), `
+INSERT INTO group_channel_reads(conversation_id,user_id,channel_id,last_read_message_id)
+SELECT cm.conversation_id,cm.user_id,$3,
+  GREATEST(cm.cleared_through_message_id,COALESCE((
+    SELECT MAX(m.id) FROM messages m WHERE m.conversation_id=$1
+      AND COALESCE(m.channel_id,0)=$3
+      AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+        (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR
+        (b.blocked_id=$2 AND b.blocker_id=m.user_id))
+  ),0))
+FROM conversation_members cm WHERE cm.conversation_id=$1 AND cm.user_id=$2
+ON CONFLICT(conversation_id,user_id,channel_id)
+DO UPDATE SET last_read_message_id=GREATEST(group_channel_reads.last_read_message_id,
+  EXCLUDED.last_read_message_id),updated_at=NOW()
+RETURNING last_read_message_id
+`, id, claims.UserID, body.ChannelID).Scan(&lastRead)
+	if err != nil {
+		httpx.Error(w, 500, "cannot update channel read state")
+		return
+	}
+	// Synchronize channel badges on the member's other logged-in devices.
+	s.publishConversationEvent(r.Context(), []int64{claims.UserID}, realtimeEvent{Type: "conversation.updated", ConversationID: id})
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, 200, map[string]any{"conversationId": id, "channelId": body.ChannelID, "lastReadMessageId": lastRead})
 }
 func channelConflict(err error) bool {
 	var e *pgconn.PgError

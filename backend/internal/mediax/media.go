@@ -34,6 +34,7 @@ type PresignedUpload struct {
 	ExpiresAt   time.Time `json:"expiresAt"`
 	Kind        string    `json:"kind"`
 	DownloadURL string    `json:"downloadUrl"`
+	RelayToken  string    `json:"relayToken,omitempty"`
 }
 
 type AttachmentInput struct {

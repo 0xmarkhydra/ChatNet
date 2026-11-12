@@ -22,7 +22,7 @@ const vite = await createServer({
 let browser
 try {
   await vite.listen()
-  const { countNotificationItems, formatNotificationBadge } = await vite.ssrLoadModule('/src/app/notification-count.ts')
+  const { countNotificationItems, formatNotificationBadge } = await vite.ssrLoadModule('/src/features/notifications/utils/notification-count.ts')
   assert.equal(countNotificationItems([], []), 0)
   assert.equal(countNotificationItems([{ direction: 'outgoing' }], [{ unreadCount: 0 }]), 0)
   assert.equal(countNotificationItems([{ direction: 'incoming' }], [{ unreadCount: 7 }]), 2)
@@ -53,7 +53,7 @@ try {
   const requests = []
   const testConversations = [{ id: 70, type: 'group', name: 'Nhóm dự án', memberCount: 3, unreadCount: 0, lastMessage: '', online: false, createdAt: '2026-11-06T00:00:00Z' }]
   const json = data => ({ status: 200, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }, contentType: 'application/json', body: JSON.stringify(data) })
-  await context.route('**/api/**', async route => {
+  await context.route(url => url.pathname.startsWith('/api/'), async route => {
     const req = route.request()
     const path = new URL(req.url()).pathname
     const method = req.method()

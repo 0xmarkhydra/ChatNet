@@ -45,3 +45,28 @@ This block was installed by CodeLocal Skills. Existing project instructions rema
 in effect. Ponytail is third-party MIT-licensed; provenance is under
 `.codelocal-skills/ponytail/`. No marketplace plugin or hooks are installed.
 <!-- CODELOCAL-SKILLS:END -->
+
+## Kiến trúc frontend (bắt buộc)
+- `app/` chỉ khởi tạo, providers, layout, điều hướng. `features/<tên>/` sở hữu components, hooks, state, `api/` và nghiệp vụ của chính nó. `shared/` chỉ chứa code không phụ thuộc feature nào. `platform/` chứa tích hợp môi trường và nhận phụ thuộc qua tham số. Quy ước thư mục: `docs/FRONTEND_STRUCTURE.md`.
+- Hướng phụ thuộc: `app → features → shared`. `shared` và `platform` không import `features` hoặc `app`. Feature không import ngược `app/`.
+- Feature khác chỉ dùng một feature qua `index.ts` của nó, không import sâu vào file nội bộ.
+- Lời gọi Backend nằm trong `features/<tên>/api/`; component không gọi `fetch`/`apiFetch` trực tiếp.
+- Các thư mục `api/`, `index.ts` và Context cho session/thông báo đang được triển khai dần theo kế hoạch PR. Code cũ chưa tuân thủ không phải lý do để vi phạm trong code mới; khi sửa một khu vực, đưa nó về đúng quy ước nếu phạm vi PR cho phép.
+
+## Quy tắc React (bắt buộc)
+- Tuân thủ Rules of Hooks, purity và immutability. Không đọc hoặc ghi `ref.current` khi render.
+- Không dùng `useEffect` để đồng bộ hoặc reset state khi có cách đúng hơn: tính trực tiếp từ state/props, hoặc dùng `key`.
+- Không lưu trong state thứ có thể tính ra. Không tạo state trùng với state hoặc ref khác.
+- Ưu tiên state cục bộ; chỉ nâng state khi nhiều nơi thực sự cần. Context chỉ cho dữ liệu ít đổi, dùng rộng (session, thông báo).
+- Component tập trung UI; hook quản lý logic có state; module `api/` giao tiếp Backend.
+- Không tắt rule ESLint để qua kiểm tra. Nếu cần ngoại lệ, ghi lý do cụ thể ngay tại chỗ.
+- `npm run lint` (trong `frontend/`) chạy ESLint với `eslint-plugin-react-hooks` và so với `lint-baseline.json`: các vi phạm có sẵn được phép giảm nhưng không được tăng. Sau khi sửa bớt vi phạm, chạy `npm run lint:baseline` để ghi nhận. `npm run lint:report` liệt kê chi tiết kèm số dòng.
+
+## Quy trình refactor kiến trúc (bắt buộc)
+- Audit chỉ đọc → xin duyệt → mới sửa. Mỗi PR một phạm vi, giữ nguyên hành vi, không đổi API, database, Docker hay cấu hình production.
+- Trước khi báo xong: `tsc`, lint, build và kiểm tra liên quan. Build PASS không chứng minh chức năng đúng; ghi rõ phần chưa kiểm tra (NOT RUN).
+
+## Khuyến nghị (không áp ngưỡng máy móc)
+- Hook có quá nhiều tham số hoặc component có quá nhiều props là dấu hiệu cần xem lại ranh giới, không phải ngưỡng cứng.
+- Chỉ dùng `useMemo`/`useCallback` khi có lý do đo được.
+- Chỉ thêm abstraction khi nó giảm độ phức tạp thực tế.
