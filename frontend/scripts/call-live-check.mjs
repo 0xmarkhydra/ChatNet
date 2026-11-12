@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const root = new URL('../', import.meta.url)
 const read = (file) => readFileSync(new URL(file, root), 'utf8')
-const ui = read('src/features/calls/components/CallManager.tsx')
+const ui = [
+  read('src/features/calls/components/CallManager.tsx'),
+  read('src/features/calls/components/CallRoomControls.tsx'),
+  read('src/features/calls/components/CallRoomNotices.tsx'),
+].join('\n')
 const transport = read('src/features/calls/lib/callMediaInterpreter.ts')
 const backend = read('../backend/cmd/call/translation.go')
 const callRoutes = read('../backend/cmd/call/main.go')
