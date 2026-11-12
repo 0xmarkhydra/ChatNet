@@ -1627,3 +1627,22 @@
     height: 15px;
   }
 }
+@media (max-width: 319px) {
+  .modern-shell.app-layout .social-chat-layout .media-composer.composer {
+    margin-inline: 4px;
+    padding-inline: 5px;
+    gap: 3px;
+  }
+  .modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input,
+  .modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input:focus,
+  .modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input:focus-visible {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 60px;
+  }
+  .modern-shell.app-layout .social-chat-layout .media-composer > .send-button {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+  }
+}

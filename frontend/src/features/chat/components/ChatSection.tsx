@@ -11,9 +11,10 @@ import { CallHeaderActions } from "../../calls/components/CallManager";
 import { createPortal } from "react-dom";
 import SharedContent from "./SharedContent";
 import MessageSearchPanel from "./MessageSearchPanel";
+import MessageReadersDialog, { MessageReadersInline } from "./MessageReadersDialog";
 import { getMessageTranslationView } from "../utils/messageTranslationPresentation";
 import { messageReactionLabel } from "../utils/messageReactions";
-import { Fragment, FormEvent, useState, type SetStateAction } from "react";
+import { Fragment, FormEvent, useMemo, useState, type SetStateAction } from "react";
 import { GroupActivityMarker, GroupActivityComposerMenu, type GroupActivityKind } from "./GroupActivities";
 import { messageTextParts, messageLinkHref } from "../lib/messageClipboard";
 import LinkPreview from "./LinkPreview";
@@ -392,6 +393,22 @@ export default function ChatSection({
   visibleLanguageOptions,
   visibleMessages,
 }: ChatSectionProps) {
+  const [readersTarget, setReadersTarget] = useState<{ message: Message; sessionId: string } | null>(null);
+  const readersMessage = readersTarget?.sessionId === session.sessionId ? readersTarget.message : null;
+  const messageReaderMembers = useMemo(() => {
+    if (!activeConversation) return [];
+    if (activeConversation.type === "group") return groupMembers;
+    if (!activeConversation.otherUserId) return [];
+    const friend = friends.find((item) => item.id === activeConversation.otherUserId);
+    if (friend) return [friend];
+    return activeConversation.otherUsername
+      ? [{
+          id: activeConversation.otherUserId,
+          username: activeConversation.otherUsername,
+          displayName: activeConversation.name || activeConversation.otherUsername,
+        }]
+      : [];
+  }, [activeConversation, friends, groupMembers]);
   const [groupPhotoBusy, setGroupPhotoBusy] = useState(false);
   const [channelSidebarOpen, setChannelSidebarOpen] = useState(false);
   const [groupManagementSection, setGroupManagementSection] = useState<GroupManagementSection>('members');
@@ -1303,9 +1320,11 @@ export default function ChatSection({
                             {formatTime(message.createdAt)}
                             {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
                             {mine && (message.readByUserIds?.length || 0) > 0
-                              ? activeConversation.type === 'group'
-                                ? ` · ${message.readByUserIds?.length} đã xem`
-                                : ' · Đã xem'
+                              ? <MessageReadersInline
+                                  readerIds={message.readByUserIds || []}
+                                  members={messageReaderMembers}
+                                  onOpen={() => setReadersTarget({ message, sessionId: session.sessionId })}
+                                />
                               : ''}
                           </div>
                         </article>
@@ -1550,6 +1569,15 @@ export default function ChatSection({
                   />
                 </aside>
               </>
+            )}
+            {readersMessage && readersMessage.conversationId === activeConversationId && (
+              <MessageReadersDialog
+                key={readersMessage.id}
+                conversationId={readersMessage.conversationId}
+                readerIds={readersMessage.readByUserIds || []}
+                request={apiFetch}
+                onClose={() => setReadersTarget(null)}
+              />
             )}
           </div>
   );
