@@ -5,6 +5,7 @@
  */
 .social-chat-groups-link { display: none; }
 .bottom-navigation .nav-label { display: none; }
+.category-filter-mobile-icon { display: none; }
 
 @media (min-width: 761px) and (max-width: 1023px) {
   /* Keep the PC sidebar, but give the conversation list a smaller share. */
@@ -364,9 +365,85 @@
   .modern-shell.app-layout .social-chat-list .zalo-conversation-list .conversation-item:active {
     background: #edf3ff;
   }
+  /* Compact phone chat controls: search + one filter row, no separate heading. */
+  .modern-shell.app-layout .social-chat-list {
+    position: relative;
+  }
+  .modern-shell.app-layout .social-chat-list-header {
+    padding: 10px 14px 9px;
+  }
+  .modern-shell.app-layout .social-chat-list-title {
+    display: none;
+  }
+  .modern-shell.app-layout .social-chat-list-header > .appbar-search-anchor .appbar-search,
+  .modern-shell.app-layout .social-chat-list-search {
+    height: 40px;
+    min-height: 40px;
+  }
+  .modern-shell.app-layout .social-chat-list-search {
+    flex-basis: 40px;
+  }
+  .modern-shell.app-layout .social-chat-list-filters {
+    gap: 5px;
+    min-height: 36px;
+    margin-top: 8px;
+    padding: 0 44px 0 0;
+  }
+  .modern-shell.app-layout .social-chat-list-filters button {
+    min-height: 34px;
+    padding: 0 clamp(8px, 2.4vw, 12px);
+    font-size: 12px;
+  }
   .modern-shell.app-layout .social-chat-list > .conversation-categories {
+    position: absolute;
+    z-index: 5;
+    top: 58px;
+    right: 14px;
+    box-sizing: border-box;
+    width: 36px;
+    height: 36px;
     min-height: 0;
-    flex: 0 0 auto;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: transparent;
+  }
+  .modern-shell.app-layout .social-chat-list > .conversation-categories .category-toolbar {
+    gap: 0;
+    height: 36px;
+  }
+  .modern-shell.app-layout .social-chat-list > .conversation-categories .category-filter-trigger {
+    box-sizing: border-box;
+    width: 36px;
+    min-width: 36px;
+    max-width: none;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    border: 1px solid #e6ecf6;
+    border-radius: 999px;
+    background: #f7f9fd;
+    color: #637a9f;
+  }
+  .modern-shell.app-layout .social-chat-list > .conversation-categories .category-filter-trigger.is-filtered {
+    border-color: #dce7ff;
+    background: #eaf1ff;
+    color: #2563eb;
+  }
+  .modern-shell.app-layout .social-chat-list > .conversation-categories .category-filter-tag-icon,
+  .modern-shell.app-layout .social-chat-list > .conversation-categories .category-filter-trigger > span,
+  .modern-shell.app-layout .social-chat-list > .conversation-categories .category-filter-trigger > svg:last-child,
+  .modern-shell.app-layout .social-chat-list > .conversation-categories .category-manage-trigger,
+  .modern-shell.app-layout .social-chat-list > .conversation-categories .category-clear {
+    display: none;
+  }
+  .modern-shell.app-layout .social-chat-list > .conversation-categories .category-filter-mobile-icon {
+    display: block;
+  }
+  /* The filter popover still offers clearing filters and managing category tags. */
+  .modern-shell.app-layout .social-chat-list .zalo-conversation-list .conversation-item {
+    min-height: 68px;
+    padding: 8px 10px;
   }
 
   /* Stable, labelled six-slot bottom tab bar. The chat detail already hides it. */

@@ -91,7 +91,9 @@ export default function ConversationCategories({ model }: { model: Model }) {
      node.style.top=Math.min(rect.bottom+8,window.innerHeight-180)+'px'
      node.style.maxHeight=Math.max(140,window.innerHeight-rect.bottom-20)+'px'
     }}>
-    <Tag size={16} aria-hidden="true" /><span>{model.selected === null ? 'Phân loại' : model.selected === 0 ? 'Chưa phân loại' : selectedCategory?.name || 'Phân loại'}</span>
+    <Tag className="category-filter-tag-icon" size={16} aria-hidden="true" />
+    <SlidersHorizontal className="category-filter-mobile-icon" size={18} aria-hidden="true" />
+    <span>{model.selected === null ? 'Phân loại' : model.selected === 0 ? 'Chưa phân loại' : selectedCategory?.name || 'Phân loại'}</span>
     <ChevronDown size={15} className={expanded ? 'is-open' : ''} aria-hidden="true" />
    </button>
    {model.selected !== null && <button className="category-clear" type="button" aria-label="Xóa bộ lọc phân loại" onClick={() => model.select(null)}><X size={15} /></button>}
