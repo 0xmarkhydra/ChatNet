@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { userLabel } from '../src/shared/lib/userLabel.ts'
+import { userLabel } from '../src/shared/utils/userLabel.ts'
 
 assert.equal(userLabel('  Lê Minh An  ', 'minhan'), 'Lê Minh An')
 assert.equal(userLabel('', 'minhan'), 'minhan')

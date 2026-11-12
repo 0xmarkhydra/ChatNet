@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { copyableMessageLinks, messageTextParts, copyChatImage } from '../src/features/chat/messageClipboard.ts'
+import { copyableMessageLinks, messageTextParts, copyChatImage } from '../src/features/chat/lib/messageClipboard.ts'
 
 const raw = 'Xem https://example.com/a?b=1, rồi https://docs.example.org/readme. '
 assert.deepEqual(copyableMessageLinks(raw), ['https://example.com/a?b=1', 'https://docs.example.org/readme'])

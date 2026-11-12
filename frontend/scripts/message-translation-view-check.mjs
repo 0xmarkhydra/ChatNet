@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import {
   getMessageTranslationView,
   LONG_TRANSLATION_THRESHOLD,
-} from '../src/features/chat/messageTranslationPresentation.ts'
+} from '../src/features/chat/utils/messageTranslationPresentation.ts'
 
 assert.equal(LONG_TRANSLATION_THRESHOLD, 100)
 for (const length of [1, 99, 100]) {

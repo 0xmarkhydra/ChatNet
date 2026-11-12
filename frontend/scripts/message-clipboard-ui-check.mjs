@@ -11,8 +11,8 @@ const server = await createServer({
   logLevel: 'error',
 })
 try {
-  const { default: MessageActions } = await server.ssrLoadModule('/src/features/chat/MessageActions.tsx')
-  const { resolveMessageCopyTarget } = await server.ssrLoadModule('/src/features/chat/messageCopyTarget.ts')
+  const { default: MessageActions } = await server.ssrLoadModule('/src/features/chat/components/MessageActions.tsx')
+  const { resolveMessageCopyTarget } = await server.ssrLoadModule('/src/features/chat/utils/messageCopyTarget.ts')
   const render = (message, target = resolveMessageCopyTarget(message, null), pin = {}, mode = 'actions') =>
     renderToStaticMarkup(React.createElement(MessageActions, {
       mode, activeMessageAction: message, userId: 1, setMessageActionId() {},

@@ -1,4 +1,4 @@
-import type { Session } from '../features/auth/session'
+import type { Session } from '../features/auth/lib/session'
 import type { ManagedAccountSession } from '../features/auth/types'
 
 export type DesktopPlatformInfo = {

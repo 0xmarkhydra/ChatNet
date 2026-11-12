@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react'
-import type { MediaAttachment } from '../lib/media'
+import type { MediaAttachment } from '../utils/media'
 import './media-viewer.css'
 
 type PreviewMedia = MediaAttachment & { url: string }

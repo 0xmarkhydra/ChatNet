@@ -1,35 +1,35 @@
-import ProfileNote from "../features/profile/ProfileNote";
+import ProfileNote from "../features/profile/components/ProfileNote";
 import ConversationCategories, {
   CategoryAssignment,
   CategoryBadge,
-} from "../features/chat/ConversationCategories";
-import { useConversationCategories } from "../features/chat/useConversationCategories";
+} from "../features/chat/components/ConversationCategories";
+import { useConversationCategories } from "../features/chat/hooks/useConversationCategories";
 import { SessionResponseCache } from "../shared/lib/sessionCache";
-import VisitorProfile from "../features/profile/VisitorProfile";
-import { userLabel } from "../shared/lib/userLabel";
-import { useMessageData } from "../features/chat/useMessageData";
-import { useChatPins } from "../features/chat/useChatPins";
-import { shouldSendChatOnEnter } from "../features/chat/composerKeyboard";
-import "../features/chat/chat-pins.css";
-import { getMessageTranslationView } from "../features/chat/messageTranslationPresentation";
-import { useApiRequest } from "./useApiRequest";
-import { useAppRealtime } from "./useAppRealtime";
+import VisitorProfile from "../features/profile/components/VisitorProfile";
+import { userLabel } from "../shared/utils/userLabel";
+import { useMessageData } from "../features/chat/hooks/useMessageData";
+import { useChatPins } from "../features/chat/hooks/useChatPins";
+import { shouldSendChatOnEnter } from "../features/chat/utils/composerKeyboard";
+import "../features/chat/styles/chat-pins.css";
+import { getMessageTranslationView } from "../features/chat/utils/messageTranslationPresentation";
+import { useApiRequest } from "./hooks/useApiRequest";
+import { useAppRealtime } from "./hooks/useAppRealtime";
 import { useDesktopNotifications } from "../platform/useDesktopNotifications";
-import { useConversationData } from "../features/chat/useConversationData";
-import { useConversationListSearch } from "../features/chat/useConversationListSearch";
+import { useConversationData } from "../features/chat/hooks/useConversationData";
+import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
 import {
   useChatQuickSearch,
   type ChatQuickContact,
   type ChatQuickHit,
-} from "../features/chat/useChatQuickSearch";
-import ChatQuickSearch from "../features/chat/ChatQuickSearch";
-import { useContactData } from "../features/contacts/useContactData";
-import { useFeedData } from "../features/feed/useFeedData";
-import { usePostSearch } from "../features/feed/usePostSearch";
-import { useFollowingPosts } from "../features/feed/useFollowingPosts";
-import { useFeedInfiniteScroll } from "../features/feed/useFeedInfiniteScroll";
+} from "../features/chat/hooks/useChatQuickSearch";
+import ChatQuickSearch from "../features/chat/components/ChatQuickSearch";
+import { useContactData } from "../features/contacts/hooks/useContactData";
+import { useFeedData } from "../features/feed/hooks/useFeedData";
+import { usePostSearch } from "../features/feed/hooks/usePostSearch";
+import { useFollowingPosts } from "../features/feed/hooks/useFollowingPosts";
+import { useFeedInfiniteScroll } from "../features/feed/hooks/useFeedInfiniteScroll";
 
-import { useGroupManagement } from "../features/chat/useGroupManagement";
+import { useGroupManagement } from "../features/chat/hooks/useGroupManagement";
 import { API } from "../shared/lib/config";
 import type {
   ProfileMediaState,
@@ -40,7 +40,7 @@ import {
   attachmentRequestBody,
   type MediaAttachment,
   type PresignedUpload,
-} from "../shared/lib/media";
+} from "../shared/utils/media";
 import {
   emptyDraft,
   CHAT_LIST_PAGE_SIZE,
@@ -65,8 +65,8 @@ import {
   inferToastKind,
   type ToastKind,
   type ToastNotice,
-} from "../features/notifications/toast";
-import { formatTime, attachmentLabel } from "../shared/lib/format";
+} from "../features/notifications/utils/toast";
+import { formatTime, attachmentLabel } from "../shared/utils/format";
 import UserAvatar, {
   avatarRefreshVersions,
   profileAssetUrl,
@@ -74,64 +74,64 @@ import UserAvatar, {
 import useSlidingPill from "../shared/ui/useSlidingPill";
 import MediaAttachmentsView from "../shared/ui/MediaAttachmentsView";
 import UiIcon from "../shared/ui/UiIcon";
-import NearbyRadar from "../features/discover/NearbyRadar";
-import AuthScreen from "../features/auth/AuthScreen";
-import { useAuthFlow } from "../features/auth/useAuthFlow";
-import PostComposer from "../features/feed/PostComposer";
-import FeedPostCard from "../features/feed/FeedPostCard";
-import FeedReactionControl from "../features/feed/FeedReactionControl";
-import StoryViewer from "../features/feed/StoryViewer";
-import MessageActions from "../features/chat/MessageActions";
-import LinkPreview from "../features/chat/LinkPreview";
-import { GroupActivityComposerMenu, GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/GroupActivities";
-import { messageReactionLabel } from "../features/chat/messageReactions";
+import NearbyRadar from "../features/discover/components/NearbyRadar";
+import AuthScreen from "../features/auth/components/AuthScreen";
+import { useAuthFlow } from "../features/auth/hooks/useAuthFlow";
+import PostComposer from "../features/feed/components/PostComposer";
+import FeedPostCard from "../features/feed/components/FeedPostCard";
+import FeedReactionControl from "../features/feed/components/FeedReactionControl";
+import StoryViewer from "../features/feed/components/StoryViewer";
+import MessageActions from "../features/chat/components/MessageActions";
+import LinkPreview from "../features/chat/components/LinkPreview";
+import { GroupActivityComposerMenu, GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/components/GroupActivities";
+import { messageReactionLabel } from "../features/chat/utils/messageReactions";
 import {
   copyChatImage,
   messageLinkHref,
   messageTextParts,
-} from "../features/chat/messageClipboard";
+} from "../features/chat/lib/messageClipboard";
 import {
   resolveMessageCopyTarget,
   type MessageCopyTarget,
-} from "../features/chat/messageCopyTarget";
-import MessageSearchPanel from "../features/chat/MessageSearchPanel";
-import ProfileIdentityForm from "../features/profile/ProfileIdentityForm";
-import BottomNavigation from "./BottomNavigation";
-import AppSidebar from "./AppSidebar";
-import { countNotificationItems, formatNotificationBadge } from "./notification-count";
-import NotificationsPage from "./NotificationsPage";
-import type { PostMentionNotification } from "../features/feed/postMentionNotifications";
-import ConversationDetailsPanel from "./ConversationDetailsPanel";
-import ChatTranslationSettingsPage from './ChatTranslationSettingsPage';
+} from "../features/chat/utils/messageCopyTarget";
+import MessageSearchPanel from "../features/chat/components/MessageSearchPanel";
+import ProfileIdentityForm from "../features/profile/components/ProfileIdentityForm";
+import BottomNavigation from "./navigation/BottomNavigation";
+import AppSidebar from "./navigation/AppSidebar";
+import { countNotificationItems, formatNotificationBadge } from "../features/notifications/utils/notification-count";
+import NotificationsPage from "../features/notifications/components/NotificationsPage";
+import type { PostMentionNotification } from "../features/feed/utils/postMentionNotifications";
+import ConversationDetailsPanel from "../features/chat/components/ConversationDetailsPanel";
+import ChatTranslationSettingsPage from '../features/chat/components/ChatTranslationSettingsPage';
 import {
   readConversationTranslationSettings,
   persistConversationTranslationSettings,
   type ChatTranslationSettings,
   type ConversationTranslationSettingsMap,
-} from '../features/chat/conversationTranslationSettings';
-import ProfilePage from "./ProfilePage";
-import ProfileEditorPage from "./ProfileEditorPage";
-import SettingsWorkspace from "./SettingsWorkspace";
-import SocialFeedComposer from "./SocialFeedComposer";
-import SocialFeedSidebar from "./SocialFeedSidebar";
-import SocialFeedStories from "./SocialFeedStories";
-import StoryComposer from "../features/feed/StoryComposer";
-import { parsePostExtras, composePostContent } from "../features/feed/postExtras";
-import PostCommentsPage from "./PostCommentsPage";
-import CommunicationHub from "./CommunicationHub";
-import CallCenter from "../features/calls/CallCenter";
-import type { GroupWorkspaceMode } from "./CommunityGroupsPage";
-import FeedCommunitiesList from "./FeedCommunitiesList";
-import "./community-groups.css";
-import CommunityGroupWizard, { type CommunityCreationExtras } from "./CommunityGroupWizard";
-import GroupSettingsPanel from "../features/chat/GroupSettingsPanel";
-import GroupChannelPicker from "../features/chat/GroupChannelPicker";
-import { validGroupChannels, type GroupChannel } from "../features/chat/groupChannels";
-import GroupInviteJoinDialog from "../features/chat/GroupInviteJoinDialog";
-import ContactsView, { type FriendsScreen } from "../features/contacts/ContactsView";
-import PrivacyControls from "../features/profile/PrivacyControls";
-import AccountSessionsPanel from "../features/auth/AccountSessionsPanel";
-import BlockedUsersPanel from "../features/contacts/BlockedUsersPanel";
+} from '../features/chat/lib/conversationTranslationSettings';
+import ProfilePage from "../features/profile/components/ProfilePage";
+import ProfileEditorPage from "../features/profile/components/ProfileEditorPage";
+import SettingsWorkspace from "../features/settings/components/SettingsWorkspace";
+import SocialFeedComposer from "../features/feed/components/SocialFeedComposer";
+import SocialFeedSidebar from "../features/feed/components/SocialFeedSidebar";
+import SocialFeedStories from "../features/feed/components/SocialFeedStories";
+import StoryComposer from "../features/feed/components/StoryComposer";
+import { parsePostExtras, composePostContent } from "../features/feed/utils/postExtras";
+import PostCommentsPage from "../features/feed/components/PostCommentsPage";
+import CommunicationHub from "../features/chat/components/CommunicationHub";
+import CallCenter from "../features/calls/components/CallCenter";
+import type { GroupWorkspaceMode } from "../features/chat/components/CommunityGroupsPage";
+import FeedCommunitiesList from "../features/feed/components/FeedCommunitiesList";
+import "../features/chat/styles/community-groups.css";
+import CommunityGroupWizard, { type CommunityCreationExtras } from "../features/chat/components/CommunityGroupWizard";
+import GroupSettingsPanel from "../features/chat/components/GroupSettingsPanel";
+import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
+import { validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
+import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
+import ContactsView, { type FriendsScreen } from "../features/contacts/components/ContactsView";
+import PrivacyControls from "../features/profile/components/PrivacyControls";
+import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
+import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
 import {
   FormEvent,
   Fragment,
@@ -150,11 +150,11 @@ import {
   FeedText,
   type FeedComment,
   type DiscussionDraft,
-} from "../features/feed/FeedDiscussion";
-import FeedModeration from "../features/feed/FeedModeration";
-import ProfileOverlay from "../features/profile/ProfileOverlay";
-import type { NearbyUser } from "../features/discover/NearbyExplorer";
-import GroupCreator from "../features/chat/GroupCreator";
+} from "../features/feed/components/FeedDiscussion";
+import FeedModeration from "../features/feed/components/FeedModeration";
+import ProfileOverlay from "../features/profile/components/ProfileOverlay";
+import type { NearbyUser } from "../features/discover/components/NearbyExplorer";
+import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
   Bell,
@@ -186,20 +186,20 @@ import {
   MESSAGE_SOUND_SETTING_KEY,
   persistMessageSoundEnabled,
   readMessageSoundEnabled,
-} from "../features/notifications/incomingSound";
+} from "../features/notifications/lib/incomingSound";
 import {
   createSessionClient,
   loadSession,
   type Session,
-} from "../features/auth/session";
+} from "../features/auth/lib/session";
 import {
   clearChatPersistence,
   clearPendingSend,
   loadChatDrafts,
   loadPendingSend,
   saveChatDrafts,
-} from "../features/chat/chatPersistence";
-import { restoreChatOutbox } from "../features/chat/outboxRecovery";
+} from "../features/chat/lib/chatPersistence";
+import { restoreChatOutbox } from "../features/chat/utils/outboxRecovery";
 import {
   clearChatOutbox,
   confirmChatMessage,
@@ -207,28 +207,28 @@ import {
   persistChatOutboxChange,
   retryableChatMessages,
   type QueuedChatMessage,
-} from "../chatOutbox";
-import { uploadPresignedFile } from "../features/chat/mediaUpload";
+} from "../features/chat/lib/chatOutbox";
+import { uploadPresignedFile } from "../features/chat/lib/mediaUpload";
 import {
   chatFilesFromClipboard,
   transferHasFiles,
-} from "../features/chat/chatFileTransfer";
-import { canMarkConversationRead } from "../features/chat/conversationRead";
-import { mergeById, toggleMessageReactionCount } from "../shared/lib/optimistic";
-import CallManager, { CallHeaderActions } from "../features/calls/CallManager";
-import SharedContent from "../features/chat/SharedContent";
-import VoiceRecorder from "../features/chat/VoiceRecorder";
+} from "../features/chat/utils/chatFileTransfer";
+import { canMarkConversationRead } from "../features/chat/utils/conversationRead";
+import { mergeById, toggleMessageReactionCount } from "../shared/utils/optimistic";
+import CallManager, { CallHeaderActions } from "../features/calls/components/CallManager";
+import SharedContent from "../features/chat/components/SharedContent";
+import VoiceRecorder from "../features/chat/components/VoiceRecorder";
 import { SocoEmptyState, SocoTextAction } from "../shared/ui/SocoUI";
 import {
   getCurrentPositionSmart,
   geolocationErrorMessage,
-} from "../features/discover/geolocation";
+} from "../features/discover/lib/geolocation";
 
 const NearbyExplorer = lazy(
-  () => import("../features/discover/NearbyExplorer"),
+  () => import("../features/discover/components/NearbyExplorer"),
 );
-const Marketplace = lazy(() => import("../Marketplace"));
-const ProfileQr = lazy(() => import("../features/profile/ProfileQr"));
+const Marketplace = lazy(() => import("../features/discover/components/Marketplace"));
+const ProfileQr = lazy(() => import("../features/profile/components/ProfileQr"));
 import {
   defaultBundle,
   loadAppLocalePreference,
@@ -240,12 +240,12 @@ import {
   UI_BUNDLE_VERSION,
   UI_MESSAGES,
   type UIBundle,
-} from "../features/i18n/i18n";
+} from "../features/i18n/lib/i18n";
 import {
   buildLanguageOptions,
   filterLanguageOptions,
   isSupportedLanguageCode,
-} from "../features/i18n/languages";
+} from "../features/i18n/utils/languages";
 import {
   disableOneSignalPush,
   enableOneSignalPush,
@@ -253,7 +253,7 @@ import {
   isPushDisabled,
   setupOneSignal,
   type PushState,
-} from "../features/notifications/onesignal";
+} from "../features/notifications/lib/onesignal";
 
 import { desktopBridge, isDesktopBuild } from "../platform/desktop";
 
