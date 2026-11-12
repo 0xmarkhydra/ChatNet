@@ -1,14 +1,11 @@
-import ProfileNote from './ProfileNote'
+import VisitorProfileHero, { type VisitorProfileData } from './VisitorProfileHero'
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, MessageCircle, UserPlus, UserMinus, UserCheck, RefreshCw } from 'lucide-react'
-import UserAvatar, { profileAssetUrl } from '../../../shared/ui/UserAvatar'
-import { userLabel } from '../../../shared/utils/userLabel'
+import { ArrowLeft, RefreshCw } from 'lucide-react'
 import FeedPostCard from '../../feed/components/FeedPostCard'
 import type { Post } from '../../feed/types'
 import type { FriendSearchResult } from '../../contacts/types'
 import '../styles/visitor-profile.css'
 
-type Profile = FriendSearchResult & { avatarSet: boolean; coverSet: boolean; updatedAt: string; allowFriendRequests: boolean; bio?: string; city?: string }
 type Props = {
  username: string
  request: (path: string, init?: RequestInit) => Promise<Response>
@@ -31,7 +28,7 @@ type Props = {
  feedback: (message: string, kind?: 'success' | 'error' | 'warning' | 'info') => void
 }
 export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onMessage, onClose, onPostOpen, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
- const [profile,setProfile]=useState<Profile|null>(null)
+ const [profile,setProfile]=useState<VisitorProfileData|null>(null)
  const [posts,setPosts]=useState<Post[]>([])
  const [more,setMore]=useState(false)
  const [loading,setLoading]=useState(false)
@@ -66,7 +63,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
    try {
     const response=await request('/api/users/'+encodeURIComponent(username)+'/profile', retry ? { cache: 'reload' } : undefined)
     if(!response.ok)throw new Error(response.status===404?'Không tìm thấy hồ sơ hoặc bạn không thể xem tài khoản này.':'Không tải được hồ sơ.')
-    const data=await response.json() as Profile
+    const data=await response.json() as VisitorProfileData
     if(cancelled||id!==sequence.current)return
     setProfile(data)
     const timeline=await request('/api/posts?author='+encodeURIComponent(data.username)+'&limit=15', retry ? { cache: 'reload' } : undefined)
@@ -133,16 +130,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   <header className="visitor-toolbar"><button ref={back} type="button" onClick={onClose} aria-label="Quay lại"><ArrowLeft size={21}/></button><strong>Trang cá nhân</strong><button type="button" onClick={()=>setRetry(n=>n+1)} disabled={loading} aria-label="Tải lại hồ sơ"><RefreshCw size={19}/></button></header>
   <div className="visitor-scroll"><div className="visitor-content">
    {profile&&<>
-    <section className="visitor-hero">
-     <div className="visitor-cover">{profile.coverSet&&<img src={profileAssetUrl(profile.username,'cover',profile.updatedAt)} alt="Ảnh bìa" onError={event=>{event.currentTarget.hidden=true}}/>}<span>Khoảnh khắc và những câu chuyện</span></div>
-     <div className="visitor-identity"><div className="profile-note-avatar"><UserAvatar username={profile.username} name={userLabel(profile.displayName,profile.username)} className="profile-avatar"/><ProfileNote username={profile.username} request={request} refreshKey={relation}/></div><h1>{userLabel(profile.displayName,profile.username)}</h1><p>@{profile.username}</p>
-      {profile.bio && <p className="visitor-profile-bio">{profile.bio}</p>}
-      {profile.city && <small className="visitor-profile-city">{profile.city}</small>}
-      <div className="visitor-actions"><button type="button" onClick={()=>void onMessage(profile.username)}><MessageCircle size={18}/>Nhắn tin</button>
-       <button type="button" disabled={relation==='accepted'||friendBusy===profile.id||(!profile.allowFriendRequests&&relation==='none')} onClick={()=>void onFriend(profile).catch(cause=>{if(alive.current)feedback(cause instanceof Error?cause.message:'Không cập nhật được kết bạn.','error')})}>{relation==='outgoing'?<UserMinus size={18}/>:relation==='accepted'||relation==='incoming'?<UserCheck size={18}/>:<UserPlus size={18}/>} {action}</button></div>
-      {!profile.allowFriendRequests&&relation==='none'&&<small>Tài khoản này đang tắt nhận lời mời kết bạn.</small>}
-     </div>
-    </section>
+    <VisitorProfileHero profile={profile} relation={relation} friendBusy={friendBusy} action={action} request={request} onMessage={onMessage} onFriendAction={() => { void onFriend(profile).catch(cause => { if (alive.current) feedback(cause instanceof Error ? cause.message : 'Không cập nhật được kết bạn.', 'error') }) }} />
     <div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
     <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={()=>onPostOpen(post)} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
