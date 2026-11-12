@@ -6,11 +6,9 @@ type FeedFilter = 'all' | 'following' | 'latest' | 'saved'
 export type FeedFiltersProps = {
   isProfileDesktop: boolean
   filter: FeedFilter
-  pill: {
-    hostRef: (node: HTMLDivElement | null) => void
-    activeRef: (node: HTMLButtonElement | null) => void
-    pillRef: (node: HTMLSpanElement | null) => void
-  }
+  onHostMount: (node: HTMLDivElement | null) => void
+  onActiveMount: (node: HTMLButtonElement | null) => void
+  onPillMount: (node: HTMLSpanElement | null) => void
   setFilter: Dispatch<SetStateAction<FeedFilter>>
   onCloseCommunities: () => void
   onRefresh: () => void
@@ -18,7 +16,7 @@ export type FeedFiltersProps = {
 }
 
 export default function FeedFilters({
-  isProfileDesktop, filter, pill, setFilter, onCloseCommunities, onRefresh, onLoadSaved,
+  isProfileDesktop, filter, onHostMount, onActiveMount, onPillMount, setFilter, onCloseCommunities, onRefresh, onLoadSaved,
 }: FeedFiltersProps) {
   function chooseFilter(next: FeedFilter) {
     onCloseCommunities()
@@ -47,13 +45,13 @@ export default function FeedFilters({
   ) : (
     <div className="soco-feed-section-label soco-feed-posts-label">
       <strong>{filter === 'saved' ? 'Bài viết đã lưu' : 'Bài viết mới'}</strong>
-      <div ref={pill.hostRef} className="feed-filter-tabs sliding-pill-host" role="group" aria-label="Lọc bảng tin">
-        <span ref={pill.pillRef} className="sliding-pill feed-filter-active-pill" aria-hidden="true" />
-        <button ref={filter === 'all' ? pill.activeRef : undefined} type="button"
+      <div ref={onHostMount} className="feed-filter-tabs sliding-pill-host" role="group" aria-label="Lọc bảng tin">
+        <span ref={onPillMount} className="sliding-pill feed-filter-active-pill" aria-hidden="true" />
+        <button ref={filter === 'all' ? onActiveMount : undefined} type="button"
           aria-pressed={filter === 'all'} onClick={() => chooseFilter('all')}>
           Mới nhất
         </button>
-        <button ref={filter === 'saved' ? pill.activeRef : undefined} type="button"
+        <button ref={filter === 'saved' ? onActiveMount : undefined} type="button"
           aria-pressed={filter === 'saved'} onClick={() => { chooseFilter('saved'); onLoadSaved() }}>
           Đã lưu
         </button>

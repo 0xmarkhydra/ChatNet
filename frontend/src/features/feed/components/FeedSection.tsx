@@ -233,7 +233,9 @@ export default function FeedSection({
                   <FeedFilters
                     isProfileDesktop={isProfileDesktop}
                     filter={feedFilter}
-                    pill={feedFiltersPill}
+                    onHostMount={feedFiltersPill.hostRef}
+                    onPillMount={feedFiltersPill.pillRef}
+                    onActiveMount={feedFiltersPill.activeRef}
                     setFilter={setFeedFilter}
                     onCloseCommunities={() => setFeedCommunitiesOpen(false)}
                     onRefresh={() => {

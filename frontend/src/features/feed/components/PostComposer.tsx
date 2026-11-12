@@ -1,17 +1,15 @@
 import { useLayoutEffect, useState } from 'react'
-import { Check, Image as ImageIcon, MapPin, Palette, Search, SmilePlus, UserRoundPlus, X } from 'lucide-react'
+import { Image as ImageIcon, MapPin, Palette, SmilePlus, UserRoundPlus, X } from 'lucide-react'
 import { userLabel } from '../../../shared/utils/userLabel'
-import { POST_FEELINGS, feelingPostLine } from '../utils/feelings'
+import { feelingPostLine } from '../utils/feelings'
+import PostTagPicker, { type TaggedFriend } from './PostTagPicker'
+import PostFeelingPicker from './PostFeelingPicker'
 import PostAudiencePicker from './PostAudiencePicker'
 import type { Dispatch, SetStateAction, RefObject, FormEvent } from 'react'
 import type { Post } from '../types'
 import type { MediaAttachment } from '../../../shared/utils/media'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../../shared/ui/MediaAttachmentsView'
-
-type TaggedFriend = { id: number; username: string; displayName: string }
-
-const MAX_TAGGED_FRIENDS = 10
 
 type Props = {
   name: string
@@ -80,12 +78,6 @@ export default function PostComposer({
       setCheckInOpen?.(false)
     }
   }
-  const normalizedQuery = tagQuery.trim().toLocaleLowerCase('vi')
-  const matchingFriends = taggableFriends.filter(friend =>
-    !normalizedQuery || friend.username.toLocaleLowerCase('vi').includes(normalizedQuery)
-      || friend.displayName.toLocaleLowerCase('vi').includes(normalizedQuery)
-  ).slice(0, 12)
-
   useLayoutEffect(() => {
     if (!popup) return
     const textarea = postComposerRef.current
@@ -151,76 +143,26 @@ export default function PostComposer({
         </label>
       )}
       {activeTool === 'tag' && (tagPickerOpen || taggedFriends.length > 0) && (
-        <section className="smart-tag-picker" aria-label="Gắn thẻ bạn bè">
-          <div className="smart-tag-picker-heading">
-            <strong><UserRoundPlus size={17} aria-hidden="true" /> Gắn thẻ bạn bè</strong>
-            <button type="button" aria-label="Đóng chọn bạn bè" disabled={isPosting}
-              onClick={() => { setTagPickerOpen(false); setTagQuery(''); setActiveTool(null) }}><X size={17} aria-hidden="true" /></button>
-          </div>
-          {taggedFriends.length > 0 && (
-            <div className="smart-tag-selected" aria-label="Bạn bè đã gắn thẻ">
-              {taggedFriends.map(friend => (
-                <span className="smart-tag-chip" key={friend.id}>
-                  {friend.displayName || friend.username}
-                  <button type="button" disabled={isPosting} aria-label={`Bỏ gắn thẻ ${friend.displayName || friend.username}`}
-                    onClick={() => setTaggedFriends(current => current.filter(item => item.id !== friend.id))}>
-                    <X size={13} aria-hidden="true" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          {tagPickerOpen && <>
-            <label className="smart-tag-search">
-              <Search size={17} aria-hidden="true" />
-              <input type="search" aria-label="Tìm bạn bè để gắn thẻ" value={tagQuery}
-                onChange={event => setTagQuery(event.target.value)}
-                disabled={isPosting} placeholder="Tìm theo tên hoặc tài khoản..." />
-            </label>
-            <div className="smart-tag-results" role="group" aria-label="Danh sách bạn bè">
-              {matchingFriends.map(friend => {
-                const selected = taggedFriends.some(item => item.id === friend.id)
-                return <button key={friend.id} type="button" className="smart-tag-person" aria-pressed={selected}
-                  disabled={isPosting || (!selected && taggedFriends.length >= MAX_TAGGED_FRIENDS)}
-                  onClick={() => setTaggedFriends(current => current.some(item => item.id === friend.id)
-                    ? current.filter(item => item.id !== friend.id)
-                    : current.length >= MAX_TAGGED_FRIENDS ? current : [...current, friend])}>
-                  <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="smart-tag-avatar" />
-                  <span><strong>{friend.displayName || friend.username}</strong><small>@{friend.username}</small></span>
-                  {selected && <Check size={19} aria-hidden="true" className="smart-tag-selected-icon" />}
-                </button>
-              })}
-              {matchingFriends.length === 0 && <p className="smart-tag-empty">
-                {taggableFriends.length ? 'Không tìm thấy bạn bè phù hợp.' : 'Danh sách bạn bè đang trống.'}
-              </p>}
-            </div>
-            <small className="smart-tag-hint">Tối đa {MAX_TAGGED_FRIENDS} người. Tên tài khoản được lưu vào nội dung bài viết.</small>
-          </>}
-        </section>
+        <PostTagPicker
+          tagPickerOpen={tagPickerOpen}
+          tagQuery={tagQuery}
+          setTagQuery={setTagQuery}
+          taggableFriends={taggableFriends}
+          taggedFriends={taggedFriends}
+          setTaggedFriends={setTaggedFriends}
+          disabled={isPosting}
+          onClose={() => { setTagPickerOpen(false); setTagQuery(''); setActiveTool(null) }}
+        />
       )}
       {activeTool === 'feeling' && (feelingPickerOpen || feelingId) && (
-        <section className="smart-feeling-picker" aria-label="Cảm xúc của bạn">
-          <header className="smart-feeling-heading">
-            <strong><SmilePlus size={17} aria-hidden="true" /> Bạn đang cảm thấy thế nào?</strong>
-            <button type="button" disabled={isPosting} aria-label="Đóng chọn cảm xúc"
-              onClick={() => { setFeelingPickerOpen(false); setActiveTool(null) }}><X size={17} aria-hidden="true" /></button>
-          </header>
-          {feelingText && <div className="smart-feeling-selected">
-            <span>{feelingText}</span>
-            <button type="button" disabled={isPosting} aria-label="Bỏ cảm xúc đã chọn"
-              onClick={() => { setFeelingId(''); setActiveTool(null) }}><X size={15} aria-hidden="true" /></button>
-          </div>}
-          {feelingPickerOpen && <div className="smart-feeling-options" role="group" aria-label="Chọn cảm xúc">
-            {POST_FEELINGS.map(feeling => (
-              <button key={feeling.id} type="button" disabled={isPosting} aria-pressed={feelingId === feeling.id}
-                onClick={() => { setFeelingId(feeling.id); setFeelingPickerOpen(false) }}>
-                <span aria-hidden="true">{feeling.emoji}</span>
-                <span>{feeling.label}</span>
-                {feelingId === feeling.id && <Check size={15} aria-hidden="true" />}
-              </button>
-            ))}
-          </div>}
-        </section>
+        <PostFeelingPicker
+          feelingPickerOpen={feelingPickerOpen}
+          feelingId={feelingId}
+          disabled={isPosting}
+          onClose={() => { setFeelingPickerOpen(false); setActiveTool(null) }}
+          onClear={() => { setFeelingId(''); setActiveTool(null) }}
+          onSelect={id => { setFeelingId(id); setFeelingPickerOpen(false) }}
+        />
       )}
       {postAttachments.length > 0 && (
         <div className="feed-pending-media">
