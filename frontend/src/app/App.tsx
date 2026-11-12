@@ -292,15 +292,42 @@ import { useConversationActions } from "../features/chat/hooks/useConversationAc
 import { useFeedActions } from "../features/feed/hooks/useFeedActions";
 import { useInviteSharing } from "../features/profile/hooks/useInviteSharing";
 import { useStoryActions } from "../features/feed/hooks/useStoryActions";
+import { usePrivacySettings } from "../features/settings/hooks/usePrivacySettings";
+import { useNearbyState } from "../features/discover/hooks/useNearbyState";
+import { useBlockedUsers } from "../features/contacts/hooks/useBlockedUsers";
+import { useFriendSearch } from "../features/contacts/hooks/useFriendSearch";
+import { useAppLocaleState } from "../features/i18n/hooks/useAppLocaleState";
+import { useTranslationState } from "../features/chat/hooks/useTranslationState";
+import { useProfileState } from "../features/profile/hooks/useProfileState";
+import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
+import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
+import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
+import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
 export default function App({
   initialSession,
 }: {
   initialSession?: Session | null;
 }) {
+  const { chatCreateError, directUsername, groupCreateStep, groupWorkspaceMode, newChatMode, quickCreateOpen, setChatCreateError, setDirectUsername, setGroupCreateStep, setGroupWorkspaceMode, setNewChatMode, setQuickCreateOpen } = useGroupWorkspaceState({  });
+
+  const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({  });
+
+  const { appLocale, languageSearch, localePickerOpen, localeSearch, setAppLocale, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setTranslationPickerOpen, setUiBundle, setUiLocaleLoading, translationPickerOpen, uiBundle, uiLocaleLoading } = useAppLocaleState({  });
+
+  const { friendActionBusy, friendActionRef, friendBusyIds, friendMenuId, friendQuery, friendResults, friendSearchError, friendSearchRetry, friendSearching, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendQuery, setFriendResults, setFriendSearchError, setFriendSearchRetry, setFriendSearching } = useFriendSearch({  });
+
+  const { blockedBusy, blockedError, blockedOpen, blockedUsers, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers } = useBlockedUsers({  });
+
+  const { nearbyBusy, nearbyRadiusKm, nearbyRequest, nearbyResultRadiusKm, nearbyScanning, nearbyUntil, nearbyUsers, setNearbyBusy, setNearbyRadiusKm, setNearbyResultRadiusKm, setNearbyScanning, setNearbyUntil, setNearbyUsers } = useNearbyState({  });
+
   const [session, setSession] = useState<Session | null>(() =>
     isDesktopBuild ? (initialSession ?? null) : loadSession(),
   );
+  const { managedSessions, sessionsBusy, sessionsError, sessionsOpen, setManagedSessions, setSessionsBusy, setSessionsError, setSessionsOpen } = useSessionsPanel({ session });
+
+  const { autoTranslate, conversationTranslationOverrides, manuallyTranslated, setAutoTranslate, setConversationTranslationOverrides, setManuallyTranslated, setTargetLanguage, setTranslationFailures, setTranslationMenuOpen, setTranslationOriginals, setTranslationPending, setTranslations, targetLanguage, translationAttempted, translationFailures, translationLanguageRef, translationMenuOpen, translationOriginals, translationPending, translations } = useTranslationState({ session });
+
   const sessionRef = useRef(session);
   const responseCache = useRef(new SessionResponseCache());
   const [sessionClient] = useState(() =>
@@ -320,6 +347,8 @@ export default function App({
   });
 
   const [tab, setTab] = useState<Tab>("chat");
+  const { activePostId, activeStoryId, commentEditors, commentSortOrder, draftBeforeEdit, editingPost, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, postAttachments, postBackground, postEditBusy, postFeelingId, postTaggedFriends, postText, postVisibility, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setEditingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostTaggedFriends, setPostText, setPostVisibility, setSearchHasScrolled, setShowPostBackgrounds, setStoryBusy, setStoryDraftFile, showPostBackgrounds, storyBusy, storyDraftFile } = useFeedUiState({ tab });
+
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const [globalSearch, setGlobalSearch] = useState("");
@@ -364,59 +393,26 @@ export default function App({
       document.removeEventListener("keydown", escape);
     };
   }, [quickSearchOpen]);
-  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
-  useEffect(() => {
-    if (!quickCreateOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setQuickCreateOpen(false);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [quickCreateOpen]);
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
-  const [groupMemberViewOpen, setGroupMemberViewOpen] = useState(false);
+  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, pinnedExpanded, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setPinnedExpanded, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId });
+
   const activeConversationIdRef = useRef<number | null>(null);
-  const [channelSelection, setChannelSelection] = useState<{ conversationId: number | null; channelId: number }>({ conversationId: null, channelId: 0 });
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
   const activeChannelIdRef = useRef(selectedChannelId);
   activeChannelIdRef.current = selectedChannelId;
-  const [groupChannelState, setGroupChannelState] = useState<{ conversationId: number | null; channels: GroupChannel[] }>({ conversationId: null, channels: [] });
-  const [groupChannelBusy, setGroupChannelBusy] = useState(false);
   const groupChannels = groupChannelState.conversationId === activeConversationId
     ? groupChannelState.channels
     : validGroupChannels([], activeConversationId ?? 0);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messageScrollAtBottom = useRef(true);
   const ownSendScrollConversation = useRef<number | null>(null);
-  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-  const [messageActionId, setMessageActionId] = useState<number | null>(null);
-  const [messageActionMode, setMessageActionMode] = useState<'reactions' | 'actions'>('actions');
-  const [conversationActionId, setConversationActionId] = useState<number | null>(null);
-  const [conversationMenuPosition, setConversationMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const [pinnedExpanded, setPinnedExpanded] = useState(false);
   const suppressConversationClick = useRef<number | null>(null);
-  const [groupActivityCreateKind, setGroupActivityCreateKind] = useState<GroupActivityKind | null>(null);
-  const [groupActivityViewedId, setGroupActivityViewedId] = useState<number | null>(null);
-  useEffect(() => {
-    setGroupActivityCreateKind(null);
-    setGroupActivityViewedId(null);
-  }, [activeConversationId]);
   const [messageCopyTarget, setMessageCopyTarget] =
     useState<MessageCopyTarget | null>(null);
   const suppressMessageClick = useRef<number | null>(null);
   const { beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress, cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress, openMessageActions, openMessageReactions } = useMessageLongPress({ setConversationActionId, setConversationMenuPosition, setMessageActionId, setMessageActionMode, setMessageCopyTarget, suppressConversationClick, suppressMessageClick });
-
-
-  const [sharedContentOpen, setSharedContentOpen] = useState(false);
-  const [messageSearchOpen, setMessageSearchOpen] = useState(false);
-  const [conversationDetailsOpen, setConversationDetailsOpen] = useState(false);
-  const [historyActionBusy, setHistoryActionBusy] = useState(false);
-  useEffect(() => {
-    setMessageSearchOpen(false);
-    setConversationDetailsOpen(false);
-  }, [activeConversationId]);
 
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
   const [messageDrafts, setMessageDrafts] = useState<
@@ -509,19 +505,7 @@ export default function App({
     retryOutboxBusy.current = false;
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
-  const [newChatMode, setNewChatMode] = useState<NewChatMode>("none");
-  const [friendQuery, setFriendQuery] = useState("");
   const [contactsScreen, setContactsScreen] = useState<FriendsScreen>("directory");
-  const [friendResults, setFriendResults] = useState<FriendSearchResult[]>([]);
-  const [friendSearching, setFriendSearching] = useState(false);
-  const [friendSearchError, setFriendSearchError] = useState(false);
-  const [friendSearchRetry, setFriendSearchRetry] = useState(0);
-  const [friendActionBusy, setFriendActionBusy] = useState<number | null>(null);
-  const friendActionRef = useRef(new Set<number>());
-  const [friendBusyIds, setFriendBusyIds] = useState<Set<number>>(
-    () => new Set(),
-  );
-  const [friendMenuId, setFriendMenuId] = useState<number | null>(null);
   const [visitorUsername, setVisitorUsername] = useState<string | null>(null);
   function openVisitor(username: string) {
     if (username === sessionRef.current?.user.username) {
@@ -536,13 +520,6 @@ export default function App({
     if (friend) openVisitor(friend.username);
     else setVisitorUsername(null);
   }
-  const [blockedUsers, setBlockedUsers] = useState<
-    Array<{ id: number; username: string; displayName: string }>
-  >([]);
-  const [blockedOpen, setBlockedOpen] = useState(false);
-  const [blockedBusy, setBlockedBusy] = useState(false);
-  const [blockedError, setBlockedError] = useState("");
-  const [directUsername, setDirectUsername] = useState("");
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
   const [desktopSection, setDesktopSection] = useState<
     "groups" | "calls" | null
@@ -554,34 +531,8 @@ export default function App({
       setTranslationSettingsConversationId(null);
     }
   }, [translationSettingsConversationId, activeConversationId]);
-  const [groupWorkspaceMode, setGroupWorkspaceMode] = useState<GroupWorkspaceMode>("list");
-  const [feedCommunitiesOpen, setFeedCommunitiesOpen] = useState(false);
-  const [groupCreateStep, setGroupCreateStep] = useState<1 | 2 | 3>(1);
-  const [chatCreateError, setChatCreateError] = useState("");
-  const [nearbyUsers, setNearbyUsers] = useState<FriendSearchResult[]>([]);
-  const [nearbyBusy, setNearbyBusy] = useState(false);
-  const [nearbyScanning, setNearbyScanning] = useState(false);
-  const [nearbyUntil, setNearbyUntil] = useState(0);
-  const [nearbyResultRadiusKm, setNearbyResultRadiusKm] = useState(5);
-  const [nearbyRadiusKm, setNearbyRadiusKm] = useState(5);
-  const nearbyRequest = useRef(0);
-
-  const [profileTimelineOpen, setProfileTimelineOpen] = useState(false);
   const [desktopProfileSettings, setDesktopProfileSettings] = useState(false);
-  const [isProfileDesktop, setIsProfileDesktop] = useState(
-    () => window.matchMedia("(min-width: 761px)").matches,
-  );
-  useEffect(() => {
-    const query = window.matchMedia("(min-width: 761px)");
-    const onResize = (event: MediaQueryListEvent) =>
-      setIsProfileDesktop(event.matches);
-    query.addEventListener("change", onResize);
-    return () => query.removeEventListener("change", onResize);
-  }, []);
   const desktopProfileOverview = isProfileDesktop && !desktopProfileSettings;
-  const [profileComposerOpen, setProfileComposerOpen] = useState(false);
-  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
-  const [postSubmitError, setPostSubmitError] = useState("");
   useEffect(() => {
     if (
       tab !== "profile" ||
@@ -591,14 +542,6 @@ export default function App({
       setProfileEditorOpen(false);
     }
   }, [tab, profileTimelineOpen, desktopProfileOverview]);
-  const [profilePosts, setProfilePosts] = useState<Post[]>([]);
-  const [profilePostsBusy, setProfilePostsBusy] = useState(false);
-  const [profilePostsError, setProfilePostsError] = useState("");
-  const [profileHasMore, setProfileHasMore] = useState(false);
-  const profileLoadSequence = useRef(0);
-  const profilePagingBusy = useRef(false);
-  const profileIdentityRef = useRef<HTMLButtonElement>(null);
-  const profileHeadingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (
       (!profileTimelineOpen && !desktopProfileOverview) ||
@@ -619,12 +562,7 @@ export default function App({
     session?.sessionId,
     session?.user.username,
   ]);
-
-  const [feedFilter, setFeedFilter] = useState<
-    "all" | "following" | "latest" | "saved"
-  >("all");
   const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
-  const [feedComposerOpen, setFeedComposerOpen] = useState(false);
   const [postMentions, setPostMentions] = useState<PostMentionNotification[]>([]);
   useEffect(() => {
     if (!session?.sessionId) {
@@ -660,32 +598,11 @@ export default function App({
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [session?.sessionId, tab === "notifications"]);
-  const [feedCheckInOpen, setFeedCheckInOpen] = useState(false);
-  const [feedCheckInLocation, setFeedCheckInLocation] = useState("");
-  useEffect(() => {
-    if (tab !== "feed") {
-      setFeedComposerOpen(false);
-      setFeedCheckInOpen(false);
-      setFeedCheckInLocation("");
-      setStoryDraftFile(null);
-    }
-  }, [tab]);
-  const feedViewRef = useRef<HTMLDivElement>(null);
-  const [searchHasScrolled, setSearchHasScrolled] = useState(false);
   useLayoutEffect(() => {
     if (tab !== "feed") return;
     if (feedViewRef.current) feedViewRef.current.scrollTop = 0;
     setSearchHasScrolled(false);
   }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN"), feedFilter]);
-  const [activePostId, setActivePostId] = useState<number | null>(null);
-  const [commentSortOrder, setCommentSortOrder] = useState<'newest' | 'oldest'>('newest');
-  const feedScrollBeforeComments = useRef<number | null>(null);
-  useLayoutEffect(() => {
-    if (tab === "feed" && activePostId === null && feedScrollBeforeComments.current !== null && feedViewRef.current) {
-      feedViewRef.current.scrollTop = feedScrollBeforeComments.current;
-      feedScrollBeforeComments.current = null;
-    }
-  }, [activePostId, tab]);
   // The desktop comments view is a real in-app page with a shareable post URL.
   // Popstate keeps the browser Back button in sync with the SPA.
   useEffect(() => {
@@ -734,34 +651,6 @@ export default function App({
       cancelled = true;
     };
   }, [session?.token]);
-  const [activeStoryId, setActiveStoryId] = useState<number | null>(null);
-  const [storyBusy, setStoryBusy] = useState(false);
-  const [storyDraftFile, setStoryDraftFile] = useState<File | null>(null);
-  const [commentEditors, setCommentEditors] = useState<
-    Record<number, DiscussionDraft>
-  >({});
-  const [postText, setPostText] = useState("");
-  const [postTaggedFriends, setPostTaggedFriends] = useState<Array<{ id: number; username: string; displayName: string }>>([]);
-  const [postFeelingId, setPostFeelingId] = useState("");
-  const [postVisibility, setPostVisibility] = useState<
-    "public" | "friends" | "private"
-  >("public");
-  const [postBackground, setPostBackground] = useState("");
-  const [showPostBackgrounds, setShowPostBackgrounds] = useState(false);
-  const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([]);
-  const [editingPost, setEditingPost] = useState<Post | null>(null);
-  const [postEditBusy, setPostEditBusy] = useState(false);
-  const draftBeforeEdit = useRef<{
-    text: string;
-    tags: typeof postTaggedFriends;
-    feelingId: string;
-    visibility: typeof postVisibility;
-    background: string;
-    showBackgrounds: boolean;
-    attachments: MediaAttachment[];
-    checkInOpen: boolean;
-    location: string;
-  } | null>(null);
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -770,80 +659,8 @@ export default function App({
     total: number;
   } | null>(null);
   const mediaUploadAbort = useRef<AbortController | null>(null);
-  const [profileMedia, setProfileMedia] = useState<ProfileMediaState | null>(
-    null,
-  );
-  const [profileBusy, setProfileBusy] = useState<"avatar" | "cover" | null>(
-    null,
-  );
-  const [profileDisplayNameDraft, setProfileDisplayNameDraft] = useState("");
-  const [profileUsernameDraft, setProfileUsernameDraft] = useState("");
-  const [profileBioDraft, setProfileBioDraft] = useState("");
-  const [profileCityDraft, setProfileCityDraft] = useState("");
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [privacy, setPrivacy] = useState<UserPrivacy | null>(null);
-  const [privacyBusy, setPrivacyBusy] = useState(false);
-  const [privacyLoading, setPrivacyLoading] = useState(false);
-  const [privacyError, setPrivacyError] = useState("");
-  const [privacyRetry, setPrivacyRetry] = useState(0);
-  const [sessionsOpen, setSessionsOpen] = useState(false);
-  const [managedSessions, setManagedSessions] = useState<
-    ManagedAccountSession[]
-  >([]);
-  const [sessionsBusy, setSessionsBusy] = useState(false);
-  const [sessionsError, setSessionsError] = useState("");
-  const [translations, setTranslations] = useState<Record<number, string>>({});
-  const [translationOriginals, setTranslationOriginals] = useState<
-    Record<number, boolean>
-  >({});
-  const [manuallyTranslated, setManuallyTranslated] = useState<Record<number, boolean>>({});
-  const [translationPending, setTranslationPending] = useState<Record<number, boolean>>({});
-  const [translationFailures, setTranslationFailures] = useState<Record<number, boolean>>({});
-  const translationAttempted = useRef(new Set<string>());
-  const [translationMenuOpen, setTranslationMenuOpen] = useState(false);
-  useEffect(() => {
-    if (!translationMenuOpen) return;
-    const onOutsidePointer = (event: PointerEvent) => {
-      if (
-        event.target instanceof Element &&
-        !event.target.closest(".translation-hub, .translation-dialog-modal, .translation-hub-scrim")
-      ) {
-        setTranslationMenuOpen(false);
-      }
-    };
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setTranslationMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", onOutsidePointer, true);
-    document.addEventListener("keydown", onEscape);
-    return () => {
-      document.removeEventListener("pointerdown", onOutsidePointer, true);
-      document.removeEventListener("keydown", onEscape);
-    };
-  }, [translationMenuOpen]);
-  const [languageSearch, setLanguageSearch] = useState("");
-  const [appLocale, setAppLocale] = useState(loadAppLocalePreference);
-  const [uiBundle, setUiBundle] = useState<UIBundle>(defaultBundle);
-  const [uiLocaleLoading, setUiLocaleLoading] = useState(false);
-  const [localePickerOpen, setLocalePickerOpen] = useState(false);
-  const [localeSearch, setLocaleSearch] = useState("");
-  const [translationPickerOpen, setTranslationPickerOpen] = useState(false);
   const [translationSettingsSearch, setTranslationSettingsSearch] =
     useState("");
-  const [targetLanguage, setTargetLanguage] = useState("en");
-  const translationLanguageRef = useRef(targetLanguage);
-
-  useEffect(() => {
-    translationAttempted.current.clear();
-    setManuallyTranslated({});
-    setTranslationPending({});
-    setTranslationFailures({});
-    setTranslationOriginals({});
-  }, [session?.sessionId, targetLanguage]);
-  const [autoTranslate, setAutoTranslate] = useState(true);
-  const [conversationTranslationOverrides, setConversationTranslationOverrides] = useState<ConversationTranslationSettingsMap>(
-    () => session?.user.id ? readConversationTranslationSettings(session.user.id) : {},
-  );
   useEffect(() => {
     setConversationTranslationOverrides(
       session?.user.id ? readConversationTranslationSettings(session.user.id) : {},
@@ -961,6 +778,8 @@ export default function App({
     pendingRequests,
     mutationRequests,
   } = useApiRequest({ session, sessionRef, sessionClient, responseCache });
+  const { privacy, privacyBusy, privacyError, privacyLoading, setPrivacy, setPrivacyBusy, setPrivacyError, setPrivacyRetry } = usePrivacySettings({ apiFetch, session });
+
 
   const {
     conversations,
@@ -1748,19 +1567,6 @@ export default function App({
   }, [session?.sessionId]);
 
   useEffect(() => {
-    if (!nearbyUntil) return;
-    const timer = window.setTimeout(
-      () => {
-        // Keep the last scan results visible from the longer server-side cache.
-        // Only the short "active nearby" lease expires here.
-        setNearbyUntil(0);
-      },
-      Math.max(0, nearbyUntil - Date.now()),
-    );
-    return () => window.clearTimeout(timer);
-  }, [nearbyUntil]);
-
-  useEffect(() => {
     if (!session?.token) {
       setTranslationPreferencesLoaded(false);
       setAutoTranslate(true);
@@ -2052,36 +1858,6 @@ export default function App({
     };
   }, [session?.sessionId]);
 
-  useEffect(() => {
-    if (!session?.token) {
-      setPrivacy(null);
-      setPrivacyError("");
-      setPrivacyLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    setPrivacy(null);
-    setPrivacyBusy(false);
-    setPrivacyLoading(true);
-    setPrivacyError("");
-    apiFetch("/api/privacy", { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Không thể tải quyền riêng tư.");
-        return response.json() as Promise<UserPrivacy>;
-      })
-      .then((value) => {
-        if (!controller.signal.aborted) setPrivacy(value);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted)
-          setPrivacyError("Không thể tải cài đặt riêng tư.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setPrivacyLoading(false);
-      });
-    return () => controller.abort();
-  }, [session?.sessionId, privacyRetry]);
-
   async function changePrivacy(key: keyof UserPrivacy) {
     if (!privacy || privacyBusy) return;
     await savePrivacy({ ...privacy, [key]: !privacy[key] });
@@ -2115,13 +1891,6 @@ export default function App({
       if (sessionRef.current?.sessionId === sessionId) setPrivacyBusy(false);
     }
   }
-
-  useEffect(() => {
-    setManagedSessions([]);
-    setSessionsOpen(false);
-    setSessionsBusy(false);
-    setSessionsError("");
-  }, [session?.sessionId]);
 
   const contactQuery = friendQuery
     .trim()
