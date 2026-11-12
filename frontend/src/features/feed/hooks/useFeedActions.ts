@@ -5,7 +5,7 @@ import { FormEvent, type SetStateAction } from "react";
 import { attachmentRequestBody, type MediaAttachment } from "../../../shared/utils/media";
 import type { FriendConnection } from "../../contacts/types";
 import { type Session } from "../../auth/lib/session";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import { type FeedComment } from "../components/FeedDiscussion";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject } from "react";

@@ -8,8 +8,9 @@ import { SessionResponseCache } from "../shared/lib/sessionCache";
 import { API } from "../shared/lib/config";
 import { desktopBridge, isDesktopBuild } from "../platform/desktop";
 import type { InstallPromptEvent } from "../features/pwa/types";
-import type { ToastKind } from "../features/notifications/utils/toast";
+import type { ToastKind } from "../shared/utils/toast";
 import AuthedApp from "./AuthedApp";
+import AuthedProviders from "./providers/AuthedProviders";
 
 /**
  * Authentication shell. It owns the session lifecycle and only mounts the
@@ -143,16 +144,21 @@ export default function App({
   if (!session) return <AuthScreen {...auth} />;
 
   return (
-    <AuthedApp
+    <AuthedProviders
       key={session.sessionId}
       session={session}
       sessionRef={sessionRef}
-      responseCache={responseCache}
       sessionClient={sessionClient}
-      saveSession={saveSession}
-      endSession={endSession}
-      installPrompt={installPrompt}
-      setInstallPrompt={setInstallPrompt}
-    />
+      responseCache={responseCache}
+    >
+      <AuthedApp
+        responseCache={responseCache}
+        sessionClient={sessionClient}
+        saveSession={saveSession}
+        endSession={endSession}
+        installPrompt={installPrompt}
+        setInstallPrompt={setInstallPrompt}
+      />
+    </AuthedProviders>
   );
 }

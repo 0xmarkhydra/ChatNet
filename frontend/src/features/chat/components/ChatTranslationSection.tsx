@@ -1,7 +1,7 @@
 import ChatTranslationSettingsPage from "./ChatTranslationSettingsPage";
 import { type ChatTranslationSettings } from "../lib/conversationTranslationSettings";
 import { type Session } from "../../auth/lib/session";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import { type SetStateAction } from "react";
 import type { LanguageOption } from "../../i18n/utils/languages";
 import type { Dispatch } from "react";

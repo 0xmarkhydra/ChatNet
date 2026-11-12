@@ -4,7 +4,7 @@ import { mergeById, toggleMessageReactionCount } from "../../../shared/utils/opt
 import { FormEvent, type SetStateAction } from "react";
 import { attachmentRequestBody, type MediaAttachment } from "../../../shared/utils/media";
 import { type Session } from "../../auth/lib/session";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 
 export type UseChatMessagingDeps = {

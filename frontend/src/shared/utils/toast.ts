@@ -1,4 +1,4 @@
-import type { ToastKind } from '../../../shared/types/notice'
+import type { ToastKind } from '../types/notice'
 
 export type { ToastKind }
 export type ToastNotice = { id: number; message: string; kind: ToastKind }

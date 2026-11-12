@@ -1,29 +1,27 @@
-import { type Session } from "../../auth/lib/session";
+import { useSession } from "../../../shared/context/SessionContext";
+import { useNotice } from "../../../shared/context/NoticeContext";
 import { type SetStateAction } from "react";
 import { type NewChatMode } from "../../chat/types";
-import { type ToastKind } from "../../notifications/utils/toast";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch } from "react";
 
 export type UseInviteSharingDeps = {
-  session: Session | null;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
   setFriendQuery: Dispatch<SetStateAction<string>>;
   setNewChatMode: Dispatch<SetStateAction<NewChatMode>>;
-  setNotice: (message: string, kind?: ToastKind) => void;
   setQuickCreateOpen: Dispatch<SetStateAction<boolean>>;
   setTab: Dispatch<SetStateAction<Tab>>;
 };
 
 export function useInviteSharing({
-  session,
   setActiveConversationId,
   setFriendQuery,
   setNewChatMode,
-  setNotice,
   setQuickCreateOpen,
   setTab,
 }: UseInviteSharingDeps) {
+  const { session } = useSession();
+  const { setNotice } = useNotice();
   function connectUrl(username = session?.user.username || "") {
     const url = new URL(window.location.href);
     url.hash = "";

@@ -204,3 +204,15 @@ src/
 | `platform/DesktopBootstrap.tsx` | `app/DesktopBootstrap.tsx` |
 
 Kiểu `Session`, `ManagedAccountSession` và `ToastKind` nay được định nghĩa ở `shared/types/` (`session.ts`, `notice.ts`). Các đường import cũ (`features/auth/lib/session`, `features/auth/types`, `features/notifications/utils/toast`) vẫn export lại đúng tên nên code đang có không bị vỡ.
+
+## Session, API và thông báo qua Context
+
+Trong ứng dụng đã đăng nhập, hook và component lấy các dịch vụ dùng chung từ Context thay vì nhận qua tham số:
+
+| Hook | Trả về | Định nghĩa |
+|---|---|---|
+| `useSession()` | `session`, `sessionRef` | `shared/context/SessionContext.tsx` |
+| `useApi()` | `apiFetch`, `pendingRequests`, `mutationRequests` | `shared/context/ApiContext.tsx` |
+| `useNotice()` | `notice`, `setNotice`, `dismissNotice` | `shared/context/NoticeContext.tsx` |
+
+Provider được gắn ở `app/providers/AuthedProviders.tsx` (trong `App.tsx`, bên trong `AuthedApp`). Hook mới nên dùng các hook trên; đã chuyển mẫu `useStoryActions` và `useInviteSharing`. Các hook cũ vẫn nhận `session`, `apiFetch`, `setNotice` qua tham số và sẽ được chuyển dần. `toast.ts` (`inferToastKind`, `ToastKind`) nay ở `shared/utils/toast.ts`.

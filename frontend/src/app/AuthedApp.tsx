@@ -12,7 +12,9 @@ import { useChatPins } from "../features/chat/hooks/useChatPins";
 import { shouldSendChatOnEnter } from "../features/chat/utils/composerKeyboard";
 import "../features/chat/styles/chat-pins.css";
 import { getMessageTranslationView } from "../features/chat/utils/messageTranslationPresentation";
-import { useApiRequest } from "./hooks/useApiRequest";
+import { useSession } from "../shared/context/SessionContext";
+import { useApi } from "../shared/context/ApiContext";
+import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
@@ -62,10 +64,8 @@ import type {
 import type { ManagedAccountSession } from "../features/auth/types";
 import type { InstallPromptEvent } from "../features/pwa/types";
 import {
-  inferToastKind,
   type ToastKind,
-  type ToastNotice,
-} from "../features/notifications/utils/toast";
+} from "../shared/utils/toast";
 import { formatTime, attachmentLabel } from "../shared/utils/format";
 import UserAvatar, {
   avatarRefreshVersions,
@@ -302,8 +302,6 @@ import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspace
 import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
 export type AuthedAppProps = {
-  session: Session;
-  sessionRef: MutableRefObject<Session | null>;
   responseCache: MutableRefObject<SessionResponseCache>;
   sessionClient: ReturnType<typeof createSessionClient>;
   saveSession: (next: Session) => void;
@@ -317,8 +315,6 @@ export type AuthedAppProps = {
 };
 
 export default function AuthedApp({
-  session,
-  sessionRef,
   responseCache,
   sessionClient,
   saveSession,
@@ -326,6 +322,9 @@ export default function AuthedApp({
   installPrompt,
   setInstallPrompt,
 }: AuthedAppProps) {
+  const { session, sessionRef } = useSession();
+  const { apiFetch, pendingRequests, mutationRequests } = useApi();
+  const { notice, setNotice, dismissNotice } = useNotice();
   const { chatCreateError, directUsername, groupCreateStep, groupWorkspaceMode, newChatMode, quickCreateOpen, setChatCreateError, setDirectUsername, setGroupCreateStep, setGroupWorkspaceMode, setNewChatMode, setQuickCreateOpen } = useGroupWorkspaceState({  });
 
   const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({  });
@@ -672,7 +671,6 @@ export default function AuthedApp({
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] =
     useState(false);
   const [status, setStatus] = useState("Đang kết nối...");
-  const [notice, setNoticeState] = useState<ToastNotice | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [pushConfigured, setPushConfigured] = useState(false);
   const [pushAppId, setPushAppId] = useState("");
@@ -767,11 +765,6 @@ export default function AuthedApp({
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
 
-  const {
-    apiFetch,
-    pendingRequests,
-    mutationRequests,
-  } = useApiRequest({ session, sessionRef, sessionClient, responseCache });
   const { privacy, privacyBusy, privacyError, privacyLoading, setPrivacy, setPrivacyBusy, setPrivacyError, setPrivacyRetry } = usePrivacySettings({ apiFetch, session });
 
 
@@ -1261,19 +1254,7 @@ export default function AuthedApp({
     languageOptions[0];
   const t = (key: keyof typeof UI_MESSAGES) => translateUI(uiBundle, key);
 
-  function setNotice(message: string, kind?: ToastKind) {
-    const clean = message.trim();
-    if (!clean) {
-      setNoticeState(null);
-      return;
-    }
-    setNoticeState({
-      id: Date.now(),
-      message: clean,
-      kind: kind || inferToastKind(clean),
-    });
-  }
-  const { connectUrl, copyInviteLink, openConnectSurface, shareMyProfile } = useInviteSharing({ session, setActiveConversationId, setFriendQuery, setNewChatMode, setNotice, setQuickCreateOpen, setTab });
+  const { connectUrl, copyInviteLink, openConnectSurface, shareMyProfile } = useInviteSharing({ setActiveConversationId, setFriendQuery, setNewChatMode, setQuickCreateOpen, setTab });
 
   const { addComment, closeFeedPostDetails, createPost, like, loadProfilePosts, manageFeedComment, openEditPost, openFeedPostDetails, removeFeedPost, reportFeedComment, restoreDraftAfterEdit, syncFeedPost } = useFeedActions({ actionLocks, apiFetch, draftBeforeEdit, editingPost, feedCheckInLocation, feedCheckInOpen, feedRevision, feedScrollBeforeComments, feedViewRef, followingFeed, friends, isProfileDesktop, mediaUploading, name, pendingPost, postAttachments, postBackground, postEditBusy, postFeelingId, postSearch, postTaggedFriends, postText, postVisibility, profileLoadSequence, profilePagingBusy, profilePosts, refreshPosts, removeFeedDataPost, session, sessionRef, setActivePostId, setEditingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setLikePreviews, setNotice, setPendingComments, setPendingPost, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPosts, setPostSubmitError, setPostTaggedFriends, setPostText, setPostVisibility, setProfileComposerOpen, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setSavedPosts, setShowPostBackgrounds, showPostBackgrounds, syncFeedDataPost, tab });
 
@@ -1288,16 +1269,6 @@ export default function AuthedApp({
   const { installApp, previewMessageSound, sendTestPush, syncPushState, toggleMessageSound, togglePush } = usePushSettings({ apiFetch, installPrompt, isStandalone, messageSound, messageSoundEnabledRef, pushAppId, pushBusy, pushConfigured, pushEnabled, pushInitFailed, session, setInstallPrompt, setMessageSoundEnabled, setNotice, setPushBusy, setPushEnabled, setPushInitFailed, setPushPrompt });
 
   const { findNearby, stopNearby } = useNearbyDiscovery({ apiFetch, nearbyBusy, nearbyRadiusKm, nearbyRequest, session, sessionRef, setNearbyBusy, setNearbyResultRadiusKm, setNearbyScanning, setNearbyUntil, setNearbyUsers, setNotice });
-
-  useEffect(() => {
-    if (!notice) return;
-    const timeout =
-      notice.kind === "error" ? 8000 : notice.kind === "warning" ? 6000 : 4500;
-    const timer = window.setTimeout(() => {
-      setNoticeState((current) => (current?.id === notice.id ? null : current));
-    }, timeout);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
 
   useEffect(() => {
     if (!session?.token) return;
@@ -2324,7 +2295,7 @@ export default function AuthedApp({
     ],
   );
   const { editOwnMessage, recallOwnMessage, retryQueuedChatMessages, sendMessage, toggleReaction } = useChatMessaging({ actionLocks, activeChannelIdRef, activeConversationId, activeConversationIdRef, apiFetch, canSend, channelDraftKey, chatOutboxRef, chatOutboxSession, draft, messageAttachments, messageChanges, messageText, ownSendScrollConversation, refreshConversations, replyingTo, retryOutboxBusy, selectedChannelId, sendingClientIDs, sendingRef, session, sessionRef, setChannelDrafts, setChatOnline, setMessageDrafts, setMessages, setNotice, setReactionPreviews, setReplyingTo, setTranslations, updateChatOutbox });
-  const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ apiFetch, mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, session, sessionRef, setActiveStoryId, setChatOnline, setNotice, setStories, setStoryBusy, setStoryDraftFile, storyBusy, updateChatOutbox, uploadMediaFiles });
+  const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraftFile, storyBusy, updateChatOutbox, uploadMediaFiles });
 
   const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
 
@@ -3091,7 +3062,7 @@ export default function AuthedApp({
           <button
             type="button"
             aria-label="Đóng thông báo"
-            onClick={() => setNoticeState(null)}
+            onClick={dismissNotice}
           >
             ×
           </button>
