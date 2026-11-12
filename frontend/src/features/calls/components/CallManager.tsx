@@ -29,12 +29,12 @@ import { buildLanguageOptions } from '../../i18n/utils/languages'
 import { isDesktopBuild } from '../../../platform/desktop'
 import { requireDesktopMedia } from '../../../platform/desktopMedia'
 import CallDeviceSettings from './CallDeviceSettings'
+import type { CallLaunchDetail } from './CallHeaderActions'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { notifyDesktopCall, dismissDesktopCall } from '../../chat/hooks/useDesktopNotifications'
 import '../styles/call.css'
 
 type ConversationLite = { id: number; name: string; type: 'direct' | 'group'; otherUsername?: string; blocked?: boolean }
-type CallLaunchDetail = { conversationId: number; mediaType: CallMediaType }
 
 type CallManagerProps = {
   request: CallRequest
@@ -55,23 +55,7 @@ type CallCaption = {
   updatedAt: number
 }
 const CONSENT_TOPIC = 'chatnet.call.translation.consent.v1'
-export function CallHeaderActions({ conversationId, disabled = false }: { conversationId: number; disabled?: boolean }) {
-  const start = (mediaType: CallMediaType) => {
-    window.dispatchEvent(new CustomEvent<CallLaunchDetail>('chatnet:start-call', {
-      detail: { conversationId, mediaType },
-    }))
-  }
-  return (
-    <div className="call-header-actions" aria-label="Gọi điện">
-      <button type="button" aria-label="Gọi thoại" title={disabled ? "Không thể gọi khi hội thoại bị chặn" : "Gọi thoại"} disabled={disabled} onClick={() => start('audio')}>
-        <Phone size={19} />
-      </button>
-      <button type="button" aria-label="Gọi video" title={disabled ? "Không thể gọi khi hội thoại bị chặn" : "Gọi video"} disabled={disabled} onClick={() => start('video')}>
-        <Video size={20} />
-      </button>
-    </div>
-  )
-}
+export { default as CallHeaderActions } from './CallHeaderActions'
 
 export default function CallManager({
   request, apiBase, token, sessionId, userId, sourceLanguage, targetLanguage, conversations,
