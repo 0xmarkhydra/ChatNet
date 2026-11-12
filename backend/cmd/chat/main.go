@@ -37,6 +37,7 @@ type message struct {
 	Sender              string              `json:"sender"`
 	SenderDisplayName   string              `json:"senderDisplayName,omitempty"`
 	Text                string              `json:"text"`
+	Forwarded           bool                `json:"forwarded,omitempty"`
 	ReplyToMessageID    *int64              `json:"replyToMessageId,omitempty"`
 	ReplyToSender       string              `json:"replyToSender,omitempty"`
 	ReplyToDisplayName  string              `json:"replyToDisplayName,omitempty"`
@@ -202,6 +203,7 @@ func main() {
 	mux.Handle("PATCH /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editMessage)))
 	mux.Handle("DELETE /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteMessage)))
 	mux.Handle("POST /api/messages/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.toggleMessageReaction)))
+	mux.Handle("GET /api/messages/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessageReactionUsers)))
 	mux.Handle("PUT /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
 	mux.Handle("DELETE /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
 	mux.Handle("POST /api/conversations/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markRead)))
@@ -1023,7 +1025,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(), `
 		SELECT m.id,m.conversation_id,COALESCE(m.channel_id,0),m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
 		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
-		       m.edited_at,(m.deleted_at IS NOT NULL),
+		       m.forwarded,m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
 		           FROM conversation_members cmr
@@ -1066,7 +1068,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		if rows.Scan(
 			&m.ID, &m.ConversationID, &m.ChannelID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
-			&m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
+			&m.Forwarded, &m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
 			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
 		) == nil {
 			if m.Deleted {
@@ -1118,6 +1120,8 @@ func messageRequestFingerprint(conversationID int64, text string, replyTo *int64
 	return hex.EncodeToString(digest[:])
 }
 
+// The forwarded flag is part of the immutable request identity. Keep the
+// original signature for callers validating ordinary chat messages.
 func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput, channelIDs ...int64) bool {
 	var channelID int64
 	if len(channelIDs) > 0 {
@@ -1143,8 +1147,22 @@ func sameMessageRequest(m message, conversationID int64, text string, replyTo *i
 	return true
 }
 
+func sameMessageRequestForwarded(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput, forwarded bool, channelID int64) bool {
+	return m.Forwarded == forwarded && sameMessageRequest(m, conversationID, text, replyTo, attachments, channelID)
+}
+
+// Preserve the existing SHA-256 digest for ordinary sends and retries.
+func messageRequestFingerprintForwarded(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput, forwarded bool, channelID int64) string {
+	base := messageRequestFingerprint(conversationID, text, replyTo, attachments, channelID)
+	if !forwarded {
+		return base
+	}
+	digest := sha256.Sum256([]byte("forwarded:" + base))
+	return hex.EncodeToString(digest[:])
+}
+
 // replyExistingMessage returns true once it wrote a response for an existing client ID.
-func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput, channelIDs ...int64) bool {
+func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput, forwarded bool, channelIDs ...int64) bool {
 	var channelID int64
 	if len(channelIDs) > 0 {
 		channelID = channelIDs[0]
@@ -1167,11 +1185,11 @@ func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, se
 		return true
 	}
 	if fingerprint != nil {
-		if *fingerprint != messageRequestFingerprint(conversationID, text, replyTo, attachments, channelID) {
+		if *fingerprint != messageRequestFingerprintForwarded(conversationID, text, replyTo, attachments, forwarded, channelID) {
 			httpx.Error(w, http.StatusConflict, "client id was already used for another message")
 			return true
 		}
-	} else if !sameMessageRequest(m, conversationID, text, replyTo, attachments, channelID) {
+	} else if !sameMessageRequestForwarded(m, conversationID, text, replyTo, attachments, forwarded, channelID) {
 		// Compatibility for rows created before the additive fingerprint migration.
 		httpx.Error(w, http.StatusConflict, "client id was already used for another message")
 		return true
@@ -1197,6 +1215,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		Text             string                   `json:"text"`
 		ClientID         string                   `json:"clientId"`
 		ReplyToMessageID *int64                   `json:"replyToMessageId"`
+		Forwarded        bool                     `json:"forwarded"`
 		ChannelID        int64                    `json:"channelId"`
 		Attachments      []mediax.AttachmentInput `json:"attachments"`
 	}
@@ -1217,7 +1236,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "text must be <= 4000 characters")
 		return
 	}
-	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments, body.ChannelID) {
+	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments, body.Forwarded, body.ChannelID) {
 		return
 	}
 
@@ -1277,12 +1296,13 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		SenderID:         claims.UserID,
 		Sender:           claims.Username,
 		ReplyToMessageID: body.ReplyToMessageID,
+		Forwarded:        body.Forwarded,
 		Attachments:      attachments,
 		Reactions:        []messageReaction{},
 	}
 	fingerprint := ""
 	if body.ClientID != "" {
-		fingerprint = messageRequestFingerprint(conversationID, body.Text, body.ReplyToMessageID, body.Attachments, body.ChannelID)
+		fingerprint = messageRequestFingerprintForwarded(conversationID, body.Text, body.ReplyToMessageID, body.Attachments, body.Forwarded, body.ChannelID)
 	}
 	if err := tx.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&m.Sender, &m.SenderDisplayName); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load message sender")
@@ -1290,15 +1310,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint,channel_id)
-		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''),NULLIF($7,0))
+		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint,channel_id,forwarded)
+		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''),NULLIF($7,0),$8)
 		ON CONFLICT (user_id,client_id) WHERE client_id IS NOT NULL DO NOTHING
 		RETURNING id,text,created_at`,
-		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint, body.ChannelID,
+		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint, body.ChannelID, body.Forwarded,
 	).Scan(&m.ID, &m.Text, &m.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = tx.Rollback(r.Context())
-		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments, body.ChannelID) {
+		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments, body.Forwarded, body.ChannelID) {
 			httpx.Error(w, http.StatusConflict, "message retry could not be resolved")
 		}
 		return
@@ -1376,7 +1396,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 	err := s.db.QueryRow(ctx, `
 		SELECT m.id,m.conversation_id,COALESCE(m.channel_id,0),m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
 		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
-		       m.edited_at,(m.deleted_at IS NOT NULL),
+		       m.forwarded,m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
 		           FROM conversation_members cmr
@@ -1397,7 +1417,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))`, messageID, viewerID).Scan(
 		&m.ID, &m.ConversationID, &m.ChannelID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
-		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
+		&m.Forwarded, &m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
 	)
 	if err != nil {
 		return message{}, err

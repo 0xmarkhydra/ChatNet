@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -130,8 +131,43 @@ func TestMessageReactionsLocalIntegration(t *testing.T) {
 	assert(1, "👍", 1, false)
 	call(1, "👍", 200)
 	assert(0, "👍", 2, true)
+	listUsers := func(actor, want int, filter ...string) []reactionUser {
+		t.Helper()
+		requestURL := fmt.Sprintf("/api/messages/%d/reactions", messageID)
+		if len(filter) > 0 {
+			requestURL += "?emoji=" + url.QueryEscape(filter[0])
+		}
+		req := httptest.NewRequest(http.MethodGet, requestURL, nil)
+		req.SetPathValue("id", fmt.Sprint(messageID))
+		req.Header.Set("Authorization", "Bearer "+tokens[actor])
+		response := httptest.NewRecorder()
+		authx.Middleware(s.jwtSecret, http.HandlerFunc(s.listMessageReactionUsers)).ServeHTTP(response, req)
+		if response.Code != want {
+			t.Fatalf("reaction users actor %d: got HTTP %d, want %d (%s)", actor, response.Code, want, response.Body.String())
+		}
+		if want != http.StatusOK {
+			return nil
+		}
+		var page struct {
+			Items []reactionUser `json:"items"`
+			HasMore bool `json:"hasMore"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &page); err != nil {
+			t.Fatal(err)
+		}
+		return page.Items
+	}
+	users := listUsers(0, http.StatusOK)
+	if len(users) != 2 || users[0].UserID != ids[1] || users[1].UserID != ids[0] {
+		t.Fatalf("expected both reactors newest first: %+v", users)
+	}
+	listUsers(2, http.StatusForbidden)
 	call(0, "❤️", 200)
 	assert(0, "❤️", 1, true)
+	filtered := listUsers(1, http.StatusOK, "❤️")
+	if len(filtered) != 1 || filtered[0].UserID != ids[0] || filtered[0].Emoji != "❤️" {
+		t.Fatalf("emoji filter did not return matching reactor: %+v", filtered)
+	}
 	m, err := s.loadMessage(ctx, messageID, ids[1])
 	if err != nil {
 		t.Fatal(err)
@@ -182,4 +218,5 @@ func TestMessageReactionsLocalIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	call(1, "😡", 403)
+	listUsers(1, http.StatusForbidden)
 }

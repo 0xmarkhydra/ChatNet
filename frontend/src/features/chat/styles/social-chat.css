@@ -1504,3 +1504,126 @@
     font-size: 16px;
   }
 }
+
+/* The forwarding label is message metadata, not part of the copied message
+   content; it remains above the bubble on both desktop and mobile. */
+.modern-shell.app-layout .social-chat-layout .message-content .chat-forwarded-caption {
+  display: block;
+  margin: 0 2px 5px;
+  color: #8190a6;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.modern-shell.app-layout .social-chat-layout .message.mine .message-content .chat-forwarded-caption {
+  text-align: right;
+}
+
+/* Keep a hit-testable bridge across the small gap between the bubble and its
+   quick actions. Without this, pointer movement drops :hover before reaching
+   the buttons. Reaction counts remain visible independently of this toolbar. */
+.chat-message-hover-toolbar { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .modern-shell.app-layout .social-chat-layout .messages .message .message-content::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    bottom: 0;
+    left: 100%;
+    width: 10px;
+  }
+  .modern-shell.app-layout .social-chat-layout .messages .message.mine .message-content::after {
+    left: auto;
+    right: 100%;
+  }
+  .modern-shell.app-layout .social-chat-layout .message-content .chat-message-hover-toolbar {
+    position: absolute;
+    z-index: 25;
+    top: 0;
+    left: calc(100% + 8px);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid #e0e6f3;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(31, 48, 81, .13);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(3px);
+    transition: opacity .12s ease, transform .12s ease;
+    white-space: nowrap;
+  }
+  /* The toolbar itself also bridges the gap, including near its top edge. */
+  .modern-shell.app-layout .social-chat-layout .message-content .chat-message-hover-toolbar::before {
+    content: "";
+    position: absolute;
+    top: -8px;
+    bottom: -8px;
+    left: -12px;
+    width: 14px;
+  }
+  .modern-shell.app-layout .social-chat-layout .message.mine .message-content .chat-message-hover-toolbar {
+    left: auto;
+    right: calc(100% + 8px);
+    flex-direction: row-reverse;
+  }
+  .modern-shell.app-layout .social-chat-layout .message.mine .message-content .chat-message-hover-toolbar::before {
+    left: auto;
+    right: -12px;
+  }
+  .modern-shell.app-layout .social-chat-layout .message-content:hover .chat-message-hover-toolbar,
+  .modern-shell.app-layout .social-chat-layout .message-content:focus-within .chat-message-hover-toolbar {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .modern-shell.app-layout .social-chat-layout .chat-message-hover-toolbar > button {
+    display: grid;
+    place-items: center;
+    flex: 0 0 31px;
+    width: 31px;
+    height: 31px;
+    min-width: 31px;
+    min-height: 31px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+    color: #61718e;
+    cursor: pointer;
+  }
+  .modern-shell.app-layout .social-chat-layout .chat-message-hover-toolbar > button:hover,
+  .modern-shell.app-layout .social-chat-layout .chat-message-hover-toolbar > button:focus-visible {
+    background: #edf2ff;
+    color: #315fd0;
+  }
+  .modern-shell.app-layout .social-chat-layout .chat-message-hover-toolbar > button:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+  .modern-shell.app-layout .social-chat-layout .message-content .bubble .chat-translation-action {
+    display: none;
+  }
+}
+@media (min-width: 761px) and (max-width: 900px) and (hover: hover) and (pointer: fine) {
+  /* Incoming toolbar may need to sit above the bubble on narrow desktop panes.
+     Own messages always mirror to the left of their bubble. */
+  .modern-shell.app-layout .social-chat-layout .message:not(.mine) .message-content .chat-message-hover-toolbar {
+    top: -42px;
+    left: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout .message:not(.mine) .message-content .chat-message-hover-toolbar::before {
+    top: 100%;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 15px;
+  }
+}

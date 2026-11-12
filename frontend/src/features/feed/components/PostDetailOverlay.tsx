@@ -14,6 +14,7 @@ export type PostDetailOverlayProps = {
   activePost: Post;
   like: (post: Post, emoji?: string) => Promise<void>;
   likePreviews: Record<number, boolean>;
+  onReactionUsers: (post: Post) => void;
   postDiscussion: ReactNode | null;
   session: Session;
   setActivePostId: Dispatch<SetStateAction<number | null>>;
@@ -25,6 +26,7 @@ export default function PostDetailOverlay({
   activePost,
   like,
   likePreviews,
+  onReactionUsers,
   postDiscussion,
   session,
   setActivePostId,
@@ -97,8 +99,12 @@ export default function PostDetailOverlay({
                         post={activePost}
                         busy={likePreviews[activePost.id] !== undefined}
                         react={like}
-                        showCount
                       />
+                      <button type="button" className="feed-reaction-users-trigger" disabled={activePost.likes === 0}
+                        aria-label={`Xem ${activePost.likes} người bày tỏ cảm xúc`}
+                        onClick={() => onReactionUsers(activePost)}>
+                        ❤️ {activePost.likes.toLocaleString('vi-VN')} lượt thích
+                      </button>
                       <span className="post-stat">
                         <UiIcon name="comment" size={21} />
                         {activePost.comments?.length || 0} bình luận

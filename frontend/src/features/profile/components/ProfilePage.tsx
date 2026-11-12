@@ -1,12 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { ArrowRight, AtSign, MapPin, Camera, Image as ImageIcon, LockKeyhole, Mail, PencilLine, Plus, RefreshCw, ShieldCheck, Users, UserRound, Video } from 'lucide-react'
+import { ArrowRight, MapPin, Camera, Image as ImageIcon, Mail, PencilLine, Plus, RefreshCw, Users, UserRound } from 'lucide-react'
 import type { Post } from '../../feed/types'
 import type { FriendConnection } from '../../contacts/types'
-import type { MediaAttachment } from '../../../shared/utils/media'
+import ProfileMediaGallery, { type ProfileMediaItem } from './ProfileMediaGallery'
+import ProfileSidebar from './ProfileSidebar'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 
 type Section = 'posts' | 'media' | 'about' | 'friends'
-type MediaItem = { postId: number; attachment: MediaAttachment; index: number }
 
 type Props = {
   username: string
@@ -44,7 +44,7 @@ export default function ProfilePage({
 }: Props) {
   const [section, setSection] = useState<Section>('posts')
   const acceptedFriends = useMemo(() => friends.filter(friend => friend.status === 'accepted'), [friends])
-  const media = useMemo<MediaItem[]>(() => posts.flatMap(post => (post.attachments || [])
+  const media = useMemo<ProfileMediaItem[]>(() => posts.flatMap(post => (post.attachments || [])
     .filter(item => (item.kind === 'image' || item.kind === 'video') && item.url)
     .map((attachment, index) => ({ postId: post.id, attachment, index }))), [posts])
   const tabs: { id: Section; name: string }[] = [
@@ -54,23 +54,6 @@ export default function ProfilePage({
     { id: 'friends', name: 'Bạn bè' },
   ]
 
-  const gallery = (items: MediaItem[], emptyText: string) => items.length ? (
-    <div className="profile-page-media-grid">
-      {items.map(({ postId, attachment, index }) => (
-        <button className="profile-page-media-item" type="button" key={`${postId}:${attachment.id ?? attachment.storageRef}:${index}`}
-          onClick={() => onOpenPost(postId)} aria-label={`Xem bài viết chứa ${attachment.name || 'ảnh hoặc video'}`}>
-          {attachment.kind === 'image'
-            ? <img src={attachment.url} alt={attachment.name || 'Ảnh bài viết'} loading="lazy" />
-            : <><video src={attachment.url} preload="metadata" muted playsInline aria-label={attachment.name || 'Video bài viết'} /><Video size={23} className="profile-page-video-badge" aria-hidden="true" /></>}
-        </button>
-      ))}
-    </div>
-  ) : postsBusy ? null : (
-    <div className="profile-page-blank"><ImageIcon size={30} aria-hidden="true" />
-      <p>{emptyText}</p>
-      <button type="button" onClick={onCreatePost}>Chia sẻ khoảnh khắc</button>
-    </div>
-  )
 
   return (
     <div className="profile-page" aria-label="Trang cá nhân">
@@ -135,7 +118,7 @@ export default function ProfilePage({
               <div className="profile-page-subsection">
                 <h2>Ảnh & video</h2>
                 <p>Ảnh và video từ các bài viết đã tải của bạn.</p>
-                {gallery(media, 'Chưa có ảnh hoặc video trong các bài viết đã tải.')}
+                <ProfileMediaGallery items={media} emptyText="Chưa có ảnh hoặc video trong các bài viết đã tải." postsBusy={postsBusy} onOpenPost={onOpenPost} onCreatePost={onCreatePost} />
                 {hasMorePosts && <button className="profile-page-more-posts" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>Tải thêm bài viết để xem ảnh cũ hơn</button>}
               </div>
             )}
@@ -171,32 +154,7 @@ export default function ProfilePage({
           </div>
         </section>
 
-        <aside className="profile-page-aside" aria-label="Thông tin và ảnh cá nhân">
-          <section className="profile-page-about">
-            <h2>Giới thiệu</h2>
-            <p className="profile-page-about-description">{bio || 'Thông tin hồ sơ và kết nối của bạn trên SocCo.'}</p>
-            {city && <div className="profile-page-about-row"><MapPin size={19} aria-hidden="true" /><span>{city}</span></div>}
-            <div className="profile-page-about-row"><AtSign size={19} aria-hidden="true" /><span>Tài khoản @{username}</span></div>
-            <div className="profile-page-about-row"><Users size={19} aria-hidden="true" /><span>{acceptedFriends.length.toLocaleString('vi-VN')} bạn bè</span></div>
-            {email && <div className="profile-page-about-row"><LockKeyhole size={19} aria-hidden="true" /><span>Email chỉ hiển thị với bạn</span></div>}
-            <button type="button" className="profile-page-aside-action" onClick={onEditProfile}><PencilLine size={17} aria-hidden="true" />Chỉnh sửa thông tin</button>
-          </section>
-          <section className="profile-page-recent">
-            <div className="profile-page-recent-heading"><h2>Ảnh gần đây</h2>
-              <button type="button" onClick={() => setSection('media')}>Xem tất cả <ArrowRight size={15} aria-hidden="true" /></button>
-            </div>
-            {media.length > 0
-              ? <div className="profile-page-recent-grid">
-                {media.slice(0, 3).map(({ postId, attachment, index }) =>
-                  <button type="button" key={`${postId}:${attachment.id ?? attachment.storageRef}:${index}`} onClick={() => onOpenPost(postId)} aria-label="Mở bài viết chứa ảnh gần đây">
-                    {attachment.kind === 'image' ? <img src={attachment.url} alt={attachment.name || 'Ảnh gần đây'} loading="lazy" /> :
-                      <><video src={attachment.url} muted preload="metadata" playsInline /><Video size={19} aria-hidden="true" /></>}
-                  </button>)}
-              </div>
-              : <div className="profile-page-recent-empty"><ImageIcon size={24} aria-hidden="true" /><span>Chưa có ảnh trong bài viết đã tải</span></div>}
-          </section>
-          <div className="profile-page-privacy-note"><ShieldCheck size={18} aria-hidden="true" /><span>Thông tin hiển thị tuân theo cài đặt quyền riêng tư của tài khoản.</span></div>
-        </aside>
+        <ProfileSidebar username={username} email={email} bio={bio} city={city} acceptedFriendCount={acceptedFriends.length} media={media} onEditProfile={onEditProfile} onShowMedia={() => setSection('media')} onOpenPost={onOpenPost} />
       </div>
     </div>
   )
