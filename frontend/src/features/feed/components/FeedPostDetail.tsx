@@ -14,6 +14,7 @@ export type FeedPostDetailProps = {
   like: (post: Post, emoji?: string) => Promise<void>;
   likePreviews: Record<number, boolean>;
   name: string;
+  onEditPost: (post: Post) => void;
   openVisitor: (username: string) => void;
   postDiscussion: ReactNode | null;
   profileMedia: ProfileMediaState | null;
@@ -22,6 +23,7 @@ export type FeedPostDetailProps = {
   setCommentSortOrder: Dispatch<SetStateAction<"newest" | "oldest">>;
   setNotice: (message: string, kind?: ToastKind) => void;
   syncFeedPost: (updated: Post) => void;
+  taggedNames: Record<string, string>;
   targetLanguage: string;
   translationPreferencesLoaded: boolean;
 };
@@ -34,6 +36,7 @@ export default function FeedPostDetail({
   like,
   likePreviews,
   name,
+  onEditPost,
   openVisitor,
   postDiscussion,
   profileMedia,
@@ -42,6 +45,7 @@ export default function FeedPostDetail({
   setCommentSortOrder,
   setNotice,
   syncFeedPost,
+  taggedNames,
   targetLanguage,
   translationPreferencesLoaded,
 }: FeedPostDetailProps) {
@@ -61,6 +65,8 @@ export default function FeedPostDetail({
             likeBusy={likePreviews[activePost.id] !== undefined}
             onLike={(post, emoji) => like(post, emoji)}
             onUpdated={syncFeedPost}
+            onEditPost={onEditPost}
+            taggedNames={taggedNames}
             onFeedback={(message, kind) => setNotice(message, kind)}
           >
             {postDiscussion}

@@ -22,6 +22,7 @@ export type UseStoryActionsDeps = {
   setNotice: (message: string, kind?: ToastKind) => void;
   setStories: Dispatch<SetStateAction<Story[]>>;
   setStoryBusy: Dispatch<SetStateAction<boolean>>;
+  setStoryDraftFile: Dispatch<SetStateAction<File | null>>;
   storyBusy: boolean;
   updateChatOutbox: (transform: (items: QueuedChatMessage[]) => QueuedChatMessage[]) => QueuedChatMessage[];
   uploadMediaFiles: (files: File[], scope: "chat" | "feed" | "story" | "profile") => Promise<MediaAttachment[]>;
@@ -41,6 +42,7 @@ export function useStoryActions({
   setNotice,
   setStories,
   setStoryBusy,
+  setStoryDraftFile,
   storyBusy,
   updateChatOutbox,
   uploadMediaFiles,
@@ -67,6 +69,8 @@ export function useStoryActions({
         ...current.filter((item) => item.id !== result.id),
       ]);
       setActiveStoryId(result.id);
+      setStoryDraftFile(null);
+      setNotice("Đã đăng Story.", "success");
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId)
         setNotice(

@@ -101,7 +101,13 @@ func (s *server) editPost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	tag, err := s.db.Exec(r.Context(), `UPDATE posts SET content=$1,visibility=$2,background=$3,updated_at=NOW() WHERE id=$4 AND user_id=$5`, b.Content, b.Visibility, b.Background, id, c.UserID)
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, 500, "cannot update post")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	tag, err := tx.Exec(r.Context(), `UPDATE posts SET content=$1,visibility=$2,background=$3,updated_at=NOW() WHERE id=$4 AND user_id=$5`, b.Content, b.Visibility, b.Background, id, c.UserID)
 	if err != nil {
 		httpx.Error(w, 500, "cannot update post")
 		return
@@ -110,6 +116,21 @@ func (s *server) editPost(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 404, "post not found")
 		return
 	}
+	newMentions, err := s.syncPostMentions(r.Context(), tx, id, c.UserID, b.Content, b.Visibility)
+	if err != nil {
+		httpx.Error(w, 500, "cannot update post mentions")
+		return
+	}
+	var authorName string
+	if err := tx.QueryRow(r.Context(), `SELECT display_name FROM users WHERE id=$1`, c.UserID).Scan(&authorName); err != nil {
+		httpx.Error(w, 500, "cannot load post author")
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, 500, "cannot update post")
+		return
+	}
+	s.pushPostMentions(id, authorName, newMentions)
 	s.respondPost(w, r, id, c.UserID, 200)
 }
 func (s *server) deletePost(w http.ResponseWriter, r *http.Request) {

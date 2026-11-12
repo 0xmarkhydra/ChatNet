@@ -5,6 +5,7 @@ import { type Conversation } from "../../chat/types";
 import { type SetStateAction } from "react";
 import { type FriendsScreen } from "../../contacts/components/ContactsView";
 import type { Tab } from "../../../app/types";
+import type { PostMentionNotification } from "../../feed/utils/postMentionNotifications";
 import type { Dispatch } from "react";
 
 export type NotificationsSectionProps = {
@@ -14,6 +15,9 @@ export type NotificationsSectionProps = {
   friendBusyIds: Set<number>;
   friendRequests: FriendConnection[];
   globalSearch: string;
+  mentions: PostMentionNotification[];
+  onReadMention: (id: number) => Promise<void>;
+  onOpenMention: (mention: PostMentionNotification) => Promise<void>;
   openVisitor: (username: string) => void;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
   setProfileTimelineOpen: Dispatch<SetStateAction<boolean>>;
@@ -27,6 +31,9 @@ export default function NotificationsSection({
   friendBusyIds,
   friendRequests,
   globalSearch,
+  mentions,
+  onReadMention,
+  onOpenMention,
   openVisitor,
   setActiveConversationId,
   setProfileTimelineOpen,
@@ -36,6 +43,9 @@ export default function NotificationsSection({
       <NotificationsPage
             requests={friendRequests}
             conversations={conversations}
+            mentions={mentions}
+            onReadMention={(id) => void onReadMention(id)}
+            onOpenMention={(mention) => void onOpenMention(mention)}
             search={globalSearch}
             busyFriendIds={friendBusyIds}
             onAccept={(friend) => void actOnFriend(friend)}

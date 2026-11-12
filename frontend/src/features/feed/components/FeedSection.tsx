@@ -25,7 +25,7 @@ export type FeedSectionProps = {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   conversationLoadingMore: boolean;
   conversations: Conversation[];
-  createStory: (file?: File) => Promise<void>;
+  addFeedFiles: (files: File[]) => Promise<void>;
   feedCommunitiesOpen: boolean;
   feedFilter: "all" | "following" | "latest" | "saved";
   feedFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
@@ -48,7 +48,6 @@ export type FeedSectionProps = {
   normalizedSearch: string;
   openVisitor: (username: string) => void;
   pendingPost: Post | null;
-  postComposer: ReactNode;
   postComposerRef: RefObject<HTMLTextAreaElement | null>;
   posts: Post[];
   postSearch: { posts: Post[]; loading: boolean; loadingMore: boolean; hasMore: boolean; error: string; loadMore: (retryOnError?: boolean) => Promise<void>; retry: () => void; syncPost: (updated: Post) => void; removePost: (id: number) => void; };
@@ -64,6 +63,7 @@ export type FeedSectionProps = {
   setActiveStoryId: Dispatch<SetStateAction<number | null>>;
   setChatListFilter: Dispatch<SetStateAction<"all" | "unread" | "groups">>;
   setFeedCheckInOpen: Dispatch<SetStateAction<boolean>>;
+  setStoryDraftFile: Dispatch<SetStateAction<File | null>>;
   setFeedCommunitiesOpen: Dispatch<SetStateAction<boolean>>;
   setFeedComposerOpen: Dispatch<SetStateAction<boolean>>;
   setFeedFilter: Dispatch<SetStateAction<"all" | "following" | "latest" | "saved">>;
@@ -85,7 +85,7 @@ export default function FeedSection({
   apiFetch,
   conversationLoadingMore,
   conversations,
-  createStory,
+  addFeedFiles,
   feedCommunitiesOpen,
   feedFilter,
   feedFiltersPill,
@@ -108,7 +108,6 @@ export default function FeedSection({
   normalizedSearch,
   openVisitor,
   pendingPost,
-  postComposer,
   postComposerRef,
   posts,
   postSearch,
@@ -124,6 +123,7 @@ export default function FeedSection({
   setActiveStoryId,
   setChatListFilter,
   setFeedCheckInOpen,
+  setStoryDraftFile,
   setFeedCommunitiesOpen,
   setFeedComposerOpen,
   setFeedFilter,
@@ -177,7 +177,7 @@ export default function FeedSection({
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
                 event.currentTarget.value = "";
-                void createStory(file);
+                if (file) setStoryDraftFile(file);
               }}
             />
             <div className="social-feed-grid">
@@ -264,23 +264,21 @@ export default function FeedSection({
                   </>
                 )}
 
-                {isProfileDesktop ? (
-                  <SocialFeedComposer
+                <SocialFeedComposer
                     username={name}
                     displayName={userLabel(
                       profileMedia?.displayName || session.user.displayName,
                       name,
                     )}
                     draft={postText}
-                    pending={Boolean(pendingPost)}
+                    pending={Boolean(pendingPost) || mediaUploading === "feed"}
                     storyBusy={storyBusy || mediaUploading === "story"}
                     onCreatePost={() => {
-                      setFeedCheckInOpen(false);
                       setFeedComposerOpen(true);
                     }}
-                    onCreateMediaPost={() => {
-                      setFeedCheckInOpen(false);
+                    onCreateMediaPost={(files) => {
                       setFeedComposerOpen(true);
+                      void addFeedFiles(files);
                     }}
                     onCreateStory={() => storyFileInputRef.current?.click()}
                     onCheckIn={() => {
@@ -288,9 +286,6 @@ export default function FeedSection({
                       setFeedComposerOpen(true);
                     }}
                   />
-                ) : (
-                  postComposer
-                )}
                 </>)}
 
                 {!feedCommunitiesOpen && (isProfileDesktop ? (

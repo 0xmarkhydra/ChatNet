@@ -21,12 +21,15 @@ type Props = {
  onMessage: (username: string) => Promise<void>
  onClose: () => void
  onPostOpen: (post: Post) => void
+ onUserOpen?: (username: string) => void
+ onEditPost?: (post: Post) => void
+ taggedNames?: Record<string, string>
  onUpdated: (post: Post) => void
  updates: Post[]
  onDeleted: (id: number) => void
  feedback: (message: string, kind?: 'success' | 'error' | 'warning' | 'info') => void
 }
-export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onMessage, onClose, onPostOpen, onUpdated, updates, onDeleted, feedback }: Props) {
+export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onMessage, onClose, onPostOpen, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
  const [profile,setProfile]=useState<Profile|null>(null)
  const [posts,setPosts]=useState<Post[]>([])
  const [more,setMore]=useState(false)
@@ -140,7 +143,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
      </div>
     </section>
     <div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
-    <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={()=>onPostOpen(post)} likePreviews={likeBusy} like={like}/>)}</div>
+    <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={()=>onPostOpen(post)} likePreviews={likeBusy} like={like}/>)}</div>
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
     {more&&<button type="button" className="soco-load-more" disabled={loading} onClick={()=>void loadMore()}>Xem bài viết cũ hơn</button>}
    </>}

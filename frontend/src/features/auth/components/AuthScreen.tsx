@@ -19,6 +19,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { isDesktopBuild } from '../../../platform/desktop'
+import { loadAppLocalePreference, saveAppLocalePreference } from '../../i18n/lib/i18n'
 import type { useAuthFlow } from '../hooks/useAuthFlow'
 import AuthSetup from './AuthSetup'
 
@@ -31,6 +32,9 @@ export default function AuthScreen({
   submitAuth, verifyOTP, resendOTP, resetRegistration, finishSetup,
 }: Props) {
   const [showPassword, setShowPassword] = useState(false)
+  const [mobileLocale, setMobileLocale] = useState(() => {
+    try { return loadAppLocalePreference() } catch { return 'auto' }
+  })
   const isOTP = registerStep === 'otp'
   const isSetup = registerStep === 'setup'
   const usingPassword = !isDesktopBuild && authMode === 'login' && loginMethod === 'password'
@@ -173,16 +177,6 @@ export default function AuthScreen({
           )}
         </div>
 
-        <div className="auth-hero-footer">
-          <span>© SocCo • ChatNet</span>
-          <div className="auth-footer-links">
-            <a href="#privacy">Quyền riêng tư</a>
-            <span aria-hidden="true">•</span>
-            <a href="#terms">Điều khoản</a>
-            <span aria-hidden="true">•</span>
-            <a href="#support">Hỗ trợ</a>
-          </div>
-        </div>
       </aside>
 
       <section className="auth-content" aria-label={isSetup ? 'Thiết lập ban đầu' : isOTP ? 'Xác thực email' : 'Đăng nhập và đăng ký'}>
@@ -224,7 +218,7 @@ export default function AuthScreen({
             <p className="auth-otp-safety"><ShieldCheck size={14} /> Không chia sẻ mã OTP với người khác.</p>
           </form>
         ) : (
-          <form className="auth-card auth-login-card" onSubmit={submitAuth}>
+          <form className={`auth-card auth-login-card auth-login-card--${authMode}`} onSubmit={submitAuth}>
             <div className="auth-form-intro">
               <h2>{authMode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản SocCo'}</h2>
               <p>{authMode === 'login' ? 'Đăng nhập để khám phá cộng đồng SocCo.' : 'Bắt đầu kết nối cùng mọi người qua email.'}</p>
@@ -283,7 +277,8 @@ export default function AuthScreen({
             <div className="auth-secondary-actions">
               {authMode === 'login' && !isDesktopBuild && (
                 <button type="button" className="auth-action-btn" onClick={() => { setLoginMethod(usingPassword ? 'otp' : 'password'); resetRegistration() }}>
-                  <Smartphone size={16} />
+                  <Smartphone className="auth-action-icon-desktop" size={16} />
+                  {usingPassword && <Mail className="auth-action-icon-mobile" size={16} />}
                   <span>{usingPassword ? 'Đăng nhập bằng mã OTP qua email' : 'Đăng nhập bằng mật khẩu'}</span>
                 </button>
               )}
@@ -306,17 +301,43 @@ export default function AuthScreen({
             </div>
 
             <div className="auth-login-bottom">
-              <span>
+              <span className="auth-login-prompt">
                 {authMode === 'login' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}{' '}
                 <button type="button" onClick={() => switchMode(authMode === 'login' ? 'register' : 'login')}>
                   {authMode === 'login' ? 'Đăng ký với email' : 'Đăng nhập'}
                 </button>
               </span>
+              <button className="auth-login-bottom-mobile" type="button" onClick={() => switchMode(authMode === 'login' ? 'register' : 'login')}>
+                {authMode === 'login' ? 'Tạo tài khoản mới' : 'Đăng nhập'}
+              </button>
             </div>
             <p className="auth-legal">Bằng việc tiếp tục, bạn đồng ý sử dụng SocCo theo chính sách của ứng dụng.</p>
           </form>
         )}
       </section>
+
+      <footer className="auth-hero-footer">
+        <span className="auth-footer-brand-desktop">© SocCo • ChatNet</span>
+        <label className="auth-mobile-language" htmlFor="auth-mobile-language">Ngôn ngữ
+          <select id="auth-mobile-language" value={mobileLocale} onChange={(event) => {
+            const nextLocale = event.target.value
+            setMobileLocale(nextLocale)
+            try { saveAppLocalePreference(nextLocale) } catch { /* Locale preference is optional before login. */ }
+          }}>
+            <option value="auto">Theo thiết bị</option>
+            <option value="vi">Tiếng Việt</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <span className="auth-footer-brand-mobile">SocCo từ ChatNet Ecosystem</span>
+        <div className="auth-footer-links">
+          <a href="#privacy">Quyền riêng tư</a>
+          <span aria-hidden="true">•</span>
+          <a href="#terms">Điều khoản</a>
+          <span aria-hidden="true">•</span>
+          <a href="#support">Hỗ trợ</a>
+        </div>
+      </footer>
     </main>
   )
 }

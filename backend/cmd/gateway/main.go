@@ -55,6 +55,7 @@ func main() {
 	})
 	mux.Handle("GET /__chatnet_copy_image", mediax.ClipboardImageHandler(nil))
 	mux.Handle("/api/auth/", authProxy)
+	mux.Handle("GET /api/link-preview", chatProxy)
 	mux.Handle("/api/messages", chatProxy)
 	mux.Handle("/api/messages/", chatProxy)
 	mux.Handle("/api/events", chatProxy)

@@ -260,9 +260,13 @@ export function useMediaUploads({
       setNotice("Mỗi bài viết tối đa 12 ảnh/video.");
       return;
     }
-    const selected = files.slice(0, remaining);
-    if (selected.length < files.length)
-      setNotice("Mỗi bài viết tối đa 12 ảnh/video.");
+    const selected = files.slice(0, remaining).filter(
+      (file) => file.size > 0 && (file.type.startsWith("image/") || file.type.startsWith("video/")),
+    );
+    if (selected.length < Math.min(files.length, remaining))
+      setNotice("Chỉ hỗ trợ ảnh/video hợp lệ và không rỗng.");
+    if (remaining < files.length) setNotice("Mỗi bài viết tối đa 12 ảnh/video.");
+    if (!selected.length) return;
     try {
       const uploaded = await uploadMediaFiles(selected, "feed");
       if (sessionRef.current?.sessionId !== sessionId) return;

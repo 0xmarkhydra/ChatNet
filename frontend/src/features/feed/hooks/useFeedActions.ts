@@ -6,9 +6,25 @@ import { type Session } from "../../auth/lib/session";
 import { type ToastKind } from "../../notifications/utils/toast";
 import { type FeedComment } from "../components/FeedDiscussion";
 import type { Tab } from "../../../app/types";
+import { composePostContent, parsePostExtras } from "../utils/postExtras";
+import type { PostDraftSnapshot, TaggedFriend } from "./useFeedUiState";
+import type { FriendConnection } from "../../contacts/types";
 import type { Dispatch, RefObject } from "react";
 
 export type UseFeedActionsDeps = {
+  draftBeforeEdit: RefObject<PostDraftSnapshot | null>;
+  editingPost: Post | null;
+  friends: FriendConnection[];
+  pendingPost: Post | null;
+  postEditBusy: boolean;
+  postFeelingId: string;
+  postTaggedFriends: TaggedFriend[];
+  showPostBackgrounds: boolean;
+  setEditingPost: Dispatch<SetStateAction<Post | null>>;
+  setPostEditBusy: Dispatch<SetStateAction<boolean>>;
+  setPostFeelingId: Dispatch<SetStateAction<string>>;
+  setPostTaggedFriends: Dispatch<SetStateAction<TaggedFriend[]>>;
+  setPostVisibility: Dispatch<SetStateAction<"public" | "friends" | "private">>;
   actionLocks: RefObject<Set<string>>;
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   feedCheckInLocation: string;
@@ -57,6 +73,19 @@ export type UseFeedActionsDeps = {
 };
 
 export function useFeedActions({
+  draftBeforeEdit,
+  editingPost,
+  friends,
+  pendingPost,
+  postEditBusy,
+  postFeelingId,
+  postTaggedFriends,
+  showPostBackgrounds,
+  setEditingPost,
+  setPostEditBusy,
+  setPostFeelingId,
+  setPostTaggedFriends,
+  setPostVisibility,
   actionLocks,
   apiFetch,
   feedCheckInLocation,
@@ -183,27 +212,123 @@ export function useFeedActions({
       }
     }
   }
+  function openEditPost(post: Post) {
+    if (post.author !== name || pendingPost || postEditBusy || mediaUploading) return;
+    const extras = parsePostExtras(post.content);
+    draftBeforeEdit.current = {
+      text: postText,
+      tags: [...postTaggedFriends],
+      feelingId: postFeelingId,
+      visibility: postVisibility,
+      background: postBackground,
+      showBackgrounds: showPostBackgrounds,
+      attachments: [...postAttachments],
+      checkInOpen: feedCheckInOpen,
+      location: feedCheckInLocation,
+    };
+    setEditingPost(post);
+    setPostSubmitError("");
+    setPostText(extras.caption);
+    setPostTaggedFriends(extras.taggedUsernames.map((username, index) => {
+      const friend = friends.find(item => item.username === username);
+      return { id: friend?.id ?? -(index + 1), username,
+        displayName: friend?.displayName || username };
+    }));
+    setPostFeelingId(extras.feelingId);
+    setFeedCheckInLocation(extras.location);
+    setFeedCheckInOpen(Boolean(extras.location));
+    setPostVisibility(post.visibility || "public");
+    setPostBackground(post.background || "");
+    setShowPostBackgrounds(false);
+    setPostAttachments(post.attachments || []);
+    if (tab === "profile") setProfileComposerOpen(true);
+    else setFeedComposerOpen(true);
+  }
+
+  function restoreDraftAfterEdit() {
+    const previous = draftBeforeEdit.current;
+    if (previous) {
+      setPostText(previous.text);
+      setPostTaggedFriends(previous.tags);
+      setPostFeelingId(previous.feelingId);
+      setPostVisibility(previous.visibility);
+      setPostBackground(previous.background);
+      setShowPostBackgrounds(previous.showBackgrounds);
+      setPostAttachments(previous.attachments);
+      setFeedCheckInOpen(previous.checkInOpen);
+      setFeedCheckInLocation(previous.location);
+    }
+    draftBeforeEdit.current = null;
+    setEditingPost(null);
+    setPostSubmitError("");
+  }
+
   async function createPost(event: FormEvent) {
     event.preventDefault();
     if (
       !session ||
       actionLocks.current.has("feed:create") ||
+      postEditBusy ||
       mediaUploading ||
       (!postText.trim() &&
         postAttachments.length === 0 &&
+        postTaggedFriends.length === 0 &&
+        !postFeelingId &&
         !(feedCheckInOpen && feedCheckInLocation.trim()))
     )
       return;
 
     setPostSubmitError("");
+    if (feedCheckInOpen && !feedCheckInLocation.trim()) {
+      setPostSubmitError("Vui lòng nhập địa điểm check-in.");
+      return;
+    }
     const locationText = feedCheckInOpen ? feedCheckInLocation.trim() : "";
-    const content = [locationText ? `📍 ${locationText}` : "", postText.trim()]
-      .filter(Boolean)
-      .join("\n");
+    const content = composePostContent({
+      caption: postText,
+      location: locationText,
+      taggedUsernames: postTaggedFriends.map(friend => friend.username),
+      feelingId: postFeelingId,
+    });
+    if (Array.from(content).length > 5000) {
+      setPostSubmitError("Nội dung và địa điểm vượt quá 5.000 ký tự.");
+      return;
+    }
     const attachments = postAttachments;
     const visibility = postVisibility;
     const background = postBackground;
     const sessionId = session.sessionId;
+    if (editingPost) {
+      const key = `feed:edit:${editingPost.id}`;
+      if (actionLocks.current.has(key)) return;
+      actionLocks.current.add(key);
+      setPostEditBusy(true);
+      try {
+        const response = await apiFetch(`/api/posts/${editingPost.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content, visibility, background }),
+        });
+        const updated = await response.json().catch(() => null) as (Post & { error?: string }) | null;
+        if (sessionRef.current?.sessionId !== sessionId) return;
+        if (!response.ok || !updated || updated.id !== editingPost.id) {
+          throw new Error(updated?.error || "Không cập nhật được bài viết.");
+        }
+        syncFeedPost(updated);
+        restoreDraftAfterEdit();
+        setFeedComposerOpen(false);
+        setProfileComposerOpen(false);
+        setNotice("Đã cập nhật bài viết.", "success");
+      } catch (error) {
+        if (sessionRef.current?.sessionId === sessionId) {
+          setPostSubmitError(error instanceof Error ? error.message : "Không cập nhật được bài viết.");
+        }
+      } finally {
+        actionLocks.current.delete(key);
+        if (sessionRef.current?.sessionId === sessionId) setPostEditBusy(false);
+      }
+      return;
+    }
     actionLocks.current.add("feed:create");
     ++feedRevision.current;
     setPendingPost({
@@ -243,6 +368,8 @@ export function useFeedActions({
         ...current.filter((item) => item.id !== post.id),
       ]);
       setPostText("");
+      setPostTaggedFriends([]);
+      setPostFeelingId("");
       setPostAttachments([]);
       setPostBackground("");
       setShowPostBackgrounds(false);
@@ -479,6 +606,8 @@ export function useFeedActions({
   }
 
   return {
+    openEditPost,
+    restoreDraftAfterEdit,
     addComment,
     closeFeedPostDetails,
     createPost,

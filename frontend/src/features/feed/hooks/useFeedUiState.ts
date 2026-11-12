@@ -2,6 +2,21 @@ import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { type DiscussionDraft } from "../components/FeedDiscussion";
 import { type MediaAttachment } from "../../../shared/utils/media";
 import type { Tab } from "../../../app/types";
+import type { Post } from "../types";
+
+export type TaggedFriend = { id: number; username: string; displayName: string };
+
+export type PostDraftSnapshot = {
+  text: string;
+  tags: TaggedFriend[];
+  feelingId: string;
+  visibility: "public" | "friends" | "private";
+  background: string;
+  showBackgrounds: boolean;
+  attachments: MediaAttachment[];
+  checkInOpen: boolean;
+  location: string;
+};
 
 export type UseFeedUiStateDeps = {
   tab: Tab;
@@ -21,6 +36,7 @@ export function useFeedUiState({
       setFeedComposerOpen(false);
       setFeedCheckInOpen(false);
       setFeedCheckInLocation("");
+      setStoryDraftFile(null);
     }
   }, [tab]);
   const feedViewRef = useRef<HTMLDivElement>(null);
@@ -36,22 +52,30 @@ export function useFeedUiState({
   }, [activePostId, tab]);
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null);
   const [storyBusy, setStoryBusy] = useState(false);
+  const [storyDraftFile, setStoryDraftFile] = useState<File | null>(null);
   const [commentEditors, setCommentEditors] = useState<
     Record<number, DiscussionDraft>
   >({});
   const [postText, setPostText] = useState("");
+  const [postTaggedFriends, setPostTaggedFriends] = useState<TaggedFriend[]>([]);
+  const [postFeelingId, setPostFeelingId] = useState("");
   const [postVisibility, setPostVisibility] = useState<
     "public" | "friends" | "private"
   >("public");
   const [postBackground, setPostBackground] = useState("");
   const [showPostBackgrounds, setShowPostBackgrounds] = useState(false);
   const [postAttachments, setPostAttachments] = useState<MediaAttachment[]>([]);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [postEditBusy, setPostEditBusy] = useState(false);
+  const draftBeforeEdit = useRef<PostDraftSnapshot | null>(null);
 
   return {
     activePostId,
     activeStoryId,
     commentEditors,
     commentSortOrder,
+    draftBeforeEdit,
+    editingPost,
     feedCheckInLocation,
     feedCheckInOpen,
     feedCommunitiesOpen,
@@ -61,6 +85,9 @@ export function useFeedUiState({
     feedViewRef,
     postAttachments,
     postBackground,
+    postEditBusy,
+    postFeelingId,
+    postTaggedFriends,
     postText,
     postVisibility,
     searchHasScrolled,
@@ -68,6 +95,7 @@ export function useFeedUiState({
     setActiveStoryId,
     setCommentEditors,
     setCommentSortOrder,
+    setEditingPost,
     setFeedCheckInLocation,
     setFeedCheckInOpen,
     setFeedCommunitiesOpen,
@@ -75,12 +103,17 @@ export function useFeedUiState({
     setFeedFilter,
     setPostAttachments,
     setPostBackground,
+    setPostEditBusy,
+    setPostFeelingId,
+    setPostTaggedFriends,
     setPostText,
     setPostVisibility,
     setSearchHasScrolled,
+    setStoryDraftFile,
     setShowPostBackgrounds,
     setStoryBusy,
     showPostBackgrounds,
     storyBusy,
+    storyDraftFile,
   };
 }

@@ -691,7 +691,7 @@
   }
   .modern-shell.app-layout .social-chat-layout .messages .message {
     max-width: min(72%, 405px);
-    margin-bottom: 22px;
+    margin-bottom: 16px;
   }
   .modern-shell.app-layout
     .social-chat-layout
@@ -729,24 +729,31 @@
   }
   .modern-shell.app-layout .social-chat-layout .message:not(.mine) .bubble,
   .modern-shell.app-layout .social-chat-layout .message.mine .bubble {
-    padding: 14px 18px;
+    padding: 8px 12px;
     border: 0;
-    border-radius: 16px;
-    font-size: 13px;
-    line-height: 1.55;
+    border-radius: 14px;
+    font-size: 15px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
   }
   .modern-shell.app-layout .social-chat-layout .message.mine .bubble {
     background: linear-gradient(120deg, #2563eb, #8955f6);
+  }
+  .modern-shell.app-layout .social-chat-layout .messages .message .message-content {
+    margin-bottom: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout .messages .message .message-content:has(.message-reactions > .reaction-chip) {
+    margin-bottom: 12px;
   }
   .modern-shell.app-layout
     .social-chat-layout
     .message
     .message-content
-    > .bubble:has(> .message-reactions) {
+    > .bubble:has(> .message-reactions > .reaction-chip) {
     padding-bottom: 22px;
   }
   .modern-shell.app-layout .social-chat-layout .message-stamp {
-    margin-top: 8px;
+    margin-top: 4px;
     color: #8796ad;
     font-size: 10px;
   }

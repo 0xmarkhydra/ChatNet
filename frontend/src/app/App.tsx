@@ -274,7 +274,9 @@ import StoryOverlay from "../features/feed/components/StoryOverlay";
 import ProfileOverviewSection from "../features/profile/components/ProfileOverviewSection";
 import ProfileSection from "../features/profile/components/ProfileSection";
 import ChatSection from "../features/chat/components/ChatSection";
+import StoryDraftOverlay from "../features/feed/components/StoryDraftOverlay";
 import FeedComposerOverlay from "../features/feed/components/FeedComposerOverlay";
+import { usePostMentions } from "../features/feed/hooks/usePostMentions";
 import { useStoryActions } from "../features/feed/hooks/useStoryActions";
 import { useNearbyDiscovery } from "../features/discover/hooks/useNearbyDiscovery";
 import { useAccountSessions } from "../features/auth/hooks/useAccountSessions";
@@ -357,7 +359,7 @@ export default function App({
     navigate(path);
   };
   const tab: Tab = tabFromPath(location.pathname) ?? "chat";
-  const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, postAttachments, postBackground, postText, postVisibility, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setPostAttachments, setPostBackground, setPostText, setPostVisibility, setSearchHasScrolled, setShowPostBackgrounds, setStoryBusy, showPostBackgrounds, storyBusy } = useFeedUiState({ tab });
+  const { activePostId, activeStoryId, commentEditors, commentSortOrder, draftBeforeEdit, editingPost, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, postAttachments, postBackground, postEditBusy, postFeelingId, postTaggedFriends, postText, postVisibility, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setEditingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostTaggedFriends, setPostText, setPostVisibility, setSearchHasScrolled, setShowPostBackgrounds, setStoryBusy, setStoryDraftFile, showPostBackgrounds, storyBusy, storyDraftFile } = useFeedUiState({ tab });
 
   const setTab = (next: Tab) => navigateTo(TAB_PATH[next]);
   const desktopSection: "groups" | "calls" | null =
@@ -767,8 +769,6 @@ export default function App({
     };
   }, []);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
-  const feedImageInputRef = useRef<HTMLInputElement>(null);
-  const feedVideoInputRef = useRef<HTMLInputElement>(null);
   const feedAlbumInputRef = useRef<HTMLInputElement>(null);
   const storyFileInputRef = useRef<HTMLInputElement>(null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
@@ -1278,7 +1278,7 @@ export default function App({
   }
   const { connectUrl, copyInviteLink, openConnectSurface, shareMyProfile } = useInviteSharing({ session, setActiveConversationId, setFriendQuery, setNewChatMode, setNotice, setQuickCreateOpen, setTab });
 
-  const { addComment, closeFeedPostDetails, createPost, like, loadProfilePosts, manageFeedComment, openFeedPostDetails, removeFeedPost, reportFeedComment, syncFeedPost } = useFeedActions({ actionLocks, apiFetch, feedCheckInLocation, feedCheckInOpen, feedRevision, feedScrollBeforeComments, feedViewRef, followingFeed, isProfileDesktop, mediaUploading, name, postAttachments, postBackground, postSearch, postText, postVisibility, profileLoadSequence, profilePagingBusy, profilePosts, refreshPosts, removeFeedDataPost, session, sessionRef, setActivePostId, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setLikePreviews, setNotice, setPendingComments, setPendingPost, setPostAttachments, setPostBackground, setPosts, setPostSubmitError, setPostText, setProfileComposerOpen, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setSavedPosts, setShowPostBackgrounds, syncFeedDataPost, tab });
+  const { addComment, closeFeedPostDetails, createPost, like, loadProfilePosts, manageFeedComment, openEditPost, openFeedPostDetails, removeFeedPost, reportFeedComment, restoreDraftAfterEdit, syncFeedPost } = useFeedActions({ actionLocks, apiFetch, draftBeforeEdit, editingPost, feedCheckInLocation, feedCheckInOpen, feedRevision, feedScrollBeforeComments, feedViewRef, followingFeed, friends, isProfileDesktop, mediaUploading, name, pendingPost, postAttachments, postBackground, postEditBusy, postFeelingId, postSearch, postTaggedFriends, postText, postVisibility, profileLoadSequence, profilePagingBusy, profilePosts, refreshPosts, removeFeedDataPost, session, sessionRef, setActivePostId, setEditingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setLikePreviews, setNotice, setPendingComments, setPendingPost, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostSubmitError, setPostTaggedFriends, setPostText, setPostVisibility, setPosts, setProfileComposerOpen, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setSavedPosts, setShowPostBackgrounds, showPostBackgrounds, syncFeedDataPost, tab });
 
   const { clearActiveConversationHistory, createDirect, createGroup, createGroupChannel, openDirectByUsername, selectGroupChannel } = useConversationActions({ actionLocks, activeChannelIdRef, activeConversation, activeConversationId, activeConversationIdRef, activeGroupMember, apiFetch, conversations, directUsername, groupChannelBusy, groupChannels, historyActionBusy, membershipEventSequence, membershipSnapshot, messageScrollAtBottom, refreshConversations, responseCache, revokedConversationIds, session, sessionRef, setActiveConversationId, setChannelSelection, setChatCreateError, setChatSearchJump, setConversationDetailsOpen, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setHistoryActionBusy, setMessageActionId, setMessages, setMessageSearchOpen, setNewChatMode, setNotice, setReplyingTo, setSharedContentOpen, setTab, setTranslations });
 
@@ -2162,6 +2162,11 @@ export default function App({
     setFriendMenuId(null);
     setFriendPreview(null);
     setPostText("");
+    setPostTaggedFriends([]);
+    setPostFeelingId("");
+    setEditingPost(null);
+    setPostEditBusy(false);
+    draftBeforeEdit.current = null;
     setPosts([]);
     setSavedPosts([]);
     setHasMoreSavedPosts(false);
@@ -2406,7 +2411,7 @@ export default function App({
   );
   const { editOwnMessage, recallOwnMessage, retryQueuedChatMessages, sendMessage, toggleReaction } = useChatMessaging({ actionLocks, activeChannelIdRef, activeConversationId, activeConversationIdRef, apiFetch, canSend, channelDraftKey, chatOutboxRef, chatOutboxSession, draft, messageAttachments, messageChanges, messageText, ownSendScrollConversation, refreshConversations, replyingTo, retryOutboxBusy, selectedChannelId, sendingClientIDs, sendingRef, session, sessionRef, setChannelDrafts, setChatOnline, setMessageDrafts, setMessages, setNotice, setReactionPreviews, setReplyingTo, setTranslations, updateChatOutbox });
   const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
-  const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ apiFetch, mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, session, sessionRef, setActiveStoryId, setChatOnline, setNotice, setStories, setStoryBusy, storyBusy, updateChatOutbox, uploadMediaFiles });
+  const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ apiFetch, mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, session, sessionRef, setActiveStoryId, setChatOnline, setNotice, setStories, setStoryBusy, setStoryDraftFile, storyBusy, updateChatOutbox, uploadMediaFiles });
 
 
   useEffect(() => {
@@ -2463,13 +2468,29 @@ export default function App({
     });
   }, [messages, session?.sessionId]);
 
+  const { postMentions, openMentionPost, readPostMention } = usePostMentions({
+    sessionId: session?.sessionId,
+    apiFetch,
+    notificationsOpen: tab === "notifications",
+    setNotice,
+    setPosts,
+    setFeedCommunitiesOpen,
+    setTab,
+    setActivePostId,
+  });
+  const friendTaggedNames = useMemo(
+    () => Object.fromEntries(friends.map(friend => [friend.username, friend.displayName || friend.username])),
+    [friends],
+  );
+
   if (!session) return <AuthScreen {...auth} />;
 
   const unreadTotal = conversations.reduce(
     (sum, conversation) => sum + conversation.unreadCount,
     0,
   );
-  const notificationItemCount = countNotificationItems(friendRequests, conversations);
+  const notificationItemCount = countNotificationItems(friendRequests, conversations)
+    + postMentions.filter(mention => !mention.readAt).length;
   const notificationBadgeText = formatNotificationBadge(notificationItemCount);
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase("vi-VN");
   // The conversation sidebar is independent of the keyword. Only the dropdown searches.
@@ -2645,13 +2666,18 @@ export default function App({
     <PostComposer
       name={name}
       createPost={createPost}
+      editingPost={editingPost}
+      editBusy={postEditBusy}
       postComposerRef={postComposerRef}
       postBackground={postBackground}
       pendingPost={pendingPost}
       postText={postText}
       setPostText={setPostText}
-      feedImageInputRef={feedImageInputRef}
-      feedVideoInputRef={feedVideoInputRef}
+      taggableFriends={friends.filter((friend) => friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther)}
+      taggedFriends={postTaggedFriends}
+      setTaggedFriends={setPostTaggedFriends}
+      feelingId={postFeelingId}
+      setFeelingId={setPostFeelingId}
       feedAlbumInputRef={feedAlbumInputRef}
       addFeedFiles={addFeedFiles}
       postAttachments={postAttachments}
@@ -2667,9 +2693,12 @@ export default function App({
         profileMedia?.displayName || session.user.displayName || name
       }
       submitError={postSubmitError}
-      checkInOpen={feedComposerOpen && feedCheckInOpen}
+      checkInOpen={feedCheckInOpen}
       checkInLocation={feedCheckInLocation}
       setCheckInLocation={setFeedCheckInLocation}
+      setCheckInOpen={setFeedCheckInOpen}
+      uploadProgress={mediaUploadProgress}
+      cancelUpload={() => mediaUploadAbort.current?.abort()}
     />
   );
 
@@ -2741,6 +2770,8 @@ export default function App({
         showSave={showSave}
         likePreviews={likePreviews}
         like={like}
+        onEditPost={openEditPost}
+        taggedNames={friendTaggedNames}
       />
     ));
 
@@ -2933,6 +2964,9 @@ export default function App({
             setActivePostId(post.id);
           }}
           onUpdated={syncFeedPost}
+          onUserOpen={openVisitor}
+          onEditPost={openEditPost}
+          taggedNames={friendTaggedNames}
           updates={posts}
           onDeleted={removeFeedPost}
           feedback={setNotice}
@@ -3343,6 +3377,9 @@ export default function App({
           friendBusyIds={friendBusyIds}
           friendRequests={friendRequests}
           globalSearch={globalSearch}
+          mentions={postMentions}
+          onReadMention={readPostMention}
+          onOpenMention={openMentionPost}
           openVisitor={openVisitor}
           setActiveConversationId={setActiveConversationId}
           setProfileTimelineOpen={setProfileTimelineOpen}
@@ -3388,6 +3425,8 @@ export default function App({
           like={like}
           likePreviews={likePreviews}
           name={name}
+          onEditPost={openEditPost}
+          taggedNames={friendTaggedNames}
           openVisitor={openVisitor}
           postDiscussion={postDiscussion}
           profileMedia={profileMedia}
@@ -3409,7 +3448,8 @@ export default function App({
           apiFetch={apiFetch}
           conversationLoadingMore={conversationLoadingMore}
           conversations={conversations}
-          createStory={createStory}
+          addFeedFiles={addFeedFiles}
+          setStoryDraftFile={setStoryDraftFile}
           feedCommunitiesOpen={feedCommunitiesOpen}
           feedFilter={feedFilter}
           feedFiltersPill={feedFiltersPill}
@@ -3432,7 +3472,6 @@ export default function App({
           normalizedSearch={normalizedSearch}
           openVisitor={openVisitor}
           pendingPost={pendingPost}
-          postComposer={postComposer}
           postComposerRef={postComposerRef}
           posts={posts}
           postSearch={postSearch}
@@ -3665,11 +3704,22 @@ export default function App({
         )}
       </section>
 
-      {feedComposerOpen && tab === "feed" && isProfileDesktop && (
+      {storyDraftFile && tab === "feed" && (
+        <StoryDraftOverlay
+          storyDraftFile={storyDraftFile}
+          busy={storyBusy || mediaUploading === "story"}
+          createStory={createStory}
+          setStoryDraftFile={setStoryDraftFile}
+        />
+      )}
+      {feedComposerOpen && tab === "feed" && (
           <FeedComposerOverlay
+          editingPost={editingPost}
           mediaUploading={mediaUploading}
           pendingPost={pendingPost}
           postComposer={postComposer}
+          postEditBusy={postEditBusy}
+          restoreDraftAfterEdit={restoreDraftAfterEdit}
           setFeedCheckInOpen={setFeedCheckInOpen}
           setFeedComposerOpen={setFeedComposerOpen}
         />
@@ -3678,9 +3728,12 @@ export default function App({
         tab === "profile" &&
         (profileTimelineOpen || desktopProfileOverview) && (
           <ProfileOverlay
-            title="Tạo bài viết"
-            busy={!!pendingPost || mediaUploading === "feed"}
-            onClose={() => setProfileComposerOpen(false)}
+            title={editingPost ? "Chỉnh sửa bài viết" : "Tạo bài viết"}
+            busy={!!pendingPost || postEditBusy || mediaUploading === "feed"}
+            onClose={() => {
+              setProfileComposerOpen(false);
+              if (editingPost) restoreDraftAfterEdit();
+            }}
           >
             {postComposer}
           </ProfileOverlay>

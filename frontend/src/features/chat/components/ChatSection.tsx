@@ -1,5 +1,6 @@
 import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
+import LinkPreview from "./LinkPreview";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { userLabel } from "../../../shared/utils/userLabel";
 import ConversationCategories, { CategoryBadge, CategoryAssignment } from "./ConversationCategories";
@@ -1139,6 +1140,7 @@ export default function ChatSection({
                                         : <Fragment key={index}>{part.text}</Fragment>)}
                                     </span>
                                   )}
+                                  <LinkPreview text={message.text} cacheScope={session?.sessionId || ""} request={apiFetch} />
                                   {reactionControls}
                                   {!isTranslating && !effectiveAutoTranslate && translationView.mode === 'dual' && (
                                     <button type="button" className="chat-translation-action"

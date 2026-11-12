@@ -1,0 +1,63 @@
+/* Interactive Facebook-style post extras: mood, location and tagged profiles. */
+.feed-post-extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 11px;
+  margin: 5px 0 7px;
+  color: #647590;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.feed-post-extra-item {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+.feed-post-extra-item > svg { color: #7285a6; flex-shrink: 0; }
+.feed-post-extra-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  padding: 0 1px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: #2d5db4;
+  text-decoration: none;
+  text-align: left;
+  font: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.feed-post-extra-link strong { font-weight: 650; }
+.feed-post-extra-link:hover { color: #1e4b9c; text-decoration: underline; }
+.feed-post-extra-link:focus-visible { outline: 2px solid #7ca7f8; outline-offset: 2px; }
+.feed-post-extra-link:disabled { opacity: .72; cursor: default; text-decoration: none; }
+.feed-post-feeling { color: #66508d; }
+.feed-post-feeling:hover { color: #543990; }
+.feed-post-feeling > span { margin-right: 2px; font-size: 15px; }
+.feed-post-feeling-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 4px 9px;
+  border-radius: 9px;
+  background: #f5f0fc;
+  color: #675084;
+  font-size: 11px;
+}
+.feed-post-tag-entry { display: inline-flex; align-items: center; }
+.feed-post-extra-more { margin-left: 3px; font-weight: 600; }
+.post-comments-author .feed-post-extras { margin: 5px 0 4px; }
+.post-comments-author .feed-post-extras .feed-post-extra-link { font-size: 12px; }
+@media (max-width: 480px) {
+  .feed-post-extras { gap: 4px 9px; font-size: 11px; }
+}

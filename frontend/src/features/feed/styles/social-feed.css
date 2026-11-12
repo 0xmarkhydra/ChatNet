@@ -1016,3 +1016,70 @@
     transition: none;
   }
 }
+
+/* Keep discovery menus visible while the feed column scrolls.
+ * The rail stays within its grid track; if the screen is too short,
+ * the rail itself scrolls independently, without moving the posts. */
+@media (min-width: 1121px) {
+  .modern-shell.app-layout .social-feed-grid > .social-feed-side {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-sizing: border-box;
+    max-height: calc(100dvh - 126px);
+    min-height: 0;
+    padding: 0 5px 1px 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #c5d2e7 transparent;
+  }
+  .modern-shell.app-layout .social-feed-grid > .social-feed-side::-webkit-scrollbar {
+    width: 5px;
+  }
+  .modern-shell.app-layout .social-feed-grid > .social-feed-side::-webkit-scrollbar-thumb {
+    border-radius: 6px;
+    background: #c5d2e7;
+  }
+  .modern-shell.app-layout .social-feed-grid > .social-feed-side > * {
+    flex: 0 0 auto;
+  }
+}
+
+/* Retain a real side rail on compact laptop screens instead of pushing
+ * the three menus underneath the entire feed, where they cannot be seen. */
+@media (min-width: 1121px) and (max-width: 1330px) {
+  .modern-shell.app-layout .social-feed-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+    max-width: 1040px;
+    gap: 18px;
+    padding: 17px 18px 36px;
+  }
+  .modern-shell.app-layout .social-feed-grid > .social-feed-side {
+    grid-template-columns: none;
+  }
+  .modern-shell.app-layout .social-feed-translation {
+    grid-column: auto;
+    height: 250px;
+  }
+}
+
+/* Short desktop viewports: tighter cards first, then independent rail scroll
+ * when all three still cannot fit. */
+@media (min-width: 1121px) and (max-height: 780px) {
+  .modern-shell.app-layout .social-feed-grid > .social-feed-side { gap: 11px; }
+  .modern-shell.app-layout .social-feed-side-card { padding: 13px 15px 15px; }
+  .modern-shell.app-layout .social-feed-suggestions { min-height: 260px; }
+  .modern-shell.app-layout .social-feed-trending { min-height: 210px; }
+  .modern-shell.app-layout .social-feed-translation {
+    height: 205px;
+    padding: 17px 19px 19px;
+  }
+  .social-feed-translation h2 { font-size: 18px; }
+  .social-feed-translation-copy { margin-top: 9px; }
+  .social-feed-translation p { margin-top: 6px; }
+}
