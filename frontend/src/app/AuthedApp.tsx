@@ -465,7 +465,15 @@ export default function AuthedApp({
     kind: "message" | "post"; id: number; initialEmoji?: string;
     reactions?: { emoji: string; count: number }[];
   } | null>(null);
-  useEffect(() => { setReactionTarget(null); setForwardSource(null) }, [session?.sessionId]);
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setReactionTarget(null);
+      setForwardSource(null);
+    });
+    return () => { cancelled = true; };
+  }, [session?.sessionId]);
   const messageChanges = useRef(new Set<number>());
   const actionLocks = useRef(new Set<string>());
   const messageReceipts = useRef(new Map<string, Message | null>());

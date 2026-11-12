@@ -43,7 +43,7 @@ export default function ReactionParticipantsDialog({
   const pending = useRef<AbortController | null>(null)
   const requestRef = useRef(request)
   const closeRef = useRef<HTMLButtonElement>(null)
-  requestRef.current = request
+  useEffect(() => { requestRef.current = request }, [request])
 
   const loadPage = useCallback(async (offset: number) => {
     if (pending.current) return
@@ -95,10 +95,14 @@ export default function ReactionParticipantsDialog({
   useEffect(() => {
     pending.current?.abort()
     pending.current = null
-    setUsers([])
-    setHasMore(false)
-    void loadPage(0)
-    return () => { pending.current?.abort() }
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setUsers([])
+      setHasMore(false)
+      void loadPage(0)
+    })
+    return () => { cancelled = true; pending.current?.abort() }
   }, [loadPage])
 
   const total = reactions.reduce((sum, item) => sum + item.count, 0)

@@ -121,9 +121,12 @@ export default function MessageReadersDialog({
     let cancelled = false
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 30_000)
-    setLoading(true)
-    setError('')
-    setReaders([])
+    queueMicrotask(() => {
+      if (cancelled) return
+      setLoading(true)
+      setError('')
+      setReaders([])
+    })
 
     void requestRef.current(`/api/conversations/${conversationId}/members`, { signal: controller.signal })
       .then(async (response) => {
