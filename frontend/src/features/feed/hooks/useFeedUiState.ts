@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
+import { useScopedState } from "../../../shared/hooks/useScopedState";
 import { type DiscussionDraft } from "../components/FeedDiscussion";
 import type { Tab } from "../../../shared/types/navigation";
 
@@ -13,18 +14,12 @@ export function useFeedUiState({
   const [feedFilter, setFeedFilter] = useState<
     "all" | "following" | "latest" | "saved"
   >("all");
-  const [feedComposerOpen, setFeedComposerOpen] = useState(false);
-  const [feedCheckInOpen, setFeedCheckInOpen] = useState(false);
-  const [feedCheckInLocation, setFeedCheckInLocation] = useState("");
-  const [storyDraftFile, setStoryDraftFile] = useState<File | null>(null);
-  useEffect(() => {
-    if (tab !== "feed") {
-      setFeedComposerOpen(false);
-      setFeedCheckInOpen(false);
-      setFeedCheckInLocation("");
-      setStoryDraftFile(null);
-    }
-  }, [tab]);
+  // Ephemeral composer and check-in UI belongs to this tab visit. Scoped setters
+  // also reject late callbacks from a previous visit, including feed → other → feed.
+  const [feedComposerOpen, setFeedComposerOpen] = useScopedState(tab, false);
+  const [feedCheckInOpen, setFeedCheckInOpen] = useScopedState(tab, false);
+  const [feedCheckInLocation, setFeedCheckInLocation] = useScopedState(tab, "");
+  const [storyDraftFile, setStoryDraftFile] = useScopedState<File | null>(tab, null);
   const feedViewRef = useRef<HTMLDivElement>(null);
   const [searchHasScrolled, setSearchHasScrolled] = useState(false);
   const [activePostId, setActivePostId] = useState<number | null>(null);
