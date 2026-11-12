@@ -23,6 +23,7 @@ type Props = {
   likeBusy: boolean
   request: (path: string, init?: RequestInit) => Promise<Response>
   onLike: (post: Post, emoji?: string) => Promise<void>
+  onReactionUsers: (post: Post) => void
   onUpdated: (post: Post) => void
   onDeleted: (id: number) => void
   onFeedback: (message: string, kind?: ToastKind) => void
@@ -46,7 +47,7 @@ function relativeDate(value: string): string {
 
 export default function PostCommentsPage({
   post, username, ownDisplayName, token, targetLanguage, likeBusy,
-  request, onLike, onUpdated, onDeleted, onFeedback, onAuthorOpen, onEditPost, taggedNames,
+  request, onLike, onReactionUsers, onUpdated, onDeleted, onFeedback, onAuthorOpen, onEditPost, taggedNames,
   sortOrder, onSortChange, children,
 }: Props) {
   const page = useRef<HTMLElement>(null)
@@ -84,7 +85,11 @@ export default function PostCommentsPage({
             )}
             <div className="post-comments-post-footer">
               <div className="post-comments-stats">
-                <span className="feed-post-likes"><Heart size={20} aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích</span>
+                <button type="button" className="feed-post-likes feed-reaction-users-trigger"
+                  disabled={post.likes === 0} onClick={() => onReactionUsers(post)}
+                  aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`}>
+                  <Heart size={20} aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích
+                </button>
                 <span>{commentCount.toLocaleString('vi-VN')} bình luận{sharesLabel}</span>
               </div>
               <div className="post-comments-post-actions post-toolbar post-toolbar-compact">
