@@ -1,8 +1,8 @@
 {
-  "total": 187,
+  "total": 184,
   "byRule": {
-    "react-hooks/exhaustive-deps": 65,
-    "react-hooks/set-state-in-effect": 61,
+    "react-hooks/exhaustive-deps": 64,
+    "react-hooks/set-state-in-effect": 59,
     "react-hooks/refs": 46,
     "unused-disable-directive": 1,
     "react-hooks/immutability": 12,
@@ -10,7 +10,7 @@
   },
   "counts": {
     "src/app/App.tsx|react-hooks/exhaustive-deps": 1,
-    "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 31,
+    "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
     "src/app/AuthedApp.tsx|react-hooks/set-state-in-effect": 8,
     "src/app/DesktopBootstrap.tsx|react-hooks/set-state-in-effect": 1,
     "src/app/hooks/useAppRealtime.ts|react-hooks/exhaustive-deps": 1,
@@ -47,7 +47,6 @@
     "src/features/chat/components/SharedContent.tsx|react-hooks/refs": 1,
     "src/features/chat/components/SharedContent.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/chat/components/VoiceRecorder.tsx|react-hooks/exhaustive-deps": 1,
-    "src/features/chat/hooks/useChatPanelState.ts|react-hooks/set-state-in-effect": 2,
     "src/features/chat/hooks/useChatPins.ts|react-hooks/exhaustive-deps": 1,
     "src/features/chat/hooks/useChatPins.ts|react-hooks/set-state-in-effect": 1,
     "src/features/chat/hooks/useChatQuickSearch.ts|react-hooks/refs": 1,
