@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { loadPrivacy } from "../api/privacy";
 import type { UserPrivacy } from "../../profile/types";
 import { type Session } from "../../auth/lib/session";
 
@@ -29,7 +30,7 @@ export function usePrivacySettings({
     setPrivacyBusy(false);
     setPrivacyLoading(true);
     setPrivacyError("");
-    apiFetch("/api/privacy", { signal: controller.signal })
+    loadPrivacy(apiFetch, controller.signal)
       .then(async (response) => {
         if (!response.ok) throw new Error("Không thể tải quyền riêng tư.");
         return response.json() as Promise<UserPrivacy>;
