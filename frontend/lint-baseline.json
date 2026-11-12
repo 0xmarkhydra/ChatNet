@@ -1,8 +1,8 @@
 {
-  "total": 115,
+  "total": 114,
   "byRule": {
     "react-hooks/exhaustive-deps": 64,
-    "react-hooks/set-state-in-effect": 51
+    "react-hooks/set-state-in-effect": 50
   },
   "counts": {
     "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
@@ -51,7 +51,6 @@
     "src/features/feed/components/FeedDiscussion.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/feed/components/FeedModeration.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/feed/components/FeedModeration.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/feed/components/PostAudiencePicker.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/feed/components/SocialFeedSidebar.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/feed/components/StoryComposer.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/feed/components/StoryViewer.tsx|react-hooks/set-state-in-effect": 1,
