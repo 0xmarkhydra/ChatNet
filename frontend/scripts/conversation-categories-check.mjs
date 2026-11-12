@@ -70,7 +70,16 @@ try{
    })
    await page.goto(origin)
    const filter=page.getByLabel('Lọc hội thoại theo phân loại',{exact:true})
-   const selectCategory=async value=>{await filter.click();await page.locator('.conversation-categories .category-option input[value="'+value+'"]').locator('..').click()}
+   const ensureList=async()=>{
+    // Narrow desktop can hide its sidebar while a conversation is active.
+    if(!(await filter.isVisible())){await page.goto(origin);await filter.waitFor({state:'visible'})}
+   }
+   const openManager=async()=>{
+    await ensureList()
+    if(width<761)await filter.click() // Mobile keeps management inside the compact filter menu.
+    await page.getByRole('button',{name:'Quản lý thẻ phân loại',exact:true}).click()
+   }
+   const selectCategory=async value=>{await ensureList();await filter.click();await page.locator('.conversation-categories .category-option input[value="'+value+'"]').locator('..').click()}
    await page.locator('.conversation-categories .category-option').filter({hasText:'Gia đình'}).waitFor({state:'attached'})
    await filter.click()
    const popup=page.locator('.conversation-categories .category-popover')
@@ -90,7 +99,7 @@ try{
    await page.getByRole('button',{name:/Hội thoại chưa phân loại/}).waitFor()
    assert.equal(await page.locator('.conversation-list .conversation-item').count(),1)
    await selectCategory('all')
-   await page.getByRole('button',{name:'Quản lý thẻ phân loại',exact:true}).click()
+   await openManager()
    await page.getByLabel('Tên phân loại',{exact:true}).fill('Đồng nghiệp')
    await page.getByRole('radio',{name:'Màu Xanh lá',exact:true}).locator('..').click()
    await page.getByRole('button',{name:'Thêm thẻ',exact:true}).click()
@@ -127,6 +136,7 @@ try{
    await page.locator('.conversation-list [role="alert"]').waitFor({state:'detached'})
    await selectCategory('all')
    await page.locator('.conversation-list .conversation-item').first().click()
+   await page.waitForLoadState('networkidle')
    const beforeAssignmentReads=counts.get('/api/conversations')
    const beforeCategoryReads=counts.get('/api/conversation-categories')
    conversations.find(c=>c.id===100).categoryId=3
@@ -135,7 +145,7 @@ try{
    assert.equal(counts.get('/api/conversations'),beforeAssignmentReads,'Realtime assignment updates local state without reloading the list')
    assert.equal(counts.get('/api/conversation-categories'),beforeCategoryReads,'Realtime assignment keeps category definitions cached')
    if(width<768) await page.getByRole('button',{name:'Quay lại danh sách',exact:true}).click()
-   await page.getByRole('button',{name:'Quản lý thẻ phân loại',exact:true}).click()
+   await openManager()
    await page.getByRole('button',{name:'Xóa phân loại Công việc',exact:true}).click()
    await page.getByRole('button',{name:'Xác nhận xóa',exact:true}).click()
    await page.locator('.conversation-categories .category-option').filter({hasText:'Công việc'}).waitFor({state:'detached'})

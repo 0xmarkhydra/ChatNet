@@ -116,6 +116,27 @@ try {
       const quickSearch = header.locator('.appbar-search-anchor input')
       assert.equal(await quickSearch.isVisible(), true, width + ': existing quick search relocated under conversation title')
       assert.equal(await header.locator('.social-chat-list-filters').isVisible(), true, width + ': chat filters')
+      const compact = await page.evaluate(() => {
+        const heading = document.querySelector('.social-chat-list-title')
+        const search = document.querySelector('.social-chat-list-header .appbar-search')
+        const filters = [...document.querySelectorAll('.social-chat-list-filters button')]
+        const category = document.querySelector('.conversation-categories .category-filter-trigger')
+        const icon = category.querySelector('.category-filter-mobile-icon')
+        const list = document.querySelector('.zalo-conversation-list')
+        return { hiddenHeading: getComputedStyle(heading).display === 'none',
+          searchHeight: search.getBoundingClientRect().height,
+          filterTop: filters[0].getBoundingClientRect().top,
+          filterRight: filters.at(-1).getBoundingClientRect().right,
+          categoryTop: category.getBoundingClientRect().top,
+          categoryLeft: category.getBoundingClientRect().left,
+          visibleIcon: getComputedStyle(icon).display !== 'none',
+          listTop: list.getBoundingClientRect().top }
+      })
+      assert.ok(compact.hiddenHeading && compact.searchHeight <= 42 && compact.visibleIcon,
+        width + ': compact mobile heading, search and category icon: ' + JSON.stringify(compact))
+      assert.ok(Math.abs(compact.filterTop - compact.categoryTop) <= 3 && compact.filterRight < compact.categoryLeft,
+        width + ': all filters and the category icon share one row without overlap: ' + JSON.stringify(compact))
+      assert.ok(compact.listTop < 235, width + ': conversation list begins high enough to show more messages')
       await quickSearch.fill('Linh')
       await header.locator('.chat-quick-search').waitFor({ state: 'visible' })
       await quickSearch.fill('')
