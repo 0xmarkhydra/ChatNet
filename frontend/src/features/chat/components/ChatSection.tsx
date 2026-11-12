@@ -69,6 +69,7 @@ export type ChatSectionProps = {
   chatCreateError: string;
   chatDragActive: boolean;
   chatDragDepth: RefObject<number>;
+  setChatDragDepth: (next: number) => void;
   chatFileInputRef: RefObject<HTMLInputElement | null>;
   chatFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
   chatFriend: { id: number; username: string; displayName: string; online: boolean; } | null;
@@ -78,7 +79,7 @@ export type ChatSectionProps = {
   chatListQuery: string;
   chatOnline: boolean;
   chatOutbox: QueuedChatMessage[];
-  chatSearchJumpRevision: RefObject<number>;
+  nextChatSearchJumpRevision: () => number;
   clearActiveConversationHistory: () => Promise<void>;
   conversationBlocked: boolean;
   conversationCategories: { categories: ConversationCategory[]; selected: number | null; select: (id: number | null) => void; items: Conversation[]; hasMore: boolean; loading: boolean; busy: boolean; error: string; listError: string; load: (more?: boolean, force?: boolean) => Promise<void>; save: (value: Omit<ConversationCategory, "id">, id?: number) => Promise<boolean>; remove: (id: number) => Promise<boolean>; assign: (id: number, categoryId: number | null) => Promise<boolean>; refreshCategories: (force?: boolean) => Promise<void>; refreshFiltered: () => void; applyAssignment: (id: number, categoryId: number | null) => void; };
@@ -128,7 +129,7 @@ export type ChatSectionProps = {
   messageGapBefore: number | null;
   messageGapLoading: boolean;
   messageInputRef: RefObject<HTMLTextAreaElement | null>;
-  messageScrollAtBottom: RefObject<boolean>;
+  setMessageScrollAtBottom: (next: boolean) => void;
   messageSearchOpen: boolean;
   messageSending: boolean;
   messagesLoadingMore: boolean;
@@ -245,6 +246,7 @@ export default function ChatSection({
   chatCreateError,
   chatDragActive,
   chatDragDepth,
+  setChatDragDepth,
   chatFileInputRef,
   chatFiltersPill,
   chatFriend,
@@ -254,7 +256,7 @@ export default function ChatSection({
   chatListQuery,
   chatOnline,
   chatOutbox,
-  chatSearchJumpRevision,
+  nextChatSearchJumpRevision,
   clearActiveConversationHistory,
   conversationBlocked,
   conversationCategories,
@@ -304,7 +306,7 @@ export default function ChatSection({
   messageGapBefore,
   messageGapLoading,
   messageInputRef,
-  messageScrollAtBottom,
+  setMessageScrollAtBottom,
   messageSearchOpen,
   messageSending,
   messagesLoadingMore,
@@ -736,7 +738,7 @@ export default function ChatSection({
                 if (!transferHasFiles(event.dataTransfer)) return
                 event.preventDefault()
                 if (conversationBlocked) return
-                chatDragDepth.current += 1
+                setChatDragDepth(chatDragDepth.current + 1)
                 if (!chatDragActive) setChatDragActive(true)
               }}
               onDragOver={(event) => {
@@ -747,13 +749,13 @@ export default function ChatSection({
               onDragLeave={(event) => {
                 if (chatDragDepth.current === 0) return
                 event.preventDefault()
-                chatDragDepth.current = Math.max(0, chatDragDepth.current - 1)
+                setChatDragDepth(Math.max(0, chatDragDepth.current - 1))
                 if (chatDragDepth.current === 0) setChatDragActive(false)
               }}
               onDrop={(event) => {
                 if (!transferHasFiles(event.dataTransfer)) return
                 event.preventDefault()
-                chatDragDepth.current = 0
+                setChatDragDepth(0)
                 setChatDragActive(false)
                 if (conversationBlocked) return
                 void addChatFiles(Array.from(event.dataTransfer.files))
@@ -997,7 +999,7 @@ export default function ChatSection({
                                 onClick={() => setChatSearchJump({
                                   conversationId: activeConversation.id,
                                   messageId: pin.message.id,
-                                  revision: ++chatSearchJumpRevision.current,
+                                  revision: nextChatSearchJumpRevision(),
                                 })}>
                                 <strong>{userLabel(pin.message.senderDisplayName, pin.message.sender)}</strong>
                                 <span>{pin.message.text || attachmentLabel(pin.message.attachments) || 'Tin nhắn'}</span>
@@ -1085,14 +1087,14 @@ export default function ChatSection({
                         setChatSearchJump({
                           conversationId: activeConversation.id,
                           messageId: result.id,
-                          revision: ++chatSearchJumpRevision.current,
+                          revision: nextChatSearchJumpRevision(),
                         })
                       }}
                     />
                   )}
                   <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
                     const element = event.currentTarget
-                    messageScrollAtBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100
+                    setMessageScrollAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < 100)
                   }}>
                     {hasMoreMessages && (
                       <button type="button" className="soco-load-more soco-older-messages"
