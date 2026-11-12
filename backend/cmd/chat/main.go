@@ -182,6 +182,7 @@ func main() {
 	mux.Handle("GET /api/conversations/{id}/notification-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getGroupNotificationPreferences)))
 	mux.Handle("PUT /api/conversations/{id}/notification-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.putGroupNotificationPreferences)))
 	mux.Handle("GET /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupChannels)))
+	mux.Handle("POST /api/conversations/{id}/channel-read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markGroupChannelRead)))
 	mux.Handle("POST /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupChannel)))
 	mux.Handle("PATCH /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupChannel)))
 	mux.Handle("DELETE /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteGroupChannel)))
@@ -631,7 +632,12 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
 		         (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		           (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))) ORDER BY m.id DESC LIMIT 1),c.created_at),
-		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id
+             AND m.id>CASE WHEN c.type='group' THEN COALESCE((
+               SELECT gcr.last_read_message_id FROM group_channel_reads gcr
+               WHERE gcr.conversation_id=c.id AND gcr.user_id=$1 AND gcr.channel_id=COALESCE(m.channel_id,0)
+             ),cm.last_read_message_id) ELSE cm.last_read_message_id END
+             AND m.id>cm.cleared_through_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0)
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
@@ -642,7 +648,12 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		  AND ($8::text='' OR c.type=$8)
 		  AND ($7::boolean=FALSE OR EXISTS (
 		    SELECT 1 FROM messages unread
-		    WHERE unread.conversation_id=c.id AND unread.id>cm.last_read_message_id AND unread.user_id<>$1
+		    WHERE unread.conversation_id=c.id
+              AND unread.id>CASE WHEN c.type='group' THEN COALESCE((
+                SELECT gcr.last_read_message_id FROM group_channel_reads gcr
+                WHERE gcr.conversation_id=c.id AND gcr.user_id=$1 AND gcr.channel_id=COALESCE(unread.channel_id,0)
+              ),cm.last_read_message_id) ELSE cm.last_read_message_id END
+              AND unread.id>cm.cleared_through_message_id AND unread.user_id<>$1
 		      AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		        (b.blocker_id=$1 AND b.blocked_id=unread.user_id) OR (b.blocked_id=$1 AND b.blocker_id=unread.user_id))
 		  ))
