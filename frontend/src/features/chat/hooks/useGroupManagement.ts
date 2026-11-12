@@ -3,7 +3,7 @@ import type { Session } from '../../auth/lib/session'
 import type { Tab } from '../../../shared/types/navigation'
 import type { FriendConnection } from '../../contacts/types'
 import type { Conversation, GroupMember } from '../types'
-import type { ToastKind } from '../../notifications/utils/toast'
+import type { ToastKind } from '../../../shared/utils/toast'
 
 type Options = {
   session: Session | null

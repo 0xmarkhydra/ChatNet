@@ -3,7 +3,7 @@ import type { ManagedAccountSession } from "../types";
 import { API } from "../../../shared/lib/config";
 import { type Session } from "../lib/session";
 import { type SetStateAction } from "react";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 
 export type UseAccountSessionsDeps = {

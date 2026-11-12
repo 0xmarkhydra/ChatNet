@@ -2,7 +2,7 @@ import type { FriendSearchResult, FriendConnection } from "../types";
 import { type Conversation } from "../../chat/types";
 import { type Session } from "../../auth/lib/session";
 import { type SetStateAction } from "react";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject } from "react";
 

@@ -3,7 +3,7 @@ import { type MediaAttachment } from "../../../shared/utils/media";
 import { copyChatImage } from "../lib/messageClipboard";
 import { type MessageCopyTarget } from "../utils/messageCopyTarget";
 import { type SetStateAction } from "react";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch } from "react";
 
 export type UseMessageClipboardDeps = {

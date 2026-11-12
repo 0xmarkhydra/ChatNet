@@ -10,7 +10,7 @@ import UserAvatar from '../../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../../shared/ui/MediaAttachmentsView'
 import { userLabel } from '../../../shared/utils/userLabel'
 import { API } from '../../../shared/lib/config'
-import type { ToastKind } from '../../notifications/utils/toast'
+import type { ToastKind } from '../../../shared/utils/toast'
 
 type SortOrder = 'newest' | 'oldest'
 

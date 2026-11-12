@@ -2,7 +2,7 @@ import { getCurrentPositionSmart, geolocationErrorMessage } from "../lib/geoloca
 import type { FriendSearchResult } from "../../contacts/types";
 import { type Session } from "../../auth/lib/session";
 import { type SetStateAction } from "react";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 
 export type UseNearbyDiscoveryDeps = {

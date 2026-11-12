@@ -5,7 +5,7 @@ import { type CommunityCreationExtras } from "../components/CommunityGroupWizard
 import { SessionResponseCache } from "../../../shared/lib/sessionCache";
 import { type Session } from "../../auth/lib/session";
 import type { FriendSearchResult } from "../../contacts/types";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject } from "react";
 

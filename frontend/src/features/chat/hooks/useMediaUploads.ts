@@ -4,7 +4,7 @@ import { emptyDraft, type MessageDraft } from "../types";
 import { uploadPresignedFile } from "../lib/mediaUpload";
 import { type Post } from "../../feed/types";
 import { type Session } from "../../auth/lib/session";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 
 export type UseMediaUploadsDeps = {

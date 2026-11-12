@@ -4,7 +4,7 @@ import { saveAppLocalePreference } from "../../i18n/lib/i18n";
 import { type ChatTranslationSettings, persistConversationTranslationSettings, type ConversationTranslationSettingsMap } from "../lib/conversationTranslationSettings";
 import { type Message } from "../types";
 import { type Session } from "../../auth/lib/session";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 
 export type UseTranslationActionsDeps = {

@@ -3,7 +3,7 @@ import { type Post } from "../types";
 import type { ProfileMediaState } from "../../profile/types";
 import { type Session } from "../../auth/lib/session";
 import { type SetStateAction } from "react";
-import { type ToastKind } from "../../notifications/utils/toast";
+import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, ReactNode } from "react";
 
 export type FeedPostDetailProps = {

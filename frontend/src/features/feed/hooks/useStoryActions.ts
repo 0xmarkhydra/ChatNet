@@ -3,23 +3,20 @@ import { type Story } from "../types";
 import { type QueuedChatMessage, enqueueChatMessage } from "../../chat/lib/chatOutbox";
 import { userLabel } from "../../../shared/utils/userLabel";
 import { type Conversation } from "../../chat/types";
-import { type Session } from "../../auth/lib/session";
+import { useSession } from "../../../shared/context/SessionContext";
+import { useApi } from "../../../shared/context/ApiContext";
+import { useNotice } from "../../../shared/context/NoticeContext";
 import { type SetStateAction } from "react";
-import { type ToastKind } from "../../notifications/utils/toast";
 import type { Dispatch, RefObject } from "react";
 
 export type UseStoryActionsDeps = {
-  apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   mediaUploading: "chat" | "feed" | "story" | "profile" | null;
   name: string;
   openDirectByUsername: (username: string, mediaType?: "audio" | "video", onOpened?: (conversation: Conversation) => void) => Promise<void>;
   ownSendScrollConversation: RefObject<number | null>;
   retryQueuedChatMessages: () => Promise<void>;
-  session: Session | null;
-  sessionRef: RefObject<Session | null>;
   setActiveStoryId: Dispatch<SetStateAction<number | null>>;
   setChatOnline: Dispatch<SetStateAction<boolean>>;
-  setNotice: (message: string, kind?: ToastKind) => void;
   setStories: Dispatch<SetStateAction<Story[]>>;
   setStoryBusy: Dispatch<SetStateAction<boolean>>;
   setStoryDraftFile: Dispatch<SetStateAction<File | null>>;
@@ -29,17 +26,13 @@ export type UseStoryActionsDeps = {
 };
 
 export function useStoryActions({
-  apiFetch,
   mediaUploading,
   name,
   openDirectByUsername,
   ownSendScrollConversation,
   retryQueuedChatMessages,
-  session,
-  sessionRef,
   setActiveStoryId,
   setChatOnline,
-  setNotice,
   setStories,
   setStoryBusy,
   setStoryDraftFile,
@@ -47,6 +40,9 @@ export function useStoryActions({
   updateChatOutbox,
   uploadMediaFiles,
 }: UseStoryActionsDeps) {
+  const { session, sessionRef } = useSession();
+  const { apiFetch } = useApi();
+  const { setNotice } = useNotice();
   async function createStory(file?: File) {
     if (!file || storyBusy || mediaUploading) return;
     const sessionId = session?.sessionId;
