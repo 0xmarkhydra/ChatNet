@@ -1,5 +1,5 @@
 import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
-import type { AppDataContext } from '../../../app/dataTypes'
+import type { AppDataContext } from '../../../shared/types/api'
 import { FEED_PAGE_SIZE, type Post, type Story } from '../types'
 type Options = AppDataContext & {
   actionLocks: RefObject<Set<string>>

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import App from '../app/App'
-import DesktopScreenPicker from './DesktopScreenPicker'
+import App from './App'
+import DesktopScreenPicker from '../platform/DesktopScreenPicker'
 import { parseSession, type Session } from '../features/auth/lib/session'
 import { clearChatPersistence, configureChatPersistenceStore } from '../features/chat/lib/chatPersistence'
 import { clearChatOutbox } from '../features/chat/lib/chatOutbox'
 import { API } from '../shared/lib/config'
-import { desktopBridge, initializeDesktopPlatform } from './desktop'
+import { desktopBridge, initializeDesktopPlatform } from '../platform/desktop'
 
 type Startup = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready'; session: Session | null }
 

@@ -1,4 +1,4 @@
-import type { Tab } from "../types";
+import type { Tab } from "../../shared/types/navigation";
 
 export type DesktopSection = "groups" | "calls" | null;
 

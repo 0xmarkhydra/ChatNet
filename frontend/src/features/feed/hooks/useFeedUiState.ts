@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { type DiscussionDraft } from "../components/FeedDiscussion";
 import { type MediaAttachment } from "../../../shared/utils/media";
 import { type Post } from "../types";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 
 export type UseFeedUiStateDeps = {
   tab: Tab;

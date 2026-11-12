@@ -4,7 +4,7 @@ import { type Conversation } from "../../chat/types";
 import type { PostMentionNotification } from "../../feed/utils/postMentionNotifications";
 import { type SetStateAction } from "react";
 import { type FriendsScreen } from "../../contacts/components/ContactsView";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch } from "react";
 
 export type NotificationsSectionProps = {

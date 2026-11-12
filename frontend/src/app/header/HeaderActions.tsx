@@ -1,7 +1,7 @@
 import { Bell, MessageCircle, PencilLine, Search, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import UiIcon from "../../shared/ui/UiIcon";
-import type { Tab } from "../types";
+import type { Tab } from "../../shared/types/navigation";
 import type { DesktopSection } from "./headerContext";
 
 export type HeaderActionsProps = {

@@ -30,7 +30,7 @@ import { isDesktopBuild } from '../../../platform/desktop'
 import { requireDesktopMedia } from '../../../platform/desktopMedia'
 import CallDeviceSettings from './CallDeviceSettings'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import { notifyDesktopCall, dismissDesktopCall } from '../../../platform/useDesktopNotifications'
+import { notifyDesktopCall, dismissDesktopCall } from '../../chat/hooks/useDesktopNotifications'
 import '../styles/call.css'
 
 type ConversationLite = { id: number; name: string; type: 'direct' | 'group'; otherUsername?: string; blocked?: boolean }

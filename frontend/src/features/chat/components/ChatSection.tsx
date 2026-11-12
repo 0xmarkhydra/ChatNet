@@ -31,7 +31,7 @@ import { type GroupChannel } from "../utils/groupChannels";
 import { type MediaAttachment } from "../../../shared/utils/media";
 import { type Session } from "../../auth/lib/session";
 import { type ToastKind } from "../../notifications/utils/toast";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 import { UI_MESSAGES } from "../../i18n/lib/i18n";
 import type { ConversationCategory } from "../hooks/useConversationCategories";
 import type { GroupActivity } from "./GroupActivities";

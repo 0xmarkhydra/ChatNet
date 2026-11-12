@@ -15,7 +15,7 @@ import { type Post, type Story } from "../types";
 import type { ProfileMediaState } from "../../profile/types";
 import { type Session } from "../../auth/lib/session";
 import { type SetStateAction } from "react";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject, ReactNode } from "react";
 
 export type FeedSectionProps = {

@@ -191,3 +191,16 @@ src/
 | `shared/lib/optimistic.ts` | `shared/utils/optimistic.ts` |
 | `shared/lib/userLabel.ts` | `shared/utils/userLabel.ts` |
 | `design-system/motion.css` | `styles/motion.css` |
+
+## Hướng phụ thuộc (cập nhật)
+
+`app → features → shared`; `platform` không import `features` hoặc `app`. Các file sau đã được chuyển để đúng hướng này:
+
+| Cũ | Mới |
+|---|---|
+| `app/types.ts` (`Tab`) | `shared/types/navigation.ts` |
+| `app/dataTypes.ts` (`ApiRequest`, `Notice`, `AppDataContext`) | `shared/types/api.ts` |
+| `platform/useDesktopNotifications.ts` | `features/chat/hooks/useDesktopNotifications.ts` |
+| `platform/DesktopBootstrap.tsx` | `app/DesktopBootstrap.tsx` |
+
+Kiểu `Session`, `ManagedAccountSession` và `ToastKind` nay được định nghĩa ở `shared/types/` (`session.ts`, `notice.ts`). Các đường import cũ (`features/auth/lib/session`, `features/auth/types`, `features/notifications/utils/toast`) vẫn export lại đúng tên nên code đang có không bị vỡ.

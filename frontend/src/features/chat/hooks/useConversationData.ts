@@ -1,5 +1,5 @@
 import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
-import type { AppDataContext } from '../../../app/dataTypes'
+import type { AppDataContext } from '../../../shared/types/api'
 import { CHAT_LIST_PAGE_SIZE, type Conversation, type MessageDraft } from '../types'
 type Options = AppDataContext & {
   activeConversationIdRef: RefObject<number | null>

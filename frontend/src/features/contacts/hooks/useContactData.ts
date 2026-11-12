@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { AppDataContext } from '../../../app/dataTypes'
+import type { AppDataContext } from '../../../shared/types/api'
 import type { FriendConnection } from '../types'
 type Options = AppDataContext
 export function useContactData({

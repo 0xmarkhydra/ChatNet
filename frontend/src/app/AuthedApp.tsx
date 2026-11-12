@@ -14,7 +14,7 @@ import "../features/chat/styles/chat-pins.css";
 import { getMessageTranslationView } from "../features/chat/utils/messageTranslationPresentation";
 import { useApiRequest } from "./hooks/useApiRequest";
 import { useAppRealtime } from "./hooks/useAppRealtime";
-import { useDesktopNotifications } from "../platform/useDesktopNotifications";
+import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
 import {
@@ -54,7 +54,7 @@ import {
   type NewChatMode,
 } from "../features/chat/types";
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
-import type { Tab } from "./types";
+import type { Tab } from "../shared/types/navigation";
 import type {
   FriendSearchResult,
   FriendConnection,

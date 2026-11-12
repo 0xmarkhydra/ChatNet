@@ -2,7 +2,7 @@ import CallCenter from "./CallCenter";
 import { type Session } from "../../auth/lib/session";
 import { type SetStateAction } from "react";
 import { type FriendsScreen } from "../../contacts/components/ContactsView";
-import type { Tab } from "../../../app/types";
+import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, ReactNode } from "react";
 
 export type CallsSectionProps = {

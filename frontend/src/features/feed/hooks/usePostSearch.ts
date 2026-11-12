@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ApiRequest } from "../../../app/dataTypes";
+import type { ApiRequest } from "../../../shared/types/api";
 import type { Post } from "../types";
 
 const SEARCH_PAGE_SIZE = 5;

@@ -1,9 +1,6 @@
-export type Session = {
-  token: string
-  refreshToken?: string
-  sessionId: string
-  user: { id: number; email: string; username: string; displayName: string }
-}
+import type { Session } from '../../../shared/types/session'
+
+export type { Session }
 
 export function parseSession(value: unknown): Session | null {
   if (!value || typeof value !== 'object') return null

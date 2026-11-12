@@ -1,5 +1,4 @@
-import type { Session } from '../features/auth/lib/session'
-import type { ManagedAccountSession } from '../features/auth/types'
+import type { Session, ManagedAccountSession } from '../shared/types/session'
 
 export type DesktopPlatformInfo = {
   platform: 'darwin' | 'win32' | 'linux'

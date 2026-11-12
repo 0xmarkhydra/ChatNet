@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AppDataContext } from '../../../app/dataTypes'
+import type { AppDataContext } from '../../../shared/types/api'
 import { CHAT_LIST_PAGE_SIZE, type Conversation } from '../types'
 export type ConversationCategory = { id: number; name: string; color: string }
 type Options = AppDataContext & { mergeConversations: (items: Conversation[]) => void; setCategory: (id: number, categoryId: number | null) => void; clearCategory: (categoryId: number) => void }

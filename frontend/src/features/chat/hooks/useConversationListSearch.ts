@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ApiRequest } from '../../../app/dataTypes'
+import type { ApiRequest } from '../../../shared/types/api'
 import { CHAT_LIST_PAGE_SIZE, type Conversation } from '../types'
 
 export type ConversationListFilter = 'all' | 'unread' | 'groups'

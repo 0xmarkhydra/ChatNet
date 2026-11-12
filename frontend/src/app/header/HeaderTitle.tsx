@@ -1,4 +1,4 @@
-import type { Tab } from "../types";
+import type { Tab } from "../../shared/types/navigation";
 import type { GroupWorkspaceMode } from "../../features/chat/components/CommunityGroupsPage";
 import type { DesktopSection } from "./headerContext";
 

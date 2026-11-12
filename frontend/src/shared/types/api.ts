@@ -1,6 +1,6 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react'
-import type { Session } from '../features/auth/lib/session'
-import type { ToastKind } from '../features/notifications/utils/toast'
+import type { Session } from './session'
+import type { ToastKind } from './notice'
 
 export type ApiRequest = (path: string, init?: RequestInit) => Promise<Response>
 export type Notice = (message: string, kind?: ToastKind) => void
