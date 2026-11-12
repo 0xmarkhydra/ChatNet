@@ -1,4 +1,4 @@
-import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash } from "lucide-react";
+import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { userLabel } from "../../../shared/utils/userLabel";
@@ -11,9 +11,10 @@ import { CallHeaderActions } from "../../calls/components/CallManager";
 import { createPortal } from "react-dom";
 import SharedContent from "./SharedContent";
 import MessageSearchPanel from "./MessageSearchPanel";
+import MessageReadersDialog, { MessageReadersInline } from "./MessageReadersDialog";
 import { getMessageTranslationView } from "../utils/messageTranslationPresentation";
 import { messageReactionLabel } from "../utils/messageReactions";
-import { Fragment, FormEvent, useState, type SetStateAction } from "react";
+import { Fragment, FormEvent, useMemo, useState, type SetStateAction } from "react";
 import { GroupActivityMarker, GroupActivityComposerMenu, type GroupActivityKind } from "./GroupActivities";
 import { messageTextParts, messageLinkHref } from "../lib/messageClipboard";
 import LinkPreview from "./LinkPreview";
@@ -69,7 +70,7 @@ export type ChatSectionProps = {
   chatDragActive: boolean;
   chatDragDepth: RefObject<number>;
   chatFileInputRef: RefObject<HTMLInputElement | null>;
-  chatFiltersPill: { setHost: (node: HTMLDivElement | null) => void; setActive: (node: HTMLButtonElement | null) => void; setPill: (node: HTMLSpanElement | null) => void; };
+  chatFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
   chatFriend: { id: number; username: string; displayName: string; online: boolean; } | null;
   chatFriendRelationship: "accepted" | "incoming" | "outgoing" | "none";
   chatListConversations: Conversation[];
@@ -140,6 +141,8 @@ export type ChatSectionProps = {
   openGroupSettings: (conversation: Conversation) => void;
   openMessageActions: (message: Message, target?: EventTarget | null) => void;
   openMessageReactions: (message: Message) => void;
+  onReactionUsers: (message: Message, emoji: string) => void;
+  onForwardMessage: (message: Message) => void;
   openVisitor: (username: string) => void;
   pinBusy: boolean;
   pinnedExpanded: boolean;
@@ -314,6 +317,8 @@ export default function ChatSection({
   openGroupSettings,
   openMessageActions,
   openMessageReactions,
+  onReactionUsers,
+  onForwardMessage,
   openVisitor,
   pinBusy,
   pinnedExpanded,
@@ -388,7 +393,23 @@ export default function ChatSection({
   visibleLanguageOptions,
   visibleMessages,
 }: ChatSectionProps) {
-  const { setHost: chatFiltersPillSetHost, setActive: chatFiltersPillSetActive, setPill: chatFiltersPillSetPill } = chatFiltersPill;
+  const { hostRef: chatFiltersPillSetHost, activeRef: chatFiltersPillSetActive, pillRef: chatFiltersPillSetPill } = chatFiltersPill;
+  const [readersTarget, setReadersTarget] = useState<{ message: Message; sessionId: string } | null>(null);
+  const readersMessage = readersTarget?.sessionId === session.sessionId ? readersTarget.message : null;
+  const messageReaderMembers = useMemo(() => {
+    if (!activeConversation) return [];
+    if (activeConversation.type === "group") return groupMembers;
+    if (!activeConversation.otherUserId) return [];
+    const friend = friends.find((item) => item.id === activeConversation.otherUserId);
+    if (friend) return [friend];
+    return activeConversation.otherUsername
+      ? [{
+          id: activeConversation.otherUserId,
+          username: activeConversation.otherUsername,
+          displayName: activeConversation.name || activeConversation.otherUsername,
+        }]
+      : [];
+  }, [activeConversation, friends, groupMembers]);
   const [groupPhotoBusy, setGroupPhotoBusy] = useState(false);
   const [channelSidebarOpen, setChannelSidebarOpen] = useState(false);
   const [groupManagementSection, setGroupManagementSection] = useState<GroupManagementSection>('members');
@@ -1116,10 +1137,9 @@ export default function ChatSection({
                               key={reaction.emoji}
                               type="button"
                               disabled={reactionPreviews[message.id] !== undefined}
-                              aria-pressed={reaction.mine}
                               className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
-                              onClick={() => void toggleReaction(message, reaction.emoji)}
-                              aria-label={`${messageReactionLabel(reaction.emoji)}: ${reaction.count} lượt`}
+                              onClick={() => onReactionUsers(message, reaction.emoji)}
+                              aria-label={`Xem ${reaction.count} người thả ${messageReactionLabel(reaction.emoji)}`}
                             >
                               {reaction.emoji} {reaction.count}
                             </button>
@@ -1197,6 +1217,9 @@ export default function ChatSection({
                             <div className="bubble recalled-message">Tin nhắn đã được thu hồi</div>
                           ) : (
                             <div className="message-content">
+                              {message.forwarded && (
+                                <span className="chat-forwarded-caption">Đã chuyển tiếp 1 tin nhắn</span>
+                              )}
                               {message.text && (
                                 <div className={`bubble${translationView.mode === 'dual' ? ' chat-translation-dual' : ''}${translationView.mode === 'translated' ? ' translated-bubble translation-flip-bubble' : ''}`}>
                                   <span
@@ -1269,15 +1292,40 @@ export default function ChatSection({
                                 </div>
                               )}
                               {!message.text && reactionControls}
+                              {!conversationBlocked && (
+                                <div className="chat-message-hover-toolbar" role="group" aria-label="Thao tác tin nhắn">
+                                  <button type="button" title="Trả lời" aria-label="Trả lời tin nhắn"
+                                    onClick={() => { setReplyingTo(message); messageInputRef.current?.focus() }}>
+                                    <CornerUpLeft size={18} strokeWidth={2} aria-hidden="true" />
+                                  </button>
+                                  <button type="button" title="Chuyển tiếp" aria-label="Chuyển tiếp tin nhắn"
+                                    onClick={() => onForwardMessage(message)}>
+                                    <Forward size={18} aria-hidden="true" />
+                                  </button>
+                                  {Boolean(message.text.trim()) && (
+                                    <button type="button" title="Dịch" aria-label="Dịch tin nhắn"
+                                      disabled={isTranslating}
+                                      onClick={() => void translateMessage(message)}>
+                                      <Languages size={18} aria-hidden="true" />
+                                    </button>
+                                  )}
+                                  <button type="button" title="Thêm tùy chọn" aria-label="Thêm tùy chọn tin nhắn"
+                                    onClick={(event) => openMessageActions(message, event.currentTarget)}>
+                                    <MoreHorizontal size={18} aria-hidden="true" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
                           <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
                             {formatTime(message.createdAt)}
                             {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
                             {mine && (message.readByUserIds?.length || 0) > 0
-                              ? activeConversation.type === 'group'
-                                ? ` · ${message.readByUserIds?.length} đã xem`
-                                : ' · Đã xem'
+                              ? <MessageReadersInline
+                                  readerIds={message.readByUserIds || []}
+                                  members={messageReaderMembers}
+                                  onOpen={() => setReadersTarget({ message, sessionId: session.sessionId })}
+                                />
                               : ''}
                           </div>
                         </article>
@@ -1522,6 +1570,15 @@ export default function ChatSection({
                   />
                 </aside>
               </>
+            )}
+            {readersMessage && readersMessage.conversationId === activeConversationId && (
+              <MessageReadersDialog
+                key={readersMessage.id}
+                conversationId={readersMessage.conversationId}
+                readerIds={readersMessage.readByUserIds || []}
+                request={apiFetch}
+                onClose={() => setReadersTarget(null)}
+              />
             )}
           </div>
   );

@@ -1,15 +1,15 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import QRCode from 'qrcode'
-import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Heart, MessageCircle, MoreHorizontal, Phone, Plus, QrCode, RefreshCw, Search, ShieldCheck, UserRound, UserRoundPlus, Users, Video, X } from 'lucide-react'
+import { Fragment, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { Phone, Plus, RefreshCw, Search, Users, Video, X } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from '../types'
 import type { Conversation } from '../../chat/types'
-import { CallHeaderActions } from '../../calls/components/CallManager'
+import ContactCallConversationSection from './ContactCallConversationSection'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import ContactInvitations from './ContactInvitations'
+import ContactFriendProfile from './ContactFriendProfile'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
+import { useContactDirectory, type DirectoryFilter } from '../hooks/useContactDirectory'
 
 export type FriendsScreen = 'directory' | 'invitations'
-type InvitationTab = 'incoming' | 'sent' | 'qr'
-type DirectoryFilter = 'alphabetical' | 'online' | 'favorites'
 type Props = {
   screen: FriendsScreen
   onScreenChange: (screen: FriendsScreen) => void
@@ -60,48 +60,13 @@ export default function ContactsView({
   callConversations = [], onOpenCallChat,
 }: Props) {
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
-  const [invitationTab, setInvitationTab] = useState<InvitationTab>('incoming')
-  const { setHost: directoryPillSetHost, setActive: directoryPillSetActive, setPill: directoryPillSetPill } = useSlidingPill<HTMLDivElement>(directoryFilter)
-  const { setHost: invitationPillSetHost, setActive: invitationPillSetActive, setPill: invitationPillSetPill } = useSlidingPill<HTMLDivElement>(invitationTab)
+  const { hostRef: filterHostRef, pillRef: filterPillRef, activeRef: filterActiveRef } = useSlidingPill<HTMLDivElement>(directoryFilter)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [expandedFriendId, setExpandedFriendId] = useState<number | null>(null)
-  const [qrImage, setQrImage] = useState('')
-  const [copyStatus, setCopyStatus] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
-  const incoming = friendRequests.filter(friend => friend.direction === 'incoming')
-  const outgoing = friendRequests.filter(friend => friend.direction === 'outgoing')
   const searching = !embeddedInCalls && Boolean(friendQuery.trim())
 
-  const visibleFriends = useMemo(() => {
-    const query = embeddedInCalls ? friendQuery.trim().toLocaleLowerCase('vi-VN') : ''
-    const items = [...friends].filter(friend => {
-      const inFilter = directoryFilter === 'online' ? friend.online :
-        directoryFilter === 'favorites' ? Boolean(contactMetadata[friend.id]?.favorite) : true
-      const matchesQuery = !query || [personName(friend), friend.username, contactMetadata[friend.id]?.nickname || '']
-        .some(value => value.toLocaleLowerCase('vi-VN').includes(query))
-      return inFilter && matchesQuery
-    })
-    if (directoryFilter === 'alphabetical') items.sort((a, b) =>
-      (contactMetadata[a.id]?.nickname || personName(a)).localeCompare(
-        contactMetadata[b.id]?.nickname || personName(b), 'vi'))
-    return items
-  }, [friends, directoryFilter, contactMetadata, embeddedInCalls, friendQuery])
-  // The merged call directory keeps direct chats not yet represented by a friend,
-  // and group conversations, without showing duplicate friend entries.
-  const callSections = useMemo(() => {
-    const friendUsernames = new Set(friends.map(friend => friend.username.toLocaleLowerCase('vi-VN')))
-    const friendIds = new Set(friends.map(friend => friend.id))
-    const search = embeddedInCalls ? friendQuery.trim().toLocaleLowerCase('vi-VN') : ''
-    const matches = (conversation: Conversation) => !search || [conversation.name, conversation.otherUsername || '']
-      .some(value => value.toLocaleLowerCase('vi-VN').includes(search))
-    const all = callConversations.filter(matches)
-    return {
-      groups: all.filter(conversation => conversation.type === 'group'),
-      otherContacts: all.filter(conversation => conversation.type === 'direct' &&
-        !(conversation.otherUsername && friendUsernames.has(conversation.otherUsername.toLocaleLowerCase('vi-VN'))) &&
-        !(conversation.otherUserId && friendIds.has(conversation.otherUserId))),
-    }
-  }, [callConversations, friends, friendQuery, embeddedInCalls])
+  const { visibleFriends, callSections } = useContactDirectory({ friends, contactMetadata, embeddedInCalls, friendQuery, directoryFilter, callConversations })
   const selectedFriend = visibleFriends.find(friend => friend.id === selectedId) ?? visibleFriends[0] ?? null
   const blockedStatus = (friend: FriendSearchResult) => friends.find(item => item.id === friend.id)
   const isBlocked = (friend: FriendSearchResult) => {
@@ -122,7 +87,6 @@ export default function ContactsView({
   }
   const enterInvitations = () => {
     setFriendQuery('')
-    setInvitationTab('incoming')
     onScreenChange('invitations')
   }
   const openSearch = () => {
@@ -132,98 +96,18 @@ export default function ContactsView({
       (searchRef.current ?? document.querySelector<HTMLInputElement>('.call-center-directory-search input'))?.focus()
     })
   }
-  useEffect(() => {
-    let cancelled = false
-    QRCode.toDataURL(connectionUrl, { width: 400, margin: 2, errorCorrectionLevel: 'M' })
-      .then(image => { if (!cancelled) setQrImage(image) })
-      .catch(() => { if (!cancelled) setQrImage('') })
-    return () => { cancelled = true }
-  }, [connectionUrl])
-  useEffect(() => { if (!copyStatus) return; const timer = window.setTimeout(() => setCopyStatus(''), 3500); return () => window.clearTimeout(timer) }, [copyStatus])
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(connectionUrl)
-      setCopyStatus('Đã sao chép liên kết kết bạn')
-    } catch { setCopyStatus('Không thể sao chép. Kiểm tra quyền clipboard.') }
-  }
-  const callConversationSection = (items: Conversation[], label: string) => items.length > 0 && (
-    <section className="fd-call-extra-section" aria-label={label}>
-      <h3 className="fd-call-section-heading">{label}<small>{items.length}</small></h3>
-      {items.map(conversation => <div key={conversation.id} className="fd-person-row fd-call-conversation-row">
-        <button type="button" className="fd-person-identity" onClick={() => onOpenCallChat?.(conversation.id)}
-          aria-label={'Mở cuộc trò chuyện với ' + conversation.name}>
-          <UserAvatar name={conversation.name} username={conversation.otherUsername} group={conversation.type === 'group'}
-            className="avatar fd-avatar" online={conversation.type === 'direct' && conversation.online}/>
-          <span><strong>{conversation.name}</strong><small>{conversation.type === 'group'
-            ? conversation.memberCount + ' thành viên' : conversation.online ? 'Đang hoạt động' : 'Cuộc trò chuyện cá nhân'}</small></span>
-        </button>
-        <CallHeaderActions conversationId={conversation.id} disabled={Boolean(conversation.blockedByMe || conversation.blockedByOther)}/>
-      </div>)}
-    </section>
-  )
+
   const avatar = (friend: FriendSearchResult, additional = '') => (
     <UserAvatar username={friend.username} name={personName(friend)}
       className={'avatar fd-avatar ' + additional} online={friend.online} />
   )
-  const menu = (friend: FriendConnection) => (
-    <div className="fd-options" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFriendMenuId(null) }}>
-      <button type="button" aria-label={'Tùy chọn của ' + personName(friend)} aria-expanded={friendMenuId === friend.id}
-        onClick={() => setFriendMenuId(value => value === friend.id ? null : friend.id)}><MoreHorizontal size={18} /></button>
-      {friendMenuId === friend.id && <div role="menu" className="fd-option-popover">
-        <button role="menuitem" type="button" onClick={() => { setFriendPreview(friend); setFriendMenuId(null) }}>Xem trang cá nhân</button>
-        <button role="menuitem" type="button" onClick={() => { setFriendMenuId(null); void changePersonalContact(friend, 'nickname') }}>Đặt biệt danh</button>
-        <button role="menuitem" type="button" onClick={() => { setFriendMenuId(null); void changePersonalContact(friend, 'note') }}>Ghi chú riêng</button>
-        <button role="menuitem" type="button" onClick={() => { setFriendMenuId(null); void changePersonalContact(friend, 'favorite') }}>
-          {contactMetadata[friend.id]?.favorite ? 'Bỏ yêu thích' : 'Yêu thích'}
-        </button>
-        {!friend.blockedByOther && <button role="menuitem" type="button" disabled={friendBusyIds.has(friend.id)}
-          onClick={() => { setFriendMenuId(null); void (friend.blockedByMe ? unblockContact(friend.id) : blockContact(friend)) }}>
-          {friend.blockedByMe ? 'Bỏ chặn người dùng' : 'Chặn người dùng'}
-        </button>}
-        <button role="menuitem" type="button" onClick={() => { setFriendMenuId(null); void reportContact(friend) }}>Báo cáo</button>
-        <button role="menuitem" type="button" disabled={friendBusyIds.has(friend.id)}
-          onClick={() => { setFriendMenuId(null); void removeAcceptedFriend(friend) }}>Hủy kết bạn</button>
-      </div>}
-    </div>
+  const profileDetails = (friend: FriendConnection) => (
+    <ContactFriendProfile friend={friend} contactMetadata={contactMetadata} friendBusyIds={friendBusyIds}
+      friendMenuId={friendMenuId} setFriendMenuId={setFriendMenuId} setFriendPreview={setFriendPreview}
+      changePersonalContact={changePersonalContact} removeAcceptedFriend={removeAcceptedFriend}
+      blockContact={blockContact} unblockContact={unblockContact} reportContact={reportContact}
+      openChat={openChat} startCall={startCall} isBlocked={isBlocked} />
   )
-
-  const profileDetails = (friend: FriendConnection) => <>
-    <div className="fd-profile-cover" aria-hidden="true"/>
-    <div className="fd-profile-core">
-      {avatar(friend, 'fd-profile-avatar')}
-      <h2>{contactMetadata[friend.id]?.nickname || personName(friend)}</h2>
-      <p className={friend.online && !isBlocked(friend) ? 'fd-online' : ''}>{friend.blockedByOther ? 'Bạn đã bị chặn' : friend.blockedByMe ? 'Bạn đã chặn người này' : friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
-        {typeof friend.mutualGroups === 'number' && friend.mutualGroups > 0 ? ' · ' + friend.mutualGroups + ' nhóm chung' : ''}
-      </p>
-    </div>
-    <div className="fd-profile-actions">
-      <button type="button" className="fd-primary" onClick={() => openChat(friend)}><MessageCircle size={20}/>{isBlocked(friend) ? 'Xem hội thoại' : 'Nhắn tin'}</button>
-      <button type="button" className="fd-secondary" disabled={isBlocked(friend)} onClick={() => startCall(friend)}><Phone size={20}/>Gọi thoại</button>
-    </div>
-    <div className="fd-profile-info">
-      <h3>Thông tin bạn bè</h3>
-      <p><UserRound size={19}/>@{friend.username}</p>
-      {typeof friend.mutualGroups === 'number' && <p><Users size={19}/>{friend.mutualGroups} nhóm chung</p>}
-      {contactMetadata[friend.id]?.note && <p><Heart size={19}/>{contactMetadata[friend.id].note}</p>}
-      <button type="button" onClick={() => setFriendPreview(friend)}><UserRound size={19}/>Xem trang cá nhân</button>
-    </div>
-    <div className="fd-profile-options"><h3><MoreHorizontal size={20}/>Tùy chọn</h3>
-      <div>
-        <button type="button" onClick={() => void changePersonalContact(friend, 'favorite')}>
-          {contactMetadata[friend.id]?.favorite ? 'Bỏ yêu thích' : 'Ghim'}
-        </button><span>·</span>
-        {!friend.blockedByOther && <>
-          <button type="button" disabled={friendBusyIds.has(friend.id)}
-            onClick={() => void (friend.blockedByMe ? unblockContact(friend.id) : blockContact(friend))}>
-            {friend.blockedByMe ? 'Bỏ chặn' : 'Chặn'}
-          </button><span>·</span>
-        </>}
-        <button type="button" onClick={() => void reportContact(friend)}>Báo cáo</button><span>·</span>
-        <button type="button" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
-      </div>
-      {menu(friend)}
-    </div>
-  </>
 
   return <div className={'friends-design-v2' + (embeddedInCalls ? ' is-call-directory' : '')} aria-label={screen === 'directory' ? 'Danh bạ' : 'Lời mời kết bạn'}>
     {screen === 'directory' ? <>
@@ -257,10 +141,10 @@ export default function ContactsView({
                   disabled={friendsLoading} onClick={onRetryFriends}><RefreshCw size={17} aria-hidden="true"/></button>
               </div>
             </div>
-            <div ref={directoryPillSetHost} className="fd-filters sliding-pill-host" role="group" aria-label="Lọc danh bạ">
-              <span ref={directoryPillSetPill} className="sliding-pill contacts-filter-active-pill" aria-hidden="true" />
+            <div ref={filterHostRef} className="fd-filters sliding-pill-host" role="group" aria-label="Lọc danh bạ">
+              <span ref={filterPillRef} className="sliding-pill contacts-filter-active-pill" aria-hidden="true" />
               {([['alphabetical','A – Z'],['online','Đang online'],['favorites','Yêu thích']] as const).map(([filter,label]) =>
-                <button ref={directoryFilter === filter ? directoryPillSetActive : undefined} type="button" key={filter} className={directoryFilter === filter ? 'active' : ''}
+                <button ref={directoryFilter === filter ? filterActiveRef : undefined} type="button" key={filter} className={directoryFilter === filter ? 'active' : ''}
                   aria-pressed={directoryFilter === filter} onClick={() => setDirectoryFilter(filter)}>{label}</button>)}
             </div>
             {friendsError && <div className="fd-sync-feedback" role="alert">
@@ -295,8 +179,8 @@ export default function ContactsView({
               {visibleFriends.length === 0 && !friendsError && (!embeddedInCalls || (callSections.groups.length === 0 && callSections.otherContacts.length === 0)) && <p className="fd-empty" role={friendsLoading ? 'status' : undefined}>
                 {friendsLoading ? 'Đang tải danh sách bạn bè...' : friends.length ? 'Không có bạn bè phù hợp.' : embeddedInCalls ? 'Bạn chưa có bạn bè trong danh bạ.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}
               </p>}
-              {embeddedInCalls && callConversationSection(callSections.groups, 'Nhóm')}
-              {embeddedInCalls && callConversationSection(callSections.otherContacts, 'Liên hệ khác')}
+              {embeddedInCalls && <ContactCallConversationSection items={callSections.groups} label="Nhóm" onOpenCallChat={onOpenCallChat} />}
+              {embeddedInCalls && <ContactCallConversationSection items={callSections.otherContacts} label="Liên hệ khác" onOpenCallChat={onOpenCallChat} />}
             </div>
           </>}
         </section>
@@ -305,64 +189,6 @@ export default function ContactsView({
             <h2>{searching ? 'Kết nối bạn bè' : 'Chưa chọn bạn bè'}</h2><p>{searching ? 'Chọn một kết quả tìm kiếm để xem hồ sơ.' : 'Kết bạn mới để xem thông tin ở đây.'}</p></div>}
         </section>}
       </div>
-    </> : <>
-      <div className="fd-invitation-tabs">
-        <button type="button" className="fd-back" onClick={() => {onScreenChange('directory');setFriendQuery('')}} aria-label="Quay lại Danh bạ"><ArrowLeft size={17}/></button>
-        <div ref={invitationPillSetHost} className="sliding-pill-host" role="tablist" aria-label="Lời mời kết bạn">
-          <span ref={invitationPillSetPill} className="sliding-pill invitation-active-pill" aria-hidden="true" />
-          {([['incoming','Lời mời đến'],['sent','Đã gửi'],['qr','Quét QR']] as const).map(([id,label]) =>
-            <button ref={invitationTab === id ? invitationPillSetActive : undefined} role="tab" type="button" key={id} className={invitationTab === id ? 'active' : ''}
-              aria-selected={invitationTab === id} onClick={() => setInvitationTab(id)}>{label}</button>)}
-        </div>
-        <small>{incoming.length + outgoing.length} đang chờ xử lý</small>
-      </div>
-      <div className="fd-invitation-layout">
-        <section className="fd-card fd-invitation-list" role="tabpanel">
-          {invitationTab === 'incoming' ? <>
-            <div className="fd-invitation-heading"><h2>Lời mời đến</h2><p>Lời mời sẽ không tự động được chấp nhận</p></div>
-            {incoming.length === 0 && <p className="fd-empty">Chưa có lời mời kết bạn đến.</p>}
-            {incoming.map(friend => <div className="fd-request-row" key={friend.id}>
-              {avatar(friend)}<div className="fd-request-copy"><strong>{personName(friend)}</strong>
-                <span>@{friend.username} · Đang chờ phản hồi</span></div>
-              <button type="button" className="fd-primary" disabled={friendBusyIds.has(friend.id)} onClick={() => void actOnFriend(friend)}><Check size={17}/>Chấp nhận</button>
-              <button type="button" className="fd-secondary" disabled={friendBusyIds.has(friend.id)} onClick={() => void declineFriendRequest(friend)}><X size={17}/>Từ chối</button>
-            </div>)}
-            <button type="button" className="fd-outgoing-summary" onClick={() => setInvitationTab('sent')}>
-              <Clock3 size={18}/><span><strong>Đã gửi {outgoing.length} lời mời</strong><small>Bạn có thể hủy lời mời khi chưa được chấp nhận.</small></span><ArrowRight size={18}/>
-            </button>
-          </> : invitationTab === 'sent' ? <>
-            <div className="fd-invitation-heading"><h2>Đã gửi</h2><p>Những lời mời đang chờ người nhận phản hồi</p></div>
-            {outgoing.length === 0 && <p className="fd-empty">Bạn chưa có lời mời đang chờ.</p>}
-            {outgoing.map(friend => <div className="fd-request-row" key={friend.id}>
-              {avatar(friend)}<div className="fd-request-copy"><strong>{personName(friend)}</strong><span>@{friend.username} · Đang chờ</span></div>
-              <button type="button" className="fd-secondary" disabled={friendBusyIds.has(friend.id)}
-                onClick={() => void actOnFriend(friend)}><X size={17}/>Hủy lời mời</button>
-            </div>)}
-            <button type="button" className="fd-outgoing-summary" onClick={openSearch}>
-              <UserRoundPlus size={20}/><span><strong>Tìm bạn bè mới</strong><small>Quay về danh bạ để tìm và gửi lời mời.</small></span><ArrowRight size={18}/>
-            </button>
-          </> : <>
-            <div className="fd-invitation-heading"><h2>Quét QR</h2><p>Quét mã kết bạn hoặc chia sẻ mã QR của bạn.</p></div>
-            <div className="fd-scan-feature"><QrCode size={76}/><h3>Kết nối bằng mã QR</h3>
-              <p>Dùng camera hoặc tải ảnh QR trong chức năng quét mã của SocCo.</p>
-              <button type="button" className="fd-primary" onClick={onScanQr}><QrCode size={19}/>Mở trình quét QR</button></div>
-          </>}
-        </section>
-        <aside className="fd-card fd-qr-panel">
-          <h2>Kết bạn bằng QR</h2><p>Chia sẻ mã QR cá nhân hoặc mở camera để quét.</p>
-          <div className="fd-qr-preview">
-            {qrImage && <img src={qrImage} alt="Mã QR liên kết kết bạn của tôi"/>}
-          </div>
-          <small>Mã QR chính xác của tài khoản hiện tại</small>
-          <div className="fd-qr-actions">
-            <button type="button" className="fd-secondary" onClick={() => void copyLink()}><Copy size={17}/>Sao chép link</button>
-            <button type="button" className="fd-primary" onClick={onScanQr}><QrCode size={18}/>Quét QR</button>
-          </div>
-          {copyStatus && <p className="fd-copy-status" role="status">{copyStatus}</p>}
-          <div className="fd-security-tip"><ShieldCheck size={20}/>
-            <span><strong>An toàn khi kết nối</strong><small>Bạn quyết định ai có thể gửi yêu cầu.</small></span></div>
-        </aside>
-      </div>
-    </>}
+    </> : <ContactInvitations friendRequests={friendRequests} friendBusyIds={friendBusyIds} actOnFriend={actOnFriend} declineFriendRequest={declineFriendRequest} connectionUrl={connectionUrl} onScanQr={onScanQr} onBack={() => { onScreenChange('directory'); setFriendQuery('') }} onSearch={openSearch} />}
   </div>
 }

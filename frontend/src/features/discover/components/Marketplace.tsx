@@ -24,7 +24,7 @@ const showMoney = (n: number, unit: string) => n.toLocaleString('vi-VN') + ' ' +
 export default function Marketplace({ userId, request, onBack }: Props) {
   const apiRef = useLatest(request)
   const [view, setView] = useState<'products' | 'cart' | 'orders' | 'sell'>('products')
-  const { setHost: tabsPillSetHost, setActive: tabsPillSetActive, setPill: tabsPillSetPill } = useSlidingPill<HTMLElement>(view)
+  const { hostRef: tabsPillSetHost, activeRef: tabsPillSetActive, pillRef: tabsPillSetPill } = useSlidingPill<HTMLElement>(view)
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [orders, setOrders] = useState<Order[]>([])

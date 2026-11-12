@@ -36,7 +36,7 @@ export default function NotificationsPage({
   onOpenConversation, onOpenInvitations, onOpenFriend, onSettings,
 }: Props) {
   const [filter, setFilter] = useState<NotificationFilter>('all')
-  const { setHost: filtersPillSetHost, setActive: filtersPillSetActive, setPill: filtersPillSetPill } = useSlidingPill<HTMLDivElement>(filter)
+  const { hostRef: filtersPillSetHost, activeRef: filtersPillSetActive, pillRef: filtersPillSetPill } = useSlidingPill<HTMLDivElement>(filter)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [readKeys, setReadKeys] = useState<Set<string>>(() => new Set())
   const notifications = useMemo(() => buildNotificationItems(requests, conversations, mentions), [requests, conversations, mentions])

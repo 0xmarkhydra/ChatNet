@@ -1,6 +1,8 @@
 import { useEffect, useRef, type FormEvent } from 'react'
-import { ArrowLeft, Camera, Check, Eye, MapPin, RotateCcw, Save, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Camera, RotateCcw, Save } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import ProfileEditorPrivacyCard from './ProfileEditorPrivacyCard'
+import ProfileEditorPreview from './ProfileEditorPreview'
 import type { ProfileMediaState, UserPrivacy } from '../types'
 
 type Props = {
@@ -30,12 +32,6 @@ type Props = {
   onChangeCover: () => void
 }
 
-const accessRows = [
-  { key: 'searchableByUsername', title: 'Tìm bằng tên người dùng', subtitle: 'Cho phép tìm bằng @username' },
-  { key: 'searchableByName', title: 'Tìm theo tên hiển thị', subtitle: 'Xuất hiện khi tìm tên của bạn' },
-  { key: 'allowFriendRequests', title: 'Lời mời kết bạn', subtitle: 'Cho phép gửi lời mời mới' },
-  { key: 'showOnlineStatus', title: 'Trạng thái trực tuyến', subtitle: 'Hiển thị khi đang hoạt động' },
-] as const
 
 export default function ProfileEditorPage({
   profile, username, displayName, coverUrl,
@@ -55,9 +51,6 @@ export default function ProfileEditorPage({
   const savingDisabled = !profile || profileSaving || same ||
     !displayNameDraft.trim() || !usernameDraft.trim() ||
     Array.from(bioDraft).length > 160 || Array.from(cityDraft).length > 100
-
-  const editName = displayNameDraft.trim() || profile?.displayName || displayName
-  const editUsername = usernameDraft.trim().toLowerCase() || profile?.username || username
 
   const cover = (preview: boolean) => (
     <div className={preview ? 'profile-editor-cover profile-editor-preview-cover' : 'profile-editor-cover'}>
@@ -124,41 +117,9 @@ export default function ProfileEditorPage({
       </form>
 
       <aside className="profile-editor-side" aria-label="Xem trước và quyền hiển thị">
-        <section className="profile-editor-preview-card" aria-label="Xem trước hồ sơ">
-          <h2>Xem trước hồ sơ</h2>
-          {cover(true)}
-          <div className="profile-editor-preview-identity">
-            <UserAvatar username={username} name={editName} className="profile-editor-preview-avatar" />
-            <div className="profile-editor-preview-name"><strong>{editName}</strong><span>@{editUsername}</span></div>
-          </div>
-          <div className="profile-editor-preview-about">
-            <p>{bioDraft.trim() || 'Thêm tiểu sử để mọi người hiểu hơn về bạn.'}</p>
-            {cityDraft.trim() && <div><MapPin size={15} aria-hidden="true" /><span>{cityDraft.trim()}</span></div>}
-          </div>
-          <div className="profile-editor-preview-message"><Eye size={15} aria-hidden="true" /> Xem trước thông tin đang chỉnh sửa</div>
-        </section>
+        <ProfileEditorPreview profile={profile} cover={cover(true)} username={username} displayName={displayName} displayNameDraft={displayNameDraft} usernameDraft={usernameDraft} bioDraft={bioDraft} cityDraft={cityDraft} />
 
-        <section className="profile-editor-privacy-card" aria-label="Quyền hiển thị">
-          <div className="profile-editor-privacy-heading"><Eye size={22} aria-hidden="true" /><h2>Quyền hiển thị</h2></div>
-          <p>Chọn cách người khác tìm và kết nối với bạn.</p>
-
-          {privacyError && <div role="alert" className="profile-editor-privacy-error">{privacyError}
-            <button type="button" onClick={retryPrivacy}>Thử lại</button>
-          </div>}
-          {privacy && <div className="profile-editor-privacy-rows">
-            {accessRows.map(row => (
-              <div className="profile-editor-privacy-row" key={row.key}>
-                <div><strong>{row.title}</strong><small>{row.subtitle}</small></div>
-                <button type="button" role="switch" className={privacy[row.key] ? 'is-on' : ''}
-                  aria-label={row.title} aria-checked={privacy[row.key]} disabled={privacyBusy}
-                  onClick={() => void changePrivacy(row.key)}>
-                  <span>{privacy[row.key] ? 'Bật' : 'Tắt'}</span><i aria-hidden="true"><Check size={11}/></i>
-                </button>
-              </div>
-            ))}
-          </div>}
-          <p className="profile-editor-privacy-foot"><ShieldCheck size={16} aria-hidden="true" /> Cài đặt này lưu riêng trên máy chủ, không phụ thuộc nút Lưu hồ sơ.</p>
-        </section>
+        <ProfileEditorPrivacyCard privacy={privacy} privacyBusy={privacyBusy} privacyError={privacyError} retryPrivacy={retryPrivacy} changePrivacy={changePrivacy} />
       </aside>
     </div>
   )

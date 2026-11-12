@@ -77,6 +77,8 @@ import UiIcon from "../shared/ui/UiIcon";
 import NearbyRadar from "../features/discover/components/NearbyRadar";
 import PostComposer from "../features/feed/components/PostComposer";
 import FeedPostCard from "../features/feed/components/FeedPostCard";
+import ReactionParticipantsDialog from "../shared/ui/ReactionParticipantsDialog";
+import MessageForwardPicker from "../features/chat/components/MessageForwardPicker";
 import FeedReactionControl from "../features/feed/components/FeedReactionControl";
 import StoryViewer from "../features/feed/components/StoryViewer";
 import MessageActions from "../features/chat/components/MessageActions";
@@ -309,6 +311,7 @@ import { useTranslationState } from "../features/chat/hooks/useTranslationState"
 import { useProfileState } from "../features/profile/hooks/useProfileState";
 import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
 import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
+import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
 import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
@@ -458,6 +461,11 @@ export default function AuthedApp({
   const [reactionPreviews, setReactionPreviews] = useState<
     Record<number, MessageReaction[]>
   >({});
+  const [forwardSource, setForwardSource] = useScopedState<Message | null>(session?.sessionId ?? null, null);
+  const [reactionTarget, setReactionTarget] = useScopedState<{
+    kind: "message" | "post"; id: number; initialEmoji?: string;
+    reactions?: { emoji: string; count: number }[];
+  } | null>(session?.sessionId ?? null, null);
   const messageChanges = useRef(new Set<number>());
   const actionLocks = useRef(new Set<string>());
   const messageReceipts = useRef(new Map<string, Message | null>());
@@ -2711,6 +2719,7 @@ export default function AuthedApp({
         showSave={showSave}
         likePreviews={likePreviews}
         like={like}
+        onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
         onEditPost={openEditPost}
         taggedNames={friendTaggedNames}
       />
@@ -2901,6 +2910,7 @@ export default function AuthedApp({
             setVisitorUsername(null);
           }}
           onClose={() => setVisitorUsername(null)}
+          onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
           onPostOpen={(post) => {
             setPosts((current) => [
               post,
@@ -3204,6 +3214,8 @@ export default function AuthedApp({
           openGroupSettings={openGroupSettings}
           openMessageActions={openMessageActions}
           openMessageReactions={openMessageReactions}
+          onReactionUsers={(message, emoji) => setReactionTarget({kind: "message", id: message.id, initialEmoji: emoji, reactions: message.reactions})}
+          onForwardMessage={setForwardSource}
           openVisitor={openVisitor}
           pinBusy={pinBusy}
           pinnedExpanded={pinnedExpanded}
@@ -3372,6 +3384,7 @@ export default function AuthedApp({
           friendTaggedNames={friendTaggedNames}
           like={like}
           likePreviews={likePreviews}
+          onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
           name={name}
           openEditPost={openEditPost}
           openVisitor={openVisitor}
@@ -3473,6 +3486,7 @@ export default function AuthedApp({
         {activeMessageAction && (
           <MessageActionDialog
           activeMessageAction={activeMessageAction}
+          onForwardMessage={setForwardSource}
           copyMessageContent={copyMessageContent}
           editOwnMessage={editOwnMessage}
           messageActionMode={messageActionMode}
@@ -3493,6 +3507,7 @@ export default function AuthedApp({
           activePost={activePost}
           like={like}
           likePreviews={likePreviews}
+          onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
           postDiscussion={postDiscussion}
           session={session}
           setActivePostId={setActivePostId}
@@ -3705,6 +3720,28 @@ export default function AuthedApp({
             </section>
           </ProfileOverlay>
         )}
+
+      {forwardSource && (
+        <MessageForwardPicker
+          message={forwardSource}
+          conversations={conversations}
+          request={apiFetch}
+          uploadFiles={uploadMediaFiles}
+          onClose={() => setForwardSource(null)}
+          onFeedback={setNotice}
+        />
+      )}
+      {reactionTarget && (
+        <ReactionParticipantsDialog
+          key={`${session.sessionId}:${reactionTarget.kind}:${reactionTarget.id}`}
+          kind={reactionTarget.kind}
+          id={reactionTarget.id}
+          initialEmoji={reactionTarget.initialEmoji}
+          reactions={reactionTarget.reactions}
+          request={apiFetch}
+          onClose={() => setReactionTarget(null)}
+        />
+      )}
 
       <GroupInviteJoinDialog
         request={apiFetch}

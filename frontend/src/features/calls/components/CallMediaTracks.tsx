@@ -60,4 +60,3 @@ export function identityLabel(identity: string) {
   const id = identity.startsWith('u_') ? identity.slice(2) : identity
   return `U${id}`
 }
-

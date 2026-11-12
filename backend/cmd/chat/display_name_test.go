@@ -88,6 +88,13 @@ func TestDisplayNamesChatIntegration(t *testing.T) {
 	}
 	first := send(0, `{"text":"Xin chào"}`)
 	second := send(1, fmt.Sprintf(`{"text":"Trả lời","replyToMessageId":%d}`, first.ID))
+	forwarded := send(0, `{"text":"Nội dung được chuyển tiếp","forwarded":true}`)
+	if !forwarded.Forwarded || forwarded.Text != "Nội dung được chuyển tiếp" {
+		t.Fatalf("forwarded message metadata and content: %+v", forwarded)
+	}
+	if second.Forwarded || first.Forwarded {
+		t.Fatal("ordinary messages must not be marked forwarded")
+	}
 	if second.ReplyToSender != names[0] || second.ReplyToDisplayName != "Nguyễn An" {
 		t.Fatalf("reply label: %+v", second)
 	}
@@ -105,8 +112,15 @@ func TestDisplayNamesChatIntegration(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &messages); err != nil {
 		t.Fatal(err)
 	}
-	if len(messages) != 2 || messages[0].Sender != names[0] || messages[0].SenderDisplayName != "Tên mới có dấu" {
+	if len(messages) != 3 || messages[0].Sender != names[0] || messages[0].SenderDisplayName != "Tên mới có dấu" {
 		t.Fatalf("message list labels: %+v", messages)
+	}
+	if !messages[2].Forwarded || messages[2].Text != forwarded.Text || messages[0].Forwarded || messages[1].Forwarded {
+		t.Fatalf("forwarded label must survive message listing without altering text: %+v", messages)
+	}
+	reloaded, err := s.loadMessage(ctx, forwarded.ID, ids[1])
+	if err != nil || !reloaded.Forwarded || reloaded.Text != forwarded.Text {
+		t.Fatalf("forwarded label must survive reload for other participant: %+v err=%v", reloaded, err)
 	}
 	req = httptest.NewRequest("PATCH", fmt.Sprintf("/api/messages/%d", first.ID), strings.NewReader(`{"text":"stolen"}`))
 	req.Header.Set("Authorization", "Bearer "+tokens[1])

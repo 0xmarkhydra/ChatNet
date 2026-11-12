@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { UserPrivacy } from "../../profile/types";
 
@@ -18,8 +18,14 @@ const privacyKeys = [
 
 export default function PrivacySettingsPanel({ privacy, privacyLoading, privacyBusy, privacyError, onPrivacyRetry, onSavePrivacy }: Props) {
   const [draft, setDraft] = useState<UserPrivacy | null>(privacy);
+  const [previousPrivacy, setPreviousPrivacy] = useState(privacy);
 
-  useEffect(() => { setDraft(privacy); }, [privacy]);
+  // Reset edits immediately when the server-provided privacy value changes,
+  // without an effect that briefly displays a stale draft.
+  if (previousPrivacy !== privacy) {
+    setPreviousPrivacy(privacy);
+    setDraft(privacy);
+  }
 
   const changed = Boolean(
     privacy && draft && privacyKeys.some((key) => privacy[key] !== draft[key]),
