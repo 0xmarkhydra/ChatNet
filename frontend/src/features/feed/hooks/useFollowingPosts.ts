@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { ApiRequest } from '../../../shared/types/api'
 import { FEED_PAGE_SIZE, type Post } from '../types'
 import { useLatest } from '../../../shared/hooks/useLatest'
@@ -11,9 +12,10 @@ type State = {
   loadingMore: boolean
   hasMore: boolean
   error: string
+  loaded: boolean
 }
 const empty = (sessionId: string): State => ({
-  sessionId, posts: [], loading: false, loadingMore: false, hasMore: false, error: '',
+  sessionId, posts: [], loading: false, loadingMore: false, hasMore: false, error: '', loaded: false,
 })
 
 export function useFollowingPosts({
@@ -23,12 +25,19 @@ export function useFollowingPosts({
   enabled: boolean
   request: ApiRequest
 }) {
-  const [state, setState] = useState<State>(() => empty(sessionId || ''))
   const [refreshVersion, setRefreshVersion] = useState(0)
+  // Every session and refresh belongs to a distinct visit. Late results from
+  // a previous visit cannot overwrite current state, including A → B → A.
+  const [state, setState] = useScopedState<State>(
+    JSON.stringify([sessionId || '', enabled, refreshVersion]),
+    empty(sessionId || ''),
+  )
   const revision = useRef(0)
   const busy = useRef(false)
   const requestRef = useLatest(request)
-  const current = state.sessionId === sessionId ? state : { ...empty(sessionId || ''), loading: enabled }
+  const current = state.sessionId === sessionId
+    ? { ...state, loading: state.loading || (enabled && !state.loaded && !state.error) }
+    : { ...empty(sessionId || ''), loading: enabled }
 
   useEffect(() => {
     if (!enabled || !sessionId) return
@@ -36,7 +45,6 @@ export function useFollowingPosts({
     const id = ++revision.current
     busy.current = false
     const abort = new AbortController()
-    setState({ ...empty(sessionId), loading: true })
     void (async () => {
       try {
         const response = await requestRef.current('/api/posts?scope=following&limit=' + FEED_PAGE_SIZE, {
@@ -47,17 +55,17 @@ export function useFollowingPosts({
         if (cancelled || id !== revision.current) return
         if (!Array.isArray(posts)) throw new Error('Danh sách bài viết không hợp lệ.')
         setState({ sessionId, posts, loading: false, loadingMore: false,
-          hasMore: posts.length === FEED_PAGE_SIZE, error: '' })
+          hasMore: posts.length === FEED_PAGE_SIZE, error: '', loaded: true })
       } catch {
         if (!cancelled && id === revision.current) {
           setState(previous => previous.sessionId === sessionId
-            ? { ...previous, loading: false, error: 'Không tải được bài viết từ bạn bè.' }
+            ? { ...previous, loading: false, error: 'Không tải được bài viết từ bạn bè.', loaded: true }
             : previous)
         }
       }
     })()
     return () => { cancelled = true; abort.abort(); ++revision.current; busy.current = false }
-  }, [enabled, sessionId, refreshVersion, requestRef])
+  }, [enabled, sessionId, refreshVersion, requestRef, setState])
 
   async function loadMore() {
     if (!enabled || !sessionId || current.loading || current.loadingMore || !current.hasMore || busy.current || !current.posts.length) return

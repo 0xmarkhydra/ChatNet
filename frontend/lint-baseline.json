@@ -1,8 +1,8 @@
 {
-  "total": 118,
+  "total": 117,
   "byRule": {
     "react-hooks/exhaustive-deps": 64,
-    "react-hooks/set-state-in-effect": 54
+    "react-hooks/set-state-in-effect": 53
   },
   "counts": {
     "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
@@ -57,7 +57,6 @@
     "src/features/feed/components/StoryComposer.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/feed/components/StoryViewer.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/feed/hooks/useFollowingPosts.ts|react-hooks/exhaustive-deps": 1,
-    "src/features/feed/hooks/useFollowingPosts.ts|react-hooks/set-state-in-effect": 1,
     "src/features/notifications/components/NotificationsPage.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/profile/components/ProfileNote.tsx|react-hooks/exhaustive-deps": 3,
     "src/features/profile/components/ProfileNote.tsx|react-hooks/set-state-in-effect": 1,
