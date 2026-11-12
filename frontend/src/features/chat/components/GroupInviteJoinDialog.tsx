@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link2, X, Users } from 'lucide-react'
 import '../styles/group-governance.css'
 import { joinGroupInvite, previewGroupInvite } from '../api/invites'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 type Preview = {
   conversationId: number
@@ -19,8 +20,7 @@ type Props = {
 }
 
 export default function GroupInviteJoinDialog({ request, onJoined, notify }: Props) {
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const [token, setToken] = useState(() => new URL(window.location.href).searchParams.get('groupInvite'))
   const [preview, setPreview] = useState<Preview | null>(null)
   const [busy, setBusy] = useState(false)
@@ -41,7 +41,7 @@ export default function GroupInviteJoinDialog({ request, onJoined, notify }: Pro
       })
       .catch(() => { if (alive) setError('Link mời không tồn tại, hết hạn hoặc đã bị thu hồi.') })
     return () => { alive = false }
-  }, [token])
+  }, [requestRef, token])
 
   useEffect(() => {
     if (!token) return

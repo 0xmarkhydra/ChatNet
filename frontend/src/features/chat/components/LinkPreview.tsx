@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { messageLinkHref, messageTextParts } from '../lib/messageClipboard'
 import '../styles/link-preview.css'
 import { fetchLinkPreview } from '../api/linkPreview'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 type LinkPreviewData = {
   url: string
@@ -65,8 +66,7 @@ export default function LinkPreview({
 }) {
   const url = firstPreviewURL(text)
   const holder = useRef<HTMLSpanElement>(null)
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const [visible, setVisible] = useState(false)
   const [preview, setPreview] = useState<LinkPreviewData | null>(null)
   const [imageFailed, setImageFailed] = useState(false)
@@ -97,7 +97,7 @@ export default function LinkPreview({
     void loadPreview(url, cacheScope, (path, init) => requestRef.current(path, init))
       .then((data) => { if (mounted) setPreview(data) })
     return () => { mounted = false }
-  }, [url, cacheScope, visible])
+  }, [url, cacheScope, visible, requestRef])
 
   if (!url) return null
   const domain = new URL(url).hostname

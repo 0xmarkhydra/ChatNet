@@ -28,7 +28,7 @@ export type FeedSectionProps = {
   conversations: Conversation[];
   feedCommunitiesOpen: boolean;
   feedFilter: "all" | "following" | "latest" | "saved";
-  feedFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
+  feedFiltersPill: { setHost: (node: HTMLDivElement | null) => void; setActive: (node: HTMLButtonElement | null) => void; setPill: (node: HTMLSpanElement | null) => void; };
   feedInfiniteScrollRef: RefObject<HTMLDivElement | null>;
   feedLoadingMore: boolean;
   feedPagingError: boolean;
@@ -137,6 +137,7 @@ export default function FeedSection({
   storyFileInputRef,
   switchTab,
 }: FeedSectionProps) {
+  const { setHost: feedFiltersPillSetHost, setActive: feedFiltersPillSetActive, setPill: feedFiltersPillSetPill } = feedFiltersPill;
   return (
       <div
             className="feed-view zalo-feed-view social-feed"
@@ -344,14 +345,14 @@ export default function FeedSection({
                           : "Bài viết mới"}
                       </strong>
                       <div
-                        ref={feedFiltersPill.hostRef}
+                        ref={feedFiltersPillSetHost}
                         className="feed-filter-tabs sliding-pill-host"
                         role="group"
                         aria-label="Lọc bảng tin"
                       >
-                        <span ref={feedFiltersPill.pillRef} className="sliding-pill feed-filter-active-pill" aria-hidden="true" />
+                        <span ref={feedFiltersPillSetPill} className="sliding-pill feed-filter-active-pill" aria-hidden="true" />
                         <button
-                          ref={!feedCommunitiesOpen && feedFilter === "all" ? feedFiltersPill.activeRef : undefined}
+                          ref={!feedCommunitiesOpen && feedFilter === "all" ? feedFiltersPillSetActive : undefined}
                           type="button"
                           aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
                           onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
@@ -359,7 +360,7 @@ export default function FeedSection({
                           Mới nhất
                         </button>
                         <button
-                          ref={!feedCommunitiesOpen && feedFilter === "saved" ? feedFiltersPill.activeRef : undefined}
+                          ref={!feedCommunitiesOpen && feedFilter === "saved" ? feedFiltersPillSetActive : undefined}
                           type="button"
                           aria-pressed={!feedCommunitiesOpen && feedFilter === "saved"}
                           onClick={() => {

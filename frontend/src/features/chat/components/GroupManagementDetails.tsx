@@ -3,6 +3,7 @@ import { Bell, Check, FileText, Files, Globe2, LockKeyhole } from 'lucide-react'
 import type { Message } from '../types'
 import { getCommunity, getNotificationSettings, saveNotificationSettings, updateCommunity } from '../api/community'
 import { listSharedFiles } from '../api/search'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 type Section = 'details' | 'rules' | 'notifications' | 'files'
 type Community = {
@@ -29,8 +30,7 @@ const initialCommunity: Community = {
 const initialPreferences: Preferences = { messageNotifications: true, mentionNotifications: true }
 
 export default function GroupManagementDetails({ conversationId, section, canEdit, request, notify, onOpenShared }: Props) {
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const [community, setCommunity] = useState<Community>(initialCommunity)
   const [preferences, setPreferences] = useState<Preferences>(initialPreferences)
   const [files, setFiles] = useState<Message[]>([])
@@ -72,7 +72,7 @@ export default function GroupManagementDetails({ conversationId, section, canEdi
       if (!ctrl.signal.aborted) setLoading(false)
     })
     return () => ctrl.abort()
-  }, [conversationId, section])
+  }, [conversationId, requestRef, section])
 
   async function saveCommunity() {
     if (busy || !canEdit) return

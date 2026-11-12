@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useLatest } from "../../../shared/hooks/useLatest";
 
 export function useFeedInfiniteScroll({
   enabled,
@@ -14,8 +15,7 @@ export function useFeedInfiniteScroll({
   onLoadMore: () => void;
 }) {
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const loadRef = useRef(onLoadMore);
-  loadRef.current = onLoadMore;
+  const loadRef = useLatest(onLoadMore);
   useEffect(() => {
     if (
       !enabled ||
@@ -35,6 +35,6 @@ export function useFeedInfiniteScroll({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [enabled, hasMore, loading, error]);
+  }, [enabled, hasMore, loading, error, loadRef]);
   return sentinelRef;
 }

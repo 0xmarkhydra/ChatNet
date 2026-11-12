@@ -92,6 +92,12 @@ try {
   await page.goto(origin)
   await page.locator('.conversation-item').first().waitFor()
 
+  // ---- the sliding filter pill attaches to its host and active tab (callback refs)
+  await page.waitForFunction(() => {
+    const pill = document.querySelector('.sliding-pill.social-chat-active-pill')
+    return pill instanceof HTMLElement && pill.classList.contains('is-ready') && parseFloat(pill.style.width) > 0
+  })
+
   // ---- open a direct conversation by username
   await page.locator('button[title="Tạo cuộc trò chuyện"]').click()
   await page.getByPlaceholder('Username người muốn chat').fill('  NewFriend ')

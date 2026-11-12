@@ -1,6 +1,7 @@
 import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { AppDataContext } from '../../../shared/types/api'
 import { FEED_PAGE_SIZE, type Post, type Story } from '../types'
+import { useLatest } from '../../../shared/hooks/useLatest'
 type Options = AppDataContext & {
   actionLocks: RefObject<Set<string>>
   setActivePostId: Dispatch<SetStateAction<number | null>>
@@ -17,8 +18,7 @@ export function useFeedData({
   const feedRevision = useRef(0)
   const feedLoads = useRef(0)
   const [posts, setPosts] = useState<Post[]>([])
-  const postsLengthRef = useRef(0)
-  postsLengthRef.current = posts.length
+  const postsLengthRef = useLatest(posts.length)
   const [savedPosts, setSavedPosts] = useState<Post[]>([])
   const [hasMoreSavedPosts, setHasMoreSavedPosts] = useState(false)
   const [savedPostsBusy, setSavedPostsBusy] = useState(false)

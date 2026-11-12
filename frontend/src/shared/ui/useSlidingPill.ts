@@ -7,15 +7,15 @@ export default function useSlidingPill<Host extends HTMLElement = HTMLElement>(a
   const pillNode = useRef<HTMLSpanElement>(null)
   const [refVersion, setRefVersion] = useState(0)
   const previousKey = useRef<string | null>(null)
-  const hostRef = useCallback((node: Host | null) => {
+  const setHost = useCallback((node: Host | null) => {
     hostNode.current = node
     setRefVersion((version) => version + 1)
   }, [])
-  const activeRef = useCallback((node: HTMLButtonElement | null) => {
+  const setActive = useCallback((node: HTMLButtonElement | null) => {
     activeNode.current = node
     setRefVersion((version) => version + 1)
   }, [])
-  const pillRef = useCallback((node: HTMLSpanElement | null) => {
+  const setPill = useCallback((node: HTMLSpanElement | null) => {
     pillNode.current = node
     setRefVersion((version) => version + 1)
   }, [])
@@ -72,5 +72,5 @@ export default function useSlidingPill<Host extends HTMLElement = HTMLElement>(a
     }
   }, [activeKey, refVersion])
 
-  return { hostRef, activeRef, pillRef }
+  return { setHost, setActive, setPill }
 }

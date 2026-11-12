@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { desktopBridge, type DesktopScreenRequest } from './desktop'
 
 export default function DesktopScreenPicker() {
@@ -6,8 +6,10 @@ export default function DesktopScreenPicker() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const dialog = useRef<HTMLDialogElement>(null)
-  const latest = useRef<DesktopScreenRequest | null>(null)
-  latest.current = request
+  const latest = useRef(request)
+  useLayoutEffect(() => {
+    latest.current = request
+  })
   useEffect(() => {
     const bridge = desktopBridge().screen
     const unsubscribe = bridge.onPicker((value) => { setBusy(false); setError(''); setRequest(value) })
@@ -16,7 +18,7 @@ export default function DesktopScreenPicker() {
       const current = latest.current
       if (current) void bridge.select(current.requestId, null).catch(() => undefined)
     }
-  }, [])
+  }, [latest])
   useEffect(() => {
     const element = dialog.current
     if (!request || !element) return

@@ -61,8 +61,8 @@ export default function ContactsView({
 }: Props) {
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
   const [invitationTab, setInvitationTab] = useState<InvitationTab>('incoming')
-  const directoryPill = useSlidingPill<HTMLDivElement>(directoryFilter)
-  const invitationPill = useSlidingPill<HTMLDivElement>(invitationTab)
+  const { setHost: directoryPillSetHost, setActive: directoryPillSetActive, setPill: directoryPillSetPill } = useSlidingPill<HTMLDivElement>(directoryFilter)
+  const { setHost: invitationPillSetHost, setActive: invitationPillSetActive, setPill: invitationPillSetPill } = useSlidingPill<HTMLDivElement>(invitationTab)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [expandedFriendId, setExpandedFriendId] = useState<number | null>(null)
   const [qrImage, setQrImage] = useState('')
@@ -257,10 +257,10 @@ export default function ContactsView({
                   disabled={friendsLoading} onClick={onRetryFriends}><RefreshCw size={17} aria-hidden="true"/></button>
               </div>
             </div>
-            <div ref={directoryPill.hostRef} className="fd-filters sliding-pill-host" role="group" aria-label="Lọc danh bạ">
-              <span ref={directoryPill.pillRef} className="sliding-pill contacts-filter-active-pill" aria-hidden="true" />
+            <div ref={directoryPillSetHost} className="fd-filters sliding-pill-host" role="group" aria-label="Lọc danh bạ">
+              <span ref={directoryPillSetPill} className="sliding-pill contacts-filter-active-pill" aria-hidden="true" />
               {([['alphabetical','A – Z'],['online','Đang online'],['favorites','Yêu thích']] as const).map(([filter,label]) =>
-                <button ref={directoryFilter === filter ? directoryPill.activeRef : undefined} type="button" key={filter} className={directoryFilter === filter ? 'active' : ''}
+                <button ref={directoryFilter === filter ? directoryPillSetActive : undefined} type="button" key={filter} className={directoryFilter === filter ? 'active' : ''}
                   aria-pressed={directoryFilter === filter} onClick={() => setDirectoryFilter(filter)}>{label}</button>)}
             </div>
             {friendsError && <div className="fd-sync-feedback" role="alert">
@@ -308,10 +308,10 @@ export default function ContactsView({
     </> : <>
       <div className="fd-invitation-tabs">
         <button type="button" className="fd-back" onClick={() => {onScreenChange('directory');setFriendQuery('')}} aria-label="Quay lại Danh bạ"><ArrowLeft size={17}/></button>
-        <div ref={invitationPill.hostRef} className="sliding-pill-host" role="tablist" aria-label="Lời mời kết bạn">
-          <span ref={invitationPill.pillRef} className="sliding-pill invitation-active-pill" aria-hidden="true" />
+        <div ref={invitationPillSetHost} className="sliding-pill-host" role="tablist" aria-label="Lời mời kết bạn">
+          <span ref={invitationPillSetPill} className="sliding-pill invitation-active-pill" aria-hidden="true" />
           {([['incoming','Lời mời đến'],['sent','Đã gửi'],['qr','Quét QR']] as const).map(([id,label]) =>
-            <button ref={invitationTab === id ? invitationPill.activeRef : undefined} role="tab" type="button" key={id} className={invitationTab === id ? 'active' : ''}
+            <button ref={invitationTab === id ? invitationPillSetActive : undefined} role="tab" type="button" key={id} className={invitationTab === id ? 'active' : ''}
               aria-selected={invitationTab === id} onClick={() => setInvitationTab(id)}>{label}</button>)}
         </div>
         <small>{incoming.length + outgoing.length} đang chờ xử lý</small>

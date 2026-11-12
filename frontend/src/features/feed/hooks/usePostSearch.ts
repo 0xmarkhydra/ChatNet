@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ApiRequest } from "../../../shared/types/api";
 import type { Post } from "../types";
+import { useLatest } from "../../../shared/hooks/useLatest";
 
 const SEARCH_PAGE_SIZE = 5;
 
@@ -44,10 +45,8 @@ export function usePostSearch({
     enabled && sessionId && normalizedQuery
       ? JSON.stringify([sessionId, scope, normalizedQuery])
       : "";
-  const currentKey = useRef(key);
-  currentKey.current = key;
-  const requestRef = useRef(request);
-  requestRef.current = request;
+  const currentKey = useLatest(key);
+  const requestRef = useLatest(request);
   const controller = useRef<AbortController | null>(null);
   const pagingBusy = useRef(false);
   const [state, setState] = useState<SearchState>(emptyState);
@@ -100,7 +99,7 @@ export function usePostSearch({
       window.clearTimeout(timer);
       controller.current?.abort();
     };
-  }, [key, baseUrl, retryNumber]);
+  }, [key, baseUrl, retryNumber, requestRef, currentKey]);
 
   const current =
     state.key === key ? state : { ...emptyState, loading: Boolean(key) };

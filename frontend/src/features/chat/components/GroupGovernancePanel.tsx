@@ -19,6 +19,7 @@ import {
   reviewJoinRequest,
   updateGroupSettings,
 } from "../api/governance";
+import { useLatest } from "../../../shared/hooks/useLatest";
 
 type Settings = {
   requireApproval: boolean;
@@ -87,8 +88,7 @@ export default function GroupGovernancePanel({
   onMembersChanged,
   section,
 }: Props) {
-  const requestRef = useRef(request);
-  requestRef.current = request;
+  const requestRef = useLatest(request);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [expiryHours, setExpiryHours] = useState(24);
   const [maxUses, setMaxUses] = useState(0);
@@ -125,7 +125,7 @@ export default function GroupGovernancePanel({
     return () => {
       active = false;
     };
-  }, [conversationId]);
+  }, [conversationId, requestRef]);
 
   useEffect(() => {
     if (!canInvite) {
@@ -145,7 +145,7 @@ export default function GroupGovernancePanel({
     return () => {
       active = false;
     };
-  }, [conversationId, canInvite]);
+  }, [conversationId, canInvite, requestRef]);
 
   useEffect(() => {
     if (!canApprove) {
@@ -165,7 +165,7 @@ export default function GroupGovernancePanel({
     return () => {
       active = false;
     };
-  }, [conversationId, canApprove]);
+  }, [conversationId, canApprove, requestRef]);
 
   useEffect(() => {
     if (!canAudit) return;
@@ -182,7 +182,7 @@ export default function GroupGovernancePanel({
     return () => {
       active = false;
     };
-  }, [conversationId, canAudit]);
+  }, [conversationId, canAudit, requestRef]);
 
   async function send(call: (api: ApiRequest) => Promise<Response>) {
     const response = await call(request);
