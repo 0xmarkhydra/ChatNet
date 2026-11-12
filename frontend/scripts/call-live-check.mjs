@@ -6,9 +6,15 @@ const ui = [
   read('src/features/calls/components/CallManager.tsx'),
   read('src/features/calls/components/SecureCallRoom.tsx'),
   read('src/features/calls/hooks/useCallMediaControls.ts'),
+  read('src/features/calls/hooks/useCallVoiceConsent.ts'),
+  read('src/features/calls/hooks/useCallRemoteConsent.ts'),
+  read('src/features/calls/hooks/useCallInterpreterSessions.ts'),
   read('src/features/calls/components/CallRoomControls.tsx'),
   read('src/features/calls/components/CallRoomNotices.tsx'),
 ].join('\n')
+const voiceConsent = read('src/features/calls/hooks/useCallVoiceConsent.ts')
+const remoteConsent = read('src/features/calls/hooks/useCallRemoteConsent.ts')
+const interpreterSessions = read('src/features/calls/hooks/useCallInterpreterSessions.ts')
 const transport = read('src/features/calls/lib/callMediaInterpreter.ts')
 const backend = read('../backend/cmd/call/translation.go')
 const callRoutes = read('../backend/cmd/call/main.go')
@@ -41,4 +47,13 @@ for (const [start, end] of [['async function toggleMic()', 'async function toggl
   assert.ok(handler.includes('if (next) await requireDesktopMedia('), 'capture enable requires explicit native permission')
 }
 assert.ok(ui.includes('isDesktopBuild ? { audio: false } : undefined'), 'Desktop screen capture must not implicitly include system audio')
+assert.ok(voiceConsent.includes('revisionAtLoad === consentRevision.current') &&
+  voiceConsent.includes('consentUpdating.current'), 'late consent reads must not overwrite newer grants or revocations')
+assert.ok(voiceConsent.includes('if (!allowed) setAllowMyVoice(false)') &&
+  voiceConsent.includes('setMicrophoneEnabled(false)'), 'failed AI consent revocation must fail closed by stopping microphone')
+assert.ok(remoteConsent.includes('RoomEvent.ParticipantDisconnected, onLeft') &&
+  remoteConsent.includes('delete next[participant.identity]'), 'departed participants must lose consent state')
+assert.ok(interpreterSessions.includes("phase !== 'connected'") &&
+  interpreterSessions.includes('session.stop()') &&
+  interpreterSessions.includes('cancelled = true'), 'AI interpreters must stop during reconnect and unmount')
 console.log('PASS: backend provider/consent boundaries, one-click UI, bounded media lifecycle and permission source guards (static, not live media)')

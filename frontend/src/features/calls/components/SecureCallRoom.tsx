@@ -26,8 +26,9 @@ import { deriveCallRoomDisplay } from '../lib/callRoomDisplay'
 import { useCallMediaControls } from '../hooks/useCallMediaControls'
 import { useCallLanguages } from '../hooks/useCallLanguages'
 import { useCallOverlayDismiss } from '../hooks/useCallOverlayDismiss'
-
-const CONSENT_TOPIC = 'chatnet.call.translation.consent.v1'
+import { useCallVoiceConsent } from '../hooks/useCallVoiceConsent'
+import { useCallRemoteConsent } from '../hooks/useCallRemoteConsent'
+import { useCallInterpreterSessions } from '../hooks/useCallInterpreterSessions'
 
 type SecureCallRoomProps = {
   autoPublish: boolean
@@ -77,8 +78,6 @@ export default function SecureCallRoom({
   const [allowMyVoice, setAllowMyVoice] = useState(false)
   const [consentBusy, setConsentBusy] = useState(false)
   const [consentError, setConsentError] = useState('')
-  const consentUpdating = useRef(false)
-  const consentRevision = useRef(0)
   const [consentRequested, setConsentRequested] = useState(false)
   const [remoteConsent, setRemoteConsent] = useState<Record<string, boolean>>({})
   const [translatingIds, setTranslatingIds] = useState<string[]>([])
@@ -300,46 +299,10 @@ export default function SecureCallRoom({
 
   const room = runtime?.room
 
-  useEffect(() => {
-    if (!room) return
-    let cancelled = false
-    const revisionAtLoad = consentRevision.current
-    request(`/api/calls/${encodeURIComponent(call.id)}/translation-consent`).then(async (response) => {
-      if (!response.ok) throw new Error('Không thể đọc quyền dịch giọng nói.')
-      const data = await response.json() as { allowed: boolean }
-      if (!cancelled && !consentUpdating.current && revisionAtLoad === consentRevision.current) setAllowMyVoice(data.allowed === true)
-    }).catch(() => { if (!cancelled) setConsentError('Không thể kiểm tra quyền dịch giọng nói. Hãy thử lại hoặc tắt micro.') })
-    return () => { cancelled = true }
-  }, [room, call.id, request])
-
-  async function updateVoiceConsent(allowed: boolean) {
-    if (!room || consentUpdating.current) return
-    consentUpdating.current = true
-    consentRevision.current += 1
-    setConsentBusy(true)
-    setConsentError('')
-    // Withdraw in the local UI immediately, before the backend responds.
-    if (!allowed) setAllowMyVoice(false)
-    try {
-      const response = await request(`/api/calls/${encodeURIComponent(call.id)}/translation-consent`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowed }),
-      })
-      if (!response.ok) throw new Error('Không thể cập nhật quyền dịch giọng nói.')
-      setAllowMyVoice(allowed)
-      setConsentRequested(false)
-    } catch {
-      if (!allowed) {
-        // Revocation could not be confirmed by the backend. Stop sending new voice.
-        await room.localParticipant.setMicrophoneEnabled(false).then(() => setMicOn(false)).catch(() => undefined)
-        setConsentError('Không xác nhận được thu hồi quyền AI. Micro đã được yêu cầu tắt; hãy kiểm tra hoặc rời cuộc gọi.')
-      } else {
-        setConsentError('Không cấp được quyền xử lý giọng nói. AI sẽ không nhận âm thanh của bạn.')
-      }
-    } finally {
-      consentUpdating.current = false
-      setConsentBusy(false)
-    }
-  }
+  const { updateVoiceConsent } = useCallVoiceConsent({
+    room, callId: call.id, request,
+    setAllowMyVoice, setConsentError, setConsentBusy, setConsentRequested, setMicOn,
+  })
 
   const participants = useMemo(() => {
     if (!room) return [] as Participant[]
@@ -347,106 +310,15 @@ export default function SecureCallRoom({
     return [room.localParticipant, ...Array.from(room.remoteParticipants.values())]
   }, [revision, room])
 
-  // Voice consent is explicit; LiveKit already authenticates the sender identity.
-  useEffect(() => {
-    if (!room) return
-    const announce = () => {
-      void room.localParticipant.publishData(
-        new TextEncoder().encode(JSON.stringify({ type: 'consent', allowed: allowMyVoice })),
-        { reliable: true, topic: CONSENT_TOPIC },
-      ).catch(() => undefined)
-    }
-    const onData = (payload: Uint8Array, participant?: Participant, _kind?: unknown, topic?: string) => {
-      if (topic !== CONSENT_TOPIC || !participant || payload.byteLength > 256) return
-      try {
-        const message = JSON.parse(new TextDecoder().decode(payload)) as { type?: string; allowed?: boolean }
-        if (message.type === 'consent' && typeof message.allowed === 'boolean') {
-          setRemoteConsent((current) => ({ ...current, [participant.identity]: message.allowed! }))
-        }
-        if (message.type === 'request' && !allowMyVoice) setConsentRequested(true)
-      } catch { /* Ignore unrecognized control payloads. */ }
-    }
-    room.on(RoomEvent.DataReceived, onData)
-    const onJoined = () => {
-      announce()
-      if (translationOn) {
-        void room.localParticipant.publishData(
-          new TextEncoder().encode(JSON.stringify({ type: 'request' })),
-          { reliable: true, topic: CONSENT_TOPIC },
-        ).catch(() => undefined)
-      }
-    }
-    const onLeft = (participant: Participant) => {
-      setRemoteConsent((current) => {
-        if (!Object.prototype.hasOwnProperty.call(current, participant.identity)) return current
-        const next = { ...current }
-        delete next[participant.identity]
-        return next
-      })
-    }
-    room.on(RoomEvent.ParticipantConnected, onJoined)
-    room.on(RoomEvent.ParticipantDisconnected, onLeft)
-    announce()
-    return () => {
-      room.off(RoomEvent.DataReceived, onData)
-      room.off(RoomEvent.ParticipantConnected, onJoined)
-      room.off(RoomEvent.ParticipantDisconnected, onLeft)
-    }
-  }, [room, allowMyVoice, translationOn])
-
-  useEffect(() => {
-    if (!room || !translationOn) return
-    void room.localParticipant.publishData(
-      new TextEncoder().encode(JSON.stringify({ type: 'request' })),
-      { reliable: true, topic: CONSENT_TOPIC },
-    ).catch(() => undefined)
-  }, [room, translationOn])
+  useCallRemoteConsent({ room, allowMyVoice, translationOn, setRemoteConsent, setConsentRequested })
 
   const { remoteTrackKey, remoteConsentKey, latestCaption, waitingConsentCount, statusLabel } =
     deriveCallRoomDisplay(participants, room?.localParticipant, captions, remoteConsent, phase)
-  useEffect(() => {
-    let cancelled = false
-    const stopAll = () => {
-      for (const session of interpreters.current.values()) session.stop()
-      interpreters.current.clear()
-      interpreterPending.current.clear()
-    }
-    if (!translationOn || !room || phase !== 'connected') {
-      stopAll()
-      setTranslatingIds([])
-      return
-    }
-    // Never send remote audio to AI while LiveKit signaling/media is reconnecting.
-    // Translate each remote speaker separately so simultaneous speech is not mixed.
-    const consent = JSON.parse(remoteConsentKey) as Record<string, boolean>
-    const tracks = Array.from(room.remoteParticipants.values()).flatMap((participant) =>
-      Array.from(participant.audioTrackPublications.values())
-        .filter((publication) => publication.track && !publication.isMuted && consent[participant.identity])
-        .map((publication) => ({ id: participant.identity, track: (publication.track as RemoteTrack).mediaStreamTrack })),
-    ).slice(0, 5)
-    void Promise.all(tracks.map(async ({ id, track }) => {
-      if (interpreterPending.current.has(id) || interpreters.current.has(id)) return
-      interpreterPending.current.add(id)
-      try {
-        const session = await startCallMediaInterpreter({
-          speakerId: id, track, callId: call.id, targetLanguage: callTargetLanguage, apiBase, request,
-          onUpdate: (update: InterpreterUpdate) => {
-            if (cancelled) return
-            setCaptions((current) => appendCallCaption(current, update))
-          },
-          onError: (message) => { if (!cancelled) setTranslationError(message) },
-          onReady: () => { if (!cancelled) setTranslatingIds((current) => Array.from(new Set([...current, id]))) },
-        })
-        if (cancelled) session.stop()
-        else { interpreters.current.set(id, session) }
-      } catch (error) {
-        if (!cancelled) setTranslationError(error instanceof Error ? error.message : 'Không thể bật phiên dịch.')
-      } finally { interpreterPending.current.delete(id) }
-    }))
-    return () => { cancelled = true; stopAll(); setTranslatingIds([]) }
-  // Stable stream IDs and consent data are the only topology dependencies.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room, phase, translationOn, call.id, callTargetLanguage, remoteTrackKey, remoteConsentKey, request, translationRetryEpoch, apiBase])
+  useCallInterpreterSessions({
+    room, phase, translationOn, callId: call.id, callTargetLanguage, apiBase, request,
+    remoteTrackKey, remoteConsentKey, translationRetryEpoch, interpreters, interpreterPending,
+    setCaptions, setTranslationError, setTranslatingIds,
+  })
 
   useEffect(() => {
     if (!translationOn) {
