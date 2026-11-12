@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { MapPin, Users, Search, RefreshCw, Navigation, List, Map as MapIcon, LocateFixed, Plus, Minus, ShieldCheck } from 'lucide-react'
-import * as maplibregl from 'maplibre-gl'
-import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import 'maplibre-gl/dist/maplibre-gl.css'
+import { useEffect, useMemo, useState } from 'react'
+import { MapPin, Users, Search, RefreshCw, Navigation, List, Map as MapIcon, ShieldCheck } from 'lucide-react'
+import NearbyMap from './NearbyMap'
 import { loadNearbyPlaces, type NearbyPlace, type NearbyPlaceCategory } from '../lib/nearbyPlaces'
 import { getCurrentPositionSmart, geolocationErrorMessage } from '../lib/geolocation'
 
@@ -38,69 +36,9 @@ const categories: { id: NearbyPlaceCategory; label: string }[] = [
   { id: 'services', label: 'Dịch vụ' }, { id: 'stay', label: 'Lưu trú' }, { id: 'health', label: 'Y tế' },
   { id: 'education', label: 'Giáo dục' }, { id: 'shopping', label: 'Mua sắm' },
 ]
-maplibregl.setWorkerUrl(maplibreWorkerUrl)
-
 function distance(value?: number) {
   if (value === undefined || !Number.isFinite(value)) return 'Chưa rõ khoảng cách'
   return value < 1 ? `${Math.max(1, Math.round(value * 100)) * 10} m` : `${value.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`
-}
-
-function NearbyMap({ location, places, selected, onSelect }: {
-  location: { latitude: number; longitude: number }
-  places: NearbyPlace[]
-  selected: string | null
-  onSelect: (id: string) => void
-}) {
-  const container = useRef<HTMLDivElement>(null)
-  const map = useRef<maplibregl.Map | null>(null)
-  const [failed, setFailed] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-  useEffect(() => {
-    if (!container.current) return
-    setFailed(false)
-    let instance: maplibregl.Map
-    try {
-      instance = new maplibregl.Map({
-        container: container.current, style: 'https://tiles.openfreemap.org/styles/liberty',
-        center: [location.longitude, location.latitude], zoom: 14,
-      })
-    } catch { setFailed(true); return }
-    map.current = instance
-    const resize = new ResizeObserver(() => instance.resize())
-    resize.observe(container.current)
-    instance.on('error', () => { if (!instance.isStyleLoaded()) setFailed(true) })
-    instance.on('load', () => setFailed(false))
-    new maplibregl.Marker({ color: '#2464ba' }).setLngLat([location.longitude, location.latitude]).addTo(instance)
-    return () => { resize.disconnect(); instance.remove(); map.current = null }
-  }, [location, attempt])
-
-  useEffect(() => {
-    if (!map.current) return
-    const instance = map.current
-    const markers = places.map((place, index) => {
-      const button = document.createElement('button')
-      button.className = `nearby-place-marker${selected === place.id ? ' selected' : ''}`
-      button.type = 'button'
-      button.textContent = String(index + 1)
-      button.title = place.name
-      button.setAttribute('aria-label', place.name)
-      button.onclick = () => onSelect(place.id)
-      return new maplibregl.Marker({ element: button }).setLngLat([place.longitude, place.latitude]).addTo(instance)
-    })
-    const place = places.find((item) => item.id === selected)
-    if (place) instance.easeTo({ center: [place.longitude, place.latitude], duration: 300 })
-    return () => markers.forEach((marker) => marker.remove())
-  }, [places, selected, onSelect, location, attempt])
-
-  return <div className="nearby-map">
-    <div ref={container} className="nearby-map-canvas" />
-    {failed && <div className="nearby-map-error" role="status">Không tải được bản đồ. Danh sách vẫn dùng được.<button onClick={() => setAttempt((value) => value + 1)}>Thử lại</button></div>}
-    <div className="nearby-map-controls">
-      <button title="Về vị trí của tôi" aria-label="Về vị trí của tôi" onClick={() => map.current?.easeTo({ center: [location.longitude, location.latitude], zoom: 14 })}><LocateFixed size={20} /></button>
-      <button title="Phóng to" aria-label="Phóng to" onClick={() => map.current?.zoomIn()}><Plus size={20} /></button>
-      <button title="Thu nhỏ" aria-label="Thu nhỏ" onClick={() => map.current?.zoomOut()}><Minus size={20} /></button>
-    </div>
-  </div>
 }
 
 export default function NearbyExplorer({

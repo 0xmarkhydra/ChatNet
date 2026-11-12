@@ -48,6 +48,7 @@
     "check:profile-note": "node scripts/profile-note-check.mjs",
     "check:cache": "node --experimental-strip-types scripts/session-cache-check.mjs",
     "check:feed-api": "node scripts/feed-api-check.mjs",
+    "check:feed-requests": "node --experimental-strip-types scripts/feed-request-check.mjs",
     "check:chat-api": "node scripts/chat-api-check.mjs",
     "check:chat-messaging-flow": "node scripts/chat-messaging-flow-check.mjs",
     "check:chat-conversation-flow": "node scripts/chat-conversation-flow-check.mjs",
