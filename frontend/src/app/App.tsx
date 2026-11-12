@@ -11,6 +11,7 @@ import type { InstallPromptEvent } from "../features/pwa/types";
 import type { ToastKind } from "../shared/utils/toast";
 import AuthedApp from "./AuthedApp";
 import AuthedProviders from "./providers/AuthedProviders";
+import { useLatest } from "../shared/hooks/useLatest";
 
 /**
  * Authentication shell. It owns the session lifecycle and only mounts the
@@ -123,23 +124,24 @@ export default function App({
     setSession(null);
   }
 
+  const endSessionRef = useLatest(endSession);
   useEffect(() => {
     if (isDesktopBuild) {
       return desktopBridge().auth.onExpired((sessionId) => {
-        if (sessionRef.current?.sessionId === sessionId) endSession(false);
+        if (sessionRef.current?.sessionId === sessionId) endSessionRef.current(false);
       });
     }
     const sync = (event: StorageEvent) => {
       if (event.key !== "chatnet-session" && event.key !== null) return;
       const next = loadSession();
       if (sessionRef.current?.sessionId !== next?.sessionId)
-        endSession(false, false);
+        endSessionRef.current(false, false);
       sessionRef.current = next;
       setSession(next);
     };
     window.addEventListener("storage", sync);
     return () => window.removeEventListener("storage", sync);
-  }, []);
+  }, [endSessionRef]);
 
   if (!session) return <AuthScreen {...auth} />;
 
