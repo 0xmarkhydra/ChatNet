@@ -1,12 +1,12 @@
 import FeedModeration from "./FeedModeration";
 import SocialFeedStories from "./SocialFeedStories";
 import { userLabel } from "../../../shared/utils/userLabel";
-import UiIcon from "../../../shared/ui/UiIcon";
+import MobileFeedStories from "./MobileFeedStories";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import SocialFeedComposer from "./SocialFeedComposer";
-import { RefreshCw } from "lucide-react";
+import FeedFilters from "./FeedFilters";
 import FeedCommunitiesList from "./FeedCommunitiesList";
-import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
+import FeedPendingPost from "./FeedPendingPost";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import type { FriendSearchResult, FriendConnection } from "../../contacts/types";
@@ -196,72 +196,13 @@ export default function FeedSection({
                     onOpen={setActiveStoryId}
                   />
                 ) : (
-                  <>
-                    <div className="soco-feed-section-label">
-                      <strong>Khoảnh khắc</strong>
-                      <small>Story trong 24 giờ</small>
-                    </div>
-                    <div className="stories-row">
-                      <button
-                        type="button"
-                        className="story-card"
-                        disabled={storyBusy || mediaUploading === "story"}
-                        onClick={() => storyFileInputRef.current?.click()}
-                        aria-label="Tạo Story mới"
-                      >
-                        <div className="story-visual self-story">
-                          <span className="story-camera">
-                            <UiIcon name="plus" size={22} />
-                          </span>
-                        </div>
-                        <span>
-                          Tạo mới
-                        </span>
-                      </button>
-                      {stories.map((story) => (
-                        <button
-                          type="button"
-                          className="story-card"
-                          key={story.id}
-                          onClick={() => setActiveStoryId(story.id)}
-                          aria-label={`Xem Story của ${userLabel(story.authorDisplayName, story.author)}`}
-                        >
-                          <div className="story-visual">
-                            {story.attachment.kind === "video" ? (
-                              <video
-                                src={story.attachment.url}
-                                muted
-                                playsInline
-                                preload="metadata"
-                              />
-                            ) : (
-                              <img
-                                src={story.attachment.url}
-                                alt=""
-                                loading="lazy"
-                              />
-                            )}
-                            <UserAvatar
-                              className="story-avatar-mini"
-                              username={story.author}
-                              name={userLabel(
-                                story.authorDisplayName,
-                                story.author,
-                              )}
-                            />
-                          </div>
-                          <span>
-                            {story.author === name
-                              ? "Story của bạn"
-                              : userLabel(
-                                  story.authorDisplayName,
-                                  story.author,
-                                )}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
+                  <MobileFeedStories
+                    username={name}
+                    stories={stories}
+                    busy={storyBusy || mediaUploading === "story"}
+                    onCreate={() => storyFileInputRef.current?.click()}
+                    onOpen={setActiveStoryId}
+                  />
                 )}
 
                 <SocialFeedComposer
@@ -288,92 +229,21 @@ export default function FeedSection({
                   />
                 </>)}
 
-                {!feedCommunitiesOpen && (isProfileDesktop ? (
-                  <div
-                    className="social-feed-filter-bar"
-                    role="group"
-                    aria-label="Lọc bảng tin"
-                  >
-                    <div className="social-feed-filter-options">
-                      <button
-                        type="button"
-                        aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
-                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
-                      >
-                        Dành cho bạn
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={!feedCommunitiesOpen && feedFilter === "following"}
-                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("following"); }}
-                      >
-                        Đang theo dõi
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={!feedCommunitiesOpen && feedFilter === "latest"}
-                        onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("latest"); }}
-                      >
-                        Mới nhất
-                      </button>
-                      {!feedCommunitiesOpen && feedFilter === "saved" && (
-                        <button type="button" aria-pressed={true}>
-                          Đã lưu
-                        </button>
-                      )}
-                    </div>
-                    {!feedCommunitiesOpen && <button
-                      className="social-feed-refresh"
-                      type="button"
-                      onClick={() => {
-                        if (feedFilter === "following") followingFeed.refresh();
-                        else if (feedFilter === "saved") void loadSavedPosts();
-                        else void refreshPosts();
-                      }}
-                    >
-                      <RefreshCw size={15} aria-hidden="true" />
-                      {feedFilter === "saved" ? "Bài đã lưu" : "Bài viết mới"}
-                    </button>}
-                  </div>
-                ) : (
-                  <>
-                    <div className="soco-feed-section-label soco-feed-posts-label">
-                      <strong>
-                        {feedCommunitiesOpen ? "Cộng đồng" : feedFilter === "saved"
-                          ? "Bài viết đã lưu"
-                          : "Bài viết mới"}
-                      </strong>
-                      <div
-                        ref={feedFiltersPill.hostRef}
-                        className="feed-filter-tabs sliding-pill-host"
-                        role="group"
-                        aria-label="Lọc bảng tin"
-                      >
-                        <span ref={feedFiltersPill.pillRef} className="sliding-pill feed-filter-active-pill" aria-hidden="true" />
-                        <button
-                          ref={!feedCommunitiesOpen && feedFilter === "all" ? feedFiltersPill.activeRef : undefined}
-                          type="button"
-                          aria-pressed={!feedCommunitiesOpen && feedFilter === "all"}
-                          onClick={() => { setFeedCommunitiesOpen(false); setFeedFilter("all"); }}
-                        >
-                          Mới nhất
-                        </button>
-                        <button
-                          ref={!feedCommunitiesOpen && feedFilter === "saved" ? feedFiltersPill.activeRef : undefined}
-                          type="button"
-                          aria-pressed={!feedCommunitiesOpen && feedFilter === "saved"}
-                          onClick={() => {
-                            setFeedCommunitiesOpen(false);
-                            setFeedFilter("saved");
-                            void loadSavedPosts();
-                          }}
-                        >
-                          Đã lưu
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ))}
+                {!feedCommunitiesOpen && (
+                  <FeedFilters
+                    isProfileDesktop={isProfileDesktop}
+                    filter={feedFilter}
+                    pill={feedFiltersPill}
+                    setFilter={setFeedFilter}
+                    onCloseCommunities={() => setFeedCommunitiesOpen(false)}
+                    onRefresh={() => {
+                      if (feedFilter === "following") followingFeed.refresh();
+                      else if (feedFilter === "saved") void loadSavedPosts();
+                      else void refreshPosts();
+                    }}
+                    onLoadSaved={() => void loadSavedPosts()}
+                  />
+                )}
                 <div className="feed zalo-feed">
                   {feedCommunitiesOpen ? (
                     <FeedCommunitiesList
@@ -384,34 +254,7 @@ export default function FeedSection({
                       onLoadMore={() => void loadMoreConversations()}
                     />
                   ) : (<>
-                  {pendingPost && (
-                    <article
-                      className="post zalo-post outgoing-preview"
-                      aria-busy="true"
-                    >
-                      <UserAvatar
-                        username={pendingPost.author}
-                        name={userLabel(
-                          pendingPost.authorDisplayName,
-                          pendingPost.author,
-                        )}
-                        className="avatar"
-                      />
-                      <div className="post-body">
-                        <div className="post-author">
-                          <strong>
-                            {userLabel(
-                              pendingPost.authorDisplayName,
-                              pendingPost.author,
-                            )}
-                          </strong>
-                          <small>{pendingPost.visibility === "friends" ? "Bạn bè" : pendingPost.visibility === "private" ? "Chỉ mình tôi" : "Công khai"}</small>
-                        </div>
-                        <p className="pending-content">{pendingPost.content}</p>
-                        <MediaAttachmentsView items={pendingPost.attachments} />
-                      </div>
-                    </article>
-                  )}
+                  {pendingPost && <FeedPendingPost post={pendingPost} />}
 
 
                   {renderPosts(searchedPosts, isProfileDesktop)}
