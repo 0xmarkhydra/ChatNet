@@ -1,4 +1,4 @@
-import { getHistoryBatch, getSharedContent } from './api/shared'
+import { getHistoryBatch, getSharedContent } from '../api/shared'
 
 // Prefer the indexed shared-content API. Older deployments can return no
 // results for messages whose channel_id is NULL; recover from chat history.

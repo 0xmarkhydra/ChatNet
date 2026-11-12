@@ -8,9 +8,9 @@ import type { GroupActivityKind } from './GroupActivities'
 import type { Conversation } from '../types'
 import type { GroupManagementSection } from './GroupSettingsPanel'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import GroupChannelCreateForm from '../GroupChannelCreateForm'
-import GroupAvatarEditor, { type GroupPhotoTarget } from '../GroupAvatarEditor'
-import ConversationSharedPreview from '../ConversationSharedPreview'
+import GroupChannelCreateForm from './GroupChannelCreateForm'
+import GroupAvatarEditor, { type GroupPhotoTarget } from './GroupAvatarEditor'
+import ConversationSharedPreview from './ConversationSharedPreview'
 
 type Props = {
   conversation: Conversation

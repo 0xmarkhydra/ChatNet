@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronRight, Film, Images } from 'lucide-react'
-import MediaViewer from '../../shared/ui/MediaViewer'
-import { loadSharedContent, type SharedAttachment } from './sharedContentLoader'
-import './conversation-shared-preview.css'
+import MediaViewer from '../../../shared/ui/MediaViewer'
+import { loadSharedContent, type SharedAttachment } from '../lib/sharedContentLoader'
+import '../styles/conversation-shared-preview.css'
 
 type PreviewItem = { id: string; kind: 'image' | 'video'; url: string; name: string }
 

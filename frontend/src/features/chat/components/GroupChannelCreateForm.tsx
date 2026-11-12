@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Hash, Plus, X } from 'lucide-react'
-import './styles/group-channel-picker.css'
-import './group-channel-create-info.css'
+import '../styles/group-channel-picker.css'
+import '../styles/group-channel-create-info.css'
 
 type Props = {
   busy: boolean

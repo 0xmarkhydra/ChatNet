@@ -231,3 +231,11 @@ Provider được gắn ở `app/providers/AuthedProviders.tsx` (trong `App.tsx`
 | `usePostDetailNavigation` | mở/đóng chi tiết bài viết và URL `?post=` |
 
 `useFeedActions` đã được gỡ; các hook trên thay thế. Tên tham số ref theo quy ước hậu tố `Ref` (`feedRevisionRef`, …).
+
+## Chat: ranh giới thư mục và API
+
+`features/chat/api/` chứa các module request Chat, phân theo nhóm như messages, conversations, groups, pins, search, shared và media. Chạy `npm run check:chat-api` để bảo đảm hợp đồng request không thay đổi khi refactor.
+
+Component Chat đặt trong `features/chat/components/`, CSS trong `features/chat/styles/`, logic hỗ trợ trong `features/chat/lib/`; không đặt thêm file ứng dụng ở gốc `features/chat/` ngoài `types.ts`. Các file `ConversationSharedPreview`, `GroupAvatarEditor`, `GroupChannelCreateForm`, `GroupChannelSidebar` và `sharedContentLoader` đã được chuyển đúng lớp; các import tương đối cần tính từ đường dẫn mới.
+
+`shared/hooks/useScopedState.ts` quản lý state UI theo hội thoại/kênh và chống callback từ lần mở scope cũ (kể cả A → B → A) bằng epoch. Không áp dụng tự động cho state dữ liệu realtime, bản nháp hoặc outbox.
