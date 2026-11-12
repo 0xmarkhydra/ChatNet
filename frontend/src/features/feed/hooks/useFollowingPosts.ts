@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ApiRequest } from '../../../shared/types/api'
 import { FEED_PAGE_SIZE, type Post } from '../types'
+import { appendUniquePosts } from '../utils/feedRequestState'
 
 type State = {
   sessionId: string
@@ -71,9 +72,8 @@ export function useFollowingPosts({
       if (id !== revision.current || !Array.isArray(posts)) return
       setState(previous => {
         if (previous.sessionId !== sessionId) return previous
-        const ids = new Set(previous.posts.map(post => post.id))
         return {
-          ...previous, posts: [...previous.posts, ...posts.filter(post => !ids.has(post.id))],
+          ...previous, posts: appendUniquePosts(previous.posts, posts),
           loadingMore: false, hasMore: posts.length === FEED_PAGE_SIZE, error: '',
         }
       })

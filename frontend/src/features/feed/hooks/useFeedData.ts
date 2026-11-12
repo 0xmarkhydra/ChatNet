@@ -1,6 +1,7 @@
 import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { AppDataContext } from '../../../shared/types/api'
-import { FEED_PAGE_SIZE, type Post, type Story } from '../types'
+import { FEED_PAGE_SIZE, type Post } from '../types'
+import { useFeedStories } from './useFeedStories'
 import { appendUniquePosts, isCurrentFeedRefresh } from '../utils/feedRequestState'
 type Options = AppDataContext & {
   actionLocks: RefObject<Set<string>>
@@ -29,7 +30,7 @@ export function useFeedData({
   const [postsPagingError, setPostsPagingError] = useState(false)
   const [savedPagingError, setSavedPagingError] = useState(false)
   const postsPagingBusy = useRef(false)
-  const [stories, setStories] = useState<Story[]>([])
+  const { stories, setStories, refreshStories } = useFeedStories({ session, sessionRef, apiFetch, setStatus, setNotice })
 
   async function refreshPosts() {
     const revision = feedRevision.current
@@ -129,21 +130,6 @@ export function useFeedData({
     setSavedPosts(current => current.filter(p => p.id !== id))
     setActivePostId(current => current === id ? null : current)
   }
-
-  async function refreshStories() {
-    try {
-      const response = await apiFetch('/api/stories')
-      if (!response.ok) return
-      const data = (await response.json()) as Story[]
-      if (sessionRef.current?.sessionId === session?.sessionId) {
-        setStories(data.filter((item) => Date.parse(item.expiresAt) > Date.now()))
-      }
-    } catch {
-      setStatus('Đang kết nối lại...')
-    }
-  }
-
-
 
   return {
     feedRevision,
