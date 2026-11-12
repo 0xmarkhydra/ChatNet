@@ -1,5 +1,5 @@
 import type { FriendConnection, FriendSearchResult } from "../types";
-import type { UseContactActionsDeps } from "./useContactActions";
+import type { UseContactActionsDeps } from "./contactActionTypes";
 
 type FriendActionsDeps = Pick<UseContactActionsDeps,
   | "apiFetch"
