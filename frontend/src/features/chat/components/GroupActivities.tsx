@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import "../styles/group-activities.css";
+import { createActivity, listActivities, setActivityPinned, voteActivity } from "../api/activities";
 
 export type GroupActivityKind = "poll" | "note" | "reminder";
 export type GroupActivity = {
@@ -82,10 +83,7 @@ export function useGroupActivities(
   const refresh = useCallback(async () => {
     if (!conversationId) return;
     try {
-      const response = await requestRef.current(
-        `/api/conversations/${conversationId}/activities`,
-        { cache: "no-store" },
-      );
+      const response = await listActivities(requestRef.current, conversationId);
       const result = (await readResponse(response)) as ActivityData;
       if (
         activeRef.current.conversationId !== conversationId ||
@@ -134,14 +132,7 @@ export function useGroupActivities(
   }) => {
     if (!conversationId) throw new Error("Chưa chọn nhóm.");
     await readResponse(
-      await requestRef.current(
-        `/api/conversations/${conversationId}/activities`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-      ),
+      await createActivity(requestRef.current, conversationId, payload),
     );
     await refresh();
   };
@@ -149,10 +140,7 @@ export function useGroupActivities(
   const setPin = async (id: number, pinned: boolean) => {
     if (!conversationId) throw new Error("Chưa chọn nhóm.");
     await readResponse(
-      await requestRef.current(
-        `/api/conversations/${conversationId}/activities/${id}/pin`,
-        { method: pinned ? "PUT" : "DELETE" },
-      ),
+      await setActivityPinned(requestRef.current, conversationId, id, pinned),
     );
     await refresh();
   };
@@ -160,14 +148,7 @@ export function useGroupActivities(
   const vote = async (id: number, optionIndex: number) => {
     if (!conversationId) throw new Error("Chưa chọn nhóm.");
     await readResponse(
-      await requestRef.current(
-        `/api/conversations/${conversationId}/activities/${id}/vote`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ optionIndex }),
-        },
-      ),
+      await voteActivity(requestRef.current, conversationId, id, optionIndex),
     );
     await refresh();
   };

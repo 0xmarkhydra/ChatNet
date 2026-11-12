@@ -8,6 +8,17 @@ import {
   Ban,
 } from "lucide-react";
 import "../styles/group-governance.css";
+import type { ApiRequest } from "../../../shared/types/api";
+import { getGroupSettings } from "../api/groups";
+import {
+  createInvite as createInviteRequest,
+  listAuditLog,
+  listInvites,
+  listJoinRequests,
+  revokeInvite as revokeInviteRequest,
+  reviewJoinRequest,
+  updateGroupSettings,
+} from "../api/governance";
 
 type Settings = {
   requireApproval: boolean;
@@ -102,8 +113,7 @@ export default function GroupGovernancePanel({
     setBefore(null);
     setSettings(defaultSettings);
     setError("");
-    void requestRef
-      .current(`/api/conversations/${conversationId}/group-settings`)
+    void getGroupSettings(requestRef.current, conversationId)
       .then(async (response) => {
         if (!response.ok) throw new Error("Không tải được cài đặt nhóm.");
         const result = (await response.json()) as Settings;
@@ -123,8 +133,7 @@ export default function GroupGovernancePanel({
       return;
     }
     let active = true;
-    void requestRef
-      .current(`/api/conversations/${conversationId}/invites`)
+    void listInvites(requestRef.current, conversationId)
       .then(async (response) => {
         if (!response.ok) throw new Error();
         const result = (await response.json()) as Invite[];
@@ -144,8 +153,7 @@ export default function GroupGovernancePanel({
       return;
     }
     let active = true;
-    void requestRef
-      .current(`/api/conversations/${conversationId}/join-requests`)
+    void listJoinRequests(requestRef.current, conversationId)
       .then(async (response) => {
         if (!response.ok) throw new Error();
         const result = (await response.json()) as JoinRequest[];
@@ -162,8 +170,7 @@ export default function GroupGovernancePanel({
   useEffect(() => {
     if (!canAudit) return;
     let active = true;
-    void requestRef
-      .current(`/api/conversations/${conversationId}/admin-audit`)
+    void listAuditLog(requestRef.current, conversationId)
       .then(async (response) => {
         if (!response.ok) throw new Error();
         const result = (await response.json()) as Audit[];
@@ -177,16 +184,8 @@ export default function GroupGovernancePanel({
     };
   }, [conversationId, canAudit]);
 
-  async function send(path: string, method: string, payload?: unknown) {
-    const response = await request(path, {
-      method,
-      ...(payload === undefined
-        ? {}
-        : {
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }),
-    });
+  async function send(call: (api: ApiRequest) => Promise<Response>) {
+    const response = await call(request);
     const value = (await response.json().catch(() => null)) as {
       error?: string;
       [key: string]: unknown;
@@ -210,9 +209,7 @@ export default function GroupGovernancePanel({
   }
 
   async function refreshAudit() {
-    const response = await request(
-      `/api/conversations/${conversationId}/admin-audit`,
-    );
+    const response = await listAuditLog(request, conversationId);
     if (response.ok) {
       setAudit((await response.json()) as Audit[]);
       setBefore(null);
@@ -220,27 +217,20 @@ export default function GroupGovernancePanel({
   }
 
   async function refreshRequests() {
-    const response = await request(
-      `/api/conversations/${conversationId}/join-requests`,
-      { cache: "reload" },
-    );
+    const response = await listJoinRequests(request, conversationId, true);
     if (!response.ok) throw new Error("Không tải được yêu cầu tham gia.");
     setRequests((await response.json()) as JoinRequest[]);
   }
 
   async function refreshInvites() {
-    const response = await request(
-      `/api/conversations/${conversationId}/invites`,
-    );
+    const response = await listInvites(request, conversationId);
     if (response.ok) setInvites((await response.json()) as Invite[]);
   }
 
   async function createInvite() {
     await run(async () => {
-      const value = await send(
-        `/api/conversations/${conversationId}/invites`,
-        "POST",
-        { expiresInHours: expiryHours, maxUses },
+      const value = await send((api) =>
+        createInviteRequest(api, conversationId, { expiresInHours: expiryHours, maxUses }),
       );
       if (typeof value?.token !== "string")
         throw new Error("Không lấy được link mời.");
@@ -254,10 +244,8 @@ export default function GroupGovernancePanel({
 
   async function saveSettings() {
     await run(async () => {
-      const value = await send(
-        `/api/conversations/${conversationId}/group-settings`,
-        "PATCH",
-        settings,
+      const value = await send((api) =>
+        updateGroupSettings(api, conversationId, settings),
       );
       setSettings(value as Settings);
       await refreshAudit();
@@ -268,10 +256,7 @@ export default function GroupGovernancePanel({
   async function revokeInvite(inviteId: number) {
     if (!window.confirm("Thu hồi link mời này?")) return;
     await run(async () => {
-      await send(
-        `/api/conversations/${conversationId}/invites/${inviteId}`,
-        "DELETE",
-      );
+      await send((api) => revokeInviteRequest(api, conversationId, inviteId));
       setCreatedUrl("");
       await Promise.all([refreshInvites(), refreshAudit()]);
       notify("Đã thu hồi link mời.");
@@ -280,10 +265,8 @@ export default function GroupGovernancePanel({
 
   async function review(item: JoinRequest, approve: boolean) {
     await run(async () => {
-      await send(
-        `/api/conversations/${conversationId}/join-requests/${item.id}`,
-        "POST",
-        { approve },
+      await send((api) =>
+        reviewJoinRequest(api, conversationId, item.id, approve),
       );
       setRequests((current) => current.filter((entry) => entry.id !== item.id));
       if (approve) await onMembersChanged();
@@ -298,9 +281,7 @@ export default function GroupGovernancePanel({
     if (!audit.length || busy) return;
     await run(async () => {
       const id = audit[audit.length - 1].id;
-      const response = await request(
-        `/api/conversations/${conversationId}/admin-audit?before=${id}`,
-      );
+      const response = await listAuditLog(request, conversationId, id);
       if (!response.ok) throw new Error("Không tải được nhật ký.");
       const entries = (await response.json()) as Audit[];
       setAudit((current) => [...current, ...entries]);

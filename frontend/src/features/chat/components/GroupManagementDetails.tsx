@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bell, Check, FileText, Files, Globe2, LockKeyhole } from 'lucide-react'
 import type { Message } from '../types'
+import { getCommunity, getNotificationSettings, saveNotificationSettings, updateCommunity } from '../api/community'
+import { listSharedFiles } from '../api/search'
 
 type Section = 'details' | 'rules' | 'notifications' | 'files'
 type Community = {
@@ -40,12 +42,12 @@ export default function GroupManagementDetails({ conversationId, section, canEdi
     const ctrl = new AbortController()
     setLoading(true)
     setError('')
-    const path = section === 'details' || section === 'rules'
-      ? `/api/conversations/${conversationId}/community`
+    const load = section === 'details' || section === 'rules'
+      ? getCommunity
       : section === 'notifications'
-        ? `/api/conversations/${conversationId}/notification-settings`
-        : `/api/conversations/${conversationId}/shared?kind=files&limit=48`
-    void requestRef.current(path, { signal: ctrl.signal }).then(async response => {
+        ? getNotificationSettings
+        : listSharedFiles
+    void load(requestRef.current, conversationId, ctrl.signal).then(async response => {
       if (!response.ok) throw new Error('Không thể tải dữ liệu của mục này.')
       const data = await response.json() as unknown
       if (ctrl.signal.aborted) return
@@ -77,15 +79,11 @@ export default function GroupManagementDetails({ conversationId, section, canEdi
     setBusy(true)
     setError('')
     try {
-      const response = await requestRef.current(`/api/conversations/${conversationId}/community`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: community.description,
-          topic: community.topic,
-          rules: community.rules,
-          visibility: community.visibility,
-        }),
+      const response = await updateCommunity(requestRef.current, conversationId, {
+        description: community.description,
+        topic: community.topic,
+        rules: community.rules,
+        visibility: community.visibility,
       })
       if (!response.ok) throw new Error('Không lưu được thông tin cộng đồng.')
       setCommunity({ ...community, ...(await response.json() as Community) })
@@ -102,11 +100,7 @@ export default function GroupManagementDetails({ conversationId, section, canEdi
     setBusy(true)
     setError('')
     try {
-      const response = await requestRef.current(`/api/conversations/${conversationId}/notification-settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(preferences),
-      })
+      const response = await saveNotificationSettings(requestRef.current, conversationId, preferences)
       if (!response.ok) throw new Error('Không lưu được tùy chọn thông báo.')
       setPreferences(await response.json() as Preferences)
       notify('Đã cập nhật thông báo nhóm.')

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { messageLinkHref, messageTextParts } from '../lib/messageClipboard'
 import '../styles/link-preview.css'
+import { fetchLinkPreview } from '../api/linkPreview'
 
 type LinkPreviewData = {
   url: string
@@ -22,7 +23,7 @@ function loadPreview(url: string, scope: string, request: RequestPreview): Promi
 
   const entry: CacheEntry = {
     expires: Date.now() + 5 * 60_000,
-    promise: request(`/api/link-preview?url=${encodeURIComponent(url)}`)
+    promise: fetchLinkPreview(request, url)
       .then(async (response) => {
         if (!response.ok || response.status === 204) return null
         const data: LinkPreviewData = await response.json()
