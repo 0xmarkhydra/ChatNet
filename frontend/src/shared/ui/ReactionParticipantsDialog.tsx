@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { messageReactionLabel } from '../../features/chat/utils/messageReactions'
+import { reactionLabel as messageReactionLabel } from '../utils/reactions'
 import UserAvatar from './UserAvatar'
 import { useScopedState } from '../hooks/useScopedState'
 import { userLabel } from '../utils/userLabel'
