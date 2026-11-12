@@ -1,3 +1,4 @@
+import { clearConversationHistory, createDirectConversation, createGroupChannel as createGroupChannelRequest, createGroupConversation } from "../api/conversations";
 import { type GroupChannel, validGroupChannels } from "../utils/groupChannels";
 import { type Conversation, type GroupMember, type Message, type NewChatMode } from "../types";
 import { FormEvent, type SetStateAction } from "react";
@@ -109,7 +110,7 @@ export function useConversationActions({
     if (!window.confirm(`Xóa lịch sử trò chuyện với ${current.name} trên tài khoản của bạn?\nNgười khác vẫn giữ lịch sử của họ. Bạn không thể khôi phục các tin nhắn cũ sau thao tác này.`)) return
     setHistoryActionBusy(true)
     try {
-      const response = await apiFetch(`/api/conversations/${current.id}/history`, { method: 'DELETE' })
+      const response = await clearConversationHistory(apiFetch, current.id)
       if (!response.ok) {
         const data = await response.json().catch(() => null) as { error?: string } | null
         throw new Error(data?.error || 'Không xóa được lịch sử trò chuyện.')
@@ -152,11 +153,7 @@ export function useConversationActions({
     const groupId = activeConversation.id;
     setGroupChannelBusy(true);
     try {
-      const response = await apiFetch(`/api/conversations/${groupId}/channels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
-      });
+      const response = await createGroupChannelRequest(apiFetch, groupId, { name, description });
       const data = await response.json().catch(() => null) as (GroupChannel & { error?: string }) | null;
       if (!response.ok || !data?.id || data.conversationId !== groupId)
         throw new Error(data?.error || 'Không tạo được kênh hội thoại.');
@@ -188,11 +185,7 @@ export function useConversationActions({
     const sessionId = session?.sessionId;
     actionLocks.current.add("chat:create");
     try {
-      const response = await apiFetch("/api/conversations/direct", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: normalized }),
-      });
+      const response = await createDirectConversation(apiFetch, normalized);
       const result = await response.json();
       if (sessionRef.current?.sessionId !== sessionId) return;
       if (!response.ok || !Number.isSafeInteger(result?.id) || result.id <= 0) {
@@ -243,11 +236,7 @@ export function useConversationActions({
     setChatCreateError("");
     const sessionId = session?.sessionId;
     try {
-      const response = await apiFetch("/api/conversations/groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, usernames, ...extras }),
-      });
+      const response = await createGroupConversation(apiFetch, { name, usernames, ...extras });
       const result = await response.json();
       if (sessionRef.current?.sessionId !== sessionId) return null;
       if (!response.ok || !Number.isSafeInteger(result?.id) || result.id <= 0) {

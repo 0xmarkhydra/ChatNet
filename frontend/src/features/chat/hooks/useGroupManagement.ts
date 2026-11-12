@@ -4,6 +4,7 @@ import type { Tab } from '../../../shared/types/navigation'
 import type { FriendConnection } from '../../contacts/types'
 import type { Conversation, GroupMember } from '../types'
 import type { ToastKind } from '../../../shared/utils/toast'
+import { addGroupMembers, getGroupSettings, listGroupMembers, removeGroupMember as removeGroupMemberRequest, setGroupMemberRole } from '../api/groups'
 
 type Options = {
   session: Session | null
@@ -94,7 +95,7 @@ export function useGroupManagement({
     setGroupInviteSearch('')
     setGroupInviteSelection([])
     setGroupPolicy(null)
-    void apiFetch(`/api/conversations/${conversation.id}/group-settings`)
+    void getGroupSettings(apiFetch, conversation.id)
       .then(async response => {
         if (!response.ok) throw new Error()
         const result = await response.json() as { adminCanInvite: boolean; adminCanEditInfo: boolean }
@@ -115,7 +116,7 @@ export function useGroupManagement({
   async function refreshGroupMembers(conversationId = activeConversationId || undefined) {
     if (!conversationId) return
     try {
-      const response = await apiFetch(`/api/conversations/${conversationId}/members`)
+      const response = await listGroupMembers(apiFetch, conversationId)
       if (!response.ok) return
       const items = (await response.json()) as GroupMember[]
       if (activeConversationIdRef.current === conversationId) {
@@ -141,11 +142,7 @@ export function useGroupManagement({
     actionLocks.current.add('group:write')
     setGroupBusy(true)
     try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernames }),
-      })
+      const response = await addGroupMembers(apiFetch, activeConversationId, usernames)
       const result = await response.json().catch(() => null) as { error?: string } | null
       if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) {
@@ -178,11 +175,7 @@ export function useGroupManagement({
     actionLocks.current.add('group:write')
     setGroupBusy(true)
     try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role }),
-      })
+      const response = await setGroupMemberRole(apiFetch, activeConversationId, member.id, role)
       const result = await response.json().catch(() => null) as { error?: string } | null
       if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) {
@@ -207,9 +200,7 @@ export function useGroupManagement({
     actionLocks.current.add('group:write')
     setGroupBusy(true)
     try {
-      const response = await apiFetch(`/api/conversations/${activeConversationId}/members/${member.id}`, {
-        method: 'DELETE',
-      })
+      const response = await removeGroupMemberRequest(apiFetch, activeConversationId, member.id)
       const result = await response.json().catch(() => null) as { error?: string } | null
       if (sessionRef.current?.sessionId !== sessionId) return
       if (!response.ok) {

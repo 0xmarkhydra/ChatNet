@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AppDataContext } from '../../../shared/types/api'
+import type { ApiRequest, AppDataContext } from '../../../shared/types/api'
+import { assignCategory, deleteCategory, listCategories, saveCategory } from '../api/categories'
+import { listConversationsByCategory } from '../api/conversations'
 import { CHAT_LIST_PAGE_SIZE, type Conversation } from '../types'
 export type ConversationCategory = { id: number; name: string; color: string }
 type Options = AppDataContext & { mergeConversations: (items: Conversation[]) => void; setCategory: (id: number, categoryId: number | null) => void; clearCategory: (categoryId: number) => void }
@@ -27,7 +29,7 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
   if (!sessionId) return
   const seq = ++categorySequence.current
   try {
-   const response = await current.current.apiFetch('/api/conversation-categories', force ? { cache: 'reload' } : {})
+   const response = await listCategories(current.current.apiFetch, force)
    if (!response.ok) throw new Error('Không tải được phân loại.')
    const data = await response.json() as ConversationCategory[]
    if (sessionRef.current?.sessionId !== sessionId || seq !== categorySequence.current) return
@@ -48,7 +50,7 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
   setLoading(true)
   setListError('')
   try {
-   const response = await current.current.apiFetch('/api/conversations?limit=' + CHAT_LIST_PAGE_SIZE + '&category=' + category + '&offset=' + (more ? offset.current : 0), force ? { cache: 'reload' } : {})
+   const response = await listConversationsByCategory(current.current.apiFetch, { limit: CHAT_LIST_PAGE_SIZE, category, offset: more ? offset.current : 0, force })
    if (!response.ok) throw new Error('Không tải được hội thoại theo phân loại.')
    const data = await response.json() as Conversation[]
    if (sessionRef.current?.sessionId !== sessionId || seq !== sequence.current || category !== selectedRef.current) return
@@ -76,7 +78,7 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
   if (id !== null) void load()
  }
 
- async function write(path: string, init: RequestInit, apply: (data: unknown) => void) {
+ async function write(send: (request: ApiRequest) => Promise<Response>, apply: (data: unknown) => void) {
   if (mutation.current) return false
   const sessionId = sessionRef.current?.sessionId
   if (!sessionId) return false
@@ -84,7 +86,7 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
   setBusy(true)
   setError('')
   try {
-   const response = await current.current.apiFetch(path, init)
+   const response = await send(current.current.apiFetch)
    const data = await response.json()
    if (sessionRef.current?.sessionId !== sessionId) return false
    if (!response.ok) throw new Error(data.error || 'Không lưu được phân loại.')
@@ -101,13 +103,13 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
  }
 
  function save(value: Omit<ConversationCategory, 'id'>, id?: number) {
-  return write('/api/conversation-categories' + (id ? '/' + id : ''), { method: id ? 'PUT' : 'POST', body: JSON.stringify(value) }, data => {
+  return write(request => saveCategory(request, value, id), data => {
    const category = data as ConversationCategory
    setCategories(previous => [...previous.filter(c => c.id !== category.id), category].sort((a,b) => a.name.localeCompare(b.name,'vi')))
   })
  }
  function remove(id: number) {
-  return write('/api/conversation-categories/' + id, { method: 'DELETE' }, () => {
+  return write(request => deleteCategory(request, id), () => {
    setCategories(previous => previous.filter(c => c.id !== id))
    if (selectedRef.current === id) select(null)
    // Only locally loaded conversations need updating; the server cascades the assignments.
@@ -120,7 +122,7 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
   if (selectedRef.current !== null) void load(false, true)
  }
  function assign(id: number, categoryId: number | null) {
-  return write('/api/conversations/' + id + '/category', { method: 'PUT', body: JSON.stringify({ categoryId }) }, () => {
+  return write(request => assignCategory(request, id, categoryId), () => {
    applyAssignment(id, categoryId)
   })
  }

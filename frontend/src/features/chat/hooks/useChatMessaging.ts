@@ -1,3 +1,4 @@
+import { editMessage, reactToMessage, recallMessage, sendMessage as sendMessageRequest } from "../api/messages";
 import { type QueuedChatMessage, confirmChatMessage, retryableChatMessages, enqueueChatMessage } from "../lib/chatOutbox";
 import { type Message, type MessageDraft, type MessageReaction } from "../types";
 import { mergeById, toggleMessageReactionCount } from "../../../shared/utils/optimistic";
@@ -91,22 +92,7 @@ export function useChatMessaging({
       return;
     sendingClientIDs.current.add(item.clientId);
     try {
-      const response = await apiFetch(
-        `/api/conversations/${item.conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: item.text,
-            attachments: item.attachments,
-            clientId: item.clientId,
-            ...(item.channelId ? { channelId: item.channelId } : {}),
-            ...(item.replyToMessageId
-              ? { replyToMessageId: item.replyToMessageId }
-              : {}),
-          }),
-        },
-      );
+      const response = await sendMessageRequest(apiFetch, item);
       if (sessionRef.current?.sessionId !== identity.sessionId) return;
       if (!response.ok) {
         const permanent =
@@ -269,11 +255,7 @@ export function useChatMessaging({
     const sessionId = session?.sessionId;
     actionLocks.current.add(key);
     try {
-      const response = await apiFetch(`/api/messages/${message.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: next.trim() }),
-      });
+      const response = await editMessage(apiFetch, message.id, next.trim());
       const result = (await response.json().catch(() => null)) as
         | Message
         | { error?: string }
@@ -328,9 +310,7 @@ export function useChatMessaging({
     const sessionId = session?.sessionId;
     actionLocks.current.add(key);
     try {
-      const response = await apiFetch(`/api/messages/${message.id}`, {
-        method: "DELETE",
-      });
+      const response = await recallMessage(apiFetch, message.id);
       const result = (await response.json().catch(() => null)) as
         | Message
         | { error?: string }
@@ -376,11 +356,7 @@ export function useChatMessaging({
       [message.id]: toggleMessageReactionCount(message.reactions || [], emoji),
     }));
     try {
-      const response = await apiFetch(`/api/messages/${message.id}/reactions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emoji }),
-      });
+      const response = await reactToMessage(apiFetch, message.id, emoji);
       const result = (await response.json()) as Message & { error?: string };
       if (sessionRef.current?.sessionId !== sessionId) return;
       if (!response.ok || result.id !== message.id)

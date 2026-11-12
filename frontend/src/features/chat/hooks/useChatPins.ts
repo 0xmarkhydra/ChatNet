@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { Session } from '../../auth/lib/session'
+import { listPins, setConversationPinned, setMessagePinned } from '../api/pins'
 import type { Conversation, Message, PinnedMessage } from '../types'
 
 type Options = {
@@ -29,7 +30,7 @@ export function useChatPins({
     if (!sessionId) return
     const sequence = ++refreshSequence.current
     try {
-      const response = await apiFetch(`/api/conversations/${conversationId}/pins`, { cache: 'reload' })
+      const response = await listPins(apiFetch, conversationId)
       if (sessionRef.current?.sessionId !== sessionId ||
         activeConversationIdRef.current !== conversationId ||
         sequence !== refreshSequence.current) return
@@ -67,9 +68,7 @@ export function useChatPins({
     pending.current.add(key)
     setPinBusy(true)
     try {
-      const response = await apiFetch(`/api/messages/${message.id}/pin`, {
-        method: currentlyPinned ? 'DELETE' : 'PUT',
-      })
+      const response = await setMessagePinned(apiFetch, message.id, !currentlyPinned)
       if (!response.ok) {
         if (response.status === 404 || response.status === 405) {
           throw new Error('Backend đang kết nối chưa hỗ trợ ghim tin nhắn. Cần cập nhật backend để sử dụng chức năng này.')
@@ -95,9 +94,7 @@ export function useChatPins({
     pending.current.add(key)
     setPinBusy(true)
     try {
-      const response = await apiFetch(`/api/conversations/${conversation.id}/pin`, {
-        method: currentlyPinned ? 'DELETE' : 'PUT',
-      })
+      const response = await setConversationPinned(apiFetch, conversation.id, !currentlyPinned)
       if (!response.ok) {
         if (response.status === 404 || response.status === 405) {
           throw new Error('Backend đang kết nối chưa hỗ trợ ghim hội thoại. Cần cập nhật backend để sử dụng chức năng này.')
