@@ -5,6 +5,7 @@ import FeedPostCard from '../../feed/components/FeedPostCard'
 import type { Post } from '../../feed/types'
 import type { FriendSearchResult } from '../../contacts/types'
 import '../styles/visitor-profile.css'
+import { loadVisitorProfile, loadVisitorPosts, reactToVisitorPost } from '../api/profile'
 
 type Props = {
  username: string
@@ -61,12 +62,12 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   setProfile(null);setPosts([]);setError('');setLoading(true);setMore(false)
   async function load(){
    try {
-    const response=await request('/api/users/'+encodeURIComponent(username)+'/profile', retry ? { cache: 'reload' } : undefined)
+    const response=await loadVisitorProfile(request, username, Boolean(retry))
     if(!response.ok)throw new Error(response.status===404?'Không tìm thấy hồ sơ hoặc bạn không thể xem tài khoản này.':'Không tải được hồ sơ.')
     const data=await response.json() as VisitorProfileData
     if(cancelled||id!==sequence.current)return
     setProfile(data)
-    const timeline=await request('/api/posts?author='+encodeURIComponent(data.username)+'&limit=15', retry ? { cache: 'reload' } : undefined)
+    const timeline=await loadVisitorPosts(request, data.username, undefined, Boolean(retry))
     if(!timeline.ok)throw new Error('Không tải được dòng thời gian.')
     const items=await timeline.json() as Post[]
     if(cancelled||id!==sequence.current)return
@@ -82,7 +83,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   const id=sequence.current
   paging.current=true;setLoading(true);setError('')
   try{
-   const response=await request('/api/posts?author='+encodeURIComponent(username)+'&limit=15&before='+posts[posts.length-1].id)
+   const response=await loadVisitorPosts(request, username, posts[posts.length-1].id)
    if(!response.ok)throw new Error('Không tải được bài viết cũ.')
    const items=await response.json() as Post[]
    if(!alive.current||id!==sequence.current)return
@@ -95,7 +96,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   if(likeBusy[post.id])return
   setLikeBusy(current=>({...current,[post.id]:true}))
   try{
-   const response=await request('/api/posts/'+post.id+(emoji==='👍'?'/like':'/reactions'),{method:'POST',...(emoji==='👍'?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify({emoji})})})
+   const response=await reactToVisitorPost(request, post.id, emoji)
    if(!response.ok)throw new Error('Không cập nhật được lượt thích.')
    const updated=await response.json() as Post
    if(alive.current)update(updated)
@@ -112,7 +113,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   const id=++sequence.current
   let cancelled=false
   setLoading(true);setError('')
-  void request('/api/posts?author='+encodeURIComponent(profile.username)+'&limit=15')
+  void loadVisitorPosts(request, profile.username)
    .then(async response=>{if(!response.ok)throw new Error('Không tải được dòng thời gian.');return await response.json() as Post[]})
    .then(items=>{if(!cancelled&&id===sequence.current){setPosts(items);setMore(items.length===15)}})
    .catch(cause=>{if(!cancelled&&id===sequence.current)setError(cause instanceof Error?cause.message:'Không tải được bài viết.')})

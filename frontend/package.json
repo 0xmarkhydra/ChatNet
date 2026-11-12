@@ -52,6 +52,7 @@
     "check:feed-requests": "node --experimental-strip-types scripts/feed-request-check.mjs",
     "check:chat-api": "node scripts/chat-api-check.mjs",
     "check:contacts-api": "node --experimental-strip-types scripts/contacts-api-check.mjs",
+    "check:profile-api": "node --experimental-strip-types scripts/profile-api-check.mjs",
     "check:settings-notifications-api": "node --experimental-strip-types scripts/settings-notifications-api-check.mjs",
     "check:architecture": "node scripts/architecture-boundaries-check.mjs",
     "check:chat-messaging-flow": "node scripts/chat-messaging-flow-check.mjs",
