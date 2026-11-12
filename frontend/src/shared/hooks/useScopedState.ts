@@ -2,39 +2,42 @@ import { useCallback, useState, type SetStateAction } from 'react'
 
 export type StateScope = string | number | null
 
-type ScopedValue<T> = { scope: StateScope; value: T }
+type ScopedValue<T> = { scope: StateScope; epoch: number; value: T }
 
 /**
- * `useState` whose value belongs to one scope (for example a conversation).
+ * `useState` whose value belongs to one visit of a scope (for example a conversation).
  * When `scope` changes the value is reset to `initial` during the same render, so a
- * previous scope's value never shows for a frame and never comes back later.
+ * previous visit's value never shows for a frame and never comes back later.
  *
- * Setters are bound to the scope they were created in. A late call from an older
- * scope (an async callback that finishes after the user switched) is ignored, so it
- * cannot overwrite the current scope. The setter identity therefore changes with
- * the scope.
+ * Every change of scope starts a new epoch. Setters are bound to the epoch they were
+ * created in, so a late call from an earlier visit (an async callback that finishes
+ * after the user switched, even if the user has since returned to the same scope,
+ * A -> B -> A) is ignored. The setter identity is stable within one visit and changes
+ * with the next one.
  *
  * `initial` is read once; pass a constant for arrays and objects.
  */
 export function useScopedState<T>(scope: StateScope, initial: T): [T, (next: SetStateAction<T>) => void] {
   const [initialValue] = useState(initial)
-  const [state, setState] = useState<ScopedValue<T>>({ scope, value: initialValue })
+  const [state, setState] = useState<ScopedValue<T>>({ scope, epoch: 0, value: initialValue })
 
   let current = state
   if (state.scope !== scope) {
     // Documented "adjust state while rendering" pattern: React re-renders immediately,
-    // before anything is committed or painted.
-    current = { scope, value: initialValue }
+    // before anything is committed or painted. The epoch is derived from the previous
+    // state, so rendering twice (StrictMode) gives the same result.
+    current = { scope, epoch: state.epoch + 1, value: initialValue }
     setState(current)
   }
 
+  const epoch = current.epoch
   const setValue = useCallback((next: SetStateAction<T>) => {
     setState((previous) => {
-      if (previous.scope !== scope) return previous
+      if (previous.epoch !== epoch) return previous
       const value = typeof next === 'function' ? (next as (previous: T) => T)(previous.value) : next
-      return Object.is(value, previous.value) ? previous : { scope, value }
+      return Object.is(value, previous.value) ? previous : { ...previous, value }
     })
-  }, [scope])
+  }, [epoch])
 
   return [current.value, setValue]
 }

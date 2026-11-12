@@ -17,13 +17,14 @@ const bundle = await build({
       import { useScopedState } from './src/shared/hooks/useScopedState.ts'
       const NO_ITEMS = []
       window.__setup = (strict) => {
-        const log = { renders: [], setters: {}, items: [] }
+        const log = { renders: [], setters: {}, firstSetters: {}, items: [] }
         let api = null
         function Probe({ scope }) {
           const [value, setValue] = useScopedState(scope, 'init')
           const [items, setItems] = useScopedState(scope, NO_ITEMS)
           log.renders.push({ scope, value })
           log.setters[scope] = setValue
+          if (!(scope in log.firstSetters)) log.firstSetters[scope] = setValue
           log.items.push(items)
           api = { setValue, setItems, value, items }
           return h('output', { id: 'out' }, String(value))
@@ -38,6 +39,8 @@ const bundle = await build({
           set: (value) => flushSync(() => api.setValue(value)),
           setItems: (value) => flushSync(() => api.setItems(value)),
           callOld: (scope, value) => flushSync(() => log.setters[scope](value)),
+          callFirst: (scope, value) => flushSync(() => log.firstSetters[scope](value)),
+          setterIdentity: () => api.setValue,
           text: () => container.querySelector('#out').textContent,
           items: () => api.items,
           sameEmptyItems: () => api.items === NO_ITEMS,
@@ -87,6 +90,27 @@ try {
       t.callOld('A', 'LATE A'); t.callOld('A', (v) => v + ' + late updater')
       return t.text()`)
     assert.equal(late, 'B value', label + ': stale setter from the previous scope is ignored')
+
+    // 4b: A -> B -> A. A setter kept from the FIRST visit of A must stay dead after returning to A
+    const revisit = await run(`
+      t.show('A'); const firstVisitSetter = t.setterIdentity(); t.set('first visit')
+      t.show('B'); t.set('B value')
+      t.show('A'); const afterReturn = t.text()
+      t.callFirst('A', 'STALE FROM FIRST VISIT'); const staleValue = t.text()
+      t.callFirst('A', (v) => v + ' + stale updater'); const staleUpdater = t.text()
+      t.callOld('B', 'STALE FROM B'); const staleB = t.text()
+      t.set('second visit'); const fresh = t.text()
+      t.callFirst('A', 'STALE AGAIN'); const stillFresh = t.text()
+      return { afterReturn, staleValue, staleUpdater, staleB, fresh, stillFresh, freshSetterIsNew: t.setterIdentity() !== firstVisitSetter }`)
+    assert.deepEqual(revisit, {
+      afterReturn: 'init', staleValue: 'init', staleUpdater: 'init', staleB: 'init',
+      fresh: 'second visit', stillFresh: 'second visit', freshSetterIsNew: true,
+    }, label + ': setters from an earlier visit are ignored after returning to the same scope')
+
+    // the setter is stable while the scope stays the same
+    const stableSetter = await run(`
+      t.show('A'); const first = t.setterIdentity(); t.set('x'); t.show('A'); return t.setterIdentity() === first`)
+    assert.equal(stableSetter, true, label + ': setter identity is stable within one visit')
 
     // 5: functional updaters compose
     const updater = await run(`
