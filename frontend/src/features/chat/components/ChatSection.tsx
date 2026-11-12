@@ -1184,7 +1184,7 @@ export default function ChatSection({
                             openMessageActions(message, event.target)
                           }}
                         >
-                          {(activeConversation.type === 'group' || !mine) && (
+                          {!mine && (
                             <>
                               <UserAvatar username={message.sender} name={userLabel(message.senderDisplayName, message.sender)}
                                 className="chat-message-sender-avatar" online={false} />

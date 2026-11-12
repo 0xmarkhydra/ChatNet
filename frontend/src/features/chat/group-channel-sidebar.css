@@ -208,13 +208,9 @@
   .modern-shell.app-layout .group-channel-workspace > .group-channel-sidebar { transition: none; }
 }
 
-/* Telegram-like member identity for every message in a group channel.
-   Unlike direct chats, show the actual sender's avatar on phones too. */
+/* Only incoming group messages show sender identity, including on phones. */
 .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message:not(.mine) {
   margin-left: 46px;
-}
-.modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine {
-  margin-right: 46px;
 }
 .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message .chat-message-sender-avatar {
   display: grid !important;
@@ -228,20 +224,9 @@
   overflow: hidden;
   z-index: 1;
 }
-.modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine .chat-message-sender-avatar {
-  left: auto;
-  right: -44px;
-}
-.modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine .message-meta {
-  text-align: right;
-  color: #647ca8;
-}
 @media (max-width: 760px) {
   .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message:not(.mine) {
     margin-left: 38px;
-  }
-  .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine {
-    margin-right: 38px;
   }
   .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message .chat-message-sender-avatar {
     display: grid !important;
@@ -250,10 +235,6 @@
     width: 29px;
     height: 29px;
     min-width: 29px;
-  }
-  .modern-shell.app-layout .social-chat-layout .group-chat-panel .message.channel-message.mine .chat-message-sender-avatar {
-    left: auto;
-    right: -36px;
   }
 }
 

@@ -612,7 +612,7 @@ try {
   assert.equal(payloads.find(item=>item.channelId===201)?.text,'Tin nhắn trong kênh riêng')
   await page.locator('.messages').getByText('Tin nhắn trong kênh riêng').waitFor()
   const ownAvatar=page.locator('.messages .message.channel-message.mine .chat-message-sender-avatar')
-  await ownAvatar.waitFor({state:'visible'})
+  assert.equal(await ownAvatar.count(),0,'Own group messages must not render an avatar')
   await channelSidebar.getByRole('button',{name:/Mở kênh Thảo luận chung/}).click()
   await page.locator('.messages').getByText('Chào mọi người, đây là nhóm ChatNet.').waitFor()
   assert.equal(await page.locator('.messages').getByText('Tin nhắn trong kênh riêng').count(),0)
@@ -628,15 +628,15 @@ try {
   const otherAvatar=page.locator('.messages .message.channel-message:not(.mine) .chat-message-sender-avatar')
   for (const width of [320, 390, 768, 1478]) {
     await page.setViewportSize({width,height:850})
-    assert.ok(await ownAvatar.isVisible(),'Own message avatar should be visible in channel at '+width+'px')
+    assert.equal(await ownAvatar.count(),0,'Own message must not have an avatar at '+width+'px')
     assert.ok(await otherAvatar.isVisible(),'Member avatar should be visible in channel at '+width+'px')
     const measures=await page.evaluate(() => {
       const entries=[...document.querySelectorAll('.message.channel-message .chat-message-sender-avatar')]
       return entries.map(el=>({display:getComputedStyle(el).display,width:el.getBoundingClientRect().width}))
     })
-    assert.ok(measures.length>=2 && measures.every(m=>m.display!=='none' && m.width>=25),
-      'Avatar size/visibility must match Telegram style at '+width+'px: '+JSON.stringify(measures))
-    console.log('PASS channel message avatars (self and others) at '+width+'px')
+    assert.ok(measures.length>=1 && measures.every(m=>m.display!=='none' && m.width>=25),
+      'Incoming member avatar must remain visible at '+width+'px: '+JSON.stringify(measures))
+    console.log('PASS sender avatars only on incoming group messages at '+width+'px')
   }
   await page.setViewportSize({width:1478,height:850})
   console.log('PASS realtime message is rendered with its sender avatar in the active channel')
