@@ -66,6 +66,7 @@ export function useOutboxDelivery({
               } | null
             )?.error
           : undefined;
+        if (sessionRef.current?.sessionId !== identity.sessionId) return;
         updateChatOutbox((items) =>
           items.map((pending) =>
             pending.clientId === item.clientId &&
@@ -83,6 +84,7 @@ export function useOutboxDelivery({
         return;
       }
       const confirmed = (await response.json()) as Message;
+      if (sessionRef.current?.sessionId !== identity.sessionId) return;
       if (
         !Number.isSafeInteger(confirmed.id) ||
         confirmed.id <= 0 ||
