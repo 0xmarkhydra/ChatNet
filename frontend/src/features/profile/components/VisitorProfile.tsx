@@ -1,5 +1,6 @@
 import VisitorProfileHero, { type VisitorProfileData } from './VisitorProfileHero'
 import { useEffect, useRef, useState } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import FeedPostCard from '../../feed/components/FeedPostCard'
 import type { Post } from '../../feed/types'
@@ -30,15 +31,17 @@ type Props = {
  feedback: (message: string, kind?: 'success' | 'error' | 'warning' | 'info') => void
 }
 export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onMessage, onClose, onPostOpen, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
- const [profile,setProfile]=useState<VisitorProfileData|null>(null)
- const [posts,setPosts]=useState<Post[]>([])
- const [more,setMore]=useState(false)
- const [loading,setLoading]=useState(false)
- const [error,setError]=useState('')
- const [retry,setRetry]=useState(0)
- const [likeBusy,setLikeBusy]=useState<Record<number,boolean>>({})
+ const scope=JSON.stringify([username,token])
+ const [profile,setProfile]=useScopedState<VisitorProfileData|null>(scope,null)
+ const [posts,setPosts]=useScopedState<Post[]>(scope,[])
+ const [more,setMore]=useScopedState(scope,false)
+ const [loading,setLoading]=useScopedState(scope,false)
+ const [error,setError]=useScopedState(scope,'')
+ const [retry,setRetry]=useScopedState(scope,0)
+ const [likeBusy,setLikeBusy]=useScopedState<Record<number,boolean>>(scope,{})
  const alive=useRef(true)
  const latestToken=useLatest(token)
+ const latestRequest=useLatest(request)
  const latestClose=useLatest(onClose)
  const paging=useRef(false)
  const sequence=useRef(0)
@@ -67,12 +70,12 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   setProfile(null);setPosts([]);setError('');setLoading(true);setMore(false)
   async function load(){
    try {
-    const response=await loadVisitorProfile(request, username, Boolean(retry))
+    const response=await loadVisitorProfile(latestRequest.current, username, Boolean(retry))
     if(!response.ok)throw new Error(response.status===404?'Không tìm thấy hồ sơ hoặc bạn không thể xem tài khoản này.':'Không tải được hồ sơ.')
     const data=await response.json() as VisitorProfileData
     if(cancelled||id!==sequence.current)return
     setProfile(data)
-    const timeline=await loadVisitorPosts(request, data.username, undefined, Boolean(retry))
+    const timeline=await loadVisitorPosts(latestRequest.current, data.username, undefined, Boolean(retry))
     if(!timeline.ok)throw new Error('Không tải được dòng thời gian.')
     const items=await timeline.json() as Post[]
     if(cancelled||id!==sequence.current)return
@@ -82,7 +85,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   }
   void load()
   return ()=>{cancelled=true}
- },[username,token,retry])
+ },[username,token,retry,latestRequest,setProfile,setPosts,setError,setLoading,setMore,setLikeBusy])
  async function loadMore(){
   if(paging.current||!posts.length)return
   const id=sequence.current
