@@ -15,7 +15,7 @@ COPY --from=build /out/translate /app/translate
 COPY --from=build /out/call /app/call
 COPY --from=build /out/gateway /app/gateway
 COPY backend-run.sh /app/backend-run.sh
-RUN chmod +x /app/backend-run.sh
+RUN sed -i 's/\r$//' /app/backend-run.sh && chmod +x /app/backend-run.sh
 USER app
 EXPOSE 8080
 ENTRYPOINT ["/app/backend-run.sh"]
