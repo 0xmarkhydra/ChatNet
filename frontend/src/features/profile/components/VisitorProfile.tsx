@@ -16,6 +16,7 @@ type Props = {
  relationship: (id: number) => string
  friendBusy: number | null
  onFriend: (user: FriendSearchResult) => Promise<void>
+ onRemoveFriend: (user: FriendSearchResult) => Promise<void>
  onMessage: (username: string) => Promise<void>
  onClose: () => void
  onPostOpen: (post: Post) => void
@@ -28,7 +29,7 @@ type Props = {
  onDeleted: (id: number) => void
  feedback: (message: string, kind?: 'success' | 'error' | 'warning' | 'info') => void
 }
-export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onMessage, onClose, onPostOpen, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
+export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onClose, onPostOpen, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
  const [profile,setProfile]=useState<VisitorProfileData|null>(null)
  const [posts,setPosts]=useState<Post[]>([])
  const [more,setMore]=useState(false)
@@ -131,7 +132,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   <header className="visitor-toolbar"><button ref={back} type="button" onClick={onClose} aria-label="Quay lại"><ArrowLeft size={21}/></button><strong>Trang cá nhân</strong><button type="button" onClick={()=>setRetry(n=>n+1)} disabled={loading} aria-label="Tải lại hồ sơ"><RefreshCw size={19}/></button></header>
   <div className="visitor-scroll"><div className="visitor-content">
    {profile&&<>
-    <VisitorProfileHero profile={profile} relation={relation} friendBusy={friendBusy} action={action} request={request} onMessage={onMessage} onFriendAction={() => { void onFriend(profile).catch(cause => { if (alive.current) feedback(cause instanceof Error ? cause.message : 'Không cập nhật được kết bạn.', 'error') }) }} />
+    <VisitorProfileHero profile={profile} relation={relation} friendBusy={friendBusy} action={action} request={request} onMessage={onMessage} onFriendAction={() => { void onFriend(profile).catch(cause => { if (alive.current) feedback(cause instanceof Error ? cause.message : 'Không cập nhật được kết bạn.', 'error') }) }} onRemoveFriendAction={() => { void onRemoveFriend(profile).catch(cause => { if (alive.current) feedback(cause instanceof Error ? cause.message : 'Không thể hủy kết bạn.', 'error') }) }} />
     <div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
     <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={()=>onPostOpen(post)} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}

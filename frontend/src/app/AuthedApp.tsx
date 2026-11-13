@@ -2908,6 +2908,7 @@ export default function AuthedApp({
           relationship={friendRelationship}
           friendBusy={friendActionBusy}
           onFriend={actOnFriend}
+          onRemoveFriend={(friend) => removeAcceptedFriend(friend, { keepProfileOpen: true })}
           onMessage={async (username) => {
             await openDirectByUsername(username);
             setVisitorUsername(null);
