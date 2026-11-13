@@ -5,6 +5,7 @@ import {
   Volume2, VolumeX, X,
 } from 'lucide-react'
 import { userLabel } from '../../../shared/utils/userLabel'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Story } from '../types'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 
@@ -37,13 +38,13 @@ export default function StoryViewer({
   onReply, onProfile, onShare, onReport,
 }: Props) {
   const authorLabel = userLabel(activeStory.authorDisplayName, activeStory.author)
-  const [paused, setPaused] = useState(false)
+  const [paused, setPaused] = useScopedState(activeStory.id, false)
   const [muted, setMuted] = useState(true)
-  const [videoProgress, setVideoProgress] = useState(0)
-  const [imageProgress, setImageProgress] = useState(0)
-  const [reply, setReply] = useState('')
-  const [replySending, setReplySending] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [videoProgress, setVideoProgress] = useScopedState(activeStory.id, 0)
+  const [imageProgress, setImageProgress] = useScopedState(activeStory.id, 0)
+  const [reply, setReply] = useScopedState(activeStory.id, '')
+  const [replySending, setReplySending] = useScopedState(activeStory.id, false)
+  const [menuOpen, setMenuOpen] = useScopedState(activeStory.id, false)
   const imageElapsedRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -71,11 +72,6 @@ export default function StoryViewer({
 
   useEffect(() => {
     imageElapsedRef.current = 0
-    setImageProgress(0)
-    setPaused(false)
-    setReply('')
-    setMenuOpen(false)
-    setVideoProgress(0)
   }, [activeStory.id])
 
   useEffect(() => {
@@ -93,13 +89,13 @@ export default function StoryViewer({
       window.clearInterval(timer)
       imageElapsedRef.current = Math.min(STORY_DURATION, imageElapsedRef.current + performance.now() - started)
     }
-  }, [activeStory.id, isVideo, paused, menuOpen, replySending, nextId, setActiveStoryId])
+  }, [activeStory.id, isVideo, paused, menuOpen, replySending, nextId, setActiveStoryId, setImageProgress])
 
   useEffect(() => {
     if (!isVideo || !videoRef.current) return
     if (paused || menuOpen || replySending) videoRef.current.pause()
     else void videoRef.current.play().catch(() => setPaused(true))
-  }, [activeStory.id, isVideo, paused, menuOpen, replySending])
+  }, [activeStory.id, isVideo, paused, menuOpen, replySending, setPaused])
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null
@@ -133,7 +129,7 @@ export default function StoryViewer({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [menuOpen, nextId, previousId, setActiveStoryId])
+  }, [menuOpen, nextId, previousId, setActiveStoryId, setMenuOpen, setPaused])
 
   async function submitReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

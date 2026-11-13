@@ -1,26 +1,19 @@
-import { useState, useEffect } from "react";
 import type { ManagedAccountSession } from "../types";
-import { type Session } from "../lib/session";
+import type { Session } from "../lib/session";
+import { useScopedState } from "../../../shared/hooks/useScopedState";
 
 export type UseSessionsPanelDeps = {
   session: Session | null;
 };
 
-export function useSessionsPanel({
-  session,
-}: UseSessionsPanelDeps) {
-  const [sessionsOpen, setSessionsOpen] = useState(false);
-  const [managedSessions, setManagedSessions] = useState<
-    ManagedAccountSession[]
-  >([]);
-  const [sessionsBusy, setSessionsBusy] = useState(false);
-  const [sessionsError, setSessionsError] = useState("");
-  useEffect(() => {
-    setManagedSessions([]);
-    setSessionsOpen(false);
-    setSessionsBusy(false);
-    setSessionsError("");
-  }, [session?.sessionId]);
+export function useSessionsPanel({ session }: UseSessionsPanelDeps) {
+  // The panel belongs to a single authenticated session. An old async response
+  // must not reopen it or restore another account's sessions after a switch.
+  const scope = session?.sessionId ?? null;
+  const [sessionsOpen, setSessionsOpen] = useScopedState(scope, false);
+  const [managedSessions, setManagedSessions] = useScopedState<ManagedAccountSession[]>(scope, []);
+  const [sessionsBusy, setSessionsBusy] = useScopedState(scope, false);
+  const [sessionsError, setSessionsError] = useScopedState(scope, "");
 
   return {
     managedSessions,

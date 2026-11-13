@@ -1,15 +1,13 @@
 {
-  "total": 112,
+  "total": 106,
   "byRule": {
     "react-hooks/exhaustive-deps": 64,
-    "react-hooks/set-state-in-effect": 48
+    "react-hooks/set-state-in-effect": 42
   },
   "counts": {
     "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
     "src/app/AuthedApp.tsx|react-hooks/set-state-in-effect": 6,
-    "src/app/DesktopBootstrap.tsx|react-hooks/set-state-in-effect": 1,
     "src/app/hooks/useAppRealtime.ts|react-hooks/exhaustive-deps": 1,
-    "src/features/auth/hooks/useSessionsPanel.ts|react-hooks/set-state-in-effect": 1,
     "src/features/calls/components/CallCenter.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/calls/components/CallManager.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/calls/components/CallManager.tsx|react-hooks/set-state-in-effect": 1,
@@ -19,7 +17,6 @@
     "src/features/calls/hooks/useCallRoomLifecycle.ts|react-hooks/exhaustive-deps": 1,
     "src/features/chat/components/CommunityGroupsPage.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/chat/components/CommunityGroupsPage.tsx|react-hooks/set-state-in-effect": 3,
-    "src/features/chat/components/ConversationDetailsPanel.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/chat/components/GroupActivities.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/chat/components/GroupActivities.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/chat/components/GroupGovernancePanel.tsx|react-hooks/set-state-in-effect": 3,
@@ -51,9 +48,7 @@
     "src/features/feed/components/FeedDiscussion.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/feed/components/FeedModeration.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/feed/components/FeedModeration.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/feed/components/SocialFeedSidebar.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/feed/components/StoryComposer.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/feed/components/StoryViewer.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/feed/hooks/useFollowingPosts.ts|react-hooks/exhaustive-deps": 1,
     "src/features/notifications/components/NotificationsPage.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/profile/components/ProfileNote.tsx|react-hooks/exhaustive-deps": 3,
@@ -63,7 +58,6 @@
     "src/features/profile/components/VisitorProfile.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/settings/hooks/usePrivacySettings.ts|react-hooks/exhaustive-deps": 1,
     "src/features/settings/hooks/usePrivacySettings.ts|react-hooks/set-state-in-effect": 1,
-    "src/platform/DesktopScreenPicker.tsx|react-hooks/exhaustive-deps": 1,
-    "src/shared/ui/MediaViewer.tsx|react-hooks/set-state-in-effect": 1
+    "src/platform/DesktopScreenPicker.tsx|react-hooks/exhaustive-deps": 1
   }
 }
