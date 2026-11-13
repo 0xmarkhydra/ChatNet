@@ -1,6 +1,6 @@
 import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { AppDataContext } from '../../../shared/types/api'
-import { listConversations, listMembershipIds } from '../api/conversations'
+import { listConversations, listGroupConversations, listMembershipIds } from '../api/conversations'
 import { CHAT_LIST_PAGE_SIZE, type Conversation, type MessageDraft } from '../types'
 type Options = AppDataContext & {
   activeConversationIdRef: RefObject<number | null>
@@ -26,6 +26,38 @@ export function useConversationData({
   const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
   const conversationPagingBusy = useRef(false)
   const conversationOffset = useRef(0)
+  const [conversationListError, setConversationListError] = useState('')
+  const lastGroupSync = useRef<{ sessionId: string; at: number } | null>(null)
+
+  // The avatar rail replaces the old list, so include older groups even when
+  // their last activity falls beyond the first page of direct conversations.
+  async function loadEarlierGroups(sessionId: string) {
+    if (lastGroupSync.current?.sessionId === sessionId &&
+        Date.now() - lastGroupSync.current.at < 120_000) return
+    lastGroupSync.current = { sessionId, at: Date.now() }
+    try {
+      for (let offset = 0; offset < 2000; offset += 100) {
+        const response = await listGroupConversations(apiFetch, 100, offset)
+        if (!response.ok) return
+        const page = (await response.json()) as Conversation[]
+        if (!Array.isArray(page) || sessionRef.current?.sessionId !== sessionId) return
+        const groups = page.filter(item => item.type === 'group' &&
+          !revokedConversationIds.current.has(item.id) &&
+          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
+        if (groups.length) {
+          setConversations(current => {
+            const fresh = new Map(groups.map(item => [item.id, item]))
+            const existingIds = new Set(current.map(item => item.id))
+            return [...current.map(item => fresh.get(item.id) || item),
+              ...groups.filter(item => !existingIds.has(item.id))]
+          })
+        }
+        if (page.length < 100) break
+      }
+    } catch {
+      // The ordinary conversation list remains usable if group prefetch fails.
+    }
+  }
 
   async function reconcileConversationMemberships() {
     const sessionId = session?.sessionId
@@ -71,20 +103,26 @@ export function useConversationData({
 
   async function refreshConversations() {
     const sessionId = session?.sessionId
+    if (!sessionId) return
     try {
       const response = await listConversations(apiFetch, CHAT_LIST_PAGE_SIZE)
-      if (!response.ok) return
-      const data = ((await response.json()) as Conversation[])
-        .filter((item) => !revokedConversationIds.current.has(item.id) &&
-          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
+      if (!response.ok) throw new Error('conversation list request failed')
+      const page = (await response.json()) as Conversation[]
+      if (!Array.isArray(page)) throw new Error('invalid conversation list response')
+      const data = page.filter((item) => !revokedConversationIds.current.has(item.id) &&
+        (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
       if (sessionRef.current?.sessionId !== sessionId) return
+      setConversationListError('')
       setConversations((current) => {
         const freshIds = new Set(data.map((item) => item.id))
         return [...data, ...current.filter((item) => !freshIds.has(item.id))]
       })
-      conversationOffset.current = Math.max(conversationOffset.current, data.length)
-      if (conversationOffset.current === data.length) setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
+      conversationOffset.current = Math.max(conversationOffset.current, page.length)
+      if (conversationOffset.current === page.length) setHasMoreConversations(page.length === CHAT_LIST_PAGE_SIZE)
+      void loadEarlierGroups(sessionId)
     } catch {
+      if (sessionRef.current?.sessionId !== sessionId) return
+      setConversationListError('Không tải được danh sách hội thoại từ máy chủ.')
       setStatus('Đang kết nối lại...')
     }
   }
@@ -125,6 +163,7 @@ export function useConversationData({
     hasMoreConversations,
     setHasMoreConversations,
     conversationLoadingMore,
+    conversationListError,
     setConversationLoadingMore,
     conversationPagingBusy,
     conversationOffset,

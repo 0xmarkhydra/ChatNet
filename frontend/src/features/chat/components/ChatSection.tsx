@@ -102,6 +102,8 @@ export default function ChatSection({
   conversationDetailsOpen,
   conversationListSearch,
   conversationLoadingMore,
+  conversationListError,
+  refreshConversations,
   copyInviteLink,
   createDirect,
   createGroupChannel,
@@ -515,6 +517,8 @@ export default function ChatSection({
             <DesktopConversationRail
               conversations={railConversations}
               visibleConversationIds={railVisibleConversationIds}
+              loadError={conversationListError}
+              onRetry={refreshConversations}
               searchValue={chatListQuery}
               onSearchChange={setChatListQuery}
               controls={railControls}
@@ -552,6 +556,8 @@ export default function ChatSection({
             <ConversationAvatarRail
                 conversations={railConversations}
                 visibleConversationIds={railVisibleConversationIds}
+              loadError={conversationListError}
+              onRetry={refreshConversations}
                 searchValue={chatListQuery}
                 searchControl={searchInConversationList ? quickSearchControl : undefined}
                 onSearchChange={setChatListQuery}
