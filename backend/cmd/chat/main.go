@@ -203,6 +203,8 @@ func main() {
 	mux.Handle("POST /api/conversations/{id}/activities/{activityId}/vote", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.voteGroupActivity)))
 	mux.Handle("PUT /api/conversations/{id}/activities/{activityId}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setGroupActivityPin)))
 	mux.Handle("DELETE /api/conversations/{id}/activities/{activityId}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setGroupActivityPin)))
+	mux.Handle("GET /api/conversations/{id}/e2ee/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMLSEvents)))
+	mux.Handle("POST /api/conversations/{id}/e2ee/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.publishMLSEvent)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessages)))
 	mux.Handle("DELETE /api/conversations/{id}/history", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.clearConversationHistory)))
 	mux.Handle("GET /api/conversations/{id}/shared", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listSharedContent)))
