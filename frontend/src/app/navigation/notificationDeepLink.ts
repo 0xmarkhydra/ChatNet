@@ -25,5 +25,5 @@ export function consumeNotificationDeepLink(url: URL) {
   params.delete("tab");
   params.delete("conversation");
   params.delete("message");
-  window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+  window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
 }
