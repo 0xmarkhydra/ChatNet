@@ -2945,25 +2945,23 @@ export default function AuthedApp({
       header={
         <AppHeader
           className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
+          title={
+            <HeaderTitle
+              tab={tab}
+              desktopSection={desktopSection}
+              translationSettingsOpen={translationSettingsConversationId !== null}
+              groupWorkspaceMode={groupWorkspaceMode}
+              groupCreateStep={groupCreateStep}
+              activeConversationName={activeConversation?.name}
+              contactsDirectory={contactsScreen === "directory"}
+              feedPostOpenOnDesktop={Boolean(isProfileDesktop && activePost)}
+              profileSettings={desktopProfileSettings}
+              profileDesktop={isProfileDesktop}
+              profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
+            />
+          }
+          search={searchInConversationList ? null : quickSearchControl}
         >
-          <HeaderTitle
-            tab={tab}
-            desktopSection={desktopSection}
-            translationSettingsOpen={translationSettingsConversationId !== null}
-            groupWorkspaceMode={groupWorkspaceMode}
-            groupCreateStep={groupCreateStep}
-            activeConversationName={activeConversation?.name}
-            contactsDirectory={contactsScreen === "directory"}
-            feedPostOpenOnDesktop={Boolean(isProfileDesktop && activePost)}
-            profileSettings={desktopProfileSettings}
-            profileDesktop={isProfileDesktop}
-            profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
-          />
-          <div className="appbar-brand">
-            <img src="/soco-mark.svg" width="32" height="32" alt="" />
-            <strong>SocCO</strong>
-          </div>
-          {!searchInConversationList && quickSearchControl}
           <AppHeaderActions
             account={
               showHeaderAccount ? (

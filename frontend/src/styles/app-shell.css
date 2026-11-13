@@ -281,16 +281,17 @@
   .modern-shell.app-layout > .chatnet-appbar {
     display: flex;
     box-sizing: border-box;
-    flex: 0 0 86px;
+    flex: 0 0 80px;
     align-items: center;
+    gap: 20px;
     width: 100%;
-    min-height: 86px;
+    min-height: 80px;
     margin: 0;
-    padding: 0px 28px 0px 38px;
+    padding: 12px 28px 12px 32px;
     border: none;
     border-bottom: 1px solid #e8ecf5;
     border-radius: 0;
-    box-shadow: none;
+    box-shadow: 0 1px 12px rgba(30, 51, 96, .035);
     background: #fff;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
