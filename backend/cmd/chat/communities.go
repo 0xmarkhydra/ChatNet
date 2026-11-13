@@ -221,10 +221,11 @@ func (s *server) getGroupNotificationPreferences(w http.ResponseWriter, r *http.
 	if !ok {
 		return
 	}
-	if _, err := s.groupRole(r.Context(), id, claims.UserID); err != nil {
-		httpx.Error(w, 403, "not a group member")
-		return
-	}
+	var member bool
+    if err := s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2)`, id, claims.UserID).Scan(&member); err != nil || !member {
+        httpx.Error(w, 403, "not a conversation member")
+        return
+    }
 	v := groupNotificationPreferences{MessageNotifications: true, MentionNotifications: true}
 	err := s.db.QueryRow(r.Context(), `SELECT message_notifications,mention_notifications FROM group_notification_preferences WHERE conversation_id=$1 AND user_id=$2`, id, claims.UserID).Scan(&v.MessageNotifications, &v.MentionNotifications)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -246,7 +247,6 @@ func (s *server) putGroupNotificationPreferences(w http.ResponseWriter, r *http.
 	}
 	tag, err := s.db.Exec(r.Context(), `INSERT INTO group_notification_preferences(conversation_id,user_id,message_notifications,mention_notifications)
   SELECT cm.conversation_id,cm.user_id,$3,$4 FROM conversation_members cm
-  JOIN conversations c ON c.id=cm.conversation_id AND c.type='group'
   WHERE cm.conversation_id=$1 AND cm.user_id=$2
   ON CONFLICT(conversation_id,user_id) DO UPDATE SET message_notifications=EXCLUDED.message_notifications,
   mention_notifications=EXCLUDED.mention_notifications,updated_at=NOW()`, id, claims.UserID, v.MessageNotifications, v.MentionNotifications)
@@ -271,7 +271,7 @@ func hasMention(message, username string) bool {
 }
 
 // Only push delivery respects notification preferences; message persistence and SSE do not change.
-func (s *server) groupPushRecipients(ctx context.Context, conversationID int64, candidates []int64, text string) []int64 {
+func (s *server) groupPushRecipients(ctx context.Context, conversationID int64, channelID int64, candidates []int64, text string) []int64 {
 	if len(candidates) == 0 {
 		return candidates
 	}
@@ -280,12 +280,27 @@ func (s *server) groupPushRecipients(ctx context.Context, conversationID int64, 
 		return []int64{}
 	}
 	if !group {
-		return candidates
+        rows, err := s.db.Query(ctx, `SELECT cm.user_id FROM conversation_members cm
+          LEFT JOIN group_notification_preferences p ON p.conversation_id=cm.conversation_id AND p.user_id=cm.user_id
+          WHERE cm.conversation_id=$1 AND cm.user_id=ANY($2::bigint[])
+            AND COALESCE(p.message_notifications,TRUE)`, conversationID, candidates)
+        if err != nil { return []int64{} }
+        defer rows.Close()
+        result := []int64{}
+        for rows.Next() {
+            var uid int64
+            if rows.Scan(&uid) != nil { return []int64{} }
+            result = append(result, uid)
+        }
+        if rows.Err() != nil { return []int64{} }
+        return result
 	}
 	rows, err := s.db.Query(ctx, `SELECT u.id,u.username,COALESCE(p.message_notifications,TRUE),COALESCE(p.mention_notifications,TRUE)
   FROM conversation_members cm JOIN users u ON u.id=cm.user_id
   LEFT JOIN group_notification_preferences p ON p.conversation_id=cm.conversation_id AND p.user_id=cm.user_id
-  WHERE cm.conversation_id=$1 AND cm.user_id=ANY($2::bigint[])`, conversationID, candidates)
+  LEFT JOIN group_channel_notification_preferences cp ON cp.conversation_id=cm.conversation_id
+    AND cp.user_id=cm.user_id AND cp.channel_id=$3
+  WHERE cm.conversation_id=$1 AND cm.user_id=ANY($2::bigint[]) AND NOT COALESCE(cp.muted,FALSE)`, conversationID, candidates, channelID)
 	if err != nil {
 		return []int64{}
 	}

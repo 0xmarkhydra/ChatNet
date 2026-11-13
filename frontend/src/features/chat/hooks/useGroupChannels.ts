@@ -2,6 +2,7 @@ import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useApi } from "../../../shared/context/ApiContext";
 import { useNotice } from "../../../shared/context/NoticeContext";
 import { createGroupChannel as createGroupChannelRequest } from "../api/conversations";
+import { listChannels } from "../api/community";
 import { type GroupChannel, validGroupChannels } from "../utils/groupChannels";
 import type { GroupMember, Message } from "../types";
 
@@ -89,5 +90,15 @@ export function useGroupChannels({
     }
   }
 
-  return { createGroupChannel, selectGroupChannel };
+  async function refreshGroupChannels() {
+    if (activeConversation?.type !== 'group') return;
+    const groupId = activeConversation.id;
+    const response = await listChannels(apiFetch, groupId);
+    if (!response.ok) throw new Error('Không tải lại được danh sách kênh.');
+    const items = validGroupChannels(await response.json() as unknown, groupId);
+    setGroupChannelState({ conversationId: groupId, channels: items });
+    if (!items.some(item => item.id === activeChannelIdRef.current)) selectGroupChannel(0);
+  }
+
+  return { createGroupChannel, selectGroupChannel, refreshGroupChannels };
 }

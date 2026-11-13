@@ -841,3 +841,10 @@
   .communication-hub-open span { display: none; }
   .communication-hub-open { min-width: 38px; padding: 0 10px; }
 }
+/* Keep the global navigation above the conversation avatar dock, including
+   when the sidebar expands on hover or keyboard focus. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout > .app-sidebar {
+    z-index: 180;
+  }
+}

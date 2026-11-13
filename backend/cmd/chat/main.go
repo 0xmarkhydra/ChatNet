@@ -73,6 +73,8 @@ type conversation struct {
 	LastMessage    string     `json:"lastMessage"`
 	LastMessageAt  *time.Time `json:"lastMessageAt,omitempty"`
 	AvatarURL      string     `json:"avatarUrl,omitempty"`
+	AvatarMembers  []string   `json:"avatarMembers,omitempty"`
+	Muted          bool       `json:"muted"`
 	Online         bool       `json:"online"`
 	CreatedAt      time.Time  `json:"createdAt"`
 }
@@ -191,6 +193,10 @@ func main() {
 	mux.Handle("POST /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupChannel)))
 	mux.Handle("PATCH /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupChannel)))
 	mux.Handle("DELETE /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteGroupChannel)))
+	mux.Handle("GET /api/conversations/{id}/channels/{channelId}/notifications", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getChannelNotifications)))
+	mux.Handle("PUT /api/conversations/{id}/channels/{channelId}/notifications", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.putChannelNotifications)))
+	mux.Handle("GET /api/conversations/{id}/channels/{channelId}/avatar", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.channelAvatarCapability)))
+	mux.Handle("PUT /api/conversations/{id}/channels/{channelId}/avatar", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateChannelAvatar)))
 	mux.Handle("GET /api/conversations/{id}/activities", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupActivities)))
 	mux.Handle("POST /api/conversations/{id}/activities", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupActivity)))
 	mux.Handle("POST /api/conversations/{id}/activities/{activityId}/vote", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.voteGroupActivity)))
@@ -631,21 +637,35 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		           END
 		           FROM messages m
 		           WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		             (m.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=m.channel_id AND active_channel.deleted_at IS NULL)) AND
 		             (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		               (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)))
 		           ORDER BY m.id DESC
 		           LIMIT 1
 		       ),''),
 		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		         (m.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=m.channel_id AND active_channel.deleted_at IS NULL)) AND
 		         (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		           (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))) ORDER BY m.id DESC LIMIT 1),c.created_at),
 		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id
+             AND (m.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=m.channel_id AND active_channel.deleted_at IS NULL))
              AND m.id>CASE WHEN c.type='group' THEN COALESCE((
                SELECT gcr.last_read_message_id FROM group_channel_reads gcr
                WHERE gcr.conversation_id=c.id AND gcr.user_id=$1 AND gcr.channel_id=COALESCE(m.channel_id,0)
              ),cm.last_read_message_id) ELSE cm.last_read_message_id END
              AND m.id>cm.cleared_through_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0), COALESCE(c.group_avatar_ref,'')
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0), COALESCE(c.group_avatar_ref,''),
+             CASE WHEN c.type='group' THEN ARRAY(
+               SELECT u.username
+               FROM conversation_members avatar_member
+               JOIN users u ON u.id=avatar_member.user_id
+               WHERE avatar_member.conversation_id=c.id
+               ORDER BY CASE WHEN avatar_member.user_id=$1 THEN 1 ELSE 0 END, avatar_member.user_id
+               LIMIT 3
+             ) ELSE ARRAY[]::text[] END,
+             COALESCE((SELECT NOT p.message_notifications AND NOT p.mention_notifications
+               FROM group_notification_preferences p
+               WHERE p.conversation_id=c.id AND p.user_id=$1),FALSE)
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
@@ -661,6 +681,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
                 WHERE gcr.conversation_id=c.id AND gcr.user_id=$1 AND gcr.channel_id=COALESCE(unread.channel_id,0)
               ),cm.last_read_message_id) ELSE cm.last_read_message_id END
               AND unread.id>cm.cleared_through_message_id AND unread.user_id<>$1
+              AND (unread.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=unread.channel_id AND active_channel.deleted_at IS NULL))
 		      AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		        (b.blocker_id=$1 AND b.blocked_id=unread.user_id) OR (b.blocked_id=$1 AND b.blocker_id=unread.user_id))
 		  ))
@@ -671,10 +692,13 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		       WHERE other.conversation_id=c.id AND other.user_id<>$1
 		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("meta.nickname")+`, `+searchx.FoldSQL("$6")+`)>0))
 		    OR EXISTS (SELECT 1 FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>cm.cleared_through_message_id
-		       AND msg.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$6")+`)>0
+		       AND msg.deleted_at IS NULL
+               AND (msg.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=msg.channel_id AND active_channel.deleted_at IS NULL))
+               AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$6")+`)>0
 		       AND (c.type='direct' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
 		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id)))))
 		ORDER BY (cm.pinned_at IS NOT NULL) DESC,cm.pinned_at DESC,COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+                 (m.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=m.channel_id AND active_channel.deleted_at IS NULL)) AND
 		         (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		           (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
@@ -691,7 +715,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		var lastRead, memberCount, unreadCount int64
 		var groupAvatarRef string
 		var lastMessageAt time.Time
-		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef); err != nil {
+		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef, &c.AvatarMembers, &c.Muted); err != nil {
 			continue
 		}
 		c.MemberCount = int(memberCount)
@@ -1376,7 +1400,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 			recipients = append(recipients, uid)
 		}
 	}
-	recipients = s.groupPushRecipients(r.Context(), conversationID, recipients, body.Text)
+	recipients = s.groupPushRecipients(r.Context(), conversationID, body.ChannelID, recipients, body.Text)
 	notificationBody := "Bạn có một tin nhắn mới."
 	if body.Text == "" && len(attachments) > 0 {
 		notificationBody = "Bạn nhận được " + mediax.PreviewLabel(attachments[0].Kind) + "."

@@ -6,10 +6,10 @@ import '../styles/conversation-categories.css'
 type Model = ReturnType<typeof useConversationCategories>
 export const categoryColors = [{value:'indigo',name:'Chàm'}, {value:'blue',name:'Xanh dương'}, {value:'green',name:'Xanh lá'}, {value:'orange',name:'Cam'}, {value:'pink',name:'Hồng'}, {value:'slate',name:'Xám'}]
 
-export function CategoryBadge({ category, iconOnly = false }: { category?: ConversationCategory; iconOnly?: boolean }) {
- return category ? <small className={'conversation-category-badge category-' + category.color + (iconOnly ? ' category-icon-only' : '')}
+export function CategoryBadge({ category, iconOnly = false, plain = false }: { category?: ConversationCategory; iconOnly?: boolean; plain?: boolean }) {
+ return category ? <small className={'conversation-category-badge category-' + category.color + (iconOnly ? ' category-icon-only' : '') + (plain ? ' category-plain' : '')}
   title={category.name} aria-label={iconOnly ? 'Phân loại: '+category.name : undefined}>
-  <Tag size={iconOnly ? 14 : 11} fill={iconOnly ? 'currentColor' : 'none'} aria-hidden="true" />{!iconOnly && category.name}
+  <Tag size={iconOnly ? 14 : 11} fill={iconOnly || plain ? 'currentColor' : 'none'} aria-hidden="true" />{!iconOnly && category.name}
  </small> : null
 }
 export function CategoryAssignment({ model, conversationId, categoryId }: { model: Model; conversationId: number; categoryId?: number }) {
@@ -82,7 +82,7 @@ export default function ConversationCategories({ model }: { model: Model }) {
  },[expanded])
  return <section className="conversation-categories" aria-label="Phân loại trò chuyện">
   <div className="category-toolbar">
-   <button ref={trigger} type="button" className={'category-filter-trigger' + (model.selected !== null ? ' is-filtered' : '')}
+   <button ref={trigger} type="button" className={'category-filter-trigger' + (model.selected !== null ? ' is-filtered category-' + (selectedCategory?.color || 'slate') : '')}
     aria-label="Lọc hội thoại theo phân loại" aria-expanded={expanded} popoverTarget={menuId}
     onClick={() => {
      const rect=trigger.current!.getBoundingClientRect()
@@ -91,13 +91,11 @@ export default function ConversationCategories({ model }: { model: Model }) {
      node.style.top=Math.min(rect.bottom+8,window.innerHeight-180)+'px'
      node.style.maxHeight=Math.max(140,window.innerHeight-rect.bottom-20)+'px'
     }}>
-    <Tag className="category-filter-tag-icon" size={16} aria-hidden="true" />
-    <SlidersHorizontal className="category-filter-mobile-icon" size={18} aria-hidden="true" />
+    <Tag className="category-filter-tag-icon" size={16} fill={selectedCategory ? 'currentColor' : 'none'} aria-hidden="true" />
     <span>{model.selected === null ? 'Phân loại' : model.selected === 0 ? 'Chưa phân loại' : selectedCategory?.name || 'Phân loại'}</span>
     <ChevronDown size={15} className={expanded ? 'is-open' : ''} aria-hidden="true" />
    </button>
    {model.selected !== null && <button className="category-clear" type="button" aria-label="Xóa bộ lọc phân loại" onClick={() => model.select(null)}><X size={15} /></button>}
-   <button className="category-manage-trigger" type="button" aria-label="Quản lý thẻ phân loại" title="Quản lý thẻ phân loại" onClick={openManager}><SlidersHorizontal size={17} /></button>
   </div>
   <div ref={menu} id={menuId} popover="auto" className="category-popover" onToggle={event => setExpanded(event.newState === 'open')}>
    <div className="category-popover-heading"><strong>Lọc theo thẻ</strong><span>Tìm nhanh những cuộc trò chuyện của bạn</span></div>

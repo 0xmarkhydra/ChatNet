@@ -21,6 +21,8 @@ type groupChannel struct {
 	UnreadCount    int64      `json:"unreadCount"`
 	LastMessage    string     `json:"lastMessage"`
 	LastMessageAt  *time.Time `json:"lastMessageAt,omitempty"`
+	AvatarURL      string     `json:"avatarUrl,omitempty"`
+	Muted          bool       `json:"muted"`
 }
 type channelFields struct {
 	Name        string `json:"name"`
@@ -35,7 +37,7 @@ func (s *server) groupChannelExists(ctx context.Context, groupID, channelID int6
 		return true
 	}
 	var exists bool
-	err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM group_channels WHERE conversation_id=$1 AND id=$2)`, groupID, channelID).Scan(&exists)
+	err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM group_channels WHERE conversation_id=$1 AND id=$2 AND deleted_at IS NULL)`, groupID, channelID).Scan(&exists)
 	return err == nil && exists
 }
 
@@ -54,11 +56,14 @@ func (s *server) listGroupChannels(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(r.Context(), `
 WITH rooms AS (
   SELECT 0::BIGINT id, $1::BIGINT conversation_id,
-    'Thảo luận chung'::TEXT name, 'Kênh mặc định của nhóm'::TEXT description
-  UNION ALL SELECT gc.id,gc.conversation_id,gc.name::TEXT,gc.description::TEXT
-    FROM group_channels gc WHERE gc.conversation_id=$1
+    'Thảo luận chung'::TEXT name, 'Kênh mặc định của nhóm'::TEXT description,
+    COALESCE(c.group_avatar_ref,'')::TEXT avatar_ref FROM conversations c WHERE c.id=$1
+  UNION ALL SELECT gc.id,gc.conversation_id,gc.name::TEXT,gc.description::TEXT,gc.avatar_ref::TEXT
+    FROM group_channels gc WHERE gc.conversation_id=$1 AND gc.deleted_at IS NULL
 )
-SELECT rooms.id,rooms.conversation_id,rooms.name,rooms.description,
+SELECT rooms.id,rooms.conversation_id,rooms.name,rooms.description,rooms.avatar_ref,
+  COALESCE((SELECT n.muted FROM group_channel_notification_preferences n
+    WHERE n.conversation_id=$1 AND n.user_id=$2 AND n.channel_id=rooms.id),FALSE),
   (SELECT COUNT(*) FROM messages m
     WHERE m.conversation_id=$1 AND COALESCE(m.channel_id,0)=rooms.id
       AND m.user_id<>$2
@@ -101,10 +106,14 @@ ORDER BY rooms.id LIMIT 31
 	list := []groupChannel{}
 	for rows.Next() {
 		var item groupChannel
-		if err := rows.Scan(&item.ID, &item.ConversationID, &item.Name, &item.Description,
+		var avatarRef string
+		if err := rows.Scan(&item.ID, &item.ConversationID, &item.Name, &item.Description, &avatarRef, &item.Muted,
 			&item.UnreadCount, &item.LastMessage, &item.LastMessageAt); err != nil {
 			httpx.Error(w, 500, "cannot load channels")
 			return
+		}
+		if avatarRef != "" && s.storage != nil && s.storage.Configured() {
+			item.AvatarURL, _ = s.storage.SignedGetURL(avatarRef, time.Hour)
 		}
 		list = append(list, item)
 	}
@@ -197,7 +206,7 @@ func (s *server) createGroupChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var count int
-	if err = tx.QueryRow(r.Context(), `SELECT COUNT(*) FROM group_channels WHERE conversation_id=$1`, id).Scan(&count); err != nil {
+	if err = tx.QueryRow(r.Context(), `SELECT COUNT(*) FROM group_channels WHERE conversation_id=$1 AND deleted_at IS NULL`, id).Scan(&count); err != nil {
 		httpx.Error(w, 500, "cannot create channel")
 		return
 	}
@@ -258,20 +267,13 @@ func (s *server) mutateGroupChannel(w http.ResponseWriter, r *http.Request, remo
 	}
 	var c groupChannel
 	if remove {
-		var count int
-		err = tx.QueryRow(r.Context(), `SELECT COUNT(*) FROM messages WHERE conversation_id=$1 AND channel_id=$2`, id, channelID).Scan(&count)
-		if err != nil {
-			httpx.Error(w, 500, "cannot remove channel")
-			return
-		}
-		if count > 0 {
-			httpx.Error(w, 409, "cannot remove a channel containing messages")
-			return
-		}
-		err = tx.QueryRow(r.Context(), `DELETE FROM group_channels WHERE conversation_id=$1 AND id=$2 RETURNING id,conversation_id,name,description`, id, channelID).Scan(&c.ID, &c.ConversationID, &c.Name, &c.Description)
+		// Preserve messages/media for audit and referential integrity; hide this channel from members.
+		err = tx.QueryRow(r.Context(), `UPDATE group_channels SET deleted_at=NOW()
+   WHERE conversation_id=$1 AND id=$2 AND deleted_at IS NULL
+   RETURNING id,conversation_id,name,description`, id, channelID).Scan(&c.ID, &c.ConversationID, &c.Name, &c.Description)
 	} else {
 		err = tx.QueryRow(r.Context(), `UPDATE group_channels SET name=$1,description=$2
-   WHERE conversation_id=$3 AND id=$4 RETURNING id,conversation_id,name,description`,
+   WHERE conversation_id=$3 AND id=$4 AND deleted_at IS NULL RETURNING id,conversation_id,name,description`,
 			strings.TrimSpace(body.Name), strings.TrimSpace(body.Description), id, channelID).Scan(&c.ID, &c.ConversationID, &c.Name, &c.Description)
 	}
 	if errors.Is(err, pgx.ErrNoRows) {

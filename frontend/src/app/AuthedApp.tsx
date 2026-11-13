@@ -126,7 +126,7 @@ import "../features/chat/styles/community-groups.css";
 import CommunityGroupWizard, { type CommunityCreationExtras } from "../features/chat/components/CommunityGroupWizard";
 import GroupSettingsPanel from "../features/chat/components/GroupSettingsPanel";
 import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
-import { validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
+import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
 import ContactsView, { type FriendsScreen } from "../features/contacts/components/ContactsView";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
@@ -1148,8 +1148,19 @@ export default function AuthedApp({
         const raw = await response.json();
         const channels = validGroupChannels(raw, id);
         if (!controller.signal.aborted) {
-          setGroupChannelUnreadStatus({ conversationId: id, available: Array.isArray(raw) && raw.every(channel => typeof channel.unreadCount === 'number') });
+          const unreadAvailable = Array.isArray(raw) && raw.every(channel =>
+            typeof channel.unreadCount === 'number' && Number.isFinite(channel.unreadCount));
+          setGroupChannelUnreadStatus({ conversationId: id, available: unreadAvailable });
           setGroupChannelState({ conversationId: id, channels });
+          // Keep the group's list badge in sync with the same per-channel unread
+          // counts shown in the picker. Do not replace the server count if the
+          // channels endpoint has no reliable unread metadata.
+          if (unreadAvailable) {
+            const totalUnread = totalGroupChannelUnread(channels);
+            setConversations(current => current.map(conversation =>
+              conversation.id === id && conversation.type === 'group' && conversation.unreadCount !== totalUnread
+                ? { ...conversation, unreadCount: totalUnread } : conversation));
+          }
           if (channelSelection.conversationId === id && !channels.some(channel => channel.id === channelSelection.channelId))
             setChannelSelection({ conversationId: id, channelId: 0 });
         }
@@ -1174,6 +1185,9 @@ export default function AuthedApp({
         channels: current.channels.map(channel => channel.id === detail.channelId
           ? { ...channel, unreadCount: 0 } : channel),
       });
+      // Only the opened channel was marked read; recalculate the group badge
+      // from all channels rather than clearing the entire group's unread count.
+      void reload();
     };
     window.addEventListener('chatnet:group-community-updated', onUpdate);
     window.addEventListener('chatnet:group-channel-event', onChannelEvent);
@@ -1315,7 +1329,7 @@ export default function AuthedApp({
   const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ feedScrollBeforeComments, feedViewRef, isProfileDesktop, setActivePostId, tab });
 
   const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
-  const { createGroupChannel, selectGroupChannel } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setMessages, setReplyingTo });
+  const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setMessages, setReplyingTo });
   const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
   const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
 
@@ -2825,7 +2839,7 @@ export default function AuthedApp({
 
   return (
     <AppLayout
-      className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""}`}
+      className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""} ${tab === "chat" && !desktopSection && translationSettingsConversationId === null ? "chat-rail-screen" : ""}`}
       sidebar={
         <AppSidebar
         tab={tab}
@@ -3149,6 +3163,7 @@ export default function AuthedApp({
           chatFiltersPill={chatFiltersPill}
           chatFriend={chatFriend}
           chatFriendRelationship={chatFriendRelationship}
+          allChatConversations={displayConversations}
           chatListConversations={chatListConversations}
           chatListFilter={chatListFilter}
           chatListQuery={chatListQuery}
@@ -3164,6 +3179,7 @@ export default function AuthedApp({
           copyInviteLink={copyInviteLink}
           createDirect={createDirect}
           createGroupChannel={createGroupChannel}
+          refreshGroupChannels={refreshGroupChannels}
           directUsername={directUsername}
           effectiveAutoTranslate={effectiveAutoTranslate}
           effectiveTargetLanguage={effectiveTargetLanguage}
