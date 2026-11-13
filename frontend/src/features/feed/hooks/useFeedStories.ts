@@ -6,15 +6,17 @@ export function useFeedStories({ session, sessionRef, apiFetch, setStatus }: App
   const [stories, setStories] = useState<Story[]>([])
 
   async function refreshStories() {
+    const sessionId = session?.sessionId
+    if (!sessionId) return
     try {
       const response = await apiFetch('/api/stories')
       if (!response.ok) return
       const data = (await response.json()) as Story[]
-      if (sessionRef.current?.sessionId === session?.sessionId) {
+      if (sessionRef.current?.sessionId === sessionId) {
         setStories(data.filter(item => Date.parse(item.expiresAt) > Date.now()))
       }
     } catch {
-      setStatus('Đang kết nối lại...')
+      if (sessionRef.current?.sessionId === sessionId) setStatus('Đang kết nối lại...')
     }
   }
 

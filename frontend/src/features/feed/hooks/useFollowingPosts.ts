@@ -34,6 +34,7 @@ export function useFollowingPosts({
   )
   const revision = useRef(0)
   const busy = useRef(false)
+  const pagingAbort = useRef<AbortController | null>(null)
   const requestRef = useLatest(request)
   const current = state.sessionId === sessionId
     ? { ...state, loading: state.loading || (enabled && !state.loaded && !state.error) }
@@ -44,6 +45,8 @@ export function useFollowingPosts({
     let cancelled = false
     const id = ++revision.current
     busy.current = false
+    pagingAbort.current?.abort()
+    pagingAbort.current = null
     const abort = new AbortController()
     void (async () => {
       try {
@@ -64,7 +67,14 @@ export function useFollowingPosts({
         }
       }
     })()
-    return () => { cancelled = true; abort.abort(); ++revision.current; busy.current = false }
+    return () => {
+      cancelled = true
+      abort.abort()
+      pagingAbort.current?.abort()
+      pagingAbort.current = null
+      ++revision.current
+      busy.current = false
+    }
   }, [enabled, sessionId, refreshVersion, requestRef, setState])
 
   async function loadMore() {
@@ -72,12 +82,14 @@ export function useFollowingPosts({
     const before = Math.min(...current.posts.map(post => post.id))
     busy.current = true
     const id = revision.current
+    const abort = new AbortController()
+    pagingAbort.current = abort
     setState(previous => ({ ...previous, loadingMore: true, error: '' }))
     try {
-      const response = await requestRef.current('/api/posts?scope=following&limit=' + FEED_PAGE_SIZE + '&before=' + before, { cache: 'no-store' })
+      const response = await requestRef.current('/api/posts?scope=following&limit=' + FEED_PAGE_SIZE + '&before=' + before, { cache: 'no-store', signal: abort.signal })
       if (!response.ok) throw new Error('Không thể tải thêm bài viết.')
       const posts = await response.json() as Post[]
-      if (id !== revision.current || !Array.isArray(posts)) return
+      if (abort.signal.aborted || id !== revision.current || !Array.isArray(posts)) return
       setState(previous => {
         if (previous.sessionId !== sessionId) return previous
         return {
@@ -86,12 +98,15 @@ export function useFollowingPosts({
         }
       })
     } catch {
-      if (id === revision.current) setState(previous =>
+      if (!abort.signal.aborted && id === revision.current) setState(previous =>
         previous.sessionId === sessionId
           ? { ...previous, loadingMore: false, error: 'Không tải thêm được bài viết từ bạn bè.' }
           : previous)
     } finally {
-      if (id === revision.current) busy.current = false
+      if (pagingAbort.current === abort) {
+        pagingAbort.current = null
+        busy.current = false
+      }
     }
   }
 
