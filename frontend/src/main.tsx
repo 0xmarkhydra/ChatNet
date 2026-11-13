@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './app/App'
+import AppRouter from './app/router/AppRouter'
 import { PWAUpdate } from './features/pwa/components/PWAUpdate'
 import DesktopBootstrap from './app/DesktopBootstrap'
 import { isDesktopBuild } from './platform/desktop'
@@ -43,7 +44,9 @@ if (window.location.search.includes('pwa=')) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {isDesktopBuild ? <DesktopBootstrap /> : <App />}
-    {import.meta.env.PROD && !isDesktopBuild && <PWAUpdate />}
+    <AppRouter>
+      {isDesktopBuild ? <DesktopBootstrap /> : <App />}
+      {import.meta.env.PROD && !isDesktopBuild && <PWAUpdate />}
+    </AppRouter>
   </React.StrictMode>,
 )
