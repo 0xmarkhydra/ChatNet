@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapPin, Users, Search, RefreshCw, Navigation, List, Map as MapIcon, ShieldCheck } from 'lucide-react'
 import NearbyMap from './NearbyMap'
 import { loadNearbyPlaces, type NearbyPlace, type NearbyPlaceCategory } from '../lib/nearbyPlaces'
@@ -51,6 +51,8 @@ export default function NearbyExplorer({
   const [radius, setRadius] = useState(1)
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
   const [locating, setLocating] = useState(false)
+  const locationRevision = useRef(0)
+  useEffect(() => () => { ++locationRevision.current }, [])
   const [locationError, setLocationError] = useState('')
   const [places, setPlaces] = useState<NearbyPlace[]>([])
   const [loading, setLoading] = useState(false)
@@ -79,13 +81,15 @@ export default function NearbyExplorer({
 
   async function locate() {
     if (locating) return
+    const revision = ++locationRevision.current
     setLocating(true); setLocationError('')
     try {
       const position = await getCurrentPositionSmart()
-      setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude })
+      if (revision === locationRevision.current) setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude })
     } catch (error) {
-      setLocationError(await geolocationErrorMessage(error))
-    } finally { setLocating(false) }
+      const message = await geolocationErrorMessage(error)
+      if (revision === locationRevision.current) setLocationError(message)
+    } finally { if (revision === locationRevision.current) setLocating(false) }
   }
 
   async function scan() {

@@ -140,6 +140,8 @@ export function useContactActions({
     }
   }
   async function openBlockedFriendConversation(userId: number) {
+    const sid = session?.sessionId;
+    if (!sid) return;
     let direct = conversations.find((item) => item.type === 'direct' && item.otherUserId === userId);
     if (!direct) {
       const username = friends.find((item) => item.id === userId)?.username;
@@ -149,6 +151,7 @@ export function useContactActions({
           const response = await findDirectConversation(apiFetch, username);
           if (response.ok) {
             const data = (await response.json()) as Conversation[];
+            if (sessionRef.current?.sessionId !== sid) return;
             direct = data.find((item) => item.type === 'direct' && item.otherUserId === userId);
             if (direct) {
               const found = direct;
@@ -160,6 +163,7 @@ export function useContactActions({
         }
       }
     }
+    if (sessionRef.current?.sessionId !== sid) return;
     if (!direct) {
       setNotice('Chưa tìm thấy hội thoại cũ để mở.', 'warning');
       return;
