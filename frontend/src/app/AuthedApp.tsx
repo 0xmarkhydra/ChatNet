@@ -754,10 +754,11 @@ export default function AuthedApp({
   }, [messageText, activeConversationId, tab, desktopSection]);
   const chatDragDepth = useRef(0);
   const setChatDragDepth = useCallback((next: number) => { chatDragDepth.current = next; }, []);
-  const [chatDragActive, setChatDragActive] = useState(false);
+  const [chatDragActive, setChatDragActive] = useScopedState(
+    `${tab}:${activeConversationId ?? "none"}`, false,
+  );
   useEffect(() => {
     chatDragDepth.current = 0;
-    setChatDragActive(false);
   }, [activeConversationId, tab]);
 
   useEffect(() => {
