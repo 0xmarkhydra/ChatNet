@@ -117,8 +117,10 @@ export function useConversationListSearch({
           : current)
       }
     } finally {
-      if (pageController.current === controller) pageController.current = null
-      pageBusy.current = false
+      if (pageController.current === controller) {
+        pageController.current = null
+        pageBusy.current = false
+      }
     }
   }
 

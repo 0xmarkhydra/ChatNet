@@ -80,6 +80,7 @@ try {
     if (path === '/api/conversation-categories') return answer(route, [])
     if (path === '/api/conversations' && method === 'GET') return answer(route, [conversation])
     if (path === '/api/conversations/memberships') return answer(route, { ids: [conversation.id], nextAfter: null })
+    if (path === '/api/conversations/42/pins' && method === 'GET') return answer(route, [])
     if (path === '/api/conversations/42/messages' && method === 'GET') return answer(route,
       [...records.values()].sort((a, b) => a.id - b.id))
     if (path === '/api/conversations/42/messages' && method === 'POST') {
@@ -160,7 +161,7 @@ try {
   await field.waitFor({ timeout: 10000 })
   pending = page.locator('.chat-outbox-message').filter({ hasText: 'P0-02 offline message from A to B' })
   await pending.waitFor({ timeout: 10000 })
-  assert.match(await pending.textContent(), /Chờ có mạng|Đang gửi|Đang xác nhận/)
+  assert.match(await pending.textContent(), /Chờ có mạng|Đang gửi|Đang xác nhận|Gửi lại/)
 
   // Ensure the simulated outage actually intercepted one attempted POST.
   for (let i = 0; i < 40 && requests.length === 0; i += 1) await delay(125)

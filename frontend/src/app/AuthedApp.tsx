@@ -16,6 +16,7 @@ import { useSession } from "../shared/context/SessionContext";
 import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
+import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
@@ -258,6 +259,7 @@ import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
 import { consumeNotificationDeepLink, notificationDeepLink } from "./navigation/notificationDeepLink";
+import { consumeInviteDeepLink } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
@@ -447,7 +449,7 @@ export default function AuthedApp({
     if (session?.user.id && sessionRef.current?.user.id === session.user.id) {
       saveChatDrafts(session.user.id, messageDrafts);
     }
-  }, [session?.user.id, messageDrafts]);
+  }, [session?.user.id, messageDrafts, sessionRef]);
   const [channelDrafts, setChannelDrafts] = useState<Record<string, MessageDraft>>({});
   const channelDraftKey = `${activeConversationId ?? 0}:${selectedChannelId}`;
   const draft = selectedChannelId > 0 ? channelDrafts[channelDraftKey] ?? emptyDraft : messageDrafts[activeConversationId ?? 0] ?? emptyDraft;
@@ -599,8 +601,11 @@ export default function AuthedApp({
     if (!session?.sessionId) return;
     const mentionSessionId = session.sessionId;
     let live = true;
+    let refreshing = false;
     const controller = new AbortController();
     const refresh = async () => {
+      if (!live || refreshing) return;
+      refreshing = true;
       try {
         const response = await apiFetch("/api/feed/mentions", { signal: controller.signal, cache: "no-store" });
         if (!response.ok) return;
@@ -615,6 +620,8 @@ export default function AuthedApp({
         }
       } catch {
         // A temporary network outage must not clear already received alerts.
+      } finally {
+        refreshing = false;
       }
     };
     const onVisible = () => {
@@ -754,10 +761,11 @@ export default function AuthedApp({
   }, [messageText, activeConversationId, tab, desktopSection]);
   const chatDragDepth = useRef(0);
   const setChatDragDepth = useCallback((next: number) => { chatDragDepth.current = next; }, []);
-  const [chatDragActive, setChatDragActive] = useState(false);
+  const [chatDragActive, setChatDragActive] = useScopedState(
+    `${tab}:${activeConversationId ?? "none"}`, false,
+  );
   useEffect(() => {
     chatDragDepth.current = 0;
-    setChatDragActive(false);
   }, [activeConversationId, tab]);
 
   useEffect(() => {
@@ -1062,7 +1070,7 @@ export default function AuthedApp({
 
   useEffect(() => {
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
-  }, [groupSettingsOpen]);
+  }, [groupSettingsOpen, setGroupMemberViewOpen]);
 
   useEffect(() => {
     if (!groupSettingsOpen) return;
@@ -1148,8 +1156,11 @@ export default function AuthedApp({
     const id = activeConversation?.type === 'group' ? activeConversation.id : null;
     setGroupChannelState({ conversationId: id, channels: validGroupChannels([], id ?? 0) });
     if (!id || !session?.token) return;
-    const controller = new AbortController();
+    let activeRequest: AbortController | null = null;
     const reload = async () => {
+      activeRequest?.abort();
+      const controller = new AbortController();
+      activeRequest = controller;
       try {
         const response = await apiFetch(`/api/conversations/${id}/channels`, { signal: controller.signal });
         if (!response.ok) throw new Error('Không tải được kênh hội thoại.');
@@ -1158,8 +1169,11 @@ export default function AuthedApp({
         if (!controller.signal.aborted) {
           setGroupChannelUnreadStatus({ conversationId: id, available: Array.isArray(raw) && raw.every(channel => typeof channel.unreadCount === 'number') });
           setGroupChannelState({ conversationId: id, channels });
-          if (channelSelection.conversationId === id && !channels.some(channel => channel.id === channelSelection.channelId))
-            setChannelSelection({ conversationId: id, channelId: 0 });
+          setChannelSelection(current =>
+            current.conversationId === id && !channels.some(channel => channel.id === current.channelId)
+              ? { conversationId: id, channelId: 0 }
+              : current,
+          );
         }
       } catch {
         if (!controller.signal.aborted) setNotice('Không tải được kênh hội thoại.', 'warning');
@@ -1187,7 +1201,7 @@ export default function AuthedApp({
     window.addEventListener('chatnet:group-channel-event', onChannelEvent);
     window.addEventListener('chatnet:channel-read', onChannelRead);
     return () => {
-      controller.abort();
+      activeRequest?.abort();
       window.removeEventListener('chatnet:group-community-updated', onUpdate);
       window.removeEventListener('chatnet:group-channel-event', onChannelEvent);
       window.removeEventListener('chatnet:channel-read', onChannelRead);
@@ -1339,27 +1353,14 @@ export default function AuthedApp({
 
   useEffect(() => {
     if (!session?.token) return;
-    const params = new URLSearchParams(window.location.search);
-    const requestedUser = (params.get("connect") || params.get("invite") || "")
-      .replace(/^@/, "")
-      .trim();
-    if (!requestedUser) return;
-
+    const requestedUser = consumeInviteDeepLink(new URL(window.location.href));
     if (
+      requestedUser &&
       requestedUser.toLocaleLowerCase("vi-VN") !==
-      session.user.username.toLocaleLowerCase("vi-VN")
+        session.user.username.toLocaleLowerCase("vi-VN")
     ) {
       openVisitor(requestedUser);
     }
-
-    params.delete("connect");
-    params.delete("invite");
-    const nextSearch = params.toString();
-    window.history.replaceState(
-      {},
-      "",
-      `${window.location.pathname}${nextSearch ? "?" + nextSearch : ""}${window.location.hash}`,
-    );
   }, [session?.token]);
 
   useEffect(() => {
@@ -2131,29 +2132,7 @@ export default function AuthedApp({
 
 
 
-  useEffect(() => {
-    if (!session) return;
-    const refresh = () => {
-      if (!isDesktopBuild && document.visibilityState === "hidden") return;
-      void sessionClient
-        .refresh()
-        .then((current) => {
-          if (isDesktopBuild && current) return sessionClient.check();
-        })
-        .catch(() => setStatus("Đang kết nối lại..."));
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 60_000);
-    window.addEventListener("focus", refresh);
-    window.addEventListener("online", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("online", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [session?.sessionId, sessionClient]);
+  useSessionKeepalive(session?.sessionId ?? null, sessionRef, sessionClient, setStatus);
 
   const nativeNotifications = useDesktopNotifications({
     session,
@@ -2176,6 +2155,15 @@ export default function AuthedApp({
       setActiveConversationId(conversation.id);
     },
   });
+
+  useEffect(() => {
+    const title = 'SocCO – Understand. Connect. Together.';
+    const count = nativeNotifications.unreadCount;
+    document.title = count !== null && count > 0
+      ? `(${count > 99 ? '99+' : count}) ${title}`
+      : title;
+    return () => { document.title = title; };
+  }, [nativeNotifications.unreadCount]);
 
   useAppRealtime({
     onCategoryAssignmentChanged: conversationCategories.applyAssignment,
@@ -2207,7 +2195,6 @@ export default function AuthedApp({
     membershipSnapshot,
     membershipEventSequence,
     membershipSyncSequence,
-    groupSettingsOpen,
     activeConversationIdRef,
     activeChannelIdRef,
     activeConversationTypeRef,

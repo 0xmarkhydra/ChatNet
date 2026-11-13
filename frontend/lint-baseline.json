@@ -1,12 +1,12 @@
 {
-  "total": 99,
+  "total": 95,
   "byRule": {
-    "react-hooks/exhaustive-deps": 64,
-    "react-hooks/set-state-in-effect": 35
+    "react-hooks/exhaustive-deps": 61,
+    "react-hooks/set-state-in-effect": 34
   },
   "counts": {
-    "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
-    "src/app/AuthedApp.tsx|react-hooks/set-state-in-effect": 6,
+    "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 28,
+    "src/app/AuthedApp.tsx|react-hooks/set-state-in-effect": 5,
     "src/app/hooks/useAppRealtime.ts|react-hooks/exhaustive-deps": 1,
     "src/features/calls/components/CallCenter.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/calls/components/CallManager.tsx|react-hooks/exhaustive-deps": 1,
@@ -50,7 +50,6 @@
     "src/features/profile/components/ProfileQr.tsx|react-hooks/exhaustive-deps": 2,
     "src/features/profile/components/VisitorProfile.tsx|react-hooks/exhaustive-deps": 4,
     "src/features/profile/components/VisitorProfile.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/settings/hooks/usePrivacySettings.ts|react-hooks/exhaustive-deps": 1,
     "src/features/settings/hooks/usePrivacySettings.ts|react-hooks/set-state-in-effect": 1,
     "src/platform/DesktopScreenPicker.tsx|react-hooks/exhaustive-deps": 1
   }

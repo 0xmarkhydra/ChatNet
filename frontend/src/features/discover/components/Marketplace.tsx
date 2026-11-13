@@ -23,6 +23,7 @@ const showMoney = (n: number, unit: string) => n.toLocaleString('vi-VN') + ' ' +
 
 export default function Marketplace({ userId, request, onBack }: Props) {
   const apiRef = useLatest(request)
+  const revision = useRef(0)
   const [view, setView] = useState<'products' | 'cart' | 'orders' | 'sell'>('products')
   const { hostRef: tabsPillSetHost, activeRef: tabsPillSetActive, pillRef: tabsPillSetPill } = useSlidingPill<HTMLElement>(view)
   const [products, setProducts] = useState<Product[]>([])
@@ -48,7 +49,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
     if (response.status === 204) return undefined as T
     return response.json() as Promise<T>
   }
-  async function refresh() {
+  async function refresh(version = revision.current) {
     try {
       const [catalog, basket, history, owned] = await Promise.all([
         api<{ products: Product[] }>('/api/marketplace/products'),
@@ -56,31 +57,39 @@ export default function Marketplace({ userId, request, onBack }: Props) {
         api<{ orders: Order[] }>('/api/marketplace/orders'),
         api<{ products: Product[] }>('/api/marketplace/products/mine'),
       ])
+      if (version !== revision.current) return
       setProducts(catalog.products)
       setCart(basket.items)
       setOrders(history.orders)
       setMine(owned.products)
       setError('')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được sàn')
+      if (version === revision.current) setError(e instanceof Error ? e.message : 'Không tải được sàn')
     } finally {
-      setLoading(false)
+      if (version === revision.current) setLoading(false)
     }
   }
-  useEffect(() => { void refresh() }, [userId])
+  useEffect(() => {
+    const version = ++revision.current
+    setProducts([]); setCart([]); setOrders([]); setMine([])
+    setError(''); setMessage(''); setLoading(true); setBusy(false)
+    void refresh(version)
+  }, [userId])
 
-  async function execute(fn: () => Promise<void>) {
+  async function execute(fn: (isCurrent: () => boolean) => Promise<void>) {
     if (busy) return
+    const version = revision.current
+    const isCurrent = () => version === revision.current
     setBusy(true)
     setMessage('')
     setError('')
-    try { await fn(); await refresh() }
-    catch (e) { setError(e instanceof Error ? e.message : 'Không thể thực hiện') }
-    finally { setBusy(false) }
+    try { await fn(isCurrent); if (isCurrent()) await refresh(version) }
+    catch (e) { if (version === revision.current) setError(e instanceof Error ? e.message : 'Không thể thực hiện') }
+    finally { if (version === revision.current) setBusy(false) }
   }
   const basketSellers = Array.from(new Set(cart.map(item => item.sellerId)))
   function updateCart(productId: number, quantity: number) {
-    void execute(async () => {
+    void execute(async (isCurrent) => {
       if (quantity <= 0) {
         await api<void>('/api/marketplace/cart/' + productId, { method: 'DELETE' })
       } else {
@@ -89,22 +98,23 @@ export default function Marketplace({ userId, request, onBack }: Props) {
           body: JSON.stringify({ quantity }),
         })
       }
-      setMessage('Đã cập nhật giỏ hàng.')
+      if (isCurrent()) setMessage('Đã cập nhật giỏ hàng.')
     })
   }
   function checkout(sellerId: number) {
-    void execute(async () => {
+    void execute(async (isCurrent) => {
       const order = await api<{ id: number }>('/api/marketplace/orders', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sellerId, idempotencyKey: crypto.randomUUID().replaceAll('-', '') }),
       })
+      if (!isCurrent()) return
       setView('orders')
       setMessage('Đã lưu yêu cầu #' + order.id + ' để kiểm thử. Chưa thu tiền, giữ hàng hoặc gửi đơn cho người bán.')
     })
   }
   function createDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    void execute(async () => {
+    void execute(async (isCurrent) => {
       await api('/api/marketplace/products', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -112,14 +122,15 @@ export default function Marketplace({ userId, request, onBack }: Props) {
           priceUnit: unit.toUpperCase().trim(), stock: Number(stock),
         }),
       })
+      if (!isCurrent()) return
       setTitle(''); setDescription(''); setPrice(''); setUnit(''); setStock('1')
       setMessage('Đã lưu bản nháp. Bạn cần xác nhận trước khi đăng.')
     })
   }
   function publish(productId: number) {
-    void execute(async () => {
+    void execute(async (isCurrent) => {
       await api('/api/marketplace/products/' + productId + '/publish', { method: 'POST' })
-      setMessage('Đã đăng sản phẩm.')
+      if (isCurrent()) setMessage('Đã đăng sản phẩm.')
     })
   }
   return (

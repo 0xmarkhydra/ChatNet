@@ -10,7 +10,7 @@ import { GroupActivityMarker } from "./GroupActivities";
 import { messageTextParts, messageLinkHref } from "../lib/messageClipboard";
 import LinkPreview from "./LinkPreview";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
-import type { ChatSectionProps } from "./ChatSection";
+import type { ChatSectionProps } from "./ChatSectionProps";
 import type { Dispatch, SetStateAction } from "react";
 import type { Message } from "../types";
 

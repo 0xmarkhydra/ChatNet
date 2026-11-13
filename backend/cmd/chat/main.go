@@ -73,6 +73,7 @@ type conversation struct {
 	LastMessage    string     `json:"lastMessage"`
 	LastMessageAt  *time.Time `json:"lastMessageAt,omitempty"`
 	AvatarURL      string     `json:"avatarUrl,omitempty"`
+	AvatarMembers  []string   `json:"avatarMembers,omitempty"`
 	Online         bool       `json:"online"`
 	CreatedAt      time.Time  `json:"createdAt"`
 }
@@ -645,7 +646,15 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
                WHERE gcr.conversation_id=c.id AND gcr.user_id=$1 AND gcr.channel_id=COALESCE(m.channel_id,0)
              ),cm.last_read_message_id) ELSE cm.last_read_message_id END
              AND m.id>cm.cleared_through_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0), COALESCE(c.group_avatar_ref,'')
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0), COALESCE(c.group_avatar_ref,''),
+		       CASE WHEN c.type='group' THEN ARRAY(
+		           SELECT u.username
+		           FROM conversation_members avatar_member
+		           JOIN users u ON u.id=avatar_member.user_id
+		           WHERE avatar_member.conversation_id=c.id
+		           ORDER BY CASE WHEN avatar_member.user_id=$1 THEN 1 ELSE 0 END, avatar_member.user_id
+		           LIMIT 3
+		       ) ELSE ARRAY[]::text[] END
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
@@ -691,7 +700,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		var lastRead, memberCount, unreadCount int64
 		var groupAvatarRef string
 		var lastMessageAt time.Time
-		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef); err != nil {
+		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef, &c.AvatarMembers); err != nil {
 			continue
 		}
 		c.MemberCount = int(memberCount)
