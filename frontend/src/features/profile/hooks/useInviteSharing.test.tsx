@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
-import type { Session } from '../../auth/lib/session'
+import type { Session } from '../../auth'
 import { useInviteSharing } from './useInviteSharing'
 import { useSession } from '../../../shared/context/SessionContext'
 import { useNotice } from '../../../shared/context/NoticeContext'

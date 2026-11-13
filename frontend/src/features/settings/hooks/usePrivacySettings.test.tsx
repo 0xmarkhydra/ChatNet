@@ -2,8 +2,8 @@
 import { act, useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it } from 'vitest'
-import type { Session } from '../../auth/lib/session'
-import type { UserPrivacy } from '../../profile/types'
+import type { Session } from '../../auth'
+import type { UserPrivacy } from '../../profile'
 import { usePrivacySettings } from './usePrivacySettings'
 
 describe('privacy session isolation', () => {

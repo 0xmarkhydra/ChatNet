@@ -38,7 +38,7 @@ describe('VisitorProfile session isolation', () => {
       onPostOpen: () => {},
       onReactionUsers: () => {},
       onUpdated: () => {},
-      updates: [] as import('../../feed/types').Post[],
+      updates: [] as import('../../feed').Post[],
       onDeleted: () => {},
       feedback: () => {},
     } as const

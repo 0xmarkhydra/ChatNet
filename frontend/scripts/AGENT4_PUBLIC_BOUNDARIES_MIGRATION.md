@@ -5,8 +5,8 @@ Source: refreshed `origin/main` at `d87f383`. This document is guidance only: Ag
 ## Verified baseline and current scan
 
 - Recorded baseline: **106** violations = **101 feature-entrypoint** + **5 dependency-cycle**.
-- Current source scan: **111** violations in **379** files. The five additions are deep feature imports in test files, not a reason to expand the legacy baseline.
-- Architecture gate currently **FAILS**. Preserve this failure until each consumer is migrated or the owner explicitly approves the architectural exception.
+- Initial source scan: **111** violations in **379** files, including five new test-only deep imports.
+- Follow-up remediation: all five test imports now use the existing type-only public barrels, with `Session` exposed from the shared type contract through `features/auth/index.ts`. The architecture gate **PASSES** with **106 existing / 106 baseline**; no baseline expansion, gate exemption, or runtime behavior change was needed.
 - Keep the baseline intact while violations remain; remove an entry only after `--report` proves the corresponding dependency is gone. The new `frontend/tests/architecture-baseline.test.ts` guards against stale baseline entries.
 
 ## Public entrypoints prepared by Agent 4
@@ -17,11 +17,11 @@ New type-only barrels are available for `auth` (`ManagedAccountSession`), `feed`
 
 | Owner | Consumer | Existing deep dependency | Migration required |
 |---|---|---|---|
-| Agent 3 | `features/discover/hooks/useNearbyDiscovery.test.tsx` | `features/auth/lib/session.ts` | Import stable public session types/contracts through `features/auth/index.ts` if appropriate; do not expose mutable session internals solely to satisfy the checker |
-| Agent 3 | `features/profile/components/VisitorProfile.test.tsx` | `features/feed/types.ts` | Publish only stable feed DTO/types in `features/feed/index.ts`; update test import |
-| Agent 3 | `features/profile/hooks/useInviteSharing.test.tsx` | `features/auth/lib/session.ts` | Prefer public auth type/contract; keep mocking at the actual dependency boundary if necessary |
-| Agent 3 | `features/settings/hooks/usePrivacySettings.test.tsx` | `features/auth/lib/session.ts` | Replace deep import with stable auth public entrypoint, or keep test-local mocking without feature-internal import |
-| Agent 3 | `features/settings/hooks/usePrivacySettings.test.tsx` | `features/profile/types.ts` | Publish stable profile types through `features/profile/index.ts` and migrate type-only import |
+| Agent 4 (resolved) | `features/discover/hooks/useNearbyDiscovery.test.tsx` | `features/auth/lib/session.ts` | Uses `import type { Session } from '../../auth'` |
+| Agent 4 (resolved) | `features/profile/components/VisitorProfile.test.tsx` | `features/feed/types.ts` | Uses public Feed `Post` type |
+| Agent 4 (resolved) | `features/profile/hooks/useInviteSharing.test.tsx` | `features/auth/lib/session.ts` | Uses public Auth `Session` type |
+| Agent 4 (resolved) | `features/settings/hooks/usePrivacySettings.test.tsx` | `features/auth/lib/session.ts` | Uses public Auth `Session` type |
+| Agent 4 (resolved) | `features/settings/hooks/usePrivacySettings.test.tsx` | `features/profile/types.ts` | Uses public Profile `UserPrivacy` type |
 | Agent 2 | `features/chat/components/ChatSection.tsx` and its five component cycles | ChatSection ↔ ConversationHeader, ConversationList, MessageComposer, MessageTimeline, PinnedItemsPanel | Remove reverse runtime references at source; exporting these through an index does not resolve cycles |
 | Agent 1 | app/platform consumers | Any imports through new public barrels | Verify session isolation and absence of runtime side effects; prefer `import type` for type-only symbols |
 
