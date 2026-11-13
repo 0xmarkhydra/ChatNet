@@ -1,7 +1,7 @@
 import { Pin, X } from "lucide-react";
 import { userLabel } from "../../../shared/utils/userLabel";
 import { attachmentLabel } from "../../../shared/utils/format";
-import type { ChatSectionProps } from "./ChatSection";
+import type { ChatSectionProps } from "./ChatSectionProps";
 type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "nextChatSearchJumpRevision" | "groupActivities" | "pinBusy" | "pinnedExpanded" | "pinnedItems" | "setChatSearchJump" | "setGroupActivityViewedId" | "setNotice" | "setPinnedExpanded" | "t" | "toggleMessagePin">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]> };
 export default function PinnedItemsPanel({ activeConversation, nextChatSearchJumpRevision, groupActivities, pinBusy, pinnedExpanded, pinnedItems, setChatSearchJump, setGroupActivityViewedId, setNotice, setPinnedExpanded, t, toggleMessagePin }: Props) {
  return <>

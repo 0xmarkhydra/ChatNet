@@ -61,4 +61,39 @@ describe('chat pin session isolation', () => {
     expect(mocked.listPins).toHaveBeenCalledTimes(1)
     await act(async () => root.unmount())
   })
+
+  it('does not unlock a new session pin request when an old one settles', async () => {
+    const finish: Array<(response: { ok: boolean }) => void> = []
+    mocked.setMessagePinned.mockImplementation(() => new Promise(resolve => { finish.push(resolve) }))
+    const sessionRef = { current: { sessionId: 'old' } }
+    const deps = {
+      session: { sessionId: 'old', token: 'token-old' },
+      sessionRef,
+      activeConversationId: 12,
+      activeConversationIdRef: { current: 12 },
+      apiFetch: vi.fn(), setConversations: vi.fn(),
+      refreshConversations: vi.fn(async () => {}), setNotice: vi.fn(),
+    } as unknown as Parameters<typeof useChatPins>[0]
+    let toggle!: ReturnType<typeof useChatPins>['toggleMessagePin']
+    const root = createRoot(document.createElement('div'))
+    function Harness() {
+      const pins = useChatPins(deps)
+      useEffect(() => { toggle = pins.toggleMessagePin }, [pins.toggleMessagePin])
+      return null
+    }
+    await act(async () => root.render(createElement(Harness)))
+    let oldTask!: Promise<void>
+    await act(async () => { oldTask = toggle({ id: 1, conversationId: 12 } as Message) })
+    sessionRef.current = { sessionId: 'new' }
+    deps.session = { sessionId: 'new', token: 'token-new' } as typeof deps.session
+    await act(async () => root.render(createElement(Harness)))
+    let newTask!: Promise<void>
+    await act(async () => { newTask = toggle({ id: 1, conversationId: 12 } as Message) })
+    expect(finish).toHaveLength(2)
+    await act(async () => { finish[0]({ ok: false }); await oldTask })
+    await act(async () => { await toggle({ id: 1, conversationId: 12 } as Message) })
+    expect(finish).toHaveLength(2)
+    await act(async () => { finish[1]({ ok: false }); await newTask })
+    await act(async () => root.unmount())
+  })
 })

@@ -8,7 +8,7 @@ import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import { isDesktopBuild } from "../../../platform/desktop";
 import VoiceRecorder from "./VoiceRecorder";
 import { shouldSendChatOnEnter } from "../utils/composerKeyboard";
-import type { ChatSectionProps } from "./ChatSection";
+import type { ChatSectionProps } from "./ChatSectionProps";
 
 type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "chatFileInputRef" | "groupChannels" | "isProfileDesktop" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo" | "t">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]> };
 
