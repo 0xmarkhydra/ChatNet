@@ -70,11 +70,16 @@ export function useMessageData({
 
   useEffect(() => {
     if (!session?.token || !activeConversationId || !translationPreferencesLoaded) {
-      if (!activeConversationId) setMessages([])
+      if (!activeConversationId || !session?.token) setMessages([])
       return
     }
 
     let cancelled = false
+    gapPagingBusy.current = false
+    messagesPagingBusy.current = false
+    setMessageGapLoading(false)
+    setMessagesLoadingMore(false)
+    pendingMessageScrollRestore.current = null
     const changes = new Set<number>()
     resetMessageChanges(changes)
     setTranslations({})
@@ -149,7 +154,8 @@ export function useMessageData({
         const read = activeConversationType === 'group'
           ? await markChannelRead(apiFetch, activeConversationId, activeChannelId)
           : await markConversationRead(apiFetch, activeConversationId)
-        if (!read.ok || cancelled) return
+        if (!read.ok || cancelled || sessionRef.current?.sessionId !== session.sessionId ||
+          activeConversationIdRef.current !== activeConversationId || activeChannelIdRef.current !== activeChannelId) return
         refreshDesktopUnread()
         if (activeConversationType === 'group') {
           window.dispatchEvent(new CustomEvent('chatnet:channel-read',{detail:{conversationId:activeConversationId,channelId:activeChannelId}}))
@@ -174,6 +180,7 @@ export function useMessageData({
     activeChannelId,
     activeConversationType,
     session?.token,
+    session?.sessionId,
     targetLanguage,
     translationPreferencesLoaded,
     jumpToMessage?.revision,
@@ -243,9 +250,10 @@ export function useMessageData({
       if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
         setNotice('Không tải được đoạn tin nhắn ở giữa. Hãy thử lại.', 'error')
     } finally {
-      gapPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId && activeChannelIdRef.current === activeChannelId) {
+        gapPagingBusy.current = false
         setMessageGapLoading(false)
+      }
     }
   }
 
@@ -284,9 +292,10 @@ export function useMessageData({
       if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
         setNotice('Không tải được tin nhắn cũ. Hãy thử lại.', 'error')
     } finally {
-      messagesPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId && activeChannelIdRef.current === activeChannelId) {
+        messagesPagingBusy.current = false
         setMessagesLoadingMore(false)
+      }
     }
   }
 
