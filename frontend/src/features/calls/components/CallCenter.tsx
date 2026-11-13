@@ -9,7 +9,7 @@ import UserAvatar from '../../../shared/ui/UserAvatar'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
 import { CallHeaderActions } from './CallManager'
 import { getCallHistory, type CallHistoryEntry, type CallRequest } from '../lib/calls'
-import { formatDuration, latestCallDuration } from '../utils/call-history'
+import { callOutcome, formatCallDate, formatDuration, latestCallDuration } from '../utils/call-history'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/call-center.css'
 
@@ -34,15 +34,6 @@ const ENABLE_KEY = 'chatnet.call.translation.autostart.v1'
 const LANGUAGE_KEY = 'chatnet.call.target-language.v1'
 const CAPTION_KEY = 'chatnet.call.subtitle-mode.v1'
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
-}
-function outcome(entry: CallHistoryEntry, userId: number) {
-  if (entry.createdBy !== userId && !entry.joined && !entry.declined) return 'Gọi nhỡ'
-  if (entry.declined) return 'Đã từ chối'
-  if (entry.joined && entry.startedAt) return entry.createdBy === userId ? 'Đã gọi' : 'Đã nhận'
-  return 'Không kết nối'
-}
 
 export default function CallCenter({ request, userId, token, conversations, targetLanguage, directoryContent, directoryQuery, onDirectoryQueryChange, onDirectoryOpen, onNavigate, onOpenChat, embedded = false }: Props) {
   const requestRef = useLatest(request)
@@ -57,6 +48,11 @@ export default function CallCenter({ request, userId, token, conversations, targ
   const [error, setError] = useState('')
   const [refreshId, setRefreshId] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
+  const [isMobileLayout, setIsMobileLayout] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches)
+  const detailPanelRef = useRef<HTMLElement>(null)
+  const detailCloseRef = useRef<HTMLButtonElement>(null)
+  const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
   const [autoTranslation, setAutoTranslation] = useState(() => localStorage.getItem(ENABLE_KEY) === 'true')
   const [language, setLanguage] = useState(() => localStorage.getItem(LANGUAGE_KEY) || targetLanguage.split('-')[0] || 'vi')
   const [captionMode, setCaptionMode] = useState(() => localStorage.getItem(CAPTION_KEY) || 'both')
@@ -98,8 +94,51 @@ export default function CallCenter({ request, userId, token, conversations, targ
     return () => { cancelled = true }
   }, [requestRef, token])
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 760px)')
+    const updateLayout = () => {
+      setIsMobileLayout(mediaQuery.matches)
+      if (!mediaQuery.matches) setMobileDetailsOpen(false)
+    }
+    updateLayout()
+    mediaQuery.addEventListener('change', updateLayout)
+    return () => mediaQuery.removeEventListener('change', updateLayout)
+  }, [])
+
+  const closeMobileDetails = () => {
+    setMobileDetailsOpen(false)
+    selectedTriggerRef.current?.focus()
+  }
+
+  useEffect(() => {
+    if (!isMobileLayout || !mobileDetailsOpen) return
+    detailCloseRef.current?.focus()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMobileDetailsOpen(false)
+        selectedTriggerRef.current?.focus()
+      }
+      if (event.key === 'Tab') {
+        const focusable = detailPanelRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+        )
+        if (!focusable?.length) return
+        if (event.shiftKey && document.activeElement === focusable[0]) {
+          event.preventDefault()
+          focusable[focusable.length - 1].focus()
+        } else if (!event.shiftKey && document.activeElement === focusable[focusable.length - 1]) {
+          event.preventDefault()
+          focusable[0].focus()
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isMobileLayout, mobileDetailsOpen])
+
   const conversationMap = useMemo(() => new Map(conversations.map((item) => [item.id, item])), [conversations])
-  const missed = (item: CallHistoryEntry) => outcome(item, userId) === 'Gọi nhỡ'
+  const missed = (item: CallHistoryEntry) => callOutcome(item, userId) === 'Gọi nhỡ'
   const month = new Date().getMonth()
   const year = new Date().getFullYear()
   const monthCount = entries.filter((item) => {
@@ -132,6 +171,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
     }
   }
   const showView = (next: View) => {
+    setMobileDetailsOpen(false)
     if (next === 'directory' && view !== 'settings' && view !== 'directory') onDirectoryOpen()
     if (view === 'directory' && next !== 'directory' && next !== 'settings') onDirectoryQueryChange('')
     if (next === 'settings' && view !== 'settings') previousViewRef.current = view
@@ -205,31 +245,47 @@ export default function CallCenter({ request, userId, token, conversations, targ
                   const isMissed = missed(entry)
                   const duration = formatDuration(entry)
                   return (
-                    <button type="button" key={entry.id} className={'call-history-item' + (selected?.id === entry.id ? ' selected' : '')} onClick={() => setSelectedId(entry.id)} aria-pressed={selected?.id === entry.id}>
+                    <button type="button" key={entry.id} className={'call-history-item' + (selected?.id === entry.id && (!isMobileLayout || mobileDetailsOpen) ? ' selected' : '')} onClick={(event) => {
+                      setSelectedId(entry.id)
+                      if (isMobileLayout) {
+                        selectedTriggerRef.current = event.currentTarget
+                        setMobileDetailsOpen(true)
+                      }
+                    }} aria-pressed={selected?.id === entry.id && (!isMobileLayout || mobileDetailsOpen)}>
                       <UserAvatar name={conversation?.name || 'Cuộc trò chuyện'} username={conversation?.otherUsername} group={entry.isGroup} className="call-history-avatar" />
-                      <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {outcome(entry, userId)}{' · ' + duration}</small></span>
-                      <span className="call-history-time">{formatDate(entry.createdAt)}</span>
+                      <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {callOutcome(entry, userId)}{' · ' + duration}</small></span>
+                      <span className="call-history-time">{formatCallDate(entry.createdAt)}</span>
                       {isMissed ? <PhoneMissed size={19} className="call-history-icon" /> : entry.createdBy === userId ? <PhoneOutgoing size={19} className="call-history-icon" /> : <PhoneIncoming size={19} className="call-history-icon" />}
                     </button>
                   )
                 })}
                 <small className="call-center-limit">Hiển thị tối đa 100 cuộc gọi gần nhất mà bạn có quyền truy cập.</small>
               </section>
-              <aside className="call-history-details call-center-card">
-                <h2>Chi tiết cuộc gọi</h2>
+              {isMobileLayout && mobileDetailsOpen && <button type="button" tabIndex={-1} className="call-detail-scrim" onClick={closeMobileDetails} aria-label="Đóng chi tiết cuộc gọi" />}
+              <aside
+                ref={detailPanelRef}
+                className={'call-history-details call-center-card' + (isMobileLayout && mobileDetailsOpen ? ' is-open' : '')}
+                role={isMobileLayout && mobileDetailsOpen ? 'dialog' : undefined}
+                aria-modal={isMobileLayout && mobileDetailsOpen ? true : undefined}
+                aria-labelledby="call-detail-title"
+              >
+                <div className="call-detail-heading">
+                  <h2 id="call-detail-title">Chi tiết cuộc gọi</h2>
+                  <button type="button" ref={detailCloseRef} className="call-detail-close" onClick={closeMobileDetails} aria-label="Đóng chi tiết cuộc gọi"><X size={20} /></button>
+                </div>
                 {selected && !error ? (() => {
                   const conversation = conversationMap.get(selected.conversationId)
                   return <div className="call-detail-body">
                     <UserAvatar name={conversation?.name || 'Cuộc trò chuyện'} username={conversation?.otherUsername} group={selected.isGroup} className="call-detail-avatar" />
                     <h3>{conversation?.name || 'Cuộc trò chuyện #' + selected.conversationId}</h3>
-                    <p className={missed(selected) ? 'missed' : 'success'}>{selected.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {outcome(selected, userId)}</p>
+                    <p className={missed(selected) ? 'missed' : 'success'}>{selected.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {callOutcome(selected, userId)}</p>
                     <dl>
-                      <div><dt>Thời gian bắt đầu</dt><dd>{formatDate(selected.createdAt)}</dd></div>
+                      <div><dt>Thời gian bắt đầu</dt><dd>{formatCallDate(selected.createdAt)}</dd></div>
                       <div><dt>Thời lượng</dt><dd>{formatDuration(selected)}</dd></div>
                       <div><dt>Người tham gia</dt><dd>{selected.participantCount} người đã kết nối</dd></div>
                       <div><dt>Loại cuộc gọi</dt><dd>{selected.isGroup ? 'Cuộc gọi nhóm' : 'Cá nhân'}</dd></div>
                     </dl>
-                    {conversation ? <div className="call-detail-actions"><CallHeaderActions conversationId={selected.conversationId} /><button type="button" onClick={() => onOpenChat(selected.conversationId)}>Mở tin nhắn</button></div> : <p className="call-detail-unavailable">Tải cuộc trò chuyện tương ứng trong Tin nhắn để gọi lại.</p>}
+                    {conversation ? <div className="call-detail-actions"><CallHeaderActions conversationId={selected.conversationId} /><button type="button" aria-label="Mở tin nhắn" title="Mở tin nhắn" onClick={() => { setMobileDetailsOpen(false); onOpenChat(selected.conversationId) }}><MessageCircle className="call-detail-open-chat-icon" size={19} /><span className="call-detail-open-chat-label">Mở tin nhắn</span></button></div> : <p className="call-detail-unavailable">Tải cuộc trò chuyện tương ứng trong Tin nhắn để gọi lại.</p>}
                   </div>
                 })() : <div className="call-center-state"><Clock3 size={30} /><p>Chọn một cuộc gọi để xem chi tiết.</p></div>}
               </aside>
