@@ -58,6 +58,26 @@ describe("session keepalive", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores a late refresh result after the account changes", async () => {
+    let resolveRefresh!: (session: Session | null) => void;
+    const refresh = vi.fn(() => new Promise<Session | null>((resolve) => {
+      resolveRefresh = resolve;
+    }));
+    const setStatus = vi.fn();
+    const sessionRef = { current: { sessionId: "session-a" } } as unknown as RefObject<Session | null>;
+    const mounted = mountKeepalive("session-a", sessionRef, refresh, setStatus);
+    sessionRef.current = { sessionId: "session-b" } as Session;
+    await act(async () => {
+      resolveRefresh({ sessionId: "session-a" } as Session);
+      await Promise.resolve();
+    });
+    expect(mounted.check).not.toHaveBeenCalled();
+    act(() => window.dispatchEvent(new Event("online")));
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(setStatus).not.toHaveBeenCalled();
+    mounted.unmount();
+  });
+
   it("never refreshes an outdated session", () => {
     const refresh = vi.fn(async () => null);
     const sessionRef = { current: { sessionId: "session-b" } } as unknown as RefObject<Session | null>;
