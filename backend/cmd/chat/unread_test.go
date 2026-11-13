@@ -110,7 +110,7 @@ func TestUnreadAndExactLookupVisibilityIntegration(t *testing.T) {
 			t.Fatalf("actor %d: count %d want %d", actor, value.UnreadCount, want)
 		}
 	}
-	lookup := func(actor int, id int64, want int) {
+	lookup := func(actor int, id int64, want int, blockedByOther bool) {
 		t.Helper()
 		var values []conversation
 		if err := json.Unmarshal([]byte(request(actor, s.listConversations, fmt.Sprintf("/api/conversations?limit=1&id=%d", id))), &values); err != nil {
@@ -119,18 +119,21 @@ func TestUnreadAndExactLookupVisibilityIntegration(t *testing.T) {
 		if len(values) != want || (want == 1 && values[0].ID != id) {
 			t.Fatalf("wrong exact lookup: %+v", values)
 		}
+		if want == 1 && values[0].BlockedByOther != blockedByOther {
+			t.Fatalf("wrong blocked-by-other flag: %+v", values[0])
+		}
 	}
 	count(0, 3)
 	count(2, 2)
-	lookup(0, group, 1)
-	lookup(2, direct, 0)
+	lookup(0, group, 1, false)
+	lookup(2, direct, 0, false)
 	if _, err = db.Exec(ctx, "INSERT INTO user_blocks(blocker_id,blocked_id) VALUES($1,$2)", users[1], users[0]); err != nil {
 		t.Fatal(err)
 	}
 	count(0, 1)
 	count(2, 2)
-	lookup(0, direct, 0)
-	lookup(0, group, 1)
+	lookup(0, direct, 1, true)
+	lookup(0, group, 1, false)
 	if _, err = db.Exec(ctx, "UPDATE conversation_members SET last_read_message_id=(SELECT MAX(id) FROM messages WHERE conversation_id=$1) WHERE conversation_id=$1 AND user_id=$2", group, users[0]); err != nil {
 		t.Fatal(err)
 	}
@@ -139,5 +142,5 @@ func TestUnreadAndExactLookupVisibilityIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	count(2, 0)
-	lookup(2, group, 0)
+	lookup(2, group, 0, false)
 }
