@@ -58,6 +58,8 @@ import {
 } from "../features/chat/types";
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ROUTE, TAB_PATH, tabFromPath } from "./router/routes";
 import type {
   FriendSearchResult,
   FriendConnection,
@@ -361,7 +363,13 @@ export default function AuthedApp({
   const { autoTranslate, conversationTranslationOverrides, manuallyTranslated, setAutoTranslate, setConversationTranslationOverrides, setManuallyTranslated, setTargetLanguage, setTranslationFailures, setTranslationMenuOpen, setTranslationOriginals, setTranslationPending, setTranslations, targetLanguage, translationAttempted, translationFailures, translationLanguageRef, translationMenuOpen, translationOriginals, translationPending, translations } = useTranslationState({ session });
 
 
-  const [tab, setTab] = useState<Tab>("chat");
+  const routeLocation = useLocation();
+  const navigate = useNavigate();
+  const tab = tabFromPath(routeLocation.pathname, new URLSearchParams(routeLocation.search).get("tab"));
+  const setTab: Dispatch<SetStateAction<Tab>> = useCallback((next) => {
+    const nextTab = typeof next === "function" ? next(tab) : next;
+    if (TAB_PATH[nextTab] !== routeLocation.pathname) navigate(TAB_PATH[nextTab]);
+  }, [navigate, routeLocation.pathname, tab]);
   const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraftFile, storyBusy, storyDraftFile } = useFeedUiState({ tab });
 
   const tabRef = useRef(tab);
@@ -547,9 +555,12 @@ export default function AuthedApp({
     else setVisitorUsername(null);
   }
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
-  const [desktopSection, setDesktopSection] = useState<
+  const [desktopSectionState, setDesktopSection] = useState<
     "groups" | "calls" | null
   >(null);
+  const desktopSection = routeLocation.pathname === ROUTE.calls
+    ? "calls"
+    : desktopSectionState === "calls" ? null : desktopSectionState;
   const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);
   const [translationSettingsActiveConversationId, setTranslationSettingsActiveConversationId] = useState(activeConversationId);
   // Reset dialog state during render when the selected conversation changes,
@@ -558,7 +569,12 @@ export default function AuthedApp({
     setTranslationSettingsActiveConversationId(activeConversationId);
     setTranslationSettingsConversationId(null);
   }
-  const [desktopProfileSettings, setDesktopProfileSettings] = useState(false);
+  const desktopProfileSettings = routeLocation.pathname === ROUTE.settings;
+  const setDesktopProfileSettings: Dispatch<SetStateAction<boolean>> = (next) => {
+    const open = typeof next === "function" ? next(desktopProfileSettings) : next;
+    if (open && !desktopProfileSettings) navigate(ROUTE.settings);
+    if (!open && desktopProfileSettings) navigate(TAB_PATH.profile);
+  };
   const desktopProfileOverview = isProfileDesktop && !desktopProfileSettings;
   useEffect(() => {
     if (
@@ -642,22 +658,17 @@ export default function AuthedApp({
     if (feedViewRef.current) feedViewRef.current.scrollTop = 0;
     setSearchHasScrolled(false);
   }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN"), feedFilter]);
-  // The desktop comments view is a real in-app page with a shareable post URL.
-  // Popstate keeps the browser Back button in sync with the SPA.
+  // Router location is authoritative for browser Back/Forward on post URLs.
   useEffect(() => {
-    const onPopState = () => {
-      if (tabRef.current !== "feed") return;
-      const id = Number(new URLSearchParams(window.location.search).get("post"));
-      setActivePostId(Number.isSafeInteger(id) && id > 0 ? id : null);
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+    if (tab !== "feed") return;
+    const id = Number(new URLSearchParams(routeLocation.search).get("post"));
+    setActivePostId(Number.isSafeInteger(id) && id > 0 ? id : null);
+  }, [tab, routeLocation.search]);
   useEffect(() => {
     if (!session?.token) return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("tab") !== "feed") return;
-    setTab("feed");
+    const params = new URLSearchParams(routeLocation.search);
+    if (tab !== "feed" && params.get("tab") !== "feed") return;
+    if (tab !== "feed") setTab("feed");
     const id = Number(params.get("post"));
     if (!Number.isSafeInteger(id) || id <= 0) return;
     let cancelled = false;
@@ -689,7 +700,7 @@ export default function AuthedApp({
     return () => {
       cancelled = true;
     };
-  }, [session?.token]);
+  }, [session?.token, tab, routeLocation.search]);
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -2532,10 +2543,7 @@ export default function AuthedApp({
       setFeedCommunitiesOpen(false);
       setTab("feed");
       setActivePostId(post.id);
-      const url = new URL(window.location.href);
-      url.searchParams.set("tab", "feed");
-      url.searchParams.set("post", String(post.id));
-      window.history.pushState({ ...window.history.state, postId: post.id }, "", url);
+      navigate(`${TAB_PATH.feed}?post=${post.id}`, { state: { postId: post.id } });
       void readPostMention(mention.id);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Không mở được bài viết.", "error");
@@ -2554,10 +2562,8 @@ export default function AuthedApp({
     if (activePostId !== null) {
       setActivePostId(null);
       feedScrollBeforeComments.current = null;
-      const url = new URL(window.location.href);
-      if (url.searchParams.has("post")) {
-        url.searchParams.delete("post");
-        window.history.replaceState(window.history.state, "", url);
+      if (new URLSearchParams(routeLocation.search).has("post")) {
+        navigate({ pathname: routeLocation.pathname, search: "" }, { replace: true });
       }
     }
     if (nextTab === "feed") setFeedFilter("all");
@@ -2749,7 +2755,7 @@ export default function AuthedApp({
       onScanQr={() => setQrOpen("scan")}
       embeddedInCalls={tab === "chat" && desktopSection === "calls"}
       callConversations={tab === "chat" && desktopSection === "calls" ? displayConversations : undefined}
-      onOpenCallChat={(id) => { setDesktopSection(null); setActiveConversationId(id); }}
+      onOpenCallChat={(id) => { setDesktopSection(null); setActiveConversationId(id); navigate(TAB_PATH.chat); }}
     />
   );
 
@@ -2830,6 +2836,7 @@ export default function AuthedApp({
         onCalls={() => {
           switchTab("chat");
           setDesktopSection("calls");
+          navigate(ROUTE.calls, { replace: true });
         }}
         onSaved={() => {
           switchTab("feed");
@@ -3766,7 +3773,7 @@ export default function AuthedApp({
         tab={tab}
         t={t}
         switchTab={switchTab}
-        onCalls={() => { switchTab("chat"); setDesktopSection("calls"); }}
+        onCalls={() => { switchTab("chat"); setDesktopSection("calls"); navigate(ROUTE.calls, { replace: true }); }}
         callsActive={tab === "chat" && desktopSection === "calls"}
         unreadTotal={unreadTotal}
         pushEnabled={pushEnabled}
