@@ -25,6 +25,7 @@
     "check:adaptive-pwa": "node scripts/adaptive-pwa-check.mjs",
     "check:message-search": "node --experimental-strip-types scripts/message-search-check.mjs",
     "check:message-search-ui": "node scripts/message-search-zalo-ui-check.mjs",
+    "check:message-readers": "node --experimental-strip-types scripts/message-readers-check.mjs",
     "check:outbox": "node --experimental-strip-types scripts/chat-outbox-check.mjs",
     "check:offline-browser": "node scripts/p0-02-offline-browser-check.mjs",
     "check:media": "node --experimental-strip-types scripts/media-upload-check.mjs",

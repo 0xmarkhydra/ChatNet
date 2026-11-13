@@ -5,7 +5,8 @@ import { formatTime } from "../../../shared/utils/format";
 import { MessageReadersInline } from "./MessageReadersDialog";
 import { getMessageTranslationView } from "../utils/messageTranslationPresentation";
 import { messageReactionLabel } from "../utils/messageReactions";
-import { Fragment } from "react";
+import { getLatestDirectDelivery, getLatestGroupReaderIdsByMessage } from "../utils/messageReaders";
+import { Fragment, useMemo } from "react";
 import { GroupActivityMarker } from "./GroupActivities";
 import { messageTextParts, messageLinkHref } from "../lib/messageClipboard";
 import LinkPreview from "./LinkPreview";
@@ -17,9 +18,20 @@ import type { Message } from "../types";
 type Props = Omit<Pick<ChatSectionProps, "activeChatTranslationSettings" | "activeConversation" | "activeConversationId" | "apiFetch" | "beginMessageLongPress" | "bottomRef" | "cancelMessageLongPress" | "chatOnline" | "chatOutbox" | "conversationBlocked" | "effectiveAutoTranslate" | "effectiveTargetLanguage" | "groupActivities" | "hasMoreMessages" | "languageOptions" | "loadMissingMessages" | "loadOlderMessages" | "manuallyTranslated" | "messageGapBefore" | "messageGapLoading" | "messageInputRef" | "setMessageScrollAtBottom" | "messagesLoadingMore" | "messagesScrollRef" | "moveMessageLongPress" | "openMessageActions" | "openMessageReactions" | "onReactionUsers" | "onForwardMessage" | "reactionPreviews" | "retryQueuedChatMessages" | "selectedChannelId" | "session" | "setGroupActivityViewedId" | "setManuallyTranslated" | "setReplyingTo" | "setTranslationOriginals" | "sortedGroupActivityEvents" | "suppressMessageClick" | "t" | "translateMessage" | "translationFailures" | "translationOriginals" | "translationPending" | "translations" | "updateChatOutbox" | "visibleMessages">, "activeConversation"> & {
   activeConversation: NonNullable<ChatSectionProps["activeConversation"]>;
   messageReaderMembers: Array<{ id: number; username: string; displayName: string }>;
-  setReadersTarget: Dispatch<SetStateAction<{ message: Message; sessionId: string } | null>>;
+  setReadersTarget: Dispatch<SetStateAction<{ message: Message; readerIds: number[]; sessionId: string } | null>>;
 };
 export default function MessageTimeline({ activeChatTranslationSettings, activeConversation, activeConversationId, apiFetch, beginMessageLongPress, bottomRef, cancelMessageLongPress, chatOnline, chatOutbox, conversationBlocked, effectiveAutoTranslate, effectiveTargetLanguage, groupActivities, hasMoreMessages, languageOptions, loadMissingMessages, loadOlderMessages, manuallyTranslated, messageGapBefore, messageGapLoading, messageInputRef, setMessageScrollAtBottom, messagesLoadingMore, messagesScrollRef, moveMessageLongPress, openMessageActions, openMessageReactions, onReactionUsers, onForwardMessage, reactionPreviews, retryQueuedChatMessages, selectedChannelId, session, setGroupActivityViewedId, setManuallyTranslated, setReplyingTo, setTranslationOriginals, sortedGroupActivityEvents, suppressMessageClick, t, translateMessage, translationFailures, translationOriginals, translationPending, translations, updateChatOutbox, visibleMessages, messageReaderMembers, setReadersTarget }: Props) {
+  const latestDirectDelivery = useMemo(() => (
+    activeConversation.type === 'direct' && activeConversation.otherUserId !== undefined
+      ? getLatestDirectDelivery(visibleMessages, session.user.id, activeConversation.otherUserId)
+      : null
+  ), [activeConversation, session.user.id, visibleMessages]);
+  const groupReaderIdsByMessage = useMemo(() => (
+    activeConversation.type === 'group'
+      ? getLatestGroupReaderIdsByMessage(visibleMessages, session.user.id, messageReaderMembers)
+      : new Map<number, number[]>()
+  ), [activeConversation, messageReaderMembers, session.user.id, visibleMessages]);
+
   return (
     <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
                     const element = event.currentTarget
@@ -44,6 +56,9 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                         : messageDay.toDateString() === yesterday.toDateString() ? 'Hôm qua'
                           : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(messageDay)
                       const mine = message.senderId === session.user.id
+                      const groupReaderIds = activeConversation.type === 'group' && mine
+                        ? groupReaderIdsByMessage.get(message.id) || []
+                        : []
                       const translatedText = !message.deleted ? translations[message.id] : ''
                       const photoOnly = !message.deleted && !message.text && message.attachments?.length === 1 && message.attachments[0].kind === 'image' && Boolean(message.attachments[0].url)
                       const originalVisible = Boolean(translationOriginals[message.id])
@@ -251,11 +266,14 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                           <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
                             {formatTime(message.createdAt)}
                             {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
-                            {mine && (message.readByUserIds?.length || 0) > 0
+                            {activeConversation.type === 'direct' && mine && !message.deleted && latestDirectDelivery?.messageId === message.id
+                              ? <span className="chat-message-delivery-status"> · {latestDirectDelivery.status === 'read' ? 'Đã xem' : 'Đã gửi'}</span>
+                              : ''}
+                            {activeConversation.type === 'group' && mine && groupReaderIds.length > 0
                               ? <MessageReadersInline
-                                  readerIds={message.readByUserIds || []}
+                                  readerIds={groupReaderIds}
                                   members={messageReaderMembers}
-                                  onOpen={() => setReadersTarget({ message, sessionId: session.sessionId })}
+                                  onOpen={() => setReadersTarget({ message, readerIds: groupReaderIds, sessionId: session.sessionId })}
                                 />
                               : ''}
                           </div>
