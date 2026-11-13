@@ -53,6 +53,8 @@ export function useChatPins({
   }
 
   useEffect(() => {
+    pending.current.clear()
+    setPinBusy(false)
     refreshSequence.current += 1
     setPinnedMessages([])
     setPinScope(null)
@@ -64,6 +66,7 @@ export function useChatPins({
     if (!sessionRef.current || activeConversationIdRef.current !== conversationId) return
     const key = `message:${message.id}`
     if (pending.current.has(key)) return
+    const sessionId = sessionRef.current.sessionId
     const currentlyPinned = pinnedMessages.some((pin) => pin.message.id === message.id)
     pending.current.add(key)
     setPinBusy(true)
@@ -76,13 +79,16 @@ export function useChatPins({
         const data = await response.json().catch(() => ({})) as { error?: string }
         throw new Error(data.error || 'Không cập nhật được ghim tin nhắn')
       }
+      if (sessionRef.current?.sessionId !== sessionId) return
       await refreshPinnedMessages(conversationId)
-      setNotice(currentlyPinned ? 'Đã bỏ ghim tin nhắn.' : 'Đã ghim tin nhắn.', 'success')
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+        setNotice(currentlyPinned ? 'Đã bỏ ghim tin nhắn.' : 'Đã ghim tin nhắn.', 'success')
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim tin nhắn.', 'error')
+      if (sessionRef.current?.sessionId === sessionId)
+        setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim tin nhắn.', 'error')
     } finally {
       pending.current.delete(key)
-      setPinBusy(pending.current.size > 0)
+      if (sessionRef.current?.sessionId === sessionId) setPinBusy(pending.current.size > 0)
     }
   }
 
@@ -109,10 +115,11 @@ export function useChatPins({
         setNotice(currentlyPinned ? 'Đã bỏ ghim cuộc trò chuyện.' : 'Đã ghim cuộc trò chuyện.', 'success')
       }
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim hội thoại.', 'error')
+      if (sessionRef.current?.sessionId === sessionId)
+        setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim hội thoại.', 'error')
     } finally {
       pending.current.delete(key)
-      setPinBusy(pending.current.size > 0)
+      if (sessionRef.current?.sessionId === sessionId) setPinBusy(pending.current.size > 0)
     }
   }
 
