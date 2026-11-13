@@ -5,6 +5,7 @@ import 'chat_screen.dart';
 import 'contacts_screen.dart';
 import 'discover_screen.dart';
 import 'feed_screen.dart';
+import 'groups_screen.dart';
 import 'localization.dart';
 import 'notification_sheet.dart';
 import 'profile_qr.dart';
@@ -12,7 +13,7 @@ import 'profile_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-enum SocoTab { chat, contacts, discover, feed, profile }
+enum SocoTab { chat, contacts, groups, discover, feed, profile }
 
 class HomeShell extends StatefulWidget {
   const HomeShell({
@@ -32,21 +33,29 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   SocoTab tab = SocoTab.chat;
+  final Set<SocoTab> openedTabs = {SocoTab.chat};
   String search = '';
   bool conversationOpen = false;
   Json? requestedConversation;
   int createChatRequest = 0;
+  int composeFeedRequest = 0;
+  int unreadTotal = 0;
+  final searchFocusNode = FocusNode();
   final contentKey = GlobalKey();
   late final TextEditingController searchController = TextEditingController();
 
   List<NavigationDestination> destinations(BuildContext context) => [
     NavigationDestination(
       icon: const SocoIcon(SocoIconType.chat),
-      label: tr(context, 'nav.chat'),
+      label: 'Tin nhắn',
     ),
     NavigationDestination(
       icon: const SocoIcon(SocoIconType.contacts),
       label: tr(context, 'nav.contacts'),
+    ),
+    const NavigationDestination(
+      icon: Icon(Icons.groups_2_outlined),
+      label: 'Nhóm',
     ),
     NavigationDestination(
       icon: const SocoIcon(SocoIconType.discover),
@@ -67,19 +76,22 @@ class _HomeShellState extends State<HomeShell> {
       tab = SocoTab.values[index];
       search = '';
       searchController.clear();
-      if (tab != SocoTab.chat) conversationOpen = false;
+      // Keep the chat detail state when switching tabs; hide its nav on return.
     });
   }
 
   String get hint => switch (tab) {
     SocoTab.chat => 'Tìm cuộc trò chuyện',
     SocoTab.contacts => 'Tên, @username hoặc email',
+    SocoTab.groups => '',
     SocoTab.feed => 'Tìm tác giả hoặc nội dung',
     SocoTab.discover => 'Tìm địa điểm quanh đây',
     SocoTab.profile => '',
   };
 
   Widget _screens() {
+    // Mount each tab on first visit; keep its scroll/form state afterward.
+    openedTabs.add(tab);
     return IndexedStack(
       index: tab.index,
       children: [
@@ -89,54 +101,71 @@ class _HomeShellState extends State<HomeShell> {
           query: tab == SocoTab.chat ? search : '',
           requestedConversation: requestedConversation,
           createRequest: createChatRequest,
+          foreground: tab == SocoTab.chat,
+          onUnreadChanged: (count) {
+            if (mounted && count != unreadTotal) {
+              setState(() => unreadTotal = count);
+            }
+          },
           onConversationChanged: (value) {
             if (conversationOpen != value && mounted) {
               setState(() => conversationOpen = value);
             }
           },
         ),
-        ContactsScreen(
-          key: const ValueKey('contacts'),
-          api: widget.api,
-          query: tab == SocoTab.contacts ? search : '',
-          onOpenConversation: (room) {
-            setState(() {
-              requestedConversation = room;
-              tab = SocoTab.chat;
-              search = '';
-              searchController.clear();
-            });
-          },
-          onAddFriend: () {
-            setState(() {
-              tab = SocoTab.chat;
-              createChatRequest++;
-            });
-          },
-          onCreateGroup: () {
-            setState(() {
-              tab = SocoTab.chat;
-              createChatRequest++;
-            });
-          },
-        ),
-        DiscoverScreen(
-          key: const ValueKey('discover'),
-          api: widget.api,
-          query: tab == SocoTab.discover ? search : '',
-        ),
-        FeedScreen(
-          key: const ValueKey('feed'),
-          api: widget.api,
-          query: tab == SocoTab.feed ? search : '',
-        ),
-        ProfileScreen(
-          key: const ValueKey('profile'),
-          api: widget.api,
-          onLogout: widget.onLogout,
-          onConnect: _connectProfile,
-          onLocaleChanged: widget.onLocaleChanged,
-        ),
+        if (openedTabs.contains(SocoTab.contacts))
+          ContactsScreen(
+            key: const ValueKey('contacts'),
+            api: widget.api,
+            query: tab == SocoTab.contacts ? search : '',
+            onOpenConversation: (room) {
+              setState(() {
+                requestedConversation = room;
+                tab = SocoTab.chat;
+                search = '';
+                searchController.clear();
+              });
+            },
+            onAddFriend: _focusContactSearch,
+            onCreateGroup: () => setState(() => tab = SocoTab.groups),
+          )
+        else
+          const SizedBox.shrink(),
+        if (openedTabs.contains(SocoTab.groups))
+          GroupsScreen(
+            key: const ValueKey('groups'),
+            api: widget.api,
+            onOpenConversation: _openConversation,
+          )
+        else
+          const SizedBox.shrink(),
+        if (openedTabs.contains(SocoTab.discover))
+          DiscoverScreen(
+            key: const ValueKey('discover'),
+            api: widget.api,
+            query: tab == SocoTab.discover ? search : '',
+          )
+        else
+          const SizedBox.shrink(),
+        if (openedTabs.contains(SocoTab.feed))
+          FeedScreen(
+            key: const ValueKey('feed'),
+            api: widget.api,
+            query: tab == SocoTab.feed ? search : '',
+            composeRequest: composeFeedRequest,
+          )
+        else
+          const SizedBox.shrink(),
+        if (openedTabs.contains(SocoTab.profile))
+          ProfileScreen(
+            key: const ValueKey('profile'),
+            api: widget.api,
+            onLogout: widget.onLogout,
+            onConnect: _connectProfile,
+            onLocaleChanged: widget.onLocaleChanged,
+          )
+        else
+          const SizedBox.shrink(),
       ],
     );
   }
@@ -212,13 +241,13 @@ class _HomeShellState extends State<HomeShell> {
         IconButton(
           tooltip: 'Tạo bài viết',
           style: style,
-          onPressed: () {},
+          onPressed: () => setState(() => composeFeedRequest++),
           icon: const SocoIcon(SocoIconType.compose, size: 27),
         ),
         IconButton(
           tooltip: 'Thông báo',
           style: style,
-          onPressed: () => showNotificationSheet(context, widget.api),
+          onPressed: _openNotifications,
           icon: const SocoIcon(SocoIconType.bell, size: 27),
         ),
       ];
@@ -228,17 +257,18 @@ class _HomeShellState extends State<HomeShell> {
         IconButton(
           tooltip: 'Thêm bạn',
           style: style,
-          onPressed: () {
-            setState(() {
-              tab = SocoTab.chat;
-              createChatRequest++;
-            });
-          },
+          onPressed: _focusContactSearch,
           icon: const SocoIcon(SocoIconType.plus, size: 31),
         ),
       ];
     }
     return [
+      IconButton(
+        tooltip: 'Thông báo',
+        style: style,
+        onPressed: _openNotifications,
+        icon: const SocoIcon(SocoIconType.bell, size: 26),
+      ),
       IconButton(
         tooltip: 'Quét QR',
         style: style,
@@ -265,6 +295,7 @@ class _HomeShellState extends State<HomeShell> {
       height: compact ? 41 : 46,
       child: TextField(
         controller: searchController,
+        focusNode: searchFocusNode,
         onChanged: (value) => setState(() => search = value),
         decoration: InputDecoration(
           hintText: hint,
@@ -318,8 +349,34 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  void _openConversation(Json room) {
+    setState(() {
+      requestedConversation = room;
+      tab = SocoTab.chat;
+      search = '';
+      searchController.clear();
+    });
+  }
+
+  void _focusContactSearch() {
+    setState(() => tab = SocoTab.contacts);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) searchFocusNode.requestFocus();
+    });
+  }
+
+  void _openNotifications() {
+    showNotificationSheet(
+      context,
+      widget.api,
+      onOpenConversation: _openConversation,
+      onOpenInvitations: () => setState(() => tab = SocoTab.contacts),
+    );
+  }
+
   @override
   void dispose() {
+    searchFocusNode.dispose();
     searchController.dispose();
     super.dispose();
   }
@@ -358,7 +415,10 @@ class _HomeShellState extends State<HomeShell> {
                   ),
                   child: Column(
                     children: [
-                      if (_showsHeader) _header(compact),
+                      // Zalo-style conversation detail owns its own compact header.
+                      if (_showsHeader &&
+                          !(compact && tab == SocoTab.chat && conversationOpen))
+                        _header(compact),
                       Expanded(
                         child: KeyedSubtree(key: contentKey, child: _screens()),
                       ),
@@ -378,7 +438,7 @@ class _HomeShellState extends State<HomeShell> {
     final items = destinations(context);
     return Container(
       key: const ValueKey('bottom-navigation'),
-      height: compact ? 58 : 66,
+      height: compact ? 66 : 70,
       decoration: const BoxDecoration(
         color: Color(0xFFFEFEFF),
         border: Border(top: BorderSide(color: socoLine)),
@@ -399,43 +459,85 @@ class _HomeShellState extends State<HomeShell> {
                       onTap: () => _select(index),
                       child: Center(
                         child: Container(
-                          height: compact ? 48 : 52,
+                          height: compact ? 60 : 62,
                           margin: EdgeInsets.symmetric(
                             horizontal: compact ? 3 : 8,
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: tab.index == index
-                                ? const Color(0xFFE5EDFF)
-                                : Colors.transparent,
+                            color: Colors.transparent,
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              if (tab.index == index)
-                                const Positioned(
-                                  top: 0,
-                                  child: SizedBox(
-                                    width: 28,
-                                    child: Divider(
-                                      height: 3,
-                                      thickness: 3,
-                                      color: socoBlue,
-                                    ),
-                                  ),
-                                ),
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  IconTheme(
-                                    data: IconThemeData(
+                                  Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      IconTheme(
+                                        data: IconThemeData(
+                                          color: tab.index == index
+                                              ? socoBlue
+                                              : const Color(0xFF8792A8),
+                                          size: compact ? 24 : 26,
+                                        ),
+                                        child: items[index].icon,
+                                      ),
+                                      if (index == SocoTab.chat.index &&
+                                          unreadTotal > 0)
+                                        Positioned(
+                                          top: -7,
+                                          right: -11,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 2,
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 17,
+                                              minHeight: 17,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF04452),
+                                              borderRadius:
+                                                  BorderRadius.circular(11),
+                                              border: Border.all(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              unreadTotal > 99
+                                                  ? '99+'
+                                                  : '$unreadTotal',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w800,
+                                                height: 1,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    items[index].label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: compact ? 9.5 : 11,
+                                      fontWeight: tab.index == index
+                                          ? FontWeight.w800
+                                          : FontWeight.w500,
                                       color: tab.index == index
                                           ? socoBlue
                                           : const Color(0xFF8792A8),
-                                      size: compact ? 25 : 26,
                                     ),
-                                    child: items[index].icon,
                                   ),
                                 ],
                               ),

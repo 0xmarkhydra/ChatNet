@@ -467,6 +467,15 @@ class UserAvatar extends StatelessWidget {
                       child: Image.network(
                         resolvedImageUrl,
                         fit: BoxFit.cover,
+                        // Avatars are tiny; avoid decoding full-resolution photos.
+                        cacheWidth:
+                            (size * MediaQuery.devicePixelRatioOf(context))
+                                .ceil()
+                                .clamp(1, 512),
+                        cacheHeight:
+                            (size * MediaQuery.devicePixelRatioOf(context))
+                                .ceil()
+                                .clamp(1, 512),
                         errorBuilder: (_, _, _) => Center(
                           child: Text(
                             initials,

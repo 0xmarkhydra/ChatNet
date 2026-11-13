@@ -10,10 +10,16 @@ import 'theme.dart';
 import 'widgets.dart';
 
 class FeedScreen extends StatefulWidget {
-  const FeedScreen({super.key, required this.api, required this.query});
+  const FeedScreen({
+    super.key,
+    required this.api,
+    required this.query,
+    this.composeRequest = 0,
+  });
 
   final Api api;
   final String query;
+  final int composeRequest;
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
@@ -42,6 +48,16 @@ class _FeedScreenState extends State<FeedScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant FeedScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.composeRequest != oldWidget.composeRequest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) postFocusNode.requestFocus();
+      });
+    }
   }
 
   Future<void> _load() async {
