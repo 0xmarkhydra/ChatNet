@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { Ban, Bell, BellOff, ChevronRight, Camera, MoreHorizontal, Plus, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
+
 import type { GroupActivityKind } from './GroupActivities'
 import type { Conversation } from '../types'
 import type { GroupChannel } from '../utils/groupChannels'
 import type { GroupManagementSection } from './GroupSettingsPanel'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import ConversationAvatar from './ConversationAvatar'
+
 import GroupAvatarEditor, { type GroupPhotoTarget } from './GroupAvatarEditor'
 import ConversationSharedPreview from './ConversationSharedPreview'
 import GroupChannelControls from './GroupChannelControls'
@@ -56,12 +58,9 @@ export default function ConversationDetailsPanel({
   const displayName = isChannel ? channel.name : conversation.name
   const displayAvatar = isChannel ? channel.avatarUrl : conversation.avatarUrl
   const blocked = !isGroup && Boolean(conversation.blockedByMe || conversation.blockedByOther)
-  const [photoTarget, setPhotoTarget] = useState<GroupPhotoTarget | null>(null)
-  const [creatingChannel, setCreatingChannel] = useState(false)
-  useEffect(() => {
-    setPhotoTarget(null)
-    setCreatingChannel(false)
-  }, [conversation.id])
+  const [creatingChannel, setCreatingChannel] = useScopedState(conversation.id, false)
+  const [photoTarget, setPhotoTarget] = useScopedState<GroupPhotoTarget | null>(conversation.id, null)
+
 
   return (
     <aside className="conversation-info-panel social-chat-details" id="conversation-details-panel" aria-label="Thông tin hội thoại">
@@ -79,6 +78,7 @@ export default function ConversationDetailsPanel({
             {isChannel
               ? <UserAvatar name={displayName} className="conversation-info-panel-avatar social-chat-details-avatar" group imageUrl={displayAvatar} />
               : <ConversationAvatar conversation={conversation} className="conversation-info-panel-avatar social-chat-details-avatar" />}
+
             {canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
               aria-label={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'} title={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'}
               onClick={() => setPhotoTarget({ name: displayName, avatarUrl: displayAvatar,
@@ -143,7 +143,7 @@ export default function ConversationDetailsPanel({
                 {conversation.muted ? 'Bật thông báo nhóm' : 'Tắt thông báo nhóm'}
               </button>
             </>}
-            <GroupChannelControls key={channel.id} groupId={conversation.id}
+            <GroupChannelControls key={`${conversation.id}:${channel.id}`} groupId={conversation.id}
               groupName={conversation.name} channel={channel} userId={userId}
               canEdit={canEditGroupPhotos} canLeave={canLeaveGroup}
               scope={isChannel ? 'channel' : 'group'} hideGroupNotification

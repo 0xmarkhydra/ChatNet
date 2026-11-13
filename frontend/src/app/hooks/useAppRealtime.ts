@@ -7,7 +7,8 @@ import { attachmentLabel } from '../../shared/utils/format'
 import { mergeById } from '../../shared/utils/optimistic'
 import { canMarkConversationRead } from '../../features/chat/utils/conversationRead'
 import { clearPendingSend, loadPendingSend } from '../../features/chat/lib/chatPersistence'
-import type { Message, MessageDraft, RealtimeEvent } from '../../features/chat/types'
+import type { Message, MessageDraft } from '../../features/chat/types'
+import { parseRealtimeEvent } from './parseRealtimeEvent'
 import type { IncomingMessageSound } from '../../features/notifications/lib/incomingSound'
 import type { AppDataContext } from '../../shared/types/api'
 import type { Tab } from '../../shared/types/navigation'
@@ -28,7 +29,6 @@ type Options = Omit<AppDataContext, 'setNotice'> &
     expireSession: () => void
     checkSession: () => Promise<boolean>
     purgeConversation: (id: number) => void
-    groupSettingsOpen: boolean
     activeConversationIdRef: RefObject<number | null>
     activeChannelIdRef: RefObject<number>
     activeConversationTypeRef: RefObject<'group' | 'direct' | null>
@@ -71,7 +71,6 @@ export function useAppRealtime({
   membershipSnapshot,
   membershipEventSequence,
   membershipSyncSequence,
-  groupSettingsOpen,
   activeConversationIdRef,
   activeChannelIdRef,
   activeConversationTypeRef,
@@ -92,23 +91,26 @@ export function useAppRealtime({
   onMessageConfirmed,
 }: Options) {
   useEffect(() => {
-    if (!session?.token) return
+    if (!session?.token || sessionRef.current?.sessionId !== session.sessionId) return
 
     void refreshConversations()
     void refreshPosts()
     void refreshStories()
 
+    let active = true
     let lastSSECheckAt = 0
     const events = new EventSource(
       `${API}/api/events?token=${encodeURIComponent(session.token)}`,
     )
     events.onopen = () => {
+      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
       lastSSECheckAt = Date.now()
       setStatus('Đang online')
       void refreshFriendConnections()
       void reconcileConversationMemberships()
     }
     events.onerror = () => {
+      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
       setStatus('Đang kết nối lại...')
       if (Date.now() - lastSSECheckAt < 30_000) return
       lastSSECheckAt = Date.now()
@@ -117,11 +119,12 @@ export function useAppRealtime({
       }
     }
     events.addEventListener('session-revoked', () => {
-      if (sessionRef.current?.sessionId === session.sessionId) expireSession()
+      if (active && sessionRef.current?.sessionId === session.sessionId) expireSession()
     })
     events.addEventListener('update', (event) => {
-      if (sessionRef.current?.sessionId !== session.sessionId) return
-      const update = JSON.parse((event as MessageEvent).data) as RealtimeEvent
+      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
+      const update = parseRealtimeEvent((event as MessageEvent).data)
+      if (!update) return
       if (['message', 'conversation.read', 'conversation.created', 'conversation.removed', 'privacy.updated'].includes(update.type)) refreshDesktopUnread()
       if (update.type === 'privacy.updated' || update.type === 'conversation.removed') clearDesktopNotifications(session.sessionId)
       if (update.type === 'privacy.updated') {
@@ -245,12 +248,26 @@ export function useAppRealtime({
         const incoming = update.message
         if (activeConversationTypeRef.current === 'group' && activeConversationIdRef.current === incoming.conversationId)
           window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'message',message:incoming}}))
-        // Only genuine, recent messages from other users make a sound. Loading
-        // history, updating reactions and our own sends never trigger one.
-        const viewingDesktopChat = isDesktopBuild && document.hasFocus() && document.visibilityState === 'visible' &&
-          tabRef.current === 'chat' && activeConversationIdRef.current === incoming.conversationId &&
-          (activeConversationTypeRef.current !== 'group' || activeChannelIdRef.current === (incoming.channelId || 0))
-        messageSound.current?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current && !viewingDesktopChat)
+        // SSE delivers live events only. Message timestamps can be skewed
+        // relative to the device clock, so do not use createdAt to gate sound.
+        // Loading history, reaction updates and our own sends stay silent.
+        // Background browser tabs may alert after Web Audio is unlocked.
+        // Desktop uses native sound in the background, avoiding a double chime.
+        const localSoundAllowed = !isDesktopBuild ||
+          (document.visibilityState === 'visible' && document.hasFocus())
+        const sound = messageSound.current
+        sound?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current && localSoundAllowed)
+        // Local-only diagnostics distinguish muted/own/duplicate messages
+        // and unavailable AudioContext without logging private data.
+        if (import.meta.env.DEV) {
+          const diagnostic = sound?.getDiagnostic()
+          console.info('[ChatNet incoming sound]', {
+            result: diagnostic?.result ?? 'audio-not-initialized',
+            audioState: diagnostic?.audioState ?? 'not-initialized',
+            enabled: messageSoundEnabledRef.current,
+            fromAnotherAccount: incoming.senderId !== session.user.id,
+          })
+        }
         notifyDesktopMessage(session, incoming)
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
@@ -324,29 +341,34 @@ export function useAppRealtime({
                   body: JSON.stringify({ channelId: activeChannelIdRef.current }) }
               : { method: 'POST' })
               .then(response => {
-                if (response.ok && group)
+                if (active && sessionRef.current?.sessionId === session.sessionId && response.ok && group)
                   window.dispatchEvent(new CustomEvent('chatnet:channel-read',{detail:{
                     conversationId:update.conversationId, channelId:incoming.channelId || 0,
                   }}))
               })
-              .catch(() => setStatus('Đang kết nối lại...'))
+              .catch(() => {
+                if (active && sessionRef.current?.sessionId === session.sessionId) setStatus('Đang kết nối lại...')
+              })
           }
         }
       }
     })
 
     const refreshTimer = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return
+      if (!active || sessionRef.current?.sessionId !== session.sessionId || document.visibilityState !== 'visible') return
       void refreshConversations()
       void refreshFriendConnections()
       refreshCategoryConversations()
     }, 20000)
     const membershipTimer = window.setInterval(() => {
+      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
       void reconcileConversationMemberships()
     }, 90000)
-    const checkMembership = () => { void reconcileConversationMemberships() }
+    const checkMembership = () => {
+      if (active && sessionRef.current?.sessionId === session.sessionId) void reconcileConversationMemberships()
+    }
     const checkVisibleMembership = () => {
-      if (document.visibilityState === 'visible') {
+      if (active && sessionRef.current?.sessionId === session.sessionId && document.visibilityState === 'visible') {
         checkMembership()
         void refreshConversations()
         refreshCategoryConversations()
@@ -356,6 +378,7 @@ export function useAppRealtime({
     window.addEventListener('online', checkMembership)
     document.addEventListener('visibilitychange', checkVisibleMembership)
     return () => {
+      active = false
       events.close()
       window.clearInterval(refreshTimer)
       window.clearInterval(membershipTimer)
@@ -363,6 +386,6 @@ export function useAppRealtime({
       document.removeEventListener('visibilitychange', checkVisibleMembership)
       membershipSyncSequence.current += 1
     }
-  }, [session?.token, groupSettingsOpen])
+  }, [session?.token, session?.sessionId])
 
 }

@@ -40,9 +40,6 @@ export default function GroupChannelControls({
 
   useEffect(() => {
     const ctrl = new AbortController()
-    setGroupNotifications(null)
-    setChannelMuted(null)
-    setError('')
     const base = '/api/conversations/' + groupId
     async function load(path: string) {
       const response = await request(path, { signal: ctrl.signal, cache: 'no-store' })

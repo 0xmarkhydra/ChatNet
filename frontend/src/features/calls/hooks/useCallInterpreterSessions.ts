@@ -60,7 +60,10 @@ export function useCallInterpreterSessions({ room, phase, translationOn, callId,
         else { interpreters.current.set(id, session) }
       } catch (error) {
         if (!cancelled) setTranslationError(error instanceof Error ? error.message : 'Không thể bật phiên dịch.')
-      } finally { interpreterPending.current.delete(id) }
+      } finally {
+        // Cleanup already transferred ownership to the next call effect.
+        if (!cancelled) interpreterPending.current.delete(id)
+      }
     }))
     return () => { cancelled = true; stopAll(); setTranslatingIds([]) }
   // Stable stream IDs and consent data are the only topology dependencies.

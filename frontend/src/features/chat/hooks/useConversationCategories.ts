@@ -21,6 +21,7 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
  const offset = useRef(0)
  const flight = useRef(false)
  const mutation = useRef(false)
+ const mutationSequence = useRef(0)
  const current = useRef({ apiFetch, mergeConversations, setCategory, clearCategory })
  current.current = { apiFetch, mergeConversations, setCategory, clearCategory }
 
@@ -59,7 +60,7 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
    setItems(previous => more ? [...previous, ...data.filter(c => !previous.some(p => p.id === c.id))] : data)
    current.current.mergeConversations(data)
   } catch (e) {
-   if (sessionRef.current?.sessionId === sessionId && seq === sequence.current) setListError(e instanceof Error ? e.message : 'Không tải được hội thoại.')
+   if (sessionRef.current?.sessionId === sessionId && seq === sequence.current && category === selectedRef.current) setListError(e instanceof Error ? e.message : 'Không tải được hội thoại.')
   } finally {
    if (seq === sequence.current) { flight.current = false; setLoading(false) }
   }
@@ -83,6 +84,7 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
   const sessionId = sessionRef.current?.sessionId
   if (!sessionId) return false
   mutation.current = true
+  const writeSequence = ++mutationSequence.current
   setBusy(true)
   setError('')
   try {
@@ -97,8 +99,10 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
    if (sessionRef.current?.sessionId === sessionId) setError(e instanceof Error ? e.message : 'Không lưu được phân loại. Hãy tải lại để kiểm tra.')
    return false
   } finally {
-   mutation.current = false
-   if (sessionRef.current?.sessionId === sessionId) setBusy(false)
+   if (writeSequence === mutationSequence.current) {
+    mutation.current = false
+    if (sessionRef.current?.sessionId === sessionId) setBusy(false)
+   }
   }
  }
 
@@ -131,6 +135,8 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
  useEffect(() => {
   ++sequence.current
   ++categorySequence.current
+  ++mutationSequence.current
+  mutation.current = false
   selectedRef.current = null
   offset.current = 0
   flight.current = false

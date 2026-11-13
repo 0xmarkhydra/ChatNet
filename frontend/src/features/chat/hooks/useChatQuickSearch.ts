@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ApiRequest } from '../../../shared/types/api'
 import type { Conversation } from '../types'
 import { useLatest } from '../../../shared/hooks/useLatest'
@@ -44,11 +44,11 @@ export function useChatQuickSearch({
     key: '', results: empty, loading: false, error: '',
   })
   const [retry, setRetry] = useState(0)
+  const requestKey = key ? JSON.stringify([key, retry]) : ''
 
   useEffect(() => {
     if (!key) return
     const controller = new AbortController()
-    setState({ key, results: empty, loading: true, error: '' })
     const timer = window.setTimeout(async () => {
       try {
         const response = await requestRef.current('/api/chat/search?q=' + encodeURIComponent(query), {
@@ -56,20 +56,20 @@ export function useChatQuickSearch({
         })
         if (!response.ok) throw new Error('Không thể tìm kiếm')
         const results = (await response.json()) as ChatQuickResults
-        if (!controller.signal.aborted) setState({ key, results, loading: false, error: '' })
+        if (!controller.signal.aborted) setState({ key: requestKey, results, loading: false, error: '' })
       } catch {
         if (!controller.signal.aborted) {
-          setState({ key, results: empty, loading: false, error: 'Không tải được kết quả tìm kiếm.' })
+          setState({ key: requestKey, results: empty, loading: false, error: 'Không tải được kết quả tìm kiếm.' })
         }
       }
     }, 500)
     return () => { window.clearTimeout(timer); controller.abort() }
-  }, [key, query, requestRef, retry])
+  }, [key, query, requestRef, requestKey])
 
   return {
-    results: state.key === key ? state.results : empty,
-    loading: Boolean(key) && (state.key !== key || state.loading),
-    error: state.key === key ? state.error : '',
+    results: state.key === requestKey ? state.results : empty,
+    loading: Boolean(key) && (state.key !== requestKey || state.loading),
+    error: state.key === requestKey ? state.error : '',
     retry: () => setRetry(n => n + 1),
   }
 }

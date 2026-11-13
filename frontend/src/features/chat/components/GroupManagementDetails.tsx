@@ -40,8 +40,8 @@ export default function GroupManagementDetails({ conversationId, section, canEdi
 
   useEffect(() => {
     const ctrl = new AbortController()
-    setLoading(true)
-    setError('')
+    // GroupSettingsPanel keys this component by conversation and section.
+    // Initial loading/error state already applies to each new mount.
     const load = section === 'details' || section === 'rules'
       ? getCommunity
       : section === 'notifications'

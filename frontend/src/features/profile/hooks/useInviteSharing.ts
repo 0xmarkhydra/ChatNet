@@ -20,7 +20,7 @@ export function useInviteSharing({
   setQuickCreateOpen,
   setTab,
 }: UseInviteSharingDeps) {
-  const { session } = useSession();
+  const { session, sessionRef } = useSession();
   const { setNotice } = useNotice();
   function connectUrl(username = session?.user.username || "") {
     const url = new URL(window.location.href);
@@ -38,6 +38,8 @@ export function useInviteSharing({
   }
   async function shareMyProfile() {
     if (!session?.user.username) return;
+    const sessionId = session.sessionId;
+    const isCurrentSession = () => sessionRef.current?.sessionId === sessionId;
     const url = connectUrl(session.user.username);
     const shareData = {
       title: `Kết nối với @${session.user.username} trên SocCO`,
@@ -50,19 +52,21 @@ export function useInviteSharing({
         return;
       }
       await navigator.clipboard.writeText(url);
-      setNotice("Đã sao chép link hồ sơ SocCO.", "success");
+      if (isCurrentSession()) setNotice("Đã sao chép link hồ sơ SocCO.", "success");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      setNotice("Không thể chia sẻ hồ sơ trên thiết bị này.", "error");
+      if (isCurrentSession()) setNotice("Không thể chia sẻ hồ sơ trên thiết bị này.", "error");
     }
   }
   async function copyInviteLink() {
     if (!session?.user.username) return;
+    const sessionId = session.sessionId;
+    const isCurrentSession = () => sessionRef.current?.sessionId === sessionId;
     try {
       await navigator.clipboard.writeText(connectUrl(session.user.username));
-      setNotice("Đã sao chép link kết nối SocCO.", "success");
+      if (isCurrentSession()) setNotice("Đã sao chép link kết nối SocCO.", "success");
     } catch {
-      setNotice("Không sao chép được link trên trình duyệt này.", "error");
+      if (isCurrentSession()) setNotice("Không sao chép được link trên trình duyệt này.", "error");
     }
   }
 

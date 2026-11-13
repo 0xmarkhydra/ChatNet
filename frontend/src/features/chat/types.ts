@@ -52,6 +52,7 @@ export type Conversation = {
   avatarUrl?: string
   avatarMembers?: string[]
   muted?: boolean
+
   lastMessage: string
   lastMessageAt?: string
   online: boolean

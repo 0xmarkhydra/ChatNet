@@ -136,7 +136,7 @@ export function useFriendActions({
   async function declineFriendRequest(friend: FriendConnection) {
     await actOnFriend(friend, true);
   }
-  async function removeAcceptedFriend(friend: FriendConnection) {
+  async function removeAcceptedFriend(friend: FriendSearchResult, options?: { keepProfileOpen?: boolean }) {
     const sessionId = session?.sessionId;
     if (
       !sessionId ||
@@ -166,7 +166,7 @@ export function useFriendActions({
         setFriends((current) =>
           current.filter((item) => item.id !== friend.id),
         );
-        setFriendPreview(null);
+        if (!options?.keepProfileOpen) setFriendPreview(null);
         setNotice("Đã hủy kết bạn");
       }
       await refreshFriendConnections();

@@ -2,6 +2,8 @@
 
 Read this project policy and the relevant local skills before editing code.
 
+**Frontend mandatory policy (all AI agents and human contributors):** `docs/engineering/FRONTEND_STANDARDS.md`. Read it before any `frontend/` change; follow `docs/FRONTEND_STRUCTURE.md` for the directory map. New code must not copy legacy architecture or React Hooks violations. No unreviewed baseline increases or CI bypasses.
+
 ## Product and implementation context
 - Phase 1 delivers **Web and PWA**. Do not add native iOS/Android release work without an explicit request; preserve existing mobile source and compatibility.
 - Current stack: React + TypeScript + Vite/PWA frontend; Go services, PostgreSQL and Redis backend. Inspect actual modules, APIs and configuration before choosing an approach.

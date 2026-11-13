@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { loadPrivacy } from "../api/privacy";
 import type { UserPrivacy } from "../../profile/types";
 import { type Session } from "../../auth/lib/session";
+import { useLatest } from "../../../shared/hooks/useLatest";
+import { useScopedState } from "../../../shared/hooks/useScopedState";
 
 export type UsePrivacySettingsDeps = {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
@@ -12,10 +14,14 @@ export function usePrivacySettings({
   apiFetch,
   session,
 }: UsePrivacySettingsDeps) {
-  const [privacy, setPrivacy] = useState<UserPrivacy | null>(null);
-  const [privacyBusy, setPrivacyBusy] = useState(false);
-  const [privacyLoading, setPrivacyLoading] = useState(false);
-  const [privacyError, setPrivacyError] = useState("");
+  // Reset synchronously on a session change; callbacks from an old visit
+  // cannot expose that account's settings or overwrite the current account.
+  const scope = JSON.stringify([session?.sessionId || "", session?.token || ""]);
+  const [privacy, setPrivacy] = useScopedState<UserPrivacy | null>(scope, null);
+  const apiFetchRef = useLatest(apiFetch);
+  const [privacyBusy, setPrivacyBusy] = useScopedState(scope, false);
+  const [privacyLoading, setPrivacyLoading] = useScopedState(scope, false);
+  const [privacyError, setPrivacyError] = useScopedState(scope, "");
   const [privacyRetry, setPrivacyRetry] = useState(0);
   useEffect(() => {
     if (!session?.token) {
@@ -30,7 +36,7 @@ export function usePrivacySettings({
     setPrivacyBusy(false);
     setPrivacyLoading(true);
     setPrivacyError("");
-    loadPrivacy(apiFetch, controller.signal)
+    loadPrivacy(apiFetchRef.current, controller.signal)
       .then(async (response) => {
         if (!response.ok) throw new Error("Không thể tải quyền riêng tư.");
         return response.json() as Promise<UserPrivacy>;
@@ -46,7 +52,7 @@ export function usePrivacySettings({
         if (!controller.signal.aborted) setPrivacyLoading(false);
       });
     return () => controller.abort();
-  }, [session?.sessionId, privacyRetry]);
+  }, [session?.sessionId, session?.token, privacyRetry, apiFetchRef, setPrivacy, setPrivacyBusy, setPrivacyError, setPrivacyLoading]);
 
   return {
     privacy,

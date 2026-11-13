@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useScopedState } from "../../../shared/hooks/useScopedState";
 import { type ConversationTranslationSettingsMap, readConversationTranslationSettings } from "../lib/conversationTranslationSettings";
 import { type Session } from "../../auth/lib/session";
 
@@ -10,12 +11,12 @@ export function useTranslationState({
   session,
 }: UseTranslationStateDeps) {
   const [translations, setTranslations] = useState<Record<number, string>>({});
-  const [translationOriginals, setTranslationOriginals] = useState<
-    Record<number, boolean>
-  >({});
-  const [manuallyTranslated, setManuallyTranslated] = useState<Record<number, boolean>>({});
-  const [translationPending, setTranslationPending] = useState<Record<number, boolean>>({});
-  const [translationFailures, setTranslationFailures] = useState<Record<number, boolean>>({});
+  const [targetLanguage, setTargetLanguage] = useState("en");
+  const translationScope = JSON.stringify([session?.sessionId ?? null, targetLanguage]);
+  const [translationOriginals, setTranslationOriginals] = useScopedState<Record<number, boolean>>(translationScope, {});
+  const [manuallyTranslated, setManuallyTranslated] = useScopedState<Record<number, boolean>>(translationScope, {});
+  const [translationPending, setTranslationPending] = useScopedState<Record<number, boolean>>(translationScope, {});
+  const [translationFailures, setTranslationFailures] = useScopedState<Record<number, boolean>>(translationScope, {});
   const translationAttempted = useRef(new Set<string>());
   const [translationMenuOpen, setTranslationMenuOpen] = useState(false);
   useEffect(() => {
@@ -38,15 +39,10 @@ export function useTranslationState({
       document.removeEventListener("keydown", onEscape);
     };
   }, [translationMenuOpen]);
-  const [targetLanguage, setTargetLanguage] = useState("en");
   const translationLanguageRef = useRef(targetLanguage);
   useEffect(() => {
     translationAttempted.current.clear();
-    setManuallyTranslated({});
-    setTranslationPending({});
-    setTranslationFailures({});
-    setTranslationOriginals({});
-  }, [session?.sessionId, targetLanguage]);
+  }, [translationScope]);
   const [autoTranslate, setAutoTranslate] = useState(true);
   const [conversationTranslationOverrides, setConversationTranslationOverrides] = useState<ConversationTranslationSettingsMap>(
     () => session?.user.id ? readConversationTranslationSettings(session.user.id) : {},

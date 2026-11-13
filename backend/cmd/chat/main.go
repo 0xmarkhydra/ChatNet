@@ -75,6 +75,7 @@ type conversation struct {
 	AvatarURL      string     `json:"avatarUrl,omitempty"`
 	AvatarMembers  []string   `json:"avatarMembers,omitempty"`
 	Muted          bool       `json:"muted"`
+
 	Online         bool       `json:"online"`
 	CreatedAt      time.Time  `json:"createdAt"`
 }
@@ -666,6 +667,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
              COALESCE((SELECT NOT p.message_notifications AND NOT p.mention_notifications
                FROM group_notification_preferences p
                WHERE p.conversation_id=c.id AND p.user_id=$1),FALSE)
+
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
@@ -716,6 +718,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		var groupAvatarRef string
 		var lastMessageAt time.Time
 		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef, &c.AvatarMembers, &c.Muted); err != nil {
+
 			continue
 		}
 		c.MemberCount = int(memberCount)

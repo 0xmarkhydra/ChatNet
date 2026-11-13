@@ -21,6 +21,7 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
  const alive = useRef(false)
  const seq = useRef(0)
  const writing = useRef(false)
+ const mutationRevision = useRef(0)
  const [now,setNow] = useState(() => Date.now())
  useEffect(()=>{
   const timer=window.setInterval(()=>setNow(Date.now()),30_000)
@@ -39,7 +40,8 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
   }catch(e){if(alive.current&&version===seq.current){setNote(null);setLoaded(true);setError(e instanceof Error?e.message:'Không tải được ghi chú.')}}
  }
  useEffect(()=>{
-  alive.current=true;setNote(null);setLoaded(false);setError('');setDraft('');setConfirm(false)
+  ++mutationRevision.current
+  alive.current=true;writing.current=false;setBusy(false);setNote(null);setLoaded(false);setError('');setDraft('');setConfirm(false)
   void load()
   const visible=()=>{if(document.visibilityState==='visible'&&!writing.current)void load()}
   document.addEventListener('visibilitychange',visible)
@@ -52,15 +54,16 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
  },[note?.expiresAt])
  async function publishOrDelete(remove=false) {
   if(writing.current||(!remove&&(count<1||count>60)))return
+  const revision=++mutationRevision.current
   writing.current=true;setBusy(true);setError('');++seq.current
   try {
    const response=await (remove ? deleteProfileNote(api.current, currentNote?.version) : saveProfileNote(api.current, draft.trim(), visibility))
    const data=await response.json() as {note:Note|null;error?:string}
-   if(!alive.current)return
+   if(!alive.current||revision!==mutationRevision.current)return
    if(!response.ok)throw new Error(data.error||'Chưa lưu được ghi chú. Hãy tải lại để kiểm tra.')
    setNote(data.note);setLoaded(true);setDraft('');setConfirm(false);dialog.current?.close()
-  }catch(e){if(alive.current)setError(e instanceof Error?e.message:'Chưa lưu được ghi chú. Hãy tải lại để kiểm tra.')}
-  finally{writing.current=false;if(alive.current)setBusy(false)}
+  }catch(e){if(alive.current&&revision===mutationRevision.current)setError(e instanceof Error?e.message:'Chưa lưu được ghi chú. Hãy tải lại để kiểm tra.')}
+  finally{if(revision===mutationRevision.current){writing.current=false;if(alive.current)setBusy(false)}}
  }
  if(!owner&&!currentNote)return null
  return <span className="profile-note" onClick={e=>e.stopPropagation()}>
