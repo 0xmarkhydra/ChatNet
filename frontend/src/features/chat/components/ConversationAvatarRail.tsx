@@ -21,6 +21,8 @@ type Props = {
   hasMore: boolean
   loadingMore: boolean
   onLoadMore: () => Promise<void>
+  loadError: string
+  onRetry: () => Promise<void>
   searchValue: string
   searchControl?: ReactNode
   onSearchChange: (next: string) => void
@@ -37,7 +39,7 @@ type Props = {
 /** Mobile uses the same conversation avatar DOM in both sizes; only details reveal. */
 export default function ConversationAvatarRail({
   conversations, selectedId, expanded, onSelect, onCreate, onSearchCompact, onCollapse,
-  hasMore, loadingMore, onLoadMore, searchValue, searchControl, onSearchChange, controls, categoryControls, categories, visibleConversationIds,
+  hasMore, loadingMore, onLoadMore, loadError, onRetry, searchValue, searchControl, onSearchChange, controls, categoryControls, categories, visibleConversationIds,
   onEntryContextMenu, onEntryPointerDown, onEntryPointerMove, onEntryPointerEnd,
 }: Props) {
   const { open, setOpen, searchRef, filterRef, style } = useRailSearchPopover(expanded)
@@ -81,7 +83,10 @@ export default function ConversationAvatarRail({
       <div ref={filterRef} className="conversation-rail-floating-filters" style={style}>{controls}</div>,
       document.body)}
     <div className="conversation-avatar-rail-divider" aria-hidden="true" />
-      <div className="conversation-avatar-rail-scroll">
+      <div className="conversation-avatar-rail-scroll" onScroll={event => {
+      const { scrollTop, scrollHeight, clientHeight } = event.currentTarget
+      if (hasMore && !loadingMore && scrollHeight - scrollTop - clientHeight < 100) void onLoadMore()
+    }}>
         {items.map(conversation => (
           <button type="button" key={conversation.id}
             className={selectedId === conversation.id ? 'conversation-avatar-rail-item selected' : 'conversation-avatar-rail-item'}
@@ -119,7 +124,9 @@ export default function ConversationAvatarRail({
             )}
           </button>
         ))}
-        {items.length === 0 && expanded && <p className="conversation-avatar-rail-empty">Không có hội thoại phù hợp.</p>}
+        {loadError && expanded && <p className="conversation-avatar-rail-empty" role="alert">{loadError}</p>}
+        {loadError && <button type="button" className="conversation-avatar-rail-more" title="Không tải được hội thoại. Thử lại" aria-label="Thử tải lại các cuộc hội thoại" onClick={() => void onRetry()}><RefreshCw size={17} aria-hidden="true" /></button>}
+        {items.length === 0 && expanded && !loadError && <p className="conversation-avatar-rail-empty">Không có hội thoại phù hợp.</p>}
         {hasMore && (
           <button type="button" className="conversation-avatar-rail-more"
             title="Tải thêm cuộc trò chuyện" aria-label="Tải thêm cuộc trò chuyện"

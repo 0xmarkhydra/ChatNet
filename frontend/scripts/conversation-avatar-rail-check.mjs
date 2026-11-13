@@ -234,6 +234,79 @@ try {
     await context.close()
     console.log('PASS '+width+'px: one expanding rail → group → channel → direct → expand/collapse')
   }
+
+  // Regression: older groups must populate the NEW avatar rail even when the
+  // first 25 recent conversations contain only direct chats.
+  const historicalGroup = { ...chats[1], id: 900, name: 'Nhóm cũ của tôi' }
+  const historicalDirect = { ...chats[0], id: 901, name: 'Chat cá nhân cũ', otherUserId: 902, otherUsername: 'oldfriend' }
+  const recent = Array.from({ length: 25 }, (_, index) => ({
+    ...chats[0], id: 200 + index, name: 'Bạn ' + index,
+    otherUserId: 500 + index, otherUsername: 'user' + index,
+  }))
+  const desktop = await browser.newContext({
+    viewport: { width: 1366, height: 900 }, serviceWorkers: 'block',
+  })
+  await desktop.addInitScript(value => {
+    localStorage.setItem('chatnet-session', JSON.stringify(value))
+    window.EventSource = class { addEventListener() {} close() {} }
+  }, session)
+  const desktopPage = await desktop.newPage()
+  const desktopErrors = []
+  desktopPage.on('pageerror', error => desktopErrors.push(error.message))
+  let listUnavailable = true
+  let groupLookupCount = 0
+  await desktopPage.route(url => url.pathname.startsWith('/api/'), async route => {
+    const path = new URL(route.request().url()).pathname
+    const params = new URL(route.request().url()).searchParams
+    const json = (data, status = 200) =>
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
+    if (path === '/api/conversations') {
+      if (params.get('type') === 'group') {
+        groupLookupCount += 1
+        return json([historicalGroup])
+      }
+      return listUnavailable ? json({ error: 'query failed' }, 500)
+        : json(params.has('offset') ? [historicalDirect] : recent)
+    }
+    if (path === '/api/conversations/memberships')
+      return json({ ids: [...recent.map(chat => chat.id), historicalGroup.id].sort((a,b) => a-b), nextAfter: null })
+    if (path === '/api/conversations/900/channels')
+      return json(channels.map(channel => ({ ...channel, conversationId: 900 })))
+    if (path === '/api/conversation-categories') return json([])
+    if (path.startsWith('/api/conversations/') && path.endsWith('/messages')) return json([])
+    if (path.startsWith('/api/conversations/') && path.endsWith('/members')) return json([])
+    if (path === '/api/conversations/unread') return json({ unreadCount: 0 })
+    if (path === '/api/preferences' || path === '/api/preferences/translation')
+      return json({ targetLanguage:'vi', autoTranslate:false, appLocale:'vi' })
+    if (path === '/api/profile') return json({ username:'viewer', displayName:'Người xem' })
+    if (path === '/api/push/config') return json({ configured: false })
+    return json([])
+  })
+  await desktopPage.goto(origin)
+  const desktopRail = desktopPage.locator('.desktop-conversation-rail')
+  const retry = desktopRail.getByRole('button', { name: 'Thử tải lại các cuộc hội thoại' })
+  await retry.waitFor({ state: 'visible', timeout: 15000 })
+  assert.equal(await desktopRail.locator('.desktop-conversation-rail-entry').count(), 0,
+    'HTTP 500 must display retry instead of pretending there are no conversations')
+  listUnavailable = false
+  await retry.click()
+  await desktopRail.locator('.desktop-conversation-rail-entry[title="Nhóm cũ của tôi"]')
+    .waitFor({ state: 'visible', timeout: 15000 })
+  assert.equal(await desktopRail.locator('.desktop-conversation-rail-entry').count(), 26,
+    'old groups beyond the first 25 recent conversations must appear in the avatar rail')
+  assert.ok(groupLookupCount > 0, 'old group must come from the authorized group API')
+  await desktopRail.locator('.desktop-conversation-rail-scroller').evaluate(element => {
+    element.scrollTop = element.scrollHeight
+  })
+  await desktopRail.locator('.desktop-conversation-rail-entry[title="Chat cá nhân cũ"]')
+    .waitFor({ state: 'visible', timeout: 15000 })
+  assert.equal(await desktopRail.locator('.desktop-conversation-rail-entry').count(), 27,
+    'scrolling the rail must load old direct conversations from the next API page')
+  await desktopRail.locator('.desktop-conversation-rail-entry[title="Nhóm cũ của tôi"]').click()
+  await desktopPage.locator('.group-channel-sidebar').waitFor({ state: 'visible' })
+  assert.deepEqual(desktopErrors, [], 'no runtime errors when opening an older group')
+  await desktop.close()
+  console.log('PASS desktop: retry HTTP 500 → restore historical groups in avatar rail → open group')
 } finally {
   if(browser) await browser.close()
   vite.kill('SIGTERM')

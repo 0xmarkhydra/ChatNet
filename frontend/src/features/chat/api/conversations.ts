@@ -6,6 +6,10 @@ export function listConversations(request: ApiRequest, limit: number, offset?: n
   return request(`/api/conversations?limit=${limit}${offset === undefined ? "" : `&offset=${offset}`}`);
 }
 
+export function listGroupConversations(request: ApiRequest, limit: number, offset: number) {
+  return request(`/api/conversations?type=group&limit=${limit}&offset=${offset}`);
+}
+
 export function listConversationsByCategory(
   request: ApiRequest,
   { limit, category, offset, force }: { limit: number; category: number; offset: number; force: boolean },

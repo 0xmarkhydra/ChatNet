@@ -21,6 +21,8 @@ type Props = {
   hasMore: boolean
   loadingMore: boolean
   onLoadMore: () => Promise<void>
+  loadError: string
+  onRetry: () => Promise<void>
   searchValue: string
   onSearchChange: (next: string) => void
   controls: ReactNode
@@ -36,7 +38,7 @@ type Props = {
 /** One rail for all conversations. Expanding adds detail on the right without moving avatars. */
 export default function DesktopConversationRail({
   conversations, selectedId, expanded, onSelect, onCreate, onSearchCompact, onCollapse,
-  hasMore, loadingMore, onLoadMore, searchValue, onSearchChange, controls, categoryControls, categories, visibleConversationIds,
+  hasMore, loadingMore, onLoadMore, loadError, onRetry, searchValue, onSearchChange, controls, categoryControls, categories, visibleConversationIds,
   onEntryContextMenu, onEntryPointerDown, onEntryPointerMove, onEntryPointerEnd,
 }: Props) {
   const { open, setOpen, searchRef, filterRef, style } = useRailSearchPopover(expanded)
@@ -77,7 +79,10 @@ export default function DesktopConversationRail({
       <div ref={filterRef} className="conversation-rail-floating-filters" style={style}>{controls}</div>,
       document.body)}
     <div className="desktop-conversation-rail-divider" aria-hidden="true" />
-    <div className="desktop-conversation-rail-scroller">
+    <div className="desktop-conversation-rail-scroller" onScroll={event => {
+      const { scrollTop, scrollHeight, clientHeight } = event.currentTarget
+      if (hasMore && !loadingMore && scrollHeight - scrollTop - clientHeight < 100) void onLoadMore()
+    }}>
       {items.map(conversation => (
         <div key={conversation.id} className="desktop-conversation-rail-row">
         <button type="button" className={selectedId === conversation.id
@@ -115,7 +120,9 @@ export default function DesktopConversationRail({
         </button>
         </div>
       ))}
-      {items.length === 0 && expanded && <p className="desktop-conversation-rail-empty">Không có hội thoại phù hợp.</p>}
+      {loadError && expanded && <p className="desktop-conversation-rail-empty" role="alert">{loadError}</p>}
+      {loadError && <button type="button" className="desktop-conversation-rail-load" title="Không tải được hội thoại. Thử lại" aria-label="Thử tải lại các cuộc hội thoại" onClick={() => void onRetry()}><RefreshCw size={18} aria-hidden="true" /></button>}
+      {items.length === 0 && expanded && !loadError && <p className="desktop-conversation-rail-empty">Không có hội thoại phù hợp.</p>}
       {hasMore && <button type="button" className="desktop-conversation-rail-load"
         aria-label="Tải thêm hội thoại" title="Tải thêm hội thoại" disabled={loadingMore}
         onClick={() => void onLoadMore()}><RefreshCw size={18} aria-hidden="true" /></button>}
