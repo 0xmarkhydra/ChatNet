@@ -1,8 +1,8 @@
 {
-  "total": 102,
+  "total": 99,
   "byRule": {
     "react-hooks/exhaustive-deps": 64,
-    "react-hooks/set-state-in-effect": 38
+    "react-hooks/set-state-in-effect": 35
   },
   "counts": {
     "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
@@ -28,17 +28,14 @@
     "src/features/chat/components/VoiceRecorder.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/chat/hooks/useChatPins.ts|react-hooks/exhaustive-deps": 1,
     "src/features/chat/hooks/useChatPins.ts|react-hooks/set-state-in-effect": 1,
-    "src/features/chat/hooks/useChatQuickSearch.ts|react-hooks/set-state-in-effect": 1,
     "src/features/chat/hooks/useConversationCategories.ts|react-hooks/exhaustive-deps": 3,
     "src/features/chat/hooks/useConversationCategories.ts|react-hooks/set-state-in-effect": 1,
     "src/features/chat/hooks/useConversationListSearch.ts|react-hooks/exhaustive-deps": 1,
-    "src/features/chat/hooks/useConversationListSearch.ts|react-hooks/set-state-in-effect": 1,
     "src/features/chat/hooks/useDesktopNotifications.ts|react-hooks/exhaustive-deps": 1,
     "src/features/chat/hooks/useDesktopNotifications.ts|react-hooks/set-state-in-effect": 1,
     "src/features/chat/hooks/useGroupManagement.ts|react-hooks/set-state-in-effect": 1,
     "src/features/chat/hooks/useMessageData.ts|react-hooks/exhaustive-deps": 2,
     "src/features/chat/hooks/useMessageData.ts|react-hooks/set-state-in-effect": 1,
-    "src/features/chat/hooks/useTranslationState.ts|react-hooks/set-state-in-effect": 1,
     "src/features/discover/components/Marketplace.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/discover/components/Marketplace.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/discover/components/NearbyExplorer.tsx|react-hooks/set-state-in-effect": 1,
