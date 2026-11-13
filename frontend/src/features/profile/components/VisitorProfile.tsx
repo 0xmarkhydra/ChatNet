@@ -6,6 +6,7 @@ import type { Post } from '../../feed/types'
 import type { FriendSearchResult } from '../../contacts/types'
 import '../styles/visitor-profile.css'
 import { loadVisitorProfile, loadVisitorPosts, reactToVisitorPost } from '../api/profile'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 type Props = {
  username: string
@@ -37,6 +38,8 @@ export default function VisitorProfile({ username, request, currentUser, token, 
  const [retry,setRetry]=useState(0)
  const [likeBusy,setLikeBusy]=useState<Record<number,boolean>>({})
  const alive=useRef(true)
+ const latestToken=useLatest(token)
+ const latestClose=useLatest(onClose)
  const paging=useRef(false)
  const sequence=useRef(0)
  const previousUpdates=useRef(updates)
@@ -46,7 +49,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   alive.current=true
   const previous=document.activeElement instanceof HTMLElement?document.activeElement:null
   back.current?.focus()
-  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape' && !document.querySelector('.post-detail-backdrop') && !document.querySelector('.profile-note-dialog[open]'))onClose()}
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape' && !document.querySelector('.post-detail-backdrop') && !document.querySelector('.profile-note-dialog[open]'))latestClose.current()}
   document.addEventListener('keydown',escape)
   return ()=>{alive.current=false;sequence.current++;document.removeEventListener('keydown',escape);previous?.focus()}
  },[])
@@ -59,6 +62,8 @@ export default function VisitorProfile({ username, request, currentUser, token, 
  useEffect(()=>{
   const id=++sequence.current
   let cancelled=false
+  paging.current=false
+  setLikeBusy({})
   setProfile(null);setPosts([]);setError('');setLoading(true);setMore(false)
   async function load(){
    try {
@@ -77,31 +82,34 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   }
   void load()
   return ()=>{cancelled=true}
- },[username,retry])
+ },[username,token,retry])
  async function loadMore(){
   if(paging.current||!posts.length)return
   const id=sequence.current
+  const sessionToken=token
   paging.current=true;setLoading(true);setError('')
   try{
    const response=await loadVisitorPosts(request, username, posts[posts.length-1].id)
    if(!response.ok)throw new Error('Không tải được bài viết cũ.')
    const items=await response.json() as Post[]
-   if(!alive.current||id!==sequence.current)return
+   if(!alive.current||id!==sequence.current||latestToken.current!==sessionToken)return
    setPosts(current=>[...current,...items.filter(item=>!current.some(post=>post.id===item.id))]);setMore(items.length===15)
-  }catch(cause){if(alive.current&&id===sequence.current)setError(cause instanceof Error?cause.message:'Không tải được bài viết.')}
-  finally{paging.current=false;if(alive.current&&id===sequence.current)setLoading(false)}
+  }catch(cause){if(alive.current&&id===sequence.current&&latestToken.current===sessionToken)setError(cause instanceof Error?cause.message:'Không tải được bài viết.')}
+  finally{if(id===sequence.current&&latestToken.current===sessionToken){paging.current=false;if(alive.current)setLoading(false)}}
  }
  function update(post:Post){setPosts(current=>current.map(item=>item.id===post.id?post:item));onUpdated(post)}
  async function like(post:Post,emoji='👍'){
   if(likeBusy[post.id])return
+  const sessionToken=token
+  const id=sequence.current
   setLikeBusy(current=>({...current,[post.id]:true}))
   try{
    const response=await reactToVisitorPost(request, post.id, emoji)
    if(!response.ok)throw new Error('Không cập nhật được lượt thích.')
    const updated=await response.json() as Post
-   if(alive.current)update(updated)
-  }catch(cause){if(alive.current)feedback(cause instanceof Error?cause.message:'Không cập nhật được lượt thích.','error')}
-  finally{if(alive.current)setLikeBusy(current=>{const next={...current};delete next[post.id];return next})}
+   if(alive.current&&id===sequence.current&&latestToken.current===sessionToken)update(updated)
+  }catch(cause){if(alive.current&&id===sequence.current&&latestToken.current===sessionToken)feedback(cause instanceof Error?cause.message:'Không cập nhật được lượt thích.','error')}
+  finally{if(alive.current&&id===sequence.current&&latestToken.current===sessionToken)setLikeBusy(current=>{const next={...current};delete next[post.id];return next})}
  }
  const relation=profile?relationship(profile.id):'none'
  const previousRelation=useRef<string|null>(null)
@@ -131,7 +139,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   <header className="visitor-toolbar"><button ref={back} type="button" onClick={onClose} aria-label="Quay lại"><ArrowLeft size={21}/></button><strong>Trang cá nhân</strong><button type="button" onClick={()=>setRetry(n=>n+1)} disabled={loading} aria-label="Tải lại hồ sơ"><RefreshCw size={19}/></button></header>
   <div className="visitor-scroll"><div className="visitor-content">
    {profile&&<>
-    <VisitorProfileHero profile={profile} relation={relation} friendBusy={friendBusy} action={action} request={request} onMessage={onMessage} onFriendAction={() => { void onFriend(profile).catch(cause => { if (alive.current) feedback(cause instanceof Error ? cause.message : 'Không cập nhật được kết bạn.', 'error') }) }} />
+    <VisitorProfileHero profile={profile} relation={relation} friendBusy={friendBusy} action={action} request={request} onMessage={onMessage} onFriendAction={() => { const id = sequence.current; const sessionToken = token; void onFriend(profile).catch(cause => { if (alive.current && id === sequence.current && latestToken.current === sessionToken) feedback(cause instanceof Error ? cause.message : 'Không cập nhật được kết bạn.', 'error') }) }} />
     <div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
     <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={()=>onPostOpen(post)} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
