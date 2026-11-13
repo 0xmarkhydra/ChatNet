@@ -10,7 +10,7 @@ import { requireDesktopMedia } from '../../../platform/desktopMedia'
 import IncomingCallDialog from './IncomingCallDialog'
 import SecureCallRoom from './SecureCallRoom'
 import type { CallLaunchDetail } from './CallHeaderActions'
-import { notifyDesktopCall, dismissDesktopCall } from '../../chat/hooks/useDesktopNotifications'
+import { notifyDesktopCall, dismissDesktopCall } from '../../notifications/lib/desktopCallNotifications'
 import { friendlyCallError } from '../lib/callErrors'
 import '../styles/call.css'
 
@@ -39,6 +39,8 @@ export default function CallManager({
   const [error, setError] = useState('')
   const [incomingPermission, setIncomingPermission] = useState('')
   const requestRef = useRef(request)
+  const refreshGeneration = useRef(0)
+  const refreshSequence = useRef(0)
   requestRef.current = request
   const callRequest = useCallback<CallRequest>((path, init) => requestRef.current(path, init), [])
 
@@ -55,8 +57,12 @@ export default function CallManager({
   )
   const refresh = useCallback(async () => {
     if (!token) return
+    const generation = refreshGeneration.current
+    const sequence = ++refreshSequence.current
     try {
       const calls = await getCurrentCalls(callRequest)
+      // An older response must not undo a newer SSE refresh or a session change.
+      if (generation !== refreshGeneration.current || sequence !== refreshSequence.current) return
       const current = calls.find((item) => item.joined && (item.status === 'ringing' || item.status === 'active'))
       const ringing = calls.find((item) => item.incoming && (item.status === 'ringing' || item.status === 'active'))
       if (!active && current) setActive(current)
@@ -95,6 +101,7 @@ export default function CallManager({
     const onFocus = () => void refresh()
     window.addEventListener('focus', onFocus)
     return () => {
+      refreshGeneration.current += 1
       window.clearInterval(poll)
       window.removeEventListener('focus', onFocus)
       source.close()
