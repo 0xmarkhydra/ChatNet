@@ -30,13 +30,13 @@ export function useConversationListSearch({
   enabled: boolean
   request: ApiRequest
 }) {
+  const [retry, setRetry] = useState(0)
   const keyword = query.trim()
   const key = enabled && sessionId && keyword
-    ? JSON.stringify([sessionId, keyword, filter, categoryId])
+    ? JSON.stringify([sessionId, keyword, filter, categoryId, retry])
     : ''
   const requestRef = useLatest(request)
   const [state, setState] = useState<SearchState>(initialState)
-  const [retry, setRetry] = useState(0)
   const pageController = useRef<AbortController | null>(null)
   const pageBusy = useRef(false)
 
@@ -55,7 +55,6 @@ export function useConversationListSearch({
     const controller = new AbortController()
     pageController.current?.abort()
     pageBusy.current = false
-    setState({ ...initialState, key, loading: true })
     const timer = window.setTimeout(async () => {
       try {
         const response = await requestRef.current(path(0), {
@@ -82,7 +81,7 @@ export function useConversationListSearch({
       pageBusy.current = false
     }
     // The search key contains the query and all server-side filters.
-  }, [key, retry])
+  }, [key])
 
   async function loadMore() {
     if (!key || state.key !== key || state.loading || state.loadingMore ||

@@ -588,12 +588,16 @@ export default function AuthedApp({
     session?.user.username,
   ]);
   const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
-  const [postMentions, setPostMentions] = useState<PostMentionNotification[]>([]);
+  const [postMentionsState, setPostMentionsState] = useState<{
+    sessionId: string;
+    items: PostMentionNotification[];
+  } | null>(null);
+  const postMentions = session?.sessionId === postMentionsState?.sessionId
+    ? postMentionsState.items
+    : [];
   useEffect(() => {
-    if (!session?.sessionId) {
-      setPostMentions([]);
-      return;
-    }
+    if (!session?.sessionId) return;
+    const mentionSessionId = session.sessionId;
     let live = true;
     const controller = new AbortController();
     const refresh = async () => {
@@ -602,9 +606,12 @@ export default function AuthedApp({
         if (!response.ok) return;
         const items: unknown = await response.json();
         if (live && Array.isArray(items)) {
-          setPostMentions(items.filter((item): item is PostMentionNotification =>
-            item && Number.isSafeInteger(item.id) && Number.isSafeInteger(item.postId)
-            && typeof item.author === "string" && typeof item.createdAt === "string"));
+          setPostMentionsState({
+            sessionId: mentionSessionId,
+            items: items.filter((item): item is PostMentionNotification =>
+              item && Number.isSafeInteger(item.id) && Number.isSafeInteger(item.postId)
+              && typeof item.author === "string" && typeof item.createdAt === "string"),
+          });
         }
       } catch {
         // A temporary network outage must not clear already received alerts.
@@ -2515,8 +2522,13 @@ export default function AuthedApp({
     try {
       const response = await apiFetch(`/api/feed/mentions/${id}/read`, { method: "POST" });
       if (!response.ok) throw new Error("Không đánh dấu được thông báo.");
-      setPostMentions(current => current.map(item => item.id === id
-        ? { ...item, readAt: new Date().toISOString() } : item));
+      setPostMentionsState(current => current?.sessionId === session?.sessionId
+        ? {
+            ...current,
+            items: current.items.map(item => item.id === id
+              ? { ...item, readAt: new Date().toISOString() } : item),
+          }
+        : current);
     } catch {
       setNotice("Không đánh dấu được thông báo. Vui lòng thử lại.", "error");
     }
