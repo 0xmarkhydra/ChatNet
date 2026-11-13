@@ -222,11 +222,13 @@ export function useContactActions({
       if (sessionRef.current?.sessionId === sid)
         setNotice("Không thể lưu liên hệ. Hãy thử lại.", "error");
     } finally {
-      setFriendBusyIds((ids) => {
-        const nextIDs = new Set(ids);
-        nextIDs.delete(friend.id);
-        return nextIDs;
-      });
+      if (sessionRef.current?.sessionId === sid) {
+        setFriendBusyIds((ids) => {
+          const nextIDs = new Set(ids);
+          nextIDs.delete(friend.id);
+          return nextIDs;
+        });
+      }
     }
   }
   async function blockContact(friend: Pick<FriendSearchResult, 'id' | 'username' | 'displayName'>) {
@@ -280,11 +282,13 @@ export function useContactActions({
       if (sessionRef.current?.sessionId === sid)
         setNotice("Không thể chặn người dùng. Hãy thử lại.", "error");
     } finally {
-      setFriendBusyIds((old) => {
-        const next = new Set(old);
-        next.delete(friend.id);
-        return next;
-      });
+      if (sessionRef.current?.sessionId === sid) {
+        setFriendBusyIds((old) => {
+          const next = new Set(old);
+          next.delete(friend.id);
+          return next;
+        });
+      }
     }
   }
   async function reportContact(friend: FriendSearchResult | FriendConnection) {
@@ -438,8 +442,8 @@ export function useContactActions({
         await refreshFriendConnections();
       }
     } finally {
-      friendActionRef.current.delete(friend.id);
       if (sessionRef.current?.sessionId === sessionId) {
+        friendActionRef.current.delete(friend.id);
         setFriendBusyIds((current) => {
           const next = new Set(current);
           next.delete(friend.id);
