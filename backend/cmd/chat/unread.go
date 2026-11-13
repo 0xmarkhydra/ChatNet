@@ -28,6 +28,9 @@ func (s *server) unreadSummary(w http.ResponseWriter, r *http.Request) {
                 AND gcr.channel_id=COALESCE(m.channel_id,0)
             ),cm.last_read_message_id) ELSE cm.last_read_message_id END)
 		WHERE cm.user_id=$1 AND m.user_id<>$1
+		  AND (m.channel_id IS NULL OR EXISTS (
+		    SELECT 1 FROM group_channels active_channel
+		    WHERE active_channel.id=m.channel_id AND active_channel.deleted_at IS NULL))
 		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		    (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR
 		    (b.blocked_id=$1 AND b.blocker_id=m.user_id))

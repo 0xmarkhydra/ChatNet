@@ -6,7 +6,8 @@ import '../styles/group-avatar-editor.css'
 export type GroupPhotoTarget = {
   name: string
   avatarUrl?: string
-  kind?: 'group' | 'avatar' | 'cover'
+  kind?: 'group' | 'avatar' | 'cover' | 'channel'
+  channelId?: number
 }
 
 type Props = {
@@ -42,7 +43,7 @@ export default function GroupAvatarEditor({ target, busy, onSave, onClose }: Pro
   const [dragging, setDragging] = useState(false)
   const [imageError, setImageError] = useState(false)
 
-  const label = target.kind === 'cover' ? 'ảnh bìa' : target.kind === 'avatar' ? 'ảnh đại diện' : 'ảnh nhóm'
+  const label = target.kind === 'cover' ? 'ảnh bìa' : target.kind === 'avatar' ? 'ảnh đại diện' : target.kind === 'channel' ? 'ảnh kênh' : 'ảnh nhóm'
   const isCover = target.kind === 'cover'
 
   useEffect(() => {

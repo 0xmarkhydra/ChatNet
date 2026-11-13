@@ -46,6 +46,7 @@ export type ChatSectionProps = {
   chatFriend: { id: number; username: string; displayName: string; online: boolean; } | null;
   chatFriendRelationship: "accepted" | "incoming" | "outgoing" | "none";
   chatListConversations: Conversation[];
+  allChatConversations: Conversation[];
   chatListFilter: "all" | "unread" | "groups";
   chatListQuery: string;
   chatOnline: boolean;
@@ -77,6 +78,7 @@ export type ChatSectionProps = {
   groupBusy: boolean;
   groupChannelBusy: boolean;
   groupChannels: GroupChannel[];
+  refreshGroupChannels: () => Promise<void>;
   groupChannelUnreadAvailable: boolean;
   groupInviteCandidates: FriendConnection[];
   groupInviteSearch: string;

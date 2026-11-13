@@ -32,7 +32,11 @@
   border-radius: 13px;
 }
 .group-channel-sidebar-icon { width: 34px; height: 34px; }
-.group-channel-sidebar-avatar { width: 42px; height: 42px; }
+.group-channel-sidebar-avatar { width: 42px; height: 42px; overflow:hidden; }
+.group-channel-sidebar-avatar img, .group-channel-sidebar-icon img {
+  width:100%; height:100%; object-fit:cover; border-radius:inherit;
+}
+.group-channel-sidebar-name-row svg {flex-shrink:0; color:#8999b4;}
 .group-channel-sidebar-intro { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
 .group-channel-sidebar-intro strong {
   font-size:13px; font-weight:750; color:#1d3151;
@@ -85,6 +89,7 @@
 .group-channel-sidebar-row.selected .group-channel-sidebar-avatar {
   color:#fff; background:#477be2;
 }
+.group-channel-controls-error {padding:10px 12px; color:#9b2733; background:#fff2f3; border-radius:10px; font-size:12px;}
 .group-channel-sidebar-row:focus-visible { outline:2px solid #6992e7; outline-offset:-2px; }
 .group-channel-sidebar-content { display:flex; flex:1; flex-direction:column; gap:5px; min-width:0; }
 .group-channel-sidebar-name-row,
@@ -255,3 +260,897 @@
 .group-channel-sidebar-avatar.topic-tone-5{background:#e6f4f8;color:#478ca1}
 .group-channel-sidebar-row.selected .group-channel-sidebar-avatar{background:#477be2;color:#fff}
 @media(max-width:430px){.group-channel-sidebar-row{min-height:88px;padding:10px 7px}}
+
+/* Mobile PWA: entering a group opens the WHITE full-width channel picker.
+   The chat view only appears after a channel is selected. */
+.group-channel-sidebar-toolbar { display: none; }
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-picker-open > .group-channel-sidebar {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff;
+    color: #1f2c44;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    box-shadow: none;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-picker-open > .group-channel-sidebar-overlay {
+    display: none;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-heading {
+    padding: 12px 14px;
+    min-height: 64px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #e8edf5;
+    background: #fff;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-back {
+    flex: 0 0 34px;
+    height: 38px;
+    color: #3364d9;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-intro strong {
+    font-size: 17px;
+    color: #17243c;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-intro small {
+    font-size: 12px;
+    color: #71819a;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-close {
+    display: none;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 8px 14px 6px;
+    background: #fff;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-toolbar .call-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-toolbar button {
+    display: grid;
+    box-sizing: border-box;
+    place-items: center;
+    flex: 0 0 35px;
+    width: 35px;
+    min-width: 35px;
+    height: 35px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #e4eaf6;
+    border-radius: 11px;
+    background: #f1f5ff;
+    color: #3265d7;
+    cursor: pointer;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-toolbar button:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-search {
+    margin: 5px 14px 14px;
+    height: 37px;
+    min-height: 37px;
+    background: #f6f8fc;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-caption {
+    padding: 0 18px 9px;
+    font-size: 11px;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-list {
+    flex: 1;
+    gap: 0;
+    padding: 0 10px max(12px, env(safe-area-inset-bottom));
+    background: #fff;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-row {
+    min-height: 75px;
+    gap: 12px;
+    padding: 12px 9px;
+    border-bottom: 1px solid #edf1f7;
+    border-radius: 0;
+    background: #fff;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-row.selected {
+    border-radius: 10px;
+    background: #eef4ff;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-avatar {
+    flex-basis: 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-name-row strong {
+    font-size: 14px;
+    color: #1e2b41;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-name-row time {
+    font-size: 11px;
+    color: #8997ab;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-topic-row {
+    display: none;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-meta-row small {
+    font-size: 12px;
+    color: #7b899f;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-unread {
+    min-width: 23px;
+    height: 23px;
+    padding: 2px 6px;
+    font-size: 11px;
+    background: #3473e7;
+  }
+
+  /* On mobile, the channel title and all five actions share one horizontal row. */
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel > .chat-head {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    width: 100%;
+    min-height: 58px;
+    height: 58px;
+    gap: 5px;
+    padding: 6px 8px;
+    background: #fff;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .chat-head > .room-info {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    max-width: none;
+    gap: 4px;
+    min-height: 34px;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .chat-head .room-info > .mobile-back {
+    flex: 0 0 24px;
+    width: 24px;
+    min-width: 24px;
+    height: 34px;
+    margin: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .chat-head .room-avatar {
+    display: grid;
+    flex: 0 0 29px;
+    width: 29px;
+    min-width: 29px;
+    height: 29px;
+    border-radius: 9px;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .chat-head .room-info > .group-room-details {
+    display: flex;
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    max-width: none;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-room-title {
+    flex-wrap: nowrap;
+    width: 100%;
+    max-width: 100%;
+    min-height: 20px;
+    height: 20px;
+    column-gap: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .chat-head .room-info .group-room-title > strong {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    line-height: 20px;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-room-subtitle {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    height: 16px;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 10px;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-room-subtitle .group-room-member-count {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    height: 16px;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-room-member-count > span,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-channel-parent-label {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-room-subtitle .conversation-category-assignment {
+    display: none;
+  }
+  /* The back arrow opens the channel picker, so no second selector is needed. */
+  .modern-shell.app-layout .group-channel-sidebar-toggle { display: none; }
+
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .chat-head > .group-mobile-actions {
+    display: flex;
+    align-self: center;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+    gap: 3px;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+  }
+  .modern-shell.app-layout .group-mobile-actions .call-header-actions,
+  .modern-shell.app-layout .group-mobile-actions .translation-hub {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+  }
+  .modern-shell.app-layout .group-mobile-actions .call-header-actions > button,
+  .modern-shell.app-layout .group-mobile-actions .group-more-trigger {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    flex: 0 0 29px;
+    width: 29px;
+    min-width: 29px;
+    height: 30px;
+    min-height: 30px;
+    padding: 0;
+    margin: 0;
+    border: 1px solid #dfe6f5;
+    border-radius: 9px;
+    background: #f1f5ff;
+    color: #3265d7;
+    box-shadow: none;
+    line-height: 1;
+  }
+  .modern-shell.app-layout .group-mobile-actions .call-header-actions > button:nth-child(2) { display: grid; }
+  .modern-shell.app-layout .group-mobile-actions svg { width: 16px; height: 16px; }
+}
+@media (max-width: 360px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel > .chat-head {
+    gap: 3px;
+    padding: 6px;
+  }
+  .modern-shell.app-layout .group-mobile-actions .call-header-actions,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .chat-head > .group-mobile-actions {
+    gap: 2px;
+  }
+  .modern-shell.app-layout .group-mobile-actions .call-header-actions > button,
+  .modern-shell.app-layout .group-mobile-actions .group-more-trigger {
+    flex-basis: 27px;
+    width: 27px;
+    min-width: 27px;
+    height: 29px;
+    min-height: 29px;
+  }
+}
+
+/* Mobile channel dock: Telegram-style quick switching, never shown on desktop. */
+.group-channel-rail { display: none; }
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace {
+    position: relative;
+  }
+
+  /* The full-screen picker enters from the left and closes towards the left. */
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-sidebar {
+    position: absolute;
+    inset: 0;
+    z-index: 32;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: none;
+    visibility: visible;
+    pointer-events: none;
+    transform: translate3d(-101%, 0, 0);
+    transition: transform .3s cubic-bezier(.22, 1, .36, 1);
+    will-change: transform;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-picker-open > .group-channel-sidebar {
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate3d(0, 0, 0);
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-awaiting-choice > .group-chat-panel {
+    visibility: hidden;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-rail {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 28;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+    width: 58px;
+    height: 100%;
+    padding: 10px 4px max(8px, env(safe-area-inset-bottom));
+    border-right: 1px solid #e1e9f6;
+    background: #f5f8ff;
+    overflow: hidden;
+    transition: opacity .2s ease;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-picker-open > .group-channel-rail {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-has-rail > .conversation-panel.group-chat-panel {
+    flex: 1 1 auto;
+    width: calc(100% - 58px);
+    max-width: calc(100% - 58px);
+    min-width: 0;
+    margin-left: 58px;
+  }
+  .group-channel-rail-all {
+    display: grid;
+    place-items: center;
+    flex: 0 0 43px;
+    width: 43px;
+    height: 43px;
+    padding: 0;
+    border: 1px solid #dce7fa;
+    border-radius: 14px;
+    background: #fff;
+    color: #3569d9;
+    cursor: pointer;
+  }
+  .group-channel-rail-list {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    min-height: 0;
+    padding: 1px 0 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+  .group-channel-rail-list::-webkit-scrollbar { display: none; }
+  .group-channel-rail-item {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: 0 0 46px;
+    width: 48px;
+    height: 46px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .group-channel-rail-marker {
+    position: absolute;
+    left: -4px;
+    top: 13px;
+    width: 3px;
+    height: 20px;
+    border-radius: 0 4px 4px 0;
+    background: transparent;
+    transition: background .18s, height .18s;
+  }
+  .group-channel-rail-item.selected .group-channel-rail-marker {
+    background: #346ae9;
+  }
+  .group-channel-rail-avatar {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 41px;
+    height: 41px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    box-sizing: border-box;
+    font-size: 13px;
+    font-weight: 750;
+    color: #386fe6;
+    background: #e7eeff;
+  }
+  .group-channel-rail-item.selected .group-channel-rail-avatar {
+    border-color: #3776f0;
+    box-shadow: 0 0 0 2px #dce8ff;
+  }
+  .group-channel-rail-avatar img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .group-channel-rail-avatar.topic-tone-0 { background: #eaf0ff; color: #477be2; }
+  .group-channel-rail-avatar.topic-tone-1 { background: #fcece8; color: #ca7264; }
+  .group-channel-rail-avatar.topic-tone-2 { background: #e7f6ed; color: #449b71; }
+  .group-channel-rail-avatar.topic-tone-3 { background: #f3edfb; color: #9870c4; }
+  .group-channel-rail-avatar.topic-tone-4 { background: #fff2db; color: #b78a44; }
+  .group-channel-rail-avatar.topic-tone-5 { background: #e6f4f8; color: #478ca1; }
+  .group-channel-rail-unread {
+    position: absolute;
+    z-index: 1;
+    right: -2px;
+    bottom: -1px;
+    display: grid;
+    place-items: center;
+    min-width: 17px;
+    height: 17px;
+    box-sizing: border-box;
+    padding: 0 3px;
+    border: 1.5px solid #f5f8ff;
+    border-radius: 10px;
+    background: #3776ee;
+    color: #fff;
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .group-channel-rail-item:focus-visible,
+  .group-channel-rail-all:focus-visible {
+    outline: 2px solid #356ce9;
+    outline-offset: 1px;
+  }
+
+  /* Selected channel already has an avatar in the dock; reclaim header space. */
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-has-rail .group-chat-panel .chat-head .room-info > .mobile-back,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-has-rail .group-chat-panel .chat-head .room-avatar {
+    display: none;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-has-rail .group-chat-panel .chat-head > .room-info {
+    gap: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-has-rail .group-chat-panel .chat-head > .room-info > .group-room-details {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  /* Equal-sized actions for call, video, search, translation and more. */
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-mobile-actions :is(.call-header-actions > button, .group-more-trigger) {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    flex: 0 0 29px;
+    width: 29px;
+    min-width: 29px;
+    max-width: 29px;
+    height: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #dfe6f5;
+    border-radius: 9px;
+    background: #f1f5ff;
+    color: #3265d7;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-mobile-actions .call-header-actions > button:nth-child(2) {
+    display: grid;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-mobile-actions :is(.call-header-actions, .translation-hub) {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 3px;
+    width: auto;
+    margin: 0;
+    padding: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-mobile-actions svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+@media (max-width: 360px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-rail { width: 52px; }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-has-rail > .conversation-panel.group-chat-panel {
+    margin-left: 52px;
+    width: calc(100% - 52px);
+    max-width: calc(100% - 52px);
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-mobile-actions :is(.call-header-actions > button, .group-more-trigger) {
+    flex-basis: 27px;
+    width: 27px;
+    min-width: 27px;
+    max-width: 27px;
+    height: 29px;
+    min-height: 29px;
+    max-height: 29px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-sidebar,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-rail {
+    transition: none;
+  }
+}
+
+/* Channel picker belongs visually to the avatar dock, never a floating card.
+   Group header has intentionally been removed: channel search is the first row. */
+.group-channel-sidebar-topbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 9px 10px 7px;
+  border-bottom: 1px solid #edf1f8;
+  background: #fff;
+}
+.group-channel-sidebar-topbar > .group-channel-sidebar-search {
+  display: flex;
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  height: 36px;
+  min-height: 36px;
+  margin: 0;
+  border-radius: 11px;
+}
+.group-channel-sidebar-topbar > .group-channel-sidebar-more {
+  flex: 0 0 33px;
+  width: 33px;
+  height: 34px;
+  min-width: 33px;
+  margin: 0;
+  border-radius: 10px;
+}
+.group-channel-sidebar-item {
+  display: flex;
+  position: relative;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 2px;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  border-radius: 12px;
+}
+.group-channel-sidebar-item:has(.group-channel-sidebar-row.selected) {
+  background: #eaf1ff;
+}
+.group-channel-sidebar-item > .group-channel-sidebar-row {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  padding-right: 2px;
+  background: transparent;
+}
+.group-channel-sidebar-item > .group-channel-sidebar-row.selected {
+  background: transparent;
+}
+.group-channel-row-options {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 32px;
+  min-width: 28px;
+  margin-right: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #7285a4;
+  cursor: pointer;
+  opacity: .64;
+}
+.group-channel-sidebar-item:is(:hover,:focus-within) .group-channel-row-options,
+.group-channel-row-options[aria-expanded="true"] { opacity: 1; }
+.group-channel-row-options:hover,
+.group-channel-row-options:focus-visible {
+  background: #dce8fc;
+  color: #3469d7;
+  outline-offset: -2px;
+}
+.group-channel-sidebar-name-status {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.group-channel-sidebar-name-status > strong {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.group-channel-sidebar-name-status > .group-channel-sidebar-muted {
+  flex: 0 0 13px;
+  color: #9aa7ba;
+  opacity: .8;
+}
+.group-channel-sidebar-name-row > time { margin-left: auto; flex-shrink: 0; }
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace > .group-channel-sidebar {
+    left: calc(13px + var(--avatar-rail-w)) !important;
+    width: calc(var(--desktop-channels-w) + var(--chat-rail-gap, 12px)) !important;
+    border-left: 0;
+    border-radius: 0 18px 18px 0;
+    z-index: 29;
+    box-shadow: 8px 3px 20px rgba(37, 64, 109, .07);
+    transform: translate3d(-22px, 0, 0) scaleX(.97);
+    transform-origin: left center;
+    transition: transform .34s cubic-bezier(.22,1,.36,1), opacity .28s ease, visibility .28s ease;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar {
+    transform: translate3d(0,0,0) scaleX(1);
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.desktop-channel-panel-open > .desktop-conversation-rail {
+    border-right: 0;
+    border-radius: 18px 0 0 18px;
+    box-shadow: none;
+  }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace > .group-channel-sidebar {
+    left: calc(10px + var(--avatar-rail-w)) !important;
+  }
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-sidebar {
+    border-left: 0 !important;
+    box-shadow: 0 4px 18px rgba(39,65,108,.05);
+    transition: transform .34s cubic-bezier(.22,1,.36,1), visibility .34s !important;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-topbar {
+    min-height: 55px;
+    padding: 9px 10px 8px;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-topbar > .group-channel-sidebar-search {
+    margin: 0 !important;
+    height: 36px;
+    min-height: 36px;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-item {
+    border-bottom: 1px solid #eef2fa;
+    border-radius: 9px;
+  }
+  .modern-shell.app-layout .mobile-channel-picker-open .group-channel-sidebar-item > .group-channel-sidebar-row {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    padding-right: 0;
+    border-bottom: 0;
+  }
+  .group-channel-row-options { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace > .group-channel-sidebar {
+    transition: none !important;
+    transform: none;
+  }
+}
+
+/* Joined rail + channel picker: one continuous top rule, square inner
+   corners, and exactly one divider at the shared edge. Keep both surfaces
+   at identical top/bottom coordinates during the slide animation. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail {
+    border: 1px solid #e4ebf6 !important;
+    border-right: 0 !important;
+    border-radius: 18px 0 0 18px !important;
+    box-shadow: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar {
+    top: 14px !important;
+    bottom: 17px !important;
+    left: calc(13px + var(--avatar-rail-w)) !important;
+    box-sizing: border-box;
+    border: 1px solid #e4ebf6 !important;
+    border-radius: 0 18px 18px 0 !important;
+    background: #fff;
+    box-shadow: none !important;
+  }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar {
+    top: 10px !important;
+    bottom: 10px !important;
+    left: calc(10px + var(--avatar-rail-w)) !important;
+  }
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-channel-picker-open > .conversation-avatar-rail {
+    border-top: 1px solid #e4ebf6 !important;
+    border-right: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-channel-picker-open > .group-channel-sidebar {
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 56px !important;
+    border: 1px solid #e4ebf6 !important;
+    border-right: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+/* Reserve the same 1px top border in both expanded and compact mobile modes.
+   The avatars must not move vertically when the channel picker opens. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail {
+    border-top: 1px solid #e4ebf6 !important;
+  }
+}
+/* Match the picker origin and box width to the live dock width, including
+   the 52px compact variant at 320–360px; no off-screen overflow. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-channel-picker-open > .group-channel-sidebar {
+    box-sizing: border-box;
+    left: 56px !important;
+    width: calc(100% - 56px) !important;
+    max-width: calc(100% - 56px) !important;
+  }
+}
+@media (max-width: 360px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-channel-picker-open > .group-channel-sidebar {
+    left: 52px !important;
+    width: calc(100% - 52px) !important;
+    max-width: calc(100% - 52px) !important;
+  }
+}
+/* Unified toolbar seam: the dock's horizontal divider and the channel
+   search toolbar are measured from the same outer top edge. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail > .desktop-conversation-rail-divider {
+    position: absolute !important;
+    top: 55px !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 1px !important;
+    background: #e4ebf6 !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar > .group-channel-sidebar-topbar {
+    box-sizing: border-box;
+    flex: 0 0 56px !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    padding: 9px 10px !important;
+    border-bottom: 1px solid #e4ebf6 !important;
+  }
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible.mobile-channel-picker-open > .conversation-avatar-rail > .conversation-avatar-rail-divider {
+    position: absolute !important;
+    top: 55px !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 1px !important;
+    background: #e4ebf6 !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-picker-open > .group-channel-sidebar > .group-channel-sidebar-topbar {
+    box-sizing: border-box;
+    flex: 0 0 56px !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    padding: 9px 10px !important;
+    border-bottom: 1px solid #e4ebf6 !important;
+  }
+}
+
+/* 2026-11-13: keep the separator in flex flow. Absolute positioning
+   had removed 8–9px from avatar positions whenever a channel opened. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail > .desktop-conversation-rail-divider {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    flex: 0 0 1px !important;
+    height: 1px !important;
+    margin: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar > .group-channel-sidebar-topbar {
+    flex-basis: 57px !important;
+    height: 57px !important;
+    min-height: 57px !important;
+    max-height: 57px !important;
+  }
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible.mobile-channel-picker-open > .conversation-avatar-rail > .conversation-avatar-rail-divider {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    flex: 0 0 1px !important;
+    height: 1px !important;
+    margin: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-channel-picker-open > .group-channel-sidebar > .group-channel-sidebar-topbar {
+    flex-basis: 58px !important;
+    height: 58px !important;
+    min-height: 58px !important;
+    max-height: 58px !important;
+  }
+}
+/* Search fields appear at the same position relative to the fixed chevron,
+   and share their border, background, typography and focus treatment. */
+.modern-shell.app-layout .group-channel-sidebar-topbar > .group-channel-sidebar-search,
+.modern-shell.app-layout .desktop-conversation-rail-search-field,
+.modern-shell.app-layout .conversation-avatar-rail-search-field {
+  box-sizing: border-box;
+  height: 34px !important;
+  min-height: 34px !important;
+  max-height: 34px;
+  padding: 0 10px !important;
+  border: 1px solid #e0e8f6 !important;
+  border-radius: 11px !important;
+  background: #f4f7fd !important;
+  color: #6c819f;
+  box-shadow: none;
+}
+.modern-shell.app-layout .group-channel-sidebar-topbar > .group-channel-sidebar-search:focus-within,
+.modern-shell.app-layout .desktop-conversation-rail-search-field:focus-within,
+.modern-shell.app-layout .conversation-avatar-rail-search-field:focus-within {
+  border-color: #8baeff !important;
+  background: #fff !important;
+  box-shadow: 0 0 0 2px rgba(52,110,224,.10) !important;
+}
+.modern-shell.app-layout .group-channel-sidebar-topbar > .group-channel-sidebar-search input,
+.modern-shell.app-layout .desktop-conversation-rail-search-field input,
+.modern-shell.app-layout .conversation-avatar-rail-search-field input {
+  min-width: 0;
+  width: 100%;
+  color: #273c60;
+  font-size: 12px !important;
+}
+.modern-shell.app-layout .group-channel-sidebar-topbar > .group-channel-sidebar-search svg,
+.modern-shell.app-layout .desktop-conversation-rail-search-field > svg,
+.modern-shell.app-layout .conversation-avatar-rail-search-field > svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: #7991b5;
+}
+.modern-shell.app-layout .group-channel-sidebar-list {
+  padding-top: 10px !important;
+}
+.modern-shell.app-layout .group-channel-sidebar-list > .group-channel-sidebar-item:first-child {
+  margin-top: 3px;
+}

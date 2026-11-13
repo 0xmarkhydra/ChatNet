@@ -1,0 +1,118 @@
+/* Mobile PWA has three explicit, mutually exclusive screens:
+   (1) full-width conversation avatar list,
+   (2) compact avatar dock + joined group-channel picker,
+   (3) full-width conversation chat (direct or selected channel).
+   Desktop remains unchanged. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* 1: The conversation list is the original avatar rail, not a new list. */
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view > .conversation-avatar-rail {
+    display: flex !important;
+    visibility: visible !important;
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view > .conversation-avatar-rail .conversation-avatar-rail-scroll {
+    width: 100%;
+    padding-right: 6px;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view > .conversation-avatar-rail .conversation-avatar-rail-expand-toggle {
+    display: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view > .conversation-avatar-rail .conversation-avatar-rail-top-actions {
+    padding-left: 6px !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view > .conversation-panel {
+    display: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view > .group-channel-sidebar,
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view > .group-channel-sidebar-overlay {
+    display: none !important;
+  }
+
+  /* 2: Keep the exact same avatars in a narrow fixed dock beside channels. */
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail {
+    display: flex !important;
+    visibility: visible !important;
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: 56px !important;
+    max-width: 56px !important;
+    border-right: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail .conversation-avatar-rail-scroll {
+    width: 100%;
+    padding-right: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .group-channel-sidebar {
+    box-sizing: border-box;
+    left: 56px !important;
+    width: calc(100% - 56px) !important;
+    max-width: calc(100% - 56px) !important;
+    border-left: 1px solid #e4ebf6 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view.mobile-channel-picker-open > .group-channel-sidebar {
+    transform: translate3d(0,0,0);
+    visibility: visible !important;
+    pointer-events: auto;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-panel,
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .group-channel-sidebar-overlay {
+    display: none !important;
+  }
+
+  /* 3: Direct and channel chats both reuse the exact same full-width panel. */
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view > .conversation-avatar-rail,
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view > .group-channel-sidebar,
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view > .group-channel-sidebar-overlay {
+    display: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view > .conversation-panel,
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view > .conversation-panel.group-chat-panel {
+    display: flex !important;
+    flex: 1 1 auto;
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 100%;
+    margin-left: 0 !important;
+    visibility: visible !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view > .conversation-panel > .chat-head {
+    width: 100%;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view > .conversation-panel > .media-composer {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 350px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail {
+    width: 52px !important;
+    max-width: 52px !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .group-channel-sidebar {
+    left: 52px !important;
+    width: calc(100% - 52px) !important;
+    max-width: calc(100% - 52px) !important;
+  }
+}

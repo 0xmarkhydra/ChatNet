@@ -6,6 +6,13 @@ export type GroupChannel = {
   unreadCount: number
   lastMessage: string
   lastMessageAt?: string
+  avatarUrl?: string
+  muted?: boolean
+}
+
+/** Group unread count is exactly the sum of its individual channel badges. */
+export function totalGroupChannelUnread(channels: readonly Pick<GroupChannel, 'unreadCount'>[]): number {
+  return channels.reduce((total, channel) => total + channel.unreadCount, 0)
 }
 
 export function validGroupChannels(value: unknown, conversationId: number): GroupChannel[] {
@@ -21,6 +28,8 @@ export function validGroupChannels(value: unknown, conversationId: number): Grou
         unreadCount: typeof item.unreadCount === 'number' && Number.isFinite(item.unreadCount) ? Math.max(0, Math.floor(item.unreadCount)) : 0,
         lastMessage: typeof item.lastMessage === 'string' ? item.lastMessage : '',
         lastMessageAt: typeof item.lastMessageAt === 'string' ? item.lastMessageAt : undefined,
+        avatarUrl: typeof item.avatarUrl === 'string' ? item.avatarUrl : undefined,
+        muted: item.muted === true,
       })
     }
   }
