@@ -38,6 +38,9 @@ var groupActivitiesSQL string
 //go:embed migrations/007_group_activity_pins.sql
 var groupActivityPinsSQL string
 
+//go:embed migrations/010_channel_profile_notifications.sql
+var channelProfileNotificationsSQL string
+
 //go:embed migrations/005_chat_pins.sql
 var chatPinsSQL string
 
@@ -99,6 +102,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, groupAvatarsSQL); err != nil {
 		return fmt.Errorf("apply group avatars migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, channelProfileNotificationsSQL); err != nil {
+		return fmt.Errorf("apply channel profile notifications migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)
