@@ -22,6 +22,7 @@ export default function DesktopBootstrap() {
     : { phase: 'loading' }
   useEffect(() => {
     let active = true
+    const expiredSessions = new Set<string>()
     let unsubscribe: (() => void) | undefined
     async function restore() {
       // B01 stored Web credentials here. Never hydrate them into the Desktop session.
@@ -32,9 +33,11 @@ export default function DesktopBootstrap() {
       const info = await bridge.getPlatformInfo()
       if (!active) return
       if (API !== info.apiOrigin) throw new Error('DESKTOP_API_MISMATCH')
-      unsubscribe = bridge.auth.onExpired((_sessionId, userId) => {
+      unsubscribe = bridge.auth.onExpired((sessionId, userId) => {
+        if (!active) return
+        expiredSessions.add(sessionId)
         // Also purge revocation discovered before App mounts, not only while logged in.
-        if (!active || !Number.isSafeInteger(userId) || userId <= 0) return
+        if (!Number.isSafeInteger(userId) || userId <= 0) return
         clearChatPersistence(userId)
         clearChatPersistence(userId, sessionStorage)
         clearChatOutbox(userId)
@@ -42,6 +45,7 @@ export default function DesktopBootstrap() {
       const result = await bridge.auth.restore()
       const session = result === null ? null : parseSession(result)
       if (result !== null && (!session || session.refreshToken !== undefined)) throw new Error('AUTH_INVALID_RESPONSE')
+      if (session && expiredSessions.has(session.sessionId)) throw new Error('AUTH_SESSION_REVOKED')
       if (active) setStartupResult({ attempt, value: { phase: 'ready', session } })
     }
     void restore().catch((error: unknown) => {
