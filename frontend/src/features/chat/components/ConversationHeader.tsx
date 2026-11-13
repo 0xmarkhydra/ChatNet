@@ -3,7 +3,7 @@ import ConversationAvatar from "./ConversationAvatar";
 import { CategoryAssignment } from "./ConversationCategories";
 import { CallHeaderActions } from "../../calls/components/CallManager";
 import { createPortal } from "react-dom";
-import type { ChatSectionProps } from "./ChatSection";
+import type { ChatSectionProps } from "./ChatSectionProps";
 import type { Dispatch, SetStateAction } from "react";
 
 type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "changeAutoTranslate" | "changeTargetLanguage" | "conversationBlocked" | "conversationCategories" | "conversationDetailsOpen" | "effectiveAutoTranslate" | "effectiveTargetLanguage" | "groupSettingsOpen" | "languageSearch" | "openGroupSettings" | "openVisitor" | "setActiveConversationId" | "setConversationDetailsOpen" | "setGroupMemberViewOpen" | "setGroupSettingsOpen" | "setLanguageSearch" | "setMessageSearchOpen" | "setTranslationMenuOpen" | "t" | "translationMenuOpen" | "visibleLanguageOptions"> & { setChannelSidebarOpen: Dispatch<SetStateAction<boolean>> }, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]> };
