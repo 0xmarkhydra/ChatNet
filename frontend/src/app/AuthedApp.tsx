@@ -257,6 +257,7 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
+import { consumeNotificationDeepLink, notificationDeepLink } from "./navigation/notificationDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
@@ -1734,35 +1735,23 @@ export default function AuthedApp({
 
     const openNotificationTarget = () => {
       const url = new URL(window.location.href);
-      const params = url.searchParams;
-      if (params.get("tab") === "feed") {
-        setTab("feed");
-      } else if (params.get("tab") === "contacts") {
-        setTab("contacts");
-      }
-      const conversationID = Number(params.get("conversation"));
-      const messageID = Number(params.get("message"));
-      if (Number.isSafeInteger(conversationID) && conversationID > 0) {
+      const { tab: targetTab, conversationId, messageId } = notificationDeepLink(url.searchParams);
+      if (targetTab) setTab(targetTab);
+      if (conversationId !== null) {
         setTab("chat");
         setDesktopSection(null);
         setChatSearchJump(
-          Number.isSafeInteger(messageID) && messageID > 0
+          messageId !== null
             ? {
-                conversationId: conversationID,
-                messageId: messageID,
+                conversationId,
+                messageId,
                 revision: ++chatSearchJumpRevision.current,
               }
             : null,
         );
-        setActiveConversationId(conversationID);
+        setActiveConversationId(conversationId);
       }
-      // Keep unrelated query parameters (e.g., invite links) intact.
-      if (params.has("tab") || params.has("conversation") || params.has("message")) {
-        params.delete("tab");
-        params.delete("conversation");
-        params.delete("message");
-        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
-      }
+      consumeNotificationDeepLink(url);
     };
     openNotificationTarget();
     window.addEventListener("popstate", openNotificationTarget);
