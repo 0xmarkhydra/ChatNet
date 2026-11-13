@@ -1,11 +1,11 @@
 {
-  "total": 97,
+  "total": 95,
   "byRule": {
-    "react-hooks/exhaustive-deps": 63,
+    "react-hooks/exhaustive-deps": 61,
     "react-hooks/set-state-in-effect": 34
   },
   "counts": {
-    "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
+    "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 28,
     "src/app/AuthedApp.tsx|react-hooks/set-state-in-effect": 5,
     "src/app/hooks/useAppRealtime.ts|react-hooks/exhaustive-deps": 1,
     "src/features/calls/components/CallCenter.tsx|react-hooks/set-state-in-effect": 1,

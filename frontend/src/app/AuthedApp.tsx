@@ -447,7 +447,7 @@ export default function AuthedApp({
     if (session?.user.id && sessionRef.current?.user.id === session.user.id) {
       saveChatDrafts(session.user.id, messageDrafts);
     }
-  }, [session?.user.id, messageDrafts]);
+  }, [session?.user.id, messageDrafts, sessionRef]);
   const [channelDrafts, setChannelDrafts] = useState<Record<string, MessageDraft>>({});
   const channelDraftKey = `${activeConversationId ?? 0}:${selectedChannelId}`;
   const draft = selectedChannelId > 0 ? channelDrafts[channelDraftKey] ?? emptyDraft : messageDrafts[activeConversationId ?? 0] ?? emptyDraft;
@@ -1063,7 +1063,7 @@ export default function AuthedApp({
 
   useEffect(() => {
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
-  }, [groupSettingsOpen]);
+  }, [groupSettingsOpen, setGroupMemberViewOpen]);
 
   useEffect(() => {
     if (!groupSettingsOpen) return;
