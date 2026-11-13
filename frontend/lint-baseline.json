@@ -1,8 +1,8 @@
 {
-  "total": 106,
+  "total": 102,
   "byRule": {
     "react-hooks/exhaustive-deps": 64,
-    "react-hooks/set-state-in-effect": 42
+    "react-hooks/set-state-in-effect": 38
   },
   "counts": {
     "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 30,
@@ -20,10 +20,7 @@
     "src/features/chat/components/GroupActivities.tsx|react-hooks/exhaustive-deps": 1,
     "src/features/chat/components/GroupActivities.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/chat/components/GroupGovernancePanel.tsx|react-hooks/set-state-in-effect": 3,
-    "src/features/chat/components/GroupManagementDetails.tsx|react-hooks/set-state-in-effect": 1,
     "src/features/chat/components/GroupSettingsPanel.tsx|react-hooks/exhaustive-deps": 1,
-    "src/features/chat/components/GroupSettingsPanel.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/chat/components/LinkPreview.tsx|react-hooks/set-state-in-effect": 2,
     "src/features/chat/components/MessageSearchPanel.tsx|react-hooks/exhaustive-deps": 2,
     "src/features/chat/components/MessageSearchPanel.tsx|react-hooks/set-state-in-effect": 3,
     "src/features/chat/components/SharedContent.tsx|react-hooks/exhaustive-deps": 1,

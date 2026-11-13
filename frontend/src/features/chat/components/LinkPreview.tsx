@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { messageLinkHref, messageTextParts } from '../lib/messageClipboard'
 import '../styles/link-preview.css'
 import { fetchLinkPreview } from '../api/linkPreview'
@@ -67,37 +68,31 @@ export default function LinkPreview({
   const url = firstPreviewURL(text)
   const holder = useRef<HTMLSpanElement>(null)
   const requestRef = useLatest(request)
-  const [visible, setVisible] = useState(false)
-  const [preview, setPreview] = useState<LinkPreviewData | null>(null)
-  const [imageFailed, setImageFailed] = useState(false)
+  const [observedVisible, setObservedVisible] = useScopedState(url, false)
+  const visible = typeof IntersectionObserver === 'undefined' || observedVisible
+  const previewScope = `${cacheScope}:${url ?? ''}`
+  const [preview, setPreview] = useScopedState<LinkPreviewData | null>(previewScope, null)
+  const [imageFailed, setImageFailed] = useScopedState(previewScope, false)
 
   useEffect(() => {
-    setVisible(false)
-    setPreview(null)
-    setImageFailed(false)
-    if (!url) return
-    if (typeof IntersectionObserver === 'undefined') {
-      setVisible(true)
-      return
-    }
+    if (!url || typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
-        setVisible(true)
+        setObservedVisible(true)
         observer.disconnect()
       }
     }, { rootMargin: '240px' })
     if (holder.current) observer.observe(holder.current)
     return () => observer.disconnect()
-  }, [url])
+  }, [url, setObservedVisible])
 
   useEffect(() => {
     if (!visible || !url) return
     let mounted = true
-    setPreview(null)
     void loadPreview(url, cacheScope, (path, init) => requestRef.current(path, init))
       .then((data) => { if (mounted) setPreview(data) })
     return () => { mounted = false }
-  }, [url, cacheScope, visible, requestRef])
+  }, [url, cacheScope, visible, requestRef, setPreview])
 
   if (!url) return null
   const domain = new URL(url).hostname
