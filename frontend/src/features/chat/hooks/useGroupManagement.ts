@@ -98,12 +98,16 @@ export function useGroupManagement({
     setGroupInviteSearch('')
     setGroupInviteSelection([])
     setGroupPolicy(null)
+    const sessionId = sessionRef.current?.sessionId
     void getGroupSettings(apiFetch, conversation.id)
       .then(async response => {
         if (!response.ok) throw new Error()
         const result = await response.json() as { adminCanInvite: boolean; adminCanEditInfo: boolean }
-        if (activeConversationIdRef.current === conversation.id) setGroupPolicy(result)
-      }).catch(() => setNotice('Không tải được quyền quản trị nhóm.'))
+        if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversation.id) setGroupPolicy(result)
+      }).catch(() => {
+        if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversation.id)
+          setNotice('Không tải được quyền quản trị nhóm.')
+      })
     void Promise.all([
       refreshGroupMembers(conversation.id),
       refreshFriendConnections(),
@@ -118,15 +122,17 @@ export function useGroupManagement({
 
   async function refreshGroupMembers(conversationId = activeConversationId || undefined) {
     if (!conversationId) return
+    const sessionId = sessionRef.current?.sessionId
     try {
       const response = await listGroupMembers(apiFetch, conversationId)
       if (!response.ok) return
       const items = (await response.json()) as GroupMember[]
-      if (activeConversationIdRef.current === conversationId) {
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId) {
         setGroupMembers(items)
       }
     } catch {
-      setNotice('Không tải được danh sách thành viên nhóm.')
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+        setNotice('Không tải được danh sách thành viên nhóm.')
     }
   }
 
