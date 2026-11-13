@@ -76,8 +76,8 @@ type conversation struct {
 	AvatarMembers  []string   `json:"avatarMembers,omitempty"`
 	Muted          bool       `json:"muted"`
 
-	Online         bool       `json:"online"`
-	CreatedAt      time.Time  `json:"createdAt"`
+	Online    bool      `json:"online"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 type realtimeEvent struct {
@@ -706,6 +706,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		LIMIT $2 OFFSET $3`,
 		claims.UserID, limit, offset, categoryID, conversationID, keyword, unreadOnly, conversationType)
 	if err != nil {
+		log.Printf("list conversations query failed: %v", err)
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
 	}
@@ -718,8 +719,9 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		var groupAvatarRef string
 		var lastMessageAt time.Time
 		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef, &c.AvatarMembers, &c.Muted); err != nil {
-
-			continue
+			log.Printf("list conversations scan failed: %v", err)
+			httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
+			return
 		}
 		c.MemberCount = int(memberCount)
 		c.UnreadCount = int(unreadCount)
@@ -748,6 +750,11 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		items = append(items, c)
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("list conversations rows failed: %v", err)
+		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
+		return
 	}
 	httpx.JSON(w, http.StatusOK, items)
 }

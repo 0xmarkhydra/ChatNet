@@ -161,6 +161,21 @@ func TestChannelUnreadIsolationIntegration(t *testing.T) {
 	}
 	first := load()
 	checkGroupBadge(first)
+	// The new avatar rail fetches group conversations separately from direct chats.
+	groupListRequest := httptest.NewRequest(http.MethodGet, "/api/conversations?type=group&limit=100&offset=0", nil)
+	groupListRequest.Header.Set("Authorization", "Bearer "+tokens[1])
+	groupListResponse := httptest.NewRecorder()
+	authx.Middleware("test", http.HandlerFunc(s.listConversations)).ServeHTTP(groupListResponse, groupListRequest)
+	if groupListResponse.Code != http.StatusOK {
+		t.Fatalf("group avatar list: %d %s", groupListResponse.Code, groupListResponse.Body.String())
+	}
+	var groupList []conversation
+	if err := json.Unmarshal(groupListResponse.Body.Bytes(), &groupList); err != nil {
+		t.Fatal(err)
+	}
+	if len(groupList) != 1 || groupList[0].ID != conversationID || groupList[0].Type != "group" {
+		t.Fatalf("existing group missing from avatar rail response: %+v", groupList)
+	}
 	for _, ch := range []int64{0, channelA, channelB} {
 		if first[ch] != 1 {
 			t.Fatalf("channel %d unread %d, want 1", ch, first[ch])
