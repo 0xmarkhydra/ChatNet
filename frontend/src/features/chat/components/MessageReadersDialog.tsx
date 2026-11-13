@@ -16,7 +16,6 @@ export function MessageReadersInline({
   members: Reader[]
   onOpen: () => void
 }) {
-  const [showNames, setShowNames] = useState(false)
   const memberById = new Map(members.map((member) => [member.id, member]))
   const uniqueReaderIds = [...new Set(readerIds)]
   const resolvedReaders = uniqueReaderIds.flatMap((id) => {
@@ -33,17 +32,10 @@ export function MessageReadersInline({
         <button
           type="button"
           className="message-readers-preview"
-          aria-label={showNames ? undefined : 'Hiện tên người đã xem'}
-          aria-expanded={showNames}
-          title="Di chuột hoặc nhấn để xem tên"
-          onPointerEnter={(event) => { if (event.pointerType !== 'touch') setShowNames(true) }}
-          onPointerLeave={(event) => { if (event.pointerType !== 'touch') setShowNames(false) }}
-          onClick={(event) => {
-            event.stopPropagation()
-            const pointerType = 'pointerType' in event.nativeEvent ? event.nativeEvent.pointerType : ''
-            if (pointerType === 'touch' || event.detail === 0) setShowNames((current) => !current)
-            else setShowNames(true)
-          }}
+          aria-haspopup="dialog"
+          aria-label={`Mở danh sách ${resolvedReaderCount} người đã xem${preview[0] ? `: ${preview[0].displayName.trim() || preview[0].username}` : ''}`}
+          title={preview.map((reader) => reader.displayName.trim() || reader.username).join(', ')}
+          onClick={(event) => { event.stopPropagation(); onOpen() }}
         >
           <span className="message-readers-avatars" aria-hidden="true">
             {preview.map((reader) => (
@@ -53,7 +45,7 @@ export function MessageReadersInline({
             ))}
             {remaining > 0 && <span className="message-readers-more">+{remaining}</span>}
           </span>
-          <span className="message-readers-names" aria-hidden={!showNames}>
+          <span className="message-readers-names" aria-hidden="true">
             {preview.map((reader) => (
               <span className="message-readers-name" key={reader.id}>
                 {reader.displayName.trim() || reader.username}
@@ -63,16 +55,6 @@ export function MessageReadersInline({
           </span>
         </button>
       )}
-      <button
-        type="button"
-        className="message-readers-open"
-        aria-haspopup="dialog"
-        aria-label={`Mở danh sách ${resolvedReaderCount} người đã xem`}
-        title="Mở danh sách người đã xem"
-        onClick={(event) => { event.stopPropagation(); onOpen() }}
-      >
-        …
-      </button>
     </span>
   )
 }

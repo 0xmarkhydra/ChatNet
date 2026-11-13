@@ -149,8 +149,7 @@
   color: var(--soco-blue, #2563eb);
 }
 
-.message-readers-preview,
-.message-readers-open {
+.message-readers-preview {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -224,25 +223,25 @@
   font-size: 9px;
 }
 
-.message-readers-preview[aria-expanded="true"] .message-readers-avatars {
+.message-readers-preview:focus-visible .message-readers-avatars {
   display: none;
 }
 
-.message-readers-preview[aria-expanded="true"] .message-readers-names {
+.message-readers-preview:focus-visible .message-readers-names {
   display: inline-flex;
 }
 
-.message-readers-open {
-  min-width: 36px;
-  min-height: 36px;
-  padding: 0 5px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 700;
+@media (hover: hover) and (pointer: fine) {
+  .message-readers-preview:hover .message-readers-avatars {
+    display: none;
+  }
+
+  .message-readers-preview:hover .message-readers-names {
+    display: inline-flex;
+  }
 }
 
-.message-readers-preview:focus-visible,
-.message-readers-open:focus-visible {
+.message-readers-preview:focus-visible {
   outline: 2px solid var(--soco-blue, #2563eb);
   outline-offset: 1px;
   background: color-mix(in srgb, var(--soco-blue, #2563eb) 8%, transparent);
