@@ -58,6 +58,8 @@ export type ChatSectionProps = {
   conversationDetailsOpen: boolean;
   conversationListSearch: { active: boolean; items: Conversation[]; loading: boolean; loadingMore: boolean; hasMore: boolean; error: string; retry: () => void; loadMore: () => Promise<void>; };
   conversationLoadingMore: boolean;
+  conversationListError: string;
+  refreshConversations: () => Promise<void>;
   copyInviteLink: () => Promise<void>;
   createDirect: (event: FormEvent) => Promise<void>;
   createGroupChannel: (name: string, description: string) => Promise<boolean>;

@@ -117,6 +117,13 @@ func main() {
 	mux.HandleFunc("POST /api/auth/sessions/list", s.listSessions)
 	mux.HandleFunc("POST /api/auth/sessions/revoke", s.revokeSession)
 	mux.HandleFunc("POST /api/auth/sessions/revoke-others", s.revokeOtherSessions)
+	mux.Handle("POST /api/auth/e2ee/challenge", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.newE2EEChallenge)))
+	mux.Handle("POST /api/auth/e2ee/devices", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.registerE2EEDevice)))
+	mux.Handle("POST /api/auth/e2ee/devices/{deviceId}/revoke", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.revokeE2EEDevice)))
+	mux.Handle("GET /api/auth/e2ee/devices", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listE2EEDevices)))
+	mux.Handle("POST /api/auth/e2ee/key-packages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.publishE2EEKeyPackage)))
+	mux.Handle("POST /api/auth/e2ee/key-packages/claim", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.claimE2EEKeyPackage)))
+	mux.Handle("GET /api/auth/e2ee/users/{userId}/devices", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listE2EEDevices)))
 	mux.Handle("GET /api/auth/me", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.me)))
 	// Lightweight auth check: the middleware validates sid via Redis without
 	// reloading the user profile or rotating a refresh token.

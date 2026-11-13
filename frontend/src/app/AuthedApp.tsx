@@ -834,6 +834,7 @@ export default function AuthedApp({
     hasMoreConversations,
     setHasMoreConversations,
     conversationLoadingMore,
+    conversationListError,
     setConversationLoadingMore,
     conversationPagingBusy,
     conversationOffset,
@@ -3173,6 +3174,8 @@ export default function AuthedApp({
           conversationDetailsOpen={conversationDetailsOpen}
           conversationListSearch={conversationListSearch}
           conversationLoadingMore={conversationLoadingMore}
+          conversationListError={conversationListError}
+          refreshConversations={refreshConversations}
           copyInviteLink={copyInviteLink}
           createDirect={createDirect}
           createGroupChannel={createGroupChannel}

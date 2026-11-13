@@ -38,9 +38,6 @@ var groupActivitiesSQL string
 //go:embed migrations/007_group_activity_pins.sql
 var groupActivityPinsSQL string
 
-//go:embed migrations/010_channel_profile_notifications.sql
-var channelProfileNotificationsSQL string
-
 //go:embed migrations/011_call_revocations.sql
 var callRevocationsSQL string
 
@@ -55,6 +52,21 @@ var groupChannelReadsSQL string
 
 //go:embed migrations/009_group_avatars.sql
 var groupAvatarsSQL string
+
+//go:embed migrations/010_channel_profile_notifications.sql
+var channelProfileNotificationsSQL string
+
+//go:embed migrations/011_e2ee_devices.sql
+var e2eeDevicesSQL string
+
+//go:embed migrations/012_e2ee_key_packages.sql
+var e2eeKeyPackagesSQL string
+
+//go:embed migrations/013_e2ee_mls_relay.sql
+var e2eeMLSRelaySQL string
+
+//go:embed migrations/014_e2ee_keypackage_attestation.sql
+var e2eeKeyPackageAttestationSQL string
 
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
@@ -117,6 +129,18 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, callCleanupJobsSQL); err != nil {
 		return fmt.Errorf("apply call cleanup migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, e2eeDevicesSQL); err != nil {
+		return fmt.Errorf("apply E2EE device migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, e2eeKeyPackagesSQL); err != nil {
+		return fmt.Errorf("apply E2EE KeyPackage migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, e2eeMLSRelaySQL); err != nil {
+		return fmt.Errorf("apply E2EE MLS relay migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, e2eeKeyPackageAttestationSQL); err != nil {
+		return fmt.Errorf("apply E2EE KeyPackage attestation migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)

@@ -54,4 +54,15 @@ func TestMigrateSerializesConcurrentServices(t *testing.T) {
 			t.Error(err)
 		}
 	}
+
+	// The conversation list and channel APIs depend on these columns at startup.
+	var channelColumns int
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema=current_schema() AND table_name='group_channels'
+		AND column_name IN ('avatar_ref', 'deleted_at')`).Scan(&channelColumns); err != nil {
+		t.Fatal(err)
+	}
+	if channelColumns != 2 {
+		t.Fatalf("group_channels missing profile/deletion columns after migration: found %d of 2", channelColumns)
+	}
 }
