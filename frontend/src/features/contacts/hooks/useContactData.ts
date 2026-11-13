@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { AppDataContext } from '../../../shared/types/api'
 import type { FriendConnection } from '../types'
 import { listFriendRequests, listContactMetadata, listFriends } from '../api/contacts'
@@ -10,13 +11,14 @@ export function useContactData({
   setStatus,
   setNotice,
 }: Options) {
-  const [friends, setFriends] = useState<FriendConnection[]>([])
-  const [friendRequests, setFriendRequests] = useState<FriendConnection[]>([])
-  const [contactMetadata, setContactMetadata] = useState<Record<number, { nickname: string; note: string; favorite: boolean }>>({})
+  const scope = session?.sessionId || ''
+  const [friends, setFriends] = useScopedState<FriendConnection[]>(scope, [])
+  const [friendRequests, setFriendRequests] = useScopedState<FriendConnection[]>(scope, [])
+  const [contactMetadata, setContactMetadata] = useScopedState<Record<number, { nickname: string; note: string; favorite: boolean }>>(scope, {})
   const friendSyncRequest = useRef(0)
-  const [friendSyncSessionId, setFriendSyncSessionId] = useState('')
-  const [friendSyncError, setFriendSyncError] = useState('')
-  const [friendSyncBusy, setFriendSyncBusy] = useState(false)
+  const [friendSyncSessionId, setFriendSyncSessionId] = useScopedState(scope, '')
+  const [friendSyncError, setFriendSyncError] = useScopedState(scope, '')
+  const [friendSyncBusy, setFriendSyncBusy] = useScopedState(scope, false)
 
   const friendSyncFlight = useRef<{ sessionId: string; revision: number; promise: Promise<void> } | null>(null)
   async function refreshFriendConnections() {
