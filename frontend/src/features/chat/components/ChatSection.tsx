@@ -1,6 +1,7 @@
 import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
+import { useScopedState } from "../../../shared/hooks/useScopedState";
 import ConversationAvatar from "./ConversationAvatar";
 import { userLabel } from "../../../shared/utils/userLabel";
 import ConversationCategories, { CategoryBadge, CategoryAssignment } from "./ConversationCategories";
@@ -235,7 +236,8 @@ export default function ChatSection({
   visibleLanguageOptions,
   visibleMessages,
 }: ChatSectionProps) {
-  const [readersTarget, setReadersTarget] = useState<{ message: Message; readerIds: number[]; sessionId: string } | null>(null);
+  const readersScope = `${session.sessionId}:${activeConversationId ?? ''}`;
+  const [readersTarget, setReadersTarget] = useScopedState<{ message: Message; readerIds: number[]; sessionId: string } | null>(readersScope, null);
   const readersMessage = readersTarget?.sessionId === session.sessionId ? readersTarget.message : null;
   const messageReaderMembers = useMemo(() => {
     if (!activeConversation) return [];

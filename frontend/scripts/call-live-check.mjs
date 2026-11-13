@@ -21,6 +21,8 @@ const lifecycle = read('src/features/calls/hooks/useCallRoomLifecycle.ts')
 const transport = read('src/features/calls/lib/callMediaInterpreter.ts')
 const backend = read('../backend/cmd/call/translation.go')
 const callRoutes = read('../backend/cmd/call/main.go')
+const groupRoutes = read('../backend/cmd/chat/groups.go')
+const revocations = read('../backend/cmd/call/revocations.go')
 const secrets = ['GEMINI_API_KEY', 'generativelanguage.googleapis.com', 'auth_tokens', 'BidiGenerateContent', 'liveConnectConstraints', 'gemini-3.5-live']
 for (const source of [ui, transport]) {
   for (const secret of secrets) assert.equal(source.includes(secret), false, 'client must not have provider detail: ' + secret)
@@ -35,8 +37,14 @@ assert.ok(callRoutes.includes('POST /api/calls/{id}/translation-consent') &&
   callRoutes.includes('GET /api/calls/{id}/translation-consent'), 'authenticated consent routes must be registered')
 assert.ok(callRoutes.includes('joinedCallParticipant(') &&
   callRoutes.includes('joinedCallUserIDs('), 'E2EE key access must require joined call membership')
-assert.ok(callRoutes.includes('removeLiveKitParticipant(ctx, call.RoomName, claims.UserID)'),
-  'group departure must kick participant from LiveKit media')
+assert.ok(groupRoutes.includes("VALUES('member_removed',$1,$2,$3)") &&
+  revocations.includes('case "member_removed":') &&
+  revocations.includes('revokeCallParticipant(ctx, call.callSession, job.TargetUserID)') &&
+  revocations.includes('removeLiveKitParticipantAndRevoke(') &&
+  revocations.includes('protowire.AppendTag') &&
+  revocations.includes('protowire.AppendVarint') &&
+  revocations.includes('callRevocationTokenWindow'),
+  'group departure must enqueue durable LiveKit revocation')
 assert.ok(ui.includes("phase !== 'connected'") &&
   ui.includes('[room, phase, translationOn,'), 'AI media streaming must stop on LiveKit reconnect/disconnect')
 assert.ok(backend.includes('callTranslationConsentAllowed(') && backend.includes('speaker has not consented to AI translation'), 'Gemini tickets require server-verified speaker consent')

@@ -121,6 +121,12 @@ func (s *server) blockUser(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot block user")
 		return
 	}
+	if _, err = tx.Exec(r.Context(), `
+		INSERT INTO call_revocations(reason,actor_user_id,target_user_id)
+		VALUES('block',$1,$2)`, claims.UserID, targetID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot block user")
+		return
+	}
 	if err = tx.Commit(r.Context()); err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot block user")
 		return

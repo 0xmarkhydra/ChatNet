@@ -67,23 +67,33 @@ func translationConsentKey(callID string, speakerID int64) string {
 	return fmt.Sprintf("chatnet:call:translation:consent:%s:%d", callID, speakerID)
 }
 
-func (s *server) revokeCallTranslationConsent(ctx context.Context, callID string, userID int64) {
-	if err := s.redis.Del(ctx, translationConsentKey(callID, userID)).Err(); err != nil {
-		log.Printf("call consent revoke failed call=%s: %T", callID, err)
+func (s *server) revokeCallTranslationConsent(ctx context.Context, callID string, userID int64) error {
+	if s.redis == nil {
+		return errors.New("redis is not configured")
 	}
+	if err := s.redis.Del(ctx, translationConsentKey(callID, userID)).Err(); err != nil {
+		log.Printf("call consent revoke failed call=%s code=%s", callID, safeCallErrorCode(err))
+		return err
+	}
+	return nil
 }
 
-func (s *server) cleanupCallTranslationConsents(ctx context.Context, callID string, userIDs []int64) {
+func (s *server) cleanupCallTranslationConsents(ctx context.Context, callID string, userIDs []int64) error {
 	if len(userIDs) == 0 {
-		return
+		return nil
+	}
+	if s.redis == nil {
+		return errors.New("redis is not configured")
 	}
 	keys := make([]string, 0, len(userIDs))
 	for _, id := range userIDs {
 		keys = append(keys, translationConsentKey(callID, id))
 	}
 	if err := s.redis.Del(ctx, keys...).Err(); err != nil {
-		log.Printf("call consent cleanup failed call=%s: %T", callID, err)
+		log.Printf("call consent cleanup failed call=%s code=%s", callID, safeCallErrorCode(err))
+		return err
 	}
+	return nil
 }
 
 func (s *server) callTranslationConsentAllowed(ctx context.Context, callID string, speakerID int64) (bool, error) {
@@ -528,7 +538,7 @@ func safeTranslationError(err error) string {
 	if errors.As(err, &closeErr) {
 		return fmt.Sprintf("websocket close code=%d reason=%q", closeErr.Code, sanitizeGeminiDiagnostic(closeErr.Text))
 	}
-	return fmt.Sprintf("%T", err) // Avoid URLs and credential-bearing handshake details in logs.
+	return safeCallErrorCode(err) // Avoid URLs and credential-bearing handshake details in logs.
 }
 
 func connectGeminiLive(ctx context.Context, target string) (*websocket.Conn, error) {

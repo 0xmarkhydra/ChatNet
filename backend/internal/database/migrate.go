@@ -41,6 +41,12 @@ var groupActivityPinsSQL string
 //go:embed migrations/010_channel_profile_notifications.sql
 var channelProfileNotificationsSQL string
 
+//go:embed migrations/011_call_revocations.sql
+var callRevocationsSQL string
+
+//go:embed migrations/012_call_cleanup_jobs.sql
+var callCleanupJobsSQL string
+
 //go:embed migrations/005_chat_pins.sql
 var chatPinsSQL string
 
@@ -105,6 +111,12 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, channelProfileNotificationsSQL); err != nil {
 		return fmt.Errorf("apply channel profile notifications migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, callRevocationsSQL); err != nil {
+		return fmt.Errorf("apply call revocations migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, callCleanupJobsSQL); err != nil {
+		return fmt.Errorf("apply call cleanup migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)

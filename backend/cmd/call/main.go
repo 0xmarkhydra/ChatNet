@@ -152,6 +152,7 @@ func main() {
 	}
 	s.limiter.Redis = rdb
 	go s.reapExpiredCalls(ctx)
+	go s.processCallRevocations(ctx)
 	go diagnoseGeminiLiveOnBoot()
 
 	mux := http.NewServeMux()
@@ -432,9 +433,9 @@ func (s *server) callHistory(w http.ResponseWriter, r *http.Request) {
 	items := []historyEntry{}
 	for rows.Next() {
 		var item historyEntry
-		if err := rows.Scan(&item.ID,&item.ConversationID,&item.CreatedBy,
-			&item.MediaType,&item.Status,&item.CreatedAt,&item.StartedAt,&item.EndedAt,
-			&item.Joined,&item.Declined,&item.IsGroup,&item.ParticipantCount); err != nil {
+		if err := rows.Scan(&item.ID, &item.ConversationID, &item.CreatedBy,
+			&item.MediaType, &item.Status, &item.CreatedAt, &item.StartedAt, &item.EndedAt,
+			&item.Joined, &item.Declined, &item.IsGroup, &item.ParticipantCount); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot load call history")
 			return
 		}
@@ -519,6 +520,11 @@ func (s *server) joinCall(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusConflict, "call invitation was declined")
 		return
 	}
+	// Clear any consent from a previous connection before marking this join active.
+	if err := s.revokeCallTranslationConsent(r.Context(), call.ID, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "call consent unavailable")
+		return
+	}
 
 	// Serialize simultaneous joins to prevent blocked users joining the same
 	// LiveKit room even when different service instances handle the requests.
@@ -530,6 +536,27 @@ func (s *server) joinCall(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	if _, err := tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", call.ID); err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	var stillAllowed bool
+	err = tx.QueryRow(r.Context(), `SELECT EXISTS(
+		SELECT 1 FROM call_sessions cs
+		JOIN conversations c ON c.id=cs.conversation_id
+		JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=$2
+		WHERE cs.id=$1 AND cs.status IN ('ringing','active')
+		  AND (c.type<>'direct' OR NOT EXISTS(
+		    SELECT 1 FROM conversation_members other JOIN user_blocks b ON
+		      (b.blocker_id=$2 AND b.blocked_id=other.user_id) OR
+		      (b.blocked_id=$2 AND b.blocker_id=other.user_id)
+		    WHERE other.conversation_id=c.id AND other.user_id<>$2
+		  ))
+	)`, call.ID, claims.UserID).Scan(&stillAllowed)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	if !stillAllowed {
+		httpx.Error(w, http.StatusForbidden, "not allowed to join this call")
 		return
 	}
 	var conflict bool
@@ -554,8 +581,6 @@ func (s *server) joinCall(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot join call")
 		return
 	}
-	// Rejoining requires fresh voice consent; never reuse a grant from a prior connection.
-	s.revokeCallTranslationConsent(r.Context(), call.ID, claims.UserID)
 	if claims.UserID != call.CreatedBy {
 		_, _ = s.db.Exec(r.Context(), `
 			UPDATE call_sessions SET status='active',started_at=COALESCE(started_at,NOW())
@@ -595,21 +620,23 @@ func (s *server) declineCall(w http.ResponseWriter, r *http.Request) {
 		httpx.JSON(w, http.StatusOK, call)
 		return
 	}
-	if _, err := s.db.Exec(r.Context(), `
-		UPDATE call_participants SET declined_at=COALESCE(declined_at,NOW()),left_at=COALESCE(left_at,NOW())
-		WHERE call_id=$1 AND user_id=$2`, call.ID, claims.UserID); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot decline call")
-		return
-	}
-
-	s.revokeCallTranslationConsent(r.Context(), call.ID, claims.UserID)
 	if member.ConversationType == "direct" || claims.UserID == call.CreatedBy {
+		if _, err := s.db.Exec(r.Context(), `
+			UPDATE call_participants SET declined_at=COALESCE(declined_at,NOW()),left_at=COALESCE(left_at,NOW())
+			WHERE call_id=$1 AND user_id=$2`, call.ID, claims.UserID); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot decline call")
+			return
+		}
 		if err := s.finishCall(r.Context(), &call, "cancelled"); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot cancel call")
 			return
 		}
 		s.afterCallFinished(call)
 	} else {
+		if err := s.markParticipantLeftAndQueue(r.Context(), call, claims.UserID, true); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot decline call")
+			return
+		}
 		s.publishCallEvent(r.Context(), s.callUserIDs(r.Context(), call.ID), "call.updated", call)
 	}
 	httpx.JSON(w, http.StatusOK, call)
@@ -635,19 +662,9 @@ func (s *server) leaveCall(w http.ResponseWriter, r *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
-	if _, err := s.db.Exec(r.Context(), `
-		UPDATE call_participants SET left_at=NOW()
-		WHERE call_id=$1 AND user_id=$2 AND left_at IS NULL`, call.ID, claims.UserID); err != nil {
+	if err := s.markParticipantLeftAndQueue(r.Context(), call, claims.UserID, false); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot leave call")
 		return
-	}
-	s.revokeCallTranslationConsent(r.Context(), call.ID, claims.UserID)
-	// Reject new key relay requests immediately; also kick existing LiveKit media.
-	s.cleanupCallCrypto(r.Context(), call.ID, []int64{claims.UserID})
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := s.removeLiveKitParticipant(ctx, call.RoomName, claims.UserID); err != nil {
-		log.Printf("livekit participant removal failed call=%s user=%d: %T", call.ID, claims.UserID, err)
 	}
 	s.publishCallEvent(r.Context(), s.callUserIDs(r.Context(), call.ID), "call.updated", call)
 	httpx.JSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -693,6 +710,12 @@ func (s *server) finishCall(ctx context.Context, call *callSession, status strin
 	if _, err := tx.Exec(ctx, `UPDATE call_participants SET left_at=COALESCE(left_at,NOW()) WHERE call_id=$1`, call.ID); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO call_revocations(reason,conversation_id,call_id,actor_user_id,target_user_id)
+		VALUES('call_finished',$1,$2,$3,$3)
+		ON CONFLICT DO NOTHING`, call.ConversationID, call.ID, call.CreatedBy); err != nil {
+		return err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
@@ -705,13 +728,6 @@ func (s *server) finishCall(ctx context.Context, call *callSession, status strin
 func (s *server) afterCallFinished(call callSession) {
 	users := s.callUserIDs(context.Background(), call.ID)
 	s.publishCallEvent(context.Background(), users, "call.ended", call)
-	s.cleanupCallCrypto(context.Background(), call.ID, users)
-	s.cleanupCallTranslationConsents(context.Background(), call.ID, users)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := s.deleteLiveKitRoom(ctx, call.RoomName); err != nil && s.liveKitConfigured() {
-		log.Printf("livekit room cleanup failed call=%s: %v", call.ID, err)
-	}
 }
 
 func (s *server) reapExpiredCalls(ctx context.Context) {
@@ -729,7 +745,13 @@ func (s *server) reapExpiredCalls(ctx context.Context) {
 
 func (s *server) expireRingingCalls(ctx context.Context) {
 	cutoff := time.Now().Add(-ringTimeout)
-	rows, err := s.db.Query(ctx, `
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		log.Printf("expire ringing calls transaction failed: %v", err)
+		return
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `
 		UPDATE call_sessions
 		SET status='cancelled',ended_at=NOW()
 		WHERE status='ringing' AND created_at < $1
@@ -741,14 +763,39 @@ func (s *server) expireRingingCalls(ctx context.Context) {
 	calls := []callSession{}
 	for rows.Next() {
 		var call callSession
-		if rows.Scan(&call.ID, &call.ConversationID, &call.CreatedBy, &call.MediaType, &call.Status,
-			&call.RoomName, &call.CreatedAt, &call.StartedAt, &call.EndedAt) == nil {
-			calls = append(calls, call)
+		if err := rows.Scan(&call.ID, &call.ConversationID, &call.CreatedBy, &call.MediaType, &call.Status,
+			&call.RoomName, &call.CreatedAt, &call.StartedAt, &call.EndedAt); err != nil {
+			rows.Close()
+			log.Printf("expire ringing calls scan failed: %v", err)
+			return
 		}
+		calls = append(calls, call)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		log.Printf("expire ringing calls rows failed: %v", err)
+		return
 	}
 	rows.Close()
 	for _, call := range calls {
-		_, _ = s.db.Exec(ctx, `UPDATE call_participants SET left_at=COALESCE(left_at,NOW()) WHERE call_id=$1`, call.ID)
+		if _, err := tx.Exec(ctx, `
+			UPDATE call_participants SET left_at=COALESCE(left_at,NOW()) WHERE call_id=$1`, call.ID); err != nil {
+			log.Printf("expire ringing participants failed call=%s: %v", call.ID, err)
+			return
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO call_revocations(reason,conversation_id,call_id,actor_user_id,target_user_id)
+			VALUES('call_finished',$1,$2,$3,$3)
+			ON CONFLICT DO NOTHING`, call.ConversationID, call.ID, call.CreatedBy); err != nil {
+			log.Printf("enqueue expired call cleanup failed call=%s: %v", call.ID, err)
+			return
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("expire ringing calls commit failed: %v", err)
+		return
+	}
+	for _, call := range calls {
 		s.afterCallFinished(call)
 	}
 }
@@ -1110,6 +1157,10 @@ func (s *server) liveKitParticipantRemovalToken(roomName string) (string, error)
 }
 
 func (s *server) removeLiveKitParticipant(ctx context.Context, roomName string, userID int64) error {
+	return s.removeLiveKitParticipantAt(ctx, roomName, userID)
+}
+
+func (s *server) removeLiveKitParticipantAt(ctx context.Context, roomName string, userID int64) error {
 	if !s.liveKitConfigured() || roomName == "" {
 		return nil
 	}
@@ -1120,8 +1171,7 @@ func (s *server) removeLiveKitParticipant(ctx context.Context, roomName string, 
 	baseURL := "https://" + strings.TrimPrefix(s.liveKitURL, "wss://")
 	client := &http.Client{Timeout: 5 * time.Second, Transport: bearerTransport{base: http.DefaultTransport, token: token}}
 	service := lk.NewRoomServiceProtobufClient(baseURL, client)
-	_, err = service.RemoveParticipant(ctx, &lk.RoomParticipantIdentity{Room: roomName, Identity: participantIdentity(userID)})
-	return err
+	return removeLiveKitParticipantAndRevoke(ctx, service, roomName, userID)
 }
 
 func (s *server) deleteLiveKitRoom(ctx context.Context, roomName string) error {
@@ -1129,25 +1179,44 @@ func (s *server) deleteLiveKitRoom(ctx context.Context, roomName string) error {
 		return nil
 	}
 	token, err := auth.NewAccessToken(s.liveKitAPIKey, s.liveKitAPISecret).
-		SetVideoGrant(&auth.VideoGrant{RoomCreate: true}).SetValidFor(time.Minute).ToJWT()
+		SetVideoGrant(&auth.VideoGrant{RoomCreate: true, RoomList: true}).SetValidFor(time.Minute).ToJWT()
 	if err != nil {
 		return err
 	}
 	baseURL := "https://" + strings.TrimPrefix(s.liveKitURL, "wss://")
 	client := &http.Client{Timeout: 5 * time.Second, Transport: bearerTransport{base: http.DefaultTransport, token: token}}
 	service := lk.NewRoomServiceProtobufClient(baseURL, client)
-	_, err = service.DeleteRoom(ctx, &lk.DeleteRoomRequest{Room: roomName})
-	return err
+	rooms, err := service.ListRooms(ctx, &lk.ListRoomsRequest{Names: []string{roomName}})
+	if err != nil {
+		return err
+	}
+	if rooms == nil {
+		return errors.New("livekit returned no room list")
+	}
+	for _, room := range rooms.Rooms {
+		if room.Name == roomName {
+			_, err = service.DeleteRoom(ctx, &lk.DeleteRoomRequest{Room: roomName})
+			return err
+		}
+	}
+	return nil
 }
 
-func (s *server) cleanupCallCrypto(ctx context.Context, callID string, userIDs []int64) {
+func (s *server) cleanupCallCrypto(ctx context.Context, callID string, userIDs []int64) error {
 	keys := make([]string, 0, len(userIDs)*2)
 	for _, id := range userIDs {
 		keys = append(keys, publicKeyRedisKey(callID, id), envelopeRedisKey(callID, id))
 	}
 	if len(keys) > 0 {
-		_ = s.redis.Del(ctx, keys...).Err()
+		if s.redis == nil {
+			return errors.New("redis is not configured")
+		}
+		if err := s.redis.Del(ctx, keys...).Err(); err != nil {
+			log.Printf("call crypto cleanup failed call=%s code=%s", callID, safeCallErrorCode(err))
+			return err
+		}
 	}
+	return nil
 }
 
 func participantIdentity(userID int64) string { return fmt.Sprintf("u_%d", userID) }
