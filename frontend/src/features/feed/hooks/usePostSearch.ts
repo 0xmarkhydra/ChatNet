@@ -48,7 +48,8 @@ export function usePostSearch({
       : "";
   const currentKey = useLatest(key);
   const requestRef = useLatest(request);
-  const controller = useRef<AbortController | null>(null);
+  const searchController = useRef<AbortController | null>(null);
+  const pagingController = useRef<AbortController | null>(null);
   const pagingBusy = useRef(false);
   const [retryNumber, setRetryNumber] = useState(0);
   // A search and each retry owns a fresh result set. The previous query never
@@ -63,12 +64,13 @@ export function usePostSearch({
     encodeURIComponent(normalizedQuery);
 
   useEffect(() => {
-    controller.current?.abort();
+    pagingController.current?.abort();
+    pagingController.current = null;
     pagingBusy.current = false;
     if (!key) return;
 
     const abort = new AbortController();
-    controller.current = abort;
+    searchController.current = abort;
 
     const timer = window.setTimeout(async () => {
       try {
@@ -99,7 +101,11 @@ export function usePostSearch({
 
     return () => {
       window.clearTimeout(timer);
-      controller.current?.abort();
+      abort.abort();
+      if (searchController.current === abort) searchController.current = null;
+      pagingController.current?.abort();
+      pagingController.current = null;
+      pagingBusy.current = false;
     };
   }, [key, baseUrl, retryNumber, requestRef, currentKey, setState]);
 
@@ -120,7 +126,7 @@ export function usePostSearch({
     if (!before) return;
     pagingBusy.current = true;
     const abort = new AbortController();
-    controller.current = abort;
+    pagingController.current = abort;
     setState((previous) =>
       previous.key === key ? { ...previous, loadingMore: true, error: '' } : previous,
     );
@@ -159,9 +165,9 @@ export function usePostSearch({
         );
       }
     } finally {
-      if (controller.current === abort) {
+      if (pagingController.current === abort) {
         pagingBusy.current = false;
-        controller.current = null;
+        pagingController.current = null;
       }
     }
   }
