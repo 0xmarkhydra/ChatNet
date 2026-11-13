@@ -9,7 +9,7 @@ import UserAvatar from '../../../shared/ui/UserAvatar'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
 import { CallHeaderActions } from './CallManager'
 import { getCallHistory, type CallHistoryEntry, type CallRequest } from '../lib/calls'
-import { formatDuration, latestCallDuration } from '../utils/call-history'
+import { callOutcome, formatCallDate, formatDuration, latestCallDuration } from '../utils/call-history'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/call-center.css'
 
@@ -34,15 +34,6 @@ const ENABLE_KEY = 'chatnet.call.translation.autostart.v1'
 const LANGUAGE_KEY = 'chatnet.call.target-language.v1'
 const CAPTION_KEY = 'chatnet.call.subtitle-mode.v1'
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
-}
-function outcome(entry: CallHistoryEntry, userId: number) {
-  if (entry.createdBy !== userId && !entry.joined && !entry.declined) return 'Gọi nhỡ'
-  if (entry.declined) return 'Đã từ chối'
-  if (entry.joined && entry.startedAt) return entry.createdBy === userId ? 'Đã gọi' : 'Đã nhận'
-  return 'Không kết nối'
-}
 
 export default function CallCenter({ request, userId, token, conversations, targetLanguage, directoryContent, directoryQuery, onDirectoryQueryChange, onDirectoryOpen, onNavigate, onOpenChat, embedded = false }: Props) {
   const requestRef = useLatest(request)
@@ -147,7 +138,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
   }, [isMobileLayout, mobileDetailsOpen])
 
   const conversationMap = useMemo(() => new Map(conversations.map((item) => [item.id, item])), [conversations])
-  const missed = (item: CallHistoryEntry) => outcome(item, userId) === 'Gọi nhỡ'
+  const missed = (item: CallHistoryEntry) => callOutcome(item, userId) === 'Gọi nhỡ'
   const month = new Date().getMonth()
   const year = new Date().getFullYear()
   const monthCount = entries.filter((item) => {
@@ -262,8 +253,8 @@ export default function CallCenter({ request, userId, token, conversations, targ
                       }
                     }} aria-pressed={selected?.id === entry.id && (!isMobileLayout || mobileDetailsOpen)}>
                       <UserAvatar name={conversation?.name || 'Cuộc trò chuyện'} username={conversation?.otherUsername} group={entry.isGroup} className="call-history-avatar" />
-                      <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {outcome(entry, userId)}{' · ' + duration}</small></span>
-                      <span className="call-history-time">{formatDate(entry.createdAt)}</span>
+                      <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {callOutcome(entry, userId)}{' · ' + duration}</small></span>
+                      <span className="call-history-time">{formatCallDate(entry.createdAt)}</span>
                       {isMissed ? <PhoneMissed size={19} className="call-history-icon" /> : entry.createdBy === userId ? <PhoneOutgoing size={19} className="call-history-icon" /> : <PhoneIncoming size={19} className="call-history-icon" />}
                     </button>
                   )
@@ -287,9 +278,9 @@ export default function CallCenter({ request, userId, token, conversations, targ
                   return <div className="call-detail-body">
                     <UserAvatar name={conversation?.name || 'Cuộc trò chuyện'} username={conversation?.otherUsername} group={selected.isGroup} className="call-detail-avatar" />
                     <h3>{conversation?.name || 'Cuộc trò chuyện #' + selected.conversationId}</h3>
-                    <p className={missed(selected) ? 'missed' : 'success'}>{selected.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {outcome(selected, userId)}</p>
+                    <p className={missed(selected) ? 'missed' : 'success'}>{selected.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {callOutcome(selected, userId)}</p>
                     <dl>
-                      <div><dt>Thời gian bắt đầu</dt><dd>{formatDate(selected.createdAt)}</dd></div>
+                      <div><dt>Thời gian bắt đầu</dt><dd>{formatCallDate(selected.createdAt)}</dd></div>
                       <div><dt>Thời lượng</dt><dd>{formatDuration(selected)}</dd></div>
                       <div><dt>Người tham gia</dt><dd>{selected.participantCount} người đã kết nối</dd></div>
                       <div><dt>Loại cuộc gọi</dt><dd>{selected.isGroup ? 'Cuộc gọi nhóm' : 'Cá nhân'}</dd></div>
