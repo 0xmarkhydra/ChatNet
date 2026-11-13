@@ -55,6 +55,32 @@ test('reports dependency cycles and dynamic imports', () => {
   })
 })
 
+
+
+test('detects aliased deep imports, even when a feature exposes a public index', () => {
+  fixture({
+    'features/auth/index.ts': "export type { Session } from './types'\\n",
+    'features/auth/types.ts': 'export type Session = { id: string }\\n',
+    'features/chat/useSession.ts': "import type { Session } from '@/features/auth/types'\\n",
+    'features/chat/usePublicSession.ts': "import type { Session } from '@/features/auth'\\n",
+  }, violations => {
+    assert.deepEqual(violations.filter(item => item.startsWith('feature-entrypoint:')),
+      ['feature-entrypoint: features/chat/useSession.ts -> features/auth/types.ts'])
+  })
+})
+
+test('does not allow a public index to bypass foreign feature API ownership', () => {
+  fixture({
+    'features/chat/api/request.ts': 'export const request = () => 1\\n',
+    'features/chat/index.ts': "export { request } from './api/request'\\n",
+    'features/feed/fromApi.ts': "import { request } from '../chat/api/request'\\n",
+    'features/feed/fromPublic.ts': "import { request } from '../chat'\\n",
+  }, violations => {
+    assert.deepEqual(violations.filter(item => item.startsWith('api-ownership:')),
+      ['api-ownership: features/feed/fromApi.ts -> features/chat/api/request.ts'])
+  })
+})
+
 test('legacy baseline permits old violations but rejects newly introduced ones', () => {
   assert.deepEqual(compareBaseline(['old', 'new'], ['old']), ['new'])
   assert.deepEqual(compareBaseline(['old'], ['old', 'removed']), [])
