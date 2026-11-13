@@ -1,4 +1,5 @@
-import { Fragment, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { Fragment, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { createPortal } from 'react-dom'
 import { Phone, Plus, RefreshCw, Search, Users, Video, X } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from '../types'
 import type { Conversation } from '../../chat/types'
@@ -63,11 +64,64 @@ export default function ContactsView({
   const { hostRef: filterHostRef, pillRef: filterPillRef, activeRef: filterActiveRef } = useSlidingPill<HTMLDivElement>(directoryFilter)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [expandedFriendId, setExpandedFriendId] = useState<number | null>(null)
+  const [isMobileLayout, setIsMobileLayout] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches)
   const searchRef = useRef<HTMLInputElement>(null)
+  const modalCloseRef = useRef<HTMLButtonElement>(null)
+  const modalRef = useRef<HTMLDivElement>(null)
+  const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
   const searching = !embeddedInCalls && Boolean(friendQuery.trim())
 
   const { visibleFriends, callSections } = useContactDirectory({ friends, contactMetadata, embeddedInCalls, friendQuery, directoryFilter, callConversations })
   const selectedFriend = visibleFriends.find(friend => friend.id === selectedId) ?? visibleFriends[0] ?? null
+  const modalFriend = visibleFriends.find(friend => friend.id === expandedFriendId) ?? null
+  const modalOpen = isMobileLayout && !embeddedInCalls && screen === 'directory' && Boolean(modalFriend)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 760px)')
+    const onChange = () => {
+      setIsMobileLayout(media.matches)
+      setExpandedFriendId(null)
+    }
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    if (!modalOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    modalCloseRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setExpandedFriendId(null)
+        selectedTriggerRef.current?.focus()
+      }
+      if (event.key === 'Tab') {
+        const buttons = modalRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])')
+        if (!buttons?.length) return
+        const first = buttons[0]
+        const last = buttons[buttons.length - 1]
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [modalOpen])
+
+  const closeFriendModal = () => {
+    setExpandedFriendId(null)
+    selectedTriggerRef.current?.focus()
+  }
   const blockedStatus = (friend: FriendSearchResult) => friends.find(item => item.id === friend.id)
   const isBlocked = (friend: FriendSearchResult) => {
     const item = blockedStatus(friend)
@@ -101,8 +155,8 @@ export default function ContactsView({
     <UserAvatar username={friend.username} name={personName(friend)}
       className={'avatar fd-avatar ' + additional} online={friend.online} />
   )
-  const profileDetails = (friend: FriendConnection) => (
-    <ContactFriendProfile friend={friend} contactMetadata={contactMetadata} friendBusyIds={friendBusyIds}
+  const profileDetails = (friend: FriendConnection, iconOnly = false) => (
+    <ContactFriendProfile iconOnly={iconOnly} friend={friend} contactMetadata={contactMetadata} friendBusyIds={friendBusyIds}
       friendMenuId={friendMenuId} setFriendMenuId={setFriendMenuId} setFriendPreview={setFriendPreview}
       changePersonalContact={changePersonalContact} removeAcceptedFriend={removeAcceptedFriend}
       blockContact={blockContact} unblockContact={unblockContact} reportContact={reportContact}
@@ -117,7 +171,7 @@ export default function ContactsView({
             placeholder="Tìm theo tên, số điện thoại hoặc ID SocCo..." aria-label="Tìm trong danh bạ" />
           {friendQuery && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => {setFriendQuery('');searchRef.current?.focus()}}><X size={17}/></button>}
         </label>
-        <button type="button" className="fd-primary fd-add-new" onClick={enterInvitations}><Plus size={18}/>Kết bạn mới</button>
+        <button type="button" className="fd-primary fd-add-new" onClick={enterInvitations} title="Kết bạn mới"><Plus size={18}/>Kết bạn mới</button>
       </section>}
       <div className={'fd-directory-layout' + (embeddedInCalls ? ' fd-list-only' : '')}>
         <section className="fd-card fd-list-card">
@@ -155,9 +209,10 @@ export default function ContactsView({
               {visibleFriends.map(friend => <Fragment key={friend.id}><div className={'fd-person-row' + (!embeddedInCalls && selectedFriend?.id === friend.id ? ' selected' : '') + (!embeddedInCalls && expandedFriendId === friend.id ? ' expanded' : '')}>
                 <button type="button" className="fd-person-identity" aria-pressed={embeddedInCalls ? undefined : selectedFriend?.id === friend.id}
                   aria-expanded={embeddedInCalls ? undefined : expandedFriendId === friend.id}
-                  onClick={() => {
+                  onClick={(event) => {
                     if (embeddedInCalls) { openChat(friend); return }
                     setSelectedId(friend.id)
+                    if (isMobileLayout) selectedTriggerRef.current = event.currentTarget
                     setExpandedFriendId(value => value === friend.id ? null : friend.id)
                   }}>{avatar(friend)}<span>
                     <strong>{contactMetadata[friend.id]?.nickname || personName(friend)}</strong>
@@ -172,7 +227,7 @@ export default function ContactsView({
                     disabled={isBlocked(friend)} onClick={() => void openDirectByUsername(friend.username, 'video')}><Video size={20}/></button>
                 </>}
               </div>
-              {!embeddedInCalls && expandedFriendId === friend.id && <section className="fd-inline-profile" aria-label={'Thông tin của ' + personName(friend)}>
+              {!embeddedInCalls && !isMobileLayout && expandedFriendId === friend.id && <section className="fd-inline-profile" aria-label={'Thông tin của ' + personName(friend)}>
                 {profileDetails(friend)}
               </section>}
               </Fragment>)}
@@ -190,5 +245,17 @@ export default function ContactsView({
         </section>}
       </div>
     </> : <ContactInvitations friendRequests={friendRequests} friendBusyIds={friendBusyIds} actOnFriend={actOnFriend} declineFriendRequest={declineFriendRequest} connectionUrl={connectionUrl} onScanQr={onScanQr} onBack={() => { onScreenChange('directory'); setFriendQuery('') }} onSearch={openSearch} />}
+    {modalOpen && modalFriend && createPortal(
+      <div className="friends-design-v2 fd-friend-modal-layer">
+        <button className="fd-friend-modal-backdrop" type="button" aria-label="Đóng thông tin bạn bè" onClick={closeFriendModal} tabIndex={-1} />
+        <div ref={modalRef} className="fd-friend-modal-dialog fd-card" role="dialog" aria-modal="true" aria-labelledby="fd-friend-modal-title">
+          <div className="fd-friend-modal-heading">
+            <h2 id="fd-friend-modal-title">Thông tin bạn bè</h2>
+            <button ref={modalCloseRef} type="button" aria-label="Đóng thông tin bạn bè" onClick={closeFriendModal}><X size={19}/></button>
+          </div>
+          {profileDetails(modalFriend, true)}
+        </div>
+      </div>, document.body,
+    )}
   </div>
 }

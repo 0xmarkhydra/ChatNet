@@ -124,6 +124,9 @@
 .call-history-icon { color: #2869fa; flex: 0 0 auto; }
 .call-center-limit { display: block; padding: 20px 8px 4px; color: #9aa8bf; font-size: 10px; }
 .call-history-details { min-height: 490px; }
+.call-detail-heading { display: flex; align-items: center; justify-content: space-between; margin: 1px 5px 18px; }
+.call-history-details .call-detail-heading h2 { margin: 0; font-size: 15px; font-weight: 770; }
+.call-detail-close, .call-detail-scrim { display: none; }
 .call-detail-body { text-align: center; display: flex; flex-direction: column; align-items: center; }
 .call-detail-avatar { width: 76px; height: 76px; border-radius: 50%; margin: 9px 0 13px; }
 .call-detail-body h3 { font-size: 16px; margin: 0 0 7px; }
@@ -140,6 +143,7 @@
   padding: 10px 20px; width: 46%; display: flex; align-items: center; justify-content: center;
 }
 .call-detail-actions > button { background: #edf1ff; color: #315fe8; border: 0; padding: 10px; border-radius: 10px; font-weight: 700; }
+.call-detail-open-chat-icon { display: none; }
 .call-detail-unavailable { color: #8897b3; line-height: 1.6; }
 .call-center-state { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 25px; text-align: center; color: #8290aa; }
 .call-center-state strong { color: #27385a; }
@@ -314,3 +318,55 @@
   .app-shell:has(.call-center.is-embedded) > .chatnet-appbar {display:none;}
 }
 @media(max-width:760px) { .modern-shell .bottom-navigation { grid-template-columns: repeat(6,minmax(0,1fr)); } }
+
+/* On PWA phones the call details open above history, not beneath the list. */
+@media (max-width: 760px) {
+  .call-history-layout { display: block; }
+  .call-history-list { min-height: 0; }
+  .call-history-details { display: none; }
+  .call-detail-scrim {
+    display: block; position: fixed; inset: 0; z-index: 10010;
+    width: 100%; height: 100%; padding: 0; border: 0;
+    background: rgba(13, 26, 54, .54);
+  }
+  .call-history-details.is-open {
+    display: block; position: fixed; z-index: 10011;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(360px, calc(100vw - 36px));
+    max-height: calc(100dvh - 48px);
+    min-height: 0; padding: 12px 13px max(14px, env(safe-area-inset-bottom));
+    overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+    border-radius: 20px; box-shadow: 0 24px 75px rgba(13, 26, 54, .27);
+  }
+  .call-history-details .call-detail-heading { margin-bottom: 12px; }
+  .call-detail-close {
+    display: grid; place-items: center; flex: 0 0 36px;
+    width: 36px; height: 36px; padding: 0; border: 0;
+    border-radius: 50%; background: #f0f3fc; color: #455a7c;
+  }
+  .call-history-details .call-detail-heading { margin-bottom: 6px; }
+  .call-history-details .call-detail-heading h2 { font-size: 14px; }
+  .call-history-details .call-detail-avatar { width: 62px; height: 62px; margin: 2px 0 8px; }
+  .call-history-details .call-detail-body h3 { font-size: 14px; margin-bottom: 4px; }
+  .call-history-details .call-detail-body > p { font-size: 11px; margin-bottom: 10px; }
+  .call-history-details .call-detail-body dl { margin-bottom: 10px; padding: 5px 0; }
+  .call-history-details .call-detail-body dl div { padding: 8px 3px; font-size: 11px; }
+  .call-history-details .call-detail-actions {
+    display:flex; flex-direction:row; justify-content:center; align-items:center; gap:10px;
+  }
+  .call-history-details .call-detail-actions .call-header-actions {
+    display:flex; flex:0 0 auto; align-items:center; justify-content:center; gap:10px;
+  }
+  .call-history-details .call-detail-actions .call-header-actions button {
+    display:grid; place-items:center; flex:0 0 42px;
+    width:42px; height:42px; min-height:42px; padding:0; border-radius:12px;
+  }
+  .call-history-details .call-detail-actions > button {
+    display: grid; place-items: center; align-self: center;
+    width: 42px; height: 42px; min-height: 42px; padding: 0;
+    border-radius: 12px;
+  }
+  .call-history-details .call-detail-open-chat-icon { display: block; }
+  .call-history-details .call-detail-open-chat-label { display: none; }
+  .call-center:has(.call-history-details.is-open) .call-center-content { overflow: hidden; }
+}

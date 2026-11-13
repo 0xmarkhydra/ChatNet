@@ -206,3 +206,75 @@
  .fd-request-row{gap:7px}
  .fd-request-row .fd-primary,.fd-request-row .fd-secondary{flex:1}
 }
+/* Compact modal for the Friends tab on phone-sized PWA layouts. */
+@media (max-width: 760px) {
+ .fd-friend-modal-layer {
+   position:fixed; inset:0; z-index:21000;
+   display:flex; align-items:center; justify-content:center;
+   width:100%; height:100dvh; min-height:0; padding:16px;
+   margin:0; background:transparent; overflow:visible;
+ }
+ .fd-friend-modal-backdrop {
+   position:absolute; inset:0; border:0; padding:0;
+   background:rgba(17,29,56,.56); cursor:default;
+ }
+ .fd-friend-modal-dialog {
+   position:relative; width:min(354px,100%); max-height:calc(100dvh - 32px);
+   padding:12px 13px 15px; overflow-x:hidden; overflow-y:auto;
+   overscroll-behavior:contain; border-radius:18px;
+   box-shadow:0 18px 55px rgba(15,28,54,.26);
+ }
+ .fd-friend-modal-heading {
+   display:flex; justify-content:space-between; align-items:center;
+   gap:10px; padding:0 0 10px;
+ }
+ .fd-friend-modal-heading h2 {font-size:15px}
+ .fd-friend-modal-heading button {
+   display:grid; place-items:center; width:32px; height:32px;
+   flex:0 0 32px; border:0; border-radius:50%;
+   background:#eef2fa; color:#415679;
+ }
+ .fd-friend-modal-dialog .fd-profile-cover {height:80px; min-height:80px; border-radius:11px}
+ .fd-friend-modal-dialog .fd-profile-avatar {
+   width:72px!important; height:72px!important; flex-basis:72px;
+   margin-top:-29px; border-width:3px!important;
+ }
+ .fd-friend-modal-dialog .fd-profile-core h2 {margin:6px 0 3px; font-size:17px}
+ .fd-friend-modal-dialog .fd-profile-core p {font-size:11px}
+ .fd-friend-modal-dialog .fd-profile-actions {margin:14px 0 12px; gap:7px}
+ .fd-friend-modal-dialog .fd-profile-actions button {min-height:37px; padding:8px 7px; font-size:12px; gap:5px}
+ .fd-friend-modal-dialog .fd-profile-info {padding:12px 8px 8px; gap:9px}
+ .fd-friend-modal-dialog .fd-profile-info h3 {font-size:13px}
+ .fd-friend-modal-dialog .fd-profile-info p,
+ .fd-friend-modal-dialog .fd-profile-info button {font-size:12px; gap:8px}
+ .fd-friend-modal-dialog .fd-profile-options {margin:10px 0 0; padding:12px}
+ .fd-friend-modal-dialog .fd-profile-options>div:nth-child(2) {margin-top:8px}
+ .fd-friend-modal-dialog .fd-profile-actions {
+   display:flex; justify-content:center; align-items:center;
+   gap:12px; margin:12px 0;
+ }
+ .fd-friend-modal-dialog .fd-profile-actions button {
+   display:grid; place-items:center; flex:0 0 44px;
+   width:44px; min-width:44px; height:44px; min-height:44px;
+   padding:0; border-radius:13px;
+ }
+}
+/* Keep the new-friend action compact beside search on narrow PWA screens. */
+@media (max-width:760px) {
+ .friends-design-v2:not(.is-call-directory) .fd-searchbar {
+   gap:7px; padding:9px 10px; flex-wrap:nowrap;
+ }
+ .friends-design-v2:not(.is-call-directory) .fd-add-new {
+   flex:0 0 auto; width:auto; min-width:0; min-height:35px;
+   padding:7px 9px; border-radius:10px; font-size:10px; gap:4px;
+ }
+ .friends-design-v2:not(.is-call-directory) .fd-add-new svg {
+   width:15px; height:15px;
+ }
+ .friends-design-v2:not(.is-call-directory) .fd-searchbar>label {
+   flex:1 1 0; min-width:0; gap:6px;
+ }
+ .friends-design-v2:not(.is-call-directory) .fd-searchbar>label>input {
+   min-width:0; font-size:11px;
+ }
+}
