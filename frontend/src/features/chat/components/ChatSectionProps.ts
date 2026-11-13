@@ -1,17 +1,17 @@
 import type { FormEvent, Dispatch, RefObject, ReactNode, SetStateAction } from "react";
 import type { ChatTranslationSettings } from "../lib/conversationTranslationSettings";
 import type { GroupMember, Message, Conversation, NewChatMode, MessageReaction } from "../types";
-import type { FriendSearchResult, FriendConnection } from "../../contacts/types";
+import type { FriendSearchResult, FriendConnection } from "../../contacts";
 import type { QueuedChatMessage } from "../lib/chatOutbox";
 import type { GroupChannel } from "../utils/groupChannels";
 import type { MediaAttachment } from "../../../shared/utils/media";
-import type { Session } from "../../auth/lib/session";
+import type { Session } from "../../../shared/types/session";
 import type { ToastKind } from "../../../shared/utils/toast";
 import type { Tab } from "../../../shared/types/navigation";
-import type { UI_MESSAGES } from "../../i18n/lib/i18n";
+import type { UIMessageKey } from "../../i18n";
 import type { ConversationCategory } from "../hooks/useConversationCategories";
 import type { GroupActivity, GroupActivityEvent, GroupActivityKind } from "./GroupActivities";
-import type { LanguageOption } from "../../i18n/utils/languages";
+import type { LanguageOption } from "../../i18n";
 
 export type ChatSectionProps = {
   activeChatTranslationSettings: ChatTranslationSettings | undefined;
@@ -174,7 +174,7 @@ export type ChatSectionProps = {
   suppressConversationClick: RefObject<number | null>;
   suppressMessageClick: RefObject<number | null>;
   switchTab: (nextTab: Tab) => void;
-  t: (key: keyof typeof UI_MESSAGES) => string;
+  t: (key: UIMessageKey) => string;
   toggleMessagePin: (message: Message) => Promise<void>;
   toggleReaction: (message: Message, emoji: string) => Promise<void>;
   translateMessage: (message: Message, reveal?: boolean) => Promise<void>;
