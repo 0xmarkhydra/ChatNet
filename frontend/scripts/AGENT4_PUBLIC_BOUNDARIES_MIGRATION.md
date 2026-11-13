@@ -5,7 +5,7 @@
 - Original audit: `origin/main` at `d87f383`, baseline 106 (101 feature-entrypoint + 5 dependency-cycle).
 - Refreshed and rebased on `origin/main` at `644d4e0` (Agent 2 PR #111 merged).
 - All five old ChatSection dependency cycles disappeared in the latest source scan. Removed **only those five** entries from `architecture-baseline.json`, now 101.
-- Current scan: **105 total violations = 101 existing + 4 newly introduced feature-entrypoint violations**. `npm run check:architecture` must remain **FAIL** until the four new consumers are migrated. Never add these four to the baseline or suppress the rule.
+- Follow-up consumer migration (explicitly authorized by project owner): all four new type-only imports in `ChatSectionProps.ts` now point to public entrypoints. Current scan: **101 existing / 101 baseline**, architecture gate **PASS**. No baseline exemption was added.
 - Architecture baseline integrity unit test is a separate guard ensuring the baseline does not retain already-remediated violations.
 
 ## Public type-only entrypoints
@@ -18,11 +18,11 @@
 
 All other exports above are `export type`; `UI_MESSAGES` is an intentional public, constant runtime contract. No wildcard barrel is introduced.
 
-## Required Agent 2 / integration migration
+## Completed ChatSectionProps migration (owner-approved scope exception)
 
-The following four edges are new in `frontend/src/features/chat/components/ChatSectionProps.ts` after Agent 2's contracts extraction. **Agent 4 does not edit this consumer**, because it is outside the exclusive scope.
+The four imports introduced by Agent 2's contract extraction were migrated directly after the project owner explicitly authorized editing this consumer.
 
-| Existing type-only import | Replace with |
+| Previous type-only import | New public entrypoint |
 | --- | --- |
 | `../../auth/lib/session` | `../../auth` (`Session`) |
 | `../../contacts/types` | `../../contacts` (`FriendSearchResult`, `FriendConnection`) |
