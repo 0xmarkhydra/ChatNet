@@ -2,9 +2,10 @@
 import { act, useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it } from 'vitest'
-import type { Session } from '../../auth/lib/session'
-import type { UserPrivacy } from '../../profile/types'
+import type { Session } from '../../../shared/types/session'
 import { usePrivacySettings } from './usePrivacySettings'
+
+type UserPrivacy = NonNullable<ReturnType<typeof usePrivacySettings>['privacy']>
 
 describe('privacy session isolation', () => {
   it('hides the previous account immediately and rejects its late response and setter', async () => {
