@@ -1,10 +1,5 @@
 {
   "violations": [
-    "dependency-cycle: features/chat/components/ChatSection.tsx -> features/chat/components/ConversationHeader.tsx -> features/chat/components/ChatSection.tsx",
-    "dependency-cycle: features/chat/components/ChatSection.tsx -> features/chat/components/ConversationList.tsx -> features/chat/components/ChatSection.tsx",
-    "dependency-cycle: features/chat/components/ChatSection.tsx -> features/chat/components/MessageComposer.tsx -> features/chat/components/ChatSection.tsx",
-    "dependency-cycle: features/chat/components/ChatSection.tsx -> features/chat/components/MessageTimeline.tsx -> features/chat/components/ChatSection.tsx",
-    "dependency-cycle: features/chat/components/ChatSection.tsx -> features/chat/components/PinnedItemsPanel.tsx -> features/chat/components/ChatSection.tsx",
     "feature-entrypoint: features/auth/components/AuthScreen.tsx -> features/i18n/lib/i18n.ts",
     "feature-entrypoint: features/auth/components/AuthSetup.tsx -> features/i18n/lib/i18n.ts",
     "feature-entrypoint: features/calls/components/CallCenter.tsx -> features/chat/types.ts",
