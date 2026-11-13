@@ -548,12 +548,13 @@ export default function AuthedApp({
     "groups" | "calls" | null
   >(null);
   const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);
-  useEffect(() => {
-    if (translationSettingsConversationId !== null &&
-        translationSettingsConversationId !== activeConversationId) {
-      setTranslationSettingsConversationId(null);
-    }
-  }, [translationSettingsConversationId, activeConversationId]);
+  const [translationSettingsActiveConversationId, setTranslationSettingsActiveConversationId] = useState(activeConversationId);
+  // Reset dialog state during render when the selected conversation changes,
+  // so a stale dialog never appears for a previous conversation.
+  if (translationSettingsActiveConversationId !== activeConversationId) {
+    setTranslationSettingsActiveConversationId(activeConversationId);
+    setTranslationSettingsConversationId(null);
+  }
   const [desktopProfileSettings, setDesktopProfileSettings] = useState(false);
   const desktopProfileOverview = isProfileDesktop && !desktopProfileSettings;
   useEffect(() => {
