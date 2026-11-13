@@ -19,16 +19,17 @@ export default function DesktopScreenPicker() {
       if (current) void bridge.select(current.requestId, null).catch(() => undefined)
     }
   }, [latest])
+  const requestId = request?.requestId
   useEffect(() => {
     const element = dialog.current
-    if (!request || !element) return
+    if (!requestId || !element) return
     const previous = document.activeElement
     element.showModal()
     return () => {
       element.close()
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus()
     }
-  }, [request?.requestId])
+  }, [requestId])
   async function choose(index: number | null) {
     if (!request || busy) return
     const requestId = request.requestId
