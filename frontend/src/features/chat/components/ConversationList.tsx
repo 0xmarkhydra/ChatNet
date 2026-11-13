@@ -1,6 +1,7 @@
 import { Plus, Search, Pin, RefreshCw, X } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
+import ConversationAvatar from "./ConversationAvatar";
 import { userLabel } from "../../../shared/utils/userLabel";
 import ConversationCategories, { CategoryBadge } from "./ConversationCategories";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
@@ -224,12 +225,7 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                         setTranslationMenuOpen(false)
                       }}
                     >
-                      <UserAvatar
-                        username={conversation.otherUsername} name={conversation.name}
-                        className="conversation-avatar"
-                        group={conversation.type === 'group'}
-                        online={conversation.type === 'direct' && conversation.online}
-                      />
+                      <ConversationAvatar conversation={conversation} className="conversation-avatar" />
                       <div className="conversation-copy">
                         <div>
                           <span className="conversation-title">
