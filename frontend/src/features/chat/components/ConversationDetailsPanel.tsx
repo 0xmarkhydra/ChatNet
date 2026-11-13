@@ -8,6 +8,7 @@ import type { GroupActivityKind } from './GroupActivities'
 import type { Conversation } from '../types'
 import type { GroupManagementSection } from './GroupSettingsPanel'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import ConversationAvatar from './ConversationAvatar'
 import GroupChannelCreateForm from './GroupChannelCreateForm'
 import GroupAvatarEditor, { type GroupPhotoTarget } from './GroupAvatarEditor'
 import ConversationSharedPreview from './ConversationSharedPreview'
@@ -71,9 +72,8 @@ export default function ConversationDetailsPanel({
       <div className="conversation-info-panel-identity social-chat-details-identity">
         {isGroup ? (
           <div className="group-photo-avatar-wrap">
-            <UserAvatar name={conversation.name}
-              className="conversation-info-panel-avatar social-chat-details-avatar"
-              group imageUrl={conversation.avatarUrl} />
+            <ConversationAvatar conversation={conversation}
+              className="conversation-info-panel-avatar social-chat-details-avatar" />
             {canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
               aria-label="Đổi ảnh nhóm" title="Đổi ảnh nhóm"
               onClick={() => setPhotoTarget({ name: conversation.name, avatarUrl: conversation.avatarUrl })}>

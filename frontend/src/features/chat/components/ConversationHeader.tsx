@@ -1,5 +1,5 @@
 import { Search, Users, Languages, MoreHorizontal, X, Hash } from "lucide-react";
-import UserAvatar from "../../../shared/ui/UserAvatar";
+import ConversationAvatar from "./ConversationAvatar";
 import { CategoryAssignment } from "./ConversationCategories";
 import { CallHeaderActions } from "../../calls/components/CallManager";
 import { createPortal } from "react-dom";
@@ -12,13 +12,7 @@ export default function ConversationHeader({ activeConversation, changeAutoTrans
 <header className="chat-head">
                     <div className="room-info">
                       <button className="mobile-back" type="button" aria-label="Quay lại danh sách" onClick={() => setActiveConversationId(null)}>‹</button>
-                      <UserAvatar
-                        username={activeConversation.otherUsername} name={activeConversation.name}
-                        className="room-avatar"
-                        group={activeConversation.type === 'group'}
-                        imageUrl={activeConversation.type === 'group' ? activeConversation.avatarUrl : undefined}
-                        online={activeConversation.type === 'direct' && activeConversation.online}
-                      />
+                      <ConversationAvatar conversation={activeConversation} className="room-avatar" />
                       <div className={activeConversation.type === 'group' ? 'group-room-details' : ''}>
                         {activeConversation.type === 'group' ? (
                           <>
