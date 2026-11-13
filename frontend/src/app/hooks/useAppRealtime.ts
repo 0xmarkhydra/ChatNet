@@ -91,7 +91,7 @@ export function useAppRealtime({
   onMessageConfirmed,
 }: Options) {
   useEffect(() => {
-    if (!session?.token) return
+    if (!session?.token || sessionRef.current?.sessionId !== session.sessionId) return
 
     void refreshConversations()
     void refreshPosts()
