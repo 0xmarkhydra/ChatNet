@@ -36,6 +36,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Enforce React Hooks lint baseline
         run: npm run lint
+      - name: Test architecture boundary rules
+        run: node --test scripts/architecture-boundaries-selfcheck.mjs
       - name: Check feature dependency boundaries
         run: npm run check:architecture
       - name: Run frontend unit and component tests
