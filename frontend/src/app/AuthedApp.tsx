@@ -258,6 +258,7 @@ import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
 import { consumeNotificationDeepLink, notificationDeepLink } from "./navigation/notificationDeepLink";
+import { consumeInviteDeepLink } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
@@ -599,8 +600,11 @@ export default function AuthedApp({
     if (!session?.sessionId) return;
     const mentionSessionId = session.sessionId;
     let live = true;
+    let refreshing = false;
     const controller = new AbortController();
     const refresh = async () => {
+      if (!live || refreshing) return;
+      refreshing = true;
       try {
         const response = await apiFetch("/api/feed/mentions", { signal: controller.signal, cache: "no-store" });
         if (!response.ok) return;
@@ -615,6 +619,8 @@ export default function AuthedApp({
         }
       } catch {
         // A temporary network outage must not clear already received alerts.
+      } finally {
+        refreshing = false;
       }
     };
     const onVisible = () => {
@@ -1340,27 +1346,14 @@ export default function AuthedApp({
 
   useEffect(() => {
     if (!session?.token) return;
-    const params = new URLSearchParams(window.location.search);
-    const requestedUser = (params.get("connect") || params.get("invite") || "")
-      .replace(/^@/, "")
-      .trim();
-    if (!requestedUser) return;
-
+    const requestedUser = consumeInviteDeepLink(new URL(window.location.href));
     if (
+      requestedUser &&
       requestedUser.toLocaleLowerCase("vi-VN") !==
-      session.user.username.toLocaleLowerCase("vi-VN")
+        session.user.username.toLocaleLowerCase("vi-VN")
     ) {
       openVisitor(requestedUser);
     }
-
-    params.delete("connect");
-    params.delete("invite");
-    const nextSearch = params.toString();
-    window.history.replaceState(
-      {},
-      "",
-      `${window.location.pathname}${nextSearch ? "?" + nextSearch : ""}${window.location.hash}`,
-    );
   }, [session?.token]);
 
   useEffect(() => {
