@@ -2831,7 +2831,9 @@ export default function AuthedApp({
           session.user.username
         }
         unreadTotal={unreadTotal}
+        notificationCount={notificationItemCount}
         feedSaved={feedFilter === "saved"}
+        settingsActive={desktopProfileSettings}
         onNavigate={switchTab}
         onCalls={() => {
           switchTab("chat");
@@ -2845,7 +2847,7 @@ export default function AuthedApp({
         }}
         onSettings={() => {
           switchTab("profile");
-          setDesktopProfileSettings(true);
+          navigate(ROUTE.settings);
           setProfileTimelineOpen(false);
         }}
       />
