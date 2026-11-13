@@ -44,6 +44,17 @@ test('enforces public entrypoints but accepts published feature index', () => {
   })
 })
 
+test('allows the chat public index but rejects new root implementation files', () => {
+  fixture({
+    'features/chat/index.ts': "export type { ChatItem } from './types'\n",
+    'features/chat/types.ts': 'export type ChatItem = { id: number }\n',
+    'features/chat/rogue.ts': 'export const rogue = 1\n',
+  }, violations => {
+    assert.ok(!violations.some(item => item.includes('chat-root: features/chat/index.ts')))
+    assert.ok(violations.includes('chat-root: features/chat/rogue.ts'))
+  })
+})
+
 test('reports dependency cycles and dynamic imports', () => {
   fixture({
     'features/chat/a.ts': "import './b'\n",

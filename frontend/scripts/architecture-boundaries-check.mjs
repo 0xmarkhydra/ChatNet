@@ -88,7 +88,8 @@ export function collectViolations(root = defaultRoot) {
     edges.set(source, targets)
     if (source.startsWith('features/chat/') &&
       source.slice('features/chat/'.length).indexOf('/') === -1 &&
-      source !== 'features/chat/types.ts') {
+      source !== 'features/chat/types.ts' &&
+      source !== 'features/chat/index.ts') {
       violations.add(`chat-root: ${source}`)
     }
     for (const target of targets) {
