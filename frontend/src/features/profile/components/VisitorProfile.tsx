@@ -1,5 +1,5 @@
 import VisitorProfileHero, { type VisitorProfileData } from './VisitorProfileHero'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import FeedPostCard from '../../feed/components/FeedPostCard'
@@ -18,6 +18,7 @@ type Props = {
  relationship: (id: number) => string
  friendBusy: number | null
  onFriend: (user: FriendSearchResult) => Promise<void>
+ onRemoveFriend: (user: FriendSearchResult) => Promise<void>
  onMessage: (username: string) => Promise<void>
  onClose: () => void
  onPostOpen: (post: Post) => void
@@ -30,7 +31,7 @@ type Props = {
  onDeleted: (id: number) => void
  feedback: (message: string, kind?: 'success' | 'error' | 'warning' | 'info') => void
 }
-export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onMessage, onClose, onPostOpen, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
+export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onClose, onPostOpen, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
  const scope=JSON.stringify([username,token])
  const [profile,setProfile]=useScopedState<VisitorProfileData|null>(scope,null)
  const [posts,setPosts]=useScopedState<Post[]>(scope,[])
@@ -142,7 +143,30 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   <header className="visitor-toolbar"><button ref={back} type="button" onClick={onClose} aria-label="Quay lại"><ArrowLeft size={21}/></button><strong>Trang cá nhân</strong><button type="button" onClick={()=>setRetry(n=>n+1)} disabled={loading} aria-label="Tải lại hồ sơ"><RefreshCw size={19}/></button></header>
   <div className="visitor-scroll"><div className="visitor-content">
    {profile&&<>
-    <VisitorProfileHero profile={profile} relation={relation} friendBusy={friendBusy} action={action} request={request} onMessage={onMessage} onFriendAction={() => { const id = sequence.current; const sessionToken = token; void onFriend(profile).catch(cause => { if (alive.current && id === sequence.current && latestToken.current === sessionToken) feedback(cause instanceof Error ? cause.message : 'Không cập nhật được kết bạn.', 'error') }) }} />
+    <VisitorProfileHero
+      profile={profile}
+      relation={relation}
+      friendBusy={friendBusy}
+      action={action}
+      request={request}
+      onMessage={onMessage}
+      onFriendAction={() => {
+        const id = sequence.current
+        const sessionToken = token
+        void onFriend(profile).catch(cause => {
+          if (alive.current && id === sequence.current && latestToken.current === sessionToken)
+            feedback(cause instanceof Error ? cause.message : 'Không cập nhật được kết bạn.', 'error')
+        })
+      }}
+      onRemoveFriendAction={() => {
+        const id = sequence.current
+        const sessionToken = token
+        void onRemoveFriend(profile).catch(cause => {
+          if (alive.current && id === sequence.current && latestToken.current === sessionToken)
+            feedback(cause instanceof Error ? cause.message : 'Không thể hủy kết bạn.', 'error')
+        })
+      }}
+    />
     <div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
     <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={()=>onPostOpen(post)} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}

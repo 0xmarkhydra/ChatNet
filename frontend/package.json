@@ -14,6 +14,8 @@
     "check:onesignal": "node --experimental-strip-types scripts/onesignal-init-check.mjs",
     "check:push-deeplink": "node scripts/push-notification-deeplink-check.mjs",
     "check:incoming-sound": "node --experimental-strip-types scripts/incoming-sound-check.mjs",
+    "check:incoming-sound-browser": "node scripts/incoming-sound-browser-check.mjs",
+    "check:incoming-sound-sse": "node scripts/incoming-sound-sse-check.mjs",
     "check:pwa": "node --experimental-strip-types scripts/pwa-update-check.mjs",
     "check:session": "node --experimental-strip-types scripts/session-check.mjs",
     "check:desktop-session": "node --experimental-strip-types scripts/desktop-session-check.mjs",

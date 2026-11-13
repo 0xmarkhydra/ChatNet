@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
-import type { Session } from '../../auth'
+import type { Session } from '../../../shared/types/session'
 import { getCurrentPositionSmart } from '../lib/geolocation'
 import { useNearbyDiscovery } from './useNearbyDiscovery'
 

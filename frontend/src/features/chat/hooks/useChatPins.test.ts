@@ -61,4 +61,51 @@ describe('chat pin session isolation', () => {
     expect(mocked.listPins).toHaveBeenCalledTimes(1)
     await act(async () => root.unmount())
   })
+
+  it('does not release a new session pin lock when an old request finishes', async () => {
+    const finish: Array<(response: { ok: boolean }) => void> = []
+    mocked.setMessagePinned.mockImplementation(() =>
+      new Promise(resolve => { finish.push(resolve) }))
+    const sessionRef = { current: { sessionId: 'account-a' } }
+    const deps = {
+      session: { sessionId: 'account-a', token: 'token-a' },
+      sessionRef,
+      activeConversationId: 12,
+      activeConversationIdRef: { current: 12 },
+      apiFetch: vi.fn(),
+      setConversations: vi.fn(),
+      refreshConversations: vi.fn(async () => {}),
+      setNotice: vi.fn(),
+    } as unknown as Parameters<typeof useChatPins>[0]
+    let toggle!: ReturnType<typeof useChatPins>['toggleMessagePin']
+    let busy = false
+    const root = createRoot(document.createElement('div'))
+    function Harness() {
+      const pins = useChatPins(deps)
+      toggle = pins.toggleMessagePin
+      busy = pins.pinBusy
+      return null
+    }
+    await act(async () => { root.render(createElement(Harness)) })
+    let first!: Promise<void>
+    await act(async () => { first = toggle({ id: 1, conversationId: 12 } as Message) })
+    expect(finish).toHaveLength(1)
+
+    sessionRef.current = { sessionId: 'account-b' }
+    deps.session = { sessionId: 'account-b', token: 'token-b' } as typeof deps.session
+    await act(async () => { root.render(createElement(Harness)) })
+
+    let second!: Promise<void>
+    await act(async () => { second = toggle({ id: 1, conversationId: 12 } as Message) })
+    expect(finish).toHaveLength(2)
+
+    await act(async () => { finish[0]({ ok: true }); await first })
+    expect(busy).toBe(true)
+    await act(async () => { await toggle({ id: 1, conversationId: 12 } as Message) })
+    expect(mocked.setMessagePinned).toHaveBeenCalledTimes(2)
+
+    await act(async () => { finish[1]({ ok: true }); await second })
+    expect(busy).toBe(false)
+    await act(async () => root.unmount())
+  })
 })

@@ -32,12 +32,14 @@ export function useCallMediaControls({ room, mediaType, ending, permissionRetryi
         await requireDesktopMedia('microphone')
         if (room.state !== 'connected') return
         await room.localParticipant.setMicrophoneEnabled(true)
+        if (room.state !== 'connected') return
         setMicOn(true)
       }
       if (mediaType === 'video' && !cameraOn) {
         await requireDesktopMedia('camera')
         if (room.state !== 'connected') return
         await room.localParticipant.setCameraEnabled(true)
+        if (room.state !== 'connected') return
         setCameraOn(true)
       }
       setMediaPermissionError('')
@@ -56,6 +58,7 @@ export function useCallMediaControls({ room, mediaType, ending, permissionRetryi
       if (next) await requireDesktopMedia('microphone')
       if (next && room.state !== 'connected') return
       await room.localParticipant.setMicrophoneEnabled(next)
+      if (room.state !== 'connected') return
       setMicOn(next)
       setMediaPermissionError('')
     } catch (err) { setMediaPermissionError(friendlyCallError(err)) }
@@ -70,6 +73,7 @@ export function useCallMediaControls({ room, mediaType, ending, permissionRetryi
       if (next) await requireDesktopMedia('camera')
       if (next && room.state !== 'connected') return
       await room.localParticipant.setCameraEnabled(next)
+      if (room.state !== 'connected') return
       setCameraOn(next)
       setMediaPermissionError('')
     } catch (err) { setMediaPermissionError(friendlyCallError(err)) }
@@ -82,6 +86,7 @@ export function useCallMediaControls({ room, mediaType, ending, permissionRetryi
       const next = !screenOn
       // Desktop grants video only; system audio is not implicitly shared.
       await room.localParticipant.setScreenShareEnabled(next, isDesktopBuild ? { audio: false } : undefined)
+      if (room.state !== 'connected') return
       setScreenOn(room.localParticipant.isScreenShareEnabled)
     } catch (err) { onError(friendlyCallError(err)) }
   }
