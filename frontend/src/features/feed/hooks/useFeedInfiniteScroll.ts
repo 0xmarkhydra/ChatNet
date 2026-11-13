@@ -27,14 +27,18 @@ export function useFeedInfiniteScroll({
       return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
+    let active = true;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting) loadRef.current();
+        if (active && entry?.isIntersecting) loadRef.current();
       },
       { rootMargin: "320px 0px" },
     );
     observer.observe(sentinel);
-    return () => observer.disconnect();
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
   }, [enabled, hasMore, loading, error, loadRef]);
   return sentinelRef;
 }
