@@ -47,6 +47,9 @@ var groupChannelReadsSQL string
 //go:embed migrations/009_group_avatars.sql
 var groupAvatarsSQL string
 
+//go:embed migrations/010_channel_profile_notifications.sql
+var channelProfileNotificationsSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -99,6 +102,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, groupAvatarsSQL); err != nil {
 		return fmt.Errorf("apply group avatars migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, channelProfileNotificationsSQL); err != nil {
+		return fmt.Errorf("apply channel profile notifications migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)
