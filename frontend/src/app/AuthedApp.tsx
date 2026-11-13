@@ -2178,6 +2178,15 @@ export default function AuthedApp({
     },
   });
 
+  useEffect(() => {
+    const title = 'SocCO – Understand. Connect. Together.';
+    const count = nativeNotifications.unreadCount;
+    document.title = count !== null && count > 0
+      ? `(${count > 99 ? '99+' : count}) ${title}`
+      : title;
+    return () => { document.title = title; };
+  }, [nativeNotifications.unreadCount]);
+
   useAppRealtime({
     onCategoryAssignmentChanged: conversationCategories.applyAssignment,
     onCategoriesChanged: () => {
