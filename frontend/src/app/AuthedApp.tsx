@@ -16,6 +16,7 @@ import { useSession } from "../shared/context/SessionContext";
 import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
+import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
@@ -1155,8 +1156,11 @@ export default function AuthedApp({
     const id = activeConversation?.type === 'group' ? activeConversation.id : null;
     setGroupChannelState({ conversationId: id, channels: validGroupChannels([], id ?? 0) });
     if (!id || !session?.token) return;
-    const controller = new AbortController();
+    let activeRequest: AbortController | null = null;
     const reload = async () => {
+      activeRequest?.abort();
+      const controller = new AbortController();
+      activeRequest = controller;
       try {
         const response = await apiFetch(`/api/conversations/${id}/channels`, { signal: controller.signal });
         if (!response.ok) throw new Error('Không tải được kênh hội thoại.');
@@ -1165,8 +1169,11 @@ export default function AuthedApp({
         if (!controller.signal.aborted) {
           setGroupChannelUnreadStatus({ conversationId: id, available: Array.isArray(raw) && raw.every(channel => typeof channel.unreadCount === 'number') });
           setGroupChannelState({ conversationId: id, channels });
-          if (channelSelection.conversationId === id && !channels.some(channel => channel.id === channelSelection.channelId))
-            setChannelSelection({ conversationId: id, channelId: 0 });
+          setChannelSelection(current =>
+            current.conversationId === id && !channels.some(channel => channel.id === current.channelId)
+              ? { conversationId: id, channelId: 0 }
+              : current,
+          );
         }
       } catch {
         if (!controller.signal.aborted) setNotice('Không tải được kênh hội thoại.', 'warning');
@@ -1194,7 +1201,7 @@ export default function AuthedApp({
     window.addEventListener('chatnet:group-channel-event', onChannelEvent);
     window.addEventListener('chatnet:channel-read', onChannelRead);
     return () => {
-      controller.abort();
+      activeRequest?.abort();
       window.removeEventListener('chatnet:group-community-updated', onUpdate);
       window.removeEventListener('chatnet:group-channel-event', onChannelEvent);
       window.removeEventListener('chatnet:channel-read', onChannelRead);
@@ -2125,29 +2132,7 @@ export default function AuthedApp({
 
 
 
-  useEffect(() => {
-    if (!session) return;
-    const refresh = () => {
-      if (!isDesktopBuild && document.visibilityState === "hidden") return;
-      void sessionClient
-        .refresh()
-        .then((current) => {
-          if (isDesktopBuild && current) return sessionClient.check();
-        })
-        .catch(() => setStatus("Đang kết nối lại..."));
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 60_000);
-    window.addEventListener("focus", refresh);
-    window.addEventListener("online", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("online", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [session?.sessionId, sessionClient]);
+  useSessionKeepalive(session?.sessionId ?? null, sessionRef, sessionClient, setStatus);
 
   const nativeNotifications = useDesktopNotifications({
     session,
@@ -2201,7 +2186,6 @@ export default function AuthedApp({
     membershipSnapshot,
     membershipEventSequence,
     membershipSyncSequence,
-    groupSettingsOpen,
     activeConversationIdRef,
     activeChannelIdRef,
     activeConversationTypeRef,
