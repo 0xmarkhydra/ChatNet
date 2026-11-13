@@ -53,7 +53,8 @@ export function useChatPins({
   }
 
   useEffect(() => {
-    pending.current.clear()
+    // Use a fresh lock set so completions from another session cannot unlock new writes.
+    pending.current = new Set()
     setPinBusy(false)
     refreshSequence.current += 1
     setPinnedMessages([])
@@ -68,7 +69,8 @@ export function useChatPins({
     if (pending.current.has(key)) return
     const sessionId = sessionRef.current.sessionId
     const currentlyPinned = pinnedMessages.some((pin) => pin.message.id === message.id)
-    pending.current.add(key)
+    const locks = pending.current
+    locks.add(key)
     setPinBusy(true)
     try {
       const response = await setMessagePinned(apiFetch, message.id, !currentlyPinned)
@@ -87,8 +89,8 @@ export function useChatPins({
       if (sessionRef.current?.sessionId === sessionId)
         setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim tin nhắn.', 'error')
     } finally {
-      pending.current.delete(key)
-      if (sessionRef.current?.sessionId === sessionId) setPinBusy(pending.current.size > 0)
+      locks.delete(key)
+      if (pending.current === locks && sessionRef.current?.sessionId === sessionId) setPinBusy(locks.size > 0)
     }
   }
 
@@ -97,7 +99,8 @@ export function useChatPins({
     if (pending.current.has(key)) return
     const currentlyPinned = Boolean(conversation.pinnedAt)
     const sessionId = sessionRef.current?.sessionId
-    pending.current.add(key)
+    const locks = pending.current
+    locks.add(key)
     setPinBusy(true)
     try {
       const response = await setConversationPinned(apiFetch, conversation.id, !currentlyPinned)
@@ -118,8 +121,8 @@ export function useChatPins({
       if (sessionRef.current?.sessionId === sessionId)
         setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim hội thoại.', 'error')
     } finally {
-      pending.current.delete(key)
-      if (sessionRef.current?.sessionId === sessionId) setPinBusy(pending.current.size > 0)
+      locks.delete(key)
+      if (pending.current === locks && sessionRef.current?.sessionId === sessionId) setPinBusy(locks.size > 0)
     }
   }
 

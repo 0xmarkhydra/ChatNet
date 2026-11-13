@@ -60,6 +60,7 @@ export function useGroupManagement({
 
     const controller = new AbortController()
     const groupId = activeConversationId
+    const sessionId = session.sessionId
     const get = groupRequestRef.current
     void Promise.allSettled([
       get(`/api/conversations/${groupId}/members`, { signal: controller.signal, cache: 'reload' })
@@ -67,18 +68,18 @@ export function useGroupManagement({
           if (!response.ok) throw new Error('Cannot load group members')
           return response.json() as Promise<GroupMember[]>
         }).then(members => {
-          if (!controller.signal.aborted && activeConversationIdRef.current === groupId) setGroupMembers(members)
+          if (!controller.signal.aborted && sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === groupId) setGroupMembers(members)
         }),
       get(`/api/conversations/${groupId}/group-settings`, { signal: controller.signal, cache: 'reload' })
         .then(async response => {
           if (!response.ok) throw new Error('Cannot load group permissions')
           return response.json() as Promise<{ adminCanInvite: boolean; adminCanEditInfo: boolean }>
         }).then(settings => {
-          if (!controller.signal.aborted && activeConversationIdRef.current === groupId) setGroupPolicy(settings)
+          if (!controller.signal.aborted && sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === groupId) setGroupPolicy(settings)
         }),
     ])
     return () => controller.abort()
-  }, [activeConversationId, activeConversationType, session?.token, tab, communityWorkspaceOpen, activeConversationIdRef])
+  }, [activeConversationId, activeConversationType, session?.token, session?.sessionId, tab, communityWorkspaceOpen, activeConversationIdRef, sessionRef])
 
   const activeGroupMember = groupMembers.find((item) => item.id === session?.user.id) || null
   const canManageActiveGroup = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
