@@ -33,6 +33,7 @@ describe('VisitorProfile session isolation', () => {
       relationship: () => 'none',
       friendBusy: null,
       onFriend: async () => {},
+      onRemoveFriend: async () => {},
       onMessage: async () => {},
       onClose: () => {},
       onPostOpen: () => {},
