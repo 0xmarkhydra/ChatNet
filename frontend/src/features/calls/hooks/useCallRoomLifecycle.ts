@@ -112,8 +112,16 @@ export function useCallRoomLifecycle({
         room.on(RoomEvent.LocalTrackPublished, update)
         room.on(RoomEvent.LocalTrackUnpublished, update)
         room.on(RoomEvent.ActiveSpeakersChanged, update)
-        room.on(RoomEvent.Reconnecting, () => { setPhase('reconnecting'); setDetail('Mạng thay đổi, đang nối lại…') })
-        room.on(RoomEvent.Reconnected, () => { setPhase('connected'); setDetail('Đã kết nối lại') })
+        room.on(RoomEvent.Reconnecting, () => {
+          if (disposed) return
+          setPhase('reconnecting')
+          setDetail('Mạng thay đổi, đang nối lại…')
+        })
+        room.on(RoomEvent.Reconnected, () => {
+          if (disposed) return
+          setPhase('connected')
+          setDetail('Đã kết nối lại')
+        })
         room.on(RoomEvent.Disconnected, () => {
           if (!disposed) { setPhase('error'); setDetail('Cuộc gọi đã ngắt kết nối.') }
         })

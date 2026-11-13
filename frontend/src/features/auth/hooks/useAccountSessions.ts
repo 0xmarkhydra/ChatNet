@@ -2,7 +2,7 @@ import { isDesktopBuild, desktopBridge } from "../../../platform/desktop";
 import type { ManagedAccountSession } from "../types";
 import { API } from "../../../shared/lib/config";
 import { type Session } from "../lib/session";
-import { type SetStateAction } from "react";
+import { useRef, type SetStateAction } from "react";
 import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 
@@ -29,11 +29,14 @@ export function useAccountSessions({
   setSessionsError,
   setSessionsOpen,
 }: UseAccountSessionsDeps) {
+  // The ref closes the gap before React renders the busy state after a click.
+  const pendingSession = useRef<string | null>(null);
   async function fetchAccountSessions() {
     const current = sessionRef.current;
-    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy)
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy || pendingSession.current === current.sessionId)
       return;
     const identity = current.sessionId;
+    pendingSession.current = identity;
     setSessionsBusy(true);
     setSessionsError("");
     try {
@@ -59,12 +62,13 @@ export function useAccountSessions({
         setSessionsError("Không thể tải các thiết bị. Vui lòng thử lại.");
       }
     } finally {
+      if (pendingSession.current === identity) pendingSession.current = null;
       if (sessionRef.current?.sessionId === identity) setSessionsBusy(false);
     }
   }
   async function revokeAccountSessions(sessionID?: string) {
     const current = sessionRef.current;
-    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy)
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy || pendingSession.current === current.sessionId)
       return;
     const identity = current.sessionId;
     const selected = managedSessions.find((item) => item.id === sessionID);
@@ -75,6 +79,7 @@ export function useAccountSessions({
         : "Bạn muốn thu hồi phiên đăng nhập trên thiết bị đã chọn?"
       : "Bạn muốn đăng xuất tất cả thiết bị khác?";
     if (!window.confirm(message)) return;
+    pendingSession.current = identity;
     setSessionsBusy(true);
     setSessionsError("");
     try {
@@ -116,6 +121,7 @@ export function useAccountSessions({
         setSessionsError("Không thu hồi được phiên. Vui lòng thử lại.");
       }
     } finally {
+      if (pendingSession.current === identity) pendingSession.current = null;
       if (sessionRef.current?.sessionId === identity) setSessionsBusy(false);
     }
   }
