@@ -104,7 +104,8 @@ export function useAppSession(initialSession?: Session | null) {
     const sync = (event: StorageEvent) => {
       if (event.key !== "chatnet-session" && event.key !== null) return;
       const next = loadSession();
-      if (sessionRef.current?.sessionId !== next?.sessionId)
+      if (sessionRef.current?.sessionId !== next?.sessionId ||
+          sessionRef.current?.user.id !== next?.user.id)
         endSessionRef.current(false, false);
       sessionRef.current = next;
       setSession(next);

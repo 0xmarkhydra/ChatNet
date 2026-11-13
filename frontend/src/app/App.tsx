@@ -15,7 +15,7 @@ export default function App({ initialSession }: { initialSession?: Session | nul
 
   return (
     <AuthedProviders
-      key={session.sessionId}
+      key={`${session.user.id}:${session.sessionId}`}
       session={session}
       sessionRef={sessionRef}
       sessionClient={sessionClient}
