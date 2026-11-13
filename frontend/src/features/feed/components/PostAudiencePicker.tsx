@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { Check, ChevronDown, Globe2, LockKeyhole, UsersRound } from 'lucide-react'
 
 export type PostVisibility = 'public' | 'friends' | 'private'
@@ -16,7 +17,7 @@ const audienceChoices = [
 ] as const
 
 export default function PostAudiencePicker({ value, disabled = false, onChange }: Props) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useScopedState(disabled ? 'disabled' : 'enabled', false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -30,11 +31,7 @@ export default function PostAudiencePicker({ value, disabled = false, onChange }
     }
     document.addEventListener('pointerdown', dismiss, true)
     return () => document.removeEventListener('pointerdown', dismiss, true)
-  }, [open])
-
-  useEffect(() => {
-    if (disabled) setOpen(false)
-  }, [disabled])
+  }, [open, setOpen])
 
   useEffect(() => {
     if (open) menuRef.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus()

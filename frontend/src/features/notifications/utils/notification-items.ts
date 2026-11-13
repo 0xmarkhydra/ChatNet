@@ -3,6 +3,8 @@ import type { Conversation } from '../../chat/types'
 import type { PostMentionNotification } from '../../feed/utils/postMentionNotifications'
 import { isIncomingFriendRequest, hasUnreadConversation } from './notification-count'
 
+export type NotificationFilter = 'all' | 'unread' | 'mentions'
+
 export type NotificationItem = {
   key: string
   kind: 'friend' | 'message' | 'mention'
@@ -13,6 +15,21 @@ export type NotificationItem = {
   friend?: FriendConnection
   conversation?: Conversation
   mention?: PostMentionNotification
+}
+
+export function filterNotificationItems(
+  items: readonly NotificationItem[], filter: NotificationFilter, search: string, readKeys: ReadonlySet<string>,
+): NotificationItem[] {
+  const term = search.toLocaleLowerCase('vi-VN').trim()
+  return items.filter(item => {
+    if (filter === 'mentions' && item.kind !== 'mention') return false
+    if (filter === 'unread' && (item.mention ? Boolean(item.mention.readAt) : readKeys.has(item.key))) return false
+    return !term || (item.name + ' ' + item.subtitle).toLocaleLowerCase('vi-VN').includes(term)
+  })
+}
+
+export function countUnreadNotificationItems(items: readonly NotificationItem[], readKeys: ReadonlySet<string>): number {
+  return items.filter(item => item.mention ? !item.mention.readAt : !readKeys.has(item.key)).length
 }
 
 export function buildNotificationItems(

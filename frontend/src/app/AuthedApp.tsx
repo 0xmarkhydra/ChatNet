@@ -141,6 +141,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
   useEffect,
+  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -256,6 +257,7 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
+import { consumeNotificationDeepLink, notificationDeepLink } from "./navigation/notificationDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
@@ -303,6 +305,7 @@ import { usePostDetailNavigation } from "../features/feed/hooks/usePostDetailNav
 import { useInviteSharing } from "../features/profile/hooks/useInviteSharing";
 import { useStoryActions } from "../features/feed/hooks/useStoryActions";
 import { usePrivacySettings } from "../features/settings/hooks/usePrivacySettings";
+import { savePrivacySettings } from "../features/settings/api/privacy";
 import { useNearbyState } from "../features/discover/hooks/useNearbyState";
 import { useBlockedUsers } from "../features/contacts/hooks/useBlockedUsers";
 import { useFriendSearch } from "../features/contacts/hooks/useFriendSearch";
@@ -311,6 +314,7 @@ import { useTranslationState } from "../features/chat/hooks/useTranslationState"
 import { useProfileState } from "../features/profile/hooks/useProfileState";
 import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
 import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
+import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
 import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
@@ -382,6 +386,7 @@ export default function AuthedApp({
     revision: number;
   } | null>(null);
   const chatSearchJumpRevision = useRef(0);
+  const nextChatSearchJumpRevision = useCallback(() => ++chatSearchJumpRevision.current, []);
   const lastScrolledSearchJump = useRef(0);
   useEffect(() => {
     if (!quickSearchOpen) return;
@@ -420,12 +425,11 @@ export default function AuthedApp({
     : validGroupChannels([], activeConversationId ?? 0);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messageScrollAtBottom = useRef(true);
+  const setMessageScrollAtBottom = useCallback((next: boolean) => { messageScrollAtBottom.current = next; }, []);
   const ownSendScrollConversation = useRef<number | null>(null);
-  const suppressConversationClick = useRef<number | null>(null);
   const [messageCopyTarget, setMessageCopyTarget] =
     useState<MessageCopyTarget | null>(null);
-  const suppressMessageClick = useRef<number | null>(null);
-  const { beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress, cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress, openMessageActions, openMessageReactions } = useMessageLongPress({ setConversationActionId, setConversationMenuPosition, setMessageActionId, setMessageActionMode, setMessageCopyTarget, suppressConversationClick, suppressMessageClick });
+  const { beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress, cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress, openMessageActions, openMessageReactions, suppressConversationClick, suppressMessageClick } = useMessageLongPress({ setConversationActionId, setConversationMenuPosition, setMessageActionId, setMessageActionMode, setMessageCopyTarget });
 
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
   const [messageDrafts, setMessageDrafts] = useState<
@@ -443,7 +447,7 @@ export default function AuthedApp({
     if (session?.user.id && sessionRef.current?.user.id === session.user.id) {
       saveChatDrafts(session.user.id, messageDrafts);
     }
-  }, [session?.user.id, messageDrafts]);
+  }, [session?.user.id, messageDrafts, sessionRef]);
   const [channelDrafts, setChannelDrafts] = useState<Record<string, MessageDraft>>({});
   const channelDraftKey = `${activeConversationId ?? 0}:${selectedChannelId}`;
   const draft = selectedChannelId > 0 ? channelDrafts[channelDraftKey] ?? emptyDraft : messageDrafts[activeConversationId ?? 0] ?? emptyDraft;
@@ -460,13 +464,13 @@ export default function AuthedApp({
   const [reactionPreviews, setReactionPreviews] = useState<
     Record<number, MessageReaction[]>
   >({});
-  const [forwardSource, setForwardSource] = useState<Message | null>(null);
-  const [reactionTarget, setReactionTarget] = useState<{
+  const [forwardSource, setForwardSource] = useScopedState<Message | null>(session?.sessionId ?? null, null);
+  const [reactionTarget, setReactionTarget] = useScopedState<{
     kind: "message" | "post"; id: number; initialEmoji?: string;
     reactions?: { emoji: string; count: number }[];
-  } | null>(null);
-  useEffect(() => { setReactionTarget(null); setForwardSource(null) }, [session?.sessionId]);
+  } | null>(session?.sessionId ?? null, null);
   const messageChanges = useRef(new Set<number>());
+  const resetMessageChanges = useCallback((next: Set<number>) => { messageChanges.current = next; }, []);
   const actionLocks = useRef(new Set<string>());
   const messageReceipts = useRef(new Map<string, Message | null>());
   // Preserve the request ID for an ambiguous send so a retry cannot create another row.
@@ -524,6 +528,7 @@ export default function AuthedApp({
     retryOutboxBusy.current = false;
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
+  const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
   const [contactsScreen, setContactsScreen] = useState<FriendsScreen>("directory");
   const [visitorUsername, setVisitorUsername] = useState<string | null>(null);
   function openVisitor(username: string) {
@@ -544,12 +549,13 @@ export default function AuthedApp({
     "groups" | "calls" | null
   >(null);
   const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);
-  useEffect(() => {
-    if (translationSettingsConversationId !== null &&
-        translationSettingsConversationId !== activeConversationId) {
-      setTranslationSettingsConversationId(null);
-    }
-  }, [translationSettingsConversationId, activeConversationId]);
+  const [translationSettingsActiveConversationId, setTranslationSettingsActiveConversationId] = useState(activeConversationId);
+  // Reset dialog state during render when the selected conversation changes,
+  // so a stale dialog never appears for a previous conversation.
+  if (translationSettingsActiveConversationId !== activeConversationId) {
+    setTranslationSettingsActiveConversationId(activeConversationId);
+    setTranslationSettingsConversationId(null);
+  }
   const [desktopProfileSettings, setDesktopProfileSettings] = useState(false);
   const desktopProfileOverview = isProfileDesktop && !desktopProfileSettings;
   useEffect(() => {
@@ -582,12 +588,16 @@ export default function AuthedApp({
     session?.user.username,
   ]);
   const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
-  const [postMentions, setPostMentions] = useState<PostMentionNotification[]>([]);
+  const [postMentionsState, setPostMentionsState] = useState<{
+    sessionId: string;
+    items: PostMentionNotification[];
+  } | null>(null);
+  const postMentions = session?.sessionId === postMentionsState?.sessionId
+    ? postMentionsState.items
+    : [];
   useEffect(() => {
-    if (!session?.sessionId) {
-      setPostMentions([]);
-      return;
-    }
+    if (!session?.sessionId) return;
+    const mentionSessionId = session.sessionId;
     let live = true;
     const controller = new AbortController();
     const refresh = async () => {
@@ -596,9 +606,12 @@ export default function AuthedApp({
         if (!response.ok) return;
         const items: unknown = await response.json();
         if (live && Array.isArray(items)) {
-          setPostMentions(items.filter((item): item is PostMentionNotification =>
-            item && Number.isSafeInteger(item.id) && Number.isSafeInteger(item.postId)
-            && typeof item.author === "string" && typeof item.createdAt === "string"));
+          setPostMentionsState({
+            sessionId: mentionSessionId,
+            items: items.filter((item): item is PostMentionNotification =>
+              item && Number.isSafeInteger(item.id) && Number.isSafeInteger(item.postId)
+              && typeof item.author === "string" && typeof item.createdAt === "string"),
+          });
         }
       } catch {
         // A temporary network outage must not clear already received alerts.
@@ -740,10 +753,12 @@ export default function AuthedApp({
     input.style.height = `${Math.min(input.scrollHeight, 154)}px`;
   }, [messageText, activeConversationId, tab, desktopSection]);
   const chatDragDepth = useRef(0);
-  const [chatDragActive, setChatDragActive] = useState(false);
+  const setChatDragDepth = useCallback((next: number) => { chatDragDepth.current = next; }, []);
+  const [chatDragActive, setChatDragActive] = useScopedState(
+    `${tab}:${activeConversationId ?? "none"}`, false,
+  );
   useEffect(() => {
     chatDragDepth.current = 0;
-    setChatDragActive(false);
   }, [activeConversationId, tab]);
 
   useEffect(() => {
@@ -986,7 +1001,7 @@ export default function AuthedApp({
     translationPreferencesLoaded,
     targetLanguage: effectiveTargetLanguage,
     setTranslations,
-    messageChanges,
+    resetMessageChanges,
     pendingSend,
     setMessageDrafts,
     setConversations,
@@ -1048,7 +1063,7 @@ export default function AuthedApp({
 
   useEffect(() => {
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
-  }, [groupSettingsOpen]);
+  }, [groupSettingsOpen, setGroupMemberViewOpen]);
 
   useEffect(() => {
     if (!groupSettingsOpen) return;
@@ -1313,7 +1328,7 @@ export default function AuthedApp({
   const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
   const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
 
-  const { changeAppLocale, changeAutoTranslate, changeTargetLanguage, saveConversationTranslationSettings, translateMessage } = useTranslationActions({ activeChatTranslationSettings, activeConversationId, activeConversationIdRef, apiFetch, appLocale, autoTranslate, conversationTranslationOverrides, effectiveTargetLanguage, preferenceRevision, session, sessionRef, setAppLocale, setAutoTranslate, setConversationTranslationOverrides, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setManuallyTranslated, setNotice, setTargetLanguage, setTranslationFailures, setTranslationMenuOpen, setTranslationOriginals, setTranslationPending, setTranslationPickerOpen, setTranslations, setTranslationSettingsSearch, targetLanguage, translationAttempted, translationFailures, translationLanguageRef, translations });
+  const { changeAppLocale, changeAutoTranslate, changeTargetLanguage, saveConversationTranslationSettings, translateMessage } = useTranslationActions({ activeChatTranslationSettings, activeConversationId, activeConversationIdRef, apiFetch, appLocale, autoTranslate, conversationTranslationOverrides, effectiveTargetLanguage, preferenceRevision, advancePreferenceRevision, session, sessionRef, setAppLocale, setAutoTranslate, setConversationTranslationOverrides, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setManuallyTranslated, setNotice, setTargetLanguage, setTranslationFailures, setTranslationMenuOpen, setTranslationOriginals, setTranslationPending, setTranslationPickerOpen, setTranslations, setTranslationSettingsSearch, targetLanguage, translationAttempted, translationFailures, translationLanguageRef, translations });
 
   const { addChatFiles, addFeedFiles, setMessageAttachments, uploadMediaFiles } = useMediaUploads({ activeConversationId, apiFetch, channelDraftKey, mediaUploadAbort, mediaUploading, messageAttachments, messageSending, pendingPost, postAttachments, selectedChannelId, session, sessionRef, setChannelDrafts, setMediaUploading, setMediaUploadProgress, setMessageDrafts, setNotice, setPostAttachments });
 
@@ -1728,35 +1743,23 @@ export default function AuthedApp({
 
     const openNotificationTarget = () => {
       const url = new URL(window.location.href);
-      const params = url.searchParams;
-      if (params.get("tab") === "feed") {
-        setTab("feed");
-      } else if (params.get("tab") === "contacts") {
-        setTab("contacts");
-      }
-      const conversationID = Number(params.get("conversation"));
-      const messageID = Number(params.get("message"));
-      if (Number.isSafeInteger(conversationID) && conversationID > 0) {
+      const { tab: targetTab, conversationId, messageId } = notificationDeepLink(url.searchParams);
+      if (targetTab) setTab(targetTab);
+      if (conversationId !== null) {
         setTab("chat");
         setDesktopSection(null);
         setChatSearchJump(
-          Number.isSafeInteger(messageID) && messageID > 0
+          messageId !== null
             ? {
-                conversationId: conversationID,
-                messageId: messageID,
+                conversationId,
+                messageId,
                 revision: ++chatSearchJumpRevision.current,
               }
             : null,
         );
-        setActiveConversationId(conversationID);
+        setActiveConversationId(conversationId);
       }
-      // Keep unrelated query parameters (e.g., invite links) intact.
-      if (params.has("tab") || params.has("conversation") || params.has("message")) {
-        params.delete("tab");
-        params.delete("conversation");
-        params.delete("message");
-        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
-      }
+      consumeNotificationDeepLink(url);
     };
     openNotificationTarget();
     window.addEventListener("popstate", openNotificationTarget);
@@ -1853,11 +1856,7 @@ export default function AuthedApp({
     const sessionId = session.sessionId;
     setPrivacyBusy(true);
     try {
-      const response = await apiFetch("/api/privacy", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(next),
-      });
+      const response = await savePrivacySettings(apiFetch, next);
       const result = (await response
         .json()
         .catch(() => null)) as UserPrivacy | null;
@@ -2524,8 +2523,13 @@ export default function AuthedApp({
     try {
       const response = await apiFetch(`/api/feed/mentions/${id}/read`, { method: "POST" });
       if (!response.ok) throw new Error("Không đánh dấu được thông báo.");
-      setPostMentions(current => current.map(item => item.id === id
-        ? { ...item, readAt: new Date().toISOString() } : item));
+      setPostMentionsState(current => current?.sessionId === session?.sessionId
+        ? {
+            ...current,
+            items: current.items.map(item => item.id === id
+              ? { ...item, readAt: new Date().toISOString() } : item),
+          }
+        : current);
     } catch {
       setNotice("Không đánh dấu được thông báo. Vui lòng thử lại.", "error");
     }
@@ -3142,6 +3146,7 @@ export default function AuthedApp({
           chatCreateError={chatCreateError}
           chatDragActive={chatDragActive}
           chatDragDepth={chatDragDepth}
+          setChatDragDepth={setChatDragDepth}
           chatFileInputRef={chatFileInputRef}
           chatFiltersPill={chatFiltersPill}
           chatFriend={chatFriend}
@@ -3151,7 +3156,7 @@ export default function AuthedApp({
           chatListQuery={chatListQuery}
           chatOnline={chatOnline}
           chatOutbox={chatOutbox}
-          chatSearchJumpRevision={chatSearchJumpRevision}
+          nextChatSearchJumpRevision={nextChatSearchJumpRevision}
           clearActiveConversationHistory={clearActiveConversationHistory}
           conversationBlocked={conversationBlocked}
           conversationCategories={conversationCategories}
@@ -3201,7 +3206,7 @@ export default function AuthedApp({
           messageGapBefore={messageGapBefore}
           messageGapLoading={messageGapLoading}
           messageInputRef={messageInputRef}
-          messageScrollAtBottom={messageScrollAtBottom}
+          setMessageScrollAtBottom={setMessageScrollAtBottom}
           messageSearchOpen={messageSearchOpen}
           messageSending={messageSending}
           messagesLoadingMore={messagesLoadingMore}

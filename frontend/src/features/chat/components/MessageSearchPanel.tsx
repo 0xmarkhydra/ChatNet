@@ -5,6 +5,7 @@ import { listGroupMembers } from '../api/groups'
 import { listChannelSharedFiles, listSharedFilesBefore, searchMessages, searchMoreMessages } from '../api/search'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { userLabel } from '../../../shared/utils/userLabel'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/message-search-panel.css'
 
 type Props = {
@@ -52,8 +53,7 @@ function matchesFilters(message: Message, sender: string, from: string, to: stri
 }
 
 export default function MessageSearchPanel({ conversationId, channelId = 0, request, onJump, onClose }: Props) {
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const [keyword, setKeyword] = useState('')
   const [sender, setSender] = useState('')
   const [from, setFrom] = useState('')
@@ -99,7 +99,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
       .then((items) => { if (alive && Array.isArray(items)) setMembers(items) })
       .catch(() => { /* Some direct conversations do not expose a members list. */ })
     return () => { alive = false }
-  }, [conversationId])
+  }, [conversationId, requestRef])
 
   useEffect(() => {
     const id = ++sequence.current
@@ -132,7 +132,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
       }
     }, 300)
     return () => { window.clearTimeout(timer); ++sequence.current }
-  }, [conversationId, channelId, keyword, sender, from, to, hasFilters, invalidDates])
+  }, [conversationId, channelId, keyword, sender, from, to, hasFilters, invalidDates, requestRef])
 
   // The message search API filters text only; shared files supply filename matches.
   useEffect(() => {
@@ -158,7 +158,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
       }
     }, 300)
     return () => { window.clearTimeout(timer); ++fileSequence.current }
-  }, [conversationId, channelId, keyword, sender, from, to, hasFilters, invalidDates])
+  }, [conversationId, channelId, keyword, sender, from, to, hasFilters, invalidDates, requestRef])
 
   const fileHits = useMemo(() => fileMessages.filter((message) =>
     !message.deleted && (message.channelId || 0) === channelId && matchesFilters(message, sender, from, to) && searchFileName(message, keyword.trim())

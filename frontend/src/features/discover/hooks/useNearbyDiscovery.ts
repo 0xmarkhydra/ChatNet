@@ -38,15 +38,14 @@ export function useNearbyDiscovery({
     if (!session || nearbyBusy) return;
     const request = ++nearbyRequest.current;
     const sessionId = session.sessionId;
+    const isCurrentRequest = () =>
+      request === nearbyRequest.current &&
+      sessionRef.current?.sessionId === sessionId;
     setNearbyBusy(true);
     setNearbyScanning(true);
     try {
       const position = await getCurrentPositionSmart();
-      if (
-        request !== nearbyRequest.current ||
-        sessionRef.current?.sessionId !== sessionId
-      )
-        return;
+      if (!isCurrentRequest()) return;
       const { latitude, longitude } = position.coords;
       if (
         !Number.isFinite(latitude) ||
@@ -67,11 +66,7 @@ export function useNearbyDiscovery({
           radiusKm: nearbyRadiusKm,
         }),
       });
-      if (
-        request !== nearbyRequest.current ||
-        sessionRef.current?.sessionId !== sessionId
-      )
-        return;
+      if (!isCurrentRequest()) return;
       if (!response.ok)
         throw new Error(
           response.status === 429
@@ -84,11 +79,7 @@ export function useNearbyDiscovery({
         cacheExpiresAt?: string;
         radiusKm?: number;
       };
-      if (
-        request !== nearbyRequest.current ||
-        sessionRef.current?.sessionId !== sessionId
-      )
-        return;
+      if (!isCurrentRequest()) return;
       setNearbyUsers(result.users);
       setNearbyResultRadiusKm(nearbyRadiusKm);
       setNearbyUntil(Date.parse(result.expiresAt));
@@ -99,10 +90,11 @@ export function useNearbyDiscovery({
         result.users.length ? "success" : "info",
       );
     } catch (error) {
-      if (request !== nearbyRequest.current) return;
-      setNotice(await geolocationErrorMessage(error), "error");
+      if (!isCurrentRequest()) return;
+      const message = await geolocationErrorMessage(error);
+      if (isCurrentRequest()) setNotice(message, "error");
     } finally {
-      if (request === nearbyRequest.current) {
+      if (isCurrentRequest()) {
         setNearbyBusy(false);
         setNearbyScanning(false);
       }
@@ -111,19 +103,22 @@ export function useNearbyDiscovery({
   async function stopNearby() {
     if (!session || nearbyBusy) return;
     const request = ++nearbyRequest.current;
+    const sessionId = session.sessionId;
+    const isCurrentRequest = () =>
+      request === nearbyRequest.current && sessionRef.current?.sessionId === sessionId;
     setNearbyBusy(true);
     try {
       const response = await apiFetch("/api/users/nearby", {
         method: "DELETE",
       });
-      if (request !== nearbyRequest.current) return;
+      if (!isCurrentRequest()) return;
       if (!response.ok)
         throw new Error("Chưa tắt được Quanh đây. Thử lại sau.");
       setNearbyUntil(0);
       setNearbyUsers([]);
       setNotice("Đã tắt Quanh đây và xóa cache vị trí gần nhất.", "success");
     } catch (error) {
-      if (request !== nearbyRequest.current) return;
+      if (!isCurrentRequest()) return;
       setNotice(
         error instanceof Error
           ? error.message
@@ -131,7 +126,7 @@ export function useNearbyDiscovery({
         "error",
       );
     } finally {
-      if (request === nearbyRequest.current) setNearbyBusy(false);
+      if (isCurrentRequest()) setNearbyBusy(false);
     }
   }
 

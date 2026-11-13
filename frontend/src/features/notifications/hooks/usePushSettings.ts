@@ -1,4 +1,5 @@
 import { type PushState, setupOneSignal, disableOneSignalPush, enableOneSignalPush, isPushDisabled } from "../lib/onesignal";
+import { syncPushSubscription, requestPushTest } from "../api/push";
 import { persistMessageSoundEnabled, IncomingMessageSound } from "../lib/incomingSound";
 import type { InstallPromptEvent } from "../../pwa/types";
 import { type Session } from "../../auth/lib/session";
@@ -69,18 +70,14 @@ export function usePushSettings({
   async function syncPushState(state: PushState) {
     if (!session?.token || !state.subscriptionId) return;
 
-    const response = await apiFetch("/api/push/subscription", {
-      method: state.optedIn ? "POST" : "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscriptionId: state.subscriptionId }),
-    });
+    const response = await syncPushSubscription(apiFetch, state.subscriptionId, state.optedIn);
     if (!response.ok) throw new Error("Không lưu được đăng ký thông báo.");
   }
   async function sendTestPush(silent = false, force = false) {
     if (!pushConfigured || (!pushEnabled && !force) || (pushBusy && !force))
       return false;
 
-    const response = await apiFetch("/api/push/test", { method: "POST" });
+    const response = await requestPushTest(apiFetch);
     const result = await response.json().catch(() => ({}));
 
     if (!response.ok) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import {
   Ban, CalendarClock, ChevronDown, ChevronRight, ClipboardList, Clock3,
   FileText, Camera, Info, MoreHorizontal, Plus, ScrollText, Search,
@@ -8,9 +8,9 @@ import type { GroupActivityKind } from './GroupActivities'
 import type { Conversation } from '../types'
 import type { GroupManagementSection } from './GroupSettingsPanel'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import GroupChannelCreateForm from '../GroupChannelCreateForm'
-import GroupAvatarEditor, { type GroupPhotoTarget } from '../GroupAvatarEditor'
-import ConversationSharedPreview from '../ConversationSharedPreview'
+import GroupChannelCreateForm from './GroupChannelCreateForm'
+import GroupAvatarEditor, { type GroupPhotoTarget } from './GroupAvatarEditor'
+import ConversationSharedPreview from './ConversationSharedPreview'
 
 type Props = {
   conversation: Conversation
@@ -52,14 +52,11 @@ export default function ConversationDetailsPanel({
 }: Props) {
   const isGroup = conversation.type === 'group'
   const blocked = !isGroup && Boolean(conversation.blockedByMe || conversation.blockedByOther)
-  const [groupOptionsOpen, setGroupOptionsOpen] = useState(false)
-  const [creatingChannel, setCreatingChannel] = useState(false)
-  const [photoTarget, setPhotoTarget] = useState<GroupPhotoTarget | null>(null)
-  useEffect(() => {
-    setGroupOptionsOpen(false)
-    setCreatingChannel(false)
-    setPhotoTarget(null)
-  }, [conversation.id])
+  // Each conversation visit starts with a closed menu/editor. Scoped setters
+  // also ignore late callbacks from the previously selected conversation.
+  const [groupOptionsOpen, setGroupOptionsOpen] = useScopedState(conversation.id, false)
+  const [creatingChannel, setCreatingChannel] = useScopedState(conversation.id, false)
+  const [photoTarget, setPhotoTarget] = useScopedState<GroupPhotoTarget | null>(conversation.id, null)
 
   return (
     <aside className="conversation-info-panel social-chat-details" id="conversation-details-panel" aria-label="Thông tin hội thoại">

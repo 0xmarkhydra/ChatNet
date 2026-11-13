@@ -2,7 +2,9 @@ import BubbleTextarea from '../../../shared/ui/BubbleTextarea'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, Plus, Trash2, X, LockKeyhole, Users, Globe, RefreshCw } from 'lucide-react'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/profile-note.css'
+import { loadProfileNote, saveProfileNote, deleteProfileNote } from '../api/profile'
 type Note = { content: string; visibility: 'friends'|'public'|'private'; version: string; createdAt: string; expiresAt: string }
 type Props = { username: string; owner?: boolean; refreshKey?: string; request: (path: string, init?: RequestInit) => Promise<Response> }
 export default function ProfileNote({ username, owner = false, refreshKey, request }: Props) {
@@ -15,17 +17,21 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
  const [confirm,setConfirm] = useState(false)
  const dialog = useRef<HTMLDialogElement>(null)
  const trigger = useRef<HTMLButtonElement>(null)
- const api = useRef(request); api.current=request
+ const api = useLatest(request)
  const alive = useRef(false)
  const seq = useRef(0)
  const writing = useRef(false)
- const currentNote = note && Date.parse(note.expiresAt)>Date.now() ? note : null
+ const [now,setNow] = useState(() => Date.now())
+ useEffect(()=>{
+  const timer=window.setInterval(()=>setNow(Date.now()),30_000)
+  return()=>window.clearInterval(timer)
+ },[])
+ const currentNote = note && Date.parse(note.expiresAt)>now ? note : null
  const count = Array.from(draft.trim()).length
- const path = owner ? '/api/profile/note' : '/api/users/'+encodeURIComponent(username)+'/note'
  async function load(force=false) {
   const version=++seq.current
   try {
-   const response=await api.current(path,force?{cache:'reload'}:{})
+   const response=await loadProfileNote(api.current, username, owner, force)
    if(!response.ok)throw new Error('Không tải được ghi chú.')
    const data=await response.json() as {note:Note|null}
    if(!alive.current||version!==seq.current)return
@@ -48,7 +54,7 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
   if(writing.current||(!remove&&(count<1||count>60)))return
   writing.current=true;setBusy(true);setError('');++seq.current
   try {
-   const response=await api.current('/api/profile/note',{method:remove?'DELETE':'POST',body:JSON.stringify(remove?{version:currentNote?.version}:{content:draft.trim(),visibility})})
+   const response=await (remove ? deleteProfileNote(api.current, currentNote?.version) : saveProfileNote(api.current, draft.trim(), visibility))
    const data=await response.json() as {note:Note|null;error?:string}
    if(!alive.current)return
    if(!response.ok)throw new Error(data.error||'Chưa lưu được ghi chú. Hãy tải lại để kiểm tra.')

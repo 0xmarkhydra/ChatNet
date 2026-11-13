@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { GroupMember } from '../types'
 import '../styles/message-readers.css'
 
@@ -80,10 +81,11 @@ export default function MessageReadersDialog({
   const dialogRef = useRef<HTMLDialogElement>(null)
   const requestRef = useRef(request)
   const titleId = useId()
-  const [readers, setReaders] = useState<Reader[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
+  const readerScope = `${conversationId}:${readerIds.join(',')}:${retry}`
+  const [readers, setReaders] = useScopedState<Reader[]>(readerScope, [])
+  const [loading, setLoading] = useScopedState(readerScope, true)
+  const [error, setError] = useScopedState(readerScope, '')
 
   const closeDialog = () => {
     const dialog = dialogRef.current
@@ -103,10 +105,6 @@ export default function MessageReadersDialog({
     let cancelled = false
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 30_000)
-    setLoading(true)
-    setError('')
-    setReaders([])
-
     void requestRef.current(`/api/conversations/${conversationId}/members`, { signal: controller.signal })
       .then(async (response) => {
         if (response.status === 403) throw new Error('Bạn không còn quyền xem cuộc trò chuyện này.')
@@ -130,7 +128,7 @@ export default function MessageReadersDialog({
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [conversationId, readerIds, retry])
+  }, [conversationId, readerIds, retry, setReaders, setLoading, setError])
 
   return (
     <dialog

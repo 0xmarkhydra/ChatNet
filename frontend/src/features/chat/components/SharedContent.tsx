@@ -2,7 +2,8 @@ import { userLabel } from '../../../shared/utils/userLabel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, Images, Link2, X } from 'lucide-react'
 import MediaViewer from '../../../shared/ui/MediaViewer'
-import { loadSharedContent } from '../sharedContentLoader'
+import { loadSharedContent } from '../lib/sharedContentLoader'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 type MediaAttachment = {
   id?: number
@@ -58,8 +59,7 @@ export default function SharedContent({
   request: RequestFn
   onClose: () => void
 }) {
-  const requestRef = useRef(request)
-  requestRef.current = request
+  const requestRef = useLatest(request)
   const [tab, setTab] = useState<Tab>(initialTab)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [items, setItems] = useState<SharedMessage[]>([])

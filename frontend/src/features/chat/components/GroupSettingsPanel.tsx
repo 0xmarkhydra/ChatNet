@@ -77,7 +77,6 @@ export default function GroupSettingsPanel({
   const [activeSection, setActiveSection] = useState<GroupManagementSection>(initialSection)
   const [memberSearch, setMemberSearch] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { setActiveSection(initialSection); setMemberSearch(''); setOpenMemberMenu(null) }, [activeConversation.id, initialSection])
   const filteredMembers = groupMembers.filter(member => `${member.displayName} ${member.username}`.toLocaleLowerCase('vi-VN').includes(memberSearch.trim().toLocaleLowerCase('vi-VN')))
   const isOwner = activeGroupMember?.role === 'owner'
   const isManager = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'

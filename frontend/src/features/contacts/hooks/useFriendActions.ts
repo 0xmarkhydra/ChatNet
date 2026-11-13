@@ -1,5 +1,6 @@
 import type { FriendConnection, FriendSearchResult } from "../types";
-import type { UseContactActionsDeps } from "./useContactActions";
+import { updateFriendRelationship, removeAcceptedFriend as removeFriendRequest } from "../api/contacts";
+import type { UseContactActionsDeps } from "./contactActionTypes";
 
 type FriendActionsDeps = Pick<UseContactActionsDeps,
   | "apiFetch"
@@ -69,13 +70,7 @@ export function useFriendActions({
     setFriendActionBusy(friend.id);
     try {
       const removing = decline || relationship === "outgoing";
-      const method = removing ? "DELETE" : "POST";
-      const path = removing
-        ? `/api/friends/${friend.id}?direction=${relationship}`
-        : relationship === "incoming"
-          ? `/api/friends/${friend.id}/accept`
-          : `/api/friends/${friend.id}`;
-      const response = await apiFetch(path, { method });
+      const response = await updateFriendRelationship(apiFetch, friend.id, relationship, removing);
       const result = (await response.json().catch(() => null)) as
         | (FriendConnection & { error?: string })
         | null;
@@ -160,10 +155,7 @@ export function useFriendActions({
     setFriendActionBusy(friend.id);
     setFriendMenuId(null);
     try {
-      const response = await apiFetch(
-        `/api/friends/${friend.id}?direction=accepted`,
-        { method: "DELETE" },
-      );
+      const response = await removeFriendRequest(apiFetch, friend.id);
       const result = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;

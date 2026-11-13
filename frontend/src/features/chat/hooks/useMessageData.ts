@@ -19,7 +19,7 @@ type Options = Omit<AppDataContext, 'setStatus'> &
     translationPreferencesLoaded: boolean
     targetLanguage: string
     setTranslations: Dispatch<SetStateAction<Record<number, string>>>
-    messageChanges: RefObject<Set<number>>
+    resetMessageChanges: (next: Set<number>) => void
     pendingSend: RefObject<{
       sessionId: string; conversationId: number; signature: string; clientId: string; draft: MessageDraft
     } | null>
@@ -43,7 +43,7 @@ export function useMessageData({
   translationPreferencesLoaded,
   targetLanguage,
   setTranslations,
-  messageChanges,
+  resetMessageChanges,
   pendingSend,
   setMessageDrafts,
   setConversations,
@@ -76,7 +76,7 @@ export function useMessageData({
 
     let cancelled = false
     const changes = new Set<number>()
-    messageChanges.current = changes
+    resetMessageChanges(changes)
     setTranslations({})
     // Never show another channel's messages while its own history is loading.
     setMessages([])

@@ -5,7 +5,7 @@ import type { Conversation } from '../../chat/types'
 import type { PostMentionNotification } from '../../feed/utils/postMentionNotifications'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
-import { buildNotificationItems } from '../utils/notification-items'
+import { buildNotificationItems, countUnreadNotificationItems, filterNotificationItems, type NotificationFilter } from '../utils/notification-items'
 import '../styles/notifications-page.css'
 
 type Props = {
@@ -24,7 +24,6 @@ type Props = {
   onSettings: () => void
 }
 
-type NotificationFilter = 'all' | 'unread' | 'mentions'
 const displayDate = (input: string) => {
   if (!input) return ''
   const date = new Date(input)
@@ -36,19 +35,14 @@ export default function NotificationsPage({
   onOpenConversation, onOpenInvitations, onOpenFriend, onSettings,
 }: Props) {
   const [filter, setFilter] = useState<NotificationFilter>('all')
-  const filtersPill = useSlidingPill<HTMLDivElement>(filter)
+  const { hostRef: filtersPillSetHost, activeRef: filtersPillSetActive, pillRef: filtersPillSetPill } = useSlidingPill<HTMLDivElement>(filter)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [readKeys, setReadKeys] = useState<Set<string>>(() => new Set())
   const notifications = useMemo(() => buildNotificationItems(requests, conversations, mentions), [requests, conversations, mentions])
 
-  const filtered = notifications.filter(item => {
-    if (filter === 'mentions' && item.kind !== 'mention') return false
-    if (filter === 'unread' && (item.mention ? Boolean(item.mention.readAt) : readKeys.has(item.key))) return false
-    const term = search.toLocaleLowerCase('vi-VN').trim()
-    return !term || (item.name + ' ' + item.subtitle).toLocaleLowerCase('vi-VN').includes(term)
-  })
+  const filtered = filterNotificationItems(notifications, filter, search, readKeys)
   const selected = filtered.find(n => n.key === selectedKey) ?? filtered[0] ?? null
-  const unseenCount = notifications.filter(n => n.mention ? !n.mention.readAt : !readKeys.has(n.key)).length
+  const unseenCount = countUnreadNotificationItems(notifications, readKeys)
 
   useEffect(() => {
     // Retain local read state only for notifications still backed by active server data.
@@ -78,10 +72,10 @@ export default function NotificationsPage({
     <div className="np-layout">
       <section className="np-card np-list-pane" aria-label="Thông báo mới">
         <h2>Thông báo mới</h2>
-        <div ref={filtersPill.hostRef} className="np-filters sliding-pill-host" role="tablist" aria-label="Lọc thông báo">
-          <span ref={filtersPill.pillRef} className="sliding-pill notifications-active-pill" aria-hidden="true" />
+        <div ref={filtersPillSetHost} className="np-filters sliding-pill-host" role="tablist" aria-label="Lọc thông báo">
+          <span ref={filtersPillSetPill} className="sliding-pill notifications-active-pill" aria-hidden="true" />
           {([['all','Tất cả'], ['unread','Chưa đọc'], ['mentions','Nhắc đến']] as const)
-            .map(([key, label]) => <button ref={filter === key ? filtersPill.activeRef : undefined} type="button" role="tab" key={key}
+            .map(([key, label]) => <button ref={filter === key ? filtersPillSetActive : undefined} type="button" role="tab" key={key}
               className={filter === key ? 'active' : ''} aria-selected={filter === key}
               onClick={() => setFilter(key)}>{label}</button>)}
         </div>

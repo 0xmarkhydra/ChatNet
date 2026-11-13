@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useScopedState } from '../hooks/useScopedState'
 import { API } from '../lib/config'
 
 function avatarInitials(name: string) {
@@ -40,11 +40,7 @@ export default function UserAvatar({
 }) {
   const version = avatarRefreshVersions.get(username)
   const imageUrl = group ? (suppliedImageUrl || '') : profileAssetUrl(username, 'avatar', version)
-  const [imageFailed, setImageFailed] = useState(false)
-
-  useEffect(() => {
-    setImageFailed(false)
-  }, [imageUrl])
+  const [imageFailed, setImageFailed] = useScopedState(imageUrl, false)
 
   return (
     <div

@@ -1,46 +1,11 @@
 import { useFriendActions } from "./useFriendActions";
+import { updateContactMetadata, findDirectConversation } from "../api/contacts";
 import { useContactModeration } from "./useContactModeration";
 import type { FriendSearchResult, FriendConnection } from "../types";
-import { type Conversation } from "../../chat/types";
-import { type Session } from "../../auth/lib/session";
-import { type SetStateAction } from "react";
-import { type ToastKind } from "../../../shared/utils/toast";
-import type { Tab } from "../../../shared/types/navigation";
-import type { Dispatch, RefObject } from "react";
+import type { UseContactActionsDeps } from "./contactActionTypes";
+import type { Conversation } from "../../chat/types";
 
-export type UseContactActionsDeps = {
-  apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
-  blockedBusy: boolean;
-  contactMetadata: Record<number, { nickname: string; note: string; favorite: boolean; }>;
-  conversations: Conversation[];
-  friendActionRef: RefObject<Set<number>>;
-  friendBusyIds: Set<number>;
-  friendRelationship: (userId: number) => "accepted" | "incoming" | "outgoing" | "none";
-  friends: FriendConnection[];
-  friendSyncRequest: RefObject<number>;
-  openDirectByUsername: (username: string, mediaType?: "audio" | "video", onOpened?: (conversation: Conversation) => void) => Promise<void>;
-  refreshConversations: () => Promise<void>;
-  refreshFriendConnections: () => Promise<void>;
-  session: Session | null;
-  sessionRef: RefObject<Session | null>;
-  setActiveConversationId: Dispatch<SetStateAction<number | null>>;
-  setBlockedBusy: Dispatch<SetStateAction<boolean>>;
-  setBlockedError: Dispatch<SetStateAction<string>>;
-  setBlockedOpen: Dispatch<SetStateAction<boolean>>;
-  setBlockedUsers: Dispatch<SetStateAction<{ id: number; username: string; displayName: string; }[]>>;
-  setContactMetadata: Dispatch<SetStateAction<Record<number, { nickname: string; note: string; favorite: boolean; }>>>;
-  setConversations: Dispatch<SetStateAction<Conversation[]>>;
-  setDesktopSection: Dispatch<SetStateAction<"groups" | "calls" | null>>;
-  setFriendActionBusy: Dispatch<SetStateAction<number | null>>;
-  setFriendBusyIds: Dispatch<SetStateAction<Set<number>>>;
-  setFriendMenuId: Dispatch<SetStateAction<number | null>>;
-  setFriendPreview: (friend: FriendSearchResult | null) => void;
-  setFriendRequests: Dispatch<SetStateAction<FriendConnection[]>>;
-  setFriendResults: Dispatch<SetStateAction<FriendSearchResult[]>>;
-  setFriends: Dispatch<SetStateAction<FriendConnection[]>>;
-  setNotice: (message: string, kind?: ToastKind) => void;
-  setTab: Dispatch<SetStateAction<Tab>>;
-};
+
 
 export function useContactActions({
   apiFetch,
@@ -146,11 +111,7 @@ export function useContactActions({
     setFriendMenuId(null);
     setFriendBusyIds((ids) => new Set(ids).add(friend.id));
     try {
-      const response = await apiFetch(`/api/contacts/${friend.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(next),
-      });
+      const response = await updateContactMetadata(apiFetch, friend.id, next);
       const result = (await response.json().catch(() => null)) as {
         error?: string;
         id?: number;
@@ -185,7 +146,7 @@ export function useContactActions({
       if (username) {
         try {
           // The chat may be on a later page of the paginated conversation list.
-          const response = await apiFetch(`/api/conversations?type=direct&q=${encodeURIComponent(username)}&limit=100`, { cache: 'no-store' });
+          const response = await findDirectConversation(apiFetch, username);
           if (response.ok) {
             const data = (await response.json()) as Conversation[];
             direct = data.find((item) => item.type === 'direct' && item.otherUserId === userId);

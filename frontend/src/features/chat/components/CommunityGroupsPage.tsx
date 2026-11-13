@@ -7,6 +7,7 @@ import type { FriendConnection } from '../../contacts/types'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../../shared/ui/MediaAttachmentsView'
 import GroupGovernancePanel from './GroupGovernancePanel'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import { createGroupChannel } from '../api/conversations'
 import { deleteChannel, getCommunity, getNotificationSettings, joinPublicGroup, listChannelMessages, listChannels, listPublicGroups, saveNotificationSettings, sendChannelMessage as sendChannelMessageRequest, updateChannel, updateCommunity } from '../api/community'
 import '../styles/community-groups.css'
@@ -91,8 +92,7 @@ export default function CommunityGroupsPage({
   const [publicGroups,setPublicGroups] = useState<CommunityMetadata[]>([])
   const [publicLoading,setPublicLoading] = useState(false)
   const [joiningId,setJoiningId] = useState<number | null>(null)
-  const requestRef=useRef(request)
-  requestRef.current=request
+  const requestRef=useLatest(request)
   const groupId=selectedGroup?.id ?? null
   useEffect(()=>{
     setMetadata(null)
@@ -140,7 +140,7 @@ export default function CommunityGroupsPage({
       if(!ctrl.signal.aborted)setPublicGroups(Array.isArray(value)?value:[])
     }).catch(()=>{if(!ctrl.signal.aborted)setPublicGroups([])}).finally(()=>{if(!ctrl.signal.aborted)setPublicLoading(false)})
     return()=>ctrl.abort()
-  },[mode,query])
+  },[mode, query, requestRef])
 
   useEffect(()=>{
     setChannelMessages([])
@@ -153,7 +153,7 @@ export default function CommunityGroupsPage({
       .then(value=>{if(!cancelled)setChannelMessages(Array.isArray(value)?value:[])})
       .catch(()=>{if(!cancelled)setChannelError('Không tải được tin nhắn. Thử chọn lại kênh.')})
     return()=>{cancelled=true}
-  },[groupId,activeChannelId])
+  },[groupId, activeChannelId, requestRef])
 
   useEffect(()=>{
     if(!groupId)return
@@ -166,7 +166,7 @@ export default function CommunityGroupsPage({
     }
     window.addEventListener('chatnet:group-community-updated',onChange)
     return()=>window.removeEventListener('chatnet:group-community-updated',onChange)
-  },[groupId])
+  },[groupId, requestRef])
 
   useEffect(()=>{
     if(!groupId||activeChannelId===0)return

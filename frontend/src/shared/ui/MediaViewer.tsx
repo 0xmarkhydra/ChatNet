@@ -6,6 +6,17 @@ import './media-viewer.css'
 
 type PreviewMedia = MediaAttachment & { url: string }
 
+function MediaViewerDisplay({ item }: { item: PreviewMedia }) {
+  const [failed, setFailed] = useState(false)
+  return failed ? (
+    <p role="alert" className="media-viewer-error">Không thể tải nội dung này. Liên kết có thể đã hết hạn.</p>
+  ) : item.kind === 'video' ? (
+    <video src={item.url} controls playsInline autoPlay onError={() => setFailed(true)} />
+  ) : (
+    <img src={item.url} alt={item.name || 'Ảnh đính kèm'} onError={() => setFailed(true)} />
+  )
+}
+
 export default function MediaViewer({
   items, activeIndex, onChange, onClose,
 }: {
@@ -16,8 +27,6 @@ export default function MediaViewer({
 }) {
   const item = items[activeIndex]
   const closeButton = useRef<HTMLButtonElement>(null)
-  const [failed, setFailed] = useState(false)
-
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const oldOverflow = document.body.style.overflow
@@ -28,10 +37,6 @@ export default function MediaViewer({
       previousFocus?.focus()
     }
   }, [])
-
-  useEffect(() => {
-    setFailed(false)
-  }, [item?.url])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -89,13 +94,7 @@ export default function MediaViewer({
               <ChevronLeft size={27} aria-hidden="true" />
             </button>
           )}
-          {failed ? (
-            <p role="alert" className="media-viewer-error">Không thể tải nội dung này. Liên kết có thể đã hết hạn.</p>
-          ) : item.kind === 'video' ? (
-            <video key={item.url} src={item.url} controls playsInline autoPlay onError={() => setFailed(true)} />
-          ) : (
-            <img key={item.url} src={item.url} alt={item.name || 'Ảnh đính kèm'} onError={() => setFailed(true)} />
-          )}
+          <MediaViewerDisplay key={`${activeIndex}:${item.url}`} item={item} />
           {items.length > 1 && activeIndex < items.length - 1 && (
             <button type="button" className="media-viewer-nav next"
               aria-label="Ảnh tiếp theo" onClick={() => onChange(activeIndex + 1)}>

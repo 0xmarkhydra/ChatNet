@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Camera, Check, ImagePlus, RotateCcw, Trash2, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import './group-avatar-editor.css'
+import '../styles/group-avatar-editor.css'
 
 export type GroupPhotoTarget = {
   name: string
