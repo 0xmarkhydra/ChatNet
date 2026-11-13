@@ -447,7 +447,7 @@ export default function AuthedApp({
     if (session?.user.id && sessionRef.current?.user.id === session.user.id) {
       saveChatDrafts(session.user.id, messageDrafts);
     }
-  }, [session?.user.id, messageDrafts]);
+  }, [session?.user.id, messageDrafts, sessionRef]);
   const [channelDrafts, setChannelDrafts] = useState<Record<string, MessageDraft>>({});
   const channelDraftKey = `${activeConversationId ?? 0}:${selectedChannelId}`;
   const draft = selectedChannelId > 0 ? channelDrafts[channelDraftKey] ?? emptyDraft : messageDrafts[activeConversationId ?? 0] ?? emptyDraft;
@@ -588,12 +588,16 @@ export default function AuthedApp({
     session?.user.username,
   ]);
   const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
-  const [postMentions, setPostMentions] = useState<PostMentionNotification[]>([]);
+  const [postMentionsState, setPostMentionsState] = useState<{
+    sessionId: string;
+    items: PostMentionNotification[];
+  } | null>(null);
+  const postMentions = session?.sessionId === postMentionsState?.sessionId
+    ? postMentionsState.items
+    : [];
   useEffect(() => {
-    if (!session?.sessionId) {
-      setPostMentions([]);
-      return;
-    }
+    if (!session?.sessionId) return;
+    const mentionSessionId = session.sessionId;
     let live = true;
     const controller = new AbortController();
     const refresh = async () => {
@@ -602,9 +606,12 @@ export default function AuthedApp({
         if (!response.ok) return;
         const items: unknown = await response.json();
         if (live && Array.isArray(items)) {
-          setPostMentions(items.filter((item): item is PostMentionNotification =>
-            item && Number.isSafeInteger(item.id) && Number.isSafeInteger(item.postId)
-            && typeof item.author === "string" && typeof item.createdAt === "string"));
+          setPostMentionsState({
+            sessionId: mentionSessionId,
+            items: items.filter((item): item is PostMentionNotification =>
+              item && Number.isSafeInteger(item.id) && Number.isSafeInteger(item.postId)
+              && typeof item.author === "string" && typeof item.createdAt === "string"),
+          });
         }
       } catch {
         // A temporary network outage must not clear already received alerts.
@@ -747,10 +754,11 @@ export default function AuthedApp({
   }, [messageText, activeConversationId, tab, desktopSection]);
   const chatDragDepth = useRef(0);
   const setChatDragDepth = useCallback((next: number) => { chatDragDepth.current = next; }, []);
-  const [chatDragActive, setChatDragActive] = useState(false);
+  const [chatDragActive, setChatDragActive] = useScopedState(
+    `${tab}:${activeConversationId ?? "none"}`, false,
+  );
   useEffect(() => {
     chatDragDepth.current = 0;
-    setChatDragActive(false);
   }, [activeConversationId, tab]);
 
   useEffect(() => {
@@ -1055,7 +1063,7 @@ export default function AuthedApp({
 
   useEffect(() => {
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
-  }, [groupSettingsOpen]);
+  }, [groupSettingsOpen, setGroupMemberViewOpen]);
 
   useEffect(() => {
     if (!groupSettingsOpen) return;
@@ -2515,8 +2523,13 @@ export default function AuthedApp({
     try {
       const response = await apiFetch(`/api/feed/mentions/${id}/read`, { method: "POST" });
       if (!response.ok) throw new Error("Không đánh dấu được thông báo.");
-      setPostMentions(current => current.map(item => item.id === id
-        ? { ...item, readAt: new Date().toISOString() } : item));
+      setPostMentionsState(current => current?.sessionId === session?.sessionId
+        ? {
+            ...current,
+            items: current.items.map(item => item.id === id
+              ? { ...item, readAt: new Date().toISOString() } : item),
+          }
+        : current);
     } catch {
       setNotice("Không đánh dấu được thông báo. Vui lòng thử lại.", "error");
     }

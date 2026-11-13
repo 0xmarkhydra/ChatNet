@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Languages, MessageCircle, TrendingUp, UserPlus, UsersRound } from 'lucide-react'
 import type { Post } from '../types'
 import type { FriendConnection, FriendSearchResult } from '../../contacts/types'
@@ -40,10 +40,20 @@ export default function SocialFeedSidebar({
   request, onFriend, onViewUser, onViewContacts, onSearchTag, onOpenChat,
 }: Props) {
   const requestRef = useLatest(request)
-  const [suggestions, setSuggestions] = useState<FriendSearchResult[]>([])
-  const [suggestionsBusy, setSuggestionsBusy] = useState(true)
-  const [suggestionsError, setSuggestionsError] = useState(false)
   const [revision, setRevision] = useState(0)
+  const [suggestionsResult, setSuggestionsResult] = useState<{
+    sessionId: string
+    revision: number
+    users: FriendSearchResult[]
+    error: boolean
+  } | null>(null)
+  // A new session or retry is loading immediately, before its request effect
+  // runs. Responses from the previous identity are never displayed.
+  const currentResult = suggestionsResult?.sessionId === sessionId
+    && suggestionsResult.revision === revision ? suggestionsResult : null
+  const suggestions = currentResult?.users ?? []
+  const suggestionsBusy = currentResult === null
+  const suggestionsError = currentResult?.error ?? false
   const topics = useMemo(() => extractFeedTopics(posts), [posts])
   const connectedIds = useMemo(() => new Set([...friends, ...friendRequests].map(friend => friend.id)), [friends, friendRequests])
   const visible = suggestions.filter(user => user.id > 0 && user.username !== username && !connectedIds.has(user.id)).slice(0, 3)
@@ -51,17 +61,21 @@ export default function SocialFeedSidebar({
   useEffect(() => {
     const controller = new AbortController()
     let active = true
-    setSuggestionsBusy(true)
-    setSuggestionsError(false)
     void requestRef.current('/api/users/suggestions', { signal: controller.signal })
       .then(async response => {
         if (!response.ok) throw new Error('Không tải được gợi ý kết nối')
         const data: unknown = await response.json()
         if (!Array.isArray(data)) throw new Error('Dữ liệu kết nối không hợp lệ')
-        if (active) setSuggestions(data.filter(user => user && Number.isSafeInteger(user.id) && typeof user.username === 'string'))
+        if (active) {
+          setSuggestionsResult({
+            sessionId, revision, error: false,
+            users: data.filter(user => user && Number.isSafeInteger(user.id) && typeof user.username === 'string'),
+          })
+        }
       })
-      .catch(() => { if (active) setSuggestionsError(true) })
-      .finally(() => { if (active) setSuggestionsBusy(false) })
+      .catch(() => {
+        if (active) setSuggestionsResult({ sessionId, revision, error: true, users: [] })
+      })
     return () => { active = false; controller.abort() }
   }, [sessionId, revision, requestRef])
 

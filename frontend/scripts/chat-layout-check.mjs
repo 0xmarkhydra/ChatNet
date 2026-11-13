@@ -110,6 +110,19 @@ try {
             viewport: window.innerWidth,
           }
         })
+        if (placement?.action.width === 0) {
+          // Pointer-based desktop layouts intentionally replace the per-bubble
+          // icon with a hover toolbar. Validate its translation control instead
+          // of asserting the hidden fallback has a nonzero bounding box.
+          const content = page.locator(`[data-message-id="${messageId}"] .message-content`)
+          await content.hover()
+          const action = content.locator('.chat-message-hover-toolbar button[aria-label="Dịch tin nhắn"]')
+          await action.waitFor({ state: 'visible' })
+          const bounds = await action.boundingBox()
+          assert.ok(bounds && bounds.width >= 30 && bounds.height >= 30,
+            `Desktop translation toolbar must remain accessible (${direction}, ${width}px)`)
+          continue
+        }
         assert.ok(placement && placement.svg && placement.label === 'Dịch' &&
           placement.text === '' && Math.abs(placement.action.width - 30) < 0.1,
           `Translation must be an accessible icon only (${direction}, ${width}px): ${JSON.stringify(placement)}`)
@@ -253,7 +266,15 @@ try {
         }
         console.log('content', JSON.stringify({firstBubble:rects.firstBubble,translationAction:rects.translationAction,photo:rects.photo,photoTime:rects.photoTime,composerImage:rects.composerImage,composerMic:rects.composerMic}))
         assert.ok(rects.avatar, 'incoming message avatar visible')
-        assert.ok(rects.translationAction, 'manual translation action appears when automatic translation is off')
+        if (!rects.translationAction) {
+          const translatedMessage = page.locator('[data-message-id="3"] .message-content')
+          await translatedMessage.hover()
+          const toolbarAction = translatedMessage.locator('.chat-message-hover-toolbar button[aria-label="Dịch tin nhắn"]')
+          assert.ok(await toolbarAction.boundingBox(),
+            'manual translation is available in the desktop hover toolbar')
+        } else {
+          assert.ok(rects.translationAction, 'manual translation icon is available on touch layouts')
+        }
         assert.ok(rects.photo && rects.photo.width >= 200 && rects.photo.width <= 258 &&
           rects.photo.height >= 120 && rects.photo.height <= 150,
         'Photo must retain a readable size when the translation banner is removed')

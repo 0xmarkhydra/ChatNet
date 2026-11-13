@@ -11,11 +11,18 @@ type Startup = { phase: 'loading' } | { phase: 'error'; message: string } | { ph
 
 export default function DesktopBootstrap() {
   const [attempt, setAttempt] = useState(0)
-  const [startup, setStartup] = useState<Startup>({ phase: 'loading' })
+  const [startupResult, setStartupResult] = useState<{ attempt: number; value: Startup }>({
+    attempt: 0,
+    value: { phase: 'loading' },
+  })
+  // Switching attempts shows loading immediately, without scheduling a
+  // synchronous state update from the restore effect.
+  const startup: Startup = startupResult.attempt === attempt
+    ? startupResult.value
+    : { phase: 'loading' }
   useEffect(() => {
     let active = true
     let unsubscribe: (() => void) | undefined
-    setStartup({ phase: 'loading' })
     async function restore() {
       // B01 stored Web credentials here. Never hydrate them into the Desktop session.
       localStorage.removeItem('chatnet-session')
@@ -35,7 +42,7 @@ export default function DesktopBootstrap() {
       const result = await bridge.auth.restore()
       const session = result === null ? null : parseSession(result)
       if (result !== null && (!session || session.refreshToken !== undefined)) throw new Error('AUTH_INVALID_RESPONSE')
-      if (active) setStartup({ phase: 'ready', session })
+      if (active) setStartupResult({ attempt, value: { phase: 'ready', session } })
     }
     void restore().catch((error: unknown) => {
       if (!active) return
@@ -45,7 +52,7 @@ export default function DesktopBootstrap() {
         : detail.includes('DESKTOP_')
           ? 'Bản Desktop thiếu bridge hoặc cấu hình API không khớp. Hãy dùng đúng bộ cài SocCO.'
           : 'Chưa xác minh được phiên đăng nhập. Kiểm tra kết nối rồi thử lại. Tin đang chờ và bản nháp vẫn được giữ.'
-      setStartup({ phase: 'error', message })
+      setStartupResult({ attempt, value: { phase: 'error', message } })
     })
     return () => { active = false; unsubscribe?.() }
   }, [attempt])

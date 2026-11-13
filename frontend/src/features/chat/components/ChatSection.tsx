@@ -835,6 +835,7 @@ export default function ChatSection({
                   onClick={() => setGroupSettingsOpen(false)} />
                 <aside className="group-settings-sidebar" id="group-settings-sidebar" aria-label="Thanh bên quản lý nhóm">
                   <GroupSettingsPanel
+                    key={`${activeConversation.id}:${groupManagementSection}`}
                     initialSection={groupManagementSection}
                     activeGroupMember={activeGroupMember}
                     setGroupSettingsOpen={setGroupSettingsOpen}
