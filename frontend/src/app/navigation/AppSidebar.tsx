@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
-import { Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings, ShoppingBag, UserRoundCheck } from 'lucide-react'
+import { Bell, Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings, ShoppingBag, UserRoundCheck } from 'lucide-react'
 import type { Tab } from '../../shared/types/navigation'
 import UserAvatar from '../../shared/ui/UserAvatar'
 
@@ -9,7 +9,9 @@ type Props = {
   username: string
   displayName: string
   unreadTotal: number
+  notificationCount: number
   feedSaved: boolean
+  settingsActive: boolean
   onNavigate: (tab: Tab) => void
   onCalls: () => void
   onSaved: () => void
@@ -17,10 +19,10 @@ type Props = {
 }
 
 export default function AppSidebar({
-  tab, section, username, displayName, unreadTotal, feedSaved,
+  tab, section, username, displayName, unreadTotal, notificationCount, feedSaved, settingsActive,
   onNavigate, onCalls, onSaved, onSettings,
 }: Props) {
-  const activeKey = `${tab}:${section ?? ''}:${feedSaved}`
+  const activeKey = `${tab}:${section ?? ''}:${feedSaved}:${settingsActive}`
   const navRef = useRef<HTMLElement>(null)
   const activeButtonRef = useRef<HTMLButtonElement>(null)
   const pillRef = useRef<HTMLSpanElement>(null)
@@ -85,10 +87,10 @@ export default function AppSidebar({
   }, [activeKey])
 
   const mainItems = [
-    { label: 'Bảng tin', Icon: Newspaper, active: (tab === 'feed' && !feedSaved) || tab === 'notifications', action: () => onNavigate('feed') },
+    { label: 'Bảng tin', Icon: Newspaper, active: tab === 'feed' && !feedSaved, action: () => onNavigate('feed') },
     { label: 'Tin nhắn', Icon: MessageCircle, active: tab === 'chat' && section === null, action: () => onNavigate('chat'), count: unreadTotal },
     { label: 'Khám phá', Icon: Compass, active: tab === 'discover', action: () => onNavigate('discover') },
-    { label: 'Bạn bè', Icon: UserRoundCheck, active: tab === 'contacts' || tab === 'profile', action: () => onNavigate('contacts') },
+    { label: 'Bạn bè', Icon: UserRoundCheck, active: tab === 'contacts', action: () => onNavigate('contacts') },
     { label: 'Cuộc gọi', Icon: Phone, active: section === 'calls', action: onCalls },
     { label: 'Marketplace', Icon: ShoppingBag, active: tab === 'market', action: () => onNavigate('market') },
   ]
@@ -118,14 +120,18 @@ export default function AppSidebar({
         ))}
       </nav>
       <div className="app-sidebar-secondary">
+        <button type="button" className={tab === 'notifications' ? 'app-sidebar-link is-active' : 'app-sidebar-link'} aria-label="Thông báo" aria-current={tab === 'notifications' ? 'page' : undefined} onClick={() => onNavigate('notifications')}>
+          <Bell size={22} strokeWidth={1.8} aria-hidden="true" /><span>Thông báo</span>
+          {notificationCount > 0 && <b className="app-sidebar-count">{notificationCount > 99 ? '99+' : notificationCount}</b>}
+        </button>
         <button type="button" className={tab === 'feed' && feedSaved ? 'app-sidebar-link is-active' : 'app-sidebar-link'} aria-label="Đã lưu" aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
           <Bookmark size={22} strokeWidth={1.8} aria-hidden="true" /><span>Đã lưu</span>
         </button>
-        <button type="button" className="app-sidebar-link" aria-label="Cài đặt" onClick={onSettings}>
+        <button type="button" className={settingsActive ? 'app-sidebar-link is-active' : 'app-sidebar-link'} aria-label="Cài đặt" aria-current={settingsActive ? 'page' : undefined} onClick={onSettings}>
           <Settings size={22} strokeWidth={1.8} aria-hidden="true" /><span>Cài đặt</span>
         </button>
       </div>
-      <button type="button" className="app-sidebar-account" onClick={() => onNavigate('profile')} aria-label="Cá nhân">
+      <button type="button" className={tab === 'profile' && !settingsActive ? 'app-sidebar-account is-active' : 'app-sidebar-account'} onClick={() => onNavigate('profile')} aria-label="Cá nhân" aria-current={tab === 'profile' && !settingsActive ? 'page' : undefined}>
         <UserAvatar username={username} name={displayName} className="app-sidebar-avatar" online />
         <span className="app-sidebar-account-copy"><strong>{displayName}</strong><small>Đang hoạt động</small></span>
       </button>

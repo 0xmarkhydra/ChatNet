@@ -17,11 +17,13 @@ try {
     refreshToken:'r'.repeat(43),sessionId:'groups-redesign-test',
     user:{id:1,username:'tester',displayName:'Tài khoản của tôi',email:'test@example.invalid'} }
   await context.addInitScript(data=>localStorage.setItem('chatnet-session',JSON.stringify(data)),session)
-  const group=(id,name,count=3)=>({id,type:'group',name,memberCount:count,unreadCount:1,lastMessage:'Tin nhắn trước',lastMessageAt:'2026-11-06T09:30:00Z',online:true,createdAt:'2026-11-01T09:30:00Z'})
+  const group=(id,name,count=3)=>({id,type:'group',name,memberCount:count,avatarMembers:['linhanh','david','tester'],unreadCount:1,lastMessage:'Tin nhắn trước',lastMessageAt:'2026-11-06T09:30:00Z',online:true,createdAt:'2026-11-01T09:30:00Z'})
   const groups=[group(91,'Team ChatNet'), group(92,'Nhóm thiết kế',5),
     {id:93,type:'direct',name:'Linh Anh',otherUsername:'linhanh',otherUserId:2,
       memberCount:2,unreadCount:0,lastMessage:'Chào bạn',lastMessageAt:'2026-11-06T09:15:00Z',
       online:true,createdAt:'2026-11-01T09:30:00Z'}]
+  groups[0].categoryId=5
+  groups[2].categoryId=5
   const friends=[
     {id:2,username:'linhanh',displayName:'Linh Anh',status:'accepted',online:true,updatedAt:'2026-11-06'},
     {id:3,username:'david',displayName:'David Chen',status:'accepted',online:true,updatedAt:'2026-11-06'},
@@ -82,6 +84,7 @@ try {
       groups[0].avatarUrl=photo||undefined
       return route.fulfill(json({conversationId:91,avatarUrl:photo,avatarSet:!!photo}))
     }
+    if(path==='/api/conversation-categories'&&method==='GET')return route.fulfill(json([{id:5,name:'Công việc',color:'orange'}]))
     if(path==='/api/conversations/groups'&&method==='POST'){
       const body=JSON.parse(req.postData()||'{}');payloads.push(body)
       const created=group(120,body.name,1+body.usernames.length);created.unreadCount=0
@@ -113,6 +116,14 @@ try {
           storageRef:'mock-'+index,sizeBytes:68,contentType:'image/png'}],
       }))
       return route.fulfill(json({items:media}))
+    }
+    if(path.startsWith('/api/conversations/91/channels/')&&path.endsWith('/notifications')&&method==='GET'){
+      const id=Number(path.split('/')[5]);return route.fulfill(json({muted:channels.find(ch=>ch.id===id)?.muted===true}))
+    }
+    if(path.startsWith('/api/conversations/91/channels/')&&path.endsWith('/notifications')&&method==='PUT'){
+      const id=Number(path.split('/')[5]);const body=JSON.parse(req.postData()||'{}')
+      const selected=channels.find(ch=>ch.id===id);if(selected)selected.muted=body.muted
+      return route.fulfill(json({muted:body.muted}))
     }
     if(path==='/api/conversations/91/channels'&&method==='GET')return route.fulfill(json(channelUnreadMetricsEnabled
       ? channels : channels.map(({unreadCount, ...channel})=>channel)))
@@ -192,6 +203,345 @@ try {
   const errors=[]
   page.on('pageerror',error=>errors.push(error.message))
   await page.goto(origin,{waitUntil:'domcontentloaded'})
+  if (process.env.CHATNET_DESKTOP_RAIL_SMOKE === '1') {
+    const rail = page.locator('.desktop-conversation-rail')
+    await rail.waitFor({state:'visible'})
+    const direct = rail.getByRole('button',{name:/Mở tin nhắn Linh Anh/})
+    const group = rail.getByRole('button',{name:/Mở nhóm Team ChatNet/})
+    await direct.waitFor()
+    await group.waitFor()
+    // Expanding the ONE rail changes width, not avatar coordinates or order.
+    const railGeometry = () => page.evaluate(() => {
+      const dock = document.querySelector('.desktop-conversation-rail')
+      const rect = element => {
+        const r = element.getBoundingClientRect()
+        return {x:r.x,y:r.y,width:r.width,height:r.height}
+      }
+      return {dock:rect(dock),
+        avatars:[...dock.querySelectorAll('.desktop-conversation-rail-avatar')].map(rect),
+        scrollTop:dock.querySelector('.desktop-conversation-rail-scroller')?.scrollTop}
+    })
+    const assertStableRail = (before,after,label) => {
+      const stable=(a,b)=>['x','y','width','height'].every(k=>Math.abs(a[k]-b[k])<1)
+      assert.ok(before.avatars.length===after.avatars.length &&
+        before.avatars.every((avatar,i)=>stable(avatar,after.avatars[i])) &&
+        before.scrollTop===after.scrollTop,
+        'Avatar coordinates must not change on '+label+': '+JSON.stringify({before,after}))
+    }
+    await page.waitForTimeout(350)
+    assert.equal(await rail.getAttribute('data-expanded'),'true','Desktop Messages opens the details rail')
+    assert.equal(await page.locator('.conversation-sidebar').isVisible(),false,'No separate conversation-list screen')
+    const baseRailGeometry=await railGeometry()
+    assert.equal(await rail.getByRole('button',{name:/Mở nhóm Team ChatNet/}).locator('.conversation-avatar-member').count(),3,
+      'Missing group photo uses three participant avatars from the avatar branch')
+    assert.equal(await rail.locator('.desktop-conversation-rail-home').count(),0,
+      'Manual expand/collapse button is removed')
+    const topCategory=rail.locator('.desktop-conversation-rail-top-category .category-filter-trigger')
+    const topCreate=rail.locator('.desktop-conversation-rail-top-actions .desktop-conversation-rail-plus')
+    const topToggle=rail.getByRole('button',{name:'Thu gọn cột avatar'})
+    for(const button of [topToggle,topCategory,topCreate])await button.waitFor({state:'visible'})
+    assert.equal(await rail.locator('.category-manage-trigger').count(),0,
+      'Tag manager is available inside the tag filter menu, not on the rail')
+    await topCategory.click()
+    await page.locator('.category-popover:popover-open').getByRole('button',{name:'Quản lý thẻ phân loại'}).waitFor()
+    await page.keyboard.press('Escape')
+    const navLayer=await page.evaluate(() => {
+      const sidebar=document.querySelector('.app-sidebar')
+      const dock=document.querySelector('.desktop-conversation-rail')
+      return {
+        navZ:Number(getComputedStyle(sidebar).zIndex),
+        railZ:Number(getComputedStyle(dock).zIndex),
+        navLeft:sidebar.getBoundingClientRect().left,
+        railLeft:dock.getBoundingClientRect().left,
+      }
+    })
+    assert.ok(navLayer.navZ>navLayer.railZ && navLayer.navLeft===0 && navLayer.railLeft>=76,
+      'Global navigation must stay above the avatar dock: '+JSON.stringify(navLayer))
+    const expandedCategory=await topCategory.boundingBox()
+    const expandedCreate=await topCreate.boundingBox()
+    assert.ok(Math.abs(expandedCategory.y-expandedCreate.y)<2 &&
+      expandedCategory.x<expandedCreate.x,
+      'Expanded filter and create align in the first row')
+    const searchField=rail.locator('.desktop-conversation-rail-search-field')
+    const searchRect=await searchField.boundingBox()
+    const firstAvatarRect=await rail.locator('.desktop-conversation-rail-avatar').first().boundingBox()
+    assert.ok(Math.abs(expandedCategory.y-searchRect.y)<3 &&
+      searchRect.x+searchRect.width<=expandedCategory.x+1 &&
+      expandedCategory.x+expandedCategory.width<=expandedCreate.x+1 &&
+      firstAvatarRect.y-(searchRect.y+searchRect.height)<30,
+      'Search, filter and create must share one compact row in that order: '+
+      JSON.stringify({expandedCategory,searchRect,expandedCreate,firstAvatarRect}))
+    const filters = page.locator('.conversation-rail-floating-filters .conversation-rail-filter-options')
+    assert.equal(await filters.count(),0,'Filters are hidden until the search field receives focus')
+    await rail.getByRole('searchbox',{name:'Tìm trong danh sách hội thoại'}).click()
+    await filters.getByRole('button',{name:'Nhóm'}).click()
+    assert.equal(await filters.getByRole('button',{name:'Nhóm'}).getAttribute('aria-pressed'),'true',
+      'Group filter from the original conversation list remains accessible after search focus')
+    await filters.getByRole('button',{name:'Tất cả'}).click()
+    assert.equal(await filters.getByRole('button',{name:'Tất cả'}).getAttribute('aria-pressed'),'true')
+    await rail.getByRole('button',{name:'Mở tin nhắn Linh Anh'}).click()
+    assert.equal(await filters.count(),0,'Filters hide when clicking outside the search field')
+    await direct.click({button:'right'})
+    await page.getByRole('dialog',{name:/Tùy chọn cuộc trò chuyện Linh Anh/}).waitFor()
+    await page.getByRole('button',{name:'Ghim cuộc trò chuyện'}).waitFor()
+    await page.keyboard.press('Escape')
+    await direct.click()
+    await page.locator('.chat-head').getByText('Linh Anh').waitFor()
+    await page.waitForTimeout(340)
+    assert.equal(await rail.getAttribute('data-expanded'),'true','Personal chat expands the conversation info like Telegram')
+    assertStableRail(baseRailGeometry,await railGeometry(),'direct chat opened')
+    assert.ok(await rail.isVisible(),'Direct chat keeps the conversation rail')
+    const chatFrame = () => page.evaluate(() => {
+      const panel=document.querySelector('.conversation-panel')
+      const bounds=node => {
+        if (!node) return null
+        const r=node.getBoundingClientRect()
+        return {x:r.x,y:r.y,width:r.width,height:r.height}
+      }
+      return {panel:bounds(panel),header:bounds(panel?.querySelector('.chat-head')),
+        messages:bounds(panel?.querySelector('.messages')),
+        composer:bounds(panel?.querySelector('.media-composer'))}
+    })
+    const directFrame=await chatFrame()
+    const onlineBadge=await rail.getByRole('button',{name:/Mở tin nhắn Linh Anh/})
+      .locator('.desktop-conversation-rail-avatar .presence-dot').evaluate(node=>{
+        const avatar=node.parentElement
+        const r=node.getBoundingClientRect()
+        const a=avatar.getBoundingClientRect()
+        return {width:r.width,height:r.height,visible:getComputedStyle(node).display!=='none',
+          overflow:getComputedStyle(avatar).overflow,
+          extendsPastPortrait:r.right>a.right-1}
+      })
+    assert.ok(onlineBadge.visible && onlineBadge.width>=12 && onlineBadge.height>=12 &&
+      onlineBadge.overflow==='visible' && onlineBadge.extendsPastPortrait,
+      'Online presence must be a clearly visible green dot outside avatar crop: '+JSON.stringify(onlineBadge))
+    const directEntry=rail.getByRole('button',{name:/Mở tin nhắn Linh Anh/})
+    const directStatus=directEntry.locator('.conversation-rail-notification-state')
+    assert.equal(await directStatus.count(),0,
+      'Enabled notifications must show no bell icon')
+    const categoryLabel=directEntry.locator(
+      '.conversation-rail-title-group > .conversation-rail-status > .conversation-category-badge.category-icon-only.category-plain')
+    await categoryLabel.waitFor({state:'visible'})
+    const labelLook=await categoryLabel.evaluate(node=>{
+      const style=getComputedStyle(node)
+      const tag=node.querySelector('svg').getBoundingClientRect()
+      const name=node.closest('.conversation-rail-title-group').querySelector('strong').getBoundingClientRect()
+      const rect=node.getBoundingClientRect()
+      return {bg:style.backgroundColor,color:style.color,content:node.textContent.trim(),
+        title:node.title,x:rect.x,nameRight:name.right,tagWidth:tag.width,fill:getComputedStyle(node.querySelector('svg')).fill}
+    })
+    assert.ok((labelLook.bg==='rgba(0, 0, 0, 0)' || labelLook.bg==='transparent') &&
+      labelLook.content==='' && labelLook.title==='Công việc' &&
+      labelLook.x>=labelLook.nameRight-1 && labelLook.x-labelLook.nameRight<15 &&
+      labelLook.tagWidth>=10 && labelLook.color==='rgb(154, 52, 18)',
+      'Only colored tag icon after conversation name, no label or background: '+JSON.stringify(labelLook))
+    assert.equal(await rail.locator('.desktop-conversation-rail-mute').count(),0,
+      'Notification toggle is no longer directly on avatar list')
+    await page.locator('.chat-head').getByRole('button',{name:'Thông tin hội thoại'}).click()
+    const info=page.locator('#conversation-details-panel')
+    await info.getByRole('button',{name:'Tắt thông báo hội thoại'}).click()
+    await info.getByRole('button',{name:'Bật thông báo hội thoại'}).waitFor()
+    const mutedStatus=directEntry.locator('.conversation-rail-title-group > .conversation-rail-status > .conversation-rail-notification-state.is-muted')
+    await mutedStatus.waitFor()
+    const mutedPosition=await mutedStatus.boundingBox()
+    const categoryPosition=await categoryLabel.boundingBox()
+    assert.ok(mutedPosition.x>=categoryPosition.x+categoryPosition.width-1 &&
+      mutedPosition.x-categoryPosition.x-categoryPosition.width<15,
+      'Muted bell follows colored tag on the name line')
+    await info.getByRole('button',{name:'Bật thông báo hội thoại'}).click()
+    await info.getByRole('button',{name:'Tắt thông báo hội thoại'}).waitFor()
+    assert.equal(await directStatus.count(),0,
+      'Re-enabling notifications removes the bell entirely')
+    await info.getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
+    assert.equal(await page.locator('.group-channel-sidebar:visible').count(),0)
+    await group.click()
+    const channelPanel = page.locator('.desktop-channel-panel-open .group-channel-sidebar')
+    await channelPanel.waitFor({state:'visible'})
+    await page.waitForTimeout(350)
+    assert.equal(await rail.getAttribute('data-expanded'),'false','Selecting a group collapses the rail')
+    assert.equal(await channelPanel.locator('.group-channel-sidebar-heading').count(),0,
+      'The group-name header has been removed entirely')
+    assert.equal(await channelPanel.locator('.group-channel-sidebar-caption').count(),0,
+      'The redundant channel-list caption is removed')
+    await channelPanel.locator('.group-channel-sidebar-topbar .group-channel-sidebar-search').waitFor()
+    const groupFrame=await chatFrame()
+    const equalFrame=(a,b)=>Math.abs(a-b)<1.5
+    assert.ok(['panel','header','messages','composer'].every(section=>
+      directFrame[section] && groupFrame[section] &&
+      equalFrame(directFrame[section].width,groupFrame[section].width)) &&
+      equalFrame(directFrame.panel.height,groupFrame.panel.height) &&
+      equalFrame(directFrame.header.height,groupFrame.header.height),
+      'Desktop group and direct chat share equal frames: '+
+        JSON.stringify({direct:directFrame,group:groupFrame}))
+    assert.equal(await rail.locator('.desktop-conversation-rail-selected-check').count(),1,
+      'Selected group avatar has a visible check marker')
+    const collapsedRailGeometry = await railGeometry()
+    assert.ok(collapsedRailGeometry.dock.width < baseRailGeometry.dock.width)
+    assert.equal(await topCategory.count(),0,'Compact avatar dock has no category filter')
+    assert.equal(await topCreate.count(),0,'Compact avatar dock hides the create button')
+    const compactToggle=rail.getByRole('button',{name:'Mở rộng cột avatar'})
+    await compactToggle.waitFor({state:'visible'})
+    assert.equal(await rail.locator('.category-filter-trigger').count(),0,
+      'Tag filter is not rendered when avatar dock is compact')
+    assert.equal(await rail.getByRole('searchbox',{name:'Tìm trong danh sách hội thoại'}).count(),0,
+      'Compact dock has no inline search input')
+    assertStableRail(baseRailGeometry,collapsedRailGeometry,'group channel drawer opened')
+    assert.equal(await compactToggle.getAttribute('aria-expanded'),'false',
+      'Right-pointing chevron indicates compact avatar rail')
+    assert.equal(await rail.locator('.conversation-rail-compact-status').count()>0,true,
+      'Compact avatar rail keeps classification and mute badges')
+    await compactToggle.click()
+    await rail.getByRole('searchbox',{name:'Tìm trong danh sách hội thoại'}).waitFor({state:'visible'})
+    assert.equal(await rail.getAttribute('data-expanded'),'true',
+      'Compact chevron expands the same conversation avatar rail')
+    assert.equal(await rail.getByRole('button',{name:'Thu gọn cột avatar'}).getAttribute('aria-expanded'),'true',
+      'Chevron reverses direction when the rail opens')
+    await rail.getByRole('searchbox',{name:'Tìm trong danh sách hội thoại'}).click()
+    await filters.waitFor({state:'visible'})
+    await group.click()
+    await channelPanel.waitFor({state:'visible'})
+    await page.waitForTimeout(360)
+    assert.equal(await rail.getAttribute('data-expanded'),'false','Reopening group returns to compact dock')
+    assert.equal(await channelPanel.getByRole('button',{name:'Đóng danh sách kênh'}).count(),0,
+      'Group header no longer has a close X')
+    await group.click()
+    await page.waitForTimeout(400)
+    assert.equal(await rail.getAttribute('data-expanded'),'true',
+      'Tapping the active group avatar returns to expanded conversation list')
+    assert.equal(await page.locator('.group-channel-sidebar').count(),0,
+      'Active group avatar exits channel picker')
+    assertStableRail(baseRailGeometry,await railGeometry(),'active group avatar as back action')
+    await group.click()
+    await channelPanel.waitFor({state:'visible'})
+    await page.waitForTimeout(400)
+    assert.equal(await rail.getAttribute('data-expanded'),'false',
+      'Reopening group from expanded avatar list returns to channel picker')
+    assert.equal(await channelPanel.locator('.group-channel-sidebar-more').count(),0,
+      'Group picker has no options button beside channel search')
+    assert.equal(await channelPanel.locator('.group-channel-sidebar-row [aria-haspopup]').count(),0,
+      'Channel rows have no inline options button')
+    await channelPanel.getByRole('button',{name:/Mở kênh Thiết kế giao diện/}).click({button:'right'})
+    assert.equal(await page.locator('.group-channel-context-menu').count(),0,
+      'Right click on a channel must not open a channel management menu')
+    const more=page.locator('.chat-head').getByRole('button',{name:'Thông tin hội thoại'})
+    await more.click()
+    const channelInfo=page.locator('#conversation-details-panel')
+    await channelInfo.locator('.conversation-info-group-menu').waitFor({state:'visible'})
+    await channelInfo.getByRole('button',{name:'Thành viên'}).waitFor()
+    await channelInfo.getByRole('button',{name:'Tắt thông báo nhóm'}).waitFor()
+    await channelInfo.getByRole('button',{name:'Tắt thông báo nhóm'}).click()
+    await channelInfo.getByRole('button',{name:'Bật thông báo nhóm'}).waitFor()
+    await channelInfo.getByRole('button',{name:'Bật thông báo nhóm'}).click()
+    await channelInfo.getByRole('button',{name:'Tắt thông báo nhóm'}).waitFor()
+    await channelInfo.getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
+    await channelPanel.getByRole('button',{name:/Mở kênh Thiết kế giao diện/}).click()
+    await page.locator('.chat-head').getByText('Thiết kế giao diện').waitFor()
+    await more.click()
+    await channelInfo.getByRole('button',{name:'Đổi tên kênh'}).waitFor()
+    await channelInfo.getByRole('button',{name:'Sửa chủ đề kênh'}).waitFor()
+    await channelInfo.getByRole('button',{name:'Xóa kênh'}).waitFor()
+    await channelInfo.getByRole('button',{name:'Tắt thông báo kênh'}).waitFor()
+    await channelInfo.getByRole('button',{name:'Tắt thông báo kênh'}).click()
+    await channelInfo.getByRole('button',{name:'Bật thông báo kênh'}).waitFor()
+    await channelInfo.getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
+    assert.ok(await page.locator('.chat-head').isVisible(), 'Chat stays visible while group menu opens')
+    const positions = await page.evaluate(() => {
+      const selectors = ['.desktop-conversation-rail', '.group-channel-sidebar', '.conversation-panel']
+      return selectors.map(s => {
+        const r = document.querySelector(s).getBoundingClientRect()
+        return {left:r.left, right:r.right}
+      })
+    })
+    assert.ok(Math.abs(positions[0].right-positions[1].left)<2 &&
+      positions[1].right < positions[2].left,
+      'Avatar rail and channel picker join seamlessly while chat stays separate: '+JSON.stringify(positions))
+    const joinedFrame=await page.evaluate(()=>{
+      const rail=document.querySelector('.desktop-conversation-rail')
+      const panel=document.querySelector('.group-channel-sidebar')
+      const divider=rail.querySelector('.desktop-conversation-rail-divider').getBoundingClientRect()
+      const toolbar=panel.querySelector('.group-channel-sidebar-topbar').getBoundingClientRect()
+      const a=rail.getBoundingClientRect(), b=panel.getBoundingClientRect()
+      const ra=getComputedStyle(rail), pb=getComputedStyle(panel)
+      return {railTop:a.top,pickerTop:b.top,railRight:a.right,pickerLeft:b.left,
+        railTopRightRadius:ra.borderTopRightRadius,pickerTopLeftRadius:pb.borderTopLeftRadius,
+        railTopBorder:ra.borderTopColor,pickerTopBorder:pb.borderTopColor,
+        separator:pb.borderLeftWidth, dividerY:divider.top, toolbarBorderY:toolbar.bottom-1}
+    })
+    assert.ok(Math.abs(joinedFrame.railTop-joinedFrame.pickerTop)<1 &&
+      Math.abs(joinedFrame.railRight-joinedFrame.pickerLeft)<1 &&
+      joinedFrame.railTopRightRadius==='0px' && joinedFrame.pickerTopLeftRadius==='0px' &&
+      joinedFrame.railTopBorder===joinedFrame.pickerTopBorder &&
+      joinedFrame.separator==='1px' &&
+      Math.abs(joinedFrame.dividerY-joinedFrame.toolbarBorderY)<1.5,
+      'Top and toolbar separator lines match across square joint: '+JSON.stringify(joinedFrame))
+    await channelPanel.getByRole('button',{name:/Mở kênh Thiết kế giao diện/}).click()
+    await page.locator('.chat-head').getByText('Thiết kế giao diện').waitFor()
+    assertStableRail(baseRailGeometry, await railGeometry(), 'channel switched')
+    assert.ok(await channelPanel.isVisible(), 'Desktop channel drawer stays open after channel selection')
+    await group.click()
+    await page.waitForTimeout(370)
+    assert.equal(await rail.getAttribute('data-expanded'),'true',
+      'Tapping the active group avatar expands the conversation rail on desktop')
+    assert.equal(await page.locator('.group-channel-sidebar').count(),0,
+      'Group avatar toggle exits the channel picker')
+    assert.ok((await rail.locator('.desktop-conversation-rail-meta:visible').count())>0,
+      'Group avatar toggle reveals conversation names and previews')
+    assertStableRail(baseRailGeometry,await railGeometry(),'back from group to expanded avatars')
+    await direct.click()
+    await page.locator('.chat-head').getByText('Linh Anh').waitFor()
+    await page.waitForTimeout(350)
+    assert.equal(await rail.getAttribute('data-expanded'),'true','Returning from group to personal chat expands its info column')
+    assertStableRail(baseRailGeometry,await railGeometry(),'reselecting personal chat')
+    await direct.click()
+    await page.waitForTimeout(350)
+    assert.equal(await rail.getAttribute('data-expanded'),'true','Reopening the same person keeps the info column expanded')
+    assertStableRail(baseRailGeometry,await railGeometry(),'same direct chat selected')
+    assert.equal(await page.locator('.conversation-sidebar').isVisible(),false,'Legacy conversation screen remains hidden')
+    assert.equal(await rail.locator('.desktop-conversation-rail-home').count(),0,
+      'Manual expand/collapse control must not return')
+    for (const width of [768,1024,1478]) {
+      await page.setViewportSize({width,height:920})
+      await page.waitForTimeout(100)
+      const before = await railGeometry()
+      await group.click()
+      await page.waitForTimeout(370)
+      const groupAtWidth=await chatFrame()
+      assert.equal(await rail.getAttribute('data-expanded'),'false','Group selects compact mode')
+      assert.equal(await rail.locator('.desktop-conversation-rail-search-field').count(),0,
+        'Compact mode does not render search input or icon')
+      assertStableRail(before,await railGeometry(),'desktop '+width+'px collapse')
+      await direct.click()
+      await page.waitForTimeout(370)
+      const directAtWidth=await chatFrame()
+      assert.ok(['panel','header','messages','composer'].every(part=>
+        groupAtWidth[part] && directAtWidth[part] &&
+        Math.abs(groupAtWidth[part].width-directAtWidth[part].width)<1.5) &&
+        Math.abs(groupAtWidth.panel.height-directAtWidth.panel.height)<1.5 &&
+        Math.abs(groupAtWidth.header.height-directAtWidth.header.height)<1.5,
+        width+'px group/direct chat surfaces must have matching dimensions: '+
+          JSON.stringify({group:groupAtWidth,direct:directAtWidth}))
+      assert.equal(await rail.getAttribute('data-expanded'),'true','Direct chat expands rail')
+      assertStableRail(before,await railGeometry(),'desktop '+width+'px expansion')
+      const regions = await page.evaluate(() => {
+        const bounds = selector => {
+          const el=document.querySelector(selector)
+          return el?.getBoundingClientRect().toJSON() || null
+        }
+        return {
+          nav:bounds('.app-sidebar'),
+          rail:bounds('.desktop-conversation-rail'),
+          chat:bounds('.conversation-panel'),
+        }
+      })
+      assert.ok(regions.rail && regions.chat && regions.rail.right <= regions.chat.left + 1 &&
+        regions.chat.width > 190 && (!regions.nav || regions.nav.right <= regions.rail.left + 1),
+        'Expanded rail must not cover personal messages or the main navigation: '+JSON.stringify(regions))
+    }
+    console.log('PASS desktop 768/1024/1478px: one expanding avatar rail and stable positions')
+    await browser.close()
+    await vite.close()
+    process.exit(0)
+  }
   assert.equal(await page.locator('.app-sidebar').getByRole('button',{name:'Nhóm & cộng đồng'}).count(),0)
   await page.locator('.social-chat-list-filters').getByRole('button',{name:'Nhóm'}).click()
   assert.equal(await page.locator('.social-chat-list-filters').getByRole('button',{name:'Nhóm'}).getAttribute('aria-pressed'),'true')

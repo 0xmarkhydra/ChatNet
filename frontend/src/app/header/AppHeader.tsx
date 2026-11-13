@@ -1,10 +1,25 @@
 import type { ReactNode } from "react";
 
-type AppHeaderProps = { className: string; children: ReactNode };
+type AppHeaderProps = {
+  className: string;
+  title: ReactNode;
+  search?: ReactNode;
+  children: ReactNode;
+};
 
-/** One shared semantic header shell for all application sections. */
-export default function AppHeader({ className, children }: AppHeaderProps) {
-  return <header className={className}>{children}</header>;
+/** Shared application header structure; each route supplies only its context and actions. */
+export default function AppHeader({ className, title, search, children }: AppHeaderProps) {
+  return (
+    <header className={className} aria-label="Thanh công cụ chính">
+      {title}
+      <div className="appbar-brand" aria-label="SocCO">
+        <img src="/soco-mark.svg" width="32" height="32" alt="" />
+        <strong>SocCO</strong>
+      </div>
+      {search}
+      {children}
+    </header>
+  );
 }
 
 /** Page-specific actions followed by the persistent signed-in account control. */

@@ -1,48 +1,63 @@
 import { Search, Users, Languages, MoreHorizontal, X, Hash } from "lucide-react";
+import ConversationAvatar from "./ConversationAvatar";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { CategoryAssignment } from "./ConversationCategories";
 import { CallHeaderActions } from "../../calls/components/CallManager";
 import { createPortal } from "react-dom";
-import type { ChatSectionProps } from "./ChatSection";
+import type { ChatSectionProps } from "./ChatSectionProps";
 import type { Dispatch, SetStateAction } from "react";
 
-type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "changeAutoTranslate" | "changeTargetLanguage" | "conversationBlocked" | "conversationCategories" | "conversationDetailsOpen" | "effectiveAutoTranslate" | "effectiveTargetLanguage" | "groupSettingsOpen" | "languageSearch" | "openGroupSettings" | "openVisitor" | "setActiveConversationId" | "setConversationDetailsOpen" | "setGroupMemberViewOpen" | "setGroupSettingsOpen" | "setLanguageSearch" | "setMessageSearchOpen" | "setTranslationMenuOpen" | "t" | "translationMenuOpen" | "visibleLanguageOptions"> & { setChannelSidebarOpen: Dispatch<SetStateAction<boolean>> }, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]> };
-export default function ConversationHeader({ activeConversation, changeAutoTranslate, changeTargetLanguage, conversationBlocked, conversationCategories, conversationDetailsOpen, effectiveAutoTranslate, effectiveTargetLanguage, groupSettingsOpen, languageSearch, openGroupSettings, openVisitor, setActiveConversationId, setConversationDetailsOpen, setGroupMemberViewOpen, setGroupSettingsOpen, setLanguageSearch, setMessageSearchOpen, setTranslationMenuOpen, t, translationMenuOpen, visibleLanguageOptions, setChannelSidebarOpen }: Props) {
+type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "changeAutoTranslate" | "changeTargetLanguage" | "conversationBlocked" | "conversationCategories" | "conversationDetailsOpen" | "effectiveAutoTranslate" | "effectiveTargetLanguage" | "groupSettingsOpen" | "languageSearch" | "openGroupSettings" | "openVisitor" | "setActiveConversationId" | "setConversationDetailsOpen" | "setGroupMemberViewOpen" | "setGroupSettingsOpen" | "setLanguageSearch" | "setMessageSearchOpen" | "setTranslationMenuOpen" | "t" | "translationMenuOpen" | "visibleLanguageOptions"> & { setChannelSidebarOpen: Dispatch<SetStateAction<boolean>> }, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>;
+  setMobileChannelSelected: Dispatch<SetStateAction<boolean>>;
+  selectedChannelId: number;
+  selectedRoomTitle: string;
+  selectedRoomAvatar?: string;
+  selectedChannelDescription?: string;
+};
+export default function ConversationHeader({ activeConversation, changeAutoTranslate, changeTargetLanguage, conversationBlocked, conversationCategories, conversationDetailsOpen, effectiveAutoTranslate, effectiveTargetLanguage, groupSettingsOpen, languageSearch, openGroupSettings, openVisitor, setActiveConversationId, setConversationDetailsOpen, setGroupMemberViewOpen, setGroupSettingsOpen, setLanguageSearch, setMessageSearchOpen, setTranslationMenuOpen, t, translationMenuOpen, visibleLanguageOptions, setChannelSidebarOpen, setMobileChannelSelected, selectedChannelId, selectedRoomTitle, selectedRoomAvatar, selectedChannelDescription }: Props) {
  return (
 <header className="chat-head">
                     <div className="room-info">
-                      <button className="mobile-back" type="button" aria-label="Quay lại danh sách" onClick={() => setActiveConversationId(null)}>‹</button>
-                      <UserAvatar
-                        username={activeConversation.otherUsername} name={activeConversation.name}
-                        className="room-avatar"
-                        group={activeConversation.type === 'group'}
-                        imageUrl={activeConversation.type === 'group' ? activeConversation.avatarUrl : undefined}
-                        online={activeConversation.type === 'direct' && activeConversation.online}
-                      />
+                      <button className="mobile-back" type="button"
+                        aria-label={activeConversation.type === "group" ? "Quay lại danh sách kênh" : "Quay lại danh sách"}
+                        onClick={() => {
+                          if (activeConversation.type === "group") {
+                            setMobileChannelSelected(false);
+                            setChannelSidebarOpen(true);
+                          } else setActiveConversationId(null);
+                        }}>‹</button>
+                      {activeConversation.type === 'group' && selectedChannelId !== 0
+                        ? <UserAvatar name={selectedRoomTitle} className="room-avatar" group imageUrl={selectedRoomAvatar} />
+                        : <ConversationAvatar conversation={activeConversation} className="room-avatar" />}
                       <div className={activeConversation.type === 'group' ? 'group-room-details' : ''}>
                         {activeConversation.type === 'group' ? (
                           <>
                             <div className="group-room-title">
-                              <strong title={activeConversation.name}>{activeConversation.name}</strong>
+                              <strong title={selectedRoomTitle}>{selectedRoomTitle}</strong>
                               <button type="button" className="group-channel-sidebar-toggle"
                                 aria-label="Mở danh sách kênh hội thoại"
-                                onClick={() => setChannelSidebarOpen(true)}>
+                                onClick={() => { setMobileChannelSelected(false); setChannelSidebarOpen(true); }}>
                                 <Hash size={18} aria-hidden="true" />
                               </button>
                             </div>
                             <div className="room-subtitle group-room-subtitle">
-                              <button type="button" className="group-room-member-count"
-                                aria-label={`Xem danh sách ${activeConversation.memberCount} thành viên nhóm`}
-                                onClick={() => {
-                                  if (!groupSettingsOpen) openGroupSettings(activeConversation)
-                                  setGroupMemberViewOpen(true)
-                                }}>
-                                <Users size={15} aria-hidden="true" />
-                                <span>{activeConversation.memberCount} thành viên</span>
-                              </button>
-                              <CategoryAssignment model={conversationCategories}
-                                conversationId={activeConversation.id}
-                                categoryId={activeConversation.categoryId} />
+                              {selectedChannelId === 0 ? <>
+                                <button type="button" className="group-room-member-count"
+                                  aria-label={`Xem danh sách ${activeConversation.memberCount} thành viên nhóm`}
+                                  onClick={() => {
+                                    if (!groupSettingsOpen) openGroupSettings(activeConversation)
+                                    setGroupMemberViewOpen(true)
+                                  }}>
+                                  <Users size={15} aria-hidden="true" />
+                                  <span>{activeConversation.name} · {activeConversation.memberCount} thành viên</span>
+                                </button>
+                                <CategoryAssignment model={conversationCategories}
+                                  conversationId={activeConversation.id}
+                                  categoryId={activeConversation.categoryId} />
+                              </> : <span className="group-channel-parent-label"
+                                title={selectedChannelDescription || activeConversation.name}>
+                                {selectedChannelDescription || `Thuộc nhóm ${activeConversation.name}`}
+                              </span>}
                             </div>
                           </>
                         ) : (

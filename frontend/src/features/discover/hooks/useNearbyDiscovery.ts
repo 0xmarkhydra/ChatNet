@@ -1,7 +1,7 @@
 import { getCurrentPositionSmart, geolocationErrorMessage } from "../lib/geolocation";
 import type { FriendSearchResult } from "../../contacts/types";
 import { type Session } from "../../auth/lib/session";
-import { type SetStateAction } from "react";
+import { useRef, type SetStateAction } from "react";
 import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 
@@ -24,7 +24,7 @@ export function useNearbyDiscovery({
   apiFetch,
   nearbyBusy,
   nearbyRadiusKm,
-  nearbyRequest,
+  nearbyRequest: nearbyRequestRef,
   session,
   sessionRef,
   setNearbyBusy,
@@ -34,12 +34,17 @@ export function useNearbyDiscovery({
   setNearbyUsers,
   setNotice,
 }: UseNearbyDiscoveryDeps) {
+  // React state updates are asynchronous. Claim the current scan synchronously
+  // to prevent two rapid clicks issuing duplicate location/API requests.
+  const inFlight = useRef<{ sessionId: string; request: number } | null>(null);
   async function findNearby() {
-    if (!session || nearbyBusy) return;
-    const request = ++nearbyRequest.current;
-    const sessionId = session.sessionId;
+    const sessionId = session?.sessionId;
+    if (!sessionId || nearbyBusy || inFlight.current?.sessionId === sessionId) return;
+    const request = ++nearbyRequestRef.current;
+    const flight = { sessionId, request };
+    inFlight.current = flight;
     const isCurrentRequest = () =>
-      request === nearbyRequest.current &&
+      request === nearbyRequestRef.current &&
       sessionRef.current?.sessionId === sessionId;
     setNearbyBusy(true);
     setNearbyScanning(true);
@@ -94,6 +99,7 @@ export function useNearbyDiscovery({
       const message = await geolocationErrorMessage(error);
       if (isCurrentRequest()) setNotice(message, "error");
     } finally {
+      if (inFlight.current === flight) inFlight.current = null;
       if (isCurrentRequest()) {
         setNearbyBusy(false);
         setNearbyScanning(false);
@@ -101,11 +107,13 @@ export function useNearbyDiscovery({
     }
   }
   async function stopNearby() {
-    if (!session || nearbyBusy) return;
-    const request = ++nearbyRequest.current;
-    const sessionId = session.sessionId;
+    const sessionId = session?.sessionId;
+    if (!sessionId || nearbyBusy || inFlight.current?.sessionId === sessionId) return;
+    const request = ++nearbyRequestRef.current;
+    const flight = { sessionId, request };
+    inFlight.current = flight;
     const isCurrentRequest = () =>
-      request === nearbyRequest.current && sessionRef.current?.sessionId === sessionId;
+      request === nearbyRequestRef.current && sessionRef.current?.sessionId === sessionId;
     setNearbyBusy(true);
     try {
       const response = await apiFetch("/api/users/nearby", {
@@ -126,6 +134,7 @@ export function useNearbyDiscovery({
         "error",
       );
     } finally {
+      if (inFlight.current === flight) inFlight.current = null;
       if (isCurrentRequest()) setNearbyBusy(false);
     }
   }

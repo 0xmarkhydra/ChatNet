@@ -8,6 +8,7 @@ import { userLabel } from '../../../shared/utils/userLabel'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Story } from '../types'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import { useLatest } from '../../../shared/hooks/useLatest'
 
 type Props = {
   activeStory: Story
@@ -46,6 +47,8 @@ export default function StoryViewer({
   const [replySending, setReplySending] = useScopedState(activeStory.id, false)
   const [menuOpen, setMenuOpen] = useScopedState(activeStory.id, false)
   const imageElapsedRef = useRef(0)
+  const replySequence = useRef(0)
+  const activeStoryId = useLatest(activeStory.id)
   const videoRef = useRef<HTMLVideoElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const replyInputRef = useRef<HTMLInputElement>(null)
@@ -72,6 +75,7 @@ export default function StoryViewer({
 
   useEffect(() => {
     imageElapsedRef.current = 0
+    ++replySequence.current
   }, [activeStory.id])
 
   useEffect(() => {
@@ -135,11 +139,13 @@ export default function StoryViewer({
     event.preventDefault()
     const text = reply.trim()
     if (isOwner || replySending || !text) return
+    const id = ++replySequence.current
+    const storyId = activeStory.id
     setReplySending(true)
     try {
-      if (await onReply(activeStory, text)) setReply('')
+      if (await onReply(activeStory, text) && id === replySequence.current && activeStoryId.current === storyId) setReply('')
     } finally {
-      setReplySending(false)
+      if (id === replySequence.current && activeStoryId.current === storyId) setReplySending(false)
     }
   }
 

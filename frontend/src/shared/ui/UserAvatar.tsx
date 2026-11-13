@@ -44,7 +44,7 @@ export default function UserAvatar({
 
   return (
     <div
-      className={`${className} smart-avatar avatar-tone-${avatarTone(name)} ${group ? 'group' : ''}`}
+      className={`${className} smart-avatar avatar-tone-${avatarTone(name)} ${group ? 'group' : ''} ${online ? 'is-online' : ''}`}
       aria-label={name}
       title={name}
     >
@@ -59,7 +59,7 @@ export default function UserAvatar({
         />
       )}
       <span className="avatar-shine" aria-hidden="true" />
-      {online && <span className="presence-dot" />}
+      {online && <span className="presence-dot" aria-hidden="true" />}
     </div>
   )
 }

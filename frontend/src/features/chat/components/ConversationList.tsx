@@ -1,11 +1,12 @@
 import { Plus, Search, Pin, RefreshCw, X } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
+import ConversationAvatar from "./ConversationAvatar";
 import { userLabel } from "../../../shared/utils/userLabel";
 import ConversationCategories, { CategoryBadge } from "./ConversationCategories";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
 import { formatTime } from "../../../shared/utils/format";
-import type { ChatSectionProps } from "./ChatSection";
+import type { ChatSectionProps } from "./ChatSectionProps";
 
 type Props = Pick<ChatSectionProps, "activeConversationId" | "actOnFriend" | "beginConversationLongPress" | "cancelConversationLongPress" | "chatCreateError" | "chatListConversations" | "chatListFilter" | "chatListQuery" | "conversationCategories" | "conversationListSearch" | "conversationLoadingMore" | "copyInviteLink" | "createDirect" | "directUsername" | "friendBusyIds" | "friendQuery" | "friendRelationship" | "friendResults" | "friends" | "friendSearchError" | "friendSearching" | "hasMoreConversations" | "loadMoreConversations" | "moveConversationLongPress" | "newChatMode" | "openConnectSurface" | "quickSearchControl" | "searchInConversationList" | "session" | "setActiveConversationId" | "setChatCreateError" | "setChatListFilter" | "setChatListQuery" | "setChatSearchJump" | "setConversationActionId" | "setConversationMenuPosition" | "setConversations" | "setDirectUsername" | "setFriendQuery" | "setFriendResults" | "setFriendSearchRetry" | "setNewChatMode" | "setQrOpen" | "setQuickSearchOpen" | "setTranslationMenuOpen" | "setTranslationOriginals" | "setTranslations" | "shareMyProfile" | "sortedChatListConversations" | "suppressConversationClick" | "t" | "visibleConversations" | "chatFiltersPill">;
 
@@ -224,12 +225,7 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                         setTranslationMenuOpen(false)
                       }}
                     >
-                      <UserAvatar
-                        username={conversation.otherUsername} name={conversation.name}
-                        className="conversation-avatar"
-                        group={conversation.type === 'group'}
-                        online={conversation.type === 'direct' && conversation.online}
-                      />
+                      <ConversationAvatar conversation={conversation} className="conversation-avatar" />
                       <div className="conversation-copy">
                         <div>
                           <span className="conversation-title">

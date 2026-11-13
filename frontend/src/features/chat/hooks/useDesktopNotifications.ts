@@ -12,7 +12,7 @@ function readEnabled(userId: number) {
   try { return localStorage.getItem(settingKey(userId)) !== 'false' } catch { return true }
 }
 export function refreshDesktopUnread() {
-  if (isDesktopBuild) window.dispatchEvent(new Event(unreadEvent))
+  window.dispatchEvent(new Event(unreadEvent))
 }
 export function clearDesktopNotifications(sessionId: string) {
   if (!isDesktopBuild) return
@@ -62,7 +62,7 @@ export function useDesktopNotifications(options: Options) {
   const [nativeWarning, setNativeWarning] = useState('')
 
   useEffect(() => {
-    if (!isDesktopBuild || !sessionId || !options.session) return
+    if (!sessionId || !options.session) return
     setUnreadCount(null); setSyncWarning(''); setNativeWarning('')
     let alive = true, busy = false, dirty = false, opening = false
     let timer = 0, accessRevision = 0
@@ -92,7 +92,7 @@ export function useDesktopNotifications(options: Options) {
     }
     const schedule = () => { window.clearTimeout(timer); timer = window.setTimeout(() => void refresh(), 400) }
     const unavailable = () => { if (matches()) setNativeWarning('Hệ điều hành chưa hiển thị được thông báo SocCO. Kiểm tra quyền thông báo và bản cài có ký.') }
-    const unsubscribe = desktopBridge().notifications.onClicked((input) => {
+    const unsubscribe = isDesktopBuild ? desktopBridge().notifications.onClicked((input) => {
       if (!matches() || input.sessionId !== sessionId || !Number.isSafeInteger(input.conversationId) || input.conversationId <= 0 || opening) return
       opening = true
       const revision = accessRevision
@@ -108,7 +108,7 @@ export function useDesktopNotifications(options: Options) {
       })().catch(() => {
         if (matches()) current.current.onError('Không mở được hội thoại từ thông báo. Quyền truy cập có thể đã thay đổi; hãy kiểm tra kết nối và thử lại.')
       }).finally(() => { opening = false })
-    })
+    }) : () => undefined
     window.addEventListener(unreadEvent, schedule)
     window.addEventListener('focus', schedule)
     window.addEventListener('online', schedule)
@@ -139,5 +139,5 @@ export function useDesktopNotifications(options: Options) {
     try { localStorage.setItem(settingKey(session.user.id), String(next)) } catch { /* Current session setting remains effective. */ }
     if (next) { setNativeWarning(''); refreshDesktopUnread() }
   }
-  return { enabled, toggle, warning: nativeWarning || syncWarning }
+  return { enabled, toggle, unreadCount, warning: nativeWarning || syncWarning }
 }

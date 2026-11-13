@@ -1,7 +1,10 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
+import { useLatest } from "../../../shared/hooks/useLatest";
+import { useSession } from "../../../shared/context/SessionContext";
 import { useApi } from "../../../shared/context/ApiContext";
 import { useNotice } from "../../../shared/context/NoticeContext";
 import { createGroupChannel as createGroupChannelRequest } from "../api/conversations";
+import { listChannels } from "../api/community";
 import { type GroupChannel, validGroupChannels } from "../utils/groupChannels";
 import type { GroupMember, Message } from "../types";
 
@@ -44,7 +47,9 @@ export function useGroupChannels({
   setReplyingTo,
 }: UseGroupChannelsDeps) {
   const { apiFetch } = useApi();
+  const { sessionRef } = useSession();
   const { setNotice } = useNotice();
+  const activeConversationRef = useLatest(activeConversation);
   function selectGroupChannel(channelId: number) {
     if (activeConversation?.type !== 'group' || !groupChannels.some(channel => channel.id === channelId)) return;
     activeChannelIdRef.current = channelId;
@@ -61,10 +66,12 @@ export function useGroupChannels({
   async function createGroupChannel(name: string, description: string): Promise<boolean> {
     if (activeConversation?.type !== 'group' || activeGroupMember?.role !== 'owner' || groupChannelBusy) return false;
     const groupId = activeConversation.id;
+    const sessionId = sessionRef.current?.sessionId;
     setGroupChannelBusy(true);
     try {
       const response = await createGroupChannelRequest(apiFetch, groupId, { name, description });
       const data = await response.json().catch(() => null) as (GroupChannel & { error?: string }) | null;
+      if (sessionRef.current?.sessionId !== sessionId || activeConversationRef.current?.id !== groupId) return false;
       if (!response.ok || !data?.id || data.conversationId !== groupId)
         throw new Error(data?.error || 'Không tạo được kênh hội thoại.');
       setGroupChannelState(current => ({
@@ -82,12 +89,23 @@ export function useGroupChannels({
       setNotice('Đã tạo kênh hội thoại ' + data.name + '.', 'success');
       return true;
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không tạo được kênh.', 'error');
+      if (sessionRef.current?.sessionId === sessionId && activeConversationRef.current?.id === groupId)
+        setNotice(error instanceof Error ? error.message : 'Không tạo được kênh.', 'error');
       return false;
     } finally {
-      setGroupChannelBusy(false);
+      if (sessionRef.current?.sessionId === sessionId) setGroupChannelBusy(false);
     }
   }
 
-  return { createGroupChannel, selectGroupChannel };
+  async function refreshGroupChannels() {
+    if (activeConversation?.type !== 'group') return;
+    const groupId = activeConversation.id;
+    const response = await listChannels(apiFetch, groupId);
+    if (!response.ok) throw new Error('Không tải lại được danh sách kênh.');
+    const items = validGroupChannels(await response.json() as unknown, groupId);
+    setGroupChannelState({ conversationId: groupId, channels: items });
+    if (!items.some(item => item.id === activeChannelIdRef.current)) selectGroupChannel(0);
+  }
+
+  return { createGroupChannel, selectGroupChannel, refreshGroupChannels };
 }

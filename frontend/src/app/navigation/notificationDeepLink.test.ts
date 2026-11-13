@@ -15,10 +15,12 @@ describe("notification deep links", () => {
   it("consumes only notification parameters and preserves invite/hash", () => {
     const oldUrl = window.location.href;
     try {
-      window.history.replaceState(null, "", "/chat?invite=someone&conversation=12&message=34&tab=feed#room");
+      const navigationState = { key: "route-entry", usr: { from: "inbox" } };
+      window.history.replaceState(navigationState, "", "/chat?invite=someone&conversation=12&message=34&tab=feed#room");
       consumeNotificationDeepLink(new URL(window.location.href));
       expect(window.location.pathname + window.location.search + window.location.hash)
         .toBe("/chat?invite=someone#room");
+      expect(window.history.state).toEqual(navigationState);
     } finally {
       window.history.replaceState(null, "", oldUrl);
     }

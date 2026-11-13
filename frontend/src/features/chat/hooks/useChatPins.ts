@@ -53,6 +53,9 @@ export function useChatPins({
   }
 
   useEffect(() => {
+    // Use a fresh lock set so completions from another session cannot unlock new writes.
+    pending.current = new Set()
+    setPinBusy(false)
     refreshSequence.current += 1
     setPinnedMessages([])
     setPinScope(null)
@@ -64,8 +67,10 @@ export function useChatPins({
     if (!sessionRef.current || activeConversationIdRef.current !== conversationId) return
     const key = `message:${message.id}`
     if (pending.current.has(key)) return
+    const sessionId = sessionRef.current.sessionId
     const currentlyPinned = pinnedMessages.some((pin) => pin.message.id === message.id)
-    pending.current.add(key)
+    const locks = pending.current
+    locks.add(key)
     setPinBusy(true)
     try {
       const response = await setMessagePinned(apiFetch, message.id, !currentlyPinned)
@@ -76,13 +81,16 @@ export function useChatPins({
         const data = await response.json().catch(() => ({})) as { error?: string }
         throw new Error(data.error || 'Không cập nhật được ghim tin nhắn')
       }
+      if (sessionRef.current?.sessionId !== sessionId) return
       await refreshPinnedMessages(conversationId)
-      setNotice(currentlyPinned ? 'Đã bỏ ghim tin nhắn.' : 'Đã ghim tin nhắn.', 'success')
+      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+        setNotice(currentlyPinned ? 'Đã bỏ ghim tin nhắn.' : 'Đã ghim tin nhắn.', 'success')
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim tin nhắn.', 'error')
+      if (sessionRef.current?.sessionId === sessionId)
+        setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim tin nhắn.', 'error')
     } finally {
-      pending.current.delete(key)
-      setPinBusy(pending.current.size > 0)
+      locks.delete(key)
+      if (pending.current === locks && sessionRef.current?.sessionId === sessionId) setPinBusy(locks.size > 0)
     }
   }
 
@@ -91,7 +99,8 @@ export function useChatPins({
     if (pending.current.has(key)) return
     const currentlyPinned = Boolean(conversation.pinnedAt)
     const sessionId = sessionRef.current?.sessionId
-    pending.current.add(key)
+    const locks = pending.current
+    locks.add(key)
     setPinBusy(true)
     try {
       const response = await setConversationPinned(apiFetch, conversation.id, !currentlyPinned)
@@ -109,10 +118,11 @@ export function useChatPins({
         setNotice(currentlyPinned ? 'Đã bỏ ghim cuộc trò chuyện.' : 'Đã ghim cuộc trò chuyện.', 'success')
       }
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim hội thoại.', 'error')
+      if (sessionRef.current?.sessionId === sessionId)
+        setNotice(error instanceof Error ? error.message : 'Không cập nhật được ghim hội thoại.', 'error')
     } finally {
-      pending.current.delete(key)
-      setPinBusy(pending.current.size > 0)
+      locks.delete(key)
+      if (pending.current === locks && sessionRef.current?.sessionId === sessionId) setPinBusy(locks.size > 0)
     }
   }
 

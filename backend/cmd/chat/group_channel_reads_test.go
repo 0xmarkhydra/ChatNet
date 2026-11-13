@@ -132,7 +132,35 @@ func TestChannelUnreadIsolationIntegration(t *testing.T) {
 		}
 		return result
 	}
+	// The group badge returned to the conversation list must equal the sum
+	// of channel badges, including the default general discussion channel.
+	checkGroupBadge := func(channelCounts map[int64]int64) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet,
+			fmt.Sprintf("/api/conversations?id=%d", conversationID), nil)
+		req.Header.Set("Authorization", "Bearer "+tokens[1])
+		recorder := httptest.NewRecorder()
+		authx.Middleware("test", http.HandlerFunc(s.listConversations)).ServeHTTP(recorder, req)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("group list: %d %s", recorder.Code, recorder.Body.String())
+		}
+		var groups []conversation
+		if err := json.Unmarshal(recorder.Body.Bytes(), &groups); err != nil {
+			t.Fatal(err)
+		}
+		if len(groups) != 1 || groups[0].ID != conversationID {
+			t.Fatalf("group missing from conversation list: %+v", groups)
+		}
+		var expected int64
+		for _, unread := range channelCounts {
+			expected += unread
+		}
+		if groups[0].UnreadCount != int(expected) {
+			t.Fatalf("group unread=%d, sum of channels=%d", groups[0].UnreadCount, expected)
+		}
+	}
 	first := load()
+	checkGroupBadge(first)
 	for _, ch := range []int64{0, channelA, channelB} {
 		if first[ch] != 1 {
 			t.Fatalf("channel %d unread %d, want 1", ch, first[ch])
@@ -146,6 +174,7 @@ func TestChannelUnreadIsolationIntegration(t *testing.T) {
 	if after[0] != 1 || after[channelA] != 0 || after[channelB] != 1 {
 		t.Fatalf("wrong isolation: %+v", after)
 	}
+	checkGroupBadge(after)
 	outsider := do(2, http.MethodPost, "/api/conversations/test/channel-read", fmt.Sprintf(`{"channelId":%d}`, channelB))
 	if outsider.Code != http.StatusForbidden {
 		t.Fatalf("outsider should be forbidden, got %d", outsider.Code)
