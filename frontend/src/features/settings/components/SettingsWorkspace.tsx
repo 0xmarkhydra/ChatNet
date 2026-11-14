@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import type { UserPrivacy } from "../../profile";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
+import { Button } from "../../../shared/ui/button";
+import { cn } from "../../../shared/lib/utils";
 
 type Section =
   | "account" | "privacy" | "security" | "notifications" | "language"
@@ -58,16 +60,16 @@ export default function SettingsWorkspace({
         <h2>Cài đặt tài khoản</h2>
         <nav aria-label="Danh mục cài đặt">
           {sections.map(({ id, label, icon: Icon }) => (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               key={id}
-              className={"settings-workspace-nav-item" + (selected === id ? " is-selected" : "")}
+              className={cn("settings-workspace-nav-item justify-start", selected === id && "is-selected")}
               aria-current={selected === id ? "page" : undefined}
               onClick={() => setSelected(id)}
             >
               <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
               <span>{label}</span>
-            </button>
+            </Button>
           ))}
         </nav>
       </aside>

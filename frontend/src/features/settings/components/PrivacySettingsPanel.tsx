@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { UserPrivacy } from "../../profile";
+import { Button } from "../../../shared/ui/button";
 
 type Props = {
   privacy: UserPrivacy | null;
@@ -100,22 +101,21 @@ export default function PrivacySettingsPanel({ privacy, privacyLoading, privacyB
             {privacyError && (
               <div role="alert" className="settings-workspace-error">
                 <span>{privacyError}</span>
-                <button type="button" onClick={onPrivacyRetry}>Thử lại</button>
+                <Button variant="ghost" onClick={onPrivacyRetry}>Thử lại</Button>
               </div>
             )}
             <footer className="settings-workspace-footer">
               <span aria-live="polite">{changed ? "Bạn có thay đổi chưa lưu" : "Cài đặt được lưu trên máy chủ"}</span>
-              <button type="button" className="settings-workspace-cancel" disabled={!changed || privacyBusy} onClick={() => setDraft(privacy)}>
+              <Button variant="secondary" className="settings-workspace-cancel" disabled={!changed || privacyBusy} onClick={() => setDraft(privacy)}>
                 Hủy
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
                 className="settings-workspace-save"
                 disabled={!changed || privacyBusy || privacyLoading}
                 onClick={() => { if (draft) void onSavePrivacy(draft); }}
               >
                 <Check size={16} aria-hidden="true" /> Lưu thay đổi
-              </button>
+              </Button>
             </footer>
           </div>
   );
