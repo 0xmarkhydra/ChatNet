@@ -77,6 +77,24 @@ describe("chat conversation routes", () => {
     expect(app.text("selected")).toBe("none");
   });
 
+  it("opens a shareable chat route when a call or contact selects a conversation", () => {
+    const app = mountAt("/calls");
+    app.click("Open 42");
+    expect(app.text("path")).toBe("/chat/42");
+    expect(app.text("selected")).toBe("42");
+    app.click("Close");
+    expect(app.text("path")).toBe("/chat");
+    expect(app.text("selected")).toBe("none");
+  });
+
+  it("opens a conversation from notifications or feed without dropping navigation history", () => {
+    const app = mountAt("/notifications");
+    app.click("Open 43");
+    expect(app.text("path")).toBe("/chat/43");
+    app.click("Back");
+    expect(app.text("path")).toBe("/notifications");
+  });
+
   it("does not clear chat selection simply because another tab is visited", () => {
     const app = mountAt("/chat/42");
     app.click("Feed");

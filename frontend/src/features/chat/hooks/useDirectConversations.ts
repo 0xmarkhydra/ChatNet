@@ -76,9 +76,9 @@ export function useDirectConversations({
         created,
         ...current.filter((item) => item.id !== created.id),
       ]);
-      setActiveConversationId(created.id);
       setDesktopSection(null);
       setTab("chat");
+      setActiveConversationId(created.id);
       setGlobalSearch("");
       setDirectUsername("");
       setFriendQuery("");

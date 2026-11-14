@@ -1,5 +1,5 @@
 import type { Tab } from "../../shared/types/navigation";
-import { TAB_PATH } from "../router/routes";
+import { TAB_PATH, chatConversationPath } from "../router/routes";
 
 export type NotificationDeepLink = {
   tab: Extract<Tab, "feed" | "contacts"> | null;
@@ -38,7 +38,7 @@ export function notificationRouteTarget(location: {
     ...target,
     to: {
       pathname: target.conversationId !== null
-        ? TAB_PATH.chat
+        ? chatConversationPath(target.conversationId)
         : target.tab !== null ? TAB_PATH[target.tab] : location.pathname,
       search: search ? `?${search}` : "",
       hash: location.hash,
