@@ -1,4 +1,6 @@
 import type { FormEvent } from 'react'
+import { Input } from '../../../shared/ui/input'
+import { Button } from '../../../shared/ui/button'
 import type { UIMessageKey } from '../../i18n'
 import type { ProfileMediaState } from '../types'
 
@@ -33,7 +35,7 @@ export default function ProfileIdentityForm({
       </div>
       <label className="profile-edit-field">
         <span>{t('profile.displayName')}</span>
-        <input
+        <Input
           type="text"
           value={profileDisplayNameDraft}
           onChange={(event) => setProfileDisplayNameDraft(event.target.value)}
@@ -47,7 +49,7 @@ export default function ProfileIdentityForm({
         <span>{t('profile.username')}</span>
         <div className="profile-username-input">
           <b aria-hidden="true">@</b>
-          <input
+          <Input
             type="text"
             value={profileUsernameDraft}
             onChange={(event) => setProfileUsernameDraft(event.target.value.toLowerCase())}
@@ -63,7 +65,7 @@ export default function ProfileIdentityForm({
         </div>
         <small>{t('profile.usernameHint')}</small>
       </label>
-      <button
+      <Button
         type="submit"
         className="profile-save-button"
         disabled={
@@ -76,7 +78,7 @@ export default function ProfileIdentityForm({
         }
       >
         {t('common.save')}
-      </button>
+      </Button>
     </form>
   )
 }
