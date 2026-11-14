@@ -303,6 +303,7 @@ import { useGroupChannels } from "../features/chat/hooks/useGroupChannels";
 import { useDirectConversations } from "../features/chat/hooks/useDirectConversations";
 import { useGroupCreation } from "../features/chat/hooks/useGroupCreation";
 import { usePostSync } from "../features/feed/hooks/usePostSync";
+import { usePostMentions } from "../features/feed/hooks/usePostMentions";
 import { useProfilePosts } from "../features/feed/hooks/useProfilePosts";
 import { usePostComposer } from "../features/feed/hooks/usePostComposer";
 import { usePostReactions } from "../features/feed/hooks/usePostReactions";
@@ -609,53 +610,12 @@ export default function AuthedApp({
     session?.user.username,
   ]);
   const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
-  const [postMentionsState, setPostMentionsState] = useState<{
-    sessionId: string;
-    items: PostMentionNotification[];
-  } | null>(null);
-  const postMentions = session?.sessionId === postMentionsState?.sessionId
-    ? postMentionsState.items
-    : [];
-  useEffect(() => {
-    if (!session?.sessionId) return;
-    const mentionSessionId = session.sessionId;
-    let live = true;
-    let refreshing = false;
-    const controller = new AbortController();
-    const refresh = async () => {
-      if (!live || refreshing) return;
-      refreshing = true;
-      try {
-        const response = await apiFetch("/api/feed/mentions", { signal: controller.signal, cache: "no-store" });
-        if (!response.ok) return;
-        const items: unknown = await response.json();
-        if (live && Array.isArray(items)) {
-          setPostMentionsState({
-            sessionId: mentionSessionId,
-            items: items.filter((item): item is PostMentionNotification =>
-              item && Number.isSafeInteger(item.id) && Number.isSafeInteger(item.postId)
-              && typeof item.author === "string" && typeof item.createdAt === "string"),
-          });
-        }
-      } catch {
-        // A temporary network outage must not clear already received alerts.
-      } finally {
-        refreshing = false;
-      }
-    };
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void refresh();
-    };
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), tab === "notifications" ? 12000 : 30000);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      live = false;
-      controller.abort();
-      window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [session?.sessionId, tab === "notifications"]);
+  const { mentions: postMentions, readPostMention, isCurrentVisit: isCurrentMentionVisit } = usePostMentions({
+    sessionId: session?.sessionId ?? null,
+    notificationsTab: tab === "notifications",
+    apiFetch,
+    onReadError: message => setNotice(message, "error"),
+  });
   useLayoutEffect(() => {
     if (tab !== "feed") return;
     if (feedViewRef.current) feedViewRef.current.scrollTop = 0;
@@ -2546,31 +2506,15 @@ export default function AuthedApp({
     setTranslations({});
     setTranslationOriginals({});
   };
-  async function readPostMention(id: number) {
-    const mention = postMentions.find(item => item.id === id);
-    if (!mention || mention.readAt) return;
-    try {
-      const response = await apiFetch(`/api/feed/mentions/${id}/read`, { method: "POST" });
-      if (!response.ok) throw new Error("Không đánh dấu được thông báo.");
-      setPostMentionsState(current => current?.sessionId === session?.sessionId
-        ? {
-            ...current,
-            items: current.items.map(item => item.id === id
-              ? { ...item, readAt: new Date().toISOString() } : item),
-          }
-        : current);
-    } catch {
-      setNotice("Không đánh dấu được thông báo. Vui lòng thử lại.", "error");
-    }
-  }
-
   async function openMentionPost(mention: PostMentionNotification) {
+    if (!isCurrentMentionVisit()) return;
     try {
       const response = await apiFetch(`/api/posts/${mention.postId}`, { cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 404
         ? "Bài viết không tồn tại hoặc bạn không còn quyền xem."
         : "Không mở được bài viết.");
       const post = await response.json() as Post;
+      if (!isCurrentMentionVisit()) return;
       setPosts(current => [post, ...current.filter(item => item.id !== post.id)]);
       setFeedCommunitiesOpen(false);
       setTab("feed");
@@ -2578,7 +2522,8 @@ export default function AuthedApp({
       navigate(`${TAB_PATH.feed}?post=${post.id}`, { state: { postId: post.id } });
       void readPostMention(mention.id);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Không mở được bài viết.", "error");
+      if (isCurrentMentionVisit())
+        setNotice(error instanceof Error ? error.message : "Không mở được bài viết.", "error");
     }
   }
 
