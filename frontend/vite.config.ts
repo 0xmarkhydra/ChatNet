@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { chatCopyImageDevProxy } from './dev/chatCopyImageProxy'
@@ -7,10 +9,11 @@ import { chatMediaUploadDevProxy } from './dev/chatMediaUploadProxy'
 
 export default defineConfig({
   // Ignore nested frontend/output snapshots when discovering app dependencies.
-  resolve: { dedupe: ['react', 'react-dom'] },
+  resolve: { dedupe: ['react', 'react-dom'], alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   optimizeDeps: { entries: ['index.html'] },
   plugins: [
     react(),
+    tailwindcss(),
     chatCopyImageDevProxy(),
     chatMediaUploadDevProxy(),
     {

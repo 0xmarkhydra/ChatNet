@@ -36,6 +36,15 @@ Do not treat existing legacy patterns as permission to repeat them. Legacy viola
 - Prefer lazy-loading genuinely heavy routes or features only after identifying a measured bundle or UX problem. No automatic dependency additions (router, query/cache, state manager, form library) just to follow trends.
 - Keep render and API responsibilities separate but avoid unnecessary `useMemo`, `useCallback`, providers and abstractions.
 
+## Shared UI and design system
+
+- New reusable controls belong in `frontend/src/shared/ui/`, with feature logic staying in the owning feature. Check for an existing shared control before adding another variant.
+- For **new** interface code use Tailwind CSS v4 utilities and SocCO semantic tokens from `frontend/src/styles/tailwind.css`; avoid hard-coded colors, spacing and shadow values when semantic styles exist. Keep Lucide React for icons.
+- shadcn/ui components are **source-owned** in `shared/ui/`, not a runtime UI package. Before adding a component, inspect the generator's diff, keep imports within the `shared/` boundary and add behavior/a11y tests. The project alias is `@/*`.
+- Tailwind Preflight is deliberately **disabled** while legacy CSS remains. Do not switch to `@import "tailwindcss"`, regenerate global resets, or replace existing feature styles as part of unrelated work. Any migration requires screen-by-screen visual QA and an explicit PR.
+- Use `cn()` from `shared/lib/utils.ts` to combine Tailwind classes. Do not copy a new button/dialog/input implementation into each feature or introduce competing icon/UI libraries.
+- Existing feature CSS remains supported until its owner migrates it; do not mix mass CSS rewrites with behavior changes or blindly add `!important` to win selector conflicts.
+
 ## Required workflow for AI-generated and human code
 
 1. **Inspect:** read the relevant code, contracts, existing tests and ownership; check current Git state and instructions. Start from freshly fetched `origin/main` in an isolated branch/worktree. Never change someone else's dirty files or worktree.

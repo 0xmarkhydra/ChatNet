@@ -1,0 +1,28 @@
+/*
+ * Tailwind utilities for new SocCO shared UI only.
+ * Preflight is intentionally disabled: existing feature CSS owns element defaults.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme inline {
+  --color-background: var(--soco-canvas);
+  --color-foreground: var(--soco-text);
+  --color-card: var(--soco-surface);
+  --color-card-foreground: var(--soco-text);
+  --color-popover: var(--soco-surface);
+  --color-popover-foreground: var(--soco-text);
+  --color-primary: var(--soco-blue);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--soco-soft-blue);
+  --color-secondary-foreground: var(--soco-text);
+  --color-muted: var(--soco-canvas);
+  --color-muted-foreground: var(--soco-muted);
+  --color-accent: var(--soco-soft-blue);
+  --color-accent-foreground: var(--soco-text);
+  --color-destructive: #dc2626;
+  --color-border: var(--soco-line);
+  --color-input: var(--soco-line);
+  --color-ring: var(--soco-blue);
+}
