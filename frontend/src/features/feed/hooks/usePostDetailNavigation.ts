@@ -1,4 +1,5 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { Tab } from "../../../shared/types/navigation";
 
 export type UsePostDetailNavigationDeps = {
@@ -9,37 +10,44 @@ export type UsePostDetailNavigationDeps = {
   tab: Tab;
 };
 
-/** Opens and closes the post detail view and keeps the shareable ?post= URL in step. */
+/** Keep post detail URLs in React Router history (including Desktop HashRouter). */
 export function usePostDetailNavigation({
-  feedScrollBeforeComments,
+  feedScrollBeforeComments: feedScrollBeforeCommentsRef,
   feedViewRef,
   isProfileDesktop,
   setActivePostId,
   tab,
 }: UsePostDetailNavigationDeps) {
-  function openFeedPostDetails(id: number) {
-      if (tab === "feed" && isProfileDesktop) {
-        feedScrollBeforeComments.current = feedViewRef.current?.scrollTop ?? 0;
-        const url = new URL(window.location.href);
-        if (url.searchParams.get("post") !== String(id)) {
-          url.searchParams.set("tab", "feed");
-          url.searchParams.set("post", String(id));
-          window.history.pushState({ ...window.history.state, postId: id }, "", url);
-        }
-      }
-      setActivePostId(id);
-    }
-  function closeFeedPostDetails() {
-      setActivePostId(null);
-      const url = new URL(window.location.href);
-      if (url.searchParams.has("post")) {
-        url.searchParams.delete("post");
-        window.history.replaceState(window.history.state, "", url);
-      }
-    }
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  return {
-    closeFeedPostDetails,
-    openFeedPostDetails,
-  };
+  function openFeedPostDetails(id: number) {
+    if (tab === "feed" && isProfileDesktop) {
+      feedScrollBeforeCommentsRef.current = feedViewRef.current?.scrollTop ?? 0;
+      const params = new URLSearchParams(location.search);
+      if (params.get("post") !== String(id)) {
+        params.set("tab", "feed");
+        params.set("post", String(id));
+        navigate(
+          { pathname: location.pathname, search: `?${params}`, hash: location.hash },
+          { state: { ...(location.state ?? {}), postId: id } },
+        );
+      }
+    }
+    setActivePostId(id);
+  }
+
+  function closeFeedPostDetails() {
+    setActivePostId(null);
+    const params = new URLSearchParams(location.search);
+    if (params.has("post")) {
+      params.delete("post");
+      navigate(
+        { pathname: location.pathname, search: params.size ? `?${params}` : "", hash: location.hash },
+        { replace: true, state: location.state },
+      );
+    }
+  }
+
+  return { closeFeedPostDetails, openFeedPostDetails };
 }
