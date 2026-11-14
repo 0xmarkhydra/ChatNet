@@ -75,9 +75,17 @@ describe("app route tree", () => {
     expect(onMount).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps existing nested deep links available for later migration", () => {
+  it("shows the existing conversation page for valid chat detail links", () => {
     const { location, page } = renderAt("/chat/123");
     expect(location()).toBe("/chat/123");
     expect(page()).not.toBeNull();
+  });
+
+  it("rejects malformed or unsafe conversation IDs", () => {
+    for (const path of ["/chat/0", "/chat/nope", "/chat/9007199254740992", "/chat/42/more"]) {
+      const { container, page } = renderAt(path);
+      expect(page()).toBeNull();
+      expect(container.textContent).toContain("Không tìm thấy trang");
+    }
   });
 });

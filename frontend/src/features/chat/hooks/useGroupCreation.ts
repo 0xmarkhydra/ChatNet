@@ -57,8 +57,8 @@ export function useGroupCreation({
         created,
         ...current.filter((item) => item.id !== created.id),
       ]);
-      setActiveConversationId(created.id);
       setTab("chat");
+      setActiveConversationId(created.id);
       setFriendQuery("");
       setNewChatMode("none");
       void refreshConversations();

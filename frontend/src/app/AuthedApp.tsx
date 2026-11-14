@@ -59,7 +59,9 @@ import {
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ROUTE, TAB_PATH, tabFromPath } from "./router/routes";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, tabFromPath } from "./router/routes";
+import { useChatConversationRoute } from "./router/useChatConversationRoute";
+import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
 import type {
   FriendSearchResult,
   FriendConnection,
@@ -420,6 +422,7 @@ export default function AuthedApp({
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
+  const selectRoutedConversation = useChatConversationRoute(activeConversationId, setActiveConversationId);
   const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, pinnedExpanded, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setPinnedExpanded, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId });
 
   const activeConversationIdRef = useRef<number | null>(null);
@@ -1161,6 +1164,26 @@ export default function AuthedApp({
   const activeConversation =
     displayConversations.find((item) => item.id === activeConversationId) ||
     null;
+  const routeConversationId = chatConversationIdFromPath(routeLocation.pathname);
+  const onRouteConversationUnavailable = useCallback(() => {
+    setNotice("Hội thoại không tồn tại hoặc bạn không có quyền truy cập.", "warning");
+    navigate(TAB_PATH.chat, { replace: true });
+  }, [navigate, setNotice]);
+  const onRouteConversationError = useCallback(() => {
+    setNotice("Chưa tải được hội thoại từ liên kết. Kiểm tra kết nối và thử tải lại.", "warning");
+  }, [setNotice]);
+  useChatRouteConversation({
+    conversationId: routeConversationId,
+    known: activeConversation?.id === routeConversationId,
+    sessionId: session?.sessionId ?? null,
+    sessionRef,
+    request: apiFetch,
+    setConversations,
+    revokedIds: revokedConversationIds,
+    membershipIds: membershipSnapshot,
+    onUnavailable: onRouteConversationUnavailable,
+    onError: onRouteConversationError,
+  });
   activeConversationTypeRef.current = activeConversation?.type ?? null;
 
   // Channel selection stays inside the active group and never leaks into another conversation.
@@ -1365,8 +1388,8 @@ export default function AuthedApp({
 
   const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
   const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setMessages, setReplyingTo });
-  const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
-  const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
+  const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
+  const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
 
   const { changeAppLocale, changeAutoTranslate, changeTargetLanguage, saveConversationTranslationSettings, translateMessage } = useTranslationActions({ activeChatTranslationSettings, activeConversationId, activeConversationIdRef, apiFetch, appLocale, autoTranslate, conversationTranslationOverrides, effectiveTargetLanguage, preferenceRevision, advancePreferenceRevision, session, sessionRef, setAppLocale, setAutoTranslate, setConversationTranslationOverrides, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setManuallyTranslated, setNotice, setTargetLanguage, setTranslationFailures, setTranslationMenuOpen, setTranslationOriginals, setTranslationPending, setTranslationPickerOpen, setTranslations, setTranslationSettingsSearch, targetLanguage, translationAttempted, translationFailures, translationLanguageRef, translations });
 
@@ -2172,7 +2195,7 @@ export default function AuthedApp({
       ]);
       if (activeConversationIdRef.current !== conversation.id) setMessages([]);
       switchTab("chat");
-      setActiveConversationId(conversation.id);
+      selectRoutedConversation(conversation.id);
     },
   });
 
@@ -2343,7 +2366,7 @@ export default function AuthedApp({
   const { toggleReaction } = useMessageReactions({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReactionPreviews });
   const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraftFile, storyBusy, updateChatOutbox, uploadMediaFiles });
 
-  const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
+  const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId: selectRoutedConversation, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
 
   useEffect(() => {
     if (!session?.sessionId) return;
@@ -2501,7 +2524,7 @@ export default function AuthedApp({
           ? current
           : [...current, selected],
       );
-      setActiveConversationId(selected.id);
+      selectRoutedConversation(selected.id);
     } else if (contact.username) {
       void openDirectByUsername(contact.username);
     }
@@ -2519,7 +2542,7 @@ export default function AuthedApp({
       messageId: hit.id,
       revision: ++chatSearchJumpRevision.current,
     });
-    setActiveConversationId(hit.conversation.id);
+    selectRoutedConversation(hit.conversation.id);
     setTranslations({});
     setTranslationOriginals({});
   };
@@ -2764,7 +2787,7 @@ export default function AuthedApp({
       onScanQr={() => setQrOpen("scan")}
       embeddedInCalls={tab === "chat" && desktopSection === "calls"}
       callConversations={tab === "chat" && desktopSection === "calls" ? displayConversations : undefined}
-      onOpenCallChat={(id) => { setDesktopSection(null); setActiveConversationId(id); navigate(TAB_PATH.chat); }}
+      onOpenCallChat={(id) => { setDesktopSection(null); selectRoutedConversation(id); }}
     />
   );
 
@@ -3244,7 +3267,7 @@ export default function AuthedApp({
           selectGroupChannel={selectGroupChannel}
           sendMessage={sendMessage}
           session={session}
-          setActiveConversationId={setActiveConversationId}
+          setActiveConversationId={selectRoutedConversation}
           setChatCreateError={setChatCreateError}
           setChatDragActive={setChatDragActive}
           setChatListFilter={setChatListFilter}
@@ -3329,7 +3352,7 @@ export default function AuthedApp({
           displayConversations={displayConversations}
           friendQuery={friendQuery}
           session={session}
-          setActiveConversationId={setActiveConversationId}
+          setActiveConversationId={selectRoutedConversation}
           setContactsScreen={setContactsScreen}
           setDesktopSection={setDesktopSection}
           setFriendQuery={setFriendQuery}
@@ -3350,7 +3373,7 @@ export default function AuthedApp({
           openVisitor={openVisitor}
           postMentions={postMentions}
           readPostMention={readPostMention}
-          setActiveConversationId={setActiveConversationId}
+          setActiveConversationId={selectRoutedConversation}
           setContactsScreen={setContactsScreen}
           setDesktopProfileSettings={setDesktopProfileSettings}
           setProfileTimelineOpen={setProfileTimelineOpen}
@@ -3453,7 +3476,7 @@ export default function AuthedApp({
           savedPosts={savedPosts}
           searchedPosts={searchedPosts}
           session={session}
-          setActiveConversationId={setActiveConversationId}
+          setActiveConversationId={selectRoutedConversation}
           setActivePostId={setActivePostId}
           setActiveStoryId={setActiveStoryId}
           setChatListFilter={setChatListFilter}
@@ -3761,8 +3784,8 @@ export default function AuthedApp({
         notify={(message) => setNotice(message)}
         onJoined={async (id) => {
           await refreshConversations();
-          setActiveConversationId(id);
           setTab("chat");
+          selectRoutedConversation(id);
         }}
       />
 

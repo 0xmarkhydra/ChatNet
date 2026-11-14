@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Link, Navigate, Outlet, Route, Routes, useLocation, useOutletContext } from "react-router-dom";
-import { ROUTE, TAB_PATH, tabFromPath } from "./routes";
+import { Link, Navigate, Outlet, Route, Routes, useLocation, useOutletContext, useParams } from "react-router-dom";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, tabFromPath } from "./routes";
 
 function LegacyHomeRedirect() {
   const { search } = useLocation();
@@ -25,6 +25,13 @@ function NotFoundPage() {
   );
 }
 
+function ChatConversationPage() {
+  const { conversationId } = useParams();
+  return conversationId && chatConversationIdFromPath(`/chat/${conversationId}`) !== null
+    ? <CurrentPage />
+    : <NotFoundPage />;
+}
+
 export function AppRouteTree({ children }: { children: ReactNode }) {
   return (
     <Routes>
@@ -36,8 +43,8 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
         {Object.values(ROUTE).map((path) => (
           <Route key={path} path={path.slice(1)} element={<CurrentPage />} />
         ))}
-        {/* Existing URLs can contain trailing IDs; detail screens are a separate migration. */}
-        <Route path="chat/*" element={<CurrentPage />} />
+        <Route path="chat/:conversationId" element={<ChatConversationPage />} />
+        <Route path="chat/*" element={<NotFoundPage />} />
         <Route path="profile/*" element={<CurrentPage />} />
         <Route path="feed/*" element={<CurrentPage />} />
         <Route path="*" element={<NotFoundPage />} />
