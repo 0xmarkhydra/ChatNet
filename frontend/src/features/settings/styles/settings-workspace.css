@@ -65,34 +65,7 @@
   flex-direction: column;
   gap: 8px;
 }
-.settings-workspace-nav-item {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 46px;
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  padding: 11px 14px;
-  border: 0;
-  border-radius: 11px;
-  background: transparent;
-  color: #51688b;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 570;
-  cursor: pointer;
-}
-.settings-workspace-nav-item svg { flex: 0 0 auto; }
-.settings-workspace-nav-item:hover { background: #f5f7fc; color: #2a5edb; }
-.settings-workspace-nav-item.is-selected {
-  color: #245eff;
-  background: #edf2ff;
-  font-weight: 750;
-}
-.settings-workspace-nav-item:focus-visible {
-  outline: 2px solid #6395ff;
-  outline-offset: 2px;
-}
+/* Settings navigation base/interaction styles live in SettingsWorkspace Tailwind classes. */
 
 .settings-workspace-panel {
   display: flex;

@@ -63,7 +63,10 @@ export default function SettingsWorkspace({
             <Button
               variant="ghost"
               key={id}
-              className={cn("settings-workspace-nav-item justify-start", selected === id && "is-selected")}
+              className={cn(
+                "settings-workspace-nav-item box-border flex min-h-[46px] w-full cursor-pointer items-center justify-start gap-[13px] rounded-[11px] border-0 bg-transparent px-[14px] py-[11px] text-left text-[12px] font-[570] text-[#51688b] hover:bg-[#f5f7fc] hover:text-[#2a5edb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6395ff] [&_svg]:shrink-0",
+                selected === id && "is-selected bg-[#edf2ff] text-[#245eff] font-[750] hover:bg-[#edf2ff] hover:text-[#245eff]",
+              )}
               aria-current={selected === id ? "page" : undefined}
               onClick={() => setSelected(id)}
             >

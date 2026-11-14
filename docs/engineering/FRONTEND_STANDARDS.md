@@ -44,6 +44,7 @@ Do not treat existing legacy patterns as permission to repeat them. Legacy viola
 - Tailwind Preflight is deliberately **disabled** while legacy CSS remains. Do not switch to `@import "tailwindcss"`, regenerate global resets, or replace existing feature styles as part of unrelated work. Any migration requires screen-by-screen visual QA and an explicit PR.
 - Use `cn()` from `shared/lib/utils.ts` to combine Tailwind classes. Do not copy a new button/dialog/input implementation into each feature or introduce competing icon/UI libraries.
 - Existing feature CSS remains supported until its owner migrates it; do not mix mass CSS rewrites with behavior changes or blindly add `!important` to win selector conflicts.
+- **CSS retirement is part of migration:** when a screen/control has been fully migrated to shared UI/Tailwind, identify its exact selector consumers and delete now-unused legacy rules in the same PR. Preserve feature-specific styles, responsive overrides and animation rules that still have consumers; never delete a stylesheet merely because one control was migrated. Run behavior tests, desktop/mobile visual QA and keyboard focus checks before sign-off.
 
 ## Required workflow for AI-generated and human code
 

@@ -42,8 +42,12 @@ describe("shared UI controls in settings workspace", () => {
       expect(item.type).toBe("button");
       expect(item.classList.contains("justify-start")).toBe(true);
       expect(item.classList.contains("justify-center")).toBe(false);
+      expect(item.classList.contains("min-h-[46px]")).toBe(true);
+      expect(item.classList.contains(item.getAttribute("aria-current") === "page" ? "hover:bg-[#edf2ff]" : "hover:bg-[#f5f7fc]")).toBe(true);
+      expect(item.classList.contains("focus-visible:outline-2")).toBe(true);
     }
     expect(host.querySelector('[aria-current="page"]')?.textContent).toContain("Quyền riêng tư");
+    expect(host.querySelector('[aria-current="page"]')?.classList.contains("bg-[#edf2ff]")).toBe(true);
     expect(host.querySelector(".settings-workspace-save")?.getAttribute("disabled")).not.toBeNull();
     const notifications = items.find(item => item.textContent?.includes("Thông báo"));
     expect(notifications).toBeTruthy();
