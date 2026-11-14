@@ -2962,7 +2962,7 @@ export default function AuthedApp({
       }
       header={
         <AppHeader
-          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" ? "app-section-header" : tab === "discover" || tab === "market" ? "app-section-header app-header-no-search" : ""}`}
+          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
           title={
             <HeaderTitle
               tab={tab}
@@ -2978,13 +2978,13 @@ export default function AuthedApp({
               profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
             />
           }
-          search={searchInConversationList ? null : quickSearchControl}
+          search={searchInConversationList || tab === "discover" || tab === "market" ? null : quickSearchControl}
         >
           <AppHeaderActions
             account={
-              showHeaderAccount ? (
               <HeaderAccount
                 variant={tab === "profile" ? "settings" : "profile"}
+                desktopOnly={!showHeaderAccount}
                 username={name}
                 displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
                 onClick={
@@ -2996,7 +2996,6 @@ export default function AuthedApp({
                     : () => switchTab("profile")
                 }
               />
-              ) : null
             }
           >
             <HeaderActions
