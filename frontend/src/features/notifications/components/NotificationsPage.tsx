@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
+import { useSession } from '../../../shared/context/SessionContext'
 import { AtSign, Bell, Check, MessageCircle, Settings, UserRoundPlus, Users, X } from 'lucide-react'
 import type { FriendConnection } from '../../contacts'
 import type { Conversation } from '../../chat'
@@ -36,8 +38,9 @@ export default function NotificationsPage({
 }: Props) {
   const [filter, setFilter] = useState<NotificationFilter>('all')
   const { hostRef: filtersPillSetHost, activeRef: filtersPillSetActive, pillRef: filtersPillSetPill } = useSlidingPill<HTMLDivElement>(filter)
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
-  const [readKeys, setReadKeys] = useState<Set<string>>(() => new Set())
+  const { session } = useSession()
+  const [selectedKey, setSelectedKey] = useScopedState<string | null>(session.sessionId, null)
+  const [readKeys, setReadKeys] = useScopedState<Set<string>>(session.sessionId, new Set())
   const notifications = useMemo(() => buildNotificationItems(requests, conversations, mentions), [requests, conversations, mentions])
 
   const filtered = filterNotificationItems(notifications, filter, search, readKeys)
@@ -52,7 +55,7 @@ export default function NotificationsPage({
       const next = new Set([...previous].filter(key => known.has(key)))
       return next.size === previous.size ? previous : next
     })
-  }, [notifications])
+  }, [notifications, setReadKeys])
 
   const markRead = (key: string) => {
     const item = notifications.find(value => value.key === key)

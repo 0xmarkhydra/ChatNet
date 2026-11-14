@@ -3,9 +3,10 @@ import { syncPushSubscription, requestPushTest } from "../api/push";
 import { persistMessageSoundEnabled, IncomingMessageSound } from "../lib/incomingSound";
 import type { InstallPromptEvent } from "../../pwa";
 import { type Session } from "../../../shared/types/session";
-import { type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, type SetStateAction } from "react";
 import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
+import { useLatest } from "../../../shared/hooks/useLatest";
 
 export type UsePushSettingsDeps = {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
@@ -48,13 +49,25 @@ export function usePushSettings({
   setPushInitFailed,
   setPushPrompt,
 }: UsePushSettingsDeps) {
+  // One visit is distinct even if the user switches A → B → A.
+  const sessionVisit = useMemo(() => ({ sessionId: session?.sessionId }), [session?.sessionId]);
+  const currentVisit = useLatest(sessionVisit);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+  const isCurrentSession = (startedVisit: typeof sessionVisit) =>
+    mountedRef.current && Boolean(startedVisit.sessionId) && currentVisit.current === startedVisit;
+
   async function installApp() {
+    const startedVisit = sessionVisit;
     if (isStandalone) return;
 
     if (installPrompt) {
       await installPrompt.prompt();
       const choice = await installPrompt.userChoice;
-      if (choice.outcome === "accepted") {
+      if (choice.outcome === "accepted" && isCurrentSession(startedVisit)) {
         setInstallPrompt(null);
       }
       return;
@@ -68,17 +81,20 @@ export function usePushSettings({
     );
   }
   async function syncPushState(state: PushState) {
-    if (!session?.token || !state.subscriptionId) return;
+    if (!session?.token || !state.subscriptionId || !isCurrentSession(sessionVisit)) return;
 
     const response = await syncPushSubscription(apiFetch, state.subscriptionId, state.optedIn);
     if (!response.ok) throw new Error("Không lưu được đăng ký thông báo.");
   }
   async function sendTestPush(silent = false, force = false) {
+    const startedVisit = sessionVisit;
+    if (!isCurrentSession(startedVisit)) return false;
     if (!pushConfigured || (!pushEnabled && !force) || (pushBusy && !force))
       return false;
 
     const response = await requestPushTest(apiFetch);
     const result = await response.json().catch(() => ({}));
+    if (!isCurrentSession(startedVisit)) return false;
 
     if (!response.ok) {
       if (!silent) {
@@ -99,8 +115,9 @@ export function usePushSettings({
     return true;
   }
   async function previewMessageSound() {
+    const startedVisit = sessionVisit;
     const played = await messageSound.current?.preview();
-    if (!played)
+    if (isCurrentSession(startedVisit) && !played)
       setNotice(
         "Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SocCO.",
         "warning",
@@ -114,7 +131,8 @@ export function usePushSettings({
     if (enabled) void previewMessageSound();
   }
   async function togglePush() {
-    if (pushBusy) return;
+    const startedVisit = sessionVisit;
+    if (!isCurrentSession(startedVisit) || pushBusy) return;
 
     if (!pushConfigured || !pushAppId) {
       setNotice(
@@ -126,13 +144,17 @@ export function usePushSettings({
     if (pushInitFailed) {
       try {
         const state = await setupOneSignal(pushAppId, async (nextState) => {
+          if (!isCurrentSession(startedVisit)) return;
           setPushEnabled(nextState.optedIn);
           await syncPushState(nextState);
         });
+        if (!isCurrentSession(startedVisit)) return;
         setPushInitFailed(false);
         setPushEnabled(state.optedIn);
         await syncPushState(state);
+        if (!isCurrentSession(startedVisit)) return;
       } catch (error) {
+        if (!isCurrentSession(startedVisit)) return;
         const detail = error instanceof Error ? error.message : String(error);
         setNotice(`Không khởi tạo được Push Notification: ${detail}`);
         return;
@@ -152,12 +174,14 @@ export function usePushSettings({
       const state = pushEnabled
         ? await disableOneSignalPush()
         : await enableOneSignalPush();
+      if (!isCurrentSession(startedVisit)) return;
 
       setPushEnabled(state.optedIn);
       setPushPrompt(
         state.supported && state.permission === "default" && !isPushDisabled(),
       );
       await syncPushState(state);
+      if (!isCurrentSession(startedVisit)) return;
 
       if (state.permission === "denied") {
         setNotice(
@@ -175,11 +199,12 @@ export function usePushSettings({
         setNotice("Đã tắt thông báo SocCO");
       }
     } catch {
+      if (!isCurrentSession(startedVisit)) return;
       setNotice(
         "Không thể bật thông báo. Kiểm tra quyền Notification của trình duyệt/PWA rồi thử lại.",
       );
     } finally {
-      setPushBusy(false);
+      if (isCurrentSession(startedVisit)) setPushBusy(false);
     }
   }
 
