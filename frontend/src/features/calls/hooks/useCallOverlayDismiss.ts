@@ -24,5 +24,5 @@ export function useCallOverlayDismiss(
       window.removeEventListener('keydown', onEscape)
       window.removeEventListener('pointerdown', closeMenuOutside)
     }
-  }, [moreOpen, translationSheetOpen])
+  }, [moreOpen, translationSheetOpen, moreRef, setMoreOpen, setTranslationSheetOpen])
 }
