@@ -1,6 +1,7 @@
 import type { SessionResponseCache } from '../../shared/lib/sessionCache'
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { API } from '../../shared/lib/config'
+import { useLatest } from '../../shared/hooks/useLatest'
 import { isDesktopBuild } from '../../platform/desktop'
 import { notifyDesktopMessage, clearDesktopNotifications, refreshDesktopUnread } from '../../features/chat/hooks/useDesktopNotifications'
 import { attachmentLabel } from '../../shared/utils/format'
@@ -90,12 +91,33 @@ export function useAppRealtime({
   setConversations,
   onMessageConfirmed,
 }: Options) {
+  // Long-lived SSE/timer listeners need current callbacks without re-subscribing.
+  const handlers = useLatest({
+    onCategoryAssignmentChanged,
+    onCategoriesChanged,
+    refreshCategoryConversations,
+    expireSession,
+    checkSession,
+    apiFetch,
+    setStatus,
+    refreshConversations,
+    refreshPosts,
+    refreshStories,
+    refreshFriendConnections,
+    reconcileConversationMemberships,
+    purgeConversation,
+    refreshGroupMembers,
+    refreshPinnedMessages,
+    clearPinnedMessages,
+    onMessageConfirmed
+  })
+
   useEffect(() => {
     if (!session?.token || sessionRef.current?.sessionId !== session.sessionId) return
 
-    void refreshConversations()
-    void refreshPosts()
-    void refreshStories()
+    void handlers.current.refreshConversations()
+    void handlers.current.refreshPosts()
+    void handlers.current.refreshStories()
 
     let active = true
     let lastSSECheckAt = 0
@@ -105,21 +127,21 @@ export function useAppRealtime({
     events.onopen = () => {
       if (!active || sessionRef.current?.sessionId !== session.sessionId) return
       lastSSECheckAt = Date.now()
-      setStatus('Đang online')
-      void refreshFriendConnections()
-      void reconcileConversationMemberships()
+      handlers.current.setStatus('Đang online')
+      void handlers.current.refreshFriendConnections()
+      void handlers.current.reconcileConversationMemberships()
     }
     events.onerror = () => {
       if (!active || sessionRef.current?.sessionId !== session.sessionId) return
-      setStatus('Đang kết nối lại...')
+      handlers.current.setStatus('Đang kết nối lại...')
       if (Date.now() - lastSSECheckAt < 30_000) return
       lastSSECheckAt = Date.now()
       if (document.visibilityState === 'visible' && sessionRef.current?.sessionId === session.sessionId) {
-        void checkSession().catch(() => undefined)
+        void handlers.current.checkSession().catch(() => undefined)
       }
     }
     events.addEventListener('session-revoked', () => {
-      if (active && sessionRef.current?.sessionId === session.sessionId) expireSession()
+      if (active && sessionRef.current?.sessionId === session.sessionId) handlers.current.expireSession()
     })
     events.addEventListener('update', (event) => {
       if (!active || sessionRef.current?.sessionId !== session.sessionId) return
@@ -132,13 +154,13 @@ export function useAppRealtime({
         responseCache.current.invalidate(['messages', 'conversations', 'friends', 'feed', 'stories', 'profiles', 'notes'])
         setMessages([])
         window.dispatchEvent(new Event('chatnet:privacy-updated'))
-        clearPinnedMessages()
-        if (activeConversationIdRef.current) void refreshPinnedMessages(activeConversationIdRef.current)
-        void refreshConversations()
-        void refreshFriendConnections()
-        void refreshPosts()
-        void refreshStories()
-        void reconcileConversationMemberships()
+        handlers.current.clearPinnedMessages()
+        if (activeConversationIdRef.current) void handlers.current.refreshPinnedMessages(activeConversationIdRef.current)
+        void handlers.current.refreshConversations()
+        void handlers.current.refreshFriendConnections()
+        void handlers.current.refreshPosts()
+        void handlers.current.refreshStories()
+        void handlers.current.reconcileConversationMemberships()
         return
       }
       if (update.type === 'group.activity') {
@@ -148,31 +170,31 @@ export function useAppRealtime({
       if (update.type === 'category.updated') {
         if (update.conversationId > 0) {
           responseCache.current.invalidate(['conversations'])
-          onCategoryAssignmentChanged(update.conversationId, update.categoryId || null)
+          handlers.current.onCategoryAssignmentChanged(update.conversationId, update.categoryId || null)
           return
         }
         responseCache.current.invalidate(['categories','conversations'])
-        onCategoriesChanged()
-        void refreshConversations()
+        handlers.current.onCategoriesChanged()
+        void handlers.current.refreshConversations()
         return
       }
       if (update.type === 'friend.updated') {
         responseCache.current.invalidate(['friends','feed','stories','profiles','notes'])
-        void refreshFriendConnections()
+        void handlers.current.refreshFriendConnections()
         return
       }
 
       if (update.type === 'conversation.removed') {
         responseCache.current.invalidate(['conversations','messages'])
-        if (activeConversationIdRef.current === update.conversationId) clearPinnedMessages()
-        purgeConversation(update.conversationId)
-        refreshCategoryConversations()
+        if (activeConversationIdRef.current === update.conversationId) handlers.current.clearPinnedMessages()
+        handlers.current.purgeConversation(update.conversationId)
+        handlers.current.refreshCategoryConversations()
         return
       }
 
       if (update.type === 'pins.updated') {
         if (activeConversationIdRef.current === update.conversationId) {
-          void refreshPinnedMessages(update.conversationId)
+          void handlers.current.refreshPinnedMessages(update.conversationId)
         }
         return
       }
@@ -183,10 +205,10 @@ export function useAppRealtime({
         revokedConversationIds.current.delete(update.conversationId)
         membershipSnapshot.current?.add(update.conversationId)
         membershipEventSequence.current += 1
-        void refreshConversations()
-        refreshCategoryConversations()
+        void handlers.current.refreshConversations()
+        handlers.current.refreshCategoryConversations()
         if (activeConversationIdRef.current === update.conversationId) {
-          void refreshGroupMembers(update.conversationId)
+          void handlers.current.refreshGroupMembers(update.conversationId)
         }
         return
       }
@@ -236,10 +258,10 @@ export function useAppRealtime({
             return next
           })
           // Edits and recalls must refresh the preview shown in the pinned banner.
-          void refreshPinnedMessages(update.conversationId)
+          void handlers.current.refreshPinnedMessages(update.conversationId)
         }
-        void refreshConversations()
-        refreshCategoryConversations()
+        void handlers.current.refreshConversations()
+        handlers.current.refreshCategoryConversations()
         return
       }
 
@@ -271,7 +293,7 @@ export function useAppRealtime({
         notifyDesktopMessage(session, incoming)
         messageChanges.current.add(incoming.id)
         if (incoming.senderId === session.user.id && incoming.clientId) {
-          onMessageConfirmed(incoming)
+          handlers.current.onMessageConfirmed(incoming)
           const recovered = loadPendingSend(session.user.id, session.sessionId)
           if (recovered?.clientId === incoming.clientId && recovered.conversationId === incoming.conversationId) {
             clearPendingSend(session.user.id, incoming.clientId)
@@ -322,8 +344,8 @@ export function useAppRealtime({
           )
         })
 
-        void refreshConversations()
-        refreshCategoryConversations()
+        void handlers.current.refreshConversations()
+        handlers.current.refreshCategoryConversations()
 
         if ((incoming.channelId || 0) === activeChannelIdRef.current && currentId === update.conversationId) {
           setMessages((current) =>
@@ -334,7 +356,7 @@ export function useAppRealtime({
           if (incoming.senderId !== session.user.id &&
               canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) {
             const group = activeConversationTypeRef.current === 'group'
-            void apiFetch(group
+            void handlers.current.apiFetch(group
               ? `/api/conversations/${update.conversationId}/channel-read`
               : `/api/conversations/${update.conversationId}/read`, group
               ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -347,7 +369,7 @@ export function useAppRealtime({
                   }}))
               })
               .catch(() => {
-                if (active && sessionRef.current?.sessionId === session.sessionId) setStatus('Đang kết nối lại...')
+                if (active && sessionRef.current?.sessionId === session.sessionId) handlers.current.setStatus('Đang kết nối lại...')
               })
           }
         }
@@ -356,23 +378,23 @@ export function useAppRealtime({
 
     const refreshTimer = window.setInterval(() => {
       if (!active || sessionRef.current?.sessionId !== session.sessionId || document.visibilityState !== 'visible') return
-      void refreshConversations()
-      void refreshFriendConnections()
-      refreshCategoryConversations()
+      void handlers.current.refreshConversations()
+      void handlers.current.refreshFriendConnections()
+      handlers.current.refreshCategoryConversations()
     }, 20000)
     const membershipTimer = window.setInterval(() => {
       if (!active || sessionRef.current?.sessionId !== session.sessionId) return
-      void reconcileConversationMemberships()
+      void handlers.current.reconcileConversationMemberships()
     }, 90000)
     const checkMembership = () => {
-      if (active && sessionRef.current?.sessionId === session.sessionId) void reconcileConversationMemberships()
+      if (active && sessionRef.current?.sessionId === session.sessionId) void handlers.current.reconcileConversationMemberships()
     }
     const checkVisibleMembership = () => {
       if (active && sessionRef.current?.sessionId === session.sessionId && document.visibilityState === 'visible') {
         checkMembership()
-        void refreshConversations()
-        refreshCategoryConversations()
-        void refreshFriendConnections()
+        void handlers.current.refreshConversations()
+        handlers.current.refreshCategoryConversations()
+        void handlers.current.refreshFriendConnections()
       }
     }
     window.addEventListener('online', checkMembership)
@@ -386,6 +408,6 @@ export function useAppRealtime({
       document.removeEventListener('visibilitychange', checkVisibleMembership)
       membershipSyncSequence.current += 1
     }
-  }, [session?.token, session?.sessionId])
+  }, [session?.token, session?.sessionId, handlers, sessionRef])
 
 }
