@@ -545,7 +545,10 @@ export default function AuthedApp({
   const contactsScreen: FriendsScreen = routeLocation.pathname === "/contacts/requests" ? "invitations" : "directory";
   const setContactsScreen: Dispatch<SetStateAction<FriendsScreen>> = (next) => {
     const screen = typeof next === "function" ? next(contactsScreen) : next;
-    navigate(screen === "invitations" ? "/contacts/requests" : TAB_PATH.contacts);
+    // Calls embeds the directory; opening it must not navigate away from the call workspace.
+    if (routeLocation.pathname === ROUTE.calls && screen === "directory") return;
+    const path = screen === "invitations" ? "/contacts/requests" : TAB_PATH.contacts;
+    if (routeLocation.pathname !== path) navigate(path);
   };
   const visitorUsername = visitorUsernameFromPath(routeLocation.pathname);
   function closeVisitor() {
