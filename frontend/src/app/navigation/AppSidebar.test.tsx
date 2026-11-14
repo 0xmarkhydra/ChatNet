@@ -56,6 +56,15 @@ afterEach(() => {
 });
 
 describe("AppSidebar navigation", () => {
+  it("left-aligns icons for collapsed and expanded sidebar buttons", () => {
+    const { button } = renderSidebar("chat");
+    for (const label of ["Bảng tin", "Tin nhắn", "Khám phá", "Bạn bè", "Cuộc gọi", "Marketplace", "Thông báo", "Đã lưu", "Cài đặt", "Cá nhân"]) {
+      const classList = button(label).classList;
+      expect(classList.contains("justify-start"), label).toBe(true);
+      expect(classList.contains("justify-center"), label).toBe(false);
+    }
+  });
+
   it("shows notifications as its own route, not as feed", () => {
     const { button, onNavigate } = renderSidebar("notifications");
     expect(button("Thông báo").getAttribute("aria-current")).toBe("page");
