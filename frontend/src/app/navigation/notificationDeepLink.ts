@@ -1,4 +1,5 @@
 import type { Tab } from "../../shared/types/navigation";
+import { TAB_PATH } from "../router/routes";
 
 export type NotificationDeepLink = {
   tab: Extract<Tab, "feed" | "contacts"> | null;
@@ -18,12 +19,29 @@ export function notificationDeepLink(params: URLSearchParams): NotificationDeepL
   };
 }
 
-/** Preserve invite links and hashes when removing one-shot notification parameters. */
-export function consumeNotificationDeepLink(url: URL) {
-  const params = url.searchParams;
-  if (!params.has("tab") && !params.has("conversation") && !params.has("message")) return;
+/** Resolve and consume one-shot notification parameters using the router's location. */
+export function notificationRouteTarget(location: {
+  pathname: string;
+  search: string;
+  hash: string;
+}) {
+  const params = new URLSearchParams(location.search);
+  if (!params.has("tab") && !params.has("conversation") && !params.has("message")) return null;
+
+  const target = notificationDeepLink(params);
   params.delete("tab");
   params.delete("conversation");
   params.delete("message");
-  window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+
+  const search = params.toString();
+  return {
+    ...target,
+    to: {
+      pathname: target.conversationId !== null
+        ? TAB_PATH.chat
+        : target.tab !== null ? TAB_PATH[target.tab] : location.pathname,
+      search: search ? `?${search}` : "",
+      hash: location.hash,
+    },
+  };
 }
