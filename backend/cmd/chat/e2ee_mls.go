@@ -120,10 +120,10 @@ func (s *server) allowMLSRelay(w http.ResponseWriter, r *http.Request, userID in
 // This is a transitional fail-closed guard: after the first MLS Commit, legacy
 // POST /messages must NEVER persist a new plaintext message for that room.
 func (s *server) guardPlaintextDuringMLS(w http.ResponseWriter, r *http.Request, tx pgx.Tx, conversationID int64) bool {
-	var locked int64
+	var roomType string
 	if err := tx.QueryRow(r.Context(), `
-		SELECT id FROM conversations WHERE id=$1 FOR SHARE
-	`, conversationID).Scan(&locked); err != nil {
+		SELECT type FROM conversations WHERE id=$1 FOR SHARE
+	`, conversationID).Scan(&roomType); err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify conversation encryption mode")
 		return false
 	}
@@ -141,7 +141,29 @@ func (s *server) guardPlaintextDuringMLS(w http.ResponseWriter, r *http.Request,
 		httpx.Error(w, http.StatusConflict, "this conversation requires end-to-end encrypted messages")
 		return false
 	}
+	// Default E2EE pilot is limited to *empty* direct chats. Existing legacy
+	// history is never silently converted, and server must never accept a
+	// plaintext first message for an auto-encrypted room. The conversation
+	// FOR SHARE lock is held through the caller's transaction commit.
+	if roomType == "direct" && mlsAutoDefaultEnabled() {
+		var historyExists bool
+		if err := tx.QueryRow(r.Context(), `
+			SELECT EXISTS (SELECT 1 FROM messages WHERE conversation_id=$1)
+		`, conversationID).Scan(&historyExists); err != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "cannot check legacy message history")
+			return false
+		}
+		if !historyExists {
+			httpx.Error(w, http.StatusConflict, "E2EE setup required before sending direct messages")
+			return false
+		}
+	}
 	return true
+}
+
+func mlsAutoDefaultEnabled() bool {
+	return config.Env("CHATNET_E2EE_EXPERIMENTAL", "") == "1" &&
+		config.Env("CHATNET_E2EE_AUTO_DEFAULT", "") == "1"
 }
 
 func (s *server) getMLSConversationStatus(w http.ResponseWriter, r *http.Request) {
@@ -154,13 +176,20 @@ func (s *server) getMLSConversationStatus(w http.ResponseWriter, r *http.Request
 		httpx.Error(w, http.StatusForbidden, "not a conversation member")
 		return
 	}
+	var roomType string
 	var epoch int64
+	var hasHistory bool
+	// Status snapshot must use the same parent lock as the plaintext sender
+	// and MLS bootstrap to avoid informing the UI of an impossible state.
 	err := s.db.QueryRow(r.Context(), `
-		SELECT epoch FROM e2ee_mls_groups WHERE conversation_id=$1
-	`, conversationID).Scan(&epoch)
-	if errors.Is(err, pgx.ErrNoRows) {
-		epoch = 0
-	} else if err != nil {
+		SELECT c.type,
+			COALESCE(g.epoch, 0),
+			EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id=c.id)
+		FROM conversations c
+		LEFT JOIN e2ee_mls_groups g ON g.conversation_id=c.id
+		WHERE c.id=$1
+	`, conversationID).Scan(&roomType, &epoch, &hasHistory)
+	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "encryption status unavailable")
 		return
 	}
@@ -169,8 +198,11 @@ func (s *server) getMLSConversationStatus(w http.ResponseWriter, r *http.Request
 		mode = "e2ee"
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	httpx.JSON(w, http.StatusOK, map[string]any{"mode": mode, "epoch": epoch,
-		"pilotEnabled": config.Env("CHATNET_E2EE_EXPERIMENTAL", "") == "1"})
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"mode": mode, "epoch": epoch,
+		"pilotEnabled": config.Env("CHATNET_E2EE_EXPERIMENTAL", "") == "1",
+		"autoEnabled":  mlsAutoDefaultEnabled() && roomType == "direct" && !hasHistory && epoch == 0,
+	})
 }
 
 func (s *server) publishMLSEvent(w http.ResponseWriter, r *http.Request) {

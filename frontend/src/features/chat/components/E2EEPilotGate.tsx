@@ -10,7 +10,7 @@ type Props = {
   userId: number
   otherUserId: number
   request: ApiRequest
-  onModeChange: (mode: 'unknown' | 'legacy' | 'e2ee') => void
+  onModeChange: (mode: 'unknown' | 'legacy' | 'pending' | 'e2ee') => void
 }
 
 export default function E2EEPilotGate(props: Props) {
@@ -27,7 +27,9 @@ export default function E2EEPilotGate(props: Props) {
           if (!active || !result || typeof result !== 'object') return
           if ('mode' in result &&
               (result.mode === 'legacy' || result.mode === 'e2ee')) {
-            onModeChange(result.mode)
+            onModeChange(result.mode === 'legacy' &&
+              'autoEnabled' in result && result.autoEnabled === true
+              ? 'pending' : result.mode)
             setEnabled(('pilotEnabled' in result && result.pilotEnabled === true) ||
               result.mode === 'e2ee')
           }

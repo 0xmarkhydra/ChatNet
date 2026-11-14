@@ -12,7 +12,7 @@ type Props = {
   userId: number
   otherUserId: number
   request: ApiRequest
-  onModeChange: (mode: 'unknown' | 'legacy' | 'e2ee') => void
+  onModeChange: (mode: 'unknown' | 'legacy' | 'pending' | 'e2ee') => void
 }
 
 export default function E2EEPilotPanel({
@@ -38,11 +38,20 @@ export default function E2EEPilotPanel({
   const aliveRef = useRef(true)
 
   const refresh = useCallback(async () => {
-    const state = await service.status()
+    let state = await service.status()
     if (!aliveRef.current) return
     setStatus(state)
-    onModeChange(state.mode)
+    onModeChange(state.mode === 'legacy' && state.autoEnabled ? 'pending' : state.mode)
     if (!state.pilotEnabled) return
+    if (state.autoEnabled) {
+      // Auto-onboarding only runs for eligible EMPTY direct rooms. The lower
+      // user ID initializes, while the other client waits for a Welcome.
+      await service.advanceAuto()
+      if (!aliveRef.current) return
+      state = await service.status()
+      setStatus(state)
+      onModeChange(state.mode === 'legacy' && state.autoEnabled ? 'pending' : state.mode)
+    }
     const own = await service.ownDevice()
     if (!aliveRef.current) return
     setDeviceId(own?.deviceId ?? null)
@@ -79,9 +88,11 @@ export default function E2EEPilotPanel({
     onModeChange('unknown')
     let cancelled = false
     const startup = window.setTimeout(() => {
+      if (busyRef.current) return
+      busyRef.current = true
       void refresh().catch(e => {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Không thể kiểm tra E2EE')
-      })
+      }).finally(() => { busyRef.current = false })
     }, 0)
     const timer = window.setInterval(() => {
       if (busyRef.current || document.visibilityState !== 'visible') return
@@ -142,7 +153,7 @@ export default function E2EEPilotPanel({
     <section className="mls-pilot-panel" aria-label="Nhắn tin E2EE thử nghiệm">
       <header className="mls-pilot-heading">
         <LockKeyhole size={18} aria-hidden="true" />
-        <strong>E2EE · Thử nghiệm 1–1</strong>
+        <strong>{status.autoEnabled ? 'E2EE tự động · 1–1 thử nghiệm' : 'E2EE · Thử nghiệm 1–1'}</strong>
         <span className="mls-pilot-status">{status.mode === 'e2ee' ? 'Đã có MLS epoch ' + status.epoch : 'Chưa chuyển đổi'}</span>
         <button type="button" onClick={() => void perform(refresh)}
           disabled={busy} aria-label="Đồng bộ E2EE" title="Đồng bộ E2EE">
@@ -150,11 +161,12 @@ export default function E2EEPilotPanel({
         </button>
       </header>
       <p className="mls-pilot-note">
-        Bản thử nghiệm trên một thiết bị mỗi tài khoản, chưa kiểm toán độc lập. Đối chiếu mã an toàn
-        ngoài ứng dụng trước khi tin tưởng thiết bị. Lịch sử chat cũ vẫn chưa phải E2EE.
+        {status.autoEnabled
+          ? 'Đang tự tạo khóa và thiết lập MLS khi cả hai người mở chat. Khóa lần đầu được ghim TOFU; hãy tự đối chiếu mã an toàn qua kênh khác để xác thực danh tính. Không gửi plaintext nếu chưa sẵn sàng.'
+          : 'Bản thử nghiệm trên một thiết bị mỗi tài khoản, chưa kiểm toán độc lập. Đối chiếu mã an toàn ngoài ứng dụng trước khi tin tưởng thiết bị. Lịch sử chat cũ vẫn chưa phải E2EE.'}
       </p>
 
-      {!deviceId && (
+      {!deviceId && !status.autoEnabled && (
         <button className="mls-pilot-primary" type="button" disabled={busy}
           onClick={() => void perform(() => service.prepareDevice())}>
           <KeyRound size={16} /> Chuẩn bị khóa thiết bị
@@ -172,7 +184,7 @@ export default function E2EEPilotPanel({
           </div>
         </div>
       )}
-      {deviceId && peerReady && !pinned && (
+      {deviceId && peerReady && !pinned && !status.autoEnabled && (
         <button type="button" className="mls-pilot-primary" disabled={busy}
           onClick={() => void perform(() => service.confirmPeerIdentity())}>
           <Fingerprint size={16}/> Tôi đã đối chiếu mã an toàn với người nhận
@@ -184,16 +196,16 @@ export default function E2EEPilotPanel({
           Đã ghim khóa thiết bị. Thay đổi khóa sẽ bị từ chối.
         </div>
       )}
-      {deviceId && pinned && status.mode === 'legacy' && !ownApproved && (
+      {deviceId && pinned && status.mode === 'legacy' && !status.autoEnabled && !ownApproved && (
         <button type="button" className="mls-pilot-primary" disabled={busy}
           onClick={() => void perform(() => service.approvePilot())}>
           <CheckCircle2 size={16}/> Tôi đồng ý dùng E2EE cho cuộc trò chuyện này
         </button>
       )}
-      {deviceId && pinned && status.mode === 'legacy' && ownApproved && !peerApproved && (
+      {deviceId && pinned && status.mode === 'legacy' && !status.autoEnabled && ownApproved && !peerApproved && (
         <p className="mls-pilot-note" role="status">Bạn đã đồng ý. Đang chờ người nhận xác nhận E2EE.</p>
       )}
-      {deviceId && pinned && status.mode === 'legacy' && ownApproved && peerApproved && (
+      {deviceId && pinned && status.mode === 'legacy' && !status.autoEnabled && ownApproved && peerApproved && (
         <button type="button" className="mls-pilot-primary" disabled={busy}
           onClick={() => {
             if (window.confirm('Bắt đầu E2EE thử nghiệm? Tin mới sẽ đi qua MLS, không có fallback plaintext. Người nhận cần chuẩn bị khóa và xác minh mã an toàn trước.'))
@@ -201,6 +213,12 @@ export default function E2EEPilotPanel({
           }}>
           <LockKeyhole size={16}/> Bắt đầu hội thoại E2EE
         </button>
+      )}
+      {status.mode === 'legacy' && status.autoEnabled && (
+        <p className="mls-pilot-warning" role="status">
+          <ShieldAlert size={16}/> Đang chờ hai thiết bị chuẩn bị khóa và tạo phiên MLS.
+          Tin nhắn mới chỉ được gửi khi mã hóa sẵn sàng.
+        </p>
       )}
       {status.mode === 'e2ee' && !ready && (
         <p className="mls-pilot-warning">

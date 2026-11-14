@@ -55,14 +55,14 @@ export function useOutboxDelivery({
       // If status is unavailable, fail closed with an unconfirmed item.
       const mode = await getConversationEncryptionStatus(apiFetch, item.conversationId);
       if (sessionRef.current?.sessionId !== identity.sessionId) return;
-      if (mode === 'e2ee') {
+      if (mode !== 'legacy') {
         updateChatOutbox((items) => items.map((pending) =>
           pending.clientId === item.clientId &&
           pending.conversationId === item.conversationId
             ? {
                 ...pending,
                 status: 'failed',
-                error: 'Tin plaintext không được gửi vì cuộc trò chuyện đã chuyển sang E2EE.',
+                error: 'Tin plaintext không được gửi vì cuộc trò chuyện yêu cầu E2EE.',
               }
             : pending,
         ));

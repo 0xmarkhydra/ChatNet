@@ -485,6 +485,67 @@ func TestMLSRelayThreeAccountsIntegration(t *testing.T) {
 	if otherDevice.Code != 200 || strings.Contains(otherDevice.Body.String(), `"eventType":"welcome"`) {
 		t.Fatalf("targeted Welcome leaked to non-target device: %d %s", otherDevice.Code, otherDevice.Body.String())
 	}
+
+	// Auto-default is a DEV-only, empty direct conversation gate. It must
+	// reject plaintext before any MLS group has been established, while
+	// leaving old legacy history untouched and eligible for legacy sends.
+	t.Setenv("CHATNET_E2EE_AUTO_DEFAULT", "1")
+	var freshID int64
+	if err := db.QueryRow(ctx, `
+		INSERT INTO conversations(type,created_by,direct_key)
+		VALUES('direct',$1,$2) RETURNING id
+	`, users[0], fmt.Sprintf("e2ee-auto-%d", time.Now().UnixNano())).Scan(&freshID); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = db.Exec(context.Background(), "DELETE FROM conversations WHERE id=$1", freshID) }()
+	for _, userID := range users[:2] {
+		if _, err := db.Exec(ctx, "INSERT INTO conversation_members(conversation_id,user_id) VALUES($1,$2)", freshID, userID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	freshStatus := fmt.Sprintf("/api/conversations/%d/e2ee/status", freshID)
+	freshMessages := fmt.Sprintf("/api/conversations/%d/messages", freshID)
+	if result := send(0, freshStatus, nil, "GET"); result.Code != 200 ||
+		!strings.Contains(result.Body.String(), `"autoEnabled":true`) {
+		t.Fatalf("new direct room not selected for automatic E2EE: %d %s", result.Code, result.Body.String())
+	}
+	if result := send(0, freshMessages, map[string]any{
+		"text": "CANNOT LEAK", "clientId": testMLSUUID(t),
+	}, "POST"); result.Code != 409 {
+		t.Fatalf("plaintext accepted in automatic E2EE room: %d %s", result.Code, result.Body.String())
+	}
+	var leaked int
+	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM messages WHERE conversation_id=$1", freshID).Scan(&leaked); err != nil || leaked != 0 {
+		t.Fatalf("automatic E2EE allowed plaintext storage: count=%d err=%v", leaked, err)
+	}
+
+	var oldRoom int64
+	if err := db.QueryRow(ctx, `
+		INSERT INTO conversations(type,created_by,direct_key)
+		VALUES('direct',$1,$2) RETURNING id
+	`, users[0], fmt.Sprintf("e2ee-old-%d", time.Now().UnixNano())).Scan(&oldRoom); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = db.Exec(context.Background(), "DELETE FROM conversations WHERE id=$1", oldRoom) }()
+	for _, userID := range users[:2] {
+		if _, err := db.Exec(ctx, "INSERT INTO conversation_members(conversation_id,user_id) VALUES($1,$2)", oldRoom, userID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO messages(conversation_id,user_id,text) VALUES($1,$2,'old plaintext history')
+	`, oldRoom, users[0]); err != nil {
+		t.Fatal(err)
+	}
+	if status := send(0, fmt.Sprintf("/api/conversations/%d/e2ee/status", oldRoom), nil, "GET"); status.Code != 200 ||
+		!strings.Contains(status.Body.String(), `"autoEnabled":false`) {
+		t.Fatalf("historical conversation was incorrectly auto-converted: %d %s", status.Code, status.Body.String())
+	}
+	if status := send(0, fmt.Sprintf("/api/conversations/%d/messages", oldRoom), map[string]any{
+		"text": "existing legacy room", "clientId": testMLSUUID(t),
+	}, "POST"); status.Code != 201 {
+		t.Fatalf("existing legacy history unexpectedly blocked: %d %s", status.Code, status.Body.String())
+	}
 }
 
 func mustMLSDecode(t *testing.T, encoded string) []byte {

@@ -27,7 +27,12 @@ import {
 import { listMLSTransportEvents, publishMLSTransportEvent } from '../api/mlsTransport'
 import type { ApiRequest } from '../../../shared/types/api'
 
-export type PilotStatus = { mode: 'legacy' | 'e2ee'; epoch: number; pilotEnabled: boolean }
+export type PilotStatus = {
+  mode: 'legacy' | 'e2ee'
+  epoch: number
+  pilotEnabled: boolean
+  autoEnabled?: boolean
+}
 
 export async function fetchMLSPilotStatus(request: ApiRequest, conversationId: number): Promise<PilotStatus> {
   const response = await request(`/api/conversations/${conversationId}/e2ee/status`, { cache: 'no-store' })
@@ -35,7 +40,8 @@ export async function fetchMLSPilotStatus(request: ApiRequest, conversationId: n
   const data: PilotStatus = await response.json()
   if (!data || !['legacy', 'e2ee'].includes(data.mode) ||
       !Number.isSafeInteger(data.epoch) || data.epoch < 0 ||
-      typeof data.pilotEnabled !== 'boolean') {
+      typeof data.pilotEnabled !== 'boolean' ||
+      (data.autoEnabled !== undefined && typeof data.autoEnabled !== 'boolean')) {
     throw new Error('Trạng thái E2EE không hợp lệ')
   }
   return data
@@ -49,6 +55,7 @@ export async function identitySafetyCode(publicKey: string): Promise<string> {
 
 export class MLSPilotService {
   private local: { deviceId: string; identity: E2EEDeviceIdentity } | null = null
+  private enrolled = false
 
   constructor(
     private readonly request: ApiRequest,
@@ -109,9 +116,16 @@ export class MLSPilotService {
   }
 
   async prepareDevice(): Promise<string> {
+    if (this.enrolled && this.local) return this.local.deviceId
     const status = await this.status()
     if (!status.pilotEnabled) throw new Error('Máy chủ chưa bật E2EE pilot')
     let own = await this.ownDevice()
+    // The pilot cannot recover or synchronize MLS secrets on a second
+    // browser. Fail before generating a new identity or registering a device.
+    const registered = await listE2EEDevices(this.request)
+    if (!own && registered.length > 0) {
+      throw new Error('Tài khoản đã có thiết bị E2EE khác. Chưa hỗ trợ đồng bộ khóa nhiều thiết bị.')
+    }
     if (!own) {
       const identity = await generateE2EEDeviceIdentity()
       const deviceId = crypto.randomUUID()
@@ -119,8 +133,10 @@ export class MLSPilotService {
       this.local = { identity, deviceId }
       own = this.local
     }
-    const registered = await listE2EEDevices(this.request)
     const matching = registered.find(d => d.deviceId === own.deviceId)
+    if (!matching && registered.length > 0) {
+      throw new Error('Thiết bị E2EE đã đăng ký khác với khóa cục bộ. Không được thay khóa tự động.')
+    }
     if (matching && matching.identityKey !== own.identity.publicKey) {
       throw new Error('Danh bạ thiết bị không khớp khóa đang lưu')
     }
@@ -146,6 +162,7 @@ export class MLSPilotService {
     const signedPackage = await signE2EEKeyPackage(own.identity, this.userId,
       own.deviceId, current, saved.keyPackageBytes)
     await publishE2EEKeyPackage(this.request, signedPackage)
+    this.enrolled = true
     return own.deviceId
   }
 
@@ -207,6 +224,39 @@ export class MLSPilotService {
     let data = ''
     raw.forEach(b => { data += String.fromCharCode(b) })
     return btoa(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  }
+
+  /**
+   * Experimental automatic E2EE for *empty direct chats only*. The first key
+   * seen is pinned (TOFU), NOT independently verified: a compromised directory
+   * could impersonate a peer at first contact. Safety-code verification and
+   * multi-device/rekey support are required before any production default.
+   *
+   * Only the lower user ID initiates to prevent competing one-time Welcome
+   * packages. If that participant is offline the room must remain pending,
+   * never silently fall back to plaintext.
+   */
+  async advanceAuto(): Promise<'disabled' | 'waiting-peer' | 'waiting-initiator' | 'ready'> {
+    const current = await this.status()
+    if (!current.pilotEnabled || !current.autoEnabled || current.mode !== 'legacy') {
+      return current.mode === 'e2ee' ? 'ready' : 'disabled'
+    }
+    await this.prepareDevice()
+    const peer = await this.peerDevice()
+    if (!peer) return 'waiting-peer'
+    const pinned = await this.pinnedPeer()
+    if (!pinned) {
+      // Trust on first use. Never overwrite or automatically accept a changed
+      // identity; pinMLSPeer rejects a mismatch in IndexedDB.
+      await this.confirmPeerIdentity()
+    }
+    const approvals = await this.pilotApprovals()
+    if (!approvals.ownApproved) await this.approvePilot()
+    const updated = await this.pilotApprovals()
+    if (!updated.peerApproved || !updated.ownApproved) return 'waiting-peer'
+    if (this.userId > this.otherUserId) return 'waiting-initiator'
+    await this.startConversation()
+    return 'ready'
   }
 
   async pilotApprovals(): Promise<{ ownApproved: boolean; peerApproved: boolean }> {

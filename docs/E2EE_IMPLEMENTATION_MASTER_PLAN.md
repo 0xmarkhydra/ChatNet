@@ -262,6 +262,25 @@ This is a **transport only**, NOT a working MLS crypto engine or E2EE chat mode.
 - No production-ready safety-number/key-transparency infrastructure, cross-device user onboarding, threat-model signoff, full account management/backup semantics, Safari/iOS PWA interoperability, production server e2e smoke with real accounts.
 - Do NOT automatically turn on `CHATNET_E2EE_EXPERIMENTAL` as a product default. Only expand after these are resolved, verified and security reviewed.
 
+## 6.8 Batch 08 — Automatic MLS E2EE on eligible NEW direct chats, DEV ONLY (2026-11-14)
+
+**Status: implemented and exercised locally, production NOT enabled.** Two gates are necessary on the shared Auth+Chat backend container in Railway DEV:
+- `CHATNET_E2EE_EXPERIMENTAL=1`: opt-in E2EE pilot endpoints and UI (existing setting).
+- `CHATNET_E2EE_AUTO_DEFAULT=1`: **automatically** enroll a browser device, initially pin the peer identity using *trust on first use* (TOFU), enroll both participants, and let the lower numeric user ID initiate the atomic MLS Commit + Welcome. The ordinary plaintext composer is hidden while onboarding and the old POST /messages, including stale outbox retries, are rejected *even before the first MLS epoch* for eligible rooms.
+
+**Eligibility:** only `direct` conversations with **zero existing legacy message records**. Rooms with old plaintext messages are deliberately left in legacy mode without migration or misleading E2EE labels. The fallback for unsupported devices, a peer that has never opened the chat, a second browser/device, or an unavailable initializer is **pending/error — never plaintext** in an auto-eligible room.
+
+**TOFU limitation:** automatic first contact is pinned against subsequent changes, but an attacker who controls the directory at first contact could impersonate a device. Displayed safety codes can and should be verified independently. The current experimental MLS library has no independent security audit; do not advertise the pilot as Signal-equivalent.
+
+**Operations:** Set `CHATNET_E2EE_AUTO_DEFAULT=1` **only in DEV**, with `CHATNET_E2EE_EXPERIMENTAL=1`. Backend and frontend must deploy the same commit. Keep production without AUTO and without the experimental flag. Never change the flag without verifying the deployed backend/frontend and running a two-account manual smoke.
+
+**Checks:**
+- `npm --prefix frontend run check:e2ee-auto` — two independent Chromium accounts, actual React UI, *zero manual clicks*, automatic device enrollment/TOFU pin/two-device consent/MLS bootstrap, encrypted two-way text and DOM rendering, reload and encrypted ratchet recovery, lost-ACK retry and ciphertext-only server event storage.
+- `npm --prefix frontend run check:e2ee-pilot` — manual flow regression.
+- `TestMLSRelayThreeAccountsIntegration` in PostgreSQL: fresh auto-eligible direct room rejects any plaintext pre-MLS and returns `autoEnabled:true`; old conversation with historical plaintext keeps `autoEnabled:false` and legacy history. The ordinary server-side commit/Welcome and no-downgrade checks still pass.
+
+**Production blockers:** Multi-device linking and recovery, rekey on removal, proper first-contact key transparency, encrypted attachments/media, client translation and migration of old conversations must be implemented and validated. Do **not** set `CHATNET_E2EE_AUTO_DEFAULT=1` in production until then.
+
 ## 7. Sequence, migration, gates
 
 1. Do not push/deploy this primary checkout until the POC, protocol contract, isolated integration tests and security review pass; keep current chat behavior unchanged.

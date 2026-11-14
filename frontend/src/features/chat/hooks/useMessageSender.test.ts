@@ -103,6 +103,21 @@ describe('message composer E2EE no-downgrade gate', () => {
     await sender.cleanup()
   })
 
+  it('does not queue plaintext while automatic MLS onboarding is pending', async () => {
+    mocked.apiFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ mode: 'legacy', epoch: 0, autoEnabled: true }),
+    })
+    const sender = await setup()
+    await sender.submit()
+    expect(sender.updateChatOutbox).not.toHaveBeenCalled()
+    expect(sender.setMessageDrafts).not.toHaveBeenCalled()
+    expect(mocked.setNotice).toHaveBeenCalledWith(
+      expect.stringContaining('E2EE'), 'warning',
+    )
+    await sender.cleanup()
+  })
+
   it('fails closed if encryption status is unknown', async () => {
     mocked.apiFetch.mockRejectedValue(new Error('network timeout'))
     const sender = await setup()

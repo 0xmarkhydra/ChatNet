@@ -7,7 +7,7 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 export async function getConversationEncryptionStatus(
   request: ApiRequest,
   conversationId: number,
-): Promise<'legacy' | 'e2ee'> {
+): Promise<'legacy' | 'e2ee' | 'pending'> {
   if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
     throw new Error('Invalid conversation ID')
   }
@@ -21,6 +21,10 @@ export async function getConversationEncryptionStatus(
       (body.mode !== 'legacy' && body.mode !== 'e2ee')) {
     throw new Error('Invalid encryption status response; sending blocked')
   }
+  // New direct chats on an E2EE-by-default environment must never place
+  // plaintext into the legacy local outbox while MLS enrollment is pending.
+  if (body.mode === 'legacy' &&
+      'autoEnabled' in body && body.autoEnabled === true) return 'pending'
   return body.mode
 }
 

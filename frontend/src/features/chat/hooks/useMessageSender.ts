@@ -60,8 +60,8 @@ export function useMessageSender({
       // for a room that has cut over to MLS, or when the status is unknown.
       const mode = await getConversationEncryptionStatus(apiFetch, conversationId);
       if (sessionRef.current?.sessionId !== submittingSessionId) return;
-      if (mode === 'e2ee') {
-        setNotice('Cuộc trò chuyện đã dùng E2EE. Luồng gửi mã hóa chưa sẵn sàng; tin nhắn vẫn ở ô nhập.', 'warning');
+      if (mode !== 'legacy') {
+        setNotice('Cuộc trò chuyện yêu cầu E2EE. Hãy gửi qua ô nhập mã hóa khi thiết bị đã sẵn sàng.', 'warning');
         return;
       }
     const channelId = selectedChannelId;

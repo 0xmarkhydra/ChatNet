@@ -241,7 +241,7 @@ export default function ChatSection({
 }: ChatSectionProps) {
   const readersScope = `${session.sessionId}:${activeConversationId ?? ''}`;
   const [readersTarget, setReadersTarget] = useScopedState<{ message: Message; readerIds: number[]; sessionId: string } | null>(readersScope, null);
-  const [mlsPilotMode, setMlsPilotMode] = useState<'unknown' | 'legacy' | 'e2ee'>('unknown');
+  const [mlsPilotMode, setMlsPilotMode] = useState<'unknown' | 'legacy' | 'pending' | 'e2ee'>('unknown');
   const readersMessage = readersTarget?.sessionId === session.sessionId ? readersTarget.message : null;
   const messageReaderMembers = useMemo(() => {
     if (!activeConversation) return [];
@@ -894,7 +894,7 @@ export default function ChatSection({
                         </button>
                       )}
                     </div>
-                  ) : mlsPilotMode === 'e2ee' ? null : (
+                  ) : (mlsPilotMode === 'e2ee' || mlsPilotMode === 'pending') ? null : (
                   <MessageComposer
                 activeConversation={activeConversation}
                 activeConversationId={activeConversationId}

@@ -7,6 +7,7 @@ import { webcrypto } from 'node:crypto'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
 
+const autoDefault = process.env.CHATNET_E2EE_AUTO_TEST === '1' || process.argv.includes('--auto')
 const members = new Set([401, 402])
 const deviceMap = new Map()
 const challengeMap = new Map()
@@ -40,7 +41,8 @@ async function handleAPI(req, res) {
   if (!members.has(userId)) return json(res, 401, { error: 'unauthorized' })
   const path = parsed.pathname
   if (req.method === 'GET' && path === '/api/conversations/501/e2ee/status') {
-    return json(res, 200, { mode: epoch === 0 ? 'legacy' : 'e2ee', epoch, pilotEnabled: true })
+    return json(res, 200, { mode: epoch === 0 ? 'legacy' : 'e2ee',
+      epoch, pilotEnabled: true, autoEnabled: autoDefault && epoch === 0 })
   }
   if (req.method === 'GET' && path === '/api/auth/e2ee/devices') {
     return json(res, 200, [...deviceMap.values()].filter(d => d.userId === userId)
@@ -209,19 +211,44 @@ try {
       return pilot[operation](...params)
     }, { operation, params },
   )
-  await run(alice, 'prepareDevice')
-  await run(bob, 'prepareDevice')
-  assert.equal(deviceMap.size, 2)
-  // Test fixture supplies matching fingerprints out-of-band to the two users.
-  await run(alice, 'confirmPeerIdentity')
-  await run(bob, 'confirmPeerIdentity')
-  await assert.rejects(() => run(alice, 'startConversation'),
-    'MLS cutover requires explicit agreement by both participants')
-  await run(alice, 'approvePilot')
-  await assert.rejects(() => run(alice, 'startConversation'),
-    'One consent is not sufficient to activate MLS')
-  await run(bob, 'approvePilot')
-  await run(alice, 'startConversation')
+  if (autoDefault) {
+    // Test the *actual React component* automatically enrolling, pinning TOFU,
+    // approving E2EE, creating MLS and hiding its legacy plaintext composer.
+    await Promise.all([
+      alice.evaluate(() => import('/scripts/e2ee-pilot-test-entry.tsx')),
+      bob.evaluate(() => import('/scripts/e2ee-pilot-test-entry.tsx')),
+    ])
+    await Promise.all([
+      alice.evaluate(() => window.mountE2EEPilotTest(401, 402)),
+      bob.evaluate(() => window.mountE2EEPilotTest(402, 401)),
+    ])
+    await alice.locator('#e2ee-ui-harness input[placeholder*="MLS"]')
+      .waitFor({ timeout: 55000 })
+    await bob.locator('#e2ee-ui-harness input[placeholder*="MLS"]')
+      .waitFor({ timeout: 55000 })
+    assert.equal(await alice.evaluate(() => window.e2eePilotTestMode), 'e2ee')
+    assert.equal(await bob.evaluate(() => window.e2eePilotTestMode), 'e2ee')
+    assert.equal(deviceMap.size, 2)
+    assert.equal(consents.size, 2)
+    await Promise.all([
+      alice.evaluate(() => window.unmountE2EEPilotTest()),
+      bob.evaluate(() => window.unmountE2EEPilotTest()),
+    ])
+  } else {
+    await run(alice, 'prepareDevice')
+    await run(bob, 'prepareDevice')
+    assert.equal(deviceMap.size, 2)
+    // Test fixture supplies matching fingerprints out-of-band to the two users.
+    await run(alice, 'confirmPeerIdentity')
+    await run(bob, 'confirmPeerIdentity')
+    await assert.rejects(() => run(alice, 'startConversation'),
+      'MLS cutover requires explicit agreement by both participants')
+    await run(alice, 'approvePilot')
+    await assert.rejects(() => run(alice, 'startConversation'),
+      'One consent is not sufficient to activate MLS')
+    await run(bob, 'approvePilot')
+    await run(alice, 'startConversation')
+  }
   assert.equal(epoch, 1)
   assert.equal(stats.bootstraps, 1)
   assert.deepEqual(events.map(e => e.eventType), ['commit', 'welcome'])
@@ -269,7 +296,8 @@ try {
   for (const phrase of ['Bonjour', 'đã nhận', 'lost ACK must not']) {
     assert.equal(serverBodies.includes(phrase), false, 'server saw plaintext: ' + phrase)
   }
-  // Mount the actual React pilot panel, not just the underlying service.
+  // Both pages were reloaded, so mount the React panels again to verify
+  // that the encrypted composer can render and send from persisted MLS state.
   await Promise.all([
     alice.evaluate(() => import('/scripts/e2ee-pilot-test-entry.tsx')),
     bob.evaluate(() => import('/scripts/e2ee-pilot-test-entry.tsx')),
@@ -293,7 +321,8 @@ try {
     alice.evaluate(() => window.unmountE2EEPilotTest()),
     bob.evaluate(() => window.unmountE2EEPilotTest()),
   ])
-  console.log('PASS real React Web pilot: encrypted send button, local display and remote receiver display')
+  console.log('PASS real React Web pilot: encrypted send button, local display and remote receiver display' +
+    (autoDefault ? ', default automatic E2EE onboarding and bootstrap without any user click' : ''))
   console.log('PASS two Chromium accounts: enroll/attest/pin, atomic MLS bootstrap, encrypted bidirectional chat, reload, lost ACK deduplication, ciphertext-only delivery')
 } finally {
   await browser?.close()
