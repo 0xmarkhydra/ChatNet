@@ -58,7 +58,7 @@ import {
 } from "../features/chat/types";
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, tabFromPath } from "./router/routes";
 import type {
   FriendSearchResult,
@@ -3125,9 +3125,10 @@ export default function AuthedApp({
           </button>
         </div>
       )}
-      <section
-        className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
-      >
+      <Outlet context={
+        <section
+          className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
+        >
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
           activeChatTranslationSettings={activeChatTranslationSettings}
@@ -3683,7 +3684,8 @@ export default function AuthedApp({
           visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
         />
         )}
-      </section>
+        </section>
+      } />
 
       {storyDraftFile && tab === "feed" && (
           <StoryDraftOverlay
