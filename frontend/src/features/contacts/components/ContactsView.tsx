@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState, type Dispatch, type SetStateActi
 import { createPortal } from 'react-dom'
 import { Phone, Plus, RefreshCw, Search, Users, Video, X } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from '../types'
-import type { Conversation } from '../../chat/types'
+import type { Conversation } from '../../chat'
 import ContactCallConversationSection from './ContactCallConversationSection'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import ContactInvitations from './ContactInvitations'

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { FriendSearchResult } from "../../contacts/types";
+import type { FriendSearchResult } from "../../contacts";
 
 export type UseNearbyStateDeps = {
 

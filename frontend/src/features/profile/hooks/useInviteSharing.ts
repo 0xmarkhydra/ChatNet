@@ -1,7 +1,7 @@
 import { useSession } from "../../../shared/context/SessionContext";
 import { useNotice } from "../../../shared/context/NoticeContext";
 import { type SetStateAction } from "react";
-import { type NewChatMode } from "../../chat/types";
+import { type NewChatMode } from "../../chat";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch } from "react";
 

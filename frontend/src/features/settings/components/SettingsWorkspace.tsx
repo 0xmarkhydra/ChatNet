@@ -3,7 +3,7 @@ import {
   Bell, Database, Languages, LockKeyhole, MessageCircle,
   Monitor, Palette, ShieldCheck, UserRound,
 } from "lucide-react";
-import type { UserPrivacy } from "../../profile/types";
+import type { UserPrivacy } from "../../profile";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 
 type Section =

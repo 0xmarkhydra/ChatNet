@@ -4,7 +4,7 @@ import {
   PhoneIncoming, PhoneMissed, PhoneOutgoing,
   RefreshCw, Search, Settings2, ShieldCheck, Users, X,
 } from 'lucide-react'
-import type { Conversation } from '../../chat/types'
+import type { Conversation } from '../../chat'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
 import { CallHeaderActions } from './CallManager'

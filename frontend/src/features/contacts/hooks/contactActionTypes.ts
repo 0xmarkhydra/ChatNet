@@ -1,6 +1,6 @@
 import type { FriendSearchResult, FriendConnection } from '../types'
-import type { Conversation } from '../../chat/types'
-import type { Session } from '../../auth/lib/session'
+import type { Conversation } from '../../chat'
+import type { Session } from '../../../shared/types/session'
 import type { SetStateAction, Dispatch, RefObject } from 'react'
 import type { ToastKind } from '../../../shared/utils/toast'
 import type { Tab } from '../../../shared/types/navigation'

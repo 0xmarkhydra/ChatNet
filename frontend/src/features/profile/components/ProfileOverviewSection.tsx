@@ -3,11 +3,11 @@ import { profileAssetUrl } from "../../../shared/ui/UserAvatar";
 import ProfilePage from "./ProfilePage";
 import ProfileNote from "./ProfileNote";
 import type { UserPrivacy, ProfileMediaState } from "../types";
-import type { FriendConnection } from "../../contacts/types";
-import { type Post } from "../../feed/types";
+import type { FriendConnection } from "../../contacts";
+import { type Post } from "../../feed";
 import { FormEvent, useState, type SetStateAction } from "react";
-import GroupAvatarEditor from "../../chat/components/GroupAvatarEditor";
-import { type Session } from "../../auth/lib/session";
+import { GroupAvatarEditor } from "../../chat";
+import { type Session } from "../../../shared/types/session";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject, ReactNode } from "react";
 

@@ -10,7 +10,7 @@ import { requireDesktopMedia } from '../../../platform/desktopMedia'
 import IncomingCallDialog from './IncomingCallDialog'
 import SecureCallRoom from './SecureCallRoom'
 import type { CallLaunchDetail } from './CallHeaderActions'
-import { notifyDesktopCall, dismissDesktopCall } from '../../notifications/lib/desktopCallNotifications'
+import { notifyDesktopCall, dismissDesktopCall } from '../../notifications'
 import { friendlyCallError } from '../lib/callErrors'
 import '../styles/call.css'
 

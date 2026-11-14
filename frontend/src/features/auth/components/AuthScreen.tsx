@@ -19,7 +19,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { isDesktopBuild } from '../../../platform/desktop'
-import { loadAppLocalePreference, saveAppLocalePreference } from '../../i18n/lib/i18n'
+import { loadAppLocalePreference, saveAppLocalePreference } from '../../i18n'
 import type { useAuthFlow } from '../hooks/useAuthFlow'
 import AuthSetup from './AuthSetup'
 

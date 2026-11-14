@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { type Post } from "../../feed/types";
+import { type Post } from "../../feed";
 import type { ProfileMediaState } from "../types";
 
 export type UseProfileStateDeps = {

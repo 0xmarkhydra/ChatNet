@@ -1,10 +1,10 @@
 import { useRef, type SetStateAction } from "react";
-import { isSupportedLanguageCode } from "../../i18n/utils/languages";
-import { saveAppLocalePreference } from "../../i18n/lib/i18n";
+import { isSupportedLanguageCode } from "../../i18n";
+import { saveAppLocalePreference } from "../../i18n";
 import { savePreferences as savePreferencesRequest, translateText } from "../api/translation";
 import { type ChatTranslationSettings, persistConversationTranslationSettings, type ConversationTranslationSettingsMap } from "../lib/conversationTranslationSettings";
 import { type Message } from "../types";
-import { type Session } from "../../auth/lib/session";
+import { type Session } from "../../../shared/types/session";
 import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 

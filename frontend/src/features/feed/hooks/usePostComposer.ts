@@ -5,7 +5,7 @@ import { useNotice } from "../../../shared/context/NoticeContext";
 import { useSession } from "../../../shared/context/SessionContext";
 import type { Tab } from "../../../shared/types/navigation";
 import type { MediaAttachment } from "../../../shared/utils/media";
-import type { FriendConnection } from "../../contacts/types";
+import type { FriendConnection } from "../../contacts";
 import { patchPost, submitPost } from "../api/posts";
 import type { Post } from "../types";
 import { composePostContent, parsePostExtras } from "../utils/postExtras";

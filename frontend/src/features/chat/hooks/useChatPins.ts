@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
-import type { Session } from '../../auth/lib/session'
+import type { Session } from '../../../shared/types/session'
 import { listPins, setConversationPinned, setMessagePinned } from '../api/pins'
 import type { Conversation, Message, PinnedMessage } from '../types'
 

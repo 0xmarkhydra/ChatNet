@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Bell, Camera, Check, ChevronLeft, Languages, MapPin, Mic, ShieldCheck } from 'lucide-react'
-import { loadAppLocalePreference, saveAppLocalePreference } from '../../i18n/lib/i18n'
+import { loadAppLocalePreference, saveAppLocalePreference } from '../../i18n'
 
 type Permission = 'microphone' | 'camera' | 'notification' | 'location'
 type PermissionState = 'granted' | 'denied' | 'unsupported'

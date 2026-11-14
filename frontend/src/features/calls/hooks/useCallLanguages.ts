@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { buildLanguageOptions } from '../../i18n/utils/languages'
+import { buildLanguageOptions } from '../../i18n'
 import type { CallRequest } from '../lib/calls'
 
 export function useCallLanguages(request: CallRequest, sourceLanguage: string, targetLanguage: string) {

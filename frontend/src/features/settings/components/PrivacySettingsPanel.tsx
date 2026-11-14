@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
-import type { UserPrivacy } from "../../profile/types";
+import type { UserPrivacy } from "../../profile";
 
 type Props = {
   privacy: UserPrivacy | null;

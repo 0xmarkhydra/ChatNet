@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { loadPrivacy } from "../api/privacy";
-import type { UserPrivacy } from "../../profile/types";
-import { type Session } from "../../auth/lib/session";
+import type { UserPrivacy } from "../../profile";
+import { type Session } from "../../../shared/types/session";
 import { useLatest } from "../../../shared/hooks/useLatest";
 import { useScopedState } from "../../../shared/hooks/useScopedState";
 

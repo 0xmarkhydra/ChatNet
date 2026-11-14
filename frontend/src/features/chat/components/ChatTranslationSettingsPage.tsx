@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowLeft, Check, ChevronDown, Info, Languages, ShieldCheck, X } from 'lucide-react'
 import type { Conversation } from '../types'
-import type { LanguageOption } from '../../i18n/utils/languages'
+import type { LanguageOption } from '../../i18n'
 import type { ChatTranslationDisplay, ChatTranslationSettings } from '../lib/conversationTranslationSettings'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 

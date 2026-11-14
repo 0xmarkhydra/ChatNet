@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Heart, ThumbsUp } from "lucide-react";
 import type { Post } from "../types";
-import { messageReactions } from "../../chat/utils/messageReactions";
+import { reactionOptions } from "../../../shared/utils/reactions";
 import "../styles/feed-actions.css";
 
 export default function FeedReactionControl({
@@ -45,7 +45,7 @@ export default function FeedReactionControl({
 
   const selected = post.myReaction || (post.liked ? "👍" : "");
   const label =
-    messageReactions.find(({ emoji }) => emoji === selected)?.label || "Thích";
+    reactionOptions.find(({ emoji }) => emoji === selected)?.label || "Thích";
 
   return (
     <div
@@ -123,7 +123,7 @@ export default function FeedReactionControl({
           className="feed-reaction-picker"
           aria-label="Cảm xúc bài viết"
         >
-          {messageReactions.map(({ emoji, label: reactionLabel }) => (
+          {reactionOptions.map(({ emoji, label: reactionLabel }) => (
             <button
               type="button"
               key={emoji}

@@ -1,9 +1,9 @@
 import NotificationsPage from "./NotificationsPage";
-import type { FriendSearchResult, FriendConnection } from "../../contacts/types";
-import { type Conversation } from "../../chat/types";
-import type { PostMentionNotification } from "../../feed/utils/postMentionNotifications";
+import type { FriendSearchResult, FriendConnection } from "../../contacts";
+import { type Conversation } from "../../chat";
+import type { PostMentionNotification } from "../../feed";
 import { type SetStateAction } from "react";
-import { type FriendsScreen } from "../../contacts/components/ContactsView";
+import { type FriendsScreen } from "../../contacts";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch } from "react";
 

@@ -1,7 +1,7 @@
 import { lazy } from "react";
 import { Suspense, type SetStateAction } from "react";
 import type { NearbyUser } from "./NearbyExplorer";
-import type { FriendSearchResult, FriendConnection } from "../../contacts/types";
+import type { FriendSearchResult, FriendConnection } from "../../contacts";
 import type { Dispatch } from "react";
 
 const NearbyExplorer = lazy(

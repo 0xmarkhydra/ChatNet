@@ -1,5 +1,5 @@
-import type { FriendConnection } from '../../contacts/types'
-import type { Conversation } from '../../chat/types'
+import type { FriendConnection } from '../../contacts'
+import type { Conversation } from '../../chat'
 
 /**
  * Count the rows of the 'Tất cả' notifications screen:

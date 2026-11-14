@@ -1,22 +1,22 @@
-import SettingsWorkspace from "../../settings/components/SettingsWorkspace";
+import { SettingsWorkspace } from "../../settings";
 import { PencilLine, Download, LogOut, ChevronDown, Volume2, ArrowLeft, Settings, Images, RefreshCw } from "lucide-react";
-import BlockedUsersPanel from "../../contacts/components/BlockedUsersPanel";
+import { BlockedUsersPanel } from "../../contacts";
 import { isDesktopBuild } from "../../../platform/desktop";
-import AccountSessionsPanel from "../../auth/components/AccountSessionsPanel";
+import { AccountSessionsPanel } from "../../auth";
 import UserAvatar, { profileAssetUrl } from "../../../shared/ui/UserAvatar";
 import UiIcon from "../../../shared/ui/UiIcon";
 import ProfileNote from "./ProfileNote";
 import { userLabel } from "../../../shared/utils/userLabel";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
-import type { ManagedAccountSession } from "../../auth/types";
-import { type Post } from "../../feed/types";
+import type { ManagedAccountSession } from "../../auth";
+import { type Post } from "../../feed";
 import type { UserPrivacy, ProfileMediaState } from "../types";
-import { type Session } from "../../auth/lib/session";
+import { type Session } from "../../../shared/types/session";
 import { type SetStateAction } from "react";
 import type { Tab } from "../../../shared/types/navigation";
-import { UI_MESSAGES } from "../../i18n/lib/i18n";
-import type { LanguageOption } from "../../i18n/utils/languages";
+import { UI_MESSAGES } from "../../i18n";
+import type { LanguageOption } from "../../i18n";
 import type { Dispatch, RefObject, ReactNode } from "react";
 
 export type ProfileSectionProps = {

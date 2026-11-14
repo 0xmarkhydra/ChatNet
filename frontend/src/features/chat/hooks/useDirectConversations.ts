@@ -6,7 +6,7 @@ import { FormEvent } from "react";
 import { createDirectConversation } from "../api/conversations";
 import { type GroupChannel } from "../utils/groupChannels";
 import type { Conversation, NewChatMode } from "../types";
-import type { FriendSearchResult } from "../../contacts/types";
+import type { FriendSearchResult } from "../../contacts";
 import type { Tab } from "../../../shared/types/navigation";
 
 export type UseDirectConversationsDeps = {

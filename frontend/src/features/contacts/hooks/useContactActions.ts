@@ -3,7 +3,7 @@ import { updateContactMetadata, findDirectConversation } from "../api/contacts";
 import { useContactModeration } from "./useContactModeration";
 import type { FriendSearchResult, FriendConnection } from "../types";
 import type { UseContactActionsDeps } from "./contactActionTypes";
-import type { Conversation } from "../../chat/types";
+import type { Conversation } from "../../chat";
 
 
 

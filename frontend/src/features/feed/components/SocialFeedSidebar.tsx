@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Languages, MessageCircle, TrendingUp, UserPlus, UsersRound } from 'lucide-react'
 import type { Post } from '../types'
-import type { FriendConnection, FriendSearchResult } from '../../contacts/types'
+import type { FriendConnection, FriendSearchResult } from '../../contacts'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
 

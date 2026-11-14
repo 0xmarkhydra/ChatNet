@@ -1,6 +1,6 @@
-import type { Conversation } from '../../chat/types'
+import type { Conversation } from '../../chat'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import { CallHeaderActions } from '../../calls/components/CallManager'
+import { CallHeaderActions } from '../../calls'
 
 type Props = {
   items: Conversation[]

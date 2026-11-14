@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Conversation } from '../../chat/types'
+import type { Conversation } from '../../chat'
 import type { FriendConnection, FriendSearchResult } from '../types'
 
 export type DirectoryFilter = 'alphabetical' | 'online' | 'favorites'

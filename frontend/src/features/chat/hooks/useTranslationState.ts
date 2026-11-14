@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useScopedState } from "../../../shared/hooks/useScopedState";
 import { type ConversationTranslationSettingsMap, readConversationTranslationSettings } from "../lib/conversationTranslationSettings";
-import { type Session } from "../../auth/lib/session";
+import { type Session } from "../../../shared/types/session";
 
 export type UseTranslationStateDeps = {
   session: Session | null;
