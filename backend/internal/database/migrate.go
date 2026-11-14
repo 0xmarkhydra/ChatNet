@@ -68,6 +68,9 @@ var e2eeMLSRelaySQL string
 //go:embed migrations/014_e2ee_keypackage_attestation.sql
 var e2eeKeyPackageAttestationSQL string
 
+//go:embed migrations/015_e2ee_pilot_consents.sql
+var e2eePilotConsentsSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -141,6 +144,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, e2eeKeyPackageAttestationSQL); err != nil {
 		return fmt.Errorf("apply E2EE KeyPackage attestation migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, e2eePilotConsentsSQL); err != nil {
+		return fmt.Errorf("apply E2EE pilot consent migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)

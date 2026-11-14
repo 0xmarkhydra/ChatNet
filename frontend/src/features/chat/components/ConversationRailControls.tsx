@@ -1,6 +1,6 @@
 import { RefreshCw } from 'lucide-react'
 import ConversationCategories from './ConversationCategories'
-import type { ChatSectionProps } from './ChatSection'
+import type { ChatSectionProps } from './ChatSectionProps'
 import '../styles/conversation-rail-controls.css'
 
 type Props = {

@@ -2,7 +2,7 @@ import { useApi } from "../../../shared/context/ApiContext";
 import { useSession } from "../../../shared/context/SessionContext";
 import { mergeById } from "../../../shared/utils/optimistic";
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import { sendMessage as sendMessageRequest } from "../api/messages";
+import { getConversationEncryptionStatus, sendMessage as sendMessageRequest } from "../api/messages";
 import { type QueuedChatMessage, confirmChatMessage, retryableChatMessages } from "../lib/chatOutbox";
 import type { Message } from "../types";
 
@@ -51,6 +51,23 @@ export function useOutboxDelivery({
       return;
     sendingClientIDs.current.add(item.clientId);
     try {
+      // Old offline outbox entries must not downgrade an MLS conversation.
+      // If status is unavailable, fail closed with an unconfirmed item.
+      const mode = await getConversationEncryptionStatus(apiFetch, item.conversationId);
+      if (sessionRef.current?.sessionId !== identity.sessionId) return;
+      if (mode === 'e2ee') {
+        updateChatOutbox((items) => items.map((pending) =>
+          pending.clientId === item.clientId &&
+          pending.conversationId === item.conversationId
+            ? {
+                ...pending,
+                status: 'failed',
+                error: 'Tin plaintext không được gửi vì cuộc trò chuyện đã chuyển sang E2EE.',
+              }
+            : pending,
+        ));
+        return;
+      }
       const response = await sendMessageRequest(apiFetch, item);
       if (sessionRef.current?.sessionId !== identity.sessionId) return;
       if (!response.ok) {

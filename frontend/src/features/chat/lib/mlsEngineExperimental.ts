@@ -143,6 +143,31 @@ function conversationGroupID(conversationId: number): Uint8Array {
   return utf8.encode(`chatnet:mls:conversation:v1:${conversationId}`)
 }
 
+export async function restoreExperimentalMLSDevice(
+  userId: number,
+  deviceId: string,
+  keyPackageBytes: Uint8Array,
+  privatePackage: PrivateKeyPackage,
+  suite: CiphersuiteImpl,
+): Promise<ExperimentalMLSDevice> {
+  ensureIdentity(userId, deviceId)
+  const wire = decodeFull(keyPackageBytes)
+  if (wire.wireformat !== 'mls_key_package' ||
+      wire.keyPackage.cipherSuite !== suite.name ||
+      wire.keyPackage.leafNode.credential.credentialType !== 'basic' ||
+      decoder.decode(wire.keyPackage.leafNode.credential.identity) !== memberKey(userId, deviceId) ||
+      !await verifyKeyPackage(wire.keyPackage, suite.signature) ||
+      privatePackage.initPrivateKey.length === 0 ||
+      privatePackage.hpkePrivateKey.length === 0 ||
+      privatePackage.signaturePrivateKey.length === 0) {
+    throw new Error('Invalid stored MLS device package')
+  }
+  return {
+    userId, deviceId, keyPackageBytes,
+    publicPackage: wire.keyPackage, privatePackage,
+  }
+}
+
 export async function createExperimentalMLSGroup(
   conversationId: number,
   creator: ExperimentalMLSDevice,

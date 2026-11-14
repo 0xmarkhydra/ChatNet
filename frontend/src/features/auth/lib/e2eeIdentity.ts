@@ -168,7 +168,7 @@ export async function signE2EEDeviceRegistration(
   userId: number,
   challenge: E2EEDeviceChallenge,
   label: string,
-  deviceId = crypto.randomUUID(),
+  deviceId: string = crypto.randomUUID(),
 ): Promise<E2EEDeviceRegistration> {
   if (!Number.isSafeInteger(userId) || userId <= 0 ||
       !/^[0-9a-f-]{36}$/.test(challenge.sessionId) ||

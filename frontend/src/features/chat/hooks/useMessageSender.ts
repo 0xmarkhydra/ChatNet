@@ -1,8 +1,10 @@
 import { FormEvent, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { useApi } from "../../../shared/context/ApiContext";
 import { useNotice } from "../../../shared/context/NoticeContext";
 import { useSession } from "../../../shared/context/SessionContext";
 import { attachmentRequestBody, type MediaAttachment } from "../../../shared/utils/media";
 import { type QueuedChatMessage, enqueueChatMessage } from "../lib/chatOutbox";
+import { getConversationEncryptionStatus } from "../api/messages";
 import type { Message, MessageDraft } from "../types";
 
 export type UseMessageSenderDeps = {
@@ -44,17 +46,24 @@ export function useMessageSender({
   updateChatOutbox,
 }: UseMessageSenderDeps) {
   const { setNotice } = useNotice();
-  const { session } = useSession();
-  function sendMessage(event: FormEvent) {
+  const { apiFetch } = useApi();
+  const { session, sessionRef } = useSession();
+  async function sendMessage(event: FormEvent) {
     event.preventDefault();
     if (!canSend || !activeConversationId || sendingRef.current || !session)
       return;
     sendingRef.current = true;
-    window.setTimeout(() => {
-      sendingRef.current = false;
-    }, 0);
-
+    const submittingSessionId = session.sessionId;
     const conversationId = activeConversationId;
+    try {
+      // Fail closed before the plaintext outbox. Do not queue local plaintext
+      // for a room that has cut over to MLS, or when the status is unknown.
+      const mode = await getConversationEncryptionStatus(apiFetch, conversationId);
+      if (sessionRef.current?.sessionId !== submittingSessionId) return;
+      if (mode === 'e2ee') {
+        setNotice('Cuộc trò chuyện đã dùng E2EE. Luồng gửi mã hóa chưa sẵn sàng; tin nhắn vẫn ở ô nhập.', 'warning');
+        return;
+      }
     const channelId = selectedChannelId;
     const draftKey = channelDraftKey;
     const submittedDraft = draft;
@@ -102,6 +111,13 @@ export function useMessageSender({
     setReplyingTo((current) => (current === reply ? null : current));
     if (navigator.onLine) void retryQueuedChatMessages();
     else setChatOnline(false);
+    } catch {
+      if (sessionRef.current?.sessionId === submittingSessionId) {
+        setNotice('Không xác minh được chế độ mã hóa. Tin nhắn chưa được gửi hoặc lưu vào hàng đợi.', 'warning');
+      }
+    } finally {
+      sendingRef.current = false;
+    }
   }
 
   return { sendMessage };

@@ -4,6 +4,26 @@ import type { ApiRequest } from "../../../shared/types/api";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
+export async function getConversationEncryptionStatus(
+  request: ApiRequest,
+  conversationId: number,
+): Promise<'legacy' | 'e2ee'> {
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+    throw new Error('Invalid conversation ID')
+  }
+  const response = await request(`/api/conversations/${conversationId}/e2ee/status`, {
+    cache: 'no-store',
+  })
+  if (!response.ok) throw new Error('Cannot verify encryption status; sending blocked')
+  const body: unknown = await response.json()
+  if (!body || typeof body !== 'object' ||
+      !('mode' in body) ||
+      (body.mode !== 'legacy' && body.mode !== 'e2ee')) {
+    throw new Error('Invalid encryption status response; sending blocked')
+  }
+  return body.mode
+}
+
 export type SendMessageInput = {
   conversationId: number;
   text: string;

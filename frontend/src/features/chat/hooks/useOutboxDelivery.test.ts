@@ -8,6 +8,7 @@ import type { QueuedChatMessage } from "../lib/chatOutbox";
 
 const mocked = vi.hoisted(() => ({
   apiFetch: vi.fn(),
+  postFetch: vi.fn(),
   sessionRef: {
     current: { sessionId: "old-session", user: { id: 17 } },
   } as { current: { sessionId: string; user: { id: number } } },
@@ -74,11 +75,51 @@ describe("outbox delivery session races", () => {
     vi.stubGlobal("navigator", { onLine: true });
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     mocked.sessionRef.current = { sessionId: "old-session", user: { id: 17 } };
+    mocked.apiFetch.mockImplementation((path: string) => {
+      if (path.endsWith("/e2ee/status")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ mode: "legacy", epoch: 0 }),
+        });
+      }
+      return mocked.postFetch(path);
+    });
+  });
+
+  it("never posts a queued plaintext message to an MLS-encrypted room", async () => {
+    mocked.apiFetch.mockImplementation(async (path: string) => {
+      if (path.endsWith("/e2ee/status")) return {
+        ok: true, json: async () => ({ mode: "e2ee", epoch: 1 }),
+      };
+      throw new Error("Legacy plaintext POST must never run");
+    });
+    const delivery = await createDelivery();
+    await delivery.retry();
+    expect(delivery.getOutbox()).toEqual([
+      expect.objectContaining({
+        clientId: pending.clientId,
+        status: "failed",
+        error: expect.stringContaining("E2EE"),
+      }),
+    ]);
+    expect(mocked.apiFetch).toHaveBeenCalledTimes(1);
+    expect(delivery.setMessages).not.toHaveBeenCalled();
+    await delivery.cleanup();
+  });
+
+  it("fails closed when encryption status cannot be fetched", async () => {
+    mocked.apiFetch.mockRejectedValue(new Error("offline"));
+    const delivery = await createDelivery();
+    await delivery.retry();
+    expect(mocked.apiFetch).toHaveBeenCalledTimes(1);
+    expect(delivery.getOutbox()[0].status).toBe("unconfirmed");
+    expect(mocked.postFetch).not.toHaveBeenCalled();
+    await delivery.cleanup();
   });
 
   it("does not confirm a receipt parsed after the account switches", async () => {
     let finishBody!: (message: Message) => void;
-    mocked.apiFetch.mockResolvedValue({
+    mocked.postFetch.mockResolvedValue({
       ok: true,
       json: () => new Promise<Message>((resolve) => { finishBody = resolve; }),
     });
@@ -96,7 +137,7 @@ describe("outbox delivery session races", () => {
 
   it("does not mark a delayed 4xx response failed after the account switches", async () => {
     let finishBody!: (body: { error: string }) => void;
-    mocked.apiFetch.mockResolvedValue({
+    mocked.postFetch.mockResolvedValue({
       ok: false,
       status: 403,
       json: () => new Promise((resolve) => { finishBody = resolve; }),

@@ -1,6 +1,6 @@
 # ChatNet/SOCO — E2EE implementation plan (Web/PWA first)
 
-Status: **IN_PROGRESS — experimental MLS 1.0 cryptography confirmed in two Chromium clients, signed device KeyPackage attestations, opaque relay, key vault and attachment PoCs; not yet connected to live ChatNet chat or production-ready**.
+Status: **IN_PROGRESS — a guarded, explicit opt-in MLS E2EE text-chat pilot is integrated into the real Web/PWA direct-chat UI (one browser device per account), with two-Chromium end-to-end simulated REST tests and isolated PostgreSQL/Redis API integration; NOT default, NOT production-ready, experimental feature flag OFF by default**.
 Baseline: `main@782af69` (2026-11-13). Development is in the primary checkout `/Users/levanmong/Documents/ChatNet` on `main`, not a worktree.
 Not approved for deployment; do not label any chat or file E2EE until independently verified. No commit, push, release, or production schema migration is implied by this status.
 
@@ -204,6 +204,63 @@ This is a **transport only**, NOT a working MLS crypto engine or E2EE chat mode.
 - **P0:** Connect real MLS state machine to enrolled and verified devices with **encrypted durable group-state storage**, handle lost ACKs and concurrent epoch proposals/recovery, and enforce that application-message senders belong to the actual MLS group (not only the database conversation). Authenticated MLS Commit proposals must be checked against ChatNet membership and device revocation; current `applyExperimentalMLSCommit` still uses `acceptAll` for prototype testing and **is not a production membership policy**.
 - **P0:** Implement secure device linking/QR verification and key transparency, encrypted media upload to S3, explicit opt-in client-only translation, local encrypted outbox and no-downgrade conversation migration. No existing user message is encrypted by this PoC.
 - **Remain disabled:** `CHATNET_E2EE_EXPERIMENTAL` defaults to off and the modules are not mounted in the live chat composer.
+
+## 6.6 Batch 06 — durable MLS state and fail-closed cutover safeguards (local; not pushed)
+
+**Implementation completed locally:**
+- `frontend/src/features/chat/lib/mlsStateVault.ts`: browser IndexedDB vault stores RFC 9420 serialized `GroupState` encrypted with a non-exportable AES-256-GCM key. AAD binds user/device/conversation/epoch/revision, the stored group ID and own leaf credential must match those identifiers, and the monotonically increasing revision/epoch is checked with a single transaction to prevent stale-tab overwrites.
+- The MLS decoder retains subarray references to private signing bytes; aggressively zeroing the *decrypted* serialization buffer made a recovered key invalid. The PoC test caught this, and the decoder's backing buffer is now preserved until state is discarded. Independent *encoder* buffer is wiped after AES-GCM encryption.
+- `frontend/scripts/e2ee-mls-state-browser-check.mjs`: browser-level check with Alice and Bob, each reloading the entire page, decrypting after restore, verifying their active ratchets, detecting stale concurrent writes, rejecting cross-account reads and ciphertext tampering, and refusing to export the AES-GCM storage key.
+- Backend `GET /api/conversations/{id}/e2ee/status` reports `legacy` or `e2ee` according to committed MLS epoch, with membership authorization. `createMessage` and `editMessage` refuse plaintext writes after MLS epoch 1 in that conversation. The first MLS Commit and ordinary send serialize through a PostgreSQL parent conversation row lock so they cannot race across the cutover.
+- `frontend/src/features/chat/api/messages.ts`, `hooks/useMessageSender.ts` and `hooks/useOutboxDelivery.ts`: check encryption status before queuing/sending legacy plaintext. An MLS room rejects the plaintext draft without erasing it, and old local outbox messages are marked failed rather than submitted. An unavailable or malformed status fails closed; **this is a temporary safeguard, not the completed E2EE sending UI**.
+- Integration test `TestMLSRelayThreeAccountsIntegration` exercises the legacy-to-MLS transition: old history survives, plaintext POST and PATCH are denied after MLS activation, and no new plaintext rows appear. Unit tests in `useOutboxDelivery.test.ts` verify no plaintext POST happens when MLS is active or encryption status is unavailable.
+
+**Release status: BLOCKED — DO NOT DEPLOY THESE NEW CHANGES TO AUTO-DEPLOYING `main` YET.** The existing composer currently refuses to send to an activated MLS room because there is no full supported encrypted send/receive replacement. Pushing now would risk user-visible outages. The end-user chat is **not** E2EE by default.
+
+**Required before production/main push:**
+1. User/device enrollment in the actual Web/PWA login flow, private MLS KeyPackage persistence, signed/pinned key verification and onboarding of every relevant account and device.
+2. Complete the MLS state machine for actual conversation membership, Welcome/Commit queue, concurrent epoch conflict recovery, encryption in send composer and decrypt/render in history, realtime notifications, secure encrypted local outbox and cursor atomicity with persisted ratchet. Never retry a Commit blindly.
+3. Key transparency or user-verifiable safety numbers, group removal/rekey before future messages, authenticated membership changes and multi-device tests. The prototype `acceptAll` Commit policy is NOT acceptable for live chat.
+4. Encrypt private attachments before S3 and send file keys over MLS; keep public feed/story/media unchanged.
+5. Rework the translation contract: after the receiver client decrypts, remote translation only with user consent; never read or store E2EE plaintext in the server-side translation cache.
+6. Explicitly mark pre-cutover legacy history as **not E2EE**, test two real accounts with reconnect/reload/device removal, WebKit/iOS PWA, and get a professional security review of the MLS dependency. The current `ts-mls` package has no independent audit.
+7. Resolve the unrelated repository-wide lint/architecture CI failures or obtain a reviewed, supported release process without bypassing checks.
+
+## 6.7 Batch 07 — end-to-end direct-chat Web pilot with explicit two-party consent (2026-11-14)
+
+**Status:** Web/PWA has an opt-in E2EE test interface for direct (1-to-1) conversations, but this is NOT E2EE-by-default and NOT a security-reviewed release. Production users continue using legacy chat by default. The test feature is gated behind **`CHATNET_E2EE_EXPERIMENTAL=1` in BOTH the auth service and chat service**. The environment variable is OFF by default.
+
+### What is integrated
+
+- `backend/cmd/chat/e2ee_bootstrap.go`: `POST /api/conversations/{id}/e2ee/bootstrap` writes the first signed MLS Commit and targeted Welcome atomically and advances the group epoch to 1. Only direct conversations with exactly two members and exactly one active registered device per member are eligible. Committed signed client IDs make a lost-ACK retry idempotent. A sender cannot initialize a direct group by calling the generic Commit endpoint without a matching Welcome.
+- `backend/internal/database/migrations/015_e2ee_pilot_consents.sql`: per-member consent table; `backend/cmd/chat/e2ee_pilot_consent.go` exposes `GET/POST /api/conversations/{id}/e2ee/consents`. **Both users must explicitly approve** the transition from their active registered device IDs. A single user's click does NOT switch the other user's conversation, preventing surprise write outages. Consent is tied to membership, and becomes ineffective on removal/revocation.
+- `backend/cmd/chat/e2ee_mls.go`: direct pilot only accepts application messages at MLS epoch 1 after atomic bootstrap. The generic direct-chat rekey / second Commit is explicitly rejected until credential/membership rekey policy is implemented. The status endpoint `GET /api/conversations/{id}/e2ee/status` returns `{mode,epoch,pilotEnabled}`. Existing legacy create/edit message APIs fail closed once the epoch advances; historical plaintext rows are retained but never relabeled as E2EE.
+- `frontend/src/features/chat/lib/mlsPilotService.ts` and `mlsStateVault.ts`: enroll an Ed25519 device, seal the MLS private KeyPackage and state on the originating device with non-exportable AES-256-GCM IndexedDB key, publish signed public KeyPackage, and verify the peer's pin/attestation before creating MLS group. Handle real encrypted send/receive, persist MLS ratchet, ciphertext cursor, locally encrypted plaintext history and encrypted signed pending outbox **atomically**, and idempotently retry pending signed envelopes without consuming the ratchet twice.
+- `frontend/src/features/chat/components/E2EEPilotGate.tsx` **lazy loads** the React MLS test panel only if permitted by the server flag or a previously activated direct conversation exists. `E2EEPilotPanel.tsx` adds device enrollment, out-of-band safety-code comparison, user-controlled pin, two-user consent and activation, local encrypted message timeline and encrypted-only composer inside the normal ChatNet direct conversation screen. No fallback to plaintext after activation. A clear notice states that earlier historical messages are NOT E2EE.
+- The pilot is separate from the legacy timeline and **text-only**. Legacy group rooms, attachments, online translation, voice calls, search, moderation and notifications are NOT E2EE and are NOT part of this pilot.
+
+### Repeatable tests
+
+- `npm --prefix frontend run check:e2ee-pilot` — real React pilot interface in two isolated Chromium pages with an in-process simulated API: enroll two accounts; compare/pin device identity; prove that zero or one consent cannot bootstrap; complete two approvals; atomic Commit/Welcome; send A→B and B→A; verify no plaintext in simulated server event storage; reload both browser pages; continue decrypting and chatting; simulate ACK lost after persisting ciphertext, then reload and retry same signed event ID exactly once, no duplicate; click the actual React **send** button and verify decrypted content on sender and receiver DOM.
+- `npm --prefix frontend run check:e2ee-poc` — other actual MLS crypto, removal, transport signature and state-reload tests on Chromium/Node.
+- `npm --prefix frontend run build` and `npm --prefix frontend run test:unit` (82 tests), `go -C backend test -count=1 ./...`, `go -C backend vet ./cmd/chat ./cmd/auth ./internal/database`, plus scoped ESLint: PASS.
+- Isolated real PostgreSQL 16 + Redis 7 integration tests: `TestE2EEDeviceDirectoryIntegration`, `TestE2EEKeyPackageExchangeIntegration`, `TestMLSRelayThreeAccountsIntegration`: PASS including the new double-consent and atomic direct bootstrap. Disposable test containers were removed.
+
+### Test instructions after deployment
+
+1. Deploy frontend plus chat and auth backend code to a controlled testing environment using the same commit. Set **`CHATNET_E2EE_EXPERIMENTAL=1` on BOTH chat and auth services**. Check both deployments and schema migration 015 are healthy before changing the variable. Leave disabled in general production if real users would be affected.
+2. Use **two disposable test accounts**, one active E2EE device per account, two independent desktop browsers/profiles. Open their direct chat, press **Chuẩn bị khóa thiết bị** on each device. Browser WebCrypto/IndexedDB must be available.
+3. Compare the full displayed **mã an toàn** through a trusted **out-of-band** channel, not via the same unverified conversation. Only after checking, each user clicks **Tôi đã đối chiếu mã an toàn**.
+4. Each user clicks **Tôi đồng ý dùng E2EE**; only when both approvals are present can either user click **Bắt đầu hội thoại E2EE**. This is a one-way pilot conversion; **do not perform it in an important existing chat**.
+5. Send short text from both clients in the separate purple E2EE composer, wait for receive (4-second polling), refresh browsers and verify local history and new messages. Backend stores only opaque MLS event bytes after cutover; pre-cutover history remains in the original plaintext table.
+6. Never test with sensitive information: library is not independently audited and pilot is not ready for production. Browser storage reset, new login on another browser, device loss, member revocation/rekey, and attachments may cause inaccessible messages because they are not supported.
+
+### Remaining blockers to E2EE-by-default
+
+- One device per user, no group MLS membership management, no MLS rekey on member/peer device removal, no secure recovery/transfer of MLS state and messages between devices; the underlying `ts-mls@1.6.4` is not independently audited.
+- No E2EE media or file keys, audio/video attachments, no server-free translation integration and no encrypted realtime push notifications; UI uses polling.
+- No production-ready safety-number/key-transparency infrastructure, cross-device user onboarding, threat-model signoff, full account management/backup semantics, Safari/iOS PWA interoperability, production server e2e smoke with real accounts.
+- Do NOT automatically turn on `CHATNET_E2EE_EXPERIMENTAL` as a product default. Only expand after these are resolved, verified and security reviewed.
 
 ## 7. Sequence, migration, gates
 

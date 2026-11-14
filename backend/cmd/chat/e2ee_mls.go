@@ -116,6 +116,63 @@ func (s *server) allowMLSRelay(w http.ResponseWriter, r *http.Request, userID in
 	return true
 }
 
+// guardPlaintextDuringMLS shares a parent conversation lock with MLS publishes.
+// This is a transitional fail-closed guard: after the first MLS Commit, legacy
+// POST /messages must NEVER persist a new plaintext message for that room.
+func (s *server) guardPlaintextDuringMLS(w http.ResponseWriter, r *http.Request, tx pgx.Tx, conversationID int64) bool {
+	var locked int64
+	if err := tx.QueryRow(r.Context(), `
+		SELECT id FROM conversations WHERE id=$1 FOR SHARE
+	`, conversationID).Scan(&locked); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify conversation encryption mode")
+		return false
+	}
+	var encrypted bool
+	if err := tx.QueryRow(r.Context(), `
+		SELECT EXISTS (
+			SELECT 1 FROM e2ee_mls_groups
+			WHERE conversation_id=$1 AND epoch>0
+		)
+	`, conversationID).Scan(&encrypted); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify conversation encryption mode")
+		return false
+	}
+	if encrypted {
+		httpx.Error(w, http.StatusConflict, "this conversation requires end-to-end encrypted messages")
+		return false
+	}
+	return true
+}
+
+func (s *server) getMLSConversationStatus(w http.ResponseWriter, r *http.Request) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	conversationID, ok := parseID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	if !s.isMember(r.Context(), conversationID, claims.UserID) {
+		httpx.Error(w, http.StatusForbidden, "not a conversation member")
+		return
+	}
+	var epoch int64
+	err := s.db.QueryRow(r.Context(), `
+		SELECT epoch FROM e2ee_mls_groups WHERE conversation_id=$1
+	`, conversationID).Scan(&epoch)
+	if errors.Is(err, pgx.ErrNoRows) {
+		epoch = 0
+	} else if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "encryption status unavailable")
+		return
+	}
+	mode := "legacy"
+	if epoch > 0 {
+		mode = "e2ee"
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.JSON(w, http.StatusOK, map[string]any{"mode": mode, "epoch": epoch,
+		"pilotEnabled": config.Env("CHATNET_E2EE_EXPERIMENTAL", "") == "1"})
+}
+
 func (s *server) publishMLSEvent(w http.ResponseWriter, r *http.Request) {
 	if !mlsRelayEnabled(w) {
 		return
@@ -144,6 +201,16 @@ func (s *server) publishMLSEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+
+	// Parent row serialization prevents legacy plaintext sends racing the
+	// very first MLS Commit. Legacy senders hold FOR SHARE on this same row.
+	var conversationType string
+	if err = tx.QueryRow(r.Context(), `
+		SELECT type FROM conversations WHERE id=$1 FOR UPDATE
+	`, conversationID).Scan(&conversationType); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot lock MLS conversation")
+		return
+	}
 
 	var membership int64
 	err = tx.QueryRow(r.Context(), `
@@ -213,6 +280,10 @@ func (s *server) publishMLSEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if conversationType == "direct" && (input.EventType != "application" || currentEpoch != 1) {
+		httpx.Error(w, http.StatusConflict, "direct MLS pilot permits only applications after atomic bootstrap")
+		return
+	}
 	if input.EventType == "commit" {
 		if input.Epoch != currentEpoch+1 {
 			httpx.Error(w, http.StatusConflict, "MLS commit epoch mismatch")

@@ -11,9 +11,11 @@ export function useRailSearchPopover(expanded: boolean) {
 
   useEffect(() => {
     if (!expanded) {
-      setOpen(false)
-      setStyle(null)
-      return
+      const frame = requestAnimationFrame(() => {
+        setOpen(false)
+        setStyle(null)
+      })
+      return () => cancelAnimationFrame(frame)
     }
     if (!focusAfterExpand) return
     const frame = requestAnimationFrame(() => {

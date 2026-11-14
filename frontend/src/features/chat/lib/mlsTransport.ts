@@ -43,6 +43,52 @@ export function decodeMLSPayload(encoded: string): Uint8Array {
   return raw
 }
 
+
+export async function verifyMLSTransportEvent(
+  event: ReceivedMLSEvent,
+  expectedConversationId: number,
+  expectedSenderUserId: number,
+  verifiedDevicePublicKey: string,
+): Promise<Uint8Array> {
+  if (!Number.isSafeInteger(event.id) || event.id < 1 ||
+      event.conversationId !== expectedConversationId ||
+      event.senderId !== expectedSenderUserId ||
+      !UUID_RE.test(event.deviceId) || !UUID_RE.test(event.clientId) ||
+      !Number.isSafeInteger(event.epoch) || event.epoch < 1 ||
+      !['commit', 'application', 'welcome'].includes(event.eventType) ||
+      (event.eventType === 'welcome' && !UUID_RE.test(event.targetDeviceId || '')) ||
+      (event.eventType !== 'welcome' && event.targetDeviceId)) {
+    throw new Error('Invalid MLS delivery identity or epoch')
+  }
+  const bytes = decodeMLSPayload(event.payload)
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes)))
+  const transcript = [
+    'chatnet:e2ee:mls:relay:v1', String(expectedSenderUserId),
+    String(expectedConversationId), event.deviceId, event.clientId,
+    event.eventType, String(event.epoch), event.targetDeviceId ?? '',
+    encodeBase64URL(digest),
+  ].join('\n')
+  const fromB64 = (value: string, size: number): Uint8Array<ArrayBuffer> => {
+    if (!/^[A-Za-z0-9_-]+$/.test(value) || value.length > 128) {
+      throw new Error('Invalid MLS device proof')
+    }
+    const decoded = new Uint8Array(Uint8Array.from(
+      atob(value.replace(/-/g, '+').replace(/_/g, '/')),
+      c => c.charCodeAt(0),
+    ))
+    if (decoded.length !== size || encodeBase64URL(decoded) !== value) {
+      throw new Error('Invalid MLS device proof size')
+    }
+    return decoded
+  }
+  const key = await crypto.subtle.importKey('raw', fromB64(verifiedDevicePublicKey, 32),
+    'Ed25519', false, ['verify'])
+  const valid = await crypto.subtle.verify('Ed25519', key,
+    fromB64(event.signature, 64), new TextEncoder().encode(transcript))
+  if (!valid) throw new Error('MLS delivery signature does not match pinned device')
+  return bytes
+}
+
 export async function signMLSTransportEvent(input: {
   userId: number
   conversationId: number

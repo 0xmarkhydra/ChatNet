@@ -1,0 +1,61 @@
+/* Isolated, experimental direct-chat E2EE test surface; no global overrides. */
+.mls-pilot-legacy-notice {
+  padding: 8px 14px; margin: 0; font-size: 11px;
+  color: var(--text-secondary, #667085); text-align: center;
+}
+.mls-pilot-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 12px 12px;
+  padding: 13px 15px;
+  border: 1px solid rgba(93, 113, 175, .22);
+  border-radius: 16px;
+  background: var(--surface, var(--card-bg, #fff));
+  color: var(--text-primary, #1b2440);
+  font-size: 13px;
+}
+.mls-pilot-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mls-pilot-heading > svg { color: #6366f1; flex: none; }
+.mls-pilot-heading strong { font-weight: 650; }
+.mls-pilot-heading button {
+  margin-left: auto; border: 0; background: transparent; color: inherit;
+  border-radius: 10px; display: grid; place-items: center; padding: 5px; cursor: pointer;
+}
+.mls-pilot-status { color: var(--text-secondary, #667085); font-size: 11px; }
+.mls-pilot-note { margin: 0; color: var(--text-secondary, #667085); font-size: 12px; line-height: 1.5; }
+.mls-pilot-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  align-self: flex-start; border: 0; border-radius: 11px;
+  padding: 9px 13px; background: linear-gradient(120deg,#2563eb,#7453e7);
+  color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+}
+.mls-pilot-primary:disabled { opacity: .55; cursor: not-allowed; }
+.mls-pilot-trust { display: flex; flex-wrap: wrap; gap: 16px; }
+.mls-pilot-trust > div { display: flex; flex-direction: column; gap: 4px; }
+.mls-pilot-trust span { display: inline-flex; align-items: center; gap: 4px; color: var(--text-secondary, #667085); }
+.mls-pilot-trust code { font-family: ui-monospace, monospace; font-size: 11px; overflow-wrap: anywhere; }
+.mls-pilot-trust small { color: var(--text-secondary, #667085); }
+.mls-pilot-verified { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #059669; }
+.mls-pilot-warning { display: flex; gap: 7px; align-items: flex-start; color: #b45309; margin: 0; }
+.mls-pilot-error { color: #dc2626; font-size: 12px; margin: 0; }
+.mls-pilot-thread { display: flex; flex-direction: column; gap: 8px; max-height: 240px; min-height: 64px; overflow: auto; padding: 9px 0; }
+.mls-pilot-empty { font-size: 12px; margin: 0; color: var(--text-secondary, #667085); text-align: center; }
+.mls-pilot-message { padding: 9px 12px; border: 1px solid rgba(110,120,150,.15); border-radius: 13px; background: rgba(124,131,162,.07); max-width: 85%; align-self: flex-start; overflow-wrap: anywhere; }
+.mls-pilot-message.mine { align-self: flex-end; background: rgba(99,102,241,.09); }
+.mls-pilot-message-meta { color: var(--text-secondary, #667085); display: block; font-size: 10px; margin-bottom: 4px; }
+.mls-pilot-message p { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+.mls-pilot-composer { display: flex; align-items: stretch; gap: 8px; }
+.mls-pilot-composer input {
+  min-width: 0; min-height: 39px; flex: 1; border: 1px solid rgba(110,120,150,.25);
+  border-radius: 11px; padding: 9px 12px; font: inherit; background: transparent; color: inherit; font-size: 16px;
+}
+.mls-pilot-composer button { align-self: stretch; padding: 8px 12px; }
+.mls-pilot-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@keyframes mls-pilot-rotate { to {transform:rotate(360deg)} }
+.mls-pilot-spin { animation: mls-pilot-rotate 1s linear infinite; }
+@media (max-width: 650px) {
+  .mls-pilot-panel { margin: 6px 8px 12px; padding: 11px; }
+  .mls-pilot-heading { flex-wrap: wrap; }
+  .mls-pilot-status { flex: 1; }
+}

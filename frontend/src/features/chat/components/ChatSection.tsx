@@ -50,6 +50,7 @@ import "../styles/chat-frame-unified.css";
 import "../styles/mobile-chat-navigation.css";
 import ConversationList from "./ConversationList";
 import MessageComposer from "./MessageComposer";
+import E2EEPilotGate from "./E2EEPilotGate";
 import ConversationHeader from "./ConversationHeader";
 import MessageTimeline from "./MessageTimeline";
 import PinnedItemsPanel from "./PinnedItemsPanel";
@@ -220,7 +221,7 @@ export default function ChatSection({
   shareMyProfile,
   sortedChatListConversations,
   sortedGroupActivityEvents,
-  suppressConversationClick,
+  suppressConversationClick: suppressConversationClickRef,
   suppressMessageClick,
   switchTab,
   t,
@@ -240,6 +241,7 @@ export default function ChatSection({
 }: ChatSectionProps) {
   const readersScope = `${session.sessionId}:${activeConversationId ?? ''}`;
   const [readersTarget, setReadersTarget] = useScopedState<{ message: Message; readerIds: number[]; sessionId: string } | null>(readersScope, null);
+  const [mlsPilotMode, setMlsPilotMode] = useState<'unknown' | 'legacy' | 'e2ee'>('unknown');
   const readersMessage = readersTarget?.sessionId === session.sessionId ? readersTarget.message : null;
   const messageReaderMembers = useMemo(() => {
     if (!activeConversation) return [];
@@ -257,21 +259,30 @@ export default function ChatSection({
   }, [activeConversation, friends, groupMembers]);
   // Keep rail item positions stable even when new messages reorder the full chat list.
   // Append newly discovered conversations, and remove only conversations that no longer exist.
-  const railOrderRef = useRef<number[]>([]);
+  const [railOrderIds, setRailOrderIds] = useState<number[]>([]);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setRailOrderIds(previous => {
+        const ids = new Set(allChatConversations.map(conversation => conversation.id));
+        const kept = previous.filter(id => ids.has(id));
+        const seen = new Set(kept);
+        const added = allChatConversations
+          .map(conversation => conversation.id)
+          .filter(id => !seen.has(id));
+        return [...kept, ...added];
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [allChatConversations]);
   const stableRailConversations = useMemo(() => {
     const byId = new Map(allChatConversations.map(conversation => [conversation.id, conversation]));
-    const previousIds = railOrderRef.current.filter(id => byId.has(id));
-    const previousSet = new Set(previousIds);
-    const nextIds = [
-      ...previousIds,
-      ...allChatConversations.filter(conversation => !previousSet.has(conversation.id)).map(conversation => conversation.id),
-    ];
-    railOrderRef.current = nextIds;
-    return nextIds.flatMap(id => {
-      const conversation = byId.get(id);
-      return conversation ? [conversation] : [];
-    });
-  }, [allChatConversations]);
+    const knownIds = new Set(railOrderIds);
+    return [...railOrderIds, ...allChatConversations.map(item => item.id).filter(id => !knownIds.has(id))]
+      .flatMap(id => {
+        const conversation = byId.get(id);
+        return conversation ? [conversation] : [];
+      });
+  }, [allChatConversations, railOrderIds]);
   const railConversations = useMemo(() => {
     const ids = new Set(stableRailConversations.map(conversation => conversation.id));
     return [...stableRailConversations,
@@ -323,33 +334,28 @@ export default function ChatSection({
   const [desktopChannelPanelOpen, setDesktopChannelPanelOpen] = useState(false);
   const [channelSidebarOpen, setChannelSidebarOpen] = useState(false);
   const [mobileChannelSelected, setMobileChannelSelected] = useState(false);
+  const conversationType = activeConversation?.type;
   useLayoutEffect(() => {
-    // Mount the picker off screen, then slide it in from left to right.
-    // Cancel any pending animation when switching or leaving conversations.
-    setChannelSidebarOpen(false);
-    setMobileChannelSelected(false);
-    // Telegram-style desktop: direct chats show the info list beside messages;
-    // group channels use the compact dock. On mobile, keep chats unobstructed.
-    setRailListOpen(!activeConversation ||
-      (window.matchMedia('(min-width: 761px)').matches && activeConversation.type === 'direct'));
-    setDesktopChannelPanelOpen(false);
-    if (window.matchMedia('(min-width: 761px)').matches) {
-      const frame = requestAnimationFrame(() => setDesktopChannelPanelOpen(activeConversation?.type === 'group'));
-      return () => cancelAnimationFrame(frame);
-    }
-    if (activeConversation?.type !== 'group') return;
+    // Reset and animate the drawer at the next paint when the selected room changes.
+    const isDesktop = window.matchMedia('(min-width: 761px)').matches;
     let secondFrame = 0;
     const firstFrame = requestAnimationFrame(() => {
-      secondFrame = requestAnimationFrame(() => setChannelSidebarOpen(true));
+      setChannelSidebarOpen(false);
+      setMobileChannelSelected(false);
+      setRailListOpen(!activeConversationId || (isDesktop && conversationType === 'direct'));
+      setDesktopChannelPanelOpen(isDesktop && conversationType === 'group');
+      if (!isDesktop && conversationType === 'group') {
+        secondFrame = requestAnimationFrame(() => setChannelSidebarOpen(true));
+      }
     });
     return () => {
       cancelAnimationFrame(firstFrame);
       cancelAnimationFrame(secondFrame);
     };
-  }, [activeConversationId, activeConversation?.type]);
+  }, [activeConversationId, conversationType]);
   function openConversationFromRail(conversation: Conversation) {
-    if (suppressConversationClick.current === conversation.id) {
-      suppressConversationClick.current = null;
+    if (suppressConversationClickRef.current === conversation.id) {
+      suppressConversationClickRef.current = null;
       return;
     }
     if (conversationListSearch.active) {
@@ -530,7 +536,7 @@ export default function ChatSection({
                 event.preventDefault();
                 cancelConversationLongPress();
                 const touchMenu = 'pointerType' in event.nativeEvent && event.nativeEvent.pointerType !== 'mouse';
-                if (touchMenu) suppressConversationClick.current = conversation.id;
+                if (touchMenu) suppressConversationClickRef.current = conversation.id;
                 setConversationMenuPosition(touchMenu ? null : { x: event.clientX, y: event.clientY });
                 setConversationActionId(conversation.id);
               }}
@@ -570,7 +576,7 @@ export default function ChatSection({
                   event.preventDefault();
                   cancelConversationLongPress();
                   const touchMenu = 'pointerType' in event.nativeEvent && event.nativeEvent.pointerType !== 'mouse';
-                  if (touchMenu) suppressConversationClick.current = conversation.id;
+                  if (touchMenu) suppressConversationClickRef.current = conversation.id;
                   setConversationMenuPosition(touchMenu ? null : { x: event.clientX, y: event.clientY });
                   setConversationActionId(conversation.id);
                 }}
@@ -647,7 +653,7 @@ export default function ChatSection({
                 setTranslations={setTranslations}
                 shareMyProfile={shareMyProfile}
                 sortedChatListConversations={sortedChatListConversations}
-                suppressConversationClick={suppressConversationClick}
+                suppressConversationClick={suppressConversationClickRef}
                 t={t}
                 visibleConversations={visibleConversations}
                 chatFiltersPill={chatFiltersPill}
@@ -807,6 +813,11 @@ export default function ChatSection({
                       }}
                     />
                   )}
+                  {mlsPilotMode === 'e2ee' && (
+                    <p className="mls-pilot-legacy-notice">
+                      Tin nhắn cũ ở phía trên được gửi trước E2EE và chưa được mã hóa đầu cuối.
+                    </p>
+                  )}
                   <MessageTimeline
                     activeChatTranslationSettings={activeChatTranslationSettings}
                     activeConversation={activeConversation}
@@ -859,6 +870,17 @@ export default function ChatSection({
                     setReadersTarget={setReadersTarget}
                   />
 
+                  {activeConversation.type === 'direct' && activeConversation.otherUserId && !conversationBlocked && (
+                    <E2EEPilotGate
+                      key={session.sessionId + ':' + activeConversation.id}
+                      conversationId={activeConversation.id}
+                      userId={session.user.id}
+                      otherUserId={activeConversation.otherUserId}
+                      request={apiFetch}
+                      onModeChange={setMlsPilotMode}
+                    />
+                  )}
+
                   {conversationBlocked ? (
                     <div className="chat-blocked-composer" role="status" aria-live="polite">
                       <Ban size={20} aria-hidden="true" />
@@ -872,7 +894,7 @@ export default function ChatSection({
                         </button>
                       )}
                     </div>
-                  ) : (
+                  ) : mlsPilotMode === 'e2ee' ? null : (
                   <MessageComposer
                 activeConversation={activeConversation}
                 activeConversationId={activeConversationId}

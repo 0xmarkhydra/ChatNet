@@ -152,8 +152,14 @@ func TestMLSRelayThreeAccountsIntegration(t *testing.T) {
 	wrap := func(fn http.HandlerFunc) http.Handler {
 		return authx.CachedSessionMiddleware(s.jwtSecret, db, rdb, fn)
 	}
+	mux.Handle("POST /api/conversations/{id}/e2ee/bootstrap", wrap(s.bootstrapMLSConversation))
+	mux.Handle("POST /api/conversations/{id}/e2ee/consents", wrap(s.approveMLSPilot))
+	mux.Handle("GET /api/conversations/{id}/e2ee/consents", wrap(s.getMLSPilotConsents))
 	mux.Handle("POST /api/conversations/{id}/e2ee/events", wrap(s.publishMLSEvent))
 	mux.Handle("GET /api/conversations/{id}/e2ee/events", wrap(s.listMLSEvents))
+	mux.Handle("GET /api/conversations/{id}/e2ee/status", wrap(s.getMLSConversationStatus))
+	mux.Handle("POST /api/conversations/{id}/messages", wrap(s.createMessage))
+	mux.Handle("PATCH /api/messages/{id}", wrap(s.editMessage))
 	var users [3]int64
 	var tokens [3]string
 	for i := range users {
@@ -243,7 +249,22 @@ func TestMLSRelayThreeAccountsIntegration(t *testing.T) {
 		return r.Code, result
 	}
 
+	var oldMessageID int64
+	legacyText := "legacy historical plaintext before MLS activation"
+	if err := db.QueryRow(ctx, `
+		INSERT INTO messages(conversation_id,user_id,text)
+		VALUES($1,$2,$3) RETURNING id
+	`, conversationID, users[0], legacyText).Scan(&oldMessageID); err != nil {
+		t.Fatal(err)
+	}
 	first := input(0, 0, 1, "commit", "")
+	statusPath := fmt.Sprintf("/api/conversations/%d/e2ee/status", conversationID)
+	if status := send(0, statusPath, nil, "GET"); status.Code != 200 || !strings.Contains(status.Body.String(), `"mode":"legacy"`) {
+		t.Fatalf("initial room must be legacy before MLS activation: %d %s", status.Code, status.Body.String())
+	}
+	if status := send(2, statusPath, nil, "GET"); status.Code != 403 {
+		t.Fatalf("outsider read encryption mode: %d", status.Code)
+	}
 	if r := send(-1, base, first, "POST"); r.Code != 401 {
 		t.Fatalf("unauthenticated MLS publication succeeded: %d", r.Code)
 	}
@@ -261,13 +282,33 @@ func TestMLSRelayThreeAccountsIntegration(t *testing.T) {
 	if r := send(0, base, first, "POST"); r.Code != 201 {
 		t.Fatalf("initial MLS commit failed: %d %s", r.Code, r.Body.String())
 	}
+	if status := send(0, statusPath, nil, "GET"); status.Code != 200 ||
+		!strings.Contains(status.Body.String(), `"mode":"e2ee"`) {
+		t.Fatalf("MLS room status not encrypted: %d %s", status.Code, status.Body.String())
+	}
+	if legacy := send(0, fmt.Sprintf("/api/conversations/%d/messages", conversationID),
+		map[string]any{"text": "PLAINTEXT MUST NEVER BE STORED", "clientId": testMLSUUID(t)}, "POST"); legacy.Code != http.StatusConflict {
+		t.Fatalf("plaintext was not blocked after MLS activation: %d %s", legacy.Code, legacy.Body.String())
+	}
+	var plainCount int
+	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM messages WHERE conversation_id=$1", conversationID).Scan(&plainCount); err != nil || plainCount != 1 {
+		t.Fatalf("plaintext leaked into message storage: count=%d err=%v", plainCount, err)
+	}
+	editPath := fmt.Sprintf("/api/messages/%d", oldMessageID)
+	if edited := send(0, editPath, map[string]any{"text": "new plaintext leaked via edit"}, "PATCH"); edited.Code != http.StatusConflict {
+		t.Fatalf("editing old plaintext after MLS activation was not blocked: %d %s", edited.Code, edited.Body.String())
+	}
+	var oldText string
+	if err := db.QueryRow(ctx, "SELECT text FROM messages WHERE id=$1", oldMessageID).Scan(&oldText); err != nil || oldText != legacyText {
+		t.Fatalf("historical message changed after MLS cutover: %q %v", oldText, err)
+	}
 	if r := send(0, base, first, "POST"); r.Code != 200 || !strings.Contains(r.Body.String(), `"duplicate":true`) {
 		t.Fatalf("lost-ACK retry not idempotent: %d %s", r.Code, r.Body.String())
 	}
 	conflict := input(0, 0, 1, "commit", "")
 	conflict.ClientID = first.ClientID
 	if r := send(0, base, conflict, "POST"); r.Code != 403 {
-		t.Fatalf("invalidly signed conflicting request not rejected: %d", r.Code)
+		t.Fatalf("invalidly signed conflicting request not rejected: %d %s", r.Code, r.Body.String())
 	}
 	// Valid but conflicting clientId must produce 409, not overwrite the first event.
 	digest := sha256.Sum256(mustMLSDecode(t, conflict.Payload))
@@ -349,6 +390,100 @@ func TestMLSRelayThreeAccountsIntegration(t *testing.T) {
 	}
 	if r := send(1, base, input(1, 1, 3, "commit", ""), "POST"); r.Code != 403 {
 		t.Fatalf("removed member published MLS event: %d", r.Code)
+	}
+
+	// Direct pilot must atomically initialize epoch 1 with a targeted Welcome.
+	// B2 is now revoked; A and B1 each have exactly one active device.
+	var directID int64
+	if err := db.QueryRow(ctx, `
+		INSERT INTO conversations(type,created_by,direct_key)
+		VALUES('direct',$1,$2) RETURNING id
+	`, users[0], fmt.Sprintf("e2ee-qa-%d", time.Now().UnixNano())).Scan(&directID); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = db.Exec(context.Background(), "DELETE FROM conversations WHERE id=$1", directID) }()
+	for _, userID := range users[:2] {
+		if _, err := db.Exec(ctx, "INSERT INTO conversation_members(conversation_id,user_id) VALUES($1,$2)", directID, userID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	directBase := fmt.Sprintf("/api/conversations/%d/e2ee", directID)
+	directEvent := func(kind string, target string) mlsRelayInput {
+		return signedMLSEvent(t, users[0], directID, 1, devices[0].id, kind, target, devices[0].key)
+	}
+	directCommit := directEvent("commit", "")
+	directWelcome := directEvent("welcome", devices[1].id)
+	bootstrap := map[string]any{"commit": directCommit, "welcome": directWelcome}
+	if r := send(2, directBase+"/bootstrap", bootstrap, "POST"); r.Code != 403 {
+		t.Fatalf("outsider could initialize direct MLS: %d %s", r.Code, r.Body.String())
+	}
+	if r := send(0, directBase+"/events", directCommit, "POST"); r.Code != 409 {
+		t.Fatalf("unsafe direct Commit without atomic Welcome accepted: %d %s", r.Code, r.Body.String())
+	}
+	bad := map[string]any{"commit": directCommit, "welcome": directEvent("welcome", devices[3].id)}
+	if r := send(0, directBase+"/bootstrap", bad, "POST"); r.Code != 403 {
+		t.Fatalf("outsider target Welcome accepted in bootstrap: %d %s", r.Code, r.Body.String())
+	}
+	var beforeEpoch int64
+	if err := db.QueryRow(ctx, `SELECT COALESCE((SELECT epoch FROM e2ee_mls_groups WHERE conversation_id=$1),0)`, directID).Scan(&beforeEpoch); err != nil || beforeEpoch != 0 {
+		t.Fatalf("invalid bootstrap changed epoch: %d %v", beforeEpoch, err)
+	}
+	if r := send(0, directBase+"/bootstrap", bootstrap, "POST"); r.Code != 409 {
+		t.Fatalf("bootstrap without both consents was accepted: %d %s", r.Code, r.Body.String())
+	}
+	if r := send(0, directBase+"/consents",
+		map[string]any{"deviceId": devices[0].id}, "POST"); r.Code != 200 {
+		t.Fatalf("first participant consent failed: %d %s", r.Code, r.Body.String())
+	}
+	if r := send(0, directBase+"/bootstrap", bootstrap, "POST"); r.Code != 409 {
+		t.Fatalf("bootstrap with only one consent was accepted: %d %s", r.Code, r.Body.String())
+	}
+	if r := send(2, directBase+"/consents",
+		map[string]any{"deviceId": devices[3].id}, "POST"); r.Code != 403 {
+		t.Fatalf("outsider consent succeeded: %d %s", r.Code, r.Body.String())
+	}
+	if r := send(1, directBase+"/consents",
+		map[string]any{"deviceId": devices[1].id}, "POST"); r.Code != 200 {
+		t.Fatalf("second participant consent failed: %d %s", r.Code, r.Body.String())
+	}
+	if r := send(0, directBase+"/consents", nil, "GET"); r.Code != 200 ||
+		!strings.Contains(r.Body.String(), `"ownApproved":true`) ||
+		!strings.Contains(r.Body.String(), `"peerApproved":true`) {
+		t.Fatalf("both consent statuses not confirmed: %d %s", r.Code, r.Body.String())
+	}
+	firstBootstrap := send(0, directBase+"/bootstrap", bootstrap, "POST")
+	if firstBootstrap.Code != 201 {
+		t.Fatalf("atomic bootstrap failed: %d %s", firstBootstrap.Code, firstBootstrap.Body.String())
+	}
+	if r := send(0, directBase+"/bootstrap", bootstrap, "POST"); r.Code != 200 || !strings.Contains(r.Body.String(), `"duplicate":true`) {
+		t.Fatalf("lost-ACK bootstrap retry failed: %d %s", r.Code, r.Body.String())
+	}
+	if r := send(0, directBase+"/bootstrap", map[string]any{
+		"commit": directCommit, "welcome": directEvent("welcome", devices[1].id),
+	}, "POST"); r.Code != 409 {
+		t.Fatalf("conflicting bootstrap was not rejected: %d %s", r.Code, r.Body.String())
+	}
+	var eventCount int
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM e2ee_mls_events WHERE conversation_id=$1`, directID).Scan(&eventCount); err != nil || eventCount != 2 {
+		t.Fatalf("atomic bootstrap must store both events exactly once: %d %v", eventCount, err)
+	}
+	if r := send(0, directBase+"/events", directEvent("commit", ""), "POST"); r.Code != 409 {
+		t.Fatalf("unverified pilot rekey accepted: %d %s", r.Code, r.Body.String())
+	}
+	if r := send(0, directBase+"/events", directEvent("application", ""), "POST"); r.Code != 201 {
+		t.Fatalf("pilot application rejected: %d %s", r.Code, r.Body.String())
+	}
+	if r := send(0, fmt.Sprintf("/api/conversations/%d/messages", directID),
+		map[string]any{"text": "MUST NOT BE STORED", "clientId": testMLSUUID(t)}, "POST"); r.Code != 409 {
+		t.Fatalf("plaintext after direct bootstrap accepted: %d %s", r.Code, r.Body.String())
+	}
+	receive := send(1, directBase+"/events?deviceId="+devices[1].id, nil, "GET")
+	if receive.Code != 200 || !strings.Contains(receive.Body.String(), `"eventType":"welcome"`) {
+		t.Fatalf("pilot peer could not receive Welcome: %d %s", receive.Code, receive.Body.String())
+	}
+	otherDevice := send(0, directBase+"/events?deviceId="+devices[0].id, nil, "GET")
+	if otherDevice.Code != 200 || strings.Contains(otherDevice.Body.String(), `"eventType":"welcome"`) {
+		t.Fatalf("targeted Welcome leaked to non-target device: %d %s", otherDevice.Code, otherDevice.Body.String())
 	}
 }
 

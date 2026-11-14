@@ -203,7 +203,11 @@ func main() {
 	mux.Handle("POST /api/conversations/{id}/activities/{activityId}/vote", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.voteGroupActivity)))
 	mux.Handle("PUT /api/conversations/{id}/activities/{activityId}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setGroupActivityPin)))
 	mux.Handle("DELETE /api/conversations/{id}/activities/{activityId}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setGroupActivityPin)))
+	mux.Handle("GET /api/conversations/{id}/e2ee/status", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getMLSConversationStatus)))
 	mux.Handle("GET /api/conversations/{id}/e2ee/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMLSEvents)))
+	mux.Handle("GET /api/conversations/{id}/e2ee/consents", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getMLSPilotConsents)))
+	mux.Handle("POST /api/conversations/{id}/e2ee/consents", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.approveMLSPilot)))
+	mux.Handle("POST /api/conversations/{id}/e2ee/bootstrap", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.bootstrapMLSConversation)))
 	mux.Handle("POST /api/conversations/{id}/e2ee/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.publishMLSEvent)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessages)))
 	mux.Handle("DELETE /api/conversations/{id}/history", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.clearConversationHistory)))
@@ -1309,6 +1313,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if !s.guardPlaintextDuringMLS(w, r, tx, conversationID) {
+		return
+	}
 
 	// Lock active membership until the message commits. A group removal cannot
 	// race a slow S3 validation and leave a message sent after removal.
@@ -1491,8 +1498,24 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify message encryption status")
+		return
+	}
+	defer tx.Rollback(r.Context())
 	var conversationID int64
-	if err := s.db.QueryRow(r.Context(), `
+	if err := tx.QueryRow(r.Context(), `
+		SELECT conversation_id FROM messages
+		WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
+	`, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		httpx.Error(w, http.StatusNotFound, "message not found or cannot be edited")
+		return
+	}
+	if !s.guardPlaintextDuringMLS(w, r, tx, conversationID) {
+		return
+	}
+	if err := tx.QueryRow(r.Context(), `
 		UPDATE messages m
 		SET text=$1,edited_at=NOW()
 		WHERE m.id=$2 AND m.user_id=$3 AND m.deleted_at IS NULL
@@ -1505,7 +1528,14 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be edited")
 		return
 	}
-	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_translations WHERE message_id=$1`, messageID)
+	if _, err := tx.Exec(r.Context(), `DELETE FROM message_translations WHERE message_id=$1`, messageID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot clear message translation")
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot save updated message")
+		return
+	}
 
 	m, err := s.loadMessage(r.Context(), messageID, claims.UserID)
 	if err != nil {
