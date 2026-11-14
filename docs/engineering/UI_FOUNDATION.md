@@ -18,6 +18,37 @@ import { Button } from "@/shared/ui/button";
 <Button variant="outline" disabled={saving}>Hủy</Button>
 ```
 
+## Shared components now available
+
+- `shared/ui/button.tsx`: Button / variants for app-shell navigation and actions.
+- `shared/ui/input.tsx`: native Input (used by Header quick search).
+- `shared/ui/textarea.tsx`: native textarea with semantic styling.
+- `shared/ui/dialog.tsx`: Radix Dialog primitives with focus management, accessible title/description, portal overlay and close action.
+- `shared/ui/dropdown-menu.tsx`: Radix menu primitives with keyboard navigation and selectable items.
+
+```tsx
+import { Input } from "@/shared/ui/input";
+import { Textarea } from "@/shared/ui/textarea";
+import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogDescription } from "@/shared/ui/dialog";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/shared/ui/dropdown-menu";
+
+<Input aria-label="Tìm kiếm" type="search" value={query} onChange={event => setQuery(event.target.value)} />
+<Textarea aria-label="Nội dung" />
+<Dialog>
+  <DialogTrigger asChild><button type="button">Chỉnh sửa</button></DialogTrigger>
+  <DialogContent>
+    <DialogTitle>Chỉnh sửa</DialogTitle>
+    <DialogDescription>Cập nhật thông tin.</DialogDescription>
+  </DialogContent>
+</Dialog>
+<DropdownMenu>
+  <DropdownMenuTrigger asChild><button type="button">Thao tác</button></DropdownMenuTrigger>
+  <DropdownMenuContent><DropdownMenuItem onSelect={save}>Lưu</DropdownMenuItem></DropdownMenuContent>
+</DropdownMenu>
+```
+
+Keep existing feature dialog/menu implementations until a feature-scoped QA migration is planned. Do not silently replace application-owned modal lifecycle, focus returns or outside-click semantics.
+
 ## Rules for new feature work
 
 1. Reuse `shared/ui` first and keep business behavior in feature-owned components/hooks.

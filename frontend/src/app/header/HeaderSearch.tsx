@@ -1,4 +1,5 @@
 import type { KeyboardEventHandler, ReactNode, RefObject } from "react";
+import { Input } from "../../shared/ui/input";
 
 export type HeaderSearchProps = {
   anchorRef: RefObject<HTMLDivElement | null>;
@@ -25,7 +26,7 @@ export default function HeaderSearch({
     <div className="appbar-search-anchor" ref={anchorRef}>
       <label className="appbar-search">
         {icon}
-        <input
+        <Input
           value={value}
           maxLength={maxLength}
           type="search"
