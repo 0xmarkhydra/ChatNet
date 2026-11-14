@@ -32,6 +32,18 @@ export function visitorUsernameFromPath(pathname: string): string | null {
   }
 }
 
+/** Shareable post detail URLs; keep legacy ?post=id links readable. */
+export function feedPostPath(id: number): string {
+  return `${TAB_PATH.feed}/posts/${id}`;
+}
+
+export function feedPostIdFromPath(pathname: string): number | null {
+  const match = /^\/feed\/posts\/([1-9]\d*)\/?$/.exec(pathname);
+  if (!match) return null;
+  const id = Number(match[1]);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
 /** Stable shareable chat detail route; only positive safe integer IDs are valid. */
 export function chatConversationPath(id: number): string {
   return `${TAB_PATH.chat}/${id}`;

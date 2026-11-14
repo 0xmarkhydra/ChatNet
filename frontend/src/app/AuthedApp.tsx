@@ -59,7 +59,7 @@ import {
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./router/routes";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./router/routes";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
 import type {
@@ -542,7 +542,11 @@ export default function AuthedApp({
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
-  const [contactsScreen, setContactsScreen] = useState<FriendsScreen>("directory");
+  const contactsScreen: FriendsScreen = routeLocation.pathname === "/contacts/requests" ? "invitations" : "directory";
+  const setContactsScreen: Dispatch<SetStateAction<FriendsScreen>> = (next) => {
+    const screen = typeof next === "function" ? next(contactsScreen) : next;
+    navigate(screen === "invitations" ? "/contacts/requests" : TAB_PATH.contacts);
+  };
   const visitorUsername = visitorUsernameFromPath(routeLocation.pathname);
   function closeVisitor() {
     const returnTo = routeLocation.state?.visitorReturnTo;
@@ -672,15 +676,17 @@ export default function AuthedApp({
   // Router location is authoritative for browser Back/Forward on post URLs.
   useEffect(() => {
     if (tab !== "feed") return;
-    const id = Number(new URLSearchParams(routeLocation.search).get("post"));
+    const routeId = feedPostIdFromPath(routeLocation.pathname);
+    const id = routeId ?? Number(new URLSearchParams(routeLocation.search).get("post"));
     setActivePostId(Number.isSafeInteger(id) && id > 0 ? id : null);
-  }, [tab, routeLocation.search]);
+  }, [tab, routeLocation.pathname, routeLocation.search]);
   useEffect(() => {
     if (!session?.token) return;
     const params = new URLSearchParams(routeLocation.search);
     if (tab !== "feed" && params.get("tab") !== "feed") return;
     if (tab !== "feed") setTab("feed");
-    const id = Number(params.get("post"));
+    const routeId = feedPostIdFromPath(routeLocation.pathname);
+    const id = routeId ?? Number(params.get("post"));
     if (!Number.isSafeInteger(id) || id <= 0) return;
     let cancelled = false;
     void apiFetch("/api/posts/" + id)
@@ -711,7 +717,7 @@ export default function AuthedApp({
     return () => {
       cancelled = true;
     };
-  }, [session?.token, tab, routeLocation.search]);
+  }, [session?.token, tab, routeLocation.pathname, routeLocation.search]);
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -2583,7 +2589,7 @@ export default function AuthedApp({
       setFeedCommunitiesOpen(false);
       setTab("feed");
       setActivePostId(post.id);
-      navigate(`${TAB_PATH.feed}?post=${post.id}`, { state: { postId: post.id } });
+      navigate(feedPostPath(post.id), { state: { postId: post.id } });
       void readPostMention(mention.id);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Không mở được bài viết.", "error");
@@ -2594,7 +2600,7 @@ export default function AuthedApp({
     setDesktopSection(null);
     setFeedCommunitiesOpen(false);
     setTranslationSettingsConversationId(null);
-    if (nextTab === "contacts") setContactsScreen("directory");
+
     if (nextTab === "profile") {
       setDesktopProfileSettings(false);
       setProfileEditorOpen(false);
@@ -3552,7 +3558,7 @@ export default function AuthedApp({
           onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
           postDiscussion={postDiscussion}
           session={session}
-          setActivePostId={setActivePostId}
+          onClose={closeFeedPostDetails}
           targetLanguage={targetLanguage}
           translationPreferencesLoaded={translationPreferencesLoaded}
         />

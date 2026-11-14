@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROUTE, TAB_PATH, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./routes";
+import { ROUTE, TAB_PATH, feedPostIdFromPath, feedPostPath, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./routes";
 
 describe("app URL routing", () => {
   it("maps every main tab to a stable URL", () => {
@@ -27,6 +27,16 @@ describe("app URL routing", () => {
       expect(visitorUsernameFromPath(path)).toBeNull();
     }
     expect(tabFromPath("/users/alice")).toBe("profile");
+  });
+
+  it("supports valid shareable feed posts and rejects malformed IDs", () => {
+    expect(feedPostPath(42)).toBe("/feed/posts/42");
+    expect(feedPostIdFromPath("/feed/posts/42")).toBe(42);
+    expect(feedPostIdFromPath("/feed/posts/42/")).toBe(42);
+    for (const path of ["/feed", "/feed/posts", "/feed/posts/0", "/feed/posts/abc", "/feed/posts/01", "/feed/posts/9007199254740992", "/feed/posts/42/more"]) {
+      expect(feedPostIdFromPath(path)).toBeNull();
+    }
+    expect(tabFromPath("/feed/posts/42")).toBe("feed");
   });
 
   it("matches complete route segments", () => {

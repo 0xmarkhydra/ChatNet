@@ -7,8 +7,7 @@ import FeedReactionControl from "./FeedReactionControl";
 import UiIcon from "../../../shared/ui/UiIcon";
 import { type Post } from "../types";
 import { type Session } from "../../../shared/types/session";
-import { type SetStateAction } from "react";
-import type { Dispatch, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export type PostDetailOverlayProps = {
   activePost: Post;
@@ -17,7 +16,7 @@ export type PostDetailOverlayProps = {
   onReactionUsers: (post: Post) => void;
   postDiscussion: ReactNode | null;
   session: Session;
-  setActivePostId: Dispatch<SetStateAction<number | null>>;
+  onClose: () => void;
   targetLanguage: string;
   translationPreferencesLoaded: boolean;
 };
@@ -29,7 +28,7 @@ export default function PostDetailOverlay({
   onReactionUsers,
   postDiscussion,
   session,
-  setActivePostId,
+  onClose,
   targetLanguage,
   translationPreferencesLoaded,
 }: PostDetailOverlayProps) {
@@ -40,7 +39,7 @@ export default function PostDetailOverlay({
             aria-modal="true"
             aria-label={`Chi tiết bài viết của ${userLabel(activePost.authorDisplayName, activePost.author)}`}
             onMouseDown={(event) => {
-              if (event.currentTarget === event.target) setActivePostId(null);
+              if (event.currentTarget === event.target) onClose();
             }}
           >
             <section className="post-detail-modal">
@@ -52,7 +51,7 @@ export default function PostDetailOverlay({
                 <button
                   type="button"
                   aria-label="Đóng chi tiết bài viết"
-                  onClick={() => setActivePostId(null)}
+                  onClick={() => onClose()}
                 >
                   ×
                 </button>
