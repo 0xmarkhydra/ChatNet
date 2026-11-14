@@ -283,28 +283,33 @@
     box-sizing: border-box;
     flex: 0 0 80px;
     align-items: center;
-    gap: 20px;
+    gap: 18px;
     width: 100%;
     min-height: 80px;
     margin: 0;
     padding: 12px 28px 12px 32px;
     border: none;
-    border-bottom: 1px solid #e8ecf5;
+    border-bottom: 1px solid #e3e9f6;
     border-radius: 0;
-    box-shadow: 0 1px 12px rgba(30, 51, 96, .035);
-    background: #fff;
+    box-shadow: 0 2px 14px rgba(39, 65, 126, .045);
+    background: linear-gradient(105deg, #fff 48%, #f5f7ff 100%);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
-  .app-page-heading { display: flex; flex: 0 1 auto; flex-direction: column; min-width: 180px; }
-  .app-page-heading strong { color: #182948; font-size: 25px; line-height: 1.18; letter-spacing: -.65px; font-weight: 800; }
-  .app-page-heading small { margin-top: 6px; color: #8894ac; font-size: 12px; white-space: nowrap; }
+  .modern-shell.app-layout .app-page-heading { display: flex; flex: 0 1 auto; flex-direction: column; min-width: 180px; padding-left: 17px; border-left: 3px solid #4b6ee9; }
+  .modern-shell.app-layout .app-page-heading strong { color: #182948; font-size: 23px; line-height: 1.18; letter-spacing: -.55px; font-weight: 780; }
+  .modern-shell.app-layout .app-page-heading small { margin-top: 5px; color: #7b8ca8; font-size: 12px; white-space: nowrap; }
   .modern-shell.app-layout .appbar-brand { display: none; }
-  .modern-shell.app-layout .appbar-search-anchor { flex: 0 1 380px; width: min(33vw,380px); margin-left: auto; min-width: 0; }
-  .modern-shell.app-layout .appbar-search { width: 100%; min-width: 0; height: 45px; min-height: 45px; margin: 0; border-radius: 12px; box-shadow: none; background: #f8fafe; }
-  .modern-shell.app-layout .app-header-no-search .appbar-search-anchor { display: none; }
-  .modern-shell.app-layout .appbar-actions { flex: 0 0 auto; margin-left: 18px; }
-  .modern-shell.app-layout .appbar-icon-button { color: #687d9e; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-search-anchor { flex: 0 1 350px; width: min(32vw, 350px); margin-left: auto; min-width: 0; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-search { width: 100%; min-width: 0; height: 44px; min-height: 44px; margin: 0; border: 1px solid #e3e9f6; border-radius: 13px; box-shadow: none; background: #fff; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-actions { display: flex; align-items: center; flex: 0 0 auto; gap: 10px; margin-left: auto; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-icon-button { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; color: #536c98; background: #eef2fb; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-icon-button:hover { color: #315cce; background: #e3eafe; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-icon-button:focus-visible,
+  .modern-shell.app-layout > .chatnet-appbar .app-header-account:focus-visible { outline: 3px solid #9bb7fa; outline-offset: 2px; }
+  .modern-shell.app-layout > .chatnet-appbar .app-header-account { display: grid; flex: 0 0 42px; place-items: center; width: 42px; height: 42px; padding: 0; border: 2px solid #e6ebf9; border-radius: 50%; background: #fff; cursor: pointer; }
+  .modern-shell.app-layout > .chatnet-appbar .app-header-avatar { display: grid; width: 38px; height: 38px; border-radius: 50%; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-icon-button.notification-appbar { position: relative; }
 
   .modern-shell.app-layout > .modern-frame {
     box-sizing: border-box;
@@ -362,6 +367,8 @@
 
 @media (max-width: 760px) {
   .app-sidebar, .app-page-heading, .app-section-header { display: none !important; }
+  .modern-shell.app-layout .app-header-account-desktop-only { display: none; }
+  .modern-shell.app-layout > .chatnet-appbar.mobile-section-header { display: none; }
 }
 
 .app-notifications-overlay {

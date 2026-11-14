@@ -47,12 +47,6 @@ function ChatActions(p: HeaderActionsProps) {
   const groups = desktopSection === "groups";
   return (
     <>
-      {groups && (
-        <button type="button" className="appbar-icon-button notification-appbar" aria-label="Mở thông báo" onClick={p.onOpenNotifications}>
-          <Bell size={22} aria-hidden="true" />
-          <NotificationBadge count={p.notificationCount} text={p.notificationBadgeText} />
-        </button>
-      )}
       {!groups && (
         <button className="appbar-icon-button" type="button" aria-label="Quét QR" onClick={chat.onScanQr}>
           <UiIcon name="qr" size={28} />
@@ -85,68 +79,62 @@ function ChatActions(p: HeaderActionsProps) {
   );
 }
 
-/** Page-specific header actions; the account control is rendered separately by HeaderAccount. */
+/** Route actions remain feature-specific; notification access stays consistent on every page. */
 export default function HeaderActions(p: HeaderActionsProps) {
-  const badge = <NotificationBadge count={p.notificationCount} text={p.notificationBadgeText} />;
+  const notification = (
+    <button
+      type="button"
+      className="appbar-icon-button notification-appbar"
+      aria-label={p.tab === "notifications" ? "Trang Thông báo" : "Mở thông báo"}
+      aria-current={p.tab === "notifications" ? "page" : undefined}
+      onClick={p.tab === "notifications" ? undefined : p.onOpenNotifications}
+    >
+      <Bell size={21} aria-hidden="true" />
+      <NotificationBadge count={p.notificationCount} text={p.notificationBadgeText} />
+    </button>
+  );
+
+  let pageActions: ReactNode = null;
   switch (p.tab) {
     case "chat":
-      return <ChatActions {...p} />;
+      pageActions = <ChatActions {...p} />;
+      break;
     case "feed":
-      return (
-        <>
-          <button
-            className="appbar-icon-button social-feed-header-community"
-            type="button"
-            aria-label="Cộng đồng"
-            title="Cộng đồng"
-            aria-pressed={p.feed.communitiesOpen}
-            onClick={p.feed.onToggleCommunities}
-          >
-            <Users size={23} aria-hidden="true" />
-          </button>
-          <button className="appbar-icon-button notification-appbar" type="button" aria-label="Mở thông báo" onClick={p.onOpenNotifications}>
-            <UiIcon name="bell" size={27} />
-            {badge}
-          </button>
-        </>
+      pageActions = (
+        <button
+          className="appbar-icon-button social-feed-header-community"
+          type="button"
+          aria-label="Cộng đồng"
+          title="Cộng đồng"
+          aria-pressed={p.feed.communitiesOpen}
+          onClick={p.feed.onToggleCommunities}
+        >
+          <Users size={21} aria-hidden="true" />
+        </button>
       );
+      break;
     case "profile":
-      return (
-        <>
-          <button className="appbar-icon-button notification-appbar" type="button" aria-label="Mở thông báo" onClick={p.onOpenNotifications}>
-            <Bell size={21} aria-hidden="true" />
-            {badge}
-          </button>
-          <button className="appbar-icon-button profile-page-header-new" type="button" aria-label="Tạo bài viết" onClick={p.profile.onNewPost}>
-            <PencilLine size={21} aria-hidden="true" />
-          </button>
-        </>
+      pageActions = (
+        <button className="appbar-icon-button profile-page-header-new" type="button" aria-label="Tạo bài viết" onClick={p.profile.onNewPost}>
+          <PencilLine size={21} aria-hidden="true" />
+        </button>
       );
+      break;
     case "notifications":
-      return (
-        <>
-          <button className="appbar-icon-button notification-appbar" type="button" aria-label="Trang Thông báo" aria-current="page">
-            <Bell size={22} aria-hidden="true" />
-            {badge}
-          </button>
-          <button className="appbar-icon-button" type="button" aria-label="Tạo bài viết mới" onClick={p.notifications.onNewPost}>
-            <UiIcon name="plus" size={31} />
-          </button>
-        </>
+      pageActions = (
+        <button className="appbar-icon-button" type="button" aria-label="Tạo bài viết mới" onClick={p.notifications.onNewPost}>
+          <UiIcon name="plus" size={27} />
+        </button>
       );
+      break;
     case "contacts":
-      return (
-        <>
-          <button className="appbar-icon-button notification-appbar" type="button" aria-label="Mở trang Thông báo" title="Thông báo" onClick={p.onOpenNotifications}>
-            <Bell size={22} aria-hidden="true" />
-            {badge}
-          </button>
-          <button className="appbar-icon-button" type="button" aria-label="Thêm bạn" onClick={p.contacts.onAddFriend}>
-            <UiIcon name="plus" size={31} />
-          </button>
-        </>
+      pageActions = (
+        <button className="appbar-icon-button" type="button" aria-label="Thêm bạn" onClick={p.contacts.onAddFriend}>
+          <UiIcon name="plus" size={27} />
+        </button>
       );
-    default:
-      return null;
+      break;
   }
+
+  return <>{pageActions}{notification}</>;
 }

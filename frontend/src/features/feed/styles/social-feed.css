@@ -827,28 +827,7 @@
     background: #fff;
   }
 
-  /* Header geometry and interactive actions */
-  .modern-shell.app-layout:has(.social-feed)
-    > .chatnet-appbar
-    .appbar-search-anchor {
-    flex: 0 1 307px;
-    width: min(29vw, 307px);
-    margin-left: auto;
-  }
-  .modern-shell.app-layout:has(.social-feed) > .chatnet-appbar .appbar-search {
-    height: 47px;
-    border-radius: 12px;
-    background: #f8fafe;
-  }
-  .modern-shell.app-layout:has(.social-feed)
-    > .chatnet-appbar
-    .appbar-search
-    input {
-    font-size: 13px;
-  }
-  .modern-shell.app-layout:has(.social-feed) > .chatnet-appbar .appbar-actions {
-    gap: 10px;
-  }
+  /* Header geometry is owned by the application layout. */
   .modern-shell.app-layout .social-feed-header-community {
     background: #eff3ff;
     color: #2563eb;
