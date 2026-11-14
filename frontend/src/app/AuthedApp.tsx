@@ -60,6 +60,7 @@ import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, tabFromPath } from "./router/routes";
+import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import type {
   FriendSearchResult,
   FriendConnection,
@@ -420,6 +421,7 @@ export default function AuthedApp({
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
+  const selectRoutedConversation = useChatConversationRoute(activeConversationId, setActiveConversationId);
   const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, pinnedExpanded, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setPinnedExpanded, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId });
 
   const activeConversationIdRef = useRef<number | null>(null);
@@ -3244,7 +3246,7 @@ export default function AuthedApp({
           selectGroupChannel={selectGroupChannel}
           sendMessage={sendMessage}
           session={session}
-          setActiveConversationId={setActiveConversationId}
+          setActiveConversationId={selectRoutedConversation}
           setChatCreateError={setChatCreateError}
           setChatDragActive={setChatDragActive}
           setChatListFilter={setChatListFilter}
