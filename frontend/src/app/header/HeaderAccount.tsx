@@ -1,4 +1,6 @@
 import UserAvatar from "../../shared/ui/UserAvatar";
+import { Button } from "../../shared/ui/button";
+import { cn } from "../../shared/lib/utils";
 
 type HeaderAccountProps = {
   variant: "profile" | "settings";
@@ -12,8 +14,10 @@ type HeaderAccountProps = {
 export default function HeaderAccount({ variant, username, displayName, onClick, desktopOnly = false }: HeaderAccountProps) {
   const settings = variant === "settings";
   return (
-    <button
-      className={`app-header-account ${settings ? "profile-page-header-account" : "social-feed-header-account"}${desktopOnly ? " app-header-account-desktop-only" : ""}`}
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn("app-header-account", settings ? "profile-page-header-account" : "social-feed-header-account", desktopOnly && "app-header-account-desktop-only")}
       type="button"
       aria-label={settings ? "Mở cài đặt tài khoản" : "Mở trang cá nhân"}
       onClick={onClick}
@@ -23,6 +27,6 @@ export default function HeaderAccount({ variant, username, displayName, onClick,
         name={displayName}
         className={`app-header-avatar ${settings ? "profile-page-header-avatar" : "social-feed-header-avatar"}`}
       />
-    </button>
+    </Button>
   );
 }

@@ -30,7 +30,8 @@ describe("consistent main-layout header actions", () => {
     "keeps the notification action and unread badge on %s",
     tab => {
       const html = renderToStaticMarkup(<HeaderActions {...actions} tab={tab} />);
-      expect(html.match(/class="appbar-icon-button notification-appbar"/g)).toHaveLength(1);
+      expect(html.match(/<button[^>]*class="[^"]*notification-appbar[^"]*"/g)).toHaveLength(1);
+      expect(html).toContain('data-slot="button"');
       expect(html).toContain("appbar-badge-count");
       expect(html).toContain(tab === "notifications" ? 'aria-current="page"' : 'aria-label="Mở thông báo"');
     },
