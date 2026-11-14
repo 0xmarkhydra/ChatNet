@@ -71,6 +71,10 @@
   "dependencies": {
     "@noble/ciphers": "2.1.1",
     "@noble/hashes": "2.3.0",
+    "@radix-ui/react-slot": "^1.5.0",
+    "@tailwindcss/vite": "^4.3.5",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "livekit-client": "^2.22.3",
     "lucide-react": "^1.52.0",
     "maplibre-gl": "^6.11.2",
@@ -79,6 +83,8 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.18.5",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.5",
     "ts-mls": "1.6.4"
   },
   "devDependencies": {
