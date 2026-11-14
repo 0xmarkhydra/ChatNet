@@ -15,6 +15,7 @@ export function useAppSession(initialSession?: Session | null) {
     isDesktopBuild ? (initialSession ?? null) : loadSession(),
   );
   const sessionRef = useRef(session);
+  const sessionEpoch = useRef(0);
   const responseCache = useRef(new SessionResponseCache());
   const [sessionClient] = useState(() =>
     createSessionClient(
@@ -36,6 +37,7 @@ export function useAppSession(initialSession?: Session | null) {
     } else {
       localStorage.setItem("chatnet-session", JSON.stringify(next));
     }
+    sessionEpoch.current += 1;
     sessionRef.current = next;
     setSession(next);
   }
@@ -49,18 +51,22 @@ export function useAppSession(initialSession?: Session | null) {
   ) {
     responseCache.current.clear();
     const current = sessionRef.current;
+    const logoutEpoch = ++sessionEpoch.current;
+    const notifyIfCurrent = (message: string, kind: ToastKind) => {
+      if (sessionEpoch.current === logoutEpoch) notify?.(message, kind);
+    };
     if (isDesktopBuild) {
       void desktopBridge()
         .auth.logout({ sessionId: current?.sessionId ?? null, revoke })
         .then((result) => {
           if (!result.revoked)
-            notify?.(
+            notifyIfCurrent(
               "Đã đăng xuất trên máy này. Chưa thu hồi được phiên trên server.",
               "warning",
             );
         })
         .catch(() =>
-          notify?.(
+          notifyIfCurrent(
             "Không xóa hoặc thu hồi được phiên an toàn. Hãy thu hồi thiết bị này từ một phiên khác.",
             "error",
           ),
@@ -76,7 +82,7 @@ export function useAppSession(initialSession?: Session | null) {
           if (!response.ok) throw new Error("revocation failed");
         })
         .catch(() =>
-          notify?.(
+          notifyIfCurrent(
             "Đã đăng xuất trên máy này. Không kết nối được server để thu hồi phiên.",
             "warning",
           ),
@@ -95,6 +101,9 @@ export function useAppSession(initialSession?: Session | null) {
 
   const endSessionRef = useLatest(endSession);
 
+  // Async logout callbacks must not report to an app shell that has unmounted.
+  useEffect(() => () => { sessionEpoch.current += 1; }, []);
+
   useEffect(() => {
     if (isDesktopBuild) {
       return desktopBridge().auth.onExpired((sessionId) => {
@@ -106,6 +115,7 @@ export function useAppSession(initialSession?: Session | null) {
       const next = loadSession();
       if (sessionRef.current?.sessionId !== next?.sessionId)
         endSessionRef.current(false, false);
+      sessionEpoch.current += 1;
       sessionRef.current = next;
       setSession(next);
     };
