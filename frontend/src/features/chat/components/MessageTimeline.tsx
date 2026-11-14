@@ -9,6 +9,7 @@ import { getLatestDirectDelivery, getLatestGroupReaderIdsByMessage } from "../ut
 import { Fragment, useMemo } from "react";
 import { GroupActivityMarker } from "./GroupActivities";
 import { messageTextParts, messageLinkHref } from "../lib/messageClipboard";
+import { getMessageGroupPosition } from "../utils/messageGrouping";
 import LinkPreview from "./LinkPreview";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import type { ChatSectionProps } from "./ChatSectionProps";
@@ -59,6 +60,12 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                       const groupReaderIds = activeConversation.type === 'group' && mine
                         ? groupReaderIdsByMessage.get(message.id) || []
                         : []
+                      const groupPosition = getMessageGroupPosition(visibleMessages, index, {
+                        gapBeforeId: messageGapBefore,
+                        interruptions: activeConversation.type === 'group' ? sortedGroupActivityEvents : undefined,
+                      })
+                      const groupStart = groupPosition === 'single' || groupPosition === 'start'
+                      const groupEnd = groupPosition === 'single' || groupPosition === 'end'
                       const translatedText = !message.deleted ? translations[message.id] : ''
                       const photoOnly = !message.deleted && !message.text && message.attachments?.length === 1 && message.attachments[0].kind === 'image' && Boolean(message.attachments[0].url)
                       const originalVisible = Boolean(translationOriginals[message.id])
@@ -117,7 +124,8 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                           )}
                         <article
                           data-message-id={message.id}
-                          className={'message message-press-target' + (mine ? ' mine' : '') + (activeConversation.type === 'group' ? ' channel-message' : '')}
+                          className={'message message-press-target' + (mine ? ' mine' : '') + (activeConversation.type === 'group' ? ' channel-message' : '') + (groupPosition !== 'single' ? ` message-group-${groupPosition}` : '')}
+                          title={!groupEnd ? formatTime(message.createdAt) + (message.editedAt && !message.deleted ? ' · đã sửa' : '') : undefined}
                           onPointerDown={(event) => {
                             suppressMessageClick.current = null
                             if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.pointerType, event.target)
@@ -148,9 +156,9 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                         >
                           {!mine && (
                             <>
-                              <UserAvatar username={message.sender} name={userLabel(message.senderDisplayName, message.sender)}
-                                className="chat-message-sender-avatar" online={false} />
-                              <div className={activeConversation.type === 'group' ? 'message-meta' : 'message-meta chat-message-meta-direct'}>{userLabel(message.senderDisplayName, message.sender)}</div>
+                              {groupEnd && <UserAvatar username={message.sender} name={userLabel(message.senderDisplayName, message.sender)}
+                                className="chat-message-sender-avatar" online={false} />}
+                              {groupStart && <div className={activeConversation.type === 'group' ? 'message-meta' : 'message-meta chat-message-meta-direct'}>{userLabel(message.senderDisplayName, message.sender)}</div>}
                             </>
                           )}
                           {message.replyToMessageId && (
