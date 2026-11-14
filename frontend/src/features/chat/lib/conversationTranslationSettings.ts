@@ -1,4 +1,4 @@
-import { isSupportedLanguageCode } from '../../i18n/utils/languages'
+import { isSupportedLanguageCode } from '../../i18n'
 
 export type ChatTranslationDisplay = 'adaptive' | 'bilingual' | 'translated'
 

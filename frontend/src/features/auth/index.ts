@@ -2,6 +2,7 @@ export type { ManagedAccountSession } from './types'
 export { verifyClaimedE2EEKeyPackage } from './lib/e2eeIdentity'
 export type { ClaimedE2EEKeyPackage } from './lib/e2eeIdentity'
 export type { Session } from '../../shared/types/session'
+export { default as AccountSessionsPanel } from './components/AccountSessionsPanel'
 // Public Auth capability boundary for ChatNet's experimental MLS pilot.
 // Cross-feature consumers must use this entrypoint, not Auth implementation paths.
 export { generateE2EEDeviceIdentity, signE2EEDeviceRegistration, signE2EEKeyPackage } from './lib/e2eeIdentity'

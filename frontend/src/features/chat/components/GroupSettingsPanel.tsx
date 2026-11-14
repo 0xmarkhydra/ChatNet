@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { ArrowLeft, Bell, Check, ChevronRight, Clock3, Copy, Crown, FileText, Files, Info, LogOut, MoreHorizontal, ScrollText, Search, ShieldCheck, ShieldOff, UserMinus, UserPlus, UserCheck, UsersRound, X } from 'lucide-react'
 import type { GroupMember, Conversation } from '../types'
-import type { FriendConnection } from '../../contacts/types'
+import type { FriendConnection } from '../../contacts'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import GroupGovernancePanel from './GroupGovernancePanel'
 import GroupManagementDetails from './GroupManagementDetails'

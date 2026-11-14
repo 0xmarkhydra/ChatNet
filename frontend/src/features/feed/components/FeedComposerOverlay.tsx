@@ -1,4 +1,4 @@
-import ProfileOverlay from "../../profile/components/ProfileOverlay";
+import { ProfileOverlay } from "../../profile";
 import { type Post } from "../types";
 import { type SetStateAction } from "react";
 import type { Dispatch, ReactNode } from "react";

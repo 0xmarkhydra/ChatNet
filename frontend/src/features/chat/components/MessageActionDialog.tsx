@@ -1,7 +1,7 @@
 import MessageActions from "./MessageActions";
 import { type Message } from "../types";
 import { type MessageCopyTarget } from "../utils/messageCopyTarget";
-import { type Session } from "../../auth/lib/session";
+import { type Session } from "../../../shared/types/session";
 import { type SetStateAction } from "react";
 import type { PinnedMessage } from "../types";
 import type { Dispatch } from "react";

@@ -1,5 +1,5 @@
 import ProfileOverlay from "./ProfileOverlay";
-import { type Post } from "../../feed/types";
+import { type Post } from "../../feed";
 import { type SetStateAction } from "react";
 import type { Dispatch, ReactNode } from "react";
 

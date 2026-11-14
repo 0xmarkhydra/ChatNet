@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowRight, MessageCircle, Phone, Plus, Search, Users, Video } from 'lucide-react'
 import type { Conversation } from '../types'
-import { CallHeaderActions } from '../../calls/components/CallManager'
+import { CallHeaderActions } from '../../calls'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 
 type Props = {

@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Bell, Check, Clock3, FileText, Image as ImageIco
 import type { Conversation, GroupMember, Message } from '../types'
 import type { QueuedChatMessage } from '../lib/chatOutbox'
 import { shouldSendChatOnEnter } from '../utils/composerKeyboard'
-import type { FriendConnection } from '../../contacts/types'
+import type { FriendConnection } from '../../contacts'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../../shared/ui/MediaAttachmentsView'
 import GroupGovernancePanel from './GroupGovernancePanel'

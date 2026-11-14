@@ -1,10 +1,10 @@
 import type { FormEvent } from 'react'
-import type { UI_MESSAGES } from '../../i18n/lib/i18n'
+import type { UIMessageKey } from '../../i18n'
 import type { ProfileMediaState } from '../types'
 
 type Props = {
   saveProfileIdentity: (event: FormEvent) => void
-  t: (key: keyof typeof UI_MESSAGES) => string
+  t: (key: UIMessageKey) => string
   profileDisplayNameDraft: string
   setProfileDisplayNameDraft: (value: string) => void
   profileUsernameDraft: string

@@ -1,8 +1,8 @@
 import { attachmentRequestBody, type MediaAttachment } from "../../../shared/utils/media";
 import { type Story } from "../types";
-import { type QueuedChatMessage, enqueueChatMessage } from "../../chat/lib/chatOutbox";
+import { type QueuedChatMessage, enqueueChatMessage } from "../../chat";
 import { userLabel } from "../../../shared/utils/userLabel";
-import { type Conversation } from "../../chat/types";
+import { type Conversation } from "../../chat";
 import { useSession } from "../../../shared/context/SessionContext";
 import { useApi } from "../../../shared/context/ApiContext";
 import { useNotice } from "../../../shared/context/NoticeContext";

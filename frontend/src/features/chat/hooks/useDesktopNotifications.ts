@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import type { Session } from '../../auth/lib/session'
+import type { Session } from '../../../shared/types/session'
 import type { Conversation, Message } from '../types'
 import { desktopBridge, isDesktopBuild } from '../../../platform/desktop'
 import { findConversation, getUnreadSummary } from '../api/conversations'

@@ -1,8 +1,8 @@
 import { type PushState, setupOneSignal, disableOneSignalPush, enableOneSignalPush, isPushDisabled } from "../lib/onesignal";
 import { syncPushSubscription, requestPushTest } from "../api/push";
 import { persistMessageSoundEnabled, IncomingMessageSound } from "../lib/incomingSound";
-import type { InstallPromptEvent } from "../../pwa/types";
-import { type Session } from "../../auth/lib/session";
+import type { InstallPromptEvent } from "../../pwa";
+import { type Session } from "../../../shared/types/session";
 import { type SetStateAction } from "react";
 import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";

@@ -3,8 +3,8 @@ import { type MediaAttachment, type PresignedUpload } from "../../../shared/util
 import { emptyDraft, type MessageDraft } from "../types";
 import { uploadPresignedFile } from "../lib/mediaUpload";
 import { presignUpload, relayUpload } from "../api/media";
-import { type Post } from "../../feed/types";
-import { type Session } from "../../auth/lib/session";
+import { type Post } from "../../feed";
+import { type Session } from "../../../shared/types/session";
 import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 

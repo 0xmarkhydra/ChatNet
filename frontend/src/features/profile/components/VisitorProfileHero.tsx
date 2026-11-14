@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, MessageCircle, UserPlus, UserMinus, UserCheck } from 'lucide-react'
 import UserAvatar, { profileAssetUrl } from '../../../shared/ui/UserAvatar'
 import { userLabel } from '../../../shared/utils/userLabel'
-import type { FriendSearchResult } from '../../contacts/types'
+import type { FriendSearchResult } from '../../contacts'
 import ProfileNote from './ProfileNote'
 
 export type VisitorProfileData = FriendSearchResult & {

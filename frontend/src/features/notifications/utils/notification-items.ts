@@ -1,6 +1,6 @@
-import type { FriendConnection } from '../../contacts/types'
-import type { Conversation } from '../../chat/types'
-import type { PostMentionNotification } from '../../feed/utils/postMentionNotifications'
+import type { FriendConnection } from '../../contacts'
+import type { Conversation } from '../../chat'
+import type { PostMentionNotification } from '../../feed'
 import { isIncomingFriendRequest, hasUnreadConversation } from './notification-count'
 
 export type NotificationFilter = 'all' | 'unread' | 'mentions'

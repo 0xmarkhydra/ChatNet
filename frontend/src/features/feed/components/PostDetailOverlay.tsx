@@ -6,7 +6,7 @@ import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import FeedReactionControl from "./FeedReactionControl";
 import UiIcon from "../../../shared/ui/UiIcon";
 import { type Post } from "../types";
-import { type Session } from "../../auth/lib/session";
+import { type Session } from "../../../shared/types/session";
 import { type SetStateAction } from "react";
 import type { Dispatch, ReactNode } from "react";
 

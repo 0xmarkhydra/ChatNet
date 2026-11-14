@@ -1,4 +1,4 @@
-import ProfileOverlay from "../../profile/components/ProfileOverlay";
+import { ProfileOverlay } from "../../profile";
 import StoryComposer from "./StoryComposer";
 import { type SetStateAction } from "react";
 import type { Dispatch } from "react";

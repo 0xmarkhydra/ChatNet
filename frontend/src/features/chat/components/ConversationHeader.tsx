@@ -2,7 +2,7 @@ import { Search, Users, Languages, MoreHorizontal, X, Hash } from "lucide-react"
 import ConversationAvatar from "./ConversationAvatar";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { CategoryAssignment } from "./ConversationCategories";
-import { CallHeaderActions } from "../../calls/components/CallManager";
+import { CallHeaderActions } from "../../calls";
 import { createPortal } from "react-dom";
 import type { ChatSectionProps } from "./ChatSectionProps";
 import type { Dispatch, SetStateAction } from "react";

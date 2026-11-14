@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronRight, Search, UsersRound } from 'lucide-react'
-import type { Conversation } from '../../chat/types'
+import type { Conversation } from '../../chat'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 
 type Props = {

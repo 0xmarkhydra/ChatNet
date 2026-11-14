@@ -1,6 +1,6 @@
 import { getCurrentPositionSmart, geolocationErrorMessage } from "../lib/geolocation";
-import type { FriendSearchResult } from "../../contacts/types";
-import { type Session } from "../../auth/lib/session";
+import type { FriendSearchResult } from "../../contacts";
+import { type Session } from "../../../shared/types/session";
 import { useRef, type SetStateAction } from "react";
 import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
