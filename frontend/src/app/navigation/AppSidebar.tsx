@@ -2,6 +2,8 @@ import { useLayoutEffect, useRef } from 'react'
 import { Bell, Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings, ShoppingBag, UserRoundCheck } from 'lucide-react'
 import type { Tab } from '../../shared/types/navigation'
 import UserAvatar from '../../shared/ui/UserAvatar'
+import { Button } from '../../shared/ui/button'
+import { cn } from '../../shared/lib/utils'
 
 type Props = {
   tab: Tab
@@ -104,11 +106,11 @@ export default function AppSidebar({
       <nav className="app-sidebar-nav" aria-label="Các khu vực" ref={navRef}>
         <span ref={pillRef} className="sidebar-liquid-pill" aria-hidden="true" />
         {mainItems.map(({ label, Icon, active, action, count }) => (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             key={label}
             aria-label={label}
-            className={active ? 'app-sidebar-link is-active' : 'app-sidebar-link'}
+            className={cn('app-sidebar-link', active && 'is-active')}
             aria-current={active ? 'page' : undefined}
             ref={active ? activeButtonRef : undefined}
             onClick={action}
@@ -116,25 +118,25 @@ export default function AppSidebar({
             <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
             <span>{label}</span>
             {count ? <b className="app-sidebar-count">{count > 99 ? '99+' : count}</b> : null}
-          </button>
+          </Button>
         ))}
       </nav>
       <div className="app-sidebar-secondary">
-        <button type="button" className={tab === 'notifications' ? 'app-sidebar-link is-active' : 'app-sidebar-link'} aria-label="Thông báo" aria-current={tab === 'notifications' ? 'page' : undefined} onClick={() => onNavigate('notifications')}>
+        <Button variant="ghost" className={cn('app-sidebar-link', tab === 'notifications' && 'is-active')} aria-label="Thông báo" aria-current={tab === 'notifications' ? 'page' : undefined} onClick={() => onNavigate('notifications')}>
           <Bell size={22} strokeWidth={1.8} aria-hidden="true" /><span>Thông báo</span>
           {notificationCount > 0 && <b className="app-sidebar-count">{notificationCount > 99 ? '99+' : notificationCount}</b>}
-        </button>
-        <button type="button" className={tab === 'feed' && feedSaved ? 'app-sidebar-link is-active' : 'app-sidebar-link'} aria-label="Đã lưu" aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
+        </Button>
+        <Button variant="ghost" className={cn('app-sidebar-link', tab === 'feed' && feedSaved && 'is-active')} aria-label="Đã lưu" aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
           <Bookmark size={22} strokeWidth={1.8} aria-hidden="true" /><span>Đã lưu</span>
-        </button>
-        <button type="button" className={settingsActive ? 'app-sidebar-link is-active' : 'app-sidebar-link'} aria-label="Cài đặt" aria-current={settingsActive ? 'page' : undefined} onClick={onSettings}>
+        </Button>
+        <Button variant="ghost" className={cn('app-sidebar-link', settingsActive && 'is-active')} aria-label="Cài đặt" aria-current={settingsActive ? 'page' : undefined} onClick={onSettings}>
           <Settings size={22} strokeWidth={1.8} aria-hidden="true" /><span>Cài đặt</span>
-        </button>
+        </Button>
       </div>
-      <button type="button" className={tab === 'profile' && !settingsActive ? 'app-sidebar-account is-active' : 'app-sidebar-account'} onClick={() => onNavigate('profile')} aria-label="Cá nhân" aria-current={tab === 'profile' && !settingsActive ? 'page' : undefined}>
+      <Button variant="ghost" className={cn('app-sidebar-account', tab === 'profile' && !settingsActive && 'is-active')} onClick={() => onNavigate('profile')} aria-label="Cá nhân" aria-current={tab === 'profile' && !settingsActive ? 'page' : undefined}>
         <UserAvatar username={username} name={displayName} className="app-sidebar-avatar" online />
         <span className="app-sidebar-account-copy"><strong>{displayName}</strong><small>Đang hoạt động</small></span>
-      </button>
+      </Button>
     </aside>
   )
 }

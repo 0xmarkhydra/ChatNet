@@ -59,6 +59,8 @@ describe("AppSidebar navigation", () => {
   it("shows notifications as its own route, not as feed", () => {
     const { button, onNavigate } = renderSidebar("notifications");
     expect(button("Thông báo").getAttribute("aria-current")).toBe("page");
+    expect(button("Thông báo").getAttribute("data-slot")).toBe("button");
+    expect(button("Tin nhắn").getAttribute("type")).toBe("button");
     expect(button("Bảng tin").hasAttribute("aria-current")).toBe(false);
     expect(button("Bạn bè").hasAttribute("aria-current")).toBe(false);
     expect(button("Thông báo").textContent).toContain("3");
