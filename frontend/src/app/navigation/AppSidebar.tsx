@@ -110,7 +110,7 @@ export default function AppSidebar({
             variant="ghost"
             key={label}
             aria-label={label}
-            className={cn('app-sidebar-link', active && 'is-active')}
+            className={cn('app-sidebar-link justify-start', active && 'is-active')}
             aria-current={active ? 'page' : undefined}
             ref={active ? activeButtonRef : undefined}
             onClick={action}
@@ -122,18 +122,18 @@ export default function AppSidebar({
         ))}
       </nav>
       <div className="app-sidebar-secondary">
-        <Button variant="ghost" className={cn('app-sidebar-link', tab === 'notifications' && 'is-active')} aria-label="Thông báo" aria-current={tab === 'notifications' ? 'page' : undefined} onClick={() => onNavigate('notifications')}>
+        <Button variant="ghost" className={cn('app-sidebar-link justify-start', tab === 'notifications' && 'is-active')} aria-label="Thông báo" aria-current={tab === 'notifications' ? 'page' : undefined} onClick={() => onNavigate('notifications')}>
           <Bell size={22} strokeWidth={1.8} aria-hidden="true" /><span>Thông báo</span>
           {notificationCount > 0 && <b className="app-sidebar-count">{notificationCount > 99 ? '99+' : notificationCount}</b>}
         </Button>
-        <Button variant="ghost" className={cn('app-sidebar-link', tab === 'feed' && feedSaved && 'is-active')} aria-label="Đã lưu" aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
+        <Button variant="ghost" className={cn('app-sidebar-link justify-start', tab === 'feed' && feedSaved && 'is-active')} aria-label="Đã lưu" aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
           <Bookmark size={22} strokeWidth={1.8} aria-hidden="true" /><span>Đã lưu</span>
         </Button>
-        <Button variant="ghost" className={cn('app-sidebar-link', settingsActive && 'is-active')} aria-label="Cài đặt" aria-current={settingsActive ? 'page' : undefined} onClick={onSettings}>
+        <Button variant="ghost" className={cn('app-sidebar-link justify-start', settingsActive && 'is-active')} aria-label="Cài đặt" aria-current={settingsActive ? 'page' : undefined} onClick={onSettings}>
           <Settings size={22} strokeWidth={1.8} aria-hidden="true" /><span>Cài đặt</span>
         </Button>
       </div>
-      <Button variant="ghost" className={cn('app-sidebar-account', tab === 'profile' && !settingsActive && 'is-active')} onClick={() => onNavigate('profile')} aria-label="Cá nhân" aria-current={tab === 'profile' && !settingsActive ? 'page' : undefined}>
+      <Button variant="ghost" className={cn('app-sidebar-account justify-start', tab === 'profile' && !settingsActive && 'is-active')} onClick={() => onNavigate('profile')} aria-label="Cá nhân" aria-current={tab === 'profile' && !settingsActive ? 'page' : undefined}>
         <UserAvatar username={username} name={displayName} className="app-sidebar-avatar" online />
         <span className="app-sidebar-account-copy"><strong>{displayName}</strong><small>Đang hoạt động</small></span>
       </Button>
