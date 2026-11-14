@@ -15,6 +15,18 @@ export const ROUTE = {
   settings: "/settings",
 } as const;
 
+/** Stable shareable chat detail route; only positive safe integer IDs are valid. */
+export function chatConversationPath(id: number): string {
+  return `${TAB_PATH.chat}/${id}`;
+}
+
+export function chatConversationIdFromPath(pathname: string): number | null {
+  const match = /^\/chat\/([1-9]\d*)\/?$/.exec(pathname);
+  if (!match) return null;
+  const id = Number(match[1]);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
 /** Keep route ownership in app; business state stays with the owning feature. */
 export function tabFromPath(pathname: string, legacyTab?: string | null): Tab {
   const segment = pathname.split("/")[1];

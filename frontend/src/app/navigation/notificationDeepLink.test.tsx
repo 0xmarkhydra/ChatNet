@@ -23,7 +23,7 @@ describe("notification deep links", () => {
       pathname: "/feed", search: "?invite=someone&conversation=12&message=34&tab=feed", hash: "#room",
     })).toEqual({
       tab: "feed", conversationId: 12, messageId: 34,
-      to: { pathname: "/chat", search: "?invite=someone", hash: "#room" },
+      to: { pathname: "/chat/12", search: "?invite=someone", hash: "#room" },
     });
     expect(notificationRouteTarget({ pathname: "/chat", search: "?invite=someone", hash: "" })).toBeNull();
   });
@@ -64,8 +64,8 @@ describe("notification deep links", () => {
 
     act(() => container.querySelector("button")?.click());
     expect(window.location.pathname + window.location.search).toBe("/");
-    expect(window.location.hash).toBe("#/chat?invite=someone");
-    expect(container.querySelector("output")?.textContent).toBe("/chat?invite=someone");
+    expect(window.location.hash).toBe("#/chat/12?invite=someone");
+    expect(container.querySelector("output")?.textContent).toBe("/chat/12?invite=someone");
   });
 });
 

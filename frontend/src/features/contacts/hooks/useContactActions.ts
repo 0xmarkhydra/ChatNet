@@ -169,8 +169,8 @@ export function useContactActions({
       return;
     }
     setDesktopSection(null);
-    setActiveConversationId(direct.id);
     setTab('chat');
+    setActiveConversationId(direct.id);
   }
 
   return {
