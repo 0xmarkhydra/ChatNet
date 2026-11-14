@@ -81,6 +81,21 @@ describe("app route tree", () => {
     expect(page()).not.toBeNull();
   });
 
+  it("renders visitor profile deep links inside the authenticated shell", () => {
+    const { location, page, onMount } = renderAt("/users/alice");
+    expect(location()).toBe("/users/alice");
+    expect(page()?.textContent).toBe("Current screen");
+    expect(onMount).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects unsupported or malformed visitor profile paths", () => {
+    for (const path of ["/users", "/users/alice/more", "/users/%2F"]) {
+      const { container, page } = renderAt(path);
+      expect(page()).toBeNull();
+      expect(container.textContent).toContain("Không tìm thấy trang");
+    }
+  });
+
   it("rejects malformed or unsafe conversation IDs", () => {
     for (const path of ["/chat/0", "/chat/nope", "/chat/9007199254740992", "/chat/42/more"]) {
       const { container, page } = renderAt(path);

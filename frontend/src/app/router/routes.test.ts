@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROUTE, TAB_PATH, tabFromPath } from "./routes";
+import { ROUTE, TAB_PATH, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./routes";
 
 describe("app URL routing", () => {
   it("maps every main tab to a stable URL", () => {
@@ -17,6 +17,18 @@ describe("app URL routing", () => {
     expect(tabFromPath("/unknown", "feed")).toBe("chat");
     expect(tabFromPath("/", "unknown")).toBe("chat");
   });
+  it("supports shareable visitor profile URLs and safely rejects malformed paths", () => {
+    expect(visitorProfilePath("alice")).toBe("/users/alice");
+    expect(visitorProfilePath("a.b")).toBe("/users/a.b");
+    expect(visitorUsernameFromPath("/users/alice")).toBe("alice");
+    expect(visitorUsernameFromPath("/users/alice/")).toBe("alice");
+    expect(visitorUsernameFromPath("/users/a%2Eb")).toBe("a.b");
+    for (const path of ["/users", "/users/", "/users/a/b", "/users/%2F", "/users/%E0%A4%A", "/users/%00"]) {
+      expect(visitorUsernameFromPath(path)).toBeNull();
+    }
+    expect(tabFromPath("/users/alice")).toBe("profile");
+  });
+
   it("matches complete route segments", () => {
     expect(tabFromPath("/feed-extra")).toBe("chat");
     expect(tabFromPath("/chat/123")).toBe("chat");

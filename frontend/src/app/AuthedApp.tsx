@@ -59,7 +59,7 @@ import {
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, tabFromPath } from "./router/routes";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./router/routes";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
 import type {
@@ -543,7 +543,12 @@ export default function AuthedApp({
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
   const [contactsScreen, setContactsScreen] = useState<FriendsScreen>("directory");
-  const [visitorUsername, setVisitorUsername] = useState<string | null>(null);
+  const visitorUsername = visitorUsernameFromPath(routeLocation.pathname);
+  function closeVisitor() {
+    const returnTo = routeLocation.state?.visitorReturnTo;
+    navigate(typeof returnTo === "string" && returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? returnTo : TAB_PATH.profile, { replace: true });
+  }
   function openVisitor(username: string) {
     if (username === sessionRef.current?.user.username) {
       setTab("profile");
@@ -551,11 +556,14 @@ export default function AuthedApp({
       setProfileTimelineOpen(true);
       return;
     }
-    setVisitorUsername(username);
+    const path = visitorProfilePath(username);
+    if (routeLocation.pathname !== path) {
+      navigate(path, { state: { visitorReturnTo: routeLocation.pathname + routeLocation.search + routeLocation.hash } });
+    }
   }
   function setFriendPreview(friend: FriendSearchResult | null) {
     if (friend) openVisitor(friend.username);
-    else setVisitorUsername(null);
+    else if (visitorUsername) closeVisitor();
   }
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
   const [desktopSectionState, setDesktopSection] = useState<
@@ -2063,7 +2071,7 @@ export default function AuthedApp({
   }
 
   function logout(revoke = true, clearStorage = true) {
-    setVisitorUsername(null);
+    if (visitorUsername) navigate(TAB_PATH.chat, { replace: true });
     const current = sessionRef.current;
     const currentToken = current?.token;
     ++nearbyRequest.current;
@@ -2939,9 +2947,8 @@ export default function AuthedApp({
           onRemoveFriend={(friend) => removeAcceptedFriend(friend, { keepProfileOpen: true })}
           onMessage={async (username) => {
             await openDirectByUsername(username);
-            setVisitorUsername(null);
           }}
-          onClose={() => setVisitorUsername(null)}
+          onClose={closeVisitor}
           onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
           onPostOpen={(post) => {
             setPosts((current) => [
