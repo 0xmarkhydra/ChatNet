@@ -260,7 +260,7 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
-import { consumeNotificationDeepLink, notificationDeepLink } from "./navigation/notificationDeepLink";
+import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { consumeInviteDeepLink } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
 import HeaderActions from "./header/HeaderActions";
@@ -1767,35 +1767,28 @@ export default function AuthedApp({
 
   useEffect(() => {
     if (!session?.token) return;
-
     const openNotificationTarget = () => {
-      const url = new URL(window.location.href);
-      const { tab: targetTab, conversationId, messageId } = notificationDeepLink(url.searchParams);
-      if (targetTab) setTab(targetTab);
-      if (conversationId !== null) {
-        setTab("chat");
+      const target = notificationRouteTarget(routeLocation);
+      if (!target) return;
+
+      if (target.conversationId !== null) {
         setDesktopSection(null);
         setChatSearchJump(
-          messageId !== null
+          target.messageId !== null
             ? {
-                conversationId,
-                messageId,
+                conversationId: target.conversationId,
+                messageId: target.messageId,
                 revision: ++chatSearchJumpRevision.current,
               }
             : null,
         );
-        setActiveConversationId(conversationId);
+        setActiveConversationId(target.conversationId);
       }
-      consumeNotificationDeepLink(url);
+      // Replace only the consumed query keys; keep the router's location and history in sync.
+      navigate(target.to, { replace: true, state: routeLocation.state });
     };
     openNotificationTarget();
-    window.addEventListener("popstate", openNotificationTarget);
-    window.addEventListener("pageshow", openNotificationTarget);
-    return () => {
-      window.removeEventListener("popstate", openNotificationTarget);
-      window.removeEventListener("pageshow", openNotificationTarget);
-    };
-  }, [session?.token]);
+  }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, navigate]);
 
   useEffect(() => {
     setPushPrompt(false);
