@@ -539,7 +539,7 @@ export default function AuthedApp({
     const restored = restoreChatOutbox(session?.user.id ?? 0, nextSessionId);
     chatOutboxRef.current = restored;
     setChatOutbox(restored);
-    sendingClientIDs.current.clear();
+    sendingClientIDs.current = new Set<string>();
     retryOutboxBusy.current = false;
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
@@ -2032,7 +2032,7 @@ export default function AuthedApp({
     chatOutboxRef.current = [];
     setChatOutbox([]);
     chatOutboxSession.current = "";
-    sendingClientIDs.current.clear();
+    sendingClientIDs.current = new Set<string>();
     pendingSend.current = null;
     endSession(revoke, clearStorage, setNotice);
     setConversations([]);
