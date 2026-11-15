@@ -62,6 +62,7 @@ let friendRequestsSent = 0
 let rejectStoryDirect = false
 const storyReplyRequests = []
 const mediaOnly = process.argv.includes('--media-only')
+const headerOnly = process.argv.includes('--header-only')
 
 
 try {
@@ -248,6 +249,45 @@ try {
   await page.goto(origin)
   const sidebar = page.locator('.app-sidebar')
   await sidebar.waitFor()
+  if (headerOnly) {
+    const header = page.locator('main > .chatnet-appbar')
+    for (const [path, label, navLabel] of [
+      ['/chat', 'Tin nhắn', 'Tin nhắn'], ['/feed', 'Bảng tin', 'Bảng tin'],
+      ['/discover', 'Khám phá', 'Khám phá'], ['/marketplace', 'Marketplace', 'Marketplace'],
+      ['/contacts', 'Bạn bè', 'Bạn bè'], ['/notifications', 'Thông báo', 'Thông báo'], ['/profile', 'Hồ sơ cá nhân', 'Cá nhân'],
+    ]) {
+      await sidebar.getByRole('button', { name: navLabel, exact: true }).click()
+      await header.waitFor({ state: 'visible' })
+      await header.locator('.app-page-heading strong').getByText(label, { exact: true }).waitFor()
+      await page.waitForFunction(() => document.querySelector('main > .chatnet-appbar')?.getBoundingClientRect().height >= 85)
+      const size = await header.evaluate(node => ({
+        height: node.getBoundingClientRect().height,
+        background: getComputedStyle(node).backgroundColor,
+      }))
+      assert(Math.abs(size.height - 86) < 2 && size.background === 'rgb(255, 255, 255)',
+        path + ': desktop Header must match 86px white Penpot shell: ' + JSON.stringify(size))
+      await header.locator('.appbar-search-anchor input').waitFor({ state: 'visible' })
+      await header.locator('.notification-appbar').waitFor({ state: 'visible' })
+      await header.locator('.app-header-account').waitFor({ state: 'visible' })
+    }
+    await sidebar.getByRole('button', { name: 'Khám phá' }).click()
+    const search = header.locator('.appbar-search')
+    const box = await search.boundingBox()
+    assert(Math.abs(box.height - 46) < 2 && Math.abs(box.width - 321) < 2,
+      'Desktop Header search should be 321x46: ' + JSON.stringify(box))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(origin + '/chat')
+    await page.locator('.conversation-avatar-rail').waitFor({ state: 'visible' })
+    assert(await page.locator('.app-sidebar').isHidden(), 'Mobile desktop sidebar must remain hidden')
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2),
+      'Mobile layout must not overflow horizontally')
+    assert(errors.length === 0, 'Header smoke test must not throw browser errors: ' + JSON.stringify(errors))
+    console.log('Header Penpot smoke PASS: shared desktop topbar, seven routes, search and mobile conversation rail')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   // A compact sidebar must not draw a vertical scrollbar over the chat content.
   const navScrollbars = await sidebar.locator('.app-sidebar-nav').evaluate(node => ({
     scrollbarWidth: getComputedStyle(node).scrollbarWidth,
@@ -256,10 +296,11 @@ try {
   assert(navScrollbars.scrollbarWidth === 'none' && navScrollbars.overflowY === 'auto',
     'Navigation should remain scrollable without a visible scrollbar: ' + JSON.stringify(navScrollbars))
   await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
-  const chatList = page.locator('.conversation-list.zalo-conversation-list')
+  const chatList = page.locator('.desktop-conversation-rail')
   await chatList.waitFor({ state: 'visible' })
-  assert(await chatList.evaluate(node => getComputedStyle(node).overflowX === 'hidden'),
-    'Conversation list must not show an accidental horizontal scrollbar')
+  await chatList.locator('.desktop-conversation-rail-entry').first().waitFor({ state: 'visible' })
+  assert(await chatList.locator('.desktop-conversation-rail-scroller').evaluate(node => getComputedStyle(node).overflowX === 'hidden'),
+    'Avatar conversation rail must not show an accidental horizontal scrollbar')
 
   // Hover must stay open across the entire 250px flyout, not just the 76px icon rail.
   const mainBeforeHover = await page.locator('.modern-frame').boundingBox()
@@ -407,7 +448,7 @@ try {
     // Start the chat portion without the post=... deep-link that keeps Feed active.
     await page.goto(origin)
     await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
-    await page.locator('.zalo-conversation-list .conversation-item').first().click()
+    await page.locator('.desktop-conversation-rail-entry').first().click()
     const chatImages = page.locator('.chat-message-media .media-image-button')
     try {
       await chatImages.first().waitFor({ state: 'visible', timeout: 9000 })
@@ -1244,7 +1285,7 @@ try {
   await page.getByRole('dialog', { name: 'Tùy chọn bài viết' }).waitFor({ state: 'hidden' })
   assert(await page.getByRole('dialog', { name: /Chi tiết bài viết/ }).count() === 0,
     'Desktop post comments must replace the old post-detail modal')
-  assert(new URL(page.url()).searchParams.get('post') === '88',
+  assert(new URL(page.url()).pathname === '/feed/posts/88',
     'Comment navigation must update the shareable post URL')
   assert(await commentsPage.locator('.post-comments-original').isVisible() &&
     await commentsPage.locator('.post-comments-thread').isVisible(),
@@ -1368,7 +1409,7 @@ try {
   // Sidebar navigation was simplified: group and call workflows are now covered
   // by the dedicated group/chat/call checks, not the retired hub menu.
   await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
-  await page.locator('.conversation-item').filter({ hasText: 'Minh Anh' }).first().waitFor({ state: 'visible' })
+  await page.locator('.desktop-conversation-rail-entry[title="Minh Anh"]').waitFor({ state: 'visible' })
   await sidebar.getByRole('button', { name: 'Bảng tin' }).click()
   await feed.waitFor({ state: 'visible' })
 
