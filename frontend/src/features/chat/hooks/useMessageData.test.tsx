@@ -202,4 +202,53 @@ describe('chat message pagination visit isolation', () => {
     }
   })
 
+  it('refetches current conversation only on reconnect for the active session', async () => {
+    const app = setup()
+    const session = account('A')
+    try {
+      await app.render(session)
+      await app.respond(0, [message(10)])
+      expect(app.current.messages.map(item => item.id)).toEqual([10])
+
+      await act(async () => {
+        window.dispatchEvent(new CustomEvent('chatnet:sse-reconnected', {
+          detail: { sessionId: 'other-session' },
+        }))
+      })
+      expect(app.jobs).toHaveLength(1)
+
+      await act(async () => {
+        window.dispatchEvent(new CustomEvent('chatnet:sse-reconnected', {
+          detail: { sessionId: 'A' },
+        }))
+      })
+      expect(app.jobs).toHaveLength(2)
+      await app.respond(1, [message(10), message(11)])
+      expect(app.current.messages.map(item => item.id)).toEqual([10, 11])
+      expect(app.notice).not.toHaveBeenCalled()
+    } finally { await app.close() }
+  })
+
+  it('does not overwrite reconnect backfill with an earlier in-flight history response', async () => {
+    const app = setup()
+    const session = account('A')
+    try {
+      await app.render(session)
+      expect(app.jobs).toHaveLength(1)
+
+      await act(async () => {
+        window.dispatchEvent(new CustomEvent('chatnet:sse-reconnected', {
+          detail: { sessionId: 'A' },
+        }))
+      })
+      expect(app.jobs).toHaveLength(2)
+      await app.respond(1, [message(20), message(21)])
+      expect(app.current.messages.map(item => item.id)).toEqual([20, 21])
+
+      await app.respond(0, [message(10)])
+      expect(app.current.messages.map(item => item.id)).toEqual([20, 21])
+      expect(app.notice).not.toHaveBeenCalled()
+    } finally { await app.close() }
+  })
+
 })

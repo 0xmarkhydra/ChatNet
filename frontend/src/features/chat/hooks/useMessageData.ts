@@ -69,6 +69,16 @@ export function useMessageData({
     activeConversationIdRef.current === activeConversationId &&
     activeChannelIdRef.current === activeChannelId
   const [messages, setMessages] = useState<Message[]>([])
+  const [reconnectRevision, setReconnectRevision] = useState(0)
+  useEffect(() => {
+    const refreshOnReconnect = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId?: string }>).detail
+      if (detail?.sessionId !== session?.sessionId || sessionRef.current !== session) return
+      setReconnectRevision(current => current + 1)
+    }
+    window.addEventListener('chatnet:sse-reconnected', refreshOnReconnect)
+    return () => window.removeEventListener('chatnet:sse-reconnected', refreshOnReconnect)
+  }, [session, sessionRef])
   const [privacyRevision, setPrivacyRevision] = useState(0)
   useEffect(() => {
     const refresh = () => setPrivacyRevision(current => current + 1)
@@ -200,6 +210,7 @@ export function useMessageData({
     translationPreferencesLoaded,
     jumpToMessage?.revision,
     privacyRevision,
+    reconnectRevision,
   ])
 
   useEffect(() => {

@@ -145,7 +145,8 @@ export function useOutboxDelivery({
     const retryIdentity = sessionRef.current;
     retryOutboxBusyRef.current = true;
     try {
-      while (navigator.onLine) {
+      while (navigator.onLine && sessionRef.current === retryIdentity &&
+             chatOutboxSession.current === retryIdentity.sessionId) {
         const item = retryableChatMessages(chatOutboxRef.current)[0];
         if (!item) break;
         await deliverQueuedChatMessage(item);
