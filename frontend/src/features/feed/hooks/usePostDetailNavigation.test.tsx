@@ -63,7 +63,7 @@ describe("post detail router navigation", () => {
   it("preserves filters, supports Back, and removes only the post parameter", () => {
     const app = mount("memory");
     app.click("Open");
-    expect(app.text("url")).toBe("/feed?sort=latest&tab=feed&post=42");
+    expect(app.text("url")).toBe("/feed/posts/42?sort=latest");
     expect(app.text("active")).toBe("42");
 
     app.click("Back");
@@ -71,23 +71,23 @@ describe("post detail router navigation", () => {
 
     app.click("Open");
     app.click("Close");
-    expect(app.text("url")).toBe("/feed?sort=latest&tab=feed");
+    expect(app.text("url")).toBe("/feed?sort=latest");
     expect(app.text("active")).toBe("none");
   });
 
   it("uses the hash route in Desktop instead of editing the outer query string", () => {
     const app = mount("hash", "/feed?sort=latest");
     app.click("Open");
-    expect(window.location.hash).toBe("#/feed?sort=latest&tab=feed&post=42");
+    expect(window.location.hash).toBe("#/feed/posts/42?sort=latest");
     expect(window.location.search).toBe("");
     app.click("Close");
-    expect(window.location.hash).toBe("#/feed?sort=latest&tab=feed");
+    expect(window.location.hash).toBe("#/feed?sort=latest");
   });
 
-  it("keeps mobile post navigation local when no shareable detail was requested", () => {
+  it("uses shareable post detail URLs on mobile while preserving the overlay state", () => {
     const app = mount("memory", "/feed", false);
     app.click("Open");
     expect(app.text("active")).toBe("42");
-    expect(app.text("url")).toBe("/feed");
+    expect(app.text("url")).toBe("/feed/posts/42");
   });
 });

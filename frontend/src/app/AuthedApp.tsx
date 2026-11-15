@@ -59,7 +59,7 @@ import {
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, tabFromPath } from "./router/routes";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./router/routes";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
 import type {
@@ -544,8 +544,20 @@ export default function AuthedApp({
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
-  const [contactsScreen, setContactsScreen] = useState<FriendsScreen>("directory");
-  const [visitorUsername, setVisitorUsername] = useState<string | null>(null);
+  const contactsScreen: FriendsScreen = routeLocation.pathname === "/contacts/requests" ? "invitations" : "directory";
+  const setContactsScreen: Dispatch<SetStateAction<FriendsScreen>> = (next) => {
+    const screen = typeof next === "function" ? next(contactsScreen) : next;
+    // Calls embeds the directory; opening it must not navigate away from the call workspace.
+    if (routeLocation.pathname === ROUTE.calls && screen === "directory") return;
+    const path = screen === "invitations" ? "/contacts/requests" : TAB_PATH.contacts;
+    if (routeLocation.pathname !== path) navigate(path);
+  };
+  const visitorUsername = visitorUsernameFromPath(routeLocation.pathname);
+  function closeVisitor() {
+    const returnTo = routeLocation.state?.visitorReturnTo;
+    navigate(typeof returnTo === "string" && returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? returnTo : TAB_PATH.profile, { replace: true });
+  }
   function openVisitor(username: string) {
     if (username === sessionRef.current?.user.username) {
       setTab("profile");
@@ -553,11 +565,14 @@ export default function AuthedApp({
       setProfileTimelineOpen(true);
       return;
     }
-    setVisitorUsername(username);
+    const path = visitorProfilePath(username);
+    if (routeLocation.pathname !== path) {
+      navigate(path, { state: { visitorReturnTo: routeLocation.pathname + routeLocation.search + routeLocation.hash } });
+    }
   }
   function setFriendPreview(friend: FriendSearchResult | null) {
     if (friend) openVisitor(friend.username);
-    else setVisitorUsername(null);
+    else if (visitorUsername) closeVisitor();
   }
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
   const [desktopSectionState, setDesktopSection] = useState<
@@ -625,9 +640,10 @@ export default function AuthedApp({
   // Router location is authoritative for browser Back/Forward on post URLs.
   useEffect(() => {
     if (tab !== "feed") return;
-    const id = Number(new URLSearchParams(routeLocation.search).get("post"));
+    const routeId = feedPostIdFromPath(routeLocation.pathname);
+    const id = routeId ?? Number(new URLSearchParams(routeLocation.search).get("post"));
     setActivePostId(Number.isSafeInteger(id) && id > 0 ? id : null);
-  }, [tab, routeLocation.search]);
+  }, [tab, routeLocation.pathname, routeLocation.search]);
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -879,6 +895,7 @@ export default function AuthedApp({
     sessionRef,
     tab,
     routeSearch: routeLocation.search,
+    routePostId: feedPostIdFromPath(routeLocation.pathname),
     request: apiFetch,
     setTab,
     setPosts,
@@ -2000,7 +2017,7 @@ export default function AuthedApp({
   }
 
   function logout(revoke = true, clearStorage = true) {
-    setVisitorUsername(null);
+    if (visitorUsername) navigate(TAB_PATH.chat, { replace: true });
     const current = sessionRef.current;
     const currentToken = current?.token;
     ++nearbyRequest.current;
@@ -2496,7 +2513,7 @@ export default function AuthedApp({
       setFeedCommunitiesOpen(false);
       setTab("feed");
       setActivePostId(post.id);
-      navigate(`${TAB_PATH.feed}?post=${post.id}`, { state: { postId: post.id } });
+      navigate(feedPostPath(post.id), { state: { postId: post.id } });
       void readPostMention(mention.id);
     } catch (error) {
       if (isCurrentMentionVisit())
@@ -2508,7 +2525,7 @@ export default function AuthedApp({
     setDesktopSection(null);
     setFeedCommunitiesOpen(false);
     setTranslationSettingsConversationId(null);
-    if (nextTab === "contacts") setContactsScreen("directory");
+
     if (nextTab === "profile") {
       setDesktopProfileSettings(false);
       setProfileEditorOpen(false);
@@ -2861,9 +2878,8 @@ export default function AuthedApp({
           onRemoveFriend={(friend) => removeAcceptedFriend(friend, { keepProfileOpen: true })}
           onMessage={async (username) => {
             await openDirectByUsername(username);
-            setVisitorUsername(null);
           }}
-          onClose={() => setVisitorUsername(null)}
+          onClose={closeVisitor}
           onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
           onPostOpen={(post) => {
             setPosts((current) => [
@@ -3467,7 +3483,7 @@ export default function AuthedApp({
           onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
           postDiscussion={postDiscussion}
           session={session}
-          setActivePostId={setActivePostId}
+          onClose={closeFeedPostDetails}
           targetLanguage={targetLanguage}
           translationPreferencesLoaded={translationPreferencesLoaded}
         />
