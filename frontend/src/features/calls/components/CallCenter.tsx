@@ -46,6 +46,10 @@ export default function CallCenter({ request, userId, token, conversations, targ
       : location.pathname === '/calls/translation' ? 'settings' : 'history'
     : localView
   const previousViewRef = useRef<Exclude<View, 'settings'>>('history')
+  // Browser Back/Forward can change the active tab without going through showView.
+  useEffect(() => {
+    if (view !== 'settings') previousViewRef.current = view
+  }, [view])
   const [filter, setFilter] = useState<Filter>('all')
   const { hostRef: viewPillSetHost, activeRef: viewPillSetActive, pillRef: viewPillSetPill } = useSlidingPill<HTMLDivElement>(view === 'directory' ? 'directory' : 'history')
   const { hostRef: filterPillSetHost, activeRef: filterPillSetActive, pillRef: filterPillSetPill } = useSlidingPill<HTMLDivElement>(filter)
