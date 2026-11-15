@@ -19,7 +19,7 @@ export default function MarketSection({
   switchTab,
 }: MarketSectionProps) {
   return (
-      <ErrorBoundary resetKey={session.sessionId} fallback={() => <AsyncSectionFallback title="Chợ" onRetry={() => window.location.reload()} />}>
+      <ErrorBoundary resetKey={session.sessionId} fallback={(retry) => <AsyncSectionFallback title="Chợ" onRetry={retry} onReload={() => window.location.reload()} />}>
       <Suspense fallback={<AsyncSectionFallback title="Chợ" loading />}>
             <Marketplace
               key={session.sessionId}

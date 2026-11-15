@@ -84,6 +84,20 @@ describe("shared error recovery", () => {
     expect(host.textContent).toContain("Đang tải Chợ");
   });
 
+  it("offers component retry and explicit full-page reload separately", async () => {
+    const retry = vi.fn();
+    const reload = vi.fn();
+    await render(<AsyncSectionFallback title="Khám phá" onRetry={retry} onReload={reload} />);
+    const actions = Array.from(host.querySelectorAll("button"));
+    expect(actions.map((button) => button.textContent)).toEqual(["Thử lại", "Tải lại trang"]);
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    await act(async () => actions[0]?.click());
+    expect(retry).toHaveBeenCalledOnce();
+    expect(reload).not.toHaveBeenCalled();
+    await act(async () => actions[1]?.click());
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
   it("shows accessible recovery when a lazy module rejects", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const Failed = lazy(() => Promise.reject(new Error("chunk secret")));
