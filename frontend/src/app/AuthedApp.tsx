@@ -17,6 +17,7 @@ import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
 import { usePhoneSearchLayout } from "./hooks/usePhoneSearchLayout";
+import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
 import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
@@ -2220,17 +2221,13 @@ export default function AuthedApp({
     },
   });
 
-  useEffect(() => {
-    if (!session?.token || tab !== "feed") return;
-    void refreshPosts();
-    void refreshStories();
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      void refreshPosts();
-      void refreshStories();
-    }, 12000);
-    return () => window.clearInterval(timer);
-  }, [tab, session?.token]);
+  useFeedRefreshInterval({
+    enabled: tab === "feed" && Boolean(session?.token),
+    sessionId: session?.sessionId ?? null,
+    sessionToken: session?.token ?? null,
+    refreshPosts,
+    refreshStories,
+  });
 
   useLayoutEffect(() => {
     const container = messagesScrollRef.current;

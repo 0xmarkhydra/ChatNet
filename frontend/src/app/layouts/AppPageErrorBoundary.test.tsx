@@ -89,4 +89,38 @@ describe("AppPageErrorBoundary", () => {
       host.remove();
     }
   });
+
+  it("recovers when only the route hash changes", () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+
+    function Page() {
+      const { hash } = useLocation();
+      if (hash === "#broken") throw new Error("render failed");
+      return <p>Healthy fragment</p>;
+    }
+
+    function Shell() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button onClick={() => navigate("/feed#healthy")}>Go to fragment</button>
+          <AppPageErrorBoundary><Page /></AppPageErrorBoundary>
+        </>
+      );
+    }
+
+    try {
+      act(() => root.render(<MemoryRouter initialEntries={["/feed#broken"]}><Shell /></MemoryRouter>));
+      expect(host.textContent).toContain("Không thể hiển thị trang này.");
+      act(() => host.querySelector("button")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+      expect(host.textContent).toContain("Healthy fragment");
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
 });
