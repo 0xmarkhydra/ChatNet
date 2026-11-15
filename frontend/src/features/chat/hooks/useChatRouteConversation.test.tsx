@@ -74,4 +74,42 @@ describe("chat URL conversation resolution", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(container.querySelector("output")?.textContent).toBe("");
   });
+  it("does not refetch on callback changes and routes a late 404 to the latest handler", async () => {
+    let resolve!: (value: { ok: boolean; status: number }) => void;
+    mockFindConversation.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const sessionRef = { current: { sessionId: "A" } };
+    const revokedIds = { current: new Set<number>() };
+    const membershipIds = { current: null as Set<number> | null };
+    const initialHandler = vi.fn();
+    const latestHandler = vi.fn();
+    const request = vi.fn() as unknown as ApiRequest;
+    function Probe({ unavailable }: { unavailable: () => void }) {
+      const [conversations, setConversations] = useState<Conversation[]>([]);
+      useChatRouteConversation({
+        conversationId: 42, known: false, sessionId: "A",
+        sessionRef, request, setConversations, revokedIds, membershipIds,
+        onUnavailable: unavailable, onError: vi.fn(),
+      });
+      return <output>{conversations.length}</output>;
+    }
+    try {
+      await act(async () => root.render(<Probe unavailable={initialHandler} />));
+      expect(mockFindConversation).toHaveBeenCalledTimes(1);
+      const oldSignal = mockFindConversation.mock.calls[0][2] as AbortSignal;
+      await act(async () => root.render(<Probe unavailable={latestHandler} />));
+      expect(mockFindConversation).toHaveBeenCalledTimes(1);
+      expect(oldSignal.aborted).toBe(false);
+      await act(async () => { resolve({ ok: false, status: 404 }); });
+      expect(initialHandler).not.toHaveBeenCalled();
+      expect(latestHandler).toHaveBeenCalledOnce();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+
 });
