@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { useEffect, useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import type { AppDataContext } from '../../../shared/types/api'
 import type { Tab } from '../../../shared/types/navigation'
 import type { useConversationData } from './useConversationData'
@@ -53,7 +54,31 @@ export function useMessageData({
   purgeConversation,
   jumpToMessage,
 }: Options) {
+  // Distinguish visits even when a user returns to the same session/channel (A → B → A).
+  const visit = useMemo(() => ({ sessionId: session?.sessionId, userId: session?.user.id,
+    conversationId: activeConversationId, channelId: activeChannelId, targetLanguage }),
+    [session?.sessionId, session?.user.id, activeConversationId, activeChannelId, targetLanguage])
+  const latestVisit = useLatest(visit)
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  const isCurrentVisit = () => mounted.current && latestVisit.current === visit &&
+    sessionRef.current?.sessionId === session?.sessionId &&
+    activeConversationIdRef.current === activeConversationId &&
+    activeChannelIdRef.current === activeChannelId
   const [messages, setMessages] = useState<Message[]>([])
+  const [reconnectRevision, setReconnectRevision] = useState(0)
+  useEffect(() => {
+    const refreshOnReconnect = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId?: string }>).detail
+      if (detail?.sessionId !== session?.sessionId || sessionRef.current !== session) return
+      setReconnectRevision(current => current + 1)
+    }
+    window.addEventListener('chatnet:sse-reconnected', refreshOnReconnect)
+    return () => window.removeEventListener('chatnet:sse-reconnected', refreshOnReconnect)
+  }, [session, sessionRef])
   const [privacyRevision, setPrivacyRevision] = useState(0)
   useEffect(() => {
     const refresh = () => setPrivacyRevision(current => current + 1)
@@ -185,19 +210,21 @@ export function useMessageData({
     translationPreferencesLoaded,
     jumpToMessage?.revision,
     privacyRevision,
+    reconnectRevision,
   ])
 
   useEffect(() => {
     if (!session?.token || !activeConversationId) return
     const id = activeConversationId
-    const sessionId = session.sessionId
+    let cancelled = false
     const markWhenVisible = () => {
+      if (cancelled || !isCurrentVisit()) return
       if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) return
       void (activeConversationType === 'group'
         ? markChannelRead(apiFetch, id, activeChannelId)
         : markConversationRead(apiFetch, id))
         .then((response) => {
-          if (!response.ok || activeConversationIdRef.current !== id || sessionRef.current?.sessionId !== sessionId ||
+          if (!response.ok || cancelled || !isCurrentVisit() || activeConversationIdRef.current !== id ||
             activeChannelIdRef.current !== activeChannelId) return
           refreshDesktopUnread()
           if (activeConversationType === 'group') {
@@ -214,15 +241,15 @@ export function useMessageData({
     window.addEventListener('focus', markWhenVisible)
     document.addEventListener('visibilitychange', markWhenVisible)
     return () => {
+      cancelled = true
       window.removeEventListener('focus', markWhenVisible)
       document.removeEventListener('visibilitychange', markWhenVisible)
     }
-  }, [session?.sessionId, activeConversationId, activeChannelId, activeConversationType])
+  }, [session?.sessionId, session?.user.id, activeConversationId, activeChannelId, activeConversationType, targetLanguage])
 
   async function loadMissingMessages() {
     if (!session || !activeConversationId || !messageGapBefore || gapPagingBusy.current) return
     const conversationId = activeConversationId
-    const sessionId = session.sessionId
     const before = messageGapBefore
     gapPagingBusy.current = true
     setMessageGapLoading(true)
@@ -230,7 +257,7 @@ export function useMessageData({
       const response = await listMessages(apiFetch, { conversationId, target: targetLanguage, channelId: activeChannelId, limit: 80, before })
       if (!response.ok) throw new Error('Không tải được tin nhắn ở giữa')
       const data = (await response.json()) as Message[]
-      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId || activeChannelIdRef.current !== activeChannelId) return
+      if (!isCurrentVisit()) return
       const lowerWindowMax = messages.reduce((max, item) => item.id < before ? Math.max(max, item.id) : max, 0)
       const newMin = data.reduce((min, item) => Math.min(min, item.id), Infinity)
       setMessageGapBefore(data.length === 80 && newMin > lowerWindowMax ? newMin : null)
@@ -247,10 +274,10 @@ export function useMessageData({
         return next
       })
     } catch {
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+      if (isCurrentVisit())
         setNotice('Không tải được đoạn tin nhắn ở giữa. Hãy thử lại.', 'error')
     } finally {
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId && activeChannelIdRef.current === activeChannelId) {
+      if (isCurrentVisit()) {
         gapPagingBusy.current = false
         setMessageGapLoading(false)
       }
@@ -261,7 +288,6 @@ export function useMessageData({
     if (!session || !activeConversationId || messagesPagingBusy.current ||
         !hasMoreMessages || messages.length === 0) return
     const conversationId = activeConversationId
-    const sessionId = session.sessionId
     const before = Math.min(...messages.map((message) => message.id))
     messagesPagingBusy.current = true
     setMessagesLoadingMore(true)
@@ -269,7 +295,7 @@ export function useMessageData({
       const response = await listMessages(apiFetch, { conversationId, target: targetLanguage, channelId: activeChannelId, limit: MESSAGE_PAGE_SIZE, before })
       if (!response.ok) throw new Error('Không tải thêm được lịch sử tin nhắn')
       const data = (await response.json()) as Message[]
-      if (sessionRef.current?.sessionId !== sessionId || activeConversationIdRef.current !== conversationId || activeChannelIdRef.current !== activeChannelId) return
+      if (!isCurrentVisit()) return
       setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE)
       if (data.length > 0) {
         const container = messagesScrollRef.current
@@ -289,10 +315,10 @@ export function useMessageData({
         })
       }
     } catch {
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId)
+      if (isCurrentVisit())
         setNotice('Không tải được tin nhắn cũ. Hãy thử lại.', 'error')
     } finally {
-      if (sessionRef.current?.sessionId === sessionId && activeConversationIdRef.current === conversationId && activeChannelIdRef.current === activeChannelId) {
+      if (isCurrentVisit()) {
         messagesPagingBusy.current = false
         setMessagesLoadingMore(false)
       }
