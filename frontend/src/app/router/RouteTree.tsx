@@ -25,6 +25,16 @@ function NotFoundPage() {
   );
 }
 
+const settingsSections = new Set([
+  "account", "privacy", "security", "notifications", "language",
+  "messages", "appearance", "storage", "devices",
+]);
+
+function SettingsSectionPage() {
+  const { section } = useParams();
+  return section && settingsSections.has(section) ? <CurrentPage /> : <NotFoundPage />;
+}
+
 function FeedPostPage() {
   const { postId } = useParams();
   return postId && feedPostIdFromPath(`/feed/posts/${postId}`) !== null
@@ -57,6 +67,8 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
         {Object.values(ROUTE).map((path) => (
           <Route key={path} path={path.slice(1)} element={<CurrentPage />} />
         ))}
+        <Route path="settings/:section" element={<SettingsSectionPage />} />
+        <Route path="settings/*" element={<NotFoundPage />} />
         <Route path="calls/history" element={<CurrentPage />} />
         <Route path="calls/directory" element={<CurrentPage />} />
         <Route path="calls/translation" element={<CurrentPage />} />

@@ -106,6 +106,22 @@ describe("app route tree", () => {
     expect(invalid.container.textContent).toContain("Không tìm thấy trang");
   });
 
+  it("supports Settings subpages while keeping invalid sections out of the shell", () => {
+    for (const section of [
+      "account", "privacy", "security", "notifications", "language",
+      "messages", "appearance", "storage", "devices",
+    ]) {
+      const app = renderAt(`/settings/${section}`);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    for (const path of ["/settings/not-a-section", "/settings/privacy/nested"]) {
+      const invalid = renderAt(path);
+      expect(invalid.page()).toBeNull();
+      expect(invalid.container.textContent).toContain("Không tìm thấy trang");
+    }
+  });
+
   it("supports call workspace subroutes and rejects unknown call screens", () => {
     for (const path of ["/calls", "/calls/history", "/calls/directory", "/calls/translation"]) {
       const app = renderAt(path);

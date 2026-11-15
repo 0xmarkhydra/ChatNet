@@ -589,7 +589,7 @@ export default function AuthedApp({
     setTranslationSettingsActiveConversationId(activeConversationId);
     setTranslationSettingsConversationId(null);
   }
-  const desktopProfileSettings = routeLocation.pathname === ROUTE.settings;
+  const desktopProfileSettings = routeLocation.pathname === ROUTE.settings || routeLocation.pathname.startsWith(`${ROUTE.settings}/`);
   const setDesktopProfileSettings: Dispatch<SetStateAction<boolean>> = (next) => {
     const open = typeof next === "function" ? next(desktopProfileSettings) : next;
     if (open && !desktopProfileSettings) navigate(ROUTE.settings);
