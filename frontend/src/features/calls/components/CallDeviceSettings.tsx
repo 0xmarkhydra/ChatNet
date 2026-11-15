@@ -45,7 +45,7 @@ export default function CallDeviceSettings({ room, micOn, cameraOn }: { room: Ro
     } catch { if (mounted.current && activeRoom.current === room) setError('Không chuyển được thiết bị. Thiết bị có thể bị ngắt hoặc đang được ứng dụng khác sử dụng.') }
     finally { if (mounted.current) setBusy(false) }
   }
-  return <div className="call-device-settings" aria-label="Thiết bị cuộc gọi">
+  return <div className="call-device-settings" role="group" aria-label="Thiết bị cuộc gọi">
     {(['audioinput', 'videoinput'] as const).map((kind) => <label key={kind}>
       {kind === 'audioinput' ? 'Microphone' : 'Camera'}
       <select value={active[kind] || ''} disabled={busy || (kind === 'audioinput' ? !micOn : !cameraOn)}
