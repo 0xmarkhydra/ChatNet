@@ -1,5 +1,7 @@
 import { lazy } from "react";
 import { Suspense, type SetStateAction } from "react";
+import { ErrorBoundary } from "../../../shared/ui/ErrorBoundary";
+import { AsyncSectionFallback } from "../../../shared/ui/AsyncSectionFallback";
 import type { NearbyUser } from "./NearbyExplorer";
 import type { FriendSearchResult, FriendConnection } from "../../contacts";
 import type { Dispatch } from "react";
@@ -42,7 +44,8 @@ export default function DiscoverSection({
   stopNearby,
 }: DiscoverSectionProps) {
   return (
-      <Suspense fallback={null}>
+      <ErrorBoundary fallback={() => <AsyncSectionFallback title="Khám phá" onRetry={() => window.location.reload()} />}>
+      <Suspense fallback={<AsyncSectionFallback title="Khám phá" loading />}>
             <NearbyExplorer
               query={globalSearch}
               onQueryChange={setGlobalSearch}
@@ -69,5 +72,6 @@ export default function DiscoverSection({
               }}
             />
           </Suspense>
+      </ErrorBoundary>
   );
 }
