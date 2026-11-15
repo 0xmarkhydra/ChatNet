@@ -1,5 +1,7 @@
 import { lazy } from "react";
 import { Suspense } from "react";
+import { ErrorBoundary } from "../../../shared/ui/ErrorBoundary";
+import { AsyncSectionFallback } from "../../../shared/ui/AsyncSectionFallback";
 import { type Session } from "../../../shared/types/session";
 import type { Tab } from "../../../shared/types/navigation";
 
@@ -17,7 +19,8 @@ export default function MarketSection({
   switchTab,
 }: MarketSectionProps) {
   return (
-      <Suspense fallback={null}>
+      <ErrorBoundary resetKey={session.sessionId} fallback={() => <AsyncSectionFallback title="Chợ" onRetry={() => window.location.reload()} />}>
+      <Suspense fallback={<AsyncSectionFallback title="Chợ" loading />}>
             <Marketplace
               key={session.sessionId}
               userId={session.user.id}
@@ -25,5 +28,6 @@ export default function MarketSection({
               onBack={() => switchTab("discover")}
             />
           </Suspense>
+      </ErrorBoundary>
   );
 }
