@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -252,8 +253,19 @@ func (s *server) pushConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) presignMedia(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	const maxMetadataBytes = 8 << 10
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxMetadataBytes))
+	if err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			httpx.Error(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.Error(w, http.StatusBadRequest, "invalid body")
+		return
+	}
 	var body mediax.UploadRequest
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := json.Unmarshal(data, &body); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
