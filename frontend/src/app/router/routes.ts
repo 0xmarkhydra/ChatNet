@@ -15,6 +15,35 @@ export const ROUTE = {
   settings: "/settings",
 } as const;
 
+/** Shareable user profiles; username is encoded as exactly one URL segment. */
+export function visitorProfilePath(username: string): string {
+  return `/users/${encodeURIComponent(username)}`;
+}
+
+export function visitorUsernameFromPath(pathname: string): string | null {
+  const match = /^\/users\/([^/]+)\/?$/.exec(pathname);
+  if (!match) return null;
+  try {
+    const username = decodeURIComponent(match[1]);
+    return username.trim() === username && username.length > 0 &&
+      username.length <= 254 && !/[\\/\u0000-\u001f]/.test(username) ? username : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Shareable post detail URLs; keep legacy ?post=id links readable. */
+export function feedPostPath(id: number): string {
+  return `${TAB_PATH.feed}/posts/${id}`;
+}
+
+export function feedPostIdFromPath(pathname: string): number | null {
+  const match = /^\/feed\/posts\/([1-9]\d*)\/?$/.exec(pathname);
+  if (!match) return null;
+  const id = Number(match[1]);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
 /** Stable shareable chat detail route; only positive safe integer IDs are valid. */
 export function chatConversationPath(id: number): string {
   return `${TAB_PATH.chat}/${id}`;
@@ -31,7 +60,7 @@ export function chatConversationIdFromPath(pathname: string): number | null {
 export function tabFromPath(pathname: string, legacyTab?: string | null): Tab {
   const segment = pathname.split("/")[1];
   if (segment === "calls") return "chat";
-  if (segment === "settings") return "profile";
+  if (segment === "settings" || segment === "users") return "profile";
   const tab = (Object.keys(TAB_PATH) as Tab[]).find(
     (key) => TAB_PATH[key].slice(1) === segment,
   );

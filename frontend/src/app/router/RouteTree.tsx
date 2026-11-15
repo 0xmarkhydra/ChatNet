@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, Navigate, Outlet, Route, Routes, useLocation, useOutletContext, useParams } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, tabFromPath } from "./routes";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, tabFromPath, visitorUsernameFromPath } from "./routes";
 
 function LegacyHomeRedirect() {
   const { search } = useLocation();
@@ -25,6 +25,20 @@ function NotFoundPage() {
   );
 }
 
+function FeedPostPage() {
+  const { postId } = useParams();
+  return postId && feedPostIdFromPath(`/feed/posts/${postId}`) !== null
+    ? <CurrentPage />
+    : <NotFoundPage />;
+}
+
+function VisitorProfilePage() {
+  const { username } = useParams();
+  return username && visitorUsernameFromPath(`/users/${encodeURIComponent(username)}`) !== null
+    ? <CurrentPage />
+    : <NotFoundPage />;
+}
+
 function ChatConversationPage() {
   const { conversationId } = useParams();
   return conversationId && chatConversationIdFromPath(`/chat/${conversationId}`) !== null
@@ -44,6 +58,12 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
           <Route key={path} path={path.slice(1)} element={<CurrentPage />} />
         ))}
         <Route path="chat/:conversationId" element={<ChatConversationPage />} />
+        <Route path="users/:username" element={<VisitorProfilePage />} />
+        <Route path="users/*" element={<NotFoundPage />} />
+        <Route path="contacts/requests" element={<CurrentPage />} />
+        <Route path="contacts/*" element={<NotFoundPage />} />
+        <Route path="feed/posts/:postId" element={<FeedPostPage />} />
+        <Route path="feed/posts/*" element={<NotFoundPage />} />
         <Route path="chat/*" element={<NotFoundPage />} />
         <Route path="profile/*" element={<CurrentPage />} />
         <Route path="feed/*" element={<CurrentPage />} />

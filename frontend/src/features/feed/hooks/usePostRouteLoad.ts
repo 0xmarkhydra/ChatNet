@@ -12,6 +12,7 @@ type Options = {
   sessionRef: RefObject<Session | null>
   tab: Tab
   routeSearch: string
+  routePostId: number | null
   request: ApiRequest
   setTab: (tab: Tab) => void
   setPosts: Dispatch<SetStateAction<Post[]>>
@@ -21,7 +22,7 @@ type Options = {
 
 /** Load a shared post URL without leaking late responses into another login visit. */
 export function usePostRouteLoad({
-  sessionId, sessionToken, sessionRef, tab, routeSearch, request,
+  sessionId, sessionToken, sessionRef, tab, routeSearch, routePostId, request,
   setTab, setPosts, setActivePostId, onError,
 }: Options) {
   const callbacks = useLatest({ request, setTab, setPosts, setActivePostId, onError })
@@ -31,7 +32,7 @@ export function usePostRouteLoad({
     const params = new URLSearchParams(routeSearch)
     if (tab !== 'feed' && params.get('tab') !== 'feed') return
     if (tab !== 'feed') callbacks.current.setTab('feed')
-    const id = Number(params.get('post'))
+    const id = routePostId ?? Number(params.get('post'))
     if (!Number.isSafeInteger(id) || id <= 0) return
 
     let cancelled = false
@@ -57,5 +58,5 @@ export function usePostRouteLoad({
           callbacks.current.onError(error instanceof Error ? error.message : 'Không thể mở bài viết.')
       })
     return () => { cancelled = true }
-  }, [sessionId, sessionToken, sessionRef, tab, routeSearch, callbacks])
+  }, [sessionId, sessionToken, sessionRef, tab, routeSearch, routePostId, callbacks])
 }
