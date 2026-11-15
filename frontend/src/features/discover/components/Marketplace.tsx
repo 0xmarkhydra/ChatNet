@@ -31,6 +31,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
   const [orders, setOrders] = useState<Order[]>([])
   const [mine, setMine] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -62,6 +63,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
       setCart(basket.items)
       setOrders(history.orders)
       setMine(owned.products)
+      setLoaded(true)
       setError('')
     } catch (e) {
       if (version === revision.current) setError(e instanceof Error ? e.message : 'Không tải được sàn')
@@ -70,11 +72,19 @@ export default function Marketplace({ userId, request, onBack }: Props) {
     }
   }
   useEffect(() => {
-    const version = ++revision.current
+    const requestRevision = revision
+    const version = ++requestRevision.current
     setProducts([]); setCart([]); setOrders([]); setMine([])
-    setError(''); setMessage(''); setLoading(true); setBusy(false)
+    setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false)
     void refresh(version)
+    return () => { ++requestRevision.current }
   }, [userId])
+
+  function retryRead() {
+    if (!loaded) setLoading(true)
+    setError('')
+    void refresh()
+  }
 
   async function execute(fn: (isCurrent: () => boolean) => Promise<void>) {
     if (busy) return
@@ -150,10 +160,11 @@ export default function Marketplace({ userId, request, onBack }: Props) {
       <div className="marketplace-body">
         <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>
 
-        {error && <p role="alert" className="marketplace-error">{error} <button onClick={() => void refresh()} type="button">Thử lại</button></p>}
+        {loading && <p role="status" aria-busy="true">Đang tải dữ liệu chợ…</p>}
+        {error && <p role="alert" className="marketplace-error">{error} <button onClick={retryRead} type="button" disabled={busy}>Thử tải dữ liệu</button></p>}
         {message && <p role="status" className="marketplace-message">{message}</p>}
 
-        {!loading && view === 'products' && <div className="marketplace-grid">
+        {!loading && loaded && view === 'products' && <div className="marketplace-grid">
           {products.length === 0 && <p>Chưa có sản phẩm được đăng.</p>}
           {products.map(p => <article className="marketplace-card" key={p.id}>
             <div className="marketplace-image"><ShoppingBag size={36}/></div>
@@ -168,7 +179,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
           </article>)}
         </div>}
 
-        {!loading && view === 'cart' && <div className="marketplace-list">
+        {!loading && loaded && view === 'cart' && <div className="marketplace-list">
           {basketSellers.length === 0 && <p>Giỏ hàng đang trống.</p>}
           {basketSellers.map(sellerId => {
             const items = cart.filter(item => item.sellerId === sellerId)
@@ -193,7 +204,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
           })}
         </div>}
 
-        {!loading && view === 'orders' && <div className="marketplace-list">
+        {!loading && loaded && view === 'orders' && <div className="marketplace-list">
           {orders.length === 0 && <p>Bạn chưa tạo yêu cầu đơn hàng.</p>}
           {orders.map(order => <article className="marketplace-basket" key={order.id}>
             <strong>Yêu cầu #{order.id}</strong>
@@ -203,7 +214,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
           </article>)}
         </div>}
 
-        {!loading && view === 'sell' && <section className="marketplace-sell">
+        {!loading && loaded && view === 'sell' && <section className="marketplace-sell">
           <p><strong>Trợ lý AI đăng bán sẽ được tích hợp ở bước tiếp theo.</strong> Đây là biểu mẫu dự phòng để tạo bản nháp, chưa phải AI.</p>
           <form onSubmit={createDraft}>
             <label>Tên sản phẩm<input required minLength={2} maxLength={160} value={title} onChange={event => setTitle(event.target.value)}/></label>
