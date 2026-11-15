@@ -106,6 +106,18 @@ describe("app route tree", () => {
     expect(invalid.container.textContent).toContain("Không tìm thấy trang");
   });
 
+  it("supports call workspace subroutes and rejects unknown call screens", () => {
+    for (const path of ["/calls", "/calls/history", "/calls/directory", "/calls/translation"]) {
+      const app = renderAt(path);
+      expect(app.location()).toBe(path);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    const invalid = renderAt("/calls/unknown");
+    expect(invalid.page()).toBeNull();
+    expect(invalid.container.textContent).toContain("Không tìm thấy trang");
+  });
+
   it("supports direct feed post URLs and rejects malformed post IDs", () => {
     const { location, page } = renderAt("/feed/posts/42");
     expect(location()).toBe("/feed/posts/42");

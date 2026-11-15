@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, BookUser, CalendarDays, Check, Clock3, Languages, MessageCircle,
   PhoneIncoming, PhoneMissed, PhoneOutgoing,
@@ -37,7 +38,13 @@ const CAPTION_KEY = 'chatnet.call.subtitle-mode.v1'
 
 export default function CallCenter({ request, userId, token, conversations, targetLanguage, directoryContent, directoryQuery, onDirectoryQueryChange, onDirectoryOpen, onNavigate, onOpenChat, embedded = false }: Props) {
   const requestRef = useLatest(request)
-  const [view, setView] = useState<View>('history')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [localView, setLocalView] = useState<View>('history')
+  const view: View = embedded && location.pathname.startsWith('/calls')
+    ? location.pathname === '/calls/directory' ? 'directory'
+      : location.pathname === '/calls/translation' ? 'settings' : 'history'
+    : localView
   const previousViewRef = useRef<Exclude<View, 'settings'>>('history')
   const [filter, setFilter] = useState<Filter>('all')
   const { hostRef: viewPillSetHost, activeRef: viewPillSetActive, pillRef: viewPillSetPill } = useSlidingPill<HTMLDivElement>(view === 'directory' ? 'directory' : 'history')
@@ -180,7 +187,11 @@ export default function CallCenter({ request, userId, token, conversations, targ
       setLanguage(localStorage.getItem(LANGUAGE_KEY) || targetLanguage.split('-')[0] || 'vi')
       setCaptionMode(localStorage.getItem(CAPTION_KEY) || 'both')
     }
-    setView(next)
+    if (embedded) {
+      const path = next === 'history' ? '/calls/history'
+        : next === 'directory' ? '/calls/directory' : '/calls/translation'
+      if (location.pathname !== path) navigate(path)
+    } else setLocalView(next)
     setQuery('')
     setSavingMessage('')
   }

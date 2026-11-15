@@ -548,7 +548,7 @@ export default function AuthedApp({
   const setContactsScreen: Dispatch<SetStateAction<FriendsScreen>> = (next) => {
     const screen = typeof next === "function" ? next(contactsScreen) : next;
     // Calls embeds the directory; opening it must not navigate away from the call workspace.
-    if (routeLocation.pathname === ROUTE.calls && screen === "directory") return;
+    if ((routeLocation.pathname === ROUTE.calls || routeLocation.pathname.startsWith(`${ROUTE.calls}/`)) && screen === "directory") return;
     const path = screen === "invitations" ? "/contacts/requests" : TAB_PATH.contacts;
     if (routeLocation.pathname !== path) navigate(path);
   };
@@ -578,7 +578,7 @@ export default function AuthedApp({
   const [desktopSectionState, setDesktopSection] = useState<
     "groups" | "calls" | null
   >(null);
-  const desktopSection = routeLocation.pathname === ROUTE.calls
+  const desktopSection = (routeLocation.pathname === ROUTE.calls || routeLocation.pathname.startsWith(`${ROUTE.calls}/`))
     ? "calls"
     : desktopSectionState === "calls" ? null : desktopSectionState;
   const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);

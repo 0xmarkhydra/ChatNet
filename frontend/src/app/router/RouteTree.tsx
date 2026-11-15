@@ -57,6 +57,10 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
         {Object.values(ROUTE).map((path) => (
           <Route key={path} path={path.slice(1)} element={<CurrentPage />} />
         ))}
+        <Route path="calls/history" element={<CurrentPage />} />
+        <Route path="calls/directory" element={<CurrentPage />} />
+        <Route path="calls/translation" element={<CurrentPage />} />
+        <Route path="calls/*" element={<NotFoundPage />} />
         <Route path="chat/:conversationId" element={<ChatConversationPage />} />
         <Route path="users/:username" element={<VisitorProfilePage />} />
         <Route path="users/*" element={<NotFoundPage />} />
