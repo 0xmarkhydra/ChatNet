@@ -44,7 +44,8 @@ export default function E2EEPilotPanel({
     onModeChange(state.mode === 'legacy' && state.autoEnabled ? 'pending' : state.mode)
     if (!state.pilotEnabled) return
     if (state.autoEnabled) {
-      // Auto-onboarding only runs for eligible EMPTY direct rooms. The lower
+      // Auto-onboarding runs for direct rooms, including those with legacy
+      // plaintext history. New sending is fail-closed until MLS is ready. The lower
       // user ID initializes, while the other client waits for a Welcome.
       await service.advanceAuto()
       if (!aliveRef.current) return
@@ -160,6 +161,13 @@ export default function E2EEPilotPanel({
           {busy ? <LoaderCircle size={16} className="mls-pilot-spin" /> : <RefreshCw size={16}/>}
         </button>
       </header>
+      {status.legacyHistory && (
+        <p className="mls-pilot-warning" role="note">
+          <ShieldAlert size={16} aria-hidden="true"/>
+          Tin nhắn trước khi chuyển đổi vẫn là lịch sử không mã hóa đầu cuối.
+          Chỉ các tin nhắn gửi bằng MLS sau khi thiết lập thành công mới được E2EE.
+        </p>
+      )}
       <p className="mls-pilot-note">
         {status.autoEnabled
           ? 'Đang tự tạo khóa và thiết lập MLS khi cả hai người mở chat. Khóa lần đầu được ghim TOFU; hãy tự đối chiếu mã an toàn qua kênh khác để xác thực danh tính. Không gửi plaintext nếu chưa sẵn sàng.'

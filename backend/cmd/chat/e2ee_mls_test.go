@@ -537,14 +537,23 @@ func TestMLSRelayThreeAccountsIntegration(t *testing.T) {
 	`, oldRoom, users[0]); err != nil {
 		t.Fatal(err)
 	}
+	// Existing direct chats must also join MLS automatically for their *new*
+	// messages. Old plaintext history is preserved, clearly marked as legacy.
 	if status := send(0, fmt.Sprintf("/api/conversations/%d/e2ee/status", oldRoom), nil, "GET"); status.Code != 200 ||
-		!strings.Contains(status.Body.String(), `"autoEnabled":false`) {
-		t.Fatalf("historical conversation was incorrectly auto-converted: %d %s", status.Code, status.Body.String())
+		!strings.Contains(status.Body.String(), `"autoEnabled":true`) ||
+		!strings.Contains(status.Body.String(), `"legacyHistory":true`) ||
+		!strings.Contains(status.Body.String(), `"mode":"legacy"`) {
+		t.Fatalf("historical conversation missing E2EE auto cutover and legacy warning: %d %s", status.Code, status.Body.String())
 	}
 	if status := send(0, fmt.Sprintf("/api/conversations/%d/messages", oldRoom), map[string]any{
-		"text": "existing legacy room", "clientId": testMLSUUID(t),
-	}, "POST"); status.Code != 201 {
-		t.Fatalf("existing legacy history unexpectedly blocked: %d %s", status.Code, status.Body.String())
+		"text": "plaintext downgrade in old room", "clientId": testMLSUUID(t),
+	}, "POST"); status.Code != http.StatusConflict {
+		t.Fatalf("old room allowed new plaintext after auto-default: %d %s", status.Code, status.Body.String())
+	}
+	var legacyCount int
+	if err := db.QueryRow(ctx,
+		"SELECT COUNT(*) FROM messages WHERE conversation_id=$1", oldRoom).Scan(&legacyCount); err != nil || legacyCount != 1 {
+		t.Fatalf("old history was lost or a plaintext message leaked: %d %v", legacyCount, err)
 	}
 }
 

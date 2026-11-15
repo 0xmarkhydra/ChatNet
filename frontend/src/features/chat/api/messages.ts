@@ -21,8 +21,9 @@ export async function getConversationEncryptionStatus(
       (body.mode !== 'legacy' && body.mode !== 'e2ee')) {
     throw new Error('Invalid encryption status response; sending blocked')
   }
-  // New direct chats on an E2EE-by-default environment must never place
-  // plaintext into the legacy local outbox while MLS enrollment is pending.
+  // All direct chats in an E2EE-by-default environment must never place
+  // new plaintext into the legacy local outbox while MLS is pending.
+  // Pre-existing plaintext history remains marked as legacy.
   if (body.mode === 'legacy' &&
       'autoEnabled' in body && body.autoEnabled === true) return 'pending'
   return body.mode
