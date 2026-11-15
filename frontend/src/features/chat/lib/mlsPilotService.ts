@@ -32,6 +32,7 @@ export type PilotStatus = {
   epoch: number
   pilotEnabled: boolean
   autoEnabled?: boolean
+  legacyHistory?: boolean
 }
 
 export async function fetchMLSPilotStatus(request: ApiRequest, conversationId: number): Promise<PilotStatus> {
@@ -41,7 +42,8 @@ export async function fetchMLSPilotStatus(request: ApiRequest, conversationId: n
   if (!data || !['legacy', 'e2ee'].includes(data.mode) ||
       !Number.isSafeInteger(data.epoch) || data.epoch < 0 ||
       typeof data.pilotEnabled !== 'boolean' ||
-      (data.autoEnabled !== undefined && typeof data.autoEnabled !== 'boolean')) {
+      (data.autoEnabled !== undefined && typeof data.autoEnabled !== 'boolean') ||
+      (data.legacyHistory !== undefined && typeof data.legacyHistory !== 'boolean')) {
     throw new Error('Trạng thái E2EE không hợp lệ')
   }
   return data
@@ -227,7 +229,9 @@ export class MLSPilotService {
   }
 
   /**
-   * Experimental automatic E2EE for *empty direct chats only*. The first key
+   * Experimental automatic E2EE for direct chats, including those with legacy
+   * history. Old plaintext rows are not converted and remain explicitly
+   * labeled as unencrypted; only new MLS messages get E2EE. The first key
    * seen is pinned (TOFU), NOT independently verified: a compromised directory
    * could impersonate a peer at first contact. Safety-code verification and
    * multi-device/rekey support are required before any production default.

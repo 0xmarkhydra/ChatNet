@@ -813,9 +813,15 @@ export default function ChatSection({
                       }}
                     />
                   )}
-                  {mlsPilotMode === 'e2ee' && (
-                    <p className="mls-pilot-legacy-notice">
+                  {activeConversation.type === 'direct' && (mlsPilotMode === 'e2ee' || mlsPilotMode === 'pending') && (
+                    <p className="mls-pilot-legacy-notice" role="status">
                       Tin nhắn cũ ở phía trên được gửi trước E2EE và chưa được mã hóa đầu cuối.
+                      Tin nhắn mới chỉ được gửi khi phiên MLS sẵn sàng.
+                    </p>
+                  )}
+                  {activeConversation.type === 'direct' && mlsPilotMode === 'legacy' && (
+                    <p className="mls-pilot-legacy-notice" role="status">
+                      Hội thoại này chưa mã hóa đầu cuối. Tin nhắn mới vẫn có thể được lưu trên máy chủ.
                     </p>
                   )}
                   <MessageTimeline
