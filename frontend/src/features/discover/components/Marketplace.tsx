@@ -24,6 +24,8 @@ const showMoney = (n: number, unit: string) => n.toLocaleString('vi-VN') + ' ' +
 export default function Marketplace({ userId, request, onBack }: Props) {
   const apiRef = useLatest(request)
   const revision = useRef(0)
+  const readRevision = useRef(0)
+  const mutationFlight = useRef<{ version: number } | null>(null)
   const [view, setView] = useState<'products' | 'cart' | 'orders' | 'sell'>('products')
   const { hostRef: tabsPillSetHost, activeRef: tabsPillSetActive, pillRef: tabsPillSetPill } = useSlidingPill<HTMLElement>(view)
   const [products, setProducts] = useState<Product[]>([])
@@ -51,6 +53,8 @@ export default function Marketplace({ userId, request, onBack }: Props) {
     return response.json() as Promise<T>
   }
   async function refresh(version = revision.current) {
+    const read = ++readRevision.current
+    const isCurrent = () => version === revision.current && read === readRevision.current
     try {
       const [catalog, basket, history, owned] = await Promise.all([
         api<{ products: Product[] }>('/api/marketplace/products'),
@@ -58,7 +62,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
         api<{ orders: Order[] }>('/api/marketplace/orders'),
         api<{ products: Product[] }>('/api/marketplace/products/mine'),
       ])
-      if (version !== revision.current) return
+      if (!isCurrent()) return
       setProducts(catalog.products)
       setCart(basket.items)
       setOrders(history.orders)
@@ -66,15 +70,16 @@ export default function Marketplace({ userId, request, onBack }: Props) {
       setLoaded(true)
       setError('')
     } catch (e) {
-      if (version === revision.current) setError(e instanceof Error ? e.message : 'Không tải được sàn')
+      if (isCurrent()) setError(e instanceof Error ? e.message : 'Không tải được sàn')
     } finally {
-      if (version === revision.current) setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }
   useEffect(() => {
     const requestRevision = revision
     const version = ++requestRevision.current
     setProducts([]); setCart([]); setOrders([]); setMine([])
+    mutationFlight.current = null
     setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false)
     void refresh(version)
     return () => { ++requestRevision.current }
@@ -87,15 +92,22 @@ export default function Marketplace({ userId, request, onBack }: Props) {
   }
 
   async function execute(fn: (isCurrent: () => boolean) => Promise<void>) {
-    if (busy) return
+    if (busy || mutationFlight.current) return
     const version = revision.current
+    const flight = { version }
+    mutationFlight.current = flight
     const isCurrent = () => version === revision.current
     setBusy(true)
     setMessage('')
     setError('')
     try { await fn(isCurrent); if (isCurrent()) await refresh(version) }
     catch (e) { if (version === revision.current) setError(e instanceof Error ? e.message : 'Không thể thực hiện') }
-    finally { if (version === revision.current) setBusy(false) }
+    finally {
+      if (mutationFlight.current === flight) {
+        mutationFlight.current = null
+        if (isCurrent()) setBusy(false)
+      }
+    }
   }
   const basketSellers = Array.from(new Set(cart.map(item => item.sellerId)))
   function updateCart(productId: number, quantity: number) {

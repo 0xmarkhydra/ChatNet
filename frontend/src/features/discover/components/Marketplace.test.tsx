@@ -75,6 +75,59 @@ describe('Marketplace read fallback', () => {
     expect(request.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(1)
   })
 
+  it('does not send duplicate cart mutations from rapid repeated clicks', async () => {
+    let finishWrite: (() => void) | undefined
+    const pendingWrite = new Promise<void>((resolve) => { finishWrite = resolve })
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        await pendingWrite
+        return Response.json({})
+      }
+      return response(path, path.endsWith('/products') ? [product] : [])
+    })
+    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    const add = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Thêm vào giỏ')
+    expect(add).toBeTruthy()
+    await act(async () => {
+      add?.click()
+      add?.click()
+    })
+    expect(request.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(1)
+    await act(async () => finishWrite?.())
+    expect(host.textContent).toContain('Bàn học')
+  })
+
+  it('ignores a stale failed retry after a newer successful refresh', async () => {
+    let rejectOld: ((reason: Error) => void) | undefined
+    const older = new Promise<Response>((_, reject) => { rejectOld = reject })
+    let reads = 0
+    let writes = 0
+    const request = vi.fn((path: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        writes += 1
+        return writes === 1
+          ? Promise.reject(new Error('Không cập nhật được giỏ'))
+          : Promise.resolve(Response.json({}))
+      }
+      reads += 1
+      if (reads > 4 && reads <= 8) return older
+      return Promise.resolve(response(path, path.endsWith('/products') ? [product] : []))
+    })
+    const button = (label: string) => Array.from(host.querySelectorAll('button'))
+      .find((item) => item.textContent === label)
+
+    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    await act(async () => button('Thêm vào giỏ')?.click())
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Không cập nhật được giỏ')
+    await act(async () => button('Thử tải dữ liệu')?.click())
+    await act(async () => button('Thêm vào giỏ')?.click())
+    expect(writes).toBe(2)
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    await act(async () => rejectOld?.(new Error('Lỗi phản hồi cũ')))
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    expect(host.textContent).toContain('Bàn học')
+  })
+
   it('ignores the previous user response after switching users', async () => {
     let resolveOld: ((value: Response) => void) | undefined
     const old = new Promise<Response>((resolve) => { resolveOld = resolve })
