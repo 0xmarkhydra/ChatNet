@@ -81,6 +81,42 @@ describe("app route tree", () => {
     expect(page()).not.toBeNull();
   });
 
+  it("renders visitor profile deep links inside the authenticated shell", () => {
+    const { location, page, onMount } = renderAt("/users/alice");
+    expect(location()).toBe("/users/alice");
+    expect(page()?.textContent).toBe("Current screen");
+    expect(onMount).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects unsupported or malformed visitor profile paths", () => {
+    for (const path of ["/users", "/users/alice/more", "/users/%2F"]) {
+      const { container, page } = renderAt(path);
+      expect(page()).toBeNull();
+      expect(container.textContent).toContain("Không tìm thấy trang");
+    }
+  });
+
+  it("keeps invitations as a shareable contacts subpage", () => {
+    const { location, page, onMount } = renderAt("/contacts/requests");
+    expect(location()).toBe("/contacts/requests");
+    expect(page()).not.toBeNull();
+    expect(onMount).toHaveBeenCalledTimes(1);
+    const invalid = renderAt("/contacts/unknown");
+    expect(invalid.page()).toBeNull();
+    expect(invalid.container.textContent).toContain("Không tìm thấy trang");
+  });
+
+  it("supports direct feed post URLs and rejects malformed post IDs", () => {
+    const { location, page } = renderAt("/feed/posts/42");
+    expect(location()).toBe("/feed/posts/42");
+    expect(page()).not.toBeNull();
+    for (const path of ["/feed/posts/0", "/feed/posts/nope", "/feed/posts/9007199254740992", "/feed/posts/42/more"]) {
+      const invalid = renderAt(path);
+      expect(invalid.page()).toBeNull();
+      expect(invalid.container.textContent).toContain("Không tìm thấy trang");
+    }
+  });
+
   it("rejects malformed or unsafe conversation IDs", () => {
     for (const path of ["/chat/0", "/chat/nope", "/chat/9007199254740992", "/chat/42/more"]) {
       const { container, page } = renderAt(path);

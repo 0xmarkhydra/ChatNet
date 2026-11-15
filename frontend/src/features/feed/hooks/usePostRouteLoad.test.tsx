@@ -38,8 +38,8 @@ function setup() {
   const setTab = vi.fn()
   let setPosts!: React.Dispatch<React.SetStateAction<Post[]>>
   let setActivePostId!: React.Dispatch<React.SetStateAction<number | null>>
-  function Probe({ session, search, tab = 'feed' }: {
-    session: Session; search: string; tab?: 'feed' | 'chat'
+  function Probe({ session, search, tab = 'feed', routePostId = null }: {
+    session: Session; search: string; tab?: 'feed' | 'chat'; routePostId?: number | null
   }) {
     const [posts, updatePosts] = useState<Post[]>([])
     const [activePostId, updateActivePostId] = useState<number | null>(null)
@@ -47,7 +47,7 @@ function setup() {
     setActivePostId = updateActivePostId
     usePostRouteLoad({
       sessionId: session.sessionId, sessionToken: session.token, sessionRef,
-      tab, routeSearch: search, request, setTab, setPosts: updatePosts,
+      tab, routeSearch: search, routePostId, request, setTab, setPosts: updatePosts,
       setActivePostId: updateActivePostId, onError,
     })
     return <div>{posts.map(post => post.id).join(',')}|{activePostId ?? ''}</div>
@@ -55,9 +55,9 @@ function setup() {
 
   return {
     host, requests, request, onError, setTab,
-    async render(session: Session, search = '?post=11', tab: 'feed' | 'chat' = 'feed') {
+    async render(session: Session, search = '?post=11', tab: 'feed' | 'chat' = 'feed', routePostId: number | null = null) {
       sessionRef.current = session
-      await act(async () => root.render(<Probe session={session} search={search} tab={tab} />))
+      await act(async () => root.render(<Probe session={session} search={search} tab={tab} routePostId={routePostId} />))
     },
     async resetPosts() {
       await act(async () => { setPosts([]); setActivePostId(null) })
@@ -135,6 +135,23 @@ describe('deep-linked feed posts and account visits', () => {
       expect(app.onError).not.toHaveBeenCalled()
     } finally {
       if (!closed) await app.close()
+    }
+  })
+
+  it('loads a new path-based post link and ignores legacy query when path ID is present', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'), '?post=11', 'feed', 42)
+      expect(app.request).toHaveBeenCalledWith('/api/posts/42')
+      await act(async () => {
+        app.requests[0].resolve(Response.json({ id: 42 }))
+        await Promise.resolve()
+      })
+      expect(app.host.textContent).toBe('42|42')
+      await app.render(account('A'), '?post=11', 'feed', 43)
+      expect(app.request).toHaveBeenCalledWith('/api/posts/43')
+    } finally {
+      await app.close()
     }
   })
 

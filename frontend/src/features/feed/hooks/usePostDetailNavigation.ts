@@ -10,7 +10,7 @@ export type UsePostDetailNavigationDeps = {
   tab: Tab;
 };
 
-/** Keep post detail URLs in React Router history (including Desktop HashRouter). */
+/** Shareable post details use the same route on desktop, mobile and Desktop HashRouter. */
 export function usePostDetailNavigation({
   feedScrollBeforeComments: feedScrollBeforeCommentsRef,
   feedViewRef,
@@ -22,17 +22,19 @@ export function usePostDetailNavigation({
   const navigate = useNavigate();
 
   function openFeedPostDetails(id: number) {
+    if (!Number.isSafeInteger(id) || id <= 0) return;
     if (tab === "feed" && isProfileDesktop) {
       feedScrollBeforeCommentsRef.current = feedViewRef.current?.scrollTop ?? 0;
+    }
+    const path = `/feed/posts/${id}`;
+    if (tab === "feed" && location.pathname !== path) {
       const params = new URLSearchParams(location.search);
-      if (params.get("post") !== String(id)) {
-        params.set("tab", "feed");
-        params.set("post", String(id));
-        navigate(
-          { pathname: location.pathname, search: `?${params}`, hash: location.hash },
-          { state: { ...(location.state ?? {}), postId: id } },
-        );
-      }
+      params.delete("post");
+      params.delete("tab");
+      navigate(
+        { pathname: path, search: params.size ? `?${params}` : "", hash: location.hash },
+        { state: { ...(location.state ?? {}), postId: id } },
+      );
     }
     setActivePostId(id);
   }
@@ -40,10 +42,11 @@ export function usePostDetailNavigation({
   function closeFeedPostDetails() {
     setActivePostId(null);
     const params = new URLSearchParams(location.search);
-    if (params.has("post")) {
-      params.delete("post");
+    params.delete("post");
+    params.delete("tab");
+    if (location.pathname.startsWith("/feed/posts/") || new URLSearchParams(location.search).has("post")) {
       navigate(
-        { pathname: location.pathname, search: params.size ? `?${params}` : "", hash: location.hash },
+        { pathname: "/feed", search: params.size ? `?${params}` : "", hash: location.hash },
         { replace: true, state: location.state },
       );
     }
