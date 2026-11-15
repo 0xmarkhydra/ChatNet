@@ -10,7 +10,7 @@ export default function CallHeaderActions({ conversationId, disabled = false }: 
     }))
   }
   return (
-    <div className="call-header-actions" aria-label="Gọi điện">
+    <div className="call-header-actions" role="group" aria-label="Gọi điện">
       <button type="button" aria-label="Gọi thoại" title={disabled ? 'Không thể gọi khi hội thoại bị chặn' : 'Gọi thoại'} disabled={disabled} onClick={() => start('audio')}>
         <Phone size={19} />
       </button>
