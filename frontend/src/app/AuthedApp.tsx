@@ -540,6 +540,7 @@ export default function AuthedApp({
     chatOutboxRef.current = restored;
     setChatOutbox(restored);
     sendingClientIDs.current = new Set<string>();
+    actionLocks.current = new Set<string>();
     retryOutboxBusy.current = false;
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
@@ -2071,7 +2072,7 @@ export default function AuthedApp({
     setPendingComments({});
     setLikePreviews({});
     setReactionPreviews({});
-    actionLocks.current.clear();
+    actionLocks.current = new Set<string>();
     pendingRequests.current.clear();
     mutationRequests.current.clear();
     messageReceipts.current.clear();
