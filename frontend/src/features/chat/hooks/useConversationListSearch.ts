@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { ApiRequest } from '../../../shared/types/api'
 import { CHAT_LIST_PAGE_SIZE, type Conversation } from '../types'
 import { useLatest } from '../../../shared/hooks/useLatest'
@@ -36,7 +37,8 @@ export function useConversationListSearch({
     ? JSON.stringify([sessionId, keyword, filter, categoryId, retry])
     : ''
   const requestRef = useLatest(request)
-  const [state, setState] = useState<SearchState>(initialState)
+  // A → B → A must not resurrect the previous A visit's search results.
+  const [state, setState] = useScopedState<SearchState>(key, initialState)
   const pageController = useRef<AbortController | null>(null)
   const pageBusy = useRef(false)
 
