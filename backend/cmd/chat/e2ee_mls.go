@@ -141,22 +141,13 @@ func (s *server) guardPlaintextDuringMLS(w http.ResponseWriter, r *http.Request,
 		httpx.Error(w, http.StatusConflict, "this conversation requires end-to-end encrypted messages")
 		return false
 	}
-	// Default E2EE pilot is limited to *empty* direct chats. Existing legacy
-	// history is never silently converted, and server must never accept a
-	// plaintext first message for an auto-encrypted room. The conversation
-	// FOR SHARE lock is held through the caller's transaction commit.
+	// With DEV auto-default enabled, *every* direct chat requires MLS for
+	// NEW messages, including chats containing historical legacy plaintext.
+	// Old rows remain visible but must never authorize a plaintext downgrade.
+	// The FOR SHARE parent row lock serializes with atomic MLS bootstrap.
 	if roomType == "direct" && mlsAutoDefaultEnabled() {
-		var historyExists bool
-		if err := tx.QueryRow(r.Context(), `
-			SELECT EXISTS (SELECT 1 FROM messages WHERE conversation_id=$1)
-		`, conversationID).Scan(&historyExists); err != nil {
-			httpx.Error(w, http.StatusServiceUnavailable, "cannot check legacy message history")
-			return false
-		}
-		if !historyExists {
-			httpx.Error(w, http.StatusConflict, "E2EE setup required before sending direct messages")
-			return false
-		}
+		httpx.Error(w, http.StatusConflict, "E2EE setup required before sending direct messages")
+		return false
 	}
 	return true
 }
@@ -200,8 +191,9 @@ func (s *server) getMLSConversationStatus(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"mode": mode, "epoch": epoch,
-		"pilotEnabled": config.Env("CHATNET_E2EE_EXPERIMENTAL", "") == "1",
-		"autoEnabled":  mlsAutoDefaultEnabled() && roomType == "direct" && !hasHistory && epoch == 0,
+		"pilotEnabled":  config.Env("CHATNET_E2EE_EXPERIMENTAL", "") == "1",
+		"autoEnabled":   mlsAutoDefaultEnabled() && roomType == "direct" && epoch == 0,
+		"legacyHistory": hasHistory,
 	})
 }
 
