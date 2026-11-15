@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Heart, ThumbsUp } from "lucide-react";
 import type { Post } from "../types";
 import { reactionOptions } from "../../../shared/utils/reactions";
+import { burstPostHearts } from "../utils/postHeartBurst";
 import "../styles/feed-actions.css";
 
 export default function FeedReactionControl({
@@ -143,7 +144,8 @@ export default function FeedReactionControl({
               aria-pressed={selected === emoji}
               title={reactionLabel}
               disabled={busy}
-              onClick={() => {
+              onClick={(event) => {
+                if (emoji === "❤️" && selected !== emoji) burstPostHearts(event.currentTarget);
                 setOpen(false);
                 if (selected !== emoji) setReactionPulse(pulse => pulse + 1);
                 void react(post, emoji);
