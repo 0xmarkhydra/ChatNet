@@ -28,8 +28,10 @@ export function useMessageReactions({
   async function toggleReaction(message: Message, emoji: string) {
     const key = `message:${message.id}`;
     if (message.deleted || actionLocks.current.has(key)) return;
-    const sessionId = session?.sessionId;
-    actionLocks.current.add(key);
+    const identity = sessionRef.current;
+    if (!identity || identity !== session || !identity.sessionId) return;
+    const locks = actionLocks.current;
+    locks.add(key);
     setReactionPreviews((current) => ({
       ...current,
       [message.id]: toggleMessageReactionCount(message.reactions || [], emoji),
@@ -37,7 +39,7 @@ export function useMessageReactions({
     try {
       const response = await reactToMessage(apiFetch, message.id, emoji);
       const result = (await response.json()) as Message & { error?: string };
-      if (sessionRef.current?.sessionId !== sessionId) return;
+      if (sessionRef.current !== identity) return;
       if (!response.ok || result.id !== message.id)
         throw new Error(result.error || "Không thả cảm xúc được");
       if (activeConversationIdRef.current === message.conversationId) {
@@ -51,14 +53,14 @@ export function useMessageReactions({
         );
       }
     } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId)
+      if (sessionRef.current === identity)
         setNotice(
           error instanceof Error ? error.message : "Không thả cảm xúc được",
           "error",
         );
     } finally {
-      if (sessionRef.current?.sessionId === sessionId) {
-        actionLocks.current.delete(key);
+      locks.delete(key);
+      if (sessionRef.current === identity) {
         setReactionPreviews((current) => {
           const next = { ...current };
           delete next[message.id];

@@ -425,7 +425,7 @@ export default function AuthedApp({
     number | null
   >(null);
   const selectRoutedConversation = useChatConversationRoute(activeConversationId, setActiveConversationId);
-  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, pinnedExpanded, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setPinnedExpanded, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId });
+  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, pinnedExpanded, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setPinnedExpanded, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId, sessionId: session?.sessionId ?? null });
 
   const activeConversationIdRef = useRef<number | null>(null);
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
@@ -539,7 +539,8 @@ export default function AuthedApp({
     const restored = restoreChatOutbox(session?.user.id ?? 0, nextSessionId);
     chatOutboxRef.current = restored;
     setChatOutbox(restored);
-    sendingClientIDs.current.clear();
+    sendingClientIDs.current = new Set<string>();
+    actionLocks.current = new Set<string>();
     retryOutboxBusy.current = false;
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
@@ -2049,7 +2050,7 @@ export default function AuthedApp({
     chatOutboxRef.current = [];
     setChatOutbox([]);
     chatOutboxSession.current = "";
-    sendingClientIDs.current.clear();
+    sendingClientIDs.current = new Set<string>();
     pendingSend.current = null;
     endSession(revoke, clearStorage, setNotice);
     setConversations([]);
@@ -2071,7 +2072,7 @@ export default function AuthedApp({
     setPendingComments({});
     setLikePreviews({});
     setReactionPreviews({});
-    actionLocks.current.clear();
+    actionLocks.current = new Set<string>();
     pendingRequests.current.clear();
     mutationRequests.current.clear();
     messageReceipts.current.clear();

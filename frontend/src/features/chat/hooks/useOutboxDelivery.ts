@@ -49,12 +49,14 @@ export function useOutboxDelivery({
       )
     )
       return;
-    sendingClientIDs.current.add(item.clientId);
+    // Capture the visit's lock set: a later session gets a fresh set.
+    const sendLocks = sendingClientIDs.current;
+    sendLocks.add(item.clientId);
     try {
       // Old offline outbox entries must not downgrade an MLS conversation.
       // If status is unavailable, fail closed with an unconfirmed item.
       const mode = await getConversationEncryptionStatus(apiFetch, item.conversationId);
-      if (sessionRef.current?.sessionId !== identity.sessionId) return;
+      if (sessionRef.current !== identity) return;
       if (mode !== 'legacy') {
         updateChatOutbox((items) => items.map((pending) =>
           pending.clientId === item.clientId &&
@@ -69,7 +71,7 @@ export function useOutboxDelivery({
         return;
       }
       const response = await sendMessageRequest(apiFetch, item);
-      if (sessionRef.current?.sessionId !== identity.sessionId) return;
+      if (sessionRef.current !== identity) return;
       if (!response.ok) {
         const permanent =
           response.status >= 400 &&
@@ -83,7 +85,7 @@ export function useOutboxDelivery({
               } | null
             )?.error
           : undefined;
-        if (sessionRef.current?.sessionId !== identity.sessionId) return;
+        if (sessionRef.current !== identity) return;
         updateChatOutbox((items) =>
           items.map((pending) =>
             pending.clientId === item.clientId &&
@@ -101,7 +103,7 @@ export function useOutboxDelivery({
         return;
       }
       const confirmed = (await response.json()) as Message;
-      if (sessionRef.current?.sessionId !== identity.sessionId) return;
+      if (sessionRef.current !== identity) return;
       if (
         !Number.isSafeInteger(confirmed.id) ||
         confirmed.id <= 0 ||
@@ -122,7 +124,7 @@ export function useOutboxDelivery({
       }
       void refreshConversations();
     } catch {
-      if (sessionRef.current?.sessionId === identity.sessionId) {
+      if (sessionRef.current === identity) {
         // The HTTP ACK might be lost after the database commit. Reuse the same clientId.
         updateChatOutbox((items) =>
           items.map((pending) =>
@@ -134,12 +136,13 @@ export function useOutboxDelivery({
         );
       }
     } finally {
-      sendingClientIDs.current.delete(item.clientId);
+      sendLocks.delete(item.clientId);
     }
   }
   async function retryQueuedChatMessages() {
     if (!navigator.onLine || retryOutboxBusyRef.current || !sessionRef.current)
       return;
+    const retryIdentity = sessionRef.current;
     retryOutboxBusyRef.current = true;
     try {
       while (navigator.onLine) {
@@ -154,7 +157,7 @@ export function useOutboxDelivery({
         if (remaining && remaining.status !== "failed") break;
       }
     } finally {
-      retryOutboxBusyRef.current = false;
+      if (sessionRef.current === retryIdentity) retryOutboxBusyRef.current = false;
     }
   }
 
