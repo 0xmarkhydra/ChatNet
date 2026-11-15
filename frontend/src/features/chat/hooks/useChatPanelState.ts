@@ -6,10 +6,12 @@ import { type GroupActivityKind } from "../components/GroupActivities";
 
 export type UseChatPanelStateDeps = {
   activeConversationId: number | null;
+  sessionId: string | null;
 };
 
 export function useChatPanelState({
   activeConversationId,
+  sessionId,
 }: UseChatPanelStateDeps) {
   const [channelSelection, setChannelSelection] = useState<{ conversationId: number | null; channelId: number }>({ conversationId: null, channelId: 0 });
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
@@ -30,7 +32,7 @@ export function useChatPanelState({
   const [sharedContentOpen, setSharedContentOpen] = useScopedState(channelScope, false);
   const [messageSearchOpen, setMessageSearchOpen] = useScopedState(channelScope, false);
   const [conversationDetailsOpen, setConversationDetailsOpen] = useScopedState(conversationScope, false);
-  const [historyActionBusy, setHistoryActionBusy] = useState(false);
+  const [historyActionBusy, setHistoryActionBusy] = useScopedState(`${sessionId ?? ''}:${activeConversationId ?? ''}`, false);
 
   return {
     channelSelection,
