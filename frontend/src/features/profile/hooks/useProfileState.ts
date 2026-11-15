@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from "react";
+import { useScopedState } from "../../../shared/hooks/useScopedState";
 import { type Post } from "../../feed";
 import type { ProfileMediaState } from "../types";
 
 export type UseProfileStateDeps = {
-
+  sessionId: string | null;
 };
 
-export function useProfileState({
-
-}: UseProfileStateDeps) {
+export function useProfileState({ sessionId }: UseProfileStateDeps) {
   const [profileTimelineOpen, setProfileTimelineOpen] = useState(false);
   const [isProfileDesktop, setIsProfileDesktop] = useState(
     () => window.matchMedia("(min-width: 761px)").matches,
@@ -23,10 +22,11 @@ export function useProfileState({
   const [profileComposerOpen, setProfileComposerOpen] = useState(false);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [postSubmitError, setPostSubmitError] = useState("");
-  const [profilePosts, setProfilePosts] = useState<Post[]>([]);
-  const [profilePostsBusy, setProfilePostsBusy] = useState(false);
-  const [profilePostsError, setProfilePostsError] = useState("");
-  const [profileHasMore, setProfileHasMore] = useState(false);
+  // Profile timeline belongs to a login visit, even when switching A → B → A.
+  const [profilePosts, setProfilePosts] = useScopedState<Post[]>(sessionId, []);
+  const [profilePostsBusy, setProfilePostsBusy] = useScopedState(sessionId, false);
+  const [profilePostsError, setProfilePostsError] = useScopedState(sessionId, "");
+  const [profileHasMore, setProfileHasMore] = useScopedState(sessionId, false);
   const profileLoadSequence = useRef(0);
   const profilePagingBusy = useRef(false);
   const profileIdentityRef = useRef<HTMLButtonElement>(null);
