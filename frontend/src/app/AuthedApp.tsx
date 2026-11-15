@@ -259,6 +259,7 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
+import AppPageErrorBoundary from "./layouts/AppPageErrorBoundary";
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { consumeInviteDeepLink } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
@@ -3071,6 +3072,7 @@ export default function AuthedApp({
         <section
           className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
         >
+          <AppPageErrorBoundary>
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
           activeChatTranslationSettings={activeChatTranslationSettings}
@@ -3626,6 +3628,7 @@ export default function AuthedApp({
           visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
         />
         )}
+          </AppPageErrorBoundary>
         </section>
       } />
 
