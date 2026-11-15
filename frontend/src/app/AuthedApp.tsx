@@ -16,6 +16,8 @@ import { useSession } from "../shared/context/SessionContext";
 import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
+import { usePhoneSearchLayout } from "./hooks/usePhoneSearchLayout";
+import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
@@ -161,7 +163,6 @@ import {
 } from "../features/feed/components/FeedDiscussion";
 import FeedModeration from "../features/feed/components/FeedModeration";
 import ProfileOverlay from "../features/profile/components/ProfileOverlay";
-import type { NearbyUser } from "../features/discover/components/NearbyExplorer";
 import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
@@ -228,10 +229,6 @@ import {
   geolocationErrorMessage,
 } from "../features/discover/lib/geolocation";
 
-const NearbyExplorer = lazy(
-  () => import("../features/discover/components/NearbyExplorer"),
-);
-const Marketplace = lazy(() => import("../features/discover/components/Marketplace"));
 const ProfileQr = lazy(() => import("../features/profile/components/ProfileQr"));
 import {
   defaultBundle,
@@ -376,23 +373,13 @@ export default function AuthedApp({
   }, [navigate, routeLocation.pathname, tab]);
   const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraftFile, storyBusy, storyDraftFile } = useFeedUiState({ tab });
 
-  const tabRef = useRef(tab);
-  tabRef.current = tab;
+  const tabRef = useLatest(tab);
   const [globalSearch, setGlobalSearch] = useState("");
   const [chatListQuery, setChatListQuery] = useState('');
   const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'groups'>('all');
   const chatFiltersPill = useSlidingPill<HTMLDivElement>(chatListFilter);
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
-  const [phoneSearchLayout, setPhoneSearchLayout] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches,
-  );
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 760px)");
-    const update = () => setPhoneSearchLayout(media.matches);
-    media.addEventListener("change", update);
-    update();
-    return () => media.removeEventListener("change", update);
-  }, []);
+  const phoneSearchLayout = usePhoneSearchLayout();
   const quickSearchAnchorRef = useRef<HTMLDivElement>(null);
   const [chatSearchJump, setChatSearchJump] = useState<{
     conversationId: number;
@@ -429,8 +416,7 @@ export default function AuthedApp({
 
   const activeConversationIdRef = useRef<number | null>(null);
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
-  const activeChannelIdRef = useRef(selectedChannelId);
-  activeChannelIdRef.current = selectedChannelId;
+  const activeChannelIdRef = useLatest(selectedChannelId);
   const activeConversationTypeRef = useRef<'group' | 'direct' | null>(null);
   const [groupChannelUnreadStatus, setGroupChannelUnreadStatus] = useState<{ conversationId: number; available: boolean } | null>(null);
   const groupChannelUnreadAvailable = groupChannelUnreadStatus?.conversationId === activeConversationId
@@ -648,7 +634,9 @@ export default function AuthedApp({
     ? undefined : conversationTranslationOverrides[activeConversationId];
   const effectiveAutoTranslate = activeChatTranslationSettings?.enabled ?? autoTranslate;
   const effectiveTargetLanguage = activeChatTranslationSettings?.targetLanguage ?? targetLanguage;
-  translationLanguageRef.current = effectiveTargetLanguage;
+  useLayoutEffect(() => {
+    translationLanguageRef.current = effectiveTargetLanguage;
+  }, [effectiveTargetLanguage, translationLanguageRef]);
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] =
     useState(false);
   const [status, setStatus] = useState("Đang kết nối...");
@@ -659,8 +647,7 @@ export default function AuthedApp({
   const [messageSoundEnabled, setMessageSoundEnabled] = useState(
     readMessageSoundEnabled,
   );
-  const messageSoundEnabledRef = useRef(messageSoundEnabled);
-  messageSoundEnabledRef.current = messageSoundEnabled;
+  const messageSoundEnabledRef = useLatest(messageSoundEnabled);
   const messageSound = useRef<IncomingMessageSound | null>(null);
   if (!messageSound.current) messageSound.current = new IncomingMessageSound();
   useEffect(() => {
@@ -683,7 +670,7 @@ export default function AuthedApp({
       window.removeEventListener("keydown", unlockAudio);
       window.removeEventListener("storage", syncPreference);
     };
-  }, []);
+  }, [messageSoundEnabledRef]);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushInitFailed, setPushInitFailed] = useState(false);
   const [pushPrompt, setPushPrompt] = useState(false);
@@ -1121,7 +1108,9 @@ export default function AuthedApp({
     onUnavailable: onRouteConversationUnavailable,
     onError: onRouteConversationError,
   });
-  activeConversationTypeRef.current = activeConversation?.type ?? null;
+  useLayoutEffect(() => {
+    activeConversationTypeRef.current = activeConversation?.type ?? null;
+  }, [activeConversation?.type]);
 
   // Channel selection stays inside the active group and never leaks into another conversation.
   useEffect(() => {
