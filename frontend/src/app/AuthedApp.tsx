@@ -304,6 +304,7 @@ import { useDirectConversations } from "../features/chat/hooks/useDirectConversa
 import { useGroupCreation } from "../features/chat/hooks/useGroupCreation";
 import { usePostSync } from "../features/feed/hooks/usePostSync";
 import { usePostMentions } from "../features/feed/hooks/usePostMentions";
+import { usePostRouteLoad } from "../features/feed/hooks/usePostRouteLoad";
 import { useProfilePosts } from "../features/feed/hooks/useProfilePosts";
 import { usePostComposer } from "../features/feed/hooks/usePostComposer";
 import { usePostReactions } from "../features/feed/hooks/usePostReactions";
@@ -627,43 +628,6 @@ export default function AuthedApp({
     const id = Number(new URLSearchParams(routeLocation.search).get("post"));
     setActivePostId(Number.isSafeInteger(id) && id > 0 ? id : null);
   }, [tab, routeLocation.search]);
-  useEffect(() => {
-    if (!session?.token) return;
-    const params = new URLSearchParams(routeLocation.search);
-    if (tab !== "feed" && params.get("tab") !== "feed") return;
-    if (tab !== "feed") setTab("feed");
-    const id = Number(params.get("post"));
-    if (!Number.isSafeInteger(id) || id <= 0) return;
-    let cancelled = false;
-    void apiFetch("/api/posts/" + id)
-      .then(async (response) => {
-        if (!response.ok)
-          throw new Error(
-            response.status === 404
-              ? "Bài viết không tồn tại hoặc bạn không có quyền xem."
-              : "Không thể mở bài viết.",
-          );
-        return response.json() as Promise<Post>;
-      })
-      .then((post) => {
-        if (cancelled) return;
-        setPosts((current) => [
-          post,
-          ...current.filter((item) => item.id !== post.id),
-        ]);
-        setActivePostId(post.id);
-      })
-      .catch((error) => {
-        if (!cancelled)
-          setNotice(
-            error instanceof Error ? error.message : "Không thể mở bài viết.",
-            "error",
-          );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.token, tab, routeLocation.search]);
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -907,6 +871,19 @@ export default function AuthedApp({
     setNotice,
     actionLocks,
     setActivePostId,
+  });
+
+  usePostRouteLoad({
+    sessionId: session?.sessionId ?? null,
+    sessionToken: session?.token ?? null,
+    sessionRef,
+    tab,
+    routeSearch: routeLocation.search,
+    request: apiFetch,
+    setTab,
+    setPosts,
+    setActivePostId,
+    onError: message => setNotice(message, "error"),
   });
 
   const followingFeed = useFollowingPosts({
