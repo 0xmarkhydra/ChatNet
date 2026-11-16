@@ -105,6 +105,66 @@ describe('NearbyExplorer location fallback', () => {
     expect(host.textContent).toContain('Chưa tìm thấy địa điểm')
   })
 
+  it('keeps the previous place list on a failed refresh with unchanged filters', async () => {
+    const place = {
+      id: 'cafe:1', name: 'Quán cà phê', category: 'cafe' as const,
+      kind: 'Cafe', latitude: 21, longitude: 105, distanceKm: 0.4,
+    }
+    let rejectRefresh: ((error: Error) => void) | undefined
+    const pending = new Promise<Awaited<ReturnType<typeof loadNearbyPlaces>>>((_, reject) => { rejectRefresh = reject })
+    loadPlaces.mockResolvedValueOnce([place]).mockImplementationOnce(() => pending)
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Danh sách"]')?.click())
+    expect(host.textContent).toContain('Quán cà phê')
+    await act(async () => host.querySelector<HTMLButtonElement>('.nearby-refresh')?.click())
+    expect(host.textContent).toContain('Quán cà phê')
+    expect(host.textContent).toContain('Đang tải địa điểm')
+    await act(async () => rejectRefresh?.(new Error('Mất kết nối OSM')))
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Mất kết nối OSM')
+    expect(host.textContent).toContain('Quán cà phê')
+    expect(host.textContent).not.toContain('Đang tải địa điểm')
+  })
+
+  it('replaces stale location results after a successful retry with identical criteria', async () => {
+    const oldPlace = { id: 'cafe:old', name: 'Địa điểm trước', category: 'cafe' as const,
+      kind: 'Cafe', latitude: 21, longitude: 105, distanceKm: 0.4 }
+    const newPlace = { ...oldPlace, id: 'cafe:new', name: 'Địa điểm mới' }
+    let finishRefresh: ((value: Awaited<ReturnType<typeof loadNearbyPlaces>>) => void) | undefined
+    const pending = new Promise<Awaited<ReturnType<typeof loadNearbyPlaces>>>(resolve => { finishRefresh = resolve })
+    loadPlaces.mockResolvedValueOnce([oldPlace]).mockImplementationOnce(() => pending)
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    expect(host.textContent).toContain('Địa điểm trước')
+    await act(async () => host.querySelector<HTMLButtonElement>('.nearby-refresh')?.click())
+    expect(host.textContent).toContain('Địa điểm trước')
+    await act(async () => finishRefresh?.([newPlace]))
+    expect(host.textContent).not.toContain('Địa điểm trước')
+    expect(host.textContent).toContain('Địa điểm mới')
+  })
+
+  it('clears results when search criteria change rather than showing an old category', async () => {
+    const place = { id: 'food:1', name: 'Quán ăn cũ', category: 'food' as const,
+      kind: 'Restaurant', latitude: 21, longitude: 105, distanceKm: 0.5 }
+    let complete: ((items: Awaited<ReturnType<typeof loadNearbyPlaces>>) => void) | undefined
+    const next = new Promise<Awaited<ReturnType<typeof loadNearbyPlaces>>>(resolve => { complete = resolve })
+    loadPlaces.mockResolvedValueOnce([place]).mockImplementationOnce(() => next)
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    expect(host.textContent).toContain('Quán ăn cũ')
+    await act(async () => Array.from(host.querySelectorAll<HTMLButtonElement>('.nearby-categories button'))
+      .find(item => item.textContent === 'Cà phê')?.click())
+    expect(host.textContent).not.toContain('Quán ăn cũ')
+    await act(async () => complete?.([]))
+    expect(host.textContent).toContain('Chưa tìm thấy địa điểm')
+  })
+
   it('lets users switch to a list when the map cannot be used', async () => {
     geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
     await act(async () => root.render(<NearbyExplorer {...props} />))

@@ -56,6 +56,7 @@ export default function NearbyExplorer({
   useEffect(() => () => { ++locationRevision.current; locatingFlight.current = false }, [])
   const [locationError, setLocationError] = useState('')
   const [places, setPlaces] = useState<NearbyPlace[]>([])
+  const lastPlaceCriteria = useRef<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [reload, setReload] = useState(0)
@@ -72,7 +73,11 @@ export default function NearbyExplorer({
   useEffect(() => {
     if (mode !== 'places' || !location) return
     const controller = new AbortController()
-    setLoading(true); setError(''); setPlaces([]); setSelected(null)
+    const criteria = `${location.latitude}:${location.longitude}:${radius}:${category}`
+    const changedCriteria = lastPlaceCriteria.current !== criteria
+    lastPlaceCriteria.current = criteria
+    setLoading(true); setError('')
+    if (changedCriteria) { setPlaces([]); setSelected(null) }
     loadNearbyPlaces({ ...location, radiusKm: radius, category, signal: controller.signal })
       .then((items) => { if (!controller.signal.aborted) setPlaces(items) })
       .catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Không tải được địa điểm.') })
