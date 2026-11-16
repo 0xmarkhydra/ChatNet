@@ -480,14 +480,6 @@
     width: 100%;
     height: 16px;
   }
-  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-room-member-count > span,
-  .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-channel-parent-label {
-    display: block;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    min-width: 0;
-  }
   .modern-shell.app-layout .social-chat-layout.group-channel-workspace .group-chat-panel .group-room-subtitle .conversation-category-assignment {
     display: none;
   }
