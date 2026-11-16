@@ -1,0 +1,88 @@
+// @vitest-environment jsdom
+import { act } from 'react'
+import { createRoot } from 'react-dom/client'
+import { afterEach, expect, it, vi } from 'vitest'
+import { useCommunityDiscovery } from './useCommunityDiscovery'
+
+const mocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  join: vi.fn(),
+}))
+vi.mock('../api/community', () => ({
+  listPublicGroups: mocks.list,
+  joinPublicGroup: mocks.join,
+}))
+vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+
+const roots: Array<() => Promise<void>> = []
+afterEach(async () => {
+  for (const cleanup of roots.splice(0)) await cleanup()
+  document.body.innerHTML = ''
+  vi.clearAllMocks()
+})
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(done => { resolve = done })
+  return { promise, resolve }
+}
+
+function mount({ active = true, query = '' }: { active?: boolean; query?: string } = {}) {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  const request = vi.fn(async () => ({ ok: true }) as Response)
+  const notify = vi.fn()
+  const onJoinedGroup = vi.fn(async () => {})
+  let state!: ReturnType<typeof useCommunityDiscovery>
+
+  function Test({ isActive, search }: { isActive: boolean; search: string }) {
+    state = useCommunityDiscovery({ active: isActive, query: search, request, notify, onJoinedGroup })
+    return null
+  }
+  const render = async (isActive = active, search = query) => {
+    await act(async () => root.render(<Test isActive={isActive} search={search} />))
+  }
+  roots.push(async () => { await act(async () => root.unmount()) })
+  return { render, get state() { return state }, notify, onJoinedGroup, request }
+}
+
+it('ignores a stale list response after search changes and aborts the previous request', async () => {
+  const first = deferred<Response>()
+  const second = deferred<Response>()
+  mocks.list.mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise)
+  const view = mount()
+  await view.render(true, 'nhóm A')
+  await view.render(true, 'nhóm B')
+  expect(mocks.list).toHaveBeenCalledTimes(2)
+  expect((mocks.list.mock.calls[0][2] as AbortSignal).aborted).toBe(true)
+
+  await act(async () => {
+    second.resolve({ ok: true, json: async () => [{ id: 2, name: 'B' }] } as Response)
+  })
+  expect(view.state.publicGroups).toEqual([{ id: 2, name: 'B' }])
+  await act(async () => {
+    first.resolve({ ok: true, json: async () => [{ id: 1, name: 'A' }] } as Response)
+  })
+  expect(view.state.publicGroups).toEqual([{ id: 2, name: 'B' }])
+  expect(view.state.publicLoading).toBe(false)
+})
+
+it('stops discovery when leaving the list and preserves the existing join response semantics', async () => {
+  mocks.list.mockResolvedValue({
+    ok: true, json: async () => [{ id: 12, name: 'Public' }],
+  } as Response)
+  mocks.join.mockResolvedValue({
+    ok: true, json: async () => ({ status: 'member' }),
+  } as Response)
+  const view = mount()
+  await view.render()
+  expect(view.state.publicGroups).toHaveLength(1)
+  await act(async () => view.state.joinPublic(12))
+  expect(view.notify).toHaveBeenCalledWith('Đã tham gia cộng đồng.')
+  expect(view.onJoinedGroup).toHaveBeenCalledWith(12)
+  expect(view.state.joiningId).toBeNull()
+  await view.render(false, '')
+  expect(view.state.publicGroups).toEqual([])
+  expect(mocks.list).toHaveBeenCalledTimes(1)
+})
