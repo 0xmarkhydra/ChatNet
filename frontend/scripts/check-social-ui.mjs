@@ -439,6 +439,42 @@ try {
     server.kill()
     process.exit(0)
   }
+  if (process.argv.includes('--socco-61-65-only')) {
+    await page.goto(origin + '/feed?filter=latest#unused-fragment')
+    const feed = page.locator('.social-feed')
+    const card = feed.locator('.feed-post-card').first()
+    const rail = feed.locator('.social-feed-side')
+    const suggestions = rail.getByRole('region', { name: 'Gợi ý kết nối' })
+    const forbiddenCards = feed.locator('.social-feed-trending, .social-feed-translation')
+    for (const viewport of [{ width: 1586, height: 992 }, { width: 1240, height: 640 }, { width: 1000, height: 820 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport)
+      await card.waitFor({ state: 'visible' })
+      if (viewport.width > 760) {
+        await suggestions.getByRole('button', { name: 'Kết bạn' }).waitFor({ state: 'visible' })
+        assert(await rail.locator('section').count() === 1, 'The rail should contain only connection suggestions')
+      } else {
+        await rail.waitFor({ state: 'hidden' })
+      }
+      assert(await forbiddenCards.count() === 0, 'Unused sidebar sections should stay out of the DOM, including with hashtagged posts')
+    }
+    await page.setViewportSize({ width: 1586, height: 992 })
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
+    await card.getByRole('button', { name: 'Tùy chọn bài viết' }).click()
+    await page.getByRole('button', { name: 'Sao chép liên kết' }).click()
+    await page.getByText('Đã sao chép liên kết bài viết.', { exact: true }).waitFor()
+    const copied = await page.evaluate(() => navigator.clipboard.readText())
+    assert(copied === origin + '/feed/posts/88', 'Copied permalink should omit the current query and fragment: ' + copied)
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    for (const link of [copied, origin + '/?tab=feed&post=88']) {
+      await page.goto(link)
+      await details.getByText(fixturePost.content, { exact: true }).waitFor()
+    }
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('SOCCO-61/65 PASS: responsive suggestions, hidden sidebar cards, clipboard, direct and legacy post links')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
   if (process.argv.includes('--composer-motion-only')) {
     await page.goto(origin + '/feed')
     const launcher = page.locator('.social-feed-launcher')
@@ -852,7 +888,7 @@ try {
   await feedCards.first().waitFor({ state: 'visible' })
   const socialGeometry = await page.evaluate(() => {
     const keys = ['.social-feed-stories-card', '.social-feed-launcher', '.social-feed-filter-bar',
-      '.social-feed-center .post.zalo-post', '.social-feed-suggestions', '.social-feed-trending', '.social-feed-translation']
+      '.social-feed-center .post.zalo-post', '.social-feed-suggestions']
     return Object.fromEntries(keys.map(key => {
       const rect = document.querySelector(key)?.getBoundingClientRect()
       return [key, rect ? {x:rect.x,y:rect.y,width:rect.width,height:rect.height} : null]
@@ -863,8 +899,6 @@ try {
     ['.social-feed-stories-card', 107],
     ['.social-feed-launcher', 286],
     ['.social-feed-suggestions', 107],
-    ['.social-feed-trending', 425],
-    ['.social-feed-translation', 702],
   ]) {
     const rect = socialGeometry[selector]
     assert(rect && approx(rect.y, y),
@@ -1456,8 +1490,7 @@ try {
     assert(presignedUploads > 0, 'Media launcher must select and upload the chosen file')
     await mediaDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
 
-    // Discovery rail stays pinned as the main feed scrolls; on short laptop
-    // screens it gets a separate scrollbar so the AI card stays reachable.
+    // Connection suggestions stay pinned as the main feed scrolls.
     await page.setViewportSize({ width: 1240, height: 640 })
     const railMeasurements = await feed.evaluate(root => {
       const center = root.querySelector('.social-feed-center')
@@ -1471,10 +1504,10 @@ try {
         railScrollHeight: rail.scrollHeight, feedScrollTop: root.scrollTop }
     })
     assert(railMeasurements.position === 'sticky' && railMeasurements.overflowY === 'auto'
-      && railMeasurements.railScrollHeight > railMeasurements.railClientHeight + 40
+      && railMeasurements.railScrollHeight <= railMeasurements.railClientHeight + 1
       && railMeasurements.railClientHeight <= 640 - railMeasurements.viewportTop - 16
       && railMeasurements.centerRight + 8 < railMeasurements.railRight,
-      'Compact laptop rail must remain beside posts with a separate scrollbar: ' + JSON.stringify(railMeasurements))
+      'Connection suggestions must fit beside posts on a compact laptop: ' + JSON.stringify(railMeasurements))
     await feed.evaluate(root => { root.scrollTop = 240 })
     const stickyMeasurement = await feed.evaluate(root => {
       const railRect = root.querySelector('.social-feed-side').getBoundingClientRect()
@@ -1484,18 +1517,6 @@ try {
       && stickyMeasurement.railTop >= stickyMeasurement.viewportTop + 10
       && stickyMeasurement.railTop <= railMeasurements.railTop + 2,
       'Rail should remain visible while feed scrolls: ' + JSON.stringify(stickyMeasurement))
-    await feed.locator('.social-feed-side').evaluate(rail => { rail.scrollTop = rail.scrollHeight })
-    const independentScroll = await feed.evaluate(root => {
-      const rail = root.querySelector('.social-feed-side')
-      const translation = rail.querySelector('.social-feed-translation').getBoundingClientRect()
-      const railRect = rail.getBoundingClientRect()
-      return { railScrollTop: rail.scrollTop, feedScrollTop: root.scrollTop,
-        translationBottom: translation.bottom, railBottom: railRect.bottom }
-    })
-    assert(independentScroll.railScrollTop > 0
-      && independentScroll.feedScrollTop === stickyMeasurement.feedScrollTop
-      && independentScroll.translationBottom <= independentScroll.railBottom + 2,
-      'The three menu cards must scroll independently to reveal Dịch AI: ' + JSON.stringify(independentScroll))
     await feed.evaluate(root => { root.scrollTop = 0 })
     await page.setViewportSize({ width: 1586, height: 992 })
 
@@ -1681,7 +1702,6 @@ try {
   assert(await feed.locator('.social-feed-story-strip.is-expanded').count() === 1, 'View all stories must expand story row')
   await feed.getByRole('button', { name: 'Thu gọn' }).click()
   await feed.locator('.social-feed-suggestion-row').first().waitFor({ state: 'visible' })
-  await feed.locator('.social-feed-trend').first().waitFor({ state: 'visible' })
   mkdirSync('output/playwright/layout', { recursive: true })
   await page.screenshot({ path: 'output/playwright/layout/social-feed-desktop-1586.png' })
   const reactionTestStyle = await page.addStyleTag({ content: '.app-sidebar, .app-sidebar * { pointer-events: none !important }' })
@@ -1804,9 +1824,6 @@ try {
   assert(followingRequests > 0, 'Following tab must request backend scope=following')
   await feed.getByRole('button', { name: 'Mới nhất', exact: true }).click()
   await feed.getByRole('button', { name: 'Dành cho bạn' }).click()
-  await feed.locator('.social-feed-trend').first().click()
-  assert((await page.getByRole('searchbox', { name: 'Tìm bài viết' }).inputValue()).startsWith('#'), 'Trend click must search posts')
-  await page.getByRole('searchbox', { name: 'Tìm bài viết' }).fill('')
   // After sidebar navigation, the hover flyout can intercept a pointer gesture.
   // The normal pointer flow is exercised by check:smart-composer; trigger the
   // existing React click handler here to test the composer after deep navigation.
@@ -1837,7 +1854,7 @@ try {
   await feed.locator('.social-feed-suggestion-row').first().getByRole('button', { name: 'Kết bạn' }).click()
   await page.waitForFunction(() => Array.from(document.querySelectorAll('.social-feed-suggestion-row')).length === 0)
   assert(friendRequestsSent > 0, 'Connection recommendation must use friend request API')
-  await feed.locator('.social-feed-translation').getByRole('button', { name: /Mở tin nhắn/ }).click()
+  await sidebar.getByRole('button', { name: 'Tin nhắn', exact: true }).click()
   await page.locator('.modern-messenger').waitFor({ state: 'visible' })
 
   // Social V4 at compact desktop and original mobile breakpoint.

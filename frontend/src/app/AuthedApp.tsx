@@ -1255,7 +1255,7 @@ export default function AuthedApp({
   const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ setActivePostId });
 
   const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
-  const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setMessages, setReplyingTo });
+  const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setReplyingTo });
   const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
   const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
 
@@ -1891,6 +1891,7 @@ export default function AuthedApp({
 
   function purgeConversation(id: number) {
     responseCache.current.invalidate(["conversations", "messages"]);
+    window.dispatchEvent(new CustomEvent("chatnet:message-history-cleared", { detail: { conversationId: id } }));
     revokedConversationIds.current.add(id);
     membershipSnapshot.current?.delete(id);
     membershipEventSequence.current += 1;
@@ -1903,7 +1904,6 @@ export default function AuthedApp({
     if (activeConversationIdRef.current === id) {
       activeConversationIdRef.current = null;
       setActiveConversationId(null);
-      setMessages([]);
       setHasMoreMessages(false);
       setGroupMembers([]);
       setGroupSettingsOpen(false);
@@ -2051,7 +2051,6 @@ export default function AuthedApp({
         conversation,
         ...current.filter((item) => item.id !== conversation.id),
       ]);
-      if (activeConversationIdRef.current !== conversation.id) setMessages([]);
       switchTab("chat");
       selectRoutedConversation(conversation.id);
     },
@@ -3305,7 +3304,6 @@ export default function AuthedApp({
           setFeedCommunitiesOpen={setFeedCommunitiesOpen}
           setFeedComposerOpen={setFeedComposerOpen}
           setFeedFilter={setFeedFilter}
-          setGlobalSearch={setGlobalSearch}
           setPosts={setPosts}
           setSavedPosts={setSavedPosts}
           setSearchHasScrolled={setSearchHasScrolled}

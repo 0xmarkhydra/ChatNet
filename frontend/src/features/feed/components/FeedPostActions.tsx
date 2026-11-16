@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
+import { feedPostPath } from '../../../shared/utils/feedPostPath'
 import { Bookmark, Copy, Ellipsis, Flag, Pencil, Share2, Trash2, X } from 'lucide-react'
 import '../styles/feed-actions.css'
 
@@ -26,10 +27,9 @@ type Props<P extends FeedActionPost> = {
 const reasons = ['Nội dung spam', 'Quấy rối hoặc xúc phạm', 'Lừa đảo hoặc giả mạo', 'Thông tin gây hiểu lầm', 'Nội dung không phù hợp']
 
 function postUrl(id: number) {
-  const url = new URL(window.location.href)
-  url.searchParams.set('tab', 'feed')
-  url.searchParams.set('post', String(id))
-  return url.toString()
+  const { origin, protocol } = window.location
+  const webOrigin = protocol === 'https:' || protocol === 'http:' ? origin : 'https://chat.codelocal.cloud'
+  return new URL(feedPostPath(id), webOrigin).href
 }
 
 async function sharePost(id: number, feedback: Feedback, copyOnly = false) {

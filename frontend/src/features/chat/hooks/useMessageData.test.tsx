@@ -42,6 +42,7 @@ function setup() {
   })
   const notice = vi.fn()
   const setConversations = vi.fn()
+  const purgeConversation = vi.fn()
   const tabRef = { current: 'feed' as Tab }
   const sessionRef = { current: account('A') as Session | null }
   const activeConversationIdRef = { current: 42 as number | null }
@@ -59,12 +60,12 @@ function setup() {
       pendingSend: { current: null }, setMessageDrafts: vi.fn(),
       setConversations, refreshConversations: async () => {},
       tabRef, messagesScrollRef: { current: null },
-      purgeConversation: vi.fn(), jumpToMessage: jump,
+      purgeConversation, jumpToMessage: jump,
     })
     return <output>{current.messages.map(item => item.id).join(',')}</output>
   }
   return {
-    host, jobs, notice, request, setConversations, tabRef,
+    host, jobs, notice, purgeConversation, request, setConversations, tabRef,
     get current() { return current },
     async render(session: Session, channelId = 0, jump?: { conversationId: number; messageId: number; revision: number }) {
       sessionRef.current = session
@@ -107,6 +108,36 @@ describe('chat message pagination visit isolation', () => {
         detail: { conversationId: 42 },
       })))
       expect(app.current.messages).toEqual([])
+    } finally { await app.close() }
+  })
+
+  it('does not restore messages from an in-flight history request after a clear', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      await act(async () => window.dispatchEvent(new CustomEvent('chatnet:message-history-cleared', {
+        detail: { conversationId: 42 },
+      })))
+      await app.respond(0, [message(10)])
+      expect(app.current.messages).toEqual([])
+      expect(app.current.hasMoreMessages).toBe(false)
+    } finally { await app.close() }
+  })
+
+  it('keeps the current room cache when a previous visit returns a late 403', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'), 0)
+      await app.render(account('A'), 1)
+      await app.render(account('A'), 0)
+      await app.respond(2, [message(10)])
+      await act(async () => app.jobs[0].resolve(new Response(null, { status: 403 })))
+      expect(app.purgeConversation).not.toHaveBeenCalled()
+      expect(app.current.messages.map(item => item.id)).toEqual([10])
+
+      await app.render(account('A'), 1)
+      await app.render(account('A'), 0)
+      expect(app.current.messages.map(item => item.id)).toEqual([10])
     } finally { await app.close() }
   })
 

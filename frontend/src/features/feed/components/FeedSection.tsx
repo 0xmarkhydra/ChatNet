@@ -66,7 +66,6 @@ export type FeedSectionProps = {
   setFeedCommunitiesOpen: Dispatch<SetStateAction<boolean>>;
   setFeedComposerOpen: Dispatch<SetStateAction<boolean>>;
   setFeedFilter: Dispatch<SetStateAction<"all" | "following" | "latest" | "saved">>;
-  setGlobalSearch: Dispatch<SetStateAction<string>>;
   setPosts: Dispatch<SetStateAction<Post[]>>;
   setSavedPosts: Dispatch<SetStateAction<Post[]>>;
   setSearchHasScrolled: Dispatch<SetStateAction<boolean>>;
@@ -125,7 +124,6 @@ export default function FeedSection({
   setFeedCommunitiesOpen,
   setFeedComposerOpen,
   setFeedFilter,
-  setGlobalSearch,
   setPosts,
   setSavedPosts,
   setSearchHasScrolled,
@@ -326,7 +324,6 @@ export default function FeedSection({
                 <SocialFeedSidebar
                   username={name}
                   sessionId={session.sessionId}
-                  posts={posts}
                   friends={friends}
                   friendRequests={friendRequests}
                   friendBusyIds={friendBusyIds}
@@ -336,11 +333,6 @@ export default function FeedSection({
                   }}
                   onViewUser={openVisitor}
                   onViewContacts={() => switchTab("contacts")}
-                  onSearchTag={(tag) => {
-                    setFeedFilter("all");
-                    setGlobalSearch(tag);
-                  }}
-                  onOpenChat={() => switchTab("chat")}
                 />
               )}
             </div>
