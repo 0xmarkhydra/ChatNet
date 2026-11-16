@@ -366,6 +366,29 @@ try {
     await inline.getByRole('textbox', { name: 'Viết bình luận' }).fill('Bình luận thử ngay trong bảng tin')
     await inline.getByRole('button', { name: 'Gửi bình luận' }).click()
     await inline.locator('.feed-comment-bubble').getByText('Bình luận thử ngay trong bảng tin', { exact: true }).waitFor()
+    await inline.getByRole('button', { name: 'Trả lời SocCO Tester' }).click()
+    await inline.getByRole('textbox', { name: 'Phản hồi SocCO Tester' }).fill('Phản hồi thử trong bảng tin')
+    await inline.getByRole('button', { name: 'Gửi bình luận' }).click()
+    await inline.locator('.feed-comment-replies .feed-comment-bubble').getByText('Phản hồi thử trong bảng tin').waitFor()
+    const checkCommentTools = async (host) => {
+      const rows = await host.locator('.feed-comment-actions').evaluateAll(actions => actions.map(row => {
+        const centerY = node => { const box = node.getBoundingClientRect(); return box.top + box.height / 2 }
+        const controls = [...row.children].filter(node => getComputedStyle(node).display !== 'none')
+        const heart = row.querySelector('.lucide-heart')
+        const menu = row.querySelector('.feed-comment-menu button')
+        const bounds = row.getBoundingClientRect()
+        return controls.every(node => Math.abs(centerY(node) - centerY(controls[0])) < 1 &&
+          node.getBoundingClientRect().right <= bounds.right + 1) &&
+          Math.abs(centerY(heart) - centerY(heart.parentElement)) < 1 &&
+          Math.abs(centerY(menu.querySelector('svg')) - centerY(menu)) < 1
+      }))
+      assert(rows.length === 2 && rows.every(Boolean), 'Comment and reply actions must align without clipping: ' + JSON.stringify(rows))
+    }
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 820 })
+      await checkCommentTools(inline)
+    }
+    await page.setViewportSize({ width: 1440, height: 820 })
     await commentToggle.click()
     assert(await inline.count() === 0 && await commentToggle.getAttribute('aria-expanded') === 'false',
       'The comment button should collapse the inline thread')
@@ -378,6 +401,7 @@ try {
     assert(await details.locator('.post-comments-stats .lucide-heart').getAttribute('fill') === 'currentColor',
       'The dialog must also show a filled summary heart')
     await details.getByText('Bình luận thử ngay trong bảng tin', { exact: true }).waitFor()
+    await details.getByRole('button', { name: 'Xem 1 phản hồi' }).click()
     const measure = () => details.evaluate(node => {
       const rect = selector => node.querySelector(selector).getBoundingClientRect()
       const post = rect('.post-comments-original')
@@ -390,6 +414,7 @@ try {
     })
     for (const viewport of [{ width: 1440, height: 820 }, { width: 390, height: 700 }]) {
       await page.setViewportSize(viewport)
+      await checkCommentTools(details)
       const layout = await measure()
       assert(layout.stacked && layout.composerInViewport && layout.overflow <= 1,
         'The dialog should stack the thread and keep the composer visible: ' + JSON.stringify(layout))

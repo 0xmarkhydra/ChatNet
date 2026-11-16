@@ -172,31 +172,75 @@
 .post-comments-thread .feed-comment-bubble strong { display: block; margin-bottom: 4px; color: var(--soco-navy); font-size: 12px; font-weight: 700; }
 .post-comments-thread .feed-comment-bubble .feed-text > p { margin: 0; line-height: 1.45; font-size: 14px; }
 .post-comments-thread .feed-comment-bubble .feed-reply-to { margin: -4px 0 8px; font-size: 11px; color: var(--detail-secondary); }
-.post-comments-thread .feed-comment-actions {
-  display: flex; align-items: center; flex-wrap: wrap; column-gap: 8px;
-  min-height: 28px; margin: 4px 0 0 8px; color: var(--detail-secondary); white-space: nowrap; font-size: 11px;
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 clamp(4px, 1.5vw, 8px);
+  margin-block-start: 2px;
+  padding-inline-start: 12px;
+  color: var(--detail-secondary, var(--soco-muted));
+  font-size: 12px;
+  line-height: 1.25;
 }
-.post-comments-thread .feed-comment-actions time { font-size: 11px; color: var(--detail-secondary); }
-.post-comments-thread .feed-comment-actions > button {
-  min-height: 24px; padding: 0; border: 0; background: none;
-  color: var(--detail-secondary); font: inherit; font-size: 11px; cursor: pointer;
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions > :is(button, time, span) {
+  white-space: nowrap;
+  font-size: inherit;
+  line-height: inherit;
 }
-.post-comments-thread .feed-comment-actions > button:hover { color: var(--detail-like); }
-.post-comments-thread .feed-comment-actions > button.feed-comment-liked { color: var(--detail-like); }
-.post-comments-thread .feed-comment-actions > button:has(.lucide-heart) {
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions time { color: inherit; }
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions > button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--chatnet-accent-ink);
+  font-weight: 600;
 }
-.post-comments-thread .feed-comment-menu { margin-left: auto; }
-.post-comments-thread .feed-comment-menu > button {
-  display: grid; place-items: center; height: 26px; width: 26px;
-  padding: 0; border: 0; background: transparent; color: var(--detail-secondary);
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions > button:hover { text-decoration: underline; }
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions > button.feed-comment-liked { color: var(--detail-like, #ef426b); }
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions svg { display: block; flex: none; }
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-menu > button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: inherit;
 }
-.post-comments-thread .feed-comment-menu svg { width: 22px; height: 22px; }
-.post-comments-thread .feed-comment-replies { margin: 12px 0 12px 16px; border-color: var(--detail-rule); }
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions button:focus-visible,
+:is(.feed-inline-comments, .post-comments-thread) :is(.feed-text-toggle, .feed-replies-toggle):focus-visible {
+  outline: 2px solid var(--chatnet-accent-ink);
+  outline-offset: 2px;
+}
+.post-comments-thread .feed-comment-replies { margin: 8px 0 12px 16px; border-color: var(--detail-rule); }
 .post-comments-thread .feed-comment-replies > li { margin: 0 0 12px; }
-.post-comments-thread .feed-replies-toggle { display: block; margin: 4px 0 16px 48px; color: var(--chatnet-accent-ink); border: 0; background: none; font-size: 12px; cursor: pointer; }
+:is(.feed-inline-comments, .post-comments-thread) .feed-replies-toggle {
+  display: block;
+  min-height: 32px;
+  margin: 0 0 4px 56px;
+  padding: 0;
+  color: var(--chatnet-accent-ink);
+  font-size: 12px;
+}
+.post-comments-thread .feed-replies-toggle { margin-inline-start: 64px; }
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-bubble .feed-text-toggle {
+  display: block;
+  min-height: 28px;
+  margin: 2px 0 0;
+  padding: 0;
+  color: var(--chatnet-accent-ink);
+  font-size: 12px;
+}
+:is(.feed-inline-comments, .post-comments-thread) .feed-comment-bubble .feed-reply-to {
+  margin: 3px 0 0;
+  color: var(--detail-secondary, var(--soco-muted));
+  font-size: 12px;
+  line-height: 1.35;
+}
 .post-comments-composer .feed-comment-form {
   display: block; box-sizing: border-box; flex: 0 0 auto;
   margin: 0; padding: 16px;
@@ -228,6 +272,10 @@
 .post-comments-page button:focus-visible,
 .post-comments-page select:focus-visible { outline: 2px solid var(--chatnet-accent-ink); outline-offset: 2px; }
 @media (max-width: 480px) {
+  :is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions {
+    padding-inline-start: 8px;
+  }
+  :is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions > span[aria-hidden="true"] { display: none; }
   .post-comments-original { padding-inline: 12px; }
   .post-comments-post-actions.post-toolbar-compact > button { gap: 4px; }
   .post-comments-post-actions.post-toolbar-compact > button span { font-size: 11px; }
