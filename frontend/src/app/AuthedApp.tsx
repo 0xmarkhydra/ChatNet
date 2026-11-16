@@ -21,6 +21,8 @@ import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
 import { useAppInstallState } from "./hooks/useAppInstallState";
 import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
+import { useQuickSearchDismiss } from "./hooks/useQuickSearchDismiss";
+import { useUnreadDocumentTitle } from "./hooks/useUnreadDocumentTitle";
 import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
@@ -393,25 +395,7 @@ export default function AuthedApp({
   const chatSearchJumpRevision = useRef(0);
   const nextChatSearchJumpRevision = useCallback(() => ++chatSearchJumpRevision.current, []);
   const lastScrolledSearchJump = useRef(0);
-  useEffect(() => {
-    if (!quickSearchOpen) return;
-    const outside = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !quickSearchAnchorRef.current?.contains(event.target)
-      )
-        setQuickSearchOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setQuickSearchOpen(false);
-    };
-    document.addEventListener("pointerdown", outside);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", outside);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [quickSearchOpen]);
+  useQuickSearchDismiss(quickSearchOpen, quickSearchAnchorRef, setQuickSearchOpen);
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
@@ -2120,14 +2104,7 @@ export default function AuthedApp({
     },
   });
 
-  useEffect(() => {
-    const title = 'SocCO – Understand. Connect. Together.';
-    const count = nativeNotifications.unreadCount;
-    document.title = count !== null && count > 0
-      ? `(${count > 99 ? '99+' : count}) ${title}`
-      : title;
-    return () => { document.title = title; };
-  }, [nativeNotifications.unreadCount]);
+  useUnreadDocumentTitle(nativeNotifications.unreadCount);
 
   useAppRealtime({
     onCategoryAssignmentChanged: conversationCategories.applyAssignment,
