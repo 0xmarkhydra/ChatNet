@@ -13,6 +13,15 @@ function CurrentPage() {
   return useOutletContext<ReactNode>() ?? null;
 }
 
+/**
+ * Route-only nested layout: forward the shell's existing page outlet context to
+ * feature children without adding DOM or remounting auth/realtime providers.
+ */
+function FeatureRouteLayout() {
+  const page = useOutletContext<ReactNode>();
+  return <Outlet context={page} />;
+}
+
 function NotFoundPage() {
   const { pathname } = useLocation();
   const fallbackPath = fallbackPathForRoute(pathname);
@@ -71,28 +80,45 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
     <Routes>
       <Route path="/" element={<>{children}</>}>
         <Route index element={<LegacyHomeRedirect />} />
-        {Object.values(TAB_PATH).map((path) => (
+        <Route path={TAB_PATH.chat.slice(1)} element={<FeatureRouteLayout />}>
+          <Route index element={<CurrentPage />} />
+          <Route path=":conversationId" element={<ChatConversationPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+        <Route path={TAB_PATH.contacts.slice(1)} element={<FeatureRouteLayout />}>
+          <Route index element={<CurrentPage />} />
+          <Route path="requests" element={<CurrentPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+        <Route path={TAB_PATH.feed.slice(1)} element={<FeatureRouteLayout />}>
+          <Route index element={<CurrentPage />} />
+          <Route path="posts/:postId" element={<FeedPostPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+        <Route path={TAB_PATH.profile.slice(1)} element={<FeatureRouteLayout />}>
+          <Route index element={<CurrentPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+        <Route path={ROUTE.settings.slice(1)} element={<FeatureRouteLayout />}>
+          <Route index element={<CurrentPage />} />
+          <Route path=":section" element={<SettingsSectionPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+        <Route path={ROUTE.calls.slice(1)} element={<FeatureRouteLayout />}>
+          <Route index element={<CurrentPage />} />
+          <Route path="history" element={<CurrentPage />} />
+          <Route path="directory" element={<CurrentPage />} />
+          <Route path="translation" element={<CurrentPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+        <Route path="users" element={<FeatureRouteLayout />}>
+          <Route index element={<NotFoundPage />} />
+          <Route path=":username" element={<VisitorProfilePage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+        {[TAB_PATH.discover, TAB_PATH.market, TAB_PATH.notifications].map((path) => (
           <Route key={path} path={path.slice(1)} element={<CurrentPage />} />
         ))}
-        {Object.values(ROUTE).map((path) => (
-          <Route key={path} path={path.slice(1)} element={<CurrentPage />} />
-        ))}
-        <Route path="settings/:section" element={<SettingsSectionPage />} />
-        <Route path="settings/*" element={<NotFoundPage />} />
-        <Route path="calls/history" element={<CurrentPage />} />
-        <Route path="calls/directory" element={<CurrentPage />} />
-        <Route path="calls/translation" element={<CurrentPage />} />
-        <Route path="calls/*" element={<NotFoundPage />} />
-        <Route path="chat/:conversationId" element={<ChatConversationPage />} />
-        <Route path="users/:username" element={<VisitorProfilePage />} />
-        <Route path="users/*" element={<NotFoundPage />} />
-        <Route path="contacts/requests" element={<CurrentPage />} />
-        <Route path="contacts/*" element={<NotFoundPage />} />
-        <Route path="feed/posts/:postId" element={<FeedPostPage />} />
-        <Route path="feed/posts/*" element={<NotFoundPage />} />
-        <Route path="chat/*" element={<NotFoundPage />} />
-        <Route path="profile/*" element={<NotFoundPage />} />
-        <Route path="feed/*" element={<NotFoundPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

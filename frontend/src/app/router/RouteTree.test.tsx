@@ -2,7 +2,7 @@
 import { act, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Link, MemoryRouter, Outlet, parsePath, useLocation } from "react-router-dom";
+import { Link, MemoryRouter, Outlet, parsePath, useLocation, useNavigate } from "react-router-dom";
 import { AppRouteTree } from "./RouteTree";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -16,6 +16,7 @@ function renderAt(path: string, initialState?: unknown) {
 
   function Shell() {
     const location = useLocation();
+    const navigate = useNavigate();
     useEffect(() => { onMount(); }, []);
     return (
       <div>
@@ -23,7 +24,14 @@ function renderAt(path: string, initialState?: unknown) {
         <output data-testid="hash">{location.hash}</output>
         <output data-testid="state">{JSON.stringify(location.state)}</output>
         <Link to="/feed">Bảng tin</Link>
+        <Link to="/feed/posts/42">Bài viết 42</Link>
+        <Link to="/chat/123">Hội thoại 123</Link>
+        <Link to="/settings/devices">Thiết bị</Link>
+        <Link to="/calls/translation">Dịch AI</Link>
+        <Link to="/users/alice">Hồ sơ Alice</Link>
         <Link to="/somewhere-unknown">Invalid</Link>
+        <button type="button" onClick={() => navigate(-1)}>History Back</button>
+        <button type="button" onClick={() => navigate(1)}>History Forward</button>
         <Outlet context={<p data-testid="page">Current screen</p>} />
       </div>
     );
@@ -44,10 +52,15 @@ function renderAt(path: string, initialState?: unknown) {
     return el;
   };
   const location = () => container.querySelector('[data-testid="location"]')?.textContent;
+  const history = (direction: "Back" | "Forward") => {
+    const button = Array.from(container.querySelectorAll("button")).find((item) => item.textContent === `History ${direction}`);
+    if (!button) throw new Error(`Missing History ${direction}`);
+    act(() => button.click());
+  };
   const page = () => container.querySelector('[data-testid="page"]');
   const hash = () => container.querySelector('[data-testid="hash"]')?.textContent;
   const state = () => container.querySelector('[data-testid="state"]')?.textContent;
-  return { container, onMount, link, location, page, hash, state };
+  return { container, onMount, link, location, page, hash, state, history };
 }
 
 afterEach(() => {
@@ -62,6 +75,41 @@ describe("app route tree", () => {
     expect(location()).toBe("/feed");
     expect(page()?.textContent).toBe("Current screen");
     expect(onMount).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the signed-in shell and outlet context across nested feature routes", () => {
+    const app = renderAt("/feed");
+    for (const [label, path] of [
+      ["Bài viết 42", "/feed/posts/42"],
+      ["Hội thoại 123", "/chat/123"],
+      ["Thiết bị", "/settings/devices"],
+      ["Dịch AI", "/calls/translation"],
+      ["Hồ sơ Alice", "/users/alice"],
+      ["Bảng tin", "/feed"],
+    ]) {
+      act(() => app.link(label).click());
+      expect(app.location()).toBe(path);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("preserves nested page context across back/forward history", () => {
+    const app = renderAt("/chat");
+    act(() => app.link("Bài viết 42").click());
+    act(() => app.link("Thiết bị").click());
+    expect(app.location()).toBe("/settings/devices");
+    app.history("Back");
+    expect(app.location()).toBe("/feed/posts/42");
+    expect(app.page()?.textContent).toBe("Current screen");
+    app.history("Back");
+    expect(app.location()).toBe("/chat");
+    app.history("Forward");
+    expect(app.location()).toBe("/feed/posts/42");
+    app.history("Forward");
+    expect(app.location()).toBe("/settings/devices");
+    expect(app.page()?.textContent).toBe("Current screen");
+    expect(app.onMount).toHaveBeenCalledTimes(1);
   });
 
   it("redirects legacy home links without discarding the post deep link", () => {
