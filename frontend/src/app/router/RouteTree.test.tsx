@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Link, MemoryRouter, Outlet, parsePath, useLocation, useNavigate } from "react-router-dom";
 import { AppRouteTree } from "./RouteTree";
+import { ROUTE, TAB_PATH } from "./routes";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 const cleanup: Array<() => void> = [];
@@ -68,6 +69,14 @@ afterEach(() => {
 });
 
 describe("app route tree", () => {
+  it("provides a working index route for every registered app tab and workspace", () => {
+    for (const path of [...Object.values(TAB_PATH), ...Object.values(ROUTE)]) {
+      const app = renderAt(path);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("keeps the authenticated shell mounted when switching tabs", () => {
     const { onMount, link, location, page } = renderAt("/chat");
     expect(page()?.textContent).toBe("Current screen");
