@@ -82,6 +82,8 @@ export default function Marketplace({ userId, request, onBack }: Props) {
     setProducts([]); setCart([]); setOrders([]); setMine([])
     mutationFlight.current = null
     retryFlight.current = null
+    setView('products')
+    setTitle(''); setDescription(''); setPrice(''); setUnit(''); setStock('1')
     setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false)
     void refresh(version)
     return () => { ++requestRevision.current }

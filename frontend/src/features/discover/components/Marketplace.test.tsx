@@ -149,6 +149,37 @@ describe('Marketplace read fallback', () => {
     expect(host.querySelector('[role="alert"]')).toBeNull()
   })
 
+  it('resets account-specific marketplace view when switching users', async () => {
+    const request = vi.fn(async (path: string) => response(path))
+    const selectTab = (text: string) => Array.from(host.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find((button) => button.textContent?.includes(text))
+    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    await act(async () => selectTab('Bán hàng')?.click())
+    expect(host.querySelector('form')).not.toBeNull()
+    await act(async () => root.render(<Marketplace userId={2} request={request} onBack={() => {}} />))
+    expect(host.querySelector('form')).toBeNull()
+    expect(host.textContent).toContain('Chưa có sản phẩm được đăng')
+  })
+
+  it('clears a previous account draft when the active user changes', async () => {
+    const request = vi.fn(async (path: string) => response(path))
+    const sell = () => Array.from(host.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find((button) => button.textContent?.includes('Bán hàng'))
+    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    await act(async () => sell()?.click())
+    const title = host.querySelector('form input') as HTMLInputElement
+    expect(title).not.toBeNull()
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(title, 'Bản nháp riêng tài khoản 1')
+      title.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(title.value).toBe('Bản nháp riêng tài khoản 1')
+    await act(async () => root.render(<Marketplace userId={2} request={request} onBack={() => {}} />))
+    await act(async () => sell()?.click())
+    expect((host.querySelector('form input') as HTMLInputElement).value).toBe('')
+  })
+
   it('ignores the previous user response after switching users', async () => {
     let resolveOld: ((value: Response) => void) | undefined
     const old = new Promise<Response>((resolve) => { resolveOld = resolve })
