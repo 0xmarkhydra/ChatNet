@@ -87,9 +87,12 @@ export default function ReactionParticipantsDialog({
 
   useEffect(() => {
     const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     closeRef.current?.focus()
     return () => {
       pending.current?.abort()
+      document.body.style.overflow = previousOverflow
       if (previousFocus instanceof HTMLElement) previousFocus.focus()
     }
   }, [])
