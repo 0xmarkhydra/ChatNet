@@ -89,7 +89,7 @@ export default function ContactsOverview({
           {suggestionsLoading && <div className="co-suggestion-grid" role="status" aria-label="Đang tải gợi ý kết nối">{Array.from({ length: 4 }, (_, index) => <div className="co-suggestion co-skeleton-card" key={index} aria-hidden="true"><span className="co-skeleton-avatar" /><span className="co-skeleton-copy"><i /><i /></span><span className="co-skeleton-button" /></div>)}</div>}
           {suggestionsError && !suggestionsLoading && <div className="co-feedback" role="alert"><span>Không tải được gợi ý kết nối. Bạn có thể thử lại.</span><button type="button" onClick={onRetrySuggestions}><RefreshCw size={15} aria-hidden="true" /> Thử lại</button></div>}
           {!suggestionsLoading && !suggestionsError && recommended.length === 0 && <p className="co-empty">Chưa có gợi ý kết nối phù hợp.</p>}
-          {!suggestionsLoading && !suggestionsError && recommended.length > 0 && <div className="co-suggestion-grid">
+          {!suggestionsLoading && recommended.length > 0 && <div className="co-suggestion-grid">
             {recommended.map(friend => <article className="co-suggestion" key={friend.id}>
               <div className="co-suggestion-avatar-wrap"><UserAvatar username={friend.username} name={displayName(friend)} className="avatar co-suggestion-avatar" online={friend.online} /></div>
               <strong title={displayName(friend)}>{displayName(friend)}</strong>
