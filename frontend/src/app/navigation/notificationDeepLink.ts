@@ -7,15 +7,22 @@ export type NotificationDeepLink = {
   messageId: number | null;
 };
 
+/** Match the positive decimal IDs accepted by the app's shareable chat routes. */
+function notificationId(value: string | null): number | null {
+  if (value === null || !/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
 /** Parse a push/deep link without changing the current browser location. */
 export function notificationDeepLink(params: URLSearchParams): NotificationDeepLink {
   const tab = params.get("tab");
-  const conversation = Number(params.get("conversation"));
-  const message = Number(params.get("message"));
+  const conversationId = notificationId(params.get("conversation"));
+  const messageId = notificationId(params.get("message"));
   return {
     tab: tab === "feed" || tab === "contacts" ? tab : null,
-    conversationId: Number.isSafeInteger(conversation) && conversation > 0 ? conversation : null,
-    messageId: Number.isSafeInteger(message) && message > 0 ? message : null,
+    conversationId,
+    messageId,
   };
 }
 
