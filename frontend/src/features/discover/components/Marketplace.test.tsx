@@ -44,7 +44,7 @@ describe('Marketplace read fallback', () => {
       return response(path, path.endsWith('/products') ? [product] : [])
     })
     await act(async () => {
-      root.render(<Marketplace userId={1} request={request} onBack={() => {}} />)
+      root.render(<Marketplace searchQuery="" userId={1} request={request} onBack={() => {}} />)
     })
     expect(host.querySelector('[role="status"]')?.textContent).toContain('Đang tải dữ liệu chợ')
     expect(host.textContent).not.toContain('Chưa có sản phẩm được đăng')
@@ -64,7 +64,7 @@ describe('Marketplace read fallback', () => {
       return Promise.resolve(response(path, path.endsWith('/products') ? [product] : []))
     })
     await act(async () => {
-      root.render(<Marketplace userId={1} request={request} onBack={() => {}} />)
+      root.render(<Marketplace searchQuery="" userId={1} request={request} onBack={() => {}} />)
     })
     expect(host.textContent).toContain('Bàn học')
     const add = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Thêm vào giỏ')
@@ -85,7 +85,7 @@ describe('Marketplace read fallback', () => {
       }
       return response(path, path.endsWith('/products') ? [product] : [])
     })
-    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    await act(async () => root.render(<Marketplace searchQuery="" userId={1} request={request} onBack={() => {}} />))
     const add = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Thêm vào giỏ')
     expect(add).toBeTruthy()
     await act(async () => {
@@ -116,7 +116,7 @@ describe('Marketplace read fallback', () => {
     const button = (label: string) => Array.from(host.querySelectorAll('button'))
       .find((item) => item.textContent === label)
 
-    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    await act(async () => root.render(<Marketplace searchQuery="" userId={1} request={request} onBack={() => {}} />))
     await act(async () => button('Thêm vào giỏ')?.click())
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('Không cập nhật được giỏ')
     await act(async () => button('Thử tải dữ liệu')?.click())
@@ -272,14 +272,34 @@ describe('Marketplace read fallback', () => {
       return Promise.resolve(response(path))
     })
     await act(async () => {
-      root.render(<Marketplace userId={1} request={request} onBack={() => {}} />)
+      root.render(<Marketplace searchQuery="" userId={1} request={request} onBack={() => {}} />)
     })
     await act(async () => {
-      root.render(<Marketplace userId={2} request={request} onBack={() => {}} />)
+      root.render(<Marketplace searchQuery="" userId={2} request={request} onBack={() => {}} />)
     })
     expect(host.textContent).toContain('Chưa có sản phẩm được đăng')
     await act(async () => resolveOld?.(Response.json({ products: [product], items: [], orders: [] })))
     expect(host.textContent).not.toContain('Bàn học')
     expect(host.textContent).toContain('Chưa có sản phẩm được đăng')
+  })
+
+  it('filters catalog by the shared header search without refetching products', async () => {
+    const anotherProduct = { ...product, id: 43, title: 'Ghế văn phòng', description: 'Ghế xoay' }
+    const request = vi.fn(async (path: string) =>
+      response(path, path.endsWith('/products') ? [product, anotherProduct] : []))
+
+    await act(async () => root.render(<Marketplace searchQuery="" userId={1} request={request} onBack={() => {}} />))
+    expect(host.textContent).toContain('Bàn học')
+    expect(host.textContent).toContain('Ghế văn phòng')
+    const initialCalls = request.mock.calls.length
+
+    await act(async () => root.render(<Marketplace searchQuery="bàn" userId={1} request={request} onBack={() => {}} />))
+    expect(host.textContent).toContain('Bàn học')
+    expect(host.textContent).not.toContain('Ghế văn phòng')
+    expect(request).toHaveBeenCalledTimes(initialCalls)
+
+    await act(async () => root.render(<Marketplace searchQuery="không tồn tại" userId={1} request={request} onBack={() => {}} />))
+    expect(host.textContent).toContain('Không tìm thấy sản phẩm phù hợp.')
+    expect(request).toHaveBeenCalledTimes(initialCalls)
   })
 })

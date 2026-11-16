@@ -16,7 +16,12 @@ import { useSession } from "../shared/context/SessionContext";
 import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
+import { usePhoneSearchLayout } from "./hooks/usePhoneSearchLayout";
+import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
+import { useAppInstallState } from "./hooks/useAppInstallState";
+import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
+import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
@@ -161,7 +166,6 @@ import {
 } from "../features/feed/components/FeedDiscussion";
 import FeedModeration from "../features/feed/components/FeedModeration";
 import ProfileOverlay from "../features/profile/components/ProfileOverlay";
-import type { NearbyUser } from "../features/discover/components/NearbyExplorer";
 import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
@@ -228,10 +232,6 @@ import {
   geolocationErrorMessage,
 } from "../features/discover/lib/geolocation";
 
-const NearbyExplorer = lazy(
-  () => import("../features/discover/components/NearbyExplorer"),
-);
-const Marketplace = lazy(() => import("../features/discover/components/Marketplace"));
 const ProfileQr = lazy(() => import("../features/profile/components/ProfileQr"));
 import {
   defaultBundle,
@@ -262,6 +262,7 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
+import AppPageErrorBoundary from "./layouts/AppPageErrorBoundary";
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { consumeInviteDeepLink } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
@@ -376,23 +377,13 @@ export default function AuthedApp({
   }, [navigate, routeLocation.pathname, tab]);
   const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraftFile, storyBusy, storyDraftFile } = useFeedUiState({ tab });
 
-  const tabRef = useRef(tab);
-  tabRef.current = tab;
+  const tabRef = useLatest(tab);
   const [globalSearch, setGlobalSearch] = useState("");
   const [chatListQuery, setChatListQuery] = useState('');
   const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'groups'>('all');
   const chatFiltersPill = useSlidingPill<HTMLDivElement>(chatListFilter);
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
-  const [phoneSearchLayout, setPhoneSearchLayout] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches,
-  );
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 760px)");
-    const update = () => setPhoneSearchLayout(media.matches);
-    media.addEventListener("change", update);
-    update();
-    return () => media.removeEventListener("change", update);
-  }, []);
+  const phoneSearchLayout = usePhoneSearchLayout();
   const quickSearchAnchorRef = useRef<HTMLDivElement>(null);
   const [chatSearchJump, setChatSearchJump] = useState<{
     conversationId: number;
@@ -429,8 +420,7 @@ export default function AuthedApp({
 
   const activeConversationIdRef = useRef<number | null>(null);
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
-  const activeChannelIdRef = useRef(selectedChannelId);
-  activeChannelIdRef.current = selectedChannelId;
+  const activeChannelIdRef = useLatest(selectedChannelId);
   const activeConversationTypeRef = useRef<'group' | 'direct' | null>(null);
   const [groupChannelUnreadStatus, setGroupChannelUnreadStatus] = useState<{ conversationId: number; available: boolean } | null>(null);
   const groupChannelUnreadAvailable = groupChannelUnreadStatus?.conversationId === activeConversationId
@@ -665,19 +655,23 @@ export default function AuthedApp({
     ? undefined : conversationTranslationOverrides[activeConversationId];
   const effectiveAutoTranslate = activeChatTranslationSettings?.enabled ?? autoTranslate;
   const effectiveTargetLanguage = activeChatTranslationSettings?.targetLanguage ?? targetLanguage;
-  translationLanguageRef.current = effectiveTargetLanguage;
+  useLayoutEffect(() => {
+    translationLanguageRef.current = effectiveTargetLanguage;
+  }, [effectiveTargetLanguage, translationLanguageRef]);
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] =
     useState(false);
   const [status, setStatus] = useState("Đang kết nối...");
-  const [isStandalone, setIsStandalone] = useState(false);
+  const isStandalone = useAppInstallState(() => {
+    setInstallPrompt(null);
+    setNotice("SocCO đã được cài vào thiết bị");
+  });
   const [pushConfigured, setPushConfigured] = useState(false);
   const [pushAppId, setPushAppId] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
   const [messageSoundEnabled, setMessageSoundEnabled] = useState(
     readMessageSoundEnabled,
   );
-  const messageSoundEnabledRef = useRef(messageSoundEnabled);
-  messageSoundEnabledRef.current = messageSoundEnabled;
+  const messageSoundEnabledRef = useLatest(messageSoundEnabled);
   const messageSound = useRef<IncomingMessageSound | null>(null);
   if (!messageSound.current) messageSound.current = new IncomingMessageSound();
   useEffect(() => {
@@ -700,7 +694,7 @@ export default function AuthedApp({
       window.removeEventListener("keydown", unlockAudio);
       window.removeEventListener("storage", syncPreference);
     };
-  }, []);
+  }, [messageSoundEnabledRef]);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushInitFailed, setPushInitFailed] = useState(false);
   const [pushPrompt, setPushPrompt] = useState(false);
@@ -723,40 +717,21 @@ export default function AuthedApp({
     chatDragDepth.current = 0;
   }, [activeConversationId, tab]);
 
+  useDesktopShortcuts({
+    sessionRef,
+    onOpenChat: () => setTab("chat"),
+    messageInputRef,
+  });
   useEffect(() => {
     const preventFileNavigation = (event: DragEvent) => {
       // Never navigate away from the chat when a file is dropped outside it.
       if (transferHasFiles(event.dataTransfer)) event.preventDefault();
     };
-    const keyboard = (event: KeyboardEvent) => {
-      if (
-        !sessionRef.current ||
-        event.isComposing ||
-        event.altKey ||
-        !(event.ctrlKey || event.metaKey) ||
-        document.querySelector('[role="dialog"][aria-modal="true"]')
-      )
-        return;
-      if (event.key.toLowerCase() === "k" && !event.shiftKey) {
-        event.preventDefault();
-        setTab("chat");
-        requestAnimationFrame(() =>
-          document
-            .querySelector<HTMLInputElement>(".appbar-search input")
-            ?.focus(),
-        );
-      } else if (event.key.toLowerCase() === "l" && event.shiftKey) {
-        event.preventDefault();
-        messageInputRef.current?.focus();
-      }
-    };
     document.addEventListener("dragover", preventFileNavigation);
     document.addEventListener("drop", preventFileNavigation);
-    if (isDesktopBuild) window.addEventListener("keydown", keyboard);
     return () => {
       document.removeEventListener("dragover", preventFileNavigation);
       document.removeEventListener("drop", preventFileNavigation);
-      if (isDesktopBuild) window.removeEventListener("keydown", keyboard);
     };
   }, []);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
@@ -1139,7 +1114,9 @@ export default function AuthedApp({
     onUnavailable: onRouteConversationUnavailable,
     onError: onRouteConversationError,
   });
-  activeConversationTypeRef.current = activeConversation?.type ?? null;
+  useLayoutEffect(() => {
+    activeConversationTypeRef.current = activeConversation?.type ?? null;
+  }, [activeConversation?.type]);
 
   // Channel selection stays inside the active group and never leaks into another conversation.
   useEffect(() => {
@@ -1401,26 +1378,7 @@ export default function AuthedApp({
     }));
   }
 
-  useEffect(() => {
-    const navigatorWithStandalone = navigator as Navigator & {
-      standalone?: boolean;
-    };
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      navigatorWithStandalone.standalone === true;
-    setIsStandalone(standalone);
 
-    const handleInstalled = () => {
-      setInstallPrompt(null);
-      setIsStandalone(true);
-      setNotice("SocCO đã được cài vào thiết bị");
-    };
-
-    window.addEventListener("appinstalled", handleInstalled);
-    return () => {
-      window.removeEventListener("appinstalled", handleInstalled);
-    };
-  }, []);
 
 
   async function loadProfileMedia() {
@@ -2231,17 +2189,13 @@ export default function AuthedApp({
     },
   });
 
-  useEffect(() => {
-    if (!session?.token || tab !== "feed") return;
-    void refreshPosts();
-    void refreshStories();
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      void refreshPosts();
-      void refreshStories();
-    }, 12000);
-    return () => window.clearInterval(timer);
-  }, [tab, session?.token]);
+  useFeedRefreshInterval({
+    enabled: tab === "feed" && Boolean(session?.token),
+    sessionId: session?.sessionId ?? null,
+    sessionToken: session?.token ?? null,
+    refreshPosts,
+    refreshStories,
+  });
 
   useLayoutEffect(() => {
     const container = messagesScrollRef.current;
@@ -2933,7 +2887,7 @@ export default function AuthedApp({
               profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
             />
           }
-          search={searchInConversationList || tab === "discover" || tab === "market" ? null : quickSearchControl}
+          search={searchInConversationList ? null : quickSearchControl}
         >
           <AppHeaderActions
             account={
@@ -3083,6 +3037,7 @@ export default function AuthedApp({
         <section
           className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
         >
+          <AppPageErrorBoundary>
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
           activeChatTranslationSettings={activeChatTranslationSettings}
@@ -3343,6 +3298,7 @@ export default function AuthedApp({
 
         {tab === "market" && (
           <MarketSection
+            searchQuery={globalSearch}
           apiFetch={apiFetch}
           session={session}
           switchTab={switchTab}
@@ -3638,6 +3594,7 @@ export default function AuthedApp({
           visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
         />
         )}
+          </AppPageErrorBoundary>
         </section>
       } />
 
