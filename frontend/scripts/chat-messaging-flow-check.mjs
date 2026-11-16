@@ -103,14 +103,15 @@ try {
     if (path === '/api/conversations') return reply([{ id: 1, name: 'Bạn bè', type: 'direct', otherUserId: 2, otherUsername: 'friend',
       memberCount: 2, unreadCount: 0, lastMessage: 'x', createdAt: '2026-11-05T05:00:00Z', online: false }])
     if (path === '/api/conversations/1/messages') return reply(messages)
+    if (path.endsWith('/e2ee/status')) return reply({ mode: 'legacy', epoch: 0, autoEnabled: false })
     if (path === '/api/preferences') return reply({ autoTranslate: false, targetLanguage: 'vi' })
     if (path === '/api/i18n/bundle') return reply({ locale: 'vi', version: 'mock', messages: {}, cache: 'hit' })
     if (path === '/api/conversations/unread') return reply({ unreadCount: 0 })
     return reply([])
   })
 
-  await page.goto(origin)
-  await page.locator('.conversation-item').first().click()
+  await page.goto(`${origin}/chat`)
+  await page.locator('.desktop-conversation-rail-entry').first().click()
   await page.locator('[data-message-id="7"]').waitFor()
 
   // ---- send
