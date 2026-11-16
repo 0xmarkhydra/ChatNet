@@ -281,25 +281,21 @@ export function useAppRealtime({
         const incoming = update.message
         if (activeConversationTypeRef.current === 'group' && activeConversationIdRef.current === incoming.conversationId)
           window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'message',message:incoming}}))
-        // SSE delivers live events only. Message timestamps can be skewed
-        // relative to the device clock, so do not use createdAt to gate sound.
-        // Loading history, reaction updates and our own sends stay silent.
-        // Background browser tabs may alert after Web Audio is unlocked.
-        // Desktop uses native sound in the background, avoiding a double chime.
-        const localSoundAllowed = !isDesktopBuild ||
-          (document.visibilityState === 'visible' && document.hasFocus())
-        const sound = messageSound.current
-        sound?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current && localSoundAllowed)
-        // Local-only diagnostics distinguish muted/own/duplicate messages
-        // and unavailable AudioContext without logging private data.
-        if (import.meta.env.DEV) {
-          const diagnostic = sound?.getDiagnostic()
-          console.info('[ChatNet incoming sound]', {
-            result: diagnostic?.result ?? 'audio-not-initialized',
-            audioState: diagnostic?.audioState ?? 'not-initialized',
-            enabled: messageSoundEnabledRef.current,
-            fromAnotherAccount: incoming.senderId !== session.user.id,
-          })
+        // SSE messages are live; neither renderer nor Desktop Main compares
+        // createdAt against the local clock. Desktop Main plays the alert even
+        // in the background, independent of Windows toast delivery.
+        if (!isDesktopBuild) {
+          const sound = messageSound.current
+          sound?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
+          if (import.meta.env.DEV) {
+            const diagnostic = sound?.getDiagnostic()
+            console.info('[ChatNet incoming sound]', {
+              result: diagnostic?.result ?? 'audio-not-initialized',
+              audioState: diagnostic?.audioState ?? 'not-initialized',
+              enabled: messageSoundEnabledRef.current,
+              fromAnotherAccount: incoming.senderId !== session.user.id,
+            })
+          }
         }
         notifyDesktopMessage(session, incoming)
         messageChanges.current.add(incoming.id)

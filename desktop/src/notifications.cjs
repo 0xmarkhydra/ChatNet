@@ -1,13 +1,15 @@
 'use strict'
 
 const { exactObject } = require('./auth-broker.cjs')
+const { performance } = require('node:perf_hooks')
 const validID = (value) => Number.isSafeInteger(value) && value > 0
 const validSession = (value) => typeof value === 'string' && /^[a-f0-9-]{36}$/i.test(value)
 
 // No message text, names, avatars, credentials or external URLs enter the OS notification store.
-function createNativeNotifications({ Notification, getScope, getWindow, showWindow, setBadge, now = Date.now }) {
+function createNativeNotifications({ Notification, getScope, getWindow, showWindow, setBadge, playSound, now = () => performance.now() }) {
   let context = null
   let lastShown = -Infinity
+  let lastSound = -Infinity
   const seen = new Set()
   const active = new Map()
   const same = (sessionId) => validSession(sessionId) && getScope()?.sessionId === sessionId
@@ -15,7 +17,7 @@ function createNativeNotifications({ Notification, getScope, getWindow, showWind
     for (const entry of active.values()) { clearTimeout(entry.timer); entry.notification.close(); entry.resolve({ shown: false, reason: 'cancelled' }) }
     active.clear()
   }
-  function reset() { closeAll(); seen.clear(); context = null; lastShown = -Infinity; setBadge(0) }
+  function reset() { closeAll(); seen.clear(); context = null; lastShown = -Infinity; lastSound = -Infinity; setBadge(0) }
   function sync(input) {
     if (!exactObject(input, ['sessionId', 'conversationId', 'unreadCount', 'enabled', 'sound']) || !validSession(input.sessionId) ||
         (input.conversationId !== null && !validID(input.conversationId)) ||
@@ -32,6 +34,10 @@ function createNativeNotifications({ Notification, getScope, getWindow, showWind
     if (!same(sessionId)) throw new Error('NOTIFICATION_SESSION_CHANGED')
     closeAll()
     return true
+  }
+  function preview(sessionId) {
+    if (!same(sessionId) || context?.sessionId !== sessionId) throw new Error('NOTIFICATION_SESSION_CHANGED')
+    try { playSound(); return true } catch { throw new Error('NOTIFICATION_SOUND_UNAVAILABLE') }
   }
   function dismiss(input) {
     if (!exactObject(input, ['sessionId', 'kind', 'eventId']) || !validSession(input.sessionId) ||
@@ -52,17 +58,25 @@ function createNativeNotifications({ Notification, getScope, getWindow, showWind
         !/^[A-Za-z0-9_-]{1,100}$/.test(input.eventId) || typeof input.createdAt !== 'string' || input.createdAt.length > 40) {
       throw new Error('NOTIFICATION_INVALID_INPUT')
     }
-    const scope = getScope(), window = getWindow(), timestamp = Date.parse(input.createdAt)
+    const scope = getScope(), window = getWindow()
     if (!same(input.sessionId) || context?.sessionId !== input.sessionId) return { shown: false, reason: 'session' }
-    if (!context.enabled || input.senderId === scope.userId) return { shown: false, reason: 'suppressed' }
-    if (!Number.isFinite(timestamp) || now() - timestamp > 120000 || timestamp - now() > 60000) return { shown: false, reason: 'stale' }
+    if (input.senderId === scope.userId) return { shown: false, reason: 'suppressed' }
     const key = `${input.kind}:${input.eventId}`
     if (seen.has(key)) return { shown: false, reason: 'duplicate' }
     seen.add(key)
     if (seen.size > 512) seen.delete(seen.values().next().value)
+
+    // A live SSE event is new even when server and device clocks disagree.
+    // Desktop Main owns the message chime regardless of focus/toast availability.
+    let soundFailed = false
+    if (input.kind === 'message' && context.sound && now() - lastSound >= 900) {
+      try { playSound(); lastSound = now() } catch { soundFailed = true }
+    }
+    if (!context.enabled) return { shown: false, reason: soundFailed ? 'unavailable' : 'suppressed' }
     if (window && !window.isDestroyed() && window.isVisible() && window.isFocused() &&
-        (input.kind === 'call' || context.conversationId === input.conversationId)) return { shown: false, reason: 'focused' }
-    if (input.kind === 'message' && now() - lastShown < 900) return { shown: false, reason: 'rate-limited' }
+        (input.kind === 'call' || context.conversationId === input.conversationId))
+      return { shown: false, reason: soundFailed ? 'unavailable' : 'focused' }
+    if (input.kind === 'message' && now() - lastShown < 900) return { shown: false, reason: soundFailed ? 'unavailable' : 'rate-limited' }
     if (!Notification.isSupported()) return { shown: false, reason: 'unavailable' }
     if (active.size >= 8) {
       const oldest = active.values().next().value
@@ -75,7 +89,8 @@ function createNativeNotifications({ Notification, getScope, getWindow, showWind
       try {
         notification = new Notification({ title: 'SocCO',
           body: input.kind === 'call' ? 'Bạn có cuộc gọi đến. Mở SocCO để xem và trả lời.' : 'Bạn có tin nhắn mới. Mở SocCO để xem.',
-          silent: !context.sound || input.kind === 'call' || Boolean(window && !window.isDestroyed() && window.isVisible() && window.isFocused()),
+          // Main already plays the alert. Use OS toast audio only if Main sound failed.
+          silent: !soundFailed,
         })
       } catch { resolve({ shown: false, reason: 'unavailable' }); return }
       const entry = { key, notification, resolve, timer: undefined }
@@ -111,11 +126,11 @@ function createNativeNotifications({ Notification, getScope, getWindow, showWind
       try { notification.show() } catch { failed() }
     })
   }
-  return { sync, show, clear, dismiss, reset }
+  return { sync, show, clear, dismiss, preview, reset }
 }
 
 function registerNotificationIPC(ipcMain, notifications, trusted) {
-  for (const action of ['sync', 'show', 'clear', 'dismiss']) ipcMain.handle(`soco:notification:${action}`, async (event, ...args) => {
+  for (const action of ['sync', 'show', 'clear', 'dismiss', 'preview']) ipcMain.handle(`soco:notification:${action}`, async (event, ...args) => {
     if (!trusted(event)) throw new Error('Forbidden IPC origin')
     if (args.length !== 1) throw new Error('NOTIFICATION_INVALID_INPUT')
     try { return await notifications[action](args[0]) } catch (error) {

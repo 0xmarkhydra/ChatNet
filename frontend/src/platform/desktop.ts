@@ -16,6 +16,7 @@ export type DesktopBridge = {
   notifications: {
     sync: (input: { sessionId: string; conversationId: number | null; unreadCount: number | null; enabled: boolean; sound: boolean }) => Promise<boolean>
     show: (input: { sessionId: string; conversationId: number; eventId: string; kind: 'message' | 'call'; senderId: number; createdAt: string }) => Promise<{ shown: boolean; reason?: string }>
+    preview: (sessionId: string) => Promise<boolean>
     clear: (sessionId: string) => Promise<boolean>
     dismiss: (input: { sessionId: string; kind: 'message' | 'call'; eventId: string }) => Promise<boolean>
     onClicked: (callback: (input: { sessionId: string; conversationId: number; kind: 'message' | 'call' }) => void) => () => void
