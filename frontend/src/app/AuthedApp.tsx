@@ -1284,14 +1284,21 @@ export default function AuthedApp({
           ),
         },
   );
-  const activePost = activePostId
+  // Route is authoritative for Feed details, including synchronous browser Back/Forward.
+  // Local selection state may briefly lag behind history navigation.
+  const feedRoutePostId = feedPostIdFromPath(routeLocation.pathname)
+    ?? Number(new URLSearchParams(routeLocation.search).get("post"));
+  const visibleActivePostId = tab === "feed"
+    ? (Number.isSafeInteger(feedRoutePostId) && feedRoutePostId > 0 ? feedRoutePostId : null)
+    : activePostId;
+  const activePost = visibleActivePostId
     ? [
         ...visibleProfilePosts,
         ...visiblePosts,
         ...savedPosts,
         ...postSearch.posts,
         ...followingFeed.posts,
-      ].find((item) => item.id === activePostId) || null
+      ].find((item) => item.id === visibleActivePostId) || null
     : null;
   const activeConversationAction = conversationActionId
     ? displayConversations.find((item) => item.id === conversationActionId) || null : null;

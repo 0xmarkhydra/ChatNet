@@ -1330,7 +1330,7 @@ try {
   await commentsPage.waitFor({ state: 'visible' })
   await page.goBack()
   await feed.waitFor({ state: 'visible' })
-  assert(new URL(page.url()).searchParams.get('post') === null,
+  assert(new URL(page.url()).pathname === '/feed',
     'Browser Back must return to the feed from post comments')
   await feedCards.first().getByRole('button', { name: 'Bình luận', exact: true }).click()
   await commentsPage.waitFor({ state: 'visible' })
@@ -1510,7 +1510,10 @@ try {
   await workspace.getByRole('button', { name: 'Hủy', exact: true }).click()
   assert(await nameAudience.inputValue() === 'private', 'Cancel must restore saved privacy')
   await nameAudience.selectOption('everyone')
-  await workspace.getByRole('button', { name: 'Lưu thay đổi' }).click()
+  await Promise.all([
+    page.waitForResponse(response => response.url().endsWith('/api/privacy') && response.request().method() === 'PUT'),
+    workspace.getByRole('button', { name: 'Lưu thay đổi' }).click(),
+  ])
   await workspace.locator('.settings-workspace-save:disabled').waitFor()
   assert(storedPrivacy.searchableByName === true, 'Save changes must persist privacy through /api/privacy')
   await workspace.getByRole('button', { name: 'Ngôn ngữ & dịch AI' }).click()
