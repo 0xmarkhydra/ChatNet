@@ -65,6 +65,28 @@
   border: 0; border-radius: 50%; background: #eff3ff; color: #2d62e9;
 }
 .call-center-content { flex: 1; min-height: 0; overflow: auto; padding: 20px 26px 32px; }
+/* History list and call details own their scroll positions, not the page. */
+.call-center-history {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.call-center-history .call-center-stats,
+.call-center-history .call-center-filters { flex-shrink: 0; }
+.call-center-history .call-history-layout {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.call-center-history .call-history-list,
+.call-center-history .call-history-details {
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
 .call-center-stats {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px;
   background: #fff; border-radius: 18px; padding: 21px 25px; margin-bottom: 17px;
@@ -214,6 +236,7 @@
   .call-center-header { padding: 15px 18px; }
   .call-center-content { padding: 16px; }
   .call-history-layout, .call-settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .call-center-history .call-history-layout { grid-template-rows: repeat(2, minmax(0, 1fr)); }
   .call-history-details { min-height: 0; }
 }
 @media (max-width: 680px) {
@@ -321,8 +344,10 @@
 
 /* On PWA phones the call details open above history, not beneath the list. */
 @media (max-width: 760px) {
+  .call-center-history { display: block; overflow-y: auto; }
+  .call-center-history .call-history-layout { min-height: auto; }
   .call-history-layout { display: block; }
-  .call-history-list { min-height: 0; }
+  .call-center-history .call-history-list { min-height: 0; max-height: none; overflow: visible; }
   .call-history-details { display: none; }
   .call-detail-scrim {
     display: block; position: fixed; inset: 0; z-index: 10010;

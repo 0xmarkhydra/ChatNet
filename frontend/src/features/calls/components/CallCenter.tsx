@@ -237,7 +237,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
         {view === 'directory' && <div className="call-center-content call-center-directory">{directoryContent}</div>}
 
         {view === 'history' && (
-          <div className="call-center-content">
+          <div className="call-center-content call-center-history">
             <section className="call-center-stats" aria-label="Thống kê lịch sử đã tải">
               <div><strong>{monthCount}</strong><span>Cuộc gọi tháng này</span></div>
               <div><strong className="danger">{missedCount}</strong><span>Cuộc gọi nhỡ</span></div>
