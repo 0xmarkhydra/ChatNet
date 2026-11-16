@@ -16,6 +16,7 @@ import { useSession } from "../shared/context/SessionContext";
 import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
+import { applyPostLikePreviews } from "./applyPostLikePreviews";
 import { usePhoneSearchLayout } from "./hooks/usePhoneSearchLayout";
 import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
 import { useAppInstallState } from "./hooks/useAppInstallState";
@@ -1197,23 +1198,7 @@ export default function AuthedApp({
     () => Object.fromEntries(friends.map(friend => [friend.username, friend.displayName || friend.username])),
     [friends],
   );
-  const visiblePosts = posts.map((post) =>
-    likePreviews[post.id] === undefined
-      ? post
-      : {
-          ...post,
-          liked: likePreviews[post.id],
-          likes: Math.max(
-            0,
-            post.likes +
-              (likePreviews[post.id] === post.liked
-                ? 0
-                : likePreviews[post.id]
-                  ? 1
-                  : -1),
-          ),
-        },
-  );
+  const visiblePosts = applyPostLikePreviews(posts, likePreviews);
   const visibleMessages = messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
     reactionPreviews[message.id]
       ? {
@@ -1222,23 +1207,7 @@ export default function AuthedApp({
         }
       : message,
   );
-  const visibleProfilePosts = profilePosts.map((post) =>
-    likePreviews[post.id] === undefined
-      ? post
-      : {
-          ...post,
-          liked: likePreviews[post.id],
-          likes: Math.max(
-            0,
-            post.likes +
-              (likePreviews[post.id] === post.liked
-                ? 0
-                : likePreviews[post.id]
-                  ? 1
-                  : -1),
-          ),
-        },
-  );
+  const visibleProfilePosts = applyPostLikePreviews(profilePosts, likePreviews);
   // Route is authoritative for Feed details, including synchronous browser Back/Forward.
   // Local selection state may briefly lag behind history navigation.
   const feedRoutePostId = feedPostIdFromPath(routeLocation.pathname)
