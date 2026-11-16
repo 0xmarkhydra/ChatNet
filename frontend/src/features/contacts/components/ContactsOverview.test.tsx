@@ -56,15 +56,15 @@ function setup(overrides: Partial<OverviewProps> = {}) {
 afterEach(() => { while (mounts.length) mounts.pop()!() })
 
 describe('Friends overview', () => {
-  it('counts all eligible suggestions while only showing three cards; excludes existing connections', () => {
+  it('counts all eligible suggestions while only showing four cards; excludes existing connections', () => {
     const app = setup()
     expect(app.container.textContent).toContain('2Bạn bè')
     expect(app.container.textContent).toContain('1Lời mời đến')
     expect(app.container.textContent).toContain('4Gợi ý kết nối hiện có')
     expect(app.container.textContent).not.toContain('Gợi ý 2')
-    expect(app.container.querySelectorAll('.co-suggestion')).toHaveLength(3)
+    expect(app.container.querySelectorAll('.co-suggestion:not(.co-skeleton-card)')).toHaveLength(4)
     expect(app.container.textContent).toContain('Gợi ý 5')
-    expect(app.container.textContent).not.toContain('Gợi ý 8')
+    expect(app.container.textContent).toContain('Gợi ý 8')
   })
 
   it('routes and sends actions through existing callbacks without local fake mutations', () => {
@@ -83,14 +83,14 @@ describe('Friends overview', () => {
 
   it('shows loading instead of transient zero counts and prevents stale suggestion cards', () => {
     const app = setup({ friendsLoading: true, suggestionsLoading: true })
-    expect(app.container.textContent).toContain('Đang tải bạn bè và lời mời')
-    expect(app.container.textContent).toContain('Đang tải gợi ý kết nối')
+    expect(app.container.querySelector('[aria-label="Đang tải bạn bè và lời mời"]')).not.toBeNull()
+    expect(app.container.querySelector('[aria-label="Đang tải gợi ý kết nối"]')).not.toBeNull()
     expect(app.container.querySelectorAll('.co-request')).toHaveLength(0)
-    expect(app.container.querySelectorAll('.co-suggestion')).toHaveLength(0)
+    expect(app.container.querySelectorAll('.co-suggestion:not(.co-skeleton-card)')).toHaveLength(0)
     expect(app.container.textContent).not.toContain('0Bạn bè')
     app.render({ friendsLoading: false, suggestionsLoading: false })
     expect(app.container.querySelectorAll('.co-request')).toHaveLength(1)
-    expect(app.container.querySelectorAll('.co-suggestion')).toHaveLength(3)
+    expect(app.container.querySelectorAll('.co-suggestion:not(.co-skeleton-card)')).toHaveLength(4)
   })
 
   it('exposes meaningful retry actions for connection and suggestion errors', () => {
@@ -101,7 +101,7 @@ describe('Friends overview', () => {
     act(() => { retryButtons[0].click(); retryButtons[1].click() })
     expect(app.onRetryFriends).toHaveBeenCalledTimes(1)
     expect(app.onRetrySuggestions).toHaveBeenCalledTimes(1)
-    expect(app.container.querySelectorAll('.co-suggestion')).toHaveLength(0)
+    expect(app.container.querySelectorAll('.co-suggestion:not(.co-skeleton-card)')).toHaveLength(0)
   })
 
   it('disables busy invitation and suggestion actions with visible feedback', () => {
