@@ -23,6 +23,7 @@ import { useAppInstallState } from "./hooks/useAppInstallState";
 import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
 import { useQuickSearchDismiss } from "./hooks/useQuickSearchDismiss";
+import { useChatOutboxReconnect } from "./hooks/useChatOutboxReconnect";
 import { useUnreadDocumentTitle } from "./hooks/useUnreadDocumentTitle";
 import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
@@ -2208,35 +2209,11 @@ export default function AuthedApp({
 
   const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId: selectRoutedConversation, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
 
-  useEffect(() => {
-    if (!session?.sessionId) return;
-    const onOnline = () => {
-      setChatOnline(true);
-      void retryQueuedChatMessages();
-    };
-    const onOffline = () => setChatOnline(false);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") onOnline();
-    };
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    document.addEventListener("visibilitychange", onVisible);
-    const timer = window.setInterval(
-      () => void retryQueuedChatMessages(),
-      15_000,
-    );
-    const initial = window.setTimeout(
-      () => void retryQueuedChatMessages(),
-      250,
-    );
-    return () => {
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.clearInterval(timer);
-      window.clearTimeout(initial);
-    };
-  }, [session?.sessionId]);
+  useChatOutboxReconnect({
+    sessionId: session?.sessionId ?? null,
+    retryQueuedMessages: retryQueuedChatMessages,
+    setChatOnline,
+  });
 
   useEffect(() => {
     if (!session || !messages.length || !chatOutboxRef.current.length) return;
