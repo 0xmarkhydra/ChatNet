@@ -182,6 +182,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
         <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>
 
         {loading && <p role="status" aria-busy="true">Đang tải dữ liệu chợ…</p>}
+        {busy && <p role="status" aria-live="polite" aria-busy="true">Đang xử lý yêu cầu…</p>}
         {error && <p role="alert" className="marketplace-error">{error} <button onClick={retryRead} type="button" disabled={busy}>Thử tải dữ liệu</button></p>}
         {message && <p role="status" className="marketplace-message">{message}</p>}
 

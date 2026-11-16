@@ -180,6 +180,43 @@ describe('Marketplace read fallback', () => {
     expect((host.querySelector('form input') as HTMLInputElement).value).toBe('')
   })
 
+  it('announces a pending mutation without losing the existing catalog', async () => {
+    let finishWrite: (() => void) | undefined
+    const pending = new Promise<void>((resolve) => { finishWrite = resolve })
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        await pending
+        return Response.json({})
+      }
+      return response(path, path.endsWith('/products') ? [product] : [])
+    })
+    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    const add = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((button) => button.textContent === 'Thêm vào giỏ')
+    await act(async () => add?.click())
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Đang xử lý')
+    expect(add?.disabled).toBe(true)
+    expect(host.textContent).toContain('Bàn học')
+    await act(async () => finishWrite?.())
+    expect(host.textContent).not.toContain('Đang xử lý')
+  })
+
+  it('ignores a previous account mutation failure after switching users', async () => {
+    let rejectWrite: ((error: Error) => void) | undefined
+    const pending = new Promise<Response>((_, reject) => { rejectWrite = reject })
+    const request = vi.fn((path: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return pending
+      return Promise.resolve(response(path, path.endsWith('/products') ? [product] : []))
+    })
+    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    const add = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((button) => button.textContent === 'Thêm vào giỏ')
+    await act(async () => add?.click())
+    await act(async () => root.render(<Marketplace userId={2} request={request} onBack={() => {}} />))
+    await act(async () => rejectWrite?.(new Error('Lỗi riêng tài khoản 1')))
+    expect(host.textContent).not.toContain('Lỗi riêng tài khoản 1')
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    expect(host.textContent).toContain('Bàn học')
+  })
+
   it('ignores the previous user response after switching users', async () => {
     let resolveOld: ((value: Response) => void) | undefined
     const old = new Promise<Response>((resolve) => { resolveOld = resolve })
