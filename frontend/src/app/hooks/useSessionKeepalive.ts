@@ -24,9 +24,19 @@ export function useSessionKeepalive(
     let refreshing = false;
     const refresh = () => {
       if (!active || refreshing || sessionRef.current?.sessionId !== sessionId) return;
-      if (!isDesktopBuild && document.visibilityState === "hidden") return;
+      // Browser offline/hidden refresh attempts cannot succeed; the online and
+      // visibility listeners retry as soon as the connection becomes usable.
+      if (!isDesktopBuild && (document.visibilityState === "hidden" || navigator.onLine === false)) return;
       refreshing = true;
-      void sessionClient.refresh()
+      // Preserve the initial immediate refresh while normalizing synchronous
+      // transport throws into the existing rejection/cleanup path.
+      let attempt: Promise<Session | null>;
+      try {
+        attempt = sessionClient.refresh();
+      } catch (error) {
+        attempt = Promise.reject(error);
+      }
+      void attempt
         .then((current) => {
           if (active && sessionRef.current?.sessionId === sessionId && isDesktopBuild && current)
             return sessionClient.check();

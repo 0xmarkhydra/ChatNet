@@ -4,13 +4,17 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '../../shared/types/session'
 import { useAppSession } from './useAppSession'
+import { clearChatPersistence } from '../../features/chat/lib/chatPersistence'
+import { clearChatOutbox } from '../../features/chat/lib/chatOutbox'
+
+const storageSession = vi.hoisted(() => ({ value: null as unknown }))
 
 vi.mock('../../platform/desktop', () => ({ isDesktopBuild: false }))
 vi.mock('../../features/auth/hooks/useAuthFlow', () => ({
   useAuthFlow: () => ({ resetRegistration: vi.fn(), setAuthMode: vi.fn() }),
 }))
 vi.mock('../../features/auth/lib/session', () => ({
-  loadSession: () => null,
+  loadSession: () => storageSession.value,
   createSessionClient: () => ({ request: vi.fn(), refresh: vi.fn() }),
 }))
 vi.mock('../../features/chat/lib/chatPersistence', () => ({ clearChatPersistence: vi.fn() }))
@@ -46,7 +50,11 @@ function mountSession() {
   }
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  storageSession.value = null
+  vi.unstubAllGlobals()
+  vi.clearAllMocks()
+})
 
 describe('async logout notifications belong to the logout visit', () => {
   it('does not warn after A → B → A when the first logout finishes late', async () => {
@@ -99,6 +107,39 @@ describe('async logout notifications belong to the logout visit', () => {
     hook.close()
     await act(async () => { pending.reject(new Error('network failure')); await Promise.resolve() })
     expect(notice).not.toHaveBeenCalled()
+  })
+
+  it('cleans previous account data if another tab swaps users under the same session ID', () => {
+    vi.stubGlobal('localStorage', { setItem: vi.fn(), removeItem: vi.fn(), getItem: vi.fn() })
+    const hook = mountSession()
+    const accountA = session('A')
+    const accountB = { ...session('B'), sessionId: accountA.sessionId }
+    try {
+      act(() => hook.current.saveSession(accountA))
+      storageSession.value = accountB
+      act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'chatnet-session' })))
+      expect(clearChatPersistence).toHaveBeenCalledWith(accountA.user.id)
+      expect(clearChatOutbox).toHaveBeenCalledWith(accountA.user.id)
+      expect(hook.current.session?.user.id).toBe(accountB.user.id)
+    } finally {
+      hook.close()
+    }
+  })
+
+  it('retains account-scoped data for a token refresh in another tab', () => {
+    vi.stubGlobal('localStorage', { setItem: vi.fn(), removeItem: vi.fn(), getItem: vi.fn() })
+    const hook = mountSession()
+    const accountA = session('A')
+    try {
+      act(() => hook.current.saveSession(accountA))
+      storageSession.value = { ...accountA, token: 'new-access-token' }
+      act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'chatnet-session' })))
+      expect(clearChatPersistence).not.toHaveBeenCalled()
+      expect(clearChatOutbox).not.toHaveBeenCalled()
+      expect(hook.current.session?.token).toBe('new-access-token')
+    } finally {
+      hook.close()
+    }
   })
 
 })

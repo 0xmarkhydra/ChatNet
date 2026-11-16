@@ -77,6 +77,87 @@ describe("desktop shortcuts", () => {
       host.remove();
     }
   });
+  it("does not focus the search input after logout or a newly opened modal", () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const search = document.createElement("div");
+    search.className = "appbar-search";
+    const input = document.createElement("input");
+    search.append(input);
+    document.body.append(search);
+    const focus = vi.spyOn(input, "focus");
+    const sessionRef = { current: {} } as RefObject<unknown | null>;
+    const messageInputRef = { current: null } as RefObject<HTMLTextAreaElement | null>;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() => root.render(<Probe sessionRef={sessionRef} messageInputRef={messageInputRef} onOpenChat={vi.fn()} />));
+      act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, cancelable: true })));
+      sessionRef.current = null;
+      act(() => frames.shift()?.(0));
+      expect(focus).not.toHaveBeenCalled();
+
+      sessionRef.current = {};
+      act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, cancelable: true })));
+      const dialog = document.createElement("div");
+      dialog.setAttribute("role", "dialog");
+      dialog.setAttribute("aria-modal", "true");
+      document.body.append(dialog);
+      try {
+        act(() => frames.shift()?.(0));
+        expect(focus).not.toHaveBeenCalled();
+      } finally {
+        dialog.remove();
+      }
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      search.remove();
+    }
+  });
+  it("does not focus a new account's search box after a shortcut from the previous account", () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    const search = document.createElement("div");
+    search.className = "appbar-search";
+    const input = document.createElement("input");
+    search.append(input);
+    document.body.append(search);
+    const focus = vi.spyOn(input, "focus");
+    const sessionRef = { current: { sessionId: "A", user: { id: 1 } } } as RefObject<unknown | null>;
+    const messageInputRef = { current: null } as RefObject<HTMLTextAreaElement | null>;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() => root.render(<Probe sessionRef={sessionRef} messageInputRef={messageInputRef} onOpenChat={vi.fn()} />));
+      act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, cancelable: true })));
+      sessionRef.current = { sessionId: "B", user: { id: 2 } };
+      act(() => frames.shift()?.(0));
+      expect(focus).not.toHaveBeenCalled();
+
+      act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, cancelable: true })));
+      act(() => frames.shift()?.(0));
+      expect(focus).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      search.remove();
+    }
+  });
+
 });
 
 function Probe(props: {

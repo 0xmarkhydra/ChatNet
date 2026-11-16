@@ -181,4 +181,152 @@ describe("useFeedRefreshInterval", () => {
       host.remove();
     }
   });
+
+  it("refreshes immediately on reconnect, without overlapping a pending request", async () => {
+    vi.useFakeTimers();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    let finishPosts!: () => void;
+    let finishStories!: () => void;
+    const posts = vi.fn(() => new Promise<void>((resolve) => { finishPosts = resolve; }));
+    const stories = vi.fn(() => new Promise<void>((resolve) => { finishStories = resolve; }));
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    function Probe() {
+      useFeedRefreshInterval({
+        enabled: true, sessionId: "A", sessionToken: "token-A",
+        refreshPosts: posts, refreshStories: stories,
+      });
+      return null;
+    }
+    try {
+      act(() => root.render(<Probe />));
+      act(() => window.dispatchEvent(new Event("online")));
+      expect(posts).toHaveBeenCalledTimes(1);
+      expect(stories).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        finishPosts();
+        finishStories();
+        await Promise.resolve();
+      });
+      act(() => window.dispatchEvent(new Event("online")));
+      expect(posts).toHaveBeenCalledTimes(2);
+      expect(stories).toHaveBeenCalledTimes(2);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+    window.dispatchEvent(new Event("online"));
+    expect(posts).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not refresh a hidden Feed when connectivity returns", async () => {
+    vi.useFakeTimers();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    const posts = vi.fn(async () => undefined);
+    const stories = vi.fn(async () => undefined);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    function Probe() {
+      useFeedRefreshInterval({
+        enabled: true, sessionId: "A", sessionToken: "token-A",
+        refreshPosts: posts, refreshStories: stories,
+      });
+      return null;
+    }
+    try {
+      act(() => root.render(<Probe />));
+      await act(async () => { await Promise.resolve(); });
+      act(() => window.dispatchEvent(new Event("online")));
+      expect(posts).toHaveBeenCalledTimes(1);
+      expect(stories).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("skips polling while offline and resumes immediately on reconnect", async () => {
+    vi.useFakeTimers();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const originalOnline = Object.getOwnPropertyDescriptor(navigator, "onLine");
+    let online = false;
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => online });
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    const posts = vi.fn(async () => undefined);
+    const stories = vi.fn(async () => undefined);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    function Probe() {
+      useFeedRefreshInterval({ enabled: true, sessionId: "A", sessionToken: "token-A", refreshPosts: posts, refreshStories: stories });
+      return null;
+    }
+    try {
+      act(() => root.render(<Probe />));
+      act(() => vi.advanceTimersByTime(48_000));
+      expect(posts).not.toHaveBeenCalled();
+      expect(stories).not.toHaveBeenCalled();
+      online = true;
+      act(() => window.dispatchEvent(new Event("online")));
+      expect(posts).toHaveBeenCalledTimes(1);
+      expect(stories).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      if (originalOnline) Object.defineProperty(navigator, "onLine", originalOnline);
+      else Reflect.deleteProperty(navigator, "onLine");
+    }
+  });
+
+  it("coalesces reconnect and visibility refresh while requests are pending", async () => {
+    vi.useFakeTimers();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    const pending: Array<{ finishPosts: () => void; finishStories: () => void }> = [];
+    let finishPosts!: () => void;
+    let finishStories!: () => void;
+    const posts = vi.fn(() => new Promise<void>((resolve) => { finishPosts = resolve; }));
+    const stories = vi.fn(() => new Promise<void>((resolve) => {
+      finishStories = resolve;
+      pending.push({ finishPosts, finishStories });
+    }));
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    function Probe({ enabled = true }: { enabled?: boolean }) {
+      useFeedRefreshInterval({ enabled, sessionId: "A", sessionToken: "token-A", refreshPosts: posts, refreshStories: stories });
+      return null;
+    }
+    try {
+      act(() => root.render(<Probe />));
+      act(() => {
+        window.dispatchEvent(new Event("online"));
+        document.dispatchEvent(new Event("visibilitychange"));
+        vi.advanceTimersByTime(12_000);
+      });
+      expect(posts).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        pending[0].finishPosts();
+        pending[0].finishStories();
+        await Promise.resolve();
+      });
+      expect(posts).toHaveBeenCalledTimes(2);
+      expect(stories).toHaveBeenCalledTimes(2);
+      // A pending refresh from an old screen must never trigger work after cleanup.
+      act(() => root.render(<Probe enabled={false} />));
+      await act(async () => {
+        pending[1].finishPosts();
+        pending[1].finishStories();
+        await Promise.resolve();
+      });
+      expect(posts).toHaveBeenCalledTimes(2);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
 });
