@@ -196,12 +196,30 @@ describe('NearbyExplorer location fallback', () => {
     await act(async () => root.render(<NearbyExplorer {...props} />))
     await act(async () => button('Địa điểm')?.click())
     await act(async () => button('Dùng vị trí hiện tại')?.click())
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Không thể hiển thị bản đồ')
+    expect(host.querySelector('.nearby-map-fallback [role="alert"]')?.textContent).toContain('Không thể hiển thị bản đồ')
     expect(host.textContent).toContain('Quanh đây')
     await act(async () => button('Xem danh sách')?.click())
     expect(host.querySelector('[role="alert"]')).toBeNull()
     expect(host.querySelector<HTMLButtonElement>('button[aria-label="Danh sách"]')?.getAttribute('aria-pressed')).toBe('true')
     consoleError.mockRestore()
+  })
+
+  it('offers to clear a place query with no matching results without reloading the provider', async () => {
+    const onQueryChange = vi.fn()
+    loadPlaces.mockResolvedValue([{
+      id: 'cafe:1', name: 'Cà phê trung tâm', category: 'cafe',
+      kind: 'Cafe', latitude: 21, longitude: 105, distanceKm: 0.4,
+    }])
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} query="không tìm thấy" onQueryChange={onQueryChange} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    expect(host.textContent).toContain('Không khớp tìm kiếm')
+    expect(host.textContent).not.toContain('Cà phê trung tâm')
+    expect(loadPlaces).toHaveBeenCalledTimes(1)
+    await act(async () => button('Xóa tìm kiếm')?.click())
+    expect(onQueryChange).toHaveBeenCalledWith('')
+    expect(loadPlaces).toHaveBeenCalledTimes(1)
   })
 
   it('lets users switch to a list when the map cannot be used', async () => {
