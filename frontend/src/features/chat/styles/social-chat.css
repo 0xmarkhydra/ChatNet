@@ -743,14 +743,10 @@
     margin-bottom: 0;
   }
   .modern-shell.app-layout .social-chat-layout .messages .message .message-content:has(.message-reactions > .reaction-chip) {
-    margin-bottom: 12px;
+    margin-bottom: 26px;
   }
-  .modern-shell.app-layout
-    .social-chat-layout
-    .message
-    .message-content
-    > .bubble:has(> .message-reactions > .reaction-chip) {
-    padding-bottom: 22px;
+  .modern-shell.app-layout .social-chat-layout .messages .message .message-content:has(.message-reactions > .reaction-chip) .message-reactions {
+    bottom: -24px;
   }
   .modern-shell.app-layout .social-chat-layout .message-stamp {
     margin-top: 4px;
