@@ -889,7 +889,7 @@ export default function AuthedApp({
     setActivePostId,
   });
 
-  usePostRouteLoad({
+  const routedPost = usePostRouteLoad({
     sessionId: session?.sessionId ?? null,
     sessionToken: session?.token ?? null,
     sessionRef,
@@ -1298,6 +1298,7 @@ export default function AuthedApp({
         ...savedPosts,
         ...postSearch.posts,
         ...followingFeed.posts,
+        ...(routedPost ? [routedPost] : []),
       ].find((item) => item.id === visibleActivePostId) || null
     : null;
   const activeConversationAction = conversationActionId
