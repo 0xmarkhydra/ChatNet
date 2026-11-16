@@ -32,6 +32,8 @@ export function useCommunityDiscovery({
   const publicLoading = active && loadedGroups === null
   const [joiningId, setJoiningId] = useState<number | null>(null)
   const joiningRef = useRef(false)
+  const lifecycleRef = useRef(0)
+  useEffect(() => () => { lifecycleRef.current += 1 }, [])
   const requestRef = useLatest(request)
   const notifyRef = useLatest(notify)
   const onJoinedRef = useLatest(onJoinedGroup)
@@ -54,10 +56,12 @@ export function useCommunityDiscovery({
   async function joinPublic(id: number) {
     if (joiningRef.current) return
     joiningRef.current = true
+    const lifecycle = lifecycleRef.current
     setJoiningId(id)
     try {
       const response = await joinPublicGroup(requestRef.current, id)
       const result = await response.json().catch(() => null) as {status?: string; error?: string} | null
+      if (lifecycle !== lifecycleRef.current) return
       if (!response.ok) throw new Error(result?.error || 'Không tham gia được cộng đồng.')
       if (result?.status === 'member') {
         notifyRef.current('Đã tham gia cộng đồng.')
@@ -66,10 +70,14 @@ export function useCommunityDiscovery({
         notifyRef.current('Đã gửi yêu cầu tham gia. Chờ quản trị viên duyệt.')
       }
     } catch (error) {
-      notifyRef.current(error instanceof Error ? error.message : 'Không thể tham gia cộng đồng.')
+      if (lifecycle === lifecycleRef.current) {
+        notifyRef.current(error instanceof Error ? error.message : 'Không thể tham gia cộng đồng.')
+      }
     } finally {
-      joiningRef.current = false
-      setJoiningId(null)
+      if (lifecycle === lifecycleRef.current) {
+        joiningRef.current = false
+        setJoiningId(null)
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { Conversation } from '../types'
 import type { ToastKind } from '../../../shared/utils/toast'
 
@@ -14,10 +14,13 @@ export function useConversationNotificationToggle({
 }) {
   const [notificationBusyId, setNotificationBusyId] = useState<number | null>(null)
   const busyRef = useRef(false)
+  const lifecycleRef = useRef(0)
+  useEffect(() => () => { lifecycleRef.current += 1 }, [])
 
   async function toggleConversationNotifications(conversation: Conversation) {
     if (busyRef.current) return
     busyRef.current = true
+    const lifecycle = lifecycleRef.current
     setNotificationBusyId(conversation.id)
     try {
       const muted = !conversation.muted
@@ -27,6 +30,7 @@ export function useConversationNotificationToggle({
       })
       const result = await response.json().catch(() => null) as
         { messageNotifications?: boolean; mentionNotifications?: boolean; error?: string } | null
+      if (lifecycle !== lifecycleRef.current) return
       if (!response.ok || typeof result?.messageNotifications !== 'boolean') {
         throw new Error(result?.error || 'Không cập nhật được thông báo. Backend cần hỗ trợ thiết lập theo hội thoại.')
       }
@@ -35,10 +39,14 @@ export function useConversationNotificationToggle({
         item.id === conversation.id ? { ...item, muted: nextMuted } : item))
       setNotice(nextMuted ? 'Đã tắt thông báo hội thoại.' : 'Đã bật thông báo hội thoại.', 'success')
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông báo.', 'error')
+      if (lifecycle === lifecycleRef.current) {
+        setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông báo.', 'error')
+      }
     } finally {
-      busyRef.current = false
-      setNotificationBusyId(null)
+      if (lifecycle === lifecycleRef.current) {
+        busyRef.current = false
+        setNotificationBusyId(null)
+      }
     }
   }
 

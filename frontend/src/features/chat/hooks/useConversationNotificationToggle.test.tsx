@@ -36,8 +36,15 @@ function mount(apiFetch: (path: string, init?: RequestInit) => Promise<Response>
     return null
   }
 
-  unmounts.push(async () => { await act(async () => root.unmount()) })
+  let mounted = true
+  const unmount = async () => {
+    if (!mounted) return
+    mounted = false
+    await act(async () => root.unmount())
+  }
+  unmounts.push(unmount)
   return {
+    unmount,
     render: async () => { await act(async () => root.render(<Test />)) },
     get state() { return state },
     get conversations() { return conversations },
@@ -101,4 +108,36 @@ it('does not optimistically mute after an ambiguous successful response and allo
   await act(async () => view.state.toggleConversationNotifications(conversation))
   expect(apiFetch).toHaveBeenCalledTimes(2)
   expect(view.conversations[0].muted).toBe(true)
+})
+
+it('does not update conversations or show success after the notification screen unmounts', async () => {
+  const pending = deferred<Response>()
+  const view = mount(vi.fn(() => pending.promise))
+  await view.render()
+  let mutation!: Promise<void>
+  await act(async () => { mutation = view.state.toggleConversationNotifications(conversation) })
+  await view.unmount()
+  await act(async () => {
+    pending.resolve({
+      ok: true,
+      json: async () => ({ messageNotifications: false, mentionNotifications: false }),
+    } as Response)
+    await mutation
+  })
+  expect(view.conversations[0].muted).toBe(false)
+  expect(view.notify).not.toHaveBeenCalled()
+})
+
+it('does not show an outdated mutation error after the notification screen unmounts', async () => {
+  const pending = deferred<Response>()
+  const view = mount(vi.fn(() => pending.promise))
+  await view.render()
+  let mutation!: Promise<void>
+  await act(async () => { mutation = view.state.toggleConversationNotifications(conversation) })
+  await view.unmount()
+  await act(async () => {
+    pending.resolve({ ok: false, json: async () => ({ error: 'Phiên trước' }) } as Response)
+    await mutation
+  })
+  expect(view.notify).not.toHaveBeenCalled()
 })

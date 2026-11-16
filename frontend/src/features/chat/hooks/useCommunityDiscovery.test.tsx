@@ -43,8 +43,14 @@ function mount({ active = true, query = '' }: { active?: boolean; query?: string
   const render = async (isActive = active, search = query) => {
     await act(async () => root.render(<Test isActive={isActive} search={search} />))
   }
-  roots.push(async () => { await act(async () => root.unmount()) })
-  return { render, get state() { return state }, notify, onJoinedGroup, request }
+  let mounted = true
+  const unmount = async () => {
+    if (!mounted) return
+    mounted = false
+    await act(async () => root.unmount())
+  }
+  roots.push(unmount)
+  return { render, unmount, get state() { return state }, notify, onJoinedGroup, request }
 }
 
 it('ignores a stale list response after search changes and aborts the previous request', async () => {
@@ -146,4 +152,38 @@ it('ignores late discovery responses after leaving list mode', async () => {
   })
   expect(view.state.publicGroups).toEqual([])
   expect(view.state.publicLoading).toBe(false)
+})
+
+it('does not notify or refresh a departed community screen after join succeeds', async () => {
+  mocks.list.mockResolvedValue({ ok: true, json: async () => [] } as Response)
+  const pending = deferred<Response>()
+  mocks.join.mockReturnValue(pending.promise)
+  const view = mount()
+  await view.render()
+  let joined!: Promise<void>
+  await act(async () => { joined = view.state.joinPublic(12) })
+  await view.unmount()
+  await act(async () => {
+    pending.resolve({ ok: true, json: async () => ({ status: 'member' }) } as Response)
+    await joined
+  })
+  expect(view.notify).not.toHaveBeenCalled()
+  expect(view.onJoinedGroup).not.toHaveBeenCalled()
+})
+
+it('does not surface a stale join failure after leaving the community screen', async () => {
+  mocks.list.mockResolvedValue({ ok: true, json: async () => [] } as Response)
+  const pending = deferred<Response>()
+  mocks.join.mockReturnValue(pending.promise)
+  const view = mount()
+  await view.render()
+  let joined!: Promise<void>
+  await act(async () => { joined = view.state.joinPublic(12) })
+  await view.unmount()
+  await act(async () => {
+    pending.resolve({ ok: false, json: async () => ({ error: 'Không thể tham gia' }) } as Response)
+    await joined
+  })
+  expect(view.notify).not.toHaveBeenCalled()
+  expect(view.onJoinedGroup).not.toHaveBeenCalled()
 })
