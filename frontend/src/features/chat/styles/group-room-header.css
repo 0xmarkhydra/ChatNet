@@ -82,8 +82,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   gap: 5px;
+  min-width: 0;
   max-width: 100%;
   min-height: 0;
   height: 20px;
@@ -104,6 +105,14 @@
 }
 .modern-shell .group-chat-panel .group-room-member-count svg {
   flex: none;
+}
+.modern-shell .group-chat-panel .group-room-member-count > span,
+.modern-shell .group-chat-panel .group-channel-parent-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .modern-shell .group-chat-panel .group-room-subtitle .conversation-category-assignment {
   display: inline-flex;
@@ -129,6 +138,24 @@
 .modern-shell .group-chat-panel .group-room-member-count:focus-visible {
   outline: 2px solid #4169de;
   outline-offset: 2px;
+}
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout .group-chat-panel > .chat-head > .translate-controls {
+    flex: none;
+    gap: 4px;
+  }
+  .modern-shell .group-chat-panel > .chat-head .translate-controls .call-header-actions {
+    gap: 4px;
+    margin-right: 0;
+  }
+  .modern-shell .group-chat-panel > .chat-head .translate-controls .group-settings-toggle {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+  }
 }
 @media (max-width: 760px) {
   .modern-shell .group-chat-panel > .chat-head {
