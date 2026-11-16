@@ -28,10 +28,13 @@ export function useDesktopShortcuts({
 
       if (event.key.toLowerCase() === "k" && !event.shiftKey) {
         event.preventDefault();
+        const sessionAtShortcut = sessionRef.current;
         openChatRef.current();
         if (pendingFocus !== null) window.cancelAnimationFrame(pendingFocus);
         pendingFocus = window.requestAnimationFrame(() => {
           pendingFocus = null;
+          if (sessionRef.current !== sessionAtShortcut ||
+              document.querySelector('[role="dialog"][aria-modal="true"]')) return;
           document.querySelector<HTMLInputElement>(".appbar-search input")?.focus();
         });
       } else if (event.key.toLowerCase() === "l" && event.shiftKey) {

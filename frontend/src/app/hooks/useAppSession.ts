@@ -113,7 +113,10 @@ export function useAppSession(initialSession?: Session | null) {
     const sync = (event: StorageEvent) => {
       if (event.key !== "chatnet-session" && event.key !== null) return;
       const next = loadSession();
-      if (sessionRef.current?.sessionId !== next?.sessionId)
+      const previous = sessionRef.current;
+      // A session identifier alone is not an account boundary: storage can
+      // change to a different user while retaining the same session ID.
+      if (previous?.sessionId !== next?.sessionId || previous?.user.id !== next?.user.id)
         endSessionRef.current(false, false);
       sessionEpoch.current += 1;
       sessionRef.current = next;
