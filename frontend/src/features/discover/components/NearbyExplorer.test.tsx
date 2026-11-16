@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import NearbyExplorer from './NearbyExplorer'
 import { getCurrentPositionSmart } from '../lib/geolocation'
+import { loadNearbyPlaces } from '../lib/nearbyPlaces'
 
 vi.mock('./NearbyMap', () => ({ default: () => <div data-testid="nearby-map" /> }))
 vi.mock('../lib/nearbyPlaces', () => ({ loadNearbyPlaces: vi.fn(async () => []) }))
@@ -17,6 +18,7 @@ let root: Root
 const actGlobal = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const initialAct = actGlobal.IS_REACT_ACT_ENVIRONMENT
 const geo = vi.mocked(getCurrentPositionSmart)
+const loadPlaces = vi.mocked(loadNearbyPlaces)
 const props = {
   query: '', onQueryChange: vi.fn(), users: [], peopleBusy: false, peopleScanning: false,
   peopleActive: false, peopleRadiusKm: 1, resultRadiusKm: 1, onPeopleRadiusChange: vi.fn(),
@@ -65,6 +67,20 @@ describe('NearbyExplorer location fallback', () => {
     expect(geo).toHaveBeenCalledTimes(2)
     expect(host.querySelector('[role="alert"]')).toBeNull()
     expect(host.querySelector('[data-testid="nearby-map"]')).not.toBeNull()
+  })
+
+  it('announces pending place results and clears the status when loading finishes', async () => {
+    let finishPlaces: ((places: []) => void) | undefined
+    loadPlaces.mockImplementation(() => new Promise(resolve => { finishPlaces = resolve }))
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Đang tải địa điểm')
+    expect(host.textContent).not.toContain('Chưa tìm thấy địa điểm')
+    await act(async () => finishPlaces?.([]))
+    expect(host.textContent).not.toContain('Đang tải địa điểm')
+    expect(host.textContent).toContain('Chưa tìm thấy địa điểm')
   })
 
   it('shows an accessible location status while finding a position, without an empty prompt', async () => {

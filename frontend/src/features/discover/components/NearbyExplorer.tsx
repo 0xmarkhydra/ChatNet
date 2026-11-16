@@ -130,8 +130,9 @@ export default function NearbyExplorer({
       <button key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>}
     {mode === 'people' && <p className="nearby-privacy"><ShieldCheck size={16} />Vị trí chính xác của bạn không được chia sẻ.</p>}
     {locating && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang xác định vị trí…</p>}
+    {loading && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang tải địa điểm…</p>}
     {locationError && mode === 'places' && <p className="nearby-error" role="alert">{locationError}</p>}
-    {error && mode === 'places' && <div className="nearby-error" role="alert">{error}<button onClick={() => setReload((value) => value + 1)}>Thử lại</button></div>}
+    {error && mode === 'places' && <div className="nearby-error" role="alert">{error}<button type="button" disabled={loading} onClick={() => setReload((value) => value + 1)}>Thử lại</button></div>}
     <div className="nearby-results-heading">
       <strong>{count} {mode === 'people' ? 'người' : 'địa điểm'}</strong>
       {mode === 'people' ? <span>{users.length ? `Trong ${resultRadiusKm} km · gần nhất trước` : ''}</span> : <div className="nearby-view">
