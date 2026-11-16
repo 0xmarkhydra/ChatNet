@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 describe("useFeedRefreshInterval", () => {
-  it("refreshes on entry and uses current callbacks without restarting the interval", () => {
+  it("refreshes on entry and uses current callbacks without restarting the interval", async () => {
     vi.useFakeTimers();
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
@@ -42,6 +42,7 @@ describe("useFeedRefreshInterval", () => {
       act(() => root.render(<Probe newer={false} />));
       expect(firstPosts).toHaveBeenCalledTimes(1);
       expect(firstStories).toHaveBeenCalledTimes(1);
+      await act(async () => { await Promise.resolve(); });
       act(() => root.render(<Probe newer />));
       expect(currentPosts).not.toHaveBeenCalled();
       act(() => vi.advanceTimersByTime(12_000));
@@ -57,7 +58,7 @@ describe("useFeedRefreshInterval", () => {
     expect(currentPosts).toHaveBeenCalledTimes(1);
   });
 
-  it("pauses hidden-page refresh and cleans up on disable or session change", () => {
+  it("pauses hidden-page refresh and cleans up on disable or session change", async () => {
     vi.useFakeTimers();
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     let visible = false;
@@ -76,13 +77,16 @@ describe("useFeedRefreshInterval", () => {
     try {
       act(() => root.render(<Probe enabled sessionId="A" sessionToken="t-A" />));
       expect(posts).toHaveBeenCalledTimes(1);
+      await act(async () => { await Promise.resolve(); });
       act(() => vi.advanceTimersByTime(12_000));
       expect(posts).toHaveBeenCalledTimes(1);
       visible = true;
       act(() => document.dispatchEvent(new Event("visibilitychange")));
       expect(posts).toHaveBeenCalledTimes(2);
+      await act(async () => { await Promise.resolve(); });
       act(() => vi.advanceTimersByTime(12_000));
       expect(posts).toHaveBeenCalledTimes(3);
+      await act(async () => { await Promise.resolve(); });
       act(() => root.render(<Probe enabled sessionId="B" sessionToken="t-B" />));
       expect(posts).toHaveBeenCalledTimes(4);
       act(() => root.render(<Probe enabled={false} sessionId="B" sessionToken="t-B" />));
@@ -90,6 +94,88 @@ describe("useFeedRefreshInterval", () => {
       act(() => document.dispatchEvent(new Event("visibilitychange")));
       expect(posts).toHaveBeenCalledTimes(4);
       expect(stories).toHaveBeenCalledTimes(4);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("skips overlapping polling and lets a new session refresh despite old pending calls", async () => {
+    vi.useFakeTimers();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    let finishOldPosts!: () => void;
+    let finishOldStories!: () => void;
+    const oldPosts = vi.fn(() => new Promise<void>((resolve) => { finishOldPosts = resolve; }));
+    const oldStories = vi.fn(() => new Promise<void>((resolve) => { finishOldStories = resolve; }));
+    const newPosts = vi.fn(async () => undefined);
+    const newStories = vi.fn(async () => undefined);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    function Probe({ next }: { next: boolean }) {
+      useFeedRefreshInterval({
+        enabled: true,
+        sessionId: next ? "session-B" : "session-A",
+        sessionToken: next ? "token-B" : "token-A",
+        refreshPosts: next ? newPosts : oldPosts,
+        refreshStories: next ? newStories : oldStories,
+      });
+      return null;
+    }
+    try {
+      act(() => root.render(<Probe next={false} />));
+      act(() => {
+        vi.advanceTimersByTime(36_000);
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(oldPosts).toHaveBeenCalledTimes(1);
+      expect(oldStories).toHaveBeenCalledTimes(1);
+
+      act(() => root.render(<Probe next />));
+      expect(newPosts).toHaveBeenCalledTimes(1);
+      expect(newStories).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        finishOldPosts();
+        finishOldStories();
+        await Promise.resolve();
+      });
+      act(() => vi.advanceTimersByTime(12_000));
+      expect(newPosts).toHaveBeenCalledTimes(2);
+      expect(newStories).toHaveBeenCalledTimes(2);
+      expect(oldPosts).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("recovers from a rejected refresh on the next polling tick", async () => {
+    vi.useFakeTimers();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    const posts = vi.fn().mockRejectedValueOnce(new Error("network down")).mockResolvedValue(undefined);
+    const stories = vi.fn(async () => undefined);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    function Probe() {
+      useFeedRefreshInterval({
+        enabled: true,
+        sessionId: "session-A",
+        sessionToken: "token-A",
+        refreshPosts: posts,
+        refreshStories: stories,
+      });
+      return null;
+    }
+    try {
+      act(() => root.render(<Probe />));
+      await act(async () => { await Promise.resolve(); });
+      act(() => vi.advanceTimersByTime(12_000));
+      expect(posts).toHaveBeenCalledTimes(2);
+      expect(stories).toHaveBeenCalledTimes(2);
     } finally {
       act(() => root.unmount());
       host.remove();

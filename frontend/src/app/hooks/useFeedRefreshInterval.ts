@@ -20,9 +20,24 @@ export function useFeedRefreshInterval({
 
   useEffect(() => {
     if (!enabled || !sessionId || !sessionToken) return;
+    // A slow refresh must not race with the next timer tick or visibility event.
+    // Each effect owns its own guard so a new session can refresh immediately.
+    let refreshing = false;
     const refresh = () => {
-      void postsRef.current();
-      void storiesRef.current();
+      if (refreshing) return;
+      refreshing = true;
+      const call = (callback: () => Promise<unknown>) => {
+        try {
+          return Promise.resolve(callback());
+        } catch {
+          // The request owns its error UI; keep the polling cycle recoverable.
+          return Promise.resolve();
+        }
+      };
+      void Promise.allSettled([
+        call(postsRef.current),
+        call(storiesRef.current),
+      ]).then(() => { refreshing = false; });
     };
     refresh();
     const refreshWhenVisible = () => {
