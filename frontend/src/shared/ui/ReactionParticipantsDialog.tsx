@@ -87,9 +87,12 @@ export default function ReactionParticipantsDialog({
 
   useEffect(() => {
     const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     closeRef.current?.focus()
     return () => {
       pending.current?.abort()
+      document.body.style.overflow = previousOverflow
       if (previousFocus instanceof HTMLElement) previousFocus.focus()
     }
   }, [])
@@ -154,7 +157,7 @@ export default function ReactionParticipantsDialog({
             ))}
           </div>
         )}
-        <div className="reaction-users-list" aria-live="polite">
+        <div className="reaction-users-list" aria-live="polite" aria-busy={loading}>
           {users.map((user, index) => (
             <div className="reaction-users-person" key={`${user.userId}-${index}`}>
               <UserAvatar username={user.username} name={userLabel(user.displayName, user.username)} className="reaction-users-avatar" />
