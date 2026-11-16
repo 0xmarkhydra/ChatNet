@@ -68,7 +68,8 @@ function attachHandlers() {
     getScope, getWindow: () => mainWindow, trusted: isTrustedFrame, trustedURL })
   if (process.platform === 'win32') app.setAppUserModelId('asia.soco.desktop')
   nativeNotifications = createNativeNotifications({ Notification, getScope, getWindow: () => mainWindow,
-    showWindow: showMainWindow, setBadge: (count) => windowLifecycle?.setUnread(count) })
+    showWindow: showMainWindow, setBadge: (count) => windowLifecycle?.setUnread(count),
+    playSound: () => shell.beep() })
   registerNotificationIPC(ipcMain, nativeNotifications, isTrustedFrame)
   ipcMain.handle('soco:platform-info', (event) => {
     if (!isTrustedFrame(event)) throw new Error('Forbidden IPC origin')
