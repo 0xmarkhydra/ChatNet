@@ -1,8 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react'
-import { ChevronDown, Heart, MessageCircle } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, Heart, MessageCircle, X } from 'lucide-react'
 import FeedLikeButton from './FeedLikeButton'
 import type { Post } from '../types'
 import { FeedText } from './FeedDiscussion'
+import { CommentComposerTarget } from './commentComposerTarget'
 import FeedPostActions, { FeedShareAction } from './FeedPostActions'
 import PostExtrasView from './PostExtrasView'
 import { parsePostExtras } from '../utils/postExtras'
@@ -11,11 +12,13 @@ import MediaAttachmentsView from '../../../shared/ui/MediaAttachmentsView'
 import { userLabel } from '../../../shared/utils/userLabel'
 import { API } from '../../../shared/lib/config'
 import type { ToastKind } from '../../../shared/utils/toast'
+import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
 
 type SortOrder = 'newest' | 'oldest'
 
 type Props = {
   post: Post
+  onClose: () => void
   username: string
   ownDisplayName?: string
   token: string
@@ -23,7 +26,7 @@ type Props = {
   likeBusy: boolean
   request: (path: string, init?: RequestInit) => Promise<Response>
   onLike: (post: Post, emoji?: string) => Promise<void>
-  onReactionUsers: (post: Post) => void
+  onReactionUsers: (post: Post, portalContainer?: HTMLElement) => void
   onUpdated: (post: Post) => void
   onDeleted: (id: number) => void
   onFeedback: (message: string, kind?: ToastKind) => void
@@ -46,37 +49,62 @@ function relativeDate(value: string): string {
 }
 
 export default function PostCommentsPage({
-  post, username, ownDisplayName, token, targetLanguage, likeBusy,
+  post, onClose, username, ownDisplayName, token, targetLanguage, likeBusy,
   request, onLike, onReactionUsers, onUpdated, onDeleted, onFeedback, onAuthorOpen, onEditPost, taggedNames,
   sortOrder, onSortChange, children,
 }: Props) {
-  const page = useRef<HTMLElement>(null)
-  useEffect(() => { page.current?.focus() }, [post.id])
+  const dialog = useRef<HTMLDialogElement>(null)
+  const scrollBody = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null)
+  const [composerTarget, setComposerTarget] = useState<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const element = dialog.current
+    if (!element) return
+    const previous = document.activeElement
+    element.showModal()
+    return () => {
+      element.close()
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true })
+    }
+  }, [])
   const authorName = userLabel(post.author === username ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
   const commentCount = post.comments?.length || 0
   const shares = (post as Post & { shares?: number }).shares
-  const sharesLabel = typeof shares === 'number' && Number.isFinite(shares) ? ` • ${shares.toLocaleString('vi-VN')} chia sẻ` : ' • Chia sẻ'
+  const sharesLabel = typeof shares === 'number' && Number.isFinite(shares) ? `${shares.toLocaleString('vi-VN')} chia sẻ` : 'Chia sẻ'
   const visibility = post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'
   const extras = parsePostExtras(post.content)
 
   return (
-    <section ref={page} tabIndex={-1} className="post-comments-page" aria-label="Bình luận bài viết">
-      <h1 className="post-comments-visually-hidden">Bình luận bài viết</h1>
-      <div className="post-comments-shell">
-        <div className="post-comments-grid">
+    <dialog ref={dialog} className="post-detail-backdrop post-comments-page" aria-labelledby={titleId}
+      onCancel={(event) => {
+        if (event.target !== event.currentTarget) return
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}>
+      <header className="post-comments-modal-heading">
+        <h2 id={titleId}>Bài viết của {authorName}</h2>
+        <button type="button" aria-label="Đóng chi tiết bài viết" onClick={onClose}><X size={22} aria-hidden="true" /></button>
+      </header>
+      <div ref={scrollBody} className="post-comments-scroll">
+        <ModalPortalContext.Provider value={portalContainer}>
+
           <article className="post-comments-original" aria-label="Nội dung bài viết">
             <header className="post-comments-author">
               <UserAvatar username={post.author} name={authorName} className="post-comments-author-avatar" />
               <div className="post-comments-author-copy">
                 <button type="button" className="post-comments-author-name" onClick={() => onAuthorOpen(post.author)}>{authorName}</button>
-                <span>{relativeDate(post.createdAt)} · {visibility}</span>
+                <div className="post-comments-meta"><span>{relativeDate(post.createdAt)}</span><span>{visibility}</span></div>
               </div>
               <FeedPostActions onEdit={onEditPost} post={post} mine={post.author === username} request={request}
                 onUpdated={onUpdated} onDeleted={onDeleted} onFeedback={onFeedback} />
             </header>
             <PostExtrasView extras={extras} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
             {extras.caption && (
-              <div className="post-comments-content">
+              <div className={post.background ? `post-comments-content feed-text-background bg-${post.background}` : "post-comments-content"}>
                 <FeedText api={API} token={token} target={targetLanguage} text={extras.caption} />
               </div>
             )}
@@ -86,16 +114,16 @@ export default function PostCommentsPage({
             <div className="post-comments-post-footer">
               <div className="post-comments-stats">
                 <button type="button" className="feed-post-likes feed-reaction-users-trigger"
-                  disabled={post.likes === 0} onClick={() => onReactionUsers(post)}
+                  disabled={post.likes === 0} onClick={() => onReactionUsers(post, portalContainer ?? undefined)}
                   aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`}>
-                  <Heart size={20} aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích
+                  <Heart size={20} fill="currentColor" aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích
                 </button>
-                <span>{commentCount.toLocaleString('vi-VN')} bình luận{sharesLabel}</span>
+                <div className="post-comments-totals"><span>{commentCount.toLocaleString('vi-VN')} bình luận</span><span>{sharesLabel}</span></div>
               </div>
               <div className="post-comments-post-actions post-toolbar post-toolbar-compact">
                 <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void onLike(post, emoji)} />
                 <button type="button" aria-label="Bình luận" title="Bình luận"
-                  onClick={() => document.querySelector<HTMLTextAreaElement>('.post-comments-thread .feed-comment-compose textarea')?.focus()}>
+                  onClick={() => composerTarget?.querySelector<HTMLTextAreaElement>('textarea')?.focus()}>
                   <MessageCircle size={21} aria-hidden="true" /><span>Bình luận</span>
                 </button>
                 <FeedShareAction postId={post.id} onFeedback={onFeedback} />
@@ -107,7 +135,6 @@ export default function PostCommentsPage({
             <header className="post-comments-thread-heading">
               <h2>Bình luận ({commentCount.toLocaleString('vi-VN')})</h2>
               <label className="post-comments-sort">
-                <span className="post-comments-visually-hidden">Sắp xếp bình luận</span>
                 <select aria-label="Sắp xếp bình luận" value={sortOrder} onChange={event => onSortChange(event.target.value as SortOrder)}>
                   <option value="newest">Mới nhất</option>
                   <option value="oldest">Cũ nhất</option>
@@ -116,10 +143,14 @@ export default function PostCommentsPage({
               </label>
             </header>
             {commentCount === 0 && <p className="post-comments-empty">Chưa có bình luận. Hãy bắt đầu cuộc trò chuyện.</p>}
-            {children}
+            {children && composerTarget && portalContainer && (
+              <CommentComposerTarget.Provider value={composerTarget}>{children}</CommentComposerTarget.Provider>
+            )}
           </section>
-        </div>
+        </ModalPortalContext.Provider>
       </div>
-    </section>
+      <div ref={setComposerTarget} className="post-comments-composer" />
+      <div ref={setPortalContainer} />
+    </dialog>
   )
 }

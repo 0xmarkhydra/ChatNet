@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ModalPortalContext } from './modalPortalContext'
 import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react'
 import type { MediaAttachment } from '../utils/media'
 import './media-viewer.css'
@@ -25,6 +26,7 @@ export default function MediaViewer({
   onChange: (index: number) => void
   onClose: () => void
 }) {
+  const portalContainer = useContext(ModalPortalContext)
   const item = items[activeIndex]
   const hasActiveItem = Boolean(item)
   const closeButton = useRef<HTMLButtonElement>(null)
@@ -124,6 +126,6 @@ export default function MediaViewer({
         </div>
       </div>
     </div>,
-    document.body,
+    portalContainer ?? document.body,
   )
 }

@@ -11,7 +11,6 @@ export type HeaderTitleProps = {
   activeConversationName?: string;
   contactsDirectory: boolean;
   contactsOverview?: boolean;
-  feedPostOpenOnDesktop: boolean;
   profileSettings: boolean;
   profileDesktop: boolean;
   profileEditing: boolean;
@@ -40,7 +39,7 @@ export default function HeaderTitle(p: HeaderTitleProps) {
     notifications: "Thông báo",
     discover: "Khám phá",
     market: "Marketplace",
-    feed: p.feedPostOpenOnDesktop ? "Bình luận" : "Bảng tin",
+    feed: "Bảng tin",
     profile: p.profileSettings && p.profileDesktop ? "Cài đặt" : p.profileEditing ? "Chỉnh sửa hồ sơ" : "Hồ sơ cá nhân",
   };
   const subtitle: Record<Tab, string> = {
@@ -51,7 +50,7 @@ export default function HeaderTitle(p: HeaderTitleProps) {
     notifications: "Cập nhật những hoạt động quan trọng",
     discover: "Tìm người, nhóm và những nội dung thú vị",
     market: "Mua sắm, đăng bán và quản lý đơn hàng",
-    feed: p.feedPostOpenOnDesktop ? "Tương tác với mọi người trong cộng đồng" : "Khoảnh khắc và cộng đồng dành cho bạn",
+    feed: "Khoảnh khắc và cộng đồng dành cho bạn",
     profile: p.profileSettings
       ? "Cài đặt tài khoản và quyền riêng tư"
       : p.profileEditing ? "Thông tin cá nhân và quyền hiển thị" : "Trang cá nhân, bài viết và thông tin của bạn",
