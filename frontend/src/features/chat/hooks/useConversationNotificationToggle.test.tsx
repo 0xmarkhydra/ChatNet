@@ -82,3 +82,23 @@ it('keeps existing conversation state unchanged on failed responses', async () =
   expect(view.state.notificationBusyId).toBeNull()
   expect(view.notify).toHaveBeenCalledWith('Không có quyền', 'error')
 })
+
+it('does not optimistically mute after an ambiguous successful response and allows a later action', async () => {
+  const apiFetch = vi.fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as Response)
+    .mockResolvedValueOnce({
+      ok: true, json: async () => ({ messageNotifications: false, mentionNotifications: false }),
+    } as Response)
+  const view = mount(apiFetch)
+  await view.render()
+  await act(async () => view.state.toggleConversationNotifications(conversation))
+  expect(view.conversations[0].muted).toBe(false)
+  expect(view.state.notificationBusyId).toBeNull()
+  expect(view.notify).toHaveBeenCalledWith(
+    'Không cập nhật được thông báo. Backend cần hỗ trợ thiết lập theo hội thoại.',
+    'error',
+  )
+  await act(async () => view.state.toggleConversationNotifications(conversation))
+  expect(apiFetch).toHaveBeenCalledTimes(2)
+  expect(view.conversations[0].muted).toBe(true)
+})

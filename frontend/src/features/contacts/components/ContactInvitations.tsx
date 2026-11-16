@@ -51,7 +51,7 @@ export default function ContactInvitations({ friendRequests, friendBusyIds, actO
               id={tabId(id)} aria-controls={panelId} tabIndex={invitationTab === id ? 0 : -1}
               aria-selected={invitationTab === id} onKeyDown={event => onTabKeyDown(event, id)} onClick={() => setInvitationTab(id)}>{label}</button>)}
         </div>
-        <small aria-live="polite">{incoming.length + outgoing.length} đang chờ xử lý</small>
+        <small aria-live="polite">{incoming.length} lời mời đến · {outgoing.length} đã gửi</small>
       </div>
       <div className="fd-invitation-layout">
         <section className="fd-card fd-invitation-list" id={panelId} role="tabpanel" aria-labelledby={tabId(invitationTab)} tabIndex={0}>
@@ -60,7 +60,7 @@ export default function ContactInvitations({ friendRequests, friendBusyIds, actO
             {incoming.length === 0 && <p className="fd-empty">Chưa có lời mời kết bạn đến.</p>}
             {incoming.map(friend => <div className="fd-request-row" key={friend.id} aria-busy={friendBusyIds.has(friend.id)} >
               {avatar(friend)}<div className="fd-request-copy"><strong>{personName(friend)}</strong>
-                <span>@{friend.username} · Đang chờ phản hồi</span></div>
+                <span>@{friend.username} · {friendBusyIds.has(friend.id) ? 'Đang xử lý...' : 'Đang chờ phản hồi'}</span></div>
               <button type="button" className="fd-primary" disabled={friendBusyIds.has(friend.id)} aria-label={'Chấp nhận lời mời của ' + personName(friend)} onClick={() => void actOnFriend(friend)}><Check size={17}/>Chấp nhận</button>
               <button type="button" className="fd-secondary" disabled={friendBusyIds.has(friend.id)} aria-label={'Từ chối lời mời của ' + personName(friend)} onClick={() => void declineFriendRequest(friend)}><X size={17}/>Từ chối</button>
             </div>)}
@@ -71,7 +71,7 @@ export default function ContactInvitations({ friendRequests, friendBusyIds, actO
             <div className="fd-invitation-heading"><h2>Đã gửi</h2><p>Những lời mời đang chờ người nhận phản hồi</p></div>
             {outgoing.length === 0 && <p className="fd-empty">Bạn chưa có lời mời đang chờ.</p>}
             {outgoing.map(friend => <div className="fd-request-row" key={friend.id} aria-busy={friendBusyIds.has(friend.id)} >
-              {avatar(friend)}<div className="fd-request-copy"><strong>{personName(friend)}</strong><span>@{friend.username} · Đang chờ</span></div>
+              {avatar(friend)}<div className="fd-request-copy"><strong>{personName(friend)}</strong><span>@{friend.username} · {friendBusyIds.has(friend.id) ? 'Đang xử lý...' : 'Đang chờ'}</span></div>
               <button type="button" className="fd-secondary" disabled={friendBusyIds.has(friend.id)}
                 aria-label={'Hủy lời mời đã gửi cho ' + personName(friend)} onClick={() => void actOnFriend(friend)}><X size={17} aria-hidden="true"/>Hủy lời mời</button>
             </div>)}

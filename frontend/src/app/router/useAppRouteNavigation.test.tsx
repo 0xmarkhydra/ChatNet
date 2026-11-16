@@ -31,6 +31,7 @@ function mount(path: string, state?: unknown) {
         <button onClick={() => navigation.setTab(current => current === "feed" ? "chat" : "feed")}>Toggle</button>
         <button onClick={() => navigation.setContactsScreen("invitations")}>Invitations</button>
         <button onClick={() => navigation.setContactsScreen("directory")}>Directory</button>
+        <button onClick={() => navigation.setContactsScreen("overview")}>Overview</button>
         <button onClick={() => navigation.setDesktopProfileSettings(true)}>Settings</button>
         <button onClick={() => navigation.setDesktopProfileSettings(false)}>Profile</button>
         <button onClick={() => navigation.openVisitorProfile("alice")}>Open Alice</button>
@@ -80,11 +81,16 @@ describe("URL-owned app navigation", () => {
 
   it("maps contacts pages and preserves embedded Calls directory", () => {
     const contacts = mount("/contacts");
+    expect(contacts.read("contact")).toBe("overview");
     contacts.click("Invitations");
     expect(contacts.read("path")).toBe("/contacts/requests");
     expect(contacts.read("contact")).toBe("invitations");
     contacts.click("Directory");
+    expect(contacts.read("path")).toBe("/contacts/directory");
+    expect(contacts.read("contact")).toBe("directory");
+    contacts.click("Overview");
     expect(contacts.read("path")).toBe("/contacts");
+    expect(contacts.read("contact")).toBe("overview");
     const calls = mount("/calls/translation");
     calls.click("Directory");
     expect(calls.read("path")).toBe("/calls/translation");

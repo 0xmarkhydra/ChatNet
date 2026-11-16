@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { Tab } from "../../shared/types/navigation";
 import { ROUTE, TAB_PATH, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./routes";
 
-type ContactsScreen = "directory" | "invitations";
+type ContactsScreen = "overview" | "directory" | "invitations";
 
 /** Resolve return locations without leaving the app or accepting malformed paths. */
 export function visitorReturnPath(value: unknown): string {
@@ -23,13 +23,15 @@ export function useAppRouteNavigation() {
   }, [tab, location.pathname, navigate]);
 
   const contactsScreen: ContactsScreen =
-    location.pathname === "/contacts/requests" ? "invitations" : "directory";
+    location.pathname === "/contacts/requests" ? "invitations"
+      : location.pathname === "/contacts/directory" ? "directory" : "overview";
   const setContactsScreen: Dispatch<SetStateAction<ContactsScreen>> = useCallback((next) => {
     const screen = typeof next === "function" ? next(contactsScreen) : next;
     // The Calls workspace embeds the directory and must remain mounted.
     if ((location.pathname === ROUTE.calls || location.pathname.startsWith(`${ROUTE.calls}/`))
       && screen === "directory") return;
-    const path = screen === "invitations" ? "/contacts/requests" : TAB_PATH.contacts;
+    const path = screen === "invitations" ? "/contacts/requests"
+      : screen === "directory" ? "/contacts/directory" : TAB_PATH.contacts;
     if (location.pathname !== path) navigate(path);
   }, [contactsScreen, location.pathname, navigate]);
 

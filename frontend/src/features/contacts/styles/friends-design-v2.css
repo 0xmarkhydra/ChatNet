@@ -109,7 +109,8 @@
 .fd-option-popover button:hover{background:#eef2ff}
 .fd-profile-placeholder{margin:auto}
 .fd-invitation-tabs{flex:0 0 auto;min-height:68px;background:#fff;border-radius:15px;display:flex;gap:13px;align-items:center;padding:10px 17px}
-.fd-invitation-tabs .fd-back{flex:0 0 30px;height:30px;border:0;background:#f3f6ff;border-radius:9px;color:#6080bf;display:grid;place-items:center}
+.fd-invitation-tabs .fd-back{flex:0 0 44px;width:44px;height:44px;border:0;background:#f3f6ff;border-radius:11px;color:#6080bf;display:grid;place-items:center}
+.fd-invitation-tabs .fd-back:hover{background:#e6edff;color:#2459c9}
 .fd-invitation-tabs>div{display:flex;gap:6px;align-items:center;flex:1}
 .fd-invitation-tabs [role=tab]{min-height:44px;border:0;background:transparent;color:#7385a7;border-radius:11px;padding:10px 19px;font-size:12px;white-space:nowrap}
 .fd-invitation-tabs [role=tab].active{background:transparent;color:#2563eb;font-weight:800}
@@ -145,7 +146,9 @@
 .fd-qr-panel>small{text-align:center;color:#8b9ab4;font-size:11px}
 .fd-qr-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:25px}
 .fd-qr-actions button{padding:8px 7px;min-width:0;font-size:12px}
-.fd-copy-status{margin-top:9px;font-size:11px;color:#13996d}
+.fd-copy-status{margin-top:9px;font-size:12px;line-height:1.45;color:#147d5a;overflow-wrap:anywhere}
+.fd-copy-status.is-error{color:#ac3434}
+.fd-request-row[aria-busy="true"] .fd-request-copy span{color:#345db0}
 .fd-security-tip{display:flex;align-items:flex-start;gap:13px;margin-top:auto;min-height:81px;padding:20px 14px;border-radius:12px;background:#edf2ff;color:#245dec}
 .fd-security-tip span{display:grid;gap:8px}
 .fd-security-tip strong{font-size:12px;color:#1d2d4d}

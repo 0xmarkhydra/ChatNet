@@ -10,6 +10,7 @@ export type HeaderTitleProps = {
   groupCreateStep: number;
   activeConversationName?: string;
   contactsDirectory: boolean;
+  contactsOverview?: boolean;
   feedPostOpenOnDesktop: boolean;
   profileSettings: boolean;
   profileDesktop: boolean;
@@ -35,7 +36,7 @@ function groupSubtitle(p: HeaderTitleProps) {
 export default function HeaderTitle(p: HeaderTitleProps) {
   const title: Record<Tab, string> = {
     chat: "Tin nhắn",
-    contacts: p.contactsDirectory ? "Bạn bè" : "Lời mời kết bạn",
+    contacts: p.contactsOverview ? "Bạn bè" : p.contactsDirectory ? "Danh bạ" : "Lời mời kết bạn",
     notifications: "Thông báo",
     discover: "Khám phá",
     market: "Marketplace",
@@ -46,7 +47,7 @@ export default function HeaderTitle(p: HeaderTitleProps) {
     chat: p.translationSettingsOpen
       ? "Chọn ngôn ngữ và quyền dịch của cuộc trò chuyện"
       : p.desktopSection === "groups" ? groupSubtitle(p) : "Trò chuyện gần đây và kết nối realtime",
-    contacts: p.contactsDirectory ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
+    contacts: p.contactsOverview ? "Lời mời, danh bạ và kết nối an toàn" : p.contactsDirectory ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
     notifications: "Cập nhật những hoạt động quan trọng",
     discover: "Tìm người, nhóm và những nội dung thú vị",
     market: "Mua sắm, đăng bán và quản lý đơn hàng",

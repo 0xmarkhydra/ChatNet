@@ -83,35 +83,37 @@ try {
     if (path === '/api/conversations') return reply(conversations)
     if (path === '/api/conversations/1/messages') return reply([message])
     if (path === '/api/conversations/2/messages') return reply([])
+    if (path.endsWith('/e2ee/status')) return reply({ mode: 'legacy', epoch: 0, autoEnabled: false })
     if (path === '/api/preferences') return reply({ autoTranslate: false, targetLanguage: 'vi' })
     if (path === '/api/i18n/bundle') return reply({ locale: 'vi', version: 'mock', messages: {}, cache: 'hit' })
     if (path === '/api/conversations/unread') return reply({ unreadCount: 0 })
     return reply([])
   })
 
-  await page.goto(origin)
-  await page.locator('.conversation-item').first().waitFor()
+  await page.goto(`${origin}/chat`)
+  await page.locator('.desktop-conversation-rail-entry').first().waitFor()
 
-  // ---- the sliding filter pill attaches to its host and active tab (callback refs)
-  await page.waitForFunction(() => {
-    const pill = document.querySelector('.sliding-pill.social-chat-active-pill')
-    return pill instanceof HTMLElement && pill.classList.contains('is-ready') && parseFloat(pill.style.width) > 0
-  })
+  // ---- the current desktop rail must expose its conversation entries.
+  await page.locator('.desktop-conversation-rail[data-expanded="true"]').waitFor()
+  await page.locator('.desktop-conversation-rail-entry').first().waitFor()
 
   // ---- open a direct conversation by username
-  await page.locator('button[title="Tạo cuộc trò chuyện"]').click()
+  await page.locator('.desktop-conversation-rail-plus').click()
   await page.getByPlaceholder('Username người muốn chat').fill('  NewFriend ')
   await page.getByRole('button', { name: 'Tạo cuộc trò chuyện', exact: true }).click()
   await until(() => writes.length === 1, 'the create-direct request')
   assert.deepEqual(writes[0], { method: 'POST', path: '/api/conversations/direct', body: { username: 'newfriend' } })
-  await page.waitForFunction(() => document.querySelector('.conversation-item.active')?.innerText.includes('Bạn mới') ||
+  await page.waitForFunction(() => document.querySelector('.desktop-conversation-rail-entry.selected')?.innerText.includes('Bạn mới') ||
     document.body.innerText.includes('Bạn mới'))
   assert.equal(await page.getByPlaceholder('Username người muốn chat').count(), 0, 'the new-chat panel closes after creating')
 
   // ---- clear history of conversation 1
-  await page.locator('.conversation-item', { hasText: 'Bạn bè' }).first().click()
+  await page.locator('.desktop-conversation-rail-entry', { hasText: 'Bạn bè' }).first().click()
   await page.locator('[data-message-id="7"]').waitFor()
-  await page.locator('button[aria-controls="conversation-details-panel"]').first().click()
+  await page.waitForURL(/\/chat\/1$/)
+  const detailsButton = page.getByRole('button', { name: 'Thông tin hội thoại' })
+  await detailsButton.waitFor({ state: 'visible' })
+  await detailsButton.click()
   await page.getByText('Xóa lịch sử trò chuyện').click()
   await until(() => writes.some(w => w.method === 'DELETE'), 'the clear-history request')
   assert.deepEqual(writes.at(-1), { method: 'DELETE', path: '/api/conversations/1/history' })
