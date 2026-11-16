@@ -45,11 +45,11 @@ export default function HeaderTitle(p: HeaderTitleProps) {
   const subtitle: Record<Tab, string> = {
     chat: p.translationSettingsOpen
       ? "Chọn ngôn ngữ và quyền dịch của cuộc trò chuyện"
-      : p.desktopSection === "groups" ? groupSubtitle(p) : "Trò chuyện gần đây và kết nối bạn bè",
+      : p.desktopSection === "groups" ? groupSubtitle(p) : "Trò chuyện gần đây và kết nối realtime",
     contacts: p.contactsDirectory ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
     notifications: "Cập nhật những hoạt động quan trọng",
-    discover: "Khám phá và kết nối cộng đồng",
-    market: "Khám phá sản phẩm và cửa hàng",
+    discover: "Tìm người, nhóm và những nội dung thú vị",
+    market: "Mua sắm, đăng bán và quản lý đơn hàng",
     feed: p.feedPostOpenOnDesktop ? "Tương tác với mọi người trong cộng đồng" : "Khoảnh khắc và cộng đồng dành cho bạn",
     profile: p.profileSettings
       ? "Cài đặt tài khoản và quyền riêng tư"

@@ -51,18 +51,23 @@ export default function MediaAttachmentsView({
                 />
               </button>
             ) : item.kind === 'video' && item.url ? (
-              <video src={item.url} controls playsInline preload="metadata" />
+              <video src={item.url} controls playsInline preload="metadata" aria-label={`Video: ${item.name}`} />
             ) : item.kind === 'audio' && item.url ? (
               <div className="media-file-card">
                 <span>🎙️</span>
                 <div><strong>{item.name}</strong><small>{formatBytes(item.sizeBytes)}</small></div>
-                <audio src={item.url} controls preload="none" />
+                <audio src={item.url} controls preload="none" aria-label={`Âm thanh: ${item.name}`} />
               </div>
-            ) : (
-              <a className="media-file-card" href={item.url || '#'} target="_blank" rel="noreferrer">
-                <span>📎</span>
+            ) : item.url ? (
+              <a className="media-file-card" href={item.url} target="_blank" rel="noopener noreferrer">
+                <span aria-hidden="true">📎</span>
                 <div><strong>{item.name}</strong><small>{formatBytes(item.sizeBytes)}</small></div>
               </a>
+            ) : (
+              <div className="media-file-card">
+                <span aria-hidden="true">📎</span>
+                <div><strong>{item.name}</strong><small>{formatBytes(item.sizeBytes)}</small></div>
+              </div>
             )}
             {pending && onRemove && (
               <button type="button" className="media-remove" onClick={() => onRemove(index)} aria-label={`Bỏ ${item.name}`}>×</button>
