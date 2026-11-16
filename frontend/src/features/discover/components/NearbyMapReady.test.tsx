@@ -11,10 +11,14 @@ const harness = vi.hoisted(() => ({
   zoomOut: vi.fn(),
   easeTo: vi.fn(),
   remove: vi.fn(),
+  mapCreated: vi.fn(),
+  throwOnCreate: false,
+  resizeDisconnected: vi.fn(),
 }))
 vi.mock('maplibre-gl', () => ({
   setWorkerUrl: vi.fn(),
   Map: class {
+    constructor() { harness.mapCreated(); if (harness.throwOnCreate) throw new Error('WebGL unavailable') }
     on(name: string, callback: () => void) { harness.events[name] = callback }
     resize() {}
     remove() { harness.remove() }
@@ -43,11 +47,12 @@ beforeEach(() => {
   actGlobal.IS_REACT_ACT_ENVIRONMENT = true
   harness.events = {}
   harness.markerElements = []
+  harness.throwOnCreate = false
   vi.clearAllMocks()
   globalThis.ResizeObserver = class {
     observe() {}
     unobserve() {}
-    disconnect() {}
+    disconnect() { harness.resizeDisconnected() }
   }
   host = document.createElement('div')
   document.body.append(host)
@@ -112,5 +117,68 @@ describe('NearbyMap interactive controls', () => {
     await act(async () => harness.events.error?.())
     expect(controls.every(button => button.disabled)).toBe(true)
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('Không tải được bản đồ')
+  })
+
+  it('retries after a map error, restores controls, and ignores callbacks from the disposed map', async () => {
+    await act(async () => root.render(
+      <NearbyMap location={{ latitude: 21, longitude: 105 }}
+        places={[]} selected={null} onSelect={() => {}} onShowList={() => {}} />,
+    ))
+    const oldLoad = harness.events.load
+    const oldError = harness.events.error
+    await act(async () => harness.events.error?.())
+    expect(host.querySelector('[role="alert"]')).not.toBeNull()
+    const retry = Array.from(host.querySelectorAll<HTMLButtonElement>('.nearby-map-error button'))
+      .find(button => button.textContent === 'Thử lại')
+    await act(async () => retry?.click())
+    expect(harness.mapCreated).toHaveBeenCalledTimes(2)
+    expect(harness.remove).toHaveBeenCalledTimes(1)
+    expect(harness.resizeDisconnected).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    const controls = Array.from(host.querySelectorAll<HTMLButtonElement>('.nearby-map-controls button'))
+    expect(controls.every(button => button.disabled)).toBe(true)
+    await act(async () => { oldError?.(); oldLoad?.() })
+    expect(controls.every(button => button.disabled)).toBe(true)
+    await act(async () => harness.events.load?.())
+    expect(controls.every(button => !button.disabled)).toBe(true)
+  })
+
+  it('offers list fallback and recovery when MapLibre construction throws', async () => {
+    harness.throwOnCreate = true
+    const onShowList = vi.fn()
+    await act(async () => root.render(
+      <NearbyMap location={{ latitude: 21, longitude: 105 }} places={[]}
+        selected={null} onSelect={() => {}} onShowList={onShowList} />,
+    ))
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
+    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('.nearby-map-error button'))
+    expect(buttons.map(button => button.textContent)).toEqual(['Xem danh sách', 'Thử lại'])
+    await act(async () => buttons[0].click())
+    expect(onShowList).toHaveBeenCalledOnce()
+    harness.throwOnCreate = false
+    await act(async () => buttons[1].click())
+    expect(harness.mapCreated).toHaveBeenCalledTimes(2)
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    await act(async () => harness.events.load?.())
+    expect(Array.from(host.querySelectorAll<HTMLButtonElement>('.nearby-map-controls button'))
+      .every(button => !button.disabled)).toBe(true)
+  })
+
+  it('recreates the map on coordinate changes and ignores old map events', async () => {
+    const location = { latitude: 21, longitude: 105 }
+    await act(async () => root.render(
+      <NearbyMap location={location} places={[]} selected={null} onSelect={() => {}} onShowList={() => {}} />,
+    ))
+    const previousError = harness.events.error
+    await act(async () => root.render(
+      <NearbyMap location={{ ...location, latitude: 22 }} places={[]}
+        selected={null} onSelect={() => {}} onShowList={() => {}} />,
+    ))
+    expect(harness.mapCreated).toHaveBeenCalledTimes(2)
+    expect(harness.remove).toHaveBeenCalledTimes(1)
+    await act(async () => { previousError?.(); harness.events.load?.() })
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    expect(Array.from(host.querySelectorAll<HTMLButtonElement>('.nearby-map-controls button'))
+      .every(button => !button.disabled)).toBe(true)
   })
 })
