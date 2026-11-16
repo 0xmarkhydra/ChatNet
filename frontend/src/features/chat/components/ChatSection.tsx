@@ -814,27 +814,18 @@ export default function ChatSection({
                     />
                   )}
                   {activeConversation.type === 'direct' && mlsPilotMode !== 'unknown' && (
-                    <div className="flex shrink-0 justify-center px-3 py-2 sm:px-4">
-                      <div
-                        role="status"
-                        className="flex max-w-full items-start gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--soco-orange)_45%,var(--soco-line))] bg-[color-mix(in_srgb,var(--soco-orange)_9%,var(--soco-surface))] px-3 py-2 text-foreground"
-                      >
-                        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[color-mix(in_srgb,var(--soco-orange)_23%,var(--soco-surface))]">
-                          <ShieldAlert size={16} aria-hidden="true" />
-                        </span>
-                        <span className="min-w-0 wrap-break-word">
-                          <strong className="block text-[0.8125rem] leading-5 font-semibold">
-                            {mlsPilotMode === 'legacy'
-                              ? 'Hội thoại chưa mã hóa đầu cuối'
-                              : 'Tin nhắn cũ chưa mã hóa đầu cuối'}
-                          </strong>
-                          <span className="block text-xs leading-4">
-                            {mlsPilotMode === 'legacy'
-                              ? 'Tin nhắn mới vẫn có thể được lưu trên máy chủ.'
-                              : 'Tin nhắn mới chỉ được gửi khi phiên MLS sẵn sàng.'}
-                          </span>
-                        </span>
-                      </div>
+                    <div role="status" className="flex min-w-0 shrink-0 justify-center gap-1.5 px-3 py-1 text-xs leading-4 text-foreground">
+                      <ShieldAlert size={14} className="mt-px shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 wrap-break-word">
+                        <strong className="font-semibold">
+                          {mlsPilotMode === 'legacy'
+                            ? 'Hội thoại chưa mã hóa đầu cuối'
+                            : 'Tin nhắn cũ chưa mã hóa đầu cuối'}
+                        </strong>{' · '}
+                        {mlsPilotMode === 'legacy'
+                          ? 'Tin nhắn mới vẫn có thể được lưu trên máy chủ.'
+                          : 'Tin nhắn mới chỉ được gửi khi phiên MLS sẵn sàng.'}
+                      </span>
                     </div>
                   )}
                   <MessageTimeline
