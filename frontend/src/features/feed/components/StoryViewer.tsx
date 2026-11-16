@@ -9,6 +9,7 @@ import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Story } from '../types'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
+import '../styles/story-text.css'
 
 type Props = {
   activeStory: Story
@@ -71,7 +72,9 @@ export default function StoryViewer({
   const authorStories = groups.find((items) => items[0]?.author === activeStory.author) ?? [activeStory]
   const authorIndex = authorStories.findIndex((story) => story.id === activeStory.id)
   const isOwner = activeStory.author === name
-  const isVideo = activeStory.attachment.kind === 'video'
+  const attachment = activeStory.attachment
+  const isVideo = attachment?.kind === 'video'
+  const duration = attachment ? STORY_DURATION : 15_000
 
   useEffect(() => {
     imageElapsedRef.current = 0
@@ -82,18 +85,18 @@ export default function StoryViewer({
     if (isVideo || paused || menuOpen || replySending) return
     const started = performance.now()
     const timer = window.setInterval(() => {
-      const elapsed = Math.min(STORY_DURATION, imageElapsedRef.current + performance.now() - started)
-      setImageProgress((elapsed / STORY_DURATION) * 100)
-      if (elapsed >= STORY_DURATION) {
+      const elapsed = Math.min(duration, imageElapsedRef.current + performance.now() - started)
+      setImageProgress((elapsed / duration) * 100)
+      if (elapsed >= duration) {
         window.clearInterval(timer)
         setActiveStoryId(nextId)
       }
     }, 50)
     return () => {
       window.clearInterval(timer)
-      imageElapsedRef.current = Math.min(STORY_DURATION, imageElapsedRef.current + performance.now() - started)
+      imageElapsedRef.current = Math.min(duration, imageElapsedRef.current + performance.now() - started)
     }
-  }, [activeStory.id, isVideo, paused, menuOpen, replySending, nextId, setActiveStoryId, setImageProgress])
+  }, [activeStory.id, duration, isVideo, paused, menuOpen, replySending, nextId, setActiveStoryId, setImageProgress])
 
   useEffect(() => {
     if (!isVideo || !videoRef.current) return
@@ -200,8 +203,12 @@ export default function StoryViewer({
 
         <section className="story-screen-stage" aria-label={'Đang xem Story của ' + authorLabel}>
           <div className="story-screen-media">
-            {isVideo ? (
-              <video key={activeStory.id} ref={videoRef} src={activeStory.attachment.url}
+            {!attachment ? (
+              <div className="story-screen-text" data-story-background={activeStory.background ?? 'berry'}>
+                <p tabIndex={0} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>{activeStory.text}</p>
+              </div>
+            ) : isVideo ? (
+              <video key={activeStory.id} ref={videoRef} src={attachment.url}
                 autoPlay muted={muted} playsInline
                 onEnded={() => setActiveStoryId(nextId)}
                 onTimeUpdate={(event) => {
@@ -209,10 +216,10 @@ export default function StoryViewer({
                   setVideoProgress(Number.isFinite(media.duration) && media.duration > 0
                     ? Math.min(100, media.currentTime / media.duration * 100) : 0)
                 }}
-                aria-label={activeStory.attachment.name}
+                aria-label={attachment.name}
               />
             ) : (
-              <img key={activeStory.id} src={activeStory.attachment.url} alt={activeStory.attachment.name} />
+              <img key={activeStory.id} src={attachment.url} alt={attachment.name} />
             )}
           </div>
 

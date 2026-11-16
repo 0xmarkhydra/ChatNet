@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { AppDataContext } from '../../../shared/types/api'
 import type { Story } from '../types'
+import { listStories } from '../api/stories'
 
 export function useFeedStories({ session, sessionRef, apiFetch, setStatus }: AppDataContext) {
   // Reset before paint on session changes, including A → B → A. Old async setters
@@ -14,7 +15,7 @@ export function useFeedStories({ session, sessionRef, apiFetch, setStatus }: App
     const sessionId = session?.sessionId
     if (!sessionId) return
     try {
-      const response = await apiFetch('/api/stories')
+      const response = await listStories(apiFetch)
       if (!response.ok) return
       const data = (await response.json()) as Story[]
       if (sessionRef.current?.sessionId === sessionId && refreshSequence.current === request) {
