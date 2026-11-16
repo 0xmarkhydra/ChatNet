@@ -1,4 +1,4 @@
-import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward } from "lucide-react";
+import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward, ShieldAlert } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { useScopedState } from "../../../shared/hooks/useScopedState";
@@ -813,16 +813,29 @@ export default function ChatSection({
                       }}
                     />
                   )}
-                  {activeConversation.type === 'direct' && (mlsPilotMode === 'e2ee' || mlsPilotMode === 'pending') && (
-                    <p className="mls-pilot-legacy-notice" role="status">
-                      Tin nhắn cũ ở phía trên được gửi trước E2EE và chưa được mã hóa đầu cuối.
-                      Tin nhắn mới chỉ được gửi khi phiên MLS sẵn sàng.
-                    </p>
-                  )}
-                  {activeConversation.type === 'direct' && mlsPilotMode === 'legacy' && (
-                    <p className="mls-pilot-legacy-notice" role="status">
-                      Hội thoại này chưa mã hóa đầu cuối. Tin nhắn mới vẫn có thể được lưu trên máy chủ.
-                    </p>
+                  {activeConversation.type === 'direct' && mlsPilotMode !== 'unknown' && (
+                    <div className="flex shrink-0 justify-center px-3 py-2 sm:px-4">
+                      <div
+                        role="status"
+                        className="flex max-w-full items-start gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--soco-orange)_45%,var(--soco-line))] bg-[color-mix(in_srgb,var(--soco-orange)_9%,var(--soco-surface))] px-3 py-2 text-foreground"
+                      >
+                        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[color-mix(in_srgb,var(--soco-orange)_23%,var(--soco-surface))]">
+                          <ShieldAlert size={16} aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 wrap-break-word">
+                          <strong className="block text-[0.8125rem] leading-5 font-semibold">
+                            {mlsPilotMode === 'legacy'
+                              ? 'Hội thoại chưa mã hóa đầu cuối'
+                              : 'Tin nhắn cũ chưa mã hóa đầu cuối'}
+                          </strong>
+                          <span className="block text-xs leading-4">
+                            {mlsPilotMode === 'legacy'
+                              ? 'Tin nhắn mới vẫn có thể được lưu trên máy chủ.'
+                              : 'Tin nhắn mới chỉ được gửi khi phiên MLS sẵn sàng.'}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
                   )}
                   <MessageTimeline
                     activeChatTranslationSettings={activeChatTranslationSettings}
