@@ -82,7 +82,7 @@ export function tabFromPath(pathname: string, legacyTab?: string | null): Tab {
     (key) => TAB_PATH[key].slice(1) === segment,
   );
   if (tab) return tab;
-  if (pathname === "/" && legacyTab && legacyTab in TAB_PATH) {
+  if (pathname === "/" && legacyTab && Object.hasOwn(TAB_PATH, legacyTab)) {
     return legacyTab as Tab;
   }
   return "chat";

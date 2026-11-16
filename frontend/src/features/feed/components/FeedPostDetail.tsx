@@ -14,7 +14,7 @@ export type FeedPostDetailProps = {
   friendTaggedNames: { [k: string]: string; };
   like: (post: Post, emoji?: string) => Promise<void>;
   likePreviews: Record<number, boolean>;
-  onReactionUsers: (post: Post) => void;
+  onReactionUsers: (post: Post, portalContainer?: HTMLElement) => void;
   name: string;
   openEditPost: (post: Post) => void;
   openVisitor: (username: string) => void;
@@ -55,6 +55,7 @@ export default function FeedPostDetail({
       <PostCommentsPage
             key={activePost.id}
             post={activePost}
+            onClose={closeFeedPostDetails}
             username={name}
             ownDisplayName={profileMedia?.displayName || session.user.displayName || name}
             token={session.token}

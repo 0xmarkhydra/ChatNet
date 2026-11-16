@@ -10,7 +10,7 @@ export type HeaderTitleProps = {
   groupCreateStep: number;
   activeConversationName?: string;
   contactsDirectory: boolean;
-  feedPostOpenOnDesktop: boolean;
+  contactsOverview?: boolean;
   profileSettings: boolean;
   profileDesktop: boolean;
   profileEditing: boolean;
@@ -35,22 +35,22 @@ function groupSubtitle(p: HeaderTitleProps) {
 export default function HeaderTitle(p: HeaderTitleProps) {
   const title: Record<Tab, string> = {
     chat: "Tin nhắn",
-    contacts: p.contactsDirectory ? "Bạn bè" : "Lời mời kết bạn",
+    contacts: p.contactsOverview ? "Bạn bè" : p.contactsDirectory ? "Danh bạ" : "Lời mời kết bạn",
     notifications: "Thông báo",
     discover: "Khám phá",
     market: "Marketplace",
-    feed: p.feedPostOpenOnDesktop ? "Bình luận" : "Bảng tin",
+    feed: "Bảng tin",
     profile: p.profileSettings && p.profileDesktop ? "Cài đặt" : p.profileEditing ? "Chỉnh sửa hồ sơ" : "Hồ sơ cá nhân",
   };
   const subtitle: Record<Tab, string> = {
     chat: p.translationSettingsOpen
       ? "Chọn ngôn ngữ và quyền dịch của cuộc trò chuyện"
       : p.desktopSection === "groups" ? groupSubtitle(p) : "Trò chuyện gần đây và kết nối realtime",
-    contacts: p.contactsDirectory ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
+    contacts: p.contactsOverview ? "Lời mời, danh bạ và kết nối an toàn" : p.contactsDirectory ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
     notifications: "Cập nhật những hoạt động quan trọng",
     discover: "Tìm người, nhóm và những nội dung thú vị",
     market: "Mua sắm, đăng bán và quản lý đơn hàng",
-    feed: p.feedPostOpenOnDesktop ? "Tương tác với mọi người trong cộng đồng" : "Khoảnh khắc và cộng đồng dành cho bạn",
+    feed: "Khoảnh khắc và cộng đồng dành cho bạn",
     profile: p.profileSettings
       ? "Cài đặt tài khoản và quyền riêng tư"
       : p.profileEditing ? "Thông tin cá nhân và quyền hiển thị" : "Trang cá nhân, bài viết và thông tin của bạn",

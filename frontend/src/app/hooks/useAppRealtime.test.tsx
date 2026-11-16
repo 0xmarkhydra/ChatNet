@@ -104,6 +104,9 @@ describe('app SSE subscription lifecycle', () => {
       await act(async () => socket.emit('update', { type: 'friend.updated' }))
       expect(first).toHaveBeenCalledTimes(1)
       expect(latest).toHaveBeenCalledTimes(2)
+      // Switching back to a visible tab must not immediately duplicate the recent friend poll.
+      await act(async () => document.dispatchEvent(new Event('visibilitychange')))
+      expect(latest).toHaveBeenCalledTimes(3) // Conversations refresh, friends stay within their poll window.
 
       // A new session closes A's subscription and rejects events from the old socket.
       const other = user('B')
@@ -124,7 +127,7 @@ describe('app SSE subscription lifecycle', () => {
       expect(expireSession).not.toHaveBeenCalled()
       const newSocket = FakeEventSource.instances[1]
       await act(async () => newSocket.onopen?.())
-      expect(syncNew).toHaveBeenCalledTimes(2)
+      expect(syncNew).toHaveBeenCalledTimes(3) // Visibility resumes membership reconciliation.
       await act(async () => root.unmount())
       expect(newSocket.closed).toBe(true)
       const syncCalls = syncNew.mock.calls.length

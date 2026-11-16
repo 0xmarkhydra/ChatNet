@@ -1,3 +1,4 @@
+import { useId, type ReactNode } from 'react'
 import { Heart } from 'lucide-react'
 import FeedLikeButton from './FeedLikeButton'
 import { userLabel } from '../../../shared/utils/userLabel'
@@ -25,6 +26,8 @@ type Props = {
   translationPreferencesLoaded: boolean;
   targetLanguage: string;
   setActivePostId: (id: number) => void;
+  onToggleComments?: () => void;
+  discussion?: ReactNode;
   likePreviews: Record<number, boolean>;
   like: (post: Post, emoji?: string) => Promise<void>;
   onReactionUsers: (post: Post) => void;
@@ -62,6 +65,8 @@ export default function FeedPostCard({
   translationPreferencesLoaded,
   targetLanguage,
   setActivePostId,
+  onToggleComments,
+  discussion,
   likePreviews,
   like,
   onReactionUsers,
@@ -72,6 +77,8 @@ export default function FeedPostCard({
   const likeBusy = likePreviews[post.id] !== undefined
   const commentsCount = post.comments?.length ?? 0
   const extras = parsePostExtras(post.content)
+  const commentsId = useId()
+  const openPost = () => setActivePostId(post.id)
 
   return (
     <article className="post zalo-post feed-post-card" key={post.id}>
@@ -80,7 +87,9 @@ export default function FeedPostCard({
         <div className="post-author">
           <div>
             <strong>{onAuthorOpen ? <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(post.author)}>{authorLabel}</button> : authorLabel}</strong>
-            <small>{relativeDate(post.createdAt)} · {post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}</small>
+            <small><button type="button" className="feed-post-open-date" aria-label="Mở bài viết" onClick={openPost}>
+              {relativeDate(post.createdAt)}
+            </button> · {post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}</small>
           </div>
           <FeedPostActions
             onEdit={onEditPost}
@@ -94,22 +103,25 @@ export default function FeedPostCard({
         </div>
         <PostExtrasView extras={extras} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
         {extras.caption && (
-          <div className={post.background ? 'feed-text-background bg-' + post.background : 'feed-post-text'}>
+          <div className={post.background ? 'feed-post-clickable feed-text-background bg-' + post.background : 'feed-post-clickable feed-post-text'}
+            onClick={(event) => {
+              if (event.target instanceof Element && !event.target.closest('button,a,input,textarea') && !window.getSelection()?.toString()) openPost()
+            }}>
             <FeedText api={API} token={token}
               target={translationPreferencesLoaded ? targetLanguage : ''}
               text={extras.caption} maxLines={5} onExpand={() => setActivePostId(post.id)} />
           </div>
         )}
         {Boolean(post.attachments?.length) && (
-          <div className="feed-media-preview" onClick={() => setActivePostId(post.id)}>
-            <MediaAttachmentsView items={post.attachments} onImageClick={() => setActivePostId(post.id)} />
+          <div className="feed-media-preview">
+            <MediaAttachmentsView items={post.attachments} onImageClick={openPost} />
           </div>
         )}
         <div className="post-engagement-summary feed-post-engagement">
           <button type="button" className="feed-post-likes feed-reaction-users-trigger"
             disabled={post.likes === 0} aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`}
             onClick={() => onReactionUsers(post)}>
-            <Heart size={22} aria-hidden="true" />
+            <Heart size={22} fill="currentColor" aria-hidden="true" />
             <span>{formatCount(post.likes)} lượt thích</span>
           </button>
           <span className="feed-post-conversation-stats">
@@ -119,7 +131,9 @@ export default function FeedPostCard({
         <div className="post-toolbar feed-post-toolbar">
           <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void like(post, emoji)} />
           <button type="button" className="post-stat post-detail-trigger"
-            onClick={() => setActivePostId(post.id)}>
+            aria-expanded={onToggleComments ? Boolean(discussion) : undefined}
+            aria-controls={discussion ? commentsId : undefined}
+            onClick={onToggleComments ?? openPost}>
             <UiIcon name="comment" size={22} /><span>Bình luận</span>
           </button>
           <FeedShareAction postId={post.id}
@@ -127,6 +141,12 @@ export default function FeedPostCard({
           <FeedSaveAction post={post} request={apiFetch} onUpdated={syncFeedPost}
             onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
         </div>
+        {discussion && (
+          <section id={commentsId} className="feed-inline-comments" aria-label="Bình luận về bài viết">
+            {!post.comments?.length && <p className="post-comments-empty">Chưa có bình luận. Hãy bắt đầu cuộc trò chuyện.</p>}
+            {discussion}
+          </section>
+        )}
       </div>
     </article>
   )

@@ -69,6 +69,34 @@ export function useMessageData({
     activeConversationIdRef.current === activeConversationId &&
     activeChannelIdRef.current === activeChannelId
   const [messages, setMessages] = useState<Message[]>([])
+  // Keep the last authorized message window for recently visited chats.
+  // Returning to a chat should not flash an empty composer/history while the
+  // new network request runs. Keys include the session, room and channel.
+  const recentMessages = useRef(new Map<string, Message[]>())
+  const messageStateOwner = useRef('')
+  const cacheKey = session?.sessionId && activeConversationId
+    ? [session.sessionId, session.user.id, activeConversationId, activeChannelId, targetLanguage].join(':')
+    : ''
+  const displayedMessages = useMemo(() => {
+    if (!cacheKey || !activeConversationId) return []
+    const belongsToRoom = messageStateOwner.current === cacheKey &&
+      messages.length > 0 && messages.every(item =>
+        item.conversationId === activeConversationId && (item.channelId || 0) === activeChannelId)
+    return belongsToRoom ? messages : recentMessages.current.get(cacheKey) || []
+  }, [messages, cacheKey, activeConversationId, activeChannelId])
+  useEffect(() => {
+    if (!cacheKey || messageStateOwner.current !== cacheKey ||
+        !messages.length || !activeConversationId ||
+        !messages.every(item => item.conversationId === activeConversationId &&
+          (item.channelId || 0) === activeChannelId)) return
+    const cache = recentMessages.current
+    cache.delete(cacheKey)
+    cache.set(cacheKey, messages)
+    while (cache.size > 10) cache.delete(cache.keys().next().value!)
+  }, [messages, cacheKey, activeConversationId, activeChannelId])
+  useEffect(() => {
+    recentMessages.current.clear()
+  }, [session?.sessionId])
   const [reconnectRevision, setReconnectRevision] = useState(0)
   useEffect(() => {
     const refreshOnReconnect = (event: Event) => {
@@ -81,9 +109,29 @@ export function useMessageData({
   }, [session, sessionRef])
   const [privacyRevision, setPrivacyRevision] = useState(0)
   useEffect(() => {
-    const refresh = () => setPrivacyRevision(current => current + 1)
+    const refresh = () => {
+      recentMessages.current.clear()
+      messageStateOwner.current = ''
+      setMessages([])
+      setPrivacyRevision(current => current + 1)
+    }
+    const clearHistory = (event: Event) => {
+      const conversationId = (event as CustomEvent<{conversationId?: number}>).detail?.conversationId
+      if (conversationId === undefined) return
+      for (const key of recentMessages.current.keys()) {
+        if (key.split(':')[2] === String(conversationId)) recentMessages.current.delete(key)
+      }
+      if (activeConversationIdRef.current === conversationId) {
+        messageStateOwner.current = ''
+        setMessages([])
+      }
+    }
     window.addEventListener('chatnet:privacy-updated', refresh)
-    return () => window.removeEventListener('chatnet:privacy-updated', refresh)
+    window.addEventListener('chatnet:message-history-cleared', clearHistory)
+    return () => {
+      window.removeEventListener('chatnet:privacy-updated', refresh)
+      window.removeEventListener('chatnet:message-history-cleared', clearHistory)
+    }
   }, [])
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
@@ -95,10 +143,16 @@ export function useMessageData({
 
   useEffect(() => {
     if (!session?.token || !activeConversationId || !translationPreferencesLoaded) {
-      if (!activeConversationId || !session?.token) setMessages([])
+      if (!activeConversationId || !session?.token) {
+        messageStateOwner.current = ''
+        setMessages([])
+      }
       return
     }
 
+    // The raw useState array can belong to the previous room until the
+    // new fetch starts. Never show/cache it under the next session/room key.
+    messageStateOwner.current = cacheKey
     let cancelled = false
     gapPagingBusy.current = false
     messagesPagingBusy.current = false
@@ -108,8 +162,10 @@ export function useMessageData({
     const changes = new Set<number>()
     resetMessageChanges(changes)
     setTranslations({})
-    // Never show another channel's messages while its own history is loading.
-    setMessages([])
+    // Restore this room's last authorized rows immediately instead of
+    // wiping the timeline and rebuilding it on the following fetch.
+    // displayedMessages also gates the FIRST render by room/session key.
+    setMessages(recentMessages.current.get(cacheKey) || [])
     setHasMoreMessages(false)
     const jump = jumpToMessage?.conversationId === activeConversationId ? jumpToMessage : null
     setMessageGapBefore(null)
@@ -122,6 +178,7 @@ export function useMessageData({
     Promise.all(requestedPages)
       .then(async (responses) => {
         if (responses.some((response) => response.status === 403)) {
+          recentMessages.current.delete(cacheKey)
           if (!cancelled) purgeConversation(activeConversationId)
           return
         }
@@ -131,6 +188,13 @@ export function useMessageData({
         // Include the targeted history and newer messages from BOTH participants.
         const byId = new Map(pages.flat().map((item) => [item.id, item]))
         const data = [...byId.values()].filter(item => (item.channelId || 0) === activeChannelId).sort((a, b) => a.id - b.id)
+        // Replace the cache with authoritative history, including an empty
+        // history after messages were deleted. Later live updates update it.
+        recentMessages.current.delete(cacheKey)
+        recentMessages.current.set(cacheKey, data)
+        while (recentMessages.current.size > 10) {
+          recentMessages.current.delete(recentMessages.current.keys().next().value!)
+        }
 
         // Reconcile a POST whose ACK vanished before refresh. A persisted
         // clientId in history is proof of delivery; no second POST is needed.
@@ -327,7 +391,7 @@ export function useMessageData({
 
 
   return {
-    messages,
+    messages: displayedMessages,
     setMessages,
     hasMoreMessages,
     setHasMoreMessages,

@@ -1,0 +1,200 @@
+/* Shared emoji palette for chat composition and message reactions. */
+.chat-emoji-picker {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 16px;
+  background: #fff;
+  color: #243651;
+}
+.chat-emoji-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  height: 38px;
+  border: 1px solid #dce5f3;
+  border-radius: 10px;
+  color: #64748b;
+}
+.chat-emoji-picker-search:focus-within { border-color: #648ef5; box-shadow: 0 0 0 2px #648ef521; }
+.chat-emoji-picker-search input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #243651;
+  font-size: 14px;
+}
+.chat-emoji-picker-categories {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 8px 0 5px;
+  border-bottom: 1px solid #edf0f5;
+}
+.chat-emoji-picker-categories button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 19px;
+  cursor: pointer;
+}
+.chat-emoji-picker-categories button.selected,
+.chat-emoji-picker-categories button:hover { background: #eaf1ff; }
+.chat-emoji-picker-heading {
+  padding: 9px 3px 6px;
+  color: #65758e;
+  font-size: 12px;
+  font-weight: 650;
+}
+.chat-emoji-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+  max-height: min(255px, 38vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.chat-emoji-picker-grid button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-emoji-picker-grid button.selected,
+.chat-emoji-picker-grid button:hover,
+.chat-emoji-picker-grid button:focus-visible { background: #edf2ff; }
+.chat-emoji-picker button:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.chat-emoji-picker-empty { grid-column: 1 / -1; padding: 22px 6px; text-align: center; color: #77859b; font-size: 13px; }
+/* Portal to document.body: avoid clipping by scroll/overflow in chat panels. */
+.chat-composer-plus-popover {
+  position: fixed;
+  z-index: 2200;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 9px;
+  border: 1px solid #dce5f3;
+  border-radius: 18px;
+  background: #fff;
+  color: #243651;
+  box-shadow: 0 16px 48px rgba(23, 43, 77, .24);
+}
+.chat-composer-plus-title {
+  margin: 0;
+  padding: 8px 12px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #526785;
+}
+.chat-composer-plus-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #243651;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-composer-plus-option svg { color: #386bca; flex-shrink: 0; }
+.chat-composer-plus-option:hover,
+.chat-composer-plus-option:focus-visible,
+.chat-composer-plus-heading button:hover { background: #edf2ff; }
+.chat-composer-plus-popover button:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.chat-composer-plus-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 37px;
+  padding: 1px 4px;
+  font-size: 14px;
+}
+.chat-composer-plus-heading button {
+  display: grid;
+  place-items: center;
+  width: 33px;
+  height: 33px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  color: #526785;
+  background: transparent;
+  cursor: pointer;
+}
+/* The desktop plus is the sole entry point; no extra emoji toolbar icon. */
+.modern-shell.app-layout .social-chat-layout .media-composer > .chat-plus-trigger[aria-expanded='true'] {
+  color: #2563eb;
+  background: #edf2ff;
+}
+.message-context-sheet.reaction-only .chat-emoji-picker {
+  width: 100%;
+  border-top: 1px solid #edf0f5;
+}
+.modern-shell .message-context-sheet.reaction-only .message-context-reactions {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.modern-shell .message-context-sheet.reaction-only:has(.chat-emoji-picker) {
+  max-height: min(85dvh, 660px);
+  overflow-y: auto;
+}
+.message-context-sheet.reaction-only .message-context-reactions .chat-reaction-more {
+  font-size: 20px;
+  color: #506c9c;
+}
+.message-context-sheet.reaction-only .message-context-reactions .chat-reaction-more small {
+  font-size: 10px;
+}
+@media (max-width: 760px) {
+  /* Keep the + visible on phones too; its menu contains attachments and emoji. */
+  .modern-shell.app-layout .social-chat-layout .media-composer > .chat-plus-trigger {
+    display: grid;
+    flex: 0 0 36px;
+    width: 36px;
+    min-width: 36px;
+    height: 43px;
+    min-height: 43px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: #edf2ff;
+    color: #3b68d5;
+  }
+  .modern-shell.app-layout .social-chat-layout .media-composer > .chat-plus-trigger > svg:not(.chat-composer-plus) {
+    display: none;
+  }
+  .modern-shell.app-layout .social-chat-layout .media-composer > .chat-plus-trigger > svg.chat-composer-plus {
+    display: block;
+    width: 21px;
+    height: 21px;
+  }
+  .chat-emoji-picker-grid button { height: 38px; font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-composer-plus-popover,
+  .chat-composer-plus-popover * { scroll-behavior: auto; }
+}

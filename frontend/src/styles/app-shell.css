@@ -367,6 +367,16 @@
 
 @media (max-width: 760px) {
   .app-sidebar, .app-page-heading, .app-section-header { display: none !important; }
+  .modern-shell.app-layout > .chatnet-appbar .app-header-account {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+  }
+  .modern-shell.app-layout > .chatnet-appbar .app-header-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
   .modern-shell.app-layout .app-header-account-desktop-only { display: none; }
   .modern-shell.app-layout > .chatnet-appbar.mobile-section-header { display: none; }
 }

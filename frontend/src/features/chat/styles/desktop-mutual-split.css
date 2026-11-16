@@ -1,0 +1,173 @@
+/* Desktop group: the avatar and channels share one moving boundary. */
+@property --desktop-chat-split {
+  syntax: '<length-percentage>';
+  inherits: true;
+  initial-value: 72px;
+}
+@media (min-width: 761px) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open {
+    --desktop-chat-workspace: calc(var(--avatar-rail-w) + var(--desktop-channels-w) + var(--chat-rail-gap, 12px));
+    --desktop-chat-split: var(--avatar-rail-w);
+    grid-template-columns: minmax(0, var(--desktop-chat-workspace)) minmax(0, 1fr) !important;
+    gap: var(--chat-rail-gap, 12px);
+    transition: --desktop-chat-split 380ms cubic-bezier(.4,0,.2,1);
+  }
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open.avatar-rail-expanded {
+    --desktop-chat-split: var(--desktop-chat-workspace);
+  }
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open[data-split-priming="true"] {
+    /* Do not animate the CSS @property initial value when the group component
+       first appears. The next frame explicitly starts the real reveal. */
+    transition: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail {
+    grid-column: 1;
+    grid-row: 1;
+    width: var(--desktop-chat-split) !important;
+    max-width: var(--desktop-chat-split) !important;
+    min-width: 0 !important;
+    border-right: 0 !important;
+    border-radius: 18px 0 0 18px !important;
+    box-shadow: none !important;
+    transition: none !important;
+    overflow: hidden !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar {
+    position: absolute !important;
+    inset: auto !important;
+    top: 14px !important;
+    bottom: 17px !important;
+    left: calc(13px + var(--desktop-chat-split)) !important;
+    width: calc(var(--desktop-chat-workspace) - var(--desktop-chat-split)) !important;
+    max-width: calc(var(--desktop-chat-workspace) - var(--desktop-chat-split)) !important;
+    min-width: 0 !important;
+    height: auto !important;
+    border-left: 0 !important;
+    border-radius: 0 18px 18px 0 !important;
+    overflow: hidden !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    transition: none !important;
+    pointer-events: auto !important;
+    box-shadow: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .conversation-panel.group-chat-panel {
+    grid-column: 2 !important;
+    grid-row: 1;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open::after {
+    content: "";
+    position: absolute;
+    z-index: 42;
+    top: 14px;
+    bottom: 17px;
+    left: calc(13px + var(--desktop-chat-split) - 1px);
+    width: 1px;
+    background: #e4ebf6;
+    pointer-events: none;
+  }
+  /* Preserve content geometry; moving divider clips the outgoing and
+     incoming views instead of wrapping their search or message preview. */
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail .desktop-conversation-rail-top-actions,
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail .desktop-conversation-rail-row {
+    box-sizing: border-box;
+    width: calc(var(--desktop-chat-workspace) - 12px) !important;
+    min-width: calc(var(--desktop-chat-workspace) - 12px) !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail .desktop-conversation-rail-top-actions {
+    padding-left: 88px !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail .desktop-conversation-rail-scroller {
+    align-items: flex-start;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail .desktop-conversation-rail-meta {
+    visibility: visible !important;
+    opacity: 1 !important;
+    transition: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar > :is(.group-channel-sidebar-topbar, .group-channel-sidebar-list, .group-channel-unread-unavailable) {
+    box-sizing: border-box;
+    flex-shrink: 0;
+    width: calc(var(--desktop-channels-w) + var(--chat-rail-gap, 12px)) !important;
+    min-width: calc(var(--desktop-channels-w) + var(--chat-rail-gap, 12px)) !important;
+    max-width: none !important;
+    opacity: 1 !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.desktop-rail-picker-closing > .group-channel-sidebar {
+    pointer-events: none !important;
+  }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar {
+    top: 10px !important;
+    bottom: 10px !important;
+    left: calc(10px + var(--desktop-chat-split)) !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open::after {
+    top: 10px;
+    bottom: 10px;
+    left: calc(10px + var(--desktop-chat-split) - 1px);
+  }
+}
+/* Entering a group from an inactive rail starts with the avatar expanded.
+   This starting value does not affect clicks while the group stays mounted. */
+@media (min-width: 761px) and (prefers-reduced-motion: no-preference) {
+  @starting-style {
+    .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open:not(.avatar-rail-expanded) {
+      --desktop-chat-split: var(--desktop-chat-workspace);
+    }
+  }
+}
+/* Same in-place reciprocal split as PWA: the arrow only changes a DOM
+   attribute, and React keeps the entire conversation/channel tree mounted. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open[data-split-expanded="true"] {
+    /* Override the compact track immediately, even when the group layout is
+       mounted from a private chat (where no channel picker existed). */
+    --desktop-chat-split: var(--desktop-chat-workspace) !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.desktop-channel-panel-open[data-split-expanded="true"]
+  > .desktop-conversation-rail .desktop-conversation-rail-expand-toggle svg {
+    transform: rotate(180deg);
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.desktop-channel-panel-open[data-split-expanded="false"]
+  > .desktop-conversation-rail .desktop-conversation-rail-expand-toggle svg {
+    transform: rotate(0deg);
+  }
+}
+@media (min-width: 761px) and (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open {
+    transition: none !important;
+  }
+}
+
+/* Group/channel information must NOT take the implicit third grid track.
+   The two-column mutually exclusive avatar/channel split intentionally uses
+   only two explicit tracks. A grid-column: 3 info panel then computes its
+   percentage width from a tiny implicit track (36px at 1586px viewport).
+   Restore the original stable right-hand information/management sheet size
+   by positioning it against the whole conversation layout instead. */
+@media (min-width: 1420px) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.group-channel-workspace.details-open
+  > .conversation-info-panel.social-chat-details,
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.group-channel-workspace.group-sidebar-open
+  > .group-settings-sidebar {
+    display: flex !important;
+    position: absolute !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    /* The spanning grid containing block already excludes layout padding. */
+    inset: 0 0 0 auto !important;
+    box-sizing: border-box !important;
+    width: 292px !important;
+    min-width: 292px !important;
+    max-width: 292px !important;
+    height: auto !important;
+    z-index: 65 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+}

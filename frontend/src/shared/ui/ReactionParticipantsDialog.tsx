@@ -27,12 +27,14 @@ export default function ReactionParticipantsDialog({
   initialEmoji = '',
   reactions = [],
   request,
+  portalContainer,
   onClose,
 }: {
   kind: 'message' | 'post'
   id: number
   initialEmoji?: string
   reactions?: ReactionOption[]
+  portalContainer?: HTMLElement
   request: (path: string, init?: RequestInit) => Promise<Response>
   onClose: () => void
 }) {
@@ -118,7 +120,7 @@ export default function ReactionParticipantsDialog({
         aria-modal="true"
         aria-labelledby="reaction-users-title"
         onKeyDown={event => {
-          if (event.key === 'Escape') { event.stopPropagation(); onClose() }
+          if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose() }
           if (event.key !== 'Tab') return
           const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
           if (buttons.length === 0) return
@@ -181,6 +183,6 @@ export default function ReactionParticipantsDialog({
         </div>
       </section>
     </div>,
-    document.body,
+    portalContainer ?? document.body,
   )
 }
