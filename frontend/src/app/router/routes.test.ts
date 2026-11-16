@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROUTE, TAB_PATH, feedPostIdFromPath, feedPostPath, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./routes";
+import { ROUTE, TAB_PATH, fallbackPathForRoute, feedPostIdFromPath, feedPostPath, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./routes";
 
 describe("app URL routing", () => {
   it("maps every main tab to a stable URL", () => {
@@ -37,6 +37,20 @@ describe("app URL routing", () => {
       expect(feedPostIdFromPath(path)).toBeNull();
     }
     expect(tabFromPath("/feed/posts/42")).toBe("feed");
+  });
+
+  it("routes unsupported deep links back to the right parent screen", () => {
+    expect(fallbackPathForRoute("/feed/posts/missing")).toBe("/feed");
+    expect(fallbackPathForRoute("/profile/missing")).toBe("/profile");
+    expect(fallbackPathForRoute("/users/missing/extra")).toBe("/profile");
+    expect(fallbackPathForRoute("/settings/missing")).toBe("/settings");
+    expect(fallbackPathForRoute("/calls/missing")).toBe("/calls");
+    expect(fallbackPathForRoute("/contacts/missing")).toBe("/contacts");
+    expect(fallbackPathForRoute("/discover/missing")).toBe("/discover");
+    expect(fallbackPathForRoute("/marketplace/missing")).toBe("/marketplace");
+    expect(fallbackPathForRoute("/notifications/missing")).toBe("/notifications");
+    expect(fallbackPathForRoute("/random")).toBe("/chat");
+    expect(fallbackPathForRoute("/feedish/unknown")).toBe("/chat");
   });
 
   it("matches complete route segments", () => {

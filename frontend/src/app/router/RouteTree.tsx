@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, Navigate, Outlet, Route, Routes, useLocation, useOutletContext, useParams } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, tabFromPath, visitorUsernameFromPath } from "./routes";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, fallbackPathForRoute, feedPostIdFromPath, tabFromPath, visitorUsernameFromPath } from "./routes";
 
 function LegacyHomeRedirect() {
   const { search, hash, state } = useLocation();
@@ -14,12 +14,22 @@ function CurrentPage() {
 }
 
 function NotFoundPage() {
+  const { pathname } = useLocation();
+  const fallbackPath = fallbackPathForRoute(pathname);
+  const fallbackLabel = fallbackPath === TAB_PATH.chat ? "Tin nhắn"
+    : fallbackPath === TAB_PATH.feed ? "Bảng tin"
+    : fallbackPath === TAB_PATH.profile ? "Hồ sơ"
+    : fallbackPath === ROUTE.settings ? "Cài đặt"
+    : fallbackPath === ROUTE.calls ? "Cuộc gọi"
+    : fallbackPath === TAB_PATH.contacts ? "Danh bạ"
+    : fallbackPath === TAB_PATH.discover ? "Khám phá"
+    : fallbackPath === TAB_PATH.market ? "Marketplace" : "Thông báo";
   return (
     <section className="phone-frame modern-frame" aria-labelledby="route-not-found-title">
       <div className="soco-empty-state">
         <h1 id="route-not-found-title">Không tìm thấy trang</h1>
         <p>Đường dẫn này không tồn tại hoặc chưa được hỗ trợ.</p>
-        <Link to={TAB_PATH.chat}>Về Tin nhắn</Link>
+        <Link to={fallbackPath}>Về {fallbackLabel}</Link>
       </div>
     </section>
   );

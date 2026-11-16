@@ -172,6 +172,27 @@ describe("app route tree", () => {
     }
   });
 
+  it("offers a parent destination from unsupported deep links", () => {
+    const examples: Array<[string, string, string]> = [
+      ["/feed/broken", "Về Bảng tin", "/feed"],
+      ["/profile/broken", "Về Hồ sơ", "/profile"],
+      ["/users/alice/more", "Về Hồ sơ", "/profile"],
+      ["/settings/broken", "Về Cài đặt", "/settings"],
+      ["/calls/broken", "Về Cuộc gọi", "/calls"],
+      ["/contacts/broken", "Về Danh bạ", "/contacts"],
+      ["/unknown", "Về Tin nhắn", "/chat"],
+    ];
+    for (const [path, label, destination] of examples) {
+      const app = renderAt(path);
+      expect(app.page()).toBeNull();
+      expect(app.container.textContent).toContain("Không tìm thấy trang");
+      act(() => app.link(label).click());
+      expect(app.location()).toBe(destination);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("rejects malformed or unsafe conversation IDs", () => {
     for (const path of ["/chat/0", "/chat/nope", "/chat/9007199254740992", "/chat/42/more"]) {
       const { container, page } = renderAt(path);
