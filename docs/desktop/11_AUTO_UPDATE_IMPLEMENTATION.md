@@ -11,29 +11,36 @@ Status (2026-11-16): **implemented on `feat/desktop-auto-update`, NOT released**
 - Installation is blocked in the UI while there is an active/ringing call, a call transition, or persisted unconfirmed/queued messages. The native confirmation instructs users to finish transfers and unsaved work. Account data, drafts and outbox live in the existing user data directory and are not intentionally cleared on update. **Unsent attachment/reply drafts and N→N+1 persistence remain unverified release gates.**
 - `0.4.0` introduces the updater above previously distributed `0.3.1` installers. **Existing `0.3.x` Electron builds (and all earlier builds without an updater) cannot bootstrap their own updater**: offer those users a one-time signed `0.4.0` installer upgrade (in-place, preserving user data) and validate the actual update from 0.4.0 to 0.4.1 on Windows/macOS before broad release.
 
-## Release prerequisites
+## GitHub Releases (no standalone update server)
 
-1. Approve a stable, public HTTPS feed directory (not a private GitHub release requiring personal tokens), with TLS and immutable versioned artifacts. Use a separate feed directory for beta/stable. This project deliberately does not hardcode an unapproved domain.
-2. Obtain a trusted Windows code-signing certificate. The publisher subject must remain consistent across releases; `electron-builder` writes it into `app-update.yml` for Windows signature verification. Do **not** set `win.verifyUpdateCodeSignature=false`.
-3. Obtain macOS Developer ID signing + notarization/stapling credentials. Both signed DMG and signed ZIP are needed for end user distribution + auto-updates.
-4. Publish only reviewed artifacts from a clean source commit with a strictly increasing `desktop/package.json` version and matching `package-lock.json` version. Do not edit `latest.yml` or release artifact contents after signing.
+The signed release config points to public [0xmarkhydra/ChatNet Releases](https://github.com/0xmarkhydra/ChatNet/releases) using electron-builder's GitHub provider (`latest` channel). No end-user token, separate update host, S3 bucket or API endpoint is required. **The repository must remain public for unauthenticated client updates.** Never put a personal access token in the renderer, release build or `app-update.yml`.
 
-## Build (release operator only)
+`desktop/package.json` retains `publish: null` for unsigned internal builds; only `desktop/electron-builder.release.cjs` enables GitHub update metadata. The production NSIS updater verifies the Windows installer code signature against the publisher encoded in the installed `app-update.yml`. Code signing cannot be bypassed for production.
 
-Use PowerShell on a signed Windows build host:
+### One-time setup by repository owner
 
-```powershell
-$env:SOCO_DESKTOP_UPDATE_URL = "https://YOUR-APPROVED-RELEASE-HOST/stable/"
-npm ci --prefix frontend
-npm ci --prefix desktop
-npm --prefix desktop test
-npm --prefix frontend run build:desktop
-npm --prefix desktop run dist:win
-```
+1. Merge `feat/desktop-auto-update` into `main` after review (the Actions release workflow must exist on the tagged commit). Ensure GitHub Actions is enabled and has sufficient billing/quota.
+2. In GitHub repository **Settings → Secrets and variables → Actions**, add repository secrets `WIN_CSC_LINK` (base64-encoded trusted Windows .pfx certificate) and `WIN_CSC_KEY_PASSWORD`. GitHub's built-in `GITHUB_TOKEN` handles draft release creation; a user PAT is **not** needed. Keep the Windows signer identity consistent across future releases.
+3. Optional macOS: add `MAC_CSC_LINK` (base64 .p12 Developer ID Application certificate), `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`. Then set GitHub Actions variable `SOCO_ENABLE_MAC_RELEASE=true`. When off, the workflow publishes **Windows only**; macOS updates are not available through that draft.
+4. Protect `main` and release tags: do not allow arbitrary users to push release tags. Keep release-review approval with the owner.
 
-Use the same release URL on an authorized Mac signing/notarization host and run `npm --prefix desktop run dist:mac`. These commands deliberately end with `--publish never`; inspect/sign/notarize/test before manually uploading to the feed. Without a configured HTTPS feed or code signing, release builds must fail. Internal QA builds still use `dist:internal:win` and `dist:internal:mac` and **must never be placed in the update feed**.
+### Publishing a Desktop release from main
 
-Release directory should include platform-specific signed installer files, Windows `latest.yml` and `*.blockmap`, macOS `latest-mac.yml` and ZIP/DMG, plus checksum inventory. Serve manifests with `Cache-Control: no-store` and correct content types; versioned installers can be immutable. Upload binaries and blockmaps *first*, then atomically make version manifests live last, otherwise clients can see a release pointing to missing files. Do not mix Windows and Mac metadata from different version sets at the same release path. Test Range requests for differential downloads.
+1. Increment `desktop/package.json` and the root package version in `desktop/package-lock.json` (for example `0.4.0 → 0.4.1`), commit and merge the changes into `main`. Do not release the same version twice or reuse existing tags.
+2. Create and push `v0.4.1` pointing to **that exact commit on main**:
+   ```bash
+   git switch main
+   git pull --ff-only origin main
+   git tag v0.4.1
+   git push origin v0.4.1
+   ```
+   This example is for the subsequent release; for the first updater-equipped installer use `v0.4.0` after merging version 0.4.0.
+3. `.github/workflows/desktop-release.yml` checks tag/version and main ancestry, runs Desktop tests, builds signed Windows NSIS artifacts (and signed/notarized Mac builds only when enabled), verifies signing and metadata, uploads artifacts to a **Draft GitHub Release**. Failed signing or missing `latest.yml` blocks publishing.
+4. Test the draft installers and an actual in-place upgrade, including session, drafts, outbox, offline/retry, code-signature rejection and call interruption behavior. Finally, **publish the Draft Release manually** from GitHub Releases. Drafts are deliberately invisible to regular auto-update clients. Once published, installed updater-equipped clients discover the new release on startup, periodically and when returning to focus. They request user consent to download and install.
+
+Release asset inventory: signed `SocCO-<version>-win-x64.exe`, `latest.yml`, `*.blockmap`; optional macOS signed DMG, ZIP (arm64 and x64), and `latest-mac.yml`. Metadata and installers must come from the **same tag/build**. No automated pushes to `main`, no automatic public release publication, and no GitHub Pages deployment are involved.
+
+For a local signing-enabled release build, supply the same certificate environment variables and run `npm --prefix desktop run dist:win` (or `dist:mac` on a Mac). Both commands use `--publish never`; GitHub Actions uploads only verified build artifacts. Internal QA builds `dist:internal:win` and `dist:internal:mac` are unsigned and must **never** be uploaded to GitHub Releases.
 
 ## Acceptance gates (do not release until passed)
 

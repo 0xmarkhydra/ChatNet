@@ -2,9 +2,9 @@ name: SocCO Desktop core checks
 
 on:
   push:
-    branches: [feat/chatnet-desktop-electron]
+    branches: [feat/chatnet-desktop-electron, feat/desktop-auto-update]
   pull_request:
-    branches: [feat/chatnet-desktop-electron, dev]
+    branches: [feat/chatnet-desktop-electron, feat/desktop-auto-update, dev, main]
   workflow_dispatch:
 
 permissions:

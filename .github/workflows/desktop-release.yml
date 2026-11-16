@@ -1,0 +1,181 @@
+name: SocCO Desktop release (GitHub)
+
+# Merge the updater into main first. A version tag builds signed installers and
+# creates a draft Release; publishing it is a separate, reviewed operation.
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: soco-desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate tag, desktop version and main ancestry
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node desktop/scripts/check-release-tag.cjs "$RELEASE_TAG"
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo "::error::Desktop releases must be tagged from a commit already on main"
+            exit 1
+          }
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: validate
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+      - name: Require Windows signing credentials
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CSC_LINK) -or [string]::IsNullOrWhiteSpace($env:CSC_KEY_PASSWORD)) {
+            throw "WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD are required for signed releases"
+          }
+      - run: npm ci --prefix frontend
+      - run: npm ci --prefix desktop
+      - run: npm --prefix desktop test
+      - run: npm --prefix frontend run check:desktop-updates
+      - name: Build signed Windows NSIS installer and GitHub update metadata
+        run: npm --prefix desktop run dist:win
+      - name: Verify Windows installer signature and metadata
+        run: |
+          $installers = @(Get-ChildItem desktop/release -Filter *.exe -File)
+          if ($installers.Count -ne 1) { throw "Expected one signed NSIS installer" }
+          foreach ($installer in $installers) {
+            $signature = Get-AuthenticodeSignature $installer.FullName
+            if ($signature.Status -ne "Valid") { throw "Installer Authenticode signature is not valid: $($signature.Status)" }
+          }
+          $updateConfig = "desktop/release/win-unpacked/resources/app-update.yml"
+          if (-not (Test-Path $updateConfig)) { throw "Missing packaged updater configuration" }
+          $configuration = Get-Content $updateConfig -Raw
+          if ($configuration -notmatch "provider: github" -or $configuration -notmatch "owner: 0xmarkhydra" -or
+              $configuration -notmatch "repo: ChatNet" -or $configuration -notmatch "publisherName:") {
+            throw "Missing GitHub provider or update signature publisher"
+          }
+          if (-not (Test-Path "desktop/release/latest.yml")) { throw "Missing Windows update metadata" }
+          if (-not (Get-ChildItem desktop/release -Filter *.blockmap -File)) { throw "Missing differential update blockmap" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: soco-desktop-windows
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            desktop/release/*.exe
+            desktop/release/*.blockmap
+            desktop/release/latest.yml
+
+  # Enable only after provisioning Mac Developer ID + notarization secrets.
+  macos:
+    if: ${{ vars.SOCO_ENABLE_MAC_RELEASE == 'true' }}
+    needs: validate
+    runs-on: macos-15
+    timeout-minutes: 75
+    env:
+      CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+      - name: Require Mac signing and notarization credentials
+        run: |
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then echo "::error::Missing Mac signing/notarization secret: $name"; exit 1; fi
+          done
+      - run: npm ci --prefix frontend
+      - run: npm ci --prefix desktop
+      - run: npm --prefix desktop test
+      - name: Build signed and notarized Mac Intel + Apple Silicon releases
+        run: npm --prefix desktop run dist:mac
+      - name: Verify Mac update metadata and signed artifacts
+        run: |
+          test -f desktop/release/latest-mac.yml
+          test "$(find desktop/release -maxdepth 1 -name '*.dmg' | wc -l | tr -d ' ')" -eq 2
+          test "$(find desktop/release -maxdepth 1 -name '*.zip' | wc -l | tr -d ' ')" -eq 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: soco-desktop-macos
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.zip
+            desktop/release/latest-mac.yml
+
+  draft-release:
+    # A skipped Mac job is allowed only when the Mac release toggle is disabled.
+    if: ${{ always() && needs.validate.result == 'success' && needs.windows.result == 'success' && (vars.SOCO_ENABLE_MAC_RELEASE != 'true' || needs.macos.result == 'success') }}
+    needs: [validate, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: soco-desktop-*
+          path: release
+      - name: Create a reviewed GitHub Draft Release with complete assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          MAC_ENABLED: ${{ vars.SOCO_ENABLE_MAC_RELEASE }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          test -f release/soco-desktop-windows/latest.yml
+          installers=(release/soco-desktop-windows/*.exe)
+          blockmaps=(release/soco-desktop-windows/*.blockmap)
+          test "${#installers[@]}" -eq 1
+          test "${#blockmaps[@]}" -ge 1
+          assets=(release/soco-desktop-windows/*)
+          if [ "$MAC_ENABLED" = "true" ]; then
+            test -f release/soco-desktop-macos/latest-mac.yml
+            dmgs=(release/soco-desktop-macos/*.dmg)
+            zips=(release/soco-desktop-macos/*.zip)
+            test "${#dmgs[@]}" -eq 2
+            test "${#zips[@]}" -eq 2
+            assets+=(release/soco-desktop-macos/*)
+          fi
+          gh release create "$RELEASE_TAG" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --draft \
+            --title "SocCO Desktop $RELEASE_TAG" \
+            --notes "Signed Desktop installers and updater metadata. Review installation, upgrade and rollback before publishing."

@@ -3,8 +3,8 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const { EventEmitter } = require('node:events')
-const { spawnSync } = require('node:child_process')
 const { createDesktopUpdates } = require('../src/updates.cjs')
+const { checkReleaseTag } = require('../scripts/check-release-tag.cjs')
 const pkg = require('../package.json')
 
 function fixture({ packaged = true, hasFeed = true, confirm = 1 } = {}) {
@@ -108,26 +108,29 @@ test('native confirmation can defer install; download failure keeps current vers
   assert.equal(f.calls.installs, 0)
 })
 
-test('release packaging enforces a signed HTTPS feed and refuses internal/unsafe URLs', () => {
+test('release tags must match Desktop version, not a Web tag or another branch version', () => {
+  assert.equal(checkReleaseTag(`v${pkg.version}`), `v${pkg.version}`)
+  for (const tag of ['', 'v0.3.1', 'v0.4.1', '0.4.0', 'v0.4.0-beta', 'v00.4.0', 'v0.4.0;echo hi']) {
+    assert.throws(() => checkReleaseTag(tag))
+  }
+})
+
+test('signed releases use the public GitHub update feed; internal packages stay disabled', () => {
+  const config = require('../electron-builder.release.cjs')
   assert.equal(pkg.build.publish, null)
   assert.equal(pkg.build.win.verifyUpdateCodeSignature, undefined)
   assert.equal(pkg.dependencies['electron-updater'], '6.8.11')
+  assert.deepEqual(config.publish, [{
+    provider: 'github', owner: '0xmarkhydra', repo: 'ChatNet',
+    releaseType: 'draft', channel: 'latest',
+  }])
+  assert.equal(config.win.verifyUpdateCodeSignature, true)
+  assert.equal(config.mac.notarize, true)
+  assert.equal(config.appId, pkg.build.appId)
+  assert.equal(config.nsis.deleteAppDataOnUninstall, false)
   for (const cmd of ['dist:mac', 'dist:win']) {
     assert.match(pkg.scripts[cmd], /electron-builder\.release\.cjs/)
     assert.match(pkg.scripts[cmd], /--config\.forceCodeSigning=true/)
     assert.match(pkg.scripts[cmd], /--publish never/)
   }
-  const script = 'const c = require("./electron-builder.release.cjs"); if(c.publish[0].provider !== "generic" || c.win.verifyUpdateCodeSignature !== true) process.exit(2)'
-  for (const url of ['', 'http://updates.example.org/', 'https://localhost:7443/', 'https://127.0.0.1/', 'https://user:pass@updates.example.org/', 'https://updates.example.org/?token=123']) {
-    const result = spawnSync(process.execPath, ['-e', script], {
-      cwd: require('node:path').resolve(__dirname, '..'),
-      env: { ...process.env, SOCO_DESKTOP_UPDATE_URL: url }, encoding: 'utf8',
-    })
-    assert.notEqual(result.status, 0, 'must reject unapproved feed ' + url)
-  }
-  const ok = spawnSync(process.execPath, ['-e', script], {
-    cwd: require('node:path').resolve(__dirname, '..'),
-    env: { ...process.env, SOCO_DESKTOP_UPDATE_URL: 'https://updates.example.org/stable/' }, encoding: 'utf8',
-  })
-  assert.equal(ok.status, 0, ok.stderr)
 })
