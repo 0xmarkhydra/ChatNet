@@ -2680,6 +2680,7 @@ export default function AuthedApp({
       suggestions={friendResults}
       suggestionsLoading={friendSearching}
       suggestionsError={friendSearchError}
+      onRetrySuggestions={() => setFriendSearchRetry(value => value + 1)}
       onSettings={() => navigate("/settings/privacy")}
       declineFriendRequest={declineFriendRequest}
       friends={friends}

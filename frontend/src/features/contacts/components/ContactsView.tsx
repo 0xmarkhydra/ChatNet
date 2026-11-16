@@ -34,6 +34,7 @@ type Props = {
   suggestions: FriendSearchResult[]
   suggestionsLoading: boolean
   suggestionsError: boolean
+  onRetrySuggestions: () => void
   onSettings: () => void
   declineFriendRequest: (friend: FriendConnection) => Promise<void>
   friends: FriendConnection[]
@@ -62,7 +63,7 @@ export default function ContactsView({
   setFriendSearchRetry, contactSearchResults, friendRelationship, friendBusyIds, actOnFriend,
   setFriendMenuId, friendMenuId, blockContact, unblockContact, onOpenBlockedChat, reportContact, friendRequests, declineFriendRequest,
   friends, friendsLoading, friendsError, onRetryFriends, contactMetadata, openDirectByUsername, setFriendPreview, changePersonalContact,
-  removeAcceptedFriend, connectionUrl, onScanQr, suggestions, suggestionsLoading, suggestionsError, onSettings, embeddedInCalls = false,
+  removeAcceptedFriend, connectionUrl, onScanQr, suggestions, suggestionsLoading, suggestionsError, onRetrySuggestions, onSettings, embeddedInCalls = false,
   callConversations = [], onOpenCallChat,
 }: Props) {
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
@@ -171,6 +172,8 @@ export default function ContactsView({
   if (screen === 'overview' && !embeddedInCalls) return <ContactsOverview
     friends={friends} friendRequests={friendRequests} suggestions={suggestions}
     suggestionsLoading={suggestionsLoading} suggestionsError={suggestionsError}
+    friendsLoading={friendsLoading} friendsError={friendsError}
+    onRetryFriends={onRetryFriends} onRetrySuggestions={onRetrySuggestions}
     friendBusyIds={friendBusyIds} actOnFriend={actOnFriend} declineFriendRequest={declineFriendRequest}
     onDirectory={() => onScreenChange('directory')} onInvitations={() => onScreenChange('invitations')}
     onSettings={onSettings} connectionUrl={connectionUrl} onScanQr={onScanQr} />

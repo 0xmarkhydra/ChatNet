@@ -155,6 +155,36 @@
   text-align: center;
 }
 .co-request-card .co-empty { border: 0; }
+.co-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid #e3eafd;
+  border-radius: 16px;
+  background: #fff;
+  color: #546b93;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.co-feedback > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 10px;
+  background: #eaf0ff;
+  color: #245bce;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.co-feedback > button:hover { background: #dce6ff; }
 .co-suggestion-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .co-suggestion {
   display: flex;
