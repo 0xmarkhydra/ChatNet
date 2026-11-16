@@ -80,7 +80,7 @@ try {
       }))
       throw error
     }
-    assert.match(await banner.innerText(), /Hội thoại chưa mã hóa đầu cuối\s+Tin nhắn mới vẫn có thể được lưu trên máy chủ\./)
+    assert.match(await banner.innerText(), /Hội thoại chưa mã hóa đầu cuối\s+·\s+Tin nhắn mới vẫn có thể được lưu trên máy chủ\./)
     const geometry = await banner.evaluate(el => {
       const box = el.getBoundingClientRect()
       const panel = el.closest('.conversation-panel').getBoundingClientRect()
@@ -89,17 +89,28 @@ try {
       const style = getComputedStyle(el)
       const tolerance = 1
       return {
-        inset: Math.min(box.left - panel.left, panel.right - box.right),
+        fillsPanel: Math.abs(box.left - panel.left) <= 2 && Math.abs(box.right - panel.right) <= 2,
         inside: box.width > 0 && box.bottom <= timeline.top + tolerance && box.top >= header.bottom - tolerance,
         noOverflow: el.scrollWidth <= el.clientWidth,
-        styled: style.display === 'flex' && Number.parseFloat(style.borderTopLeftRadius) > 0 &&
-          style.backgroundColor !== 'rgba(0, 0, 0, 0)',
+        noFrame: [el, ...el.children].every(node => {
+          const nodeStyle = getComputedStyle(node)
+          return nodeStyle.backgroundColor === 'rgba(0, 0, 0, 0)' &&
+            nodeStyle.borderTopWidth === '0px' && nodeStyle.boxShadow === 'none'
+        }),
+        position: style.position,
         icon: el.querySelector('svg')?.getAttribute('aria-hidden') === 'true',
         height: box.height,
       }
     })
-    assert.ok(geometry.inset >= 8 && geometry.inside && geometry.noOverflow && geometry.styled && geometry.icon,
-      `Banner fits between the chat header and messages at ${width}px: ${JSON.stringify(geometry)}`)
+    assert.ok(geometry.fillsPanel && geometry.inside && geometry.noOverflow && geometry.noFrame &&
+      geometry.position === 'static' && geometry.icon && geometry.height <= 42,
+      `Notice remains a compact text row outside the timeline at ${width}px: ${JSON.stringify(geometry)}`)
+    const message = page.locator('[data-message-id="1"] .bubble')
+    await message.waitFor({state:'visible'})
+    await message.scrollIntoViewIfNeeded()
+    const messageTop = (await message.boundingBox()).y
+    const noticeBottom = await banner.evaluate(el => el.getBoundingClientRect().bottom)
+    assert.ok(messageTop >= noticeBottom - 1, `First message is not covered at ${width}px`)
     if (preview) {
       console.log('Preview open on local ChatNet with sample data. Close the browser to end.')
       await new Promise(resolve => browser.once('disconnected', resolve))
