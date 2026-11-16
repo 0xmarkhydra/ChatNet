@@ -1613,11 +1613,7 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	allowed := map[string]bool{
-		"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "😡": true,
-		"🙏": true, // Legacy reaction remains removable on existing messages.
-	}
-	if !allowed[body.Emoji] {
+	if !validChatReactionEmoji(body.Emoji) {
 		httpx.Error(w, http.StatusBadRequest, "unsupported reaction")
 		return
 	}

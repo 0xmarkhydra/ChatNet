@@ -885,6 +885,7 @@ export default function ChatSection({
                     </div>
                   ) : (mlsPilotMode === 'e2ee' || mlsPilotMode === 'pending') ? null : (
                   <MessageComposer
+                key={`${activeConversationId}:${selectedChannelId}`}
                 activeConversation={activeConversation}
                 activeConversationId={activeConversationId}
                 addChatFiles={addChatFiles}
