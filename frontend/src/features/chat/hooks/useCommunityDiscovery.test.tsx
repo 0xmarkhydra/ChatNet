@@ -86,3 +86,64 @@ it('stops discovery when leaving the list and preserves the existing join respon
   expect(view.state.publicGroups).toEqual([])
   expect(mocks.list).toHaveBeenCalledTimes(1)
 })
+
+it('allows only one join request before React commits busy state and releases the guard afterward', async () => {
+  mocks.list.mockResolvedValue({ ok: true, json: async () => [] } as Response)
+  const first = deferred<Response>()
+  mocks.join.mockImplementationOnce(() => first.promise)
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'requested' }) } as Response)
+  const view = mount()
+  await view.render()
+
+  let firstCall!: Promise<void>
+  await act(async () => {
+    firstCall = view.state.joinPublic(12)
+    await view.state.joinPublic(13)
+  })
+  expect(mocks.join).toHaveBeenCalledTimes(1)
+  expect(view.state.joiningId).toBe(12)
+
+  await act(async () => {
+    first.resolve({ ok: true, json: async () => ({ status: 'member' }) } as Response)
+    await firstCall
+  })
+  expect(view.onJoinedGroup).toHaveBeenCalledTimes(1)
+  expect(view.state.joiningId).toBeNull()
+  await act(async () => view.state.joinPublic(13))
+  expect(mocks.join).toHaveBeenCalledTimes(2)
+})
+
+it('unlocks joining after an HTTP failure without retrying the failed mutation automatically', async () => {
+  mocks.list.mockResolvedValue({ ok: true, json: async () => [] } as Response)
+  mocks.join
+    .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Không có quyền tham gia' }) } as Response)
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'requested' }) } as Response)
+  const view = mount()
+  await view.render()
+
+  await act(async () => view.state.joinPublic(12))
+  expect(view.notify).toHaveBeenCalledWith('Không có quyền tham gia')
+  expect(view.state.joiningId).toBeNull()
+  expect(view.onJoinedGroup).not.toHaveBeenCalled()
+  expect(mocks.join).toHaveBeenCalledTimes(1)
+
+  await act(async () => view.state.joinPublic(13))
+  expect(mocks.join).toHaveBeenCalledTimes(2)
+  expect(view.notify).toHaveBeenCalledWith('Đã gửi yêu cầu tham gia. Chờ quản trị viên duyệt.')
+  expect(view.state.joiningId).toBeNull()
+})
+
+it('ignores late discovery responses after leaving list mode', async () => {
+  const pending = deferred<Response>()
+  mocks.list.mockReturnValue(pending.promise)
+  const view = mount()
+  await view.render(true, 'đang tìm')
+  expect(view.state.publicLoading).toBe(true)
+  await view.render(false, 'đang tìm')
+  expect((mocks.list.mock.calls[0][2] as AbortSignal).aborted).toBe(true)
+  await act(async () => {
+    pending.resolve({ ok: true, json: async () => [{ id: 99, name: 'Đã cũ' }] } as Response)
+  })
+  expect(view.state.publicGroups).toEqual([])
+  expect(view.state.publicLoading).toBe(false)
+})

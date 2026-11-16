@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { joinPublicGroup, listPublicGroups } from '../api/community'
@@ -31,6 +31,7 @@ export function useCommunityDiscovery({
   const publicGroups = loadedGroups ?? []
   const publicLoading = active && loadedGroups === null
   const [joiningId, setJoiningId] = useState<number | null>(null)
+  const joiningRef = useRef(false)
   const requestRef = useLatest(request)
   const notifyRef = useLatest(notify)
   const onJoinedRef = useLatest(onJoinedGroup)
@@ -51,7 +52,8 @@ export function useCommunityDiscovery({
   }, [active, query, requestRef, setPublicGroups])
 
   async function joinPublic(id: number) {
-    if (joiningId !== null) return
+    if (joiningRef.current) return
+    joiningRef.current = true
     setJoiningId(id)
     try {
       const response = await joinPublicGroup(requestRef.current, id)
@@ -66,6 +68,7 @@ export function useCommunityDiscovery({
     } catch (error) {
       notifyRef.current(error instanceof Error ? error.message : 'Không thể tham gia cộng đồng.')
     } finally {
+      joiningRef.current = false
       setJoiningId(null)
     }
   }
