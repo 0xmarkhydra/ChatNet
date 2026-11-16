@@ -1,5 +1,7 @@
-import { attachmentRequestBody, type MediaAttachment } from "../../../shared/utils/media";
-import { type Story } from "../types";
+import type { MediaAttachment } from "../../../shared/utils/media";
+import type { Story, StoryDraft, TextStoryInput } from "../types";
+import { submitStory } from "../api/stories";
+import { STORY_TEXT_LIMIT, storyTextLength } from "../utils/storyText";
 import { type QueuedChatMessage, enqueueChatMessage } from "../../chat";
 import { userLabel } from "../../../shared/utils/userLabel";
 import { type Conversation } from "../../chat";
@@ -19,7 +21,7 @@ export type UseStoryActionsDeps = {
   setChatOnline: Dispatch<SetStateAction<boolean>>;
   setStories: Dispatch<SetStateAction<Story[]>>;
   setStoryBusy: Dispatch<SetStateAction<boolean>>;
-  setStoryDraftFile: Dispatch<SetStateAction<File | null>>;
+  setStoryDraft: Dispatch<SetStateAction<StoryDraft | null>>;
   storyBusy: boolean;
   updateChatOutbox: (transform: (items: QueuedChatMessage[]) => QueuedChatMessage[]) => QueuedChatMessage[];
   uploadMediaFiles: (files: File[], scope: "chat" | "feed" | "story" | "profile") => Promise<MediaAttachment[]>;
@@ -35,7 +37,7 @@ export function useStoryActions({
   setChatOnline,
   setStories,
   setStoryBusy,
-  setStoryDraftFile,
+  setStoryDraft,
   storyBusy,
   updateChatOutbox,
   uploadMediaFiles,
@@ -43,36 +45,45 @@ export function useStoryActions({
   const { session, sessionRef } = useSession();
   const { apiFetch } = useApi();
   const { setNotice } = useNotice();
-  async function createStory(file?: File) {
-    if (!file || storyBusy || mediaUploading) return;
+  async function createStory(input: { file: File } | TextStoryInput) {
     const sessionId = session?.sessionId;
+    if (!sessionId || storyBusy || ("file" in input && mediaUploading)) return false;
+    if ("text" in input) {
+      const length = storyTextLength(input.text);
+      if (!length || length > STORY_TEXT_LIMIT) return false;
+    }
     setStoryBusy(true);
     try {
-      const [attachment] = await uploadMediaFiles([file], "story");
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      const response = await apiFetch("/api/stories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attachment: attachmentRequestBody(attachment) }),
-      });
+      let body: Parameters<typeof submitStory>[1];
+      if ("file" in input) {
+        const [attachment] = await uploadMediaFiles([input.file], "story");
+        if (!attachment) throw new Error("Không tải được tệp Story");
+        body = { attachment };
+      } else {
+        body = { ...input, text: input.text.trim() };
+      }
+      if (sessionRef.current?.sessionId !== sessionId) return false;
+      const response = await submitStory(apiFetch, body);
       const result = (await response.json().catch(() => null)) as
         | (Story & { error?: string })
         | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
-      if (!response.ok || !result?.id || !result.attachment)
-        throw new Error(result?.error || "Không đăng được Story");
+      if (sessionRef.current?.sessionId !== sessionId) return false;
+      if (!response.ok || !result?.id || ("attachment" in body ? !result.attachment : !result.text || !result.background))
+        throw new Error("text" in body ? "Không đăng được tin văn bản. Vui lòng thử lại." : result?.error || "Không đăng được Story");
       setStories((current) => [
         result,
         ...current.filter((item) => item.id !== result.id),
       ]);
       setActiveStoryId(result.id);
-      setStoryDraftFile(null);
+      setStoryDraft(null);
       setNotice("Đã đăng Story.", "success");
+      return true;
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId)
         setNotice(
           error instanceof Error ? error.message : "Không đăng được Story",
         );
+      return false;
     } finally {
       if (sessionRef.current?.sessionId === sessionId) setStoryBusy(false);
     }
@@ -130,8 +141,8 @@ export function useStoryActions({
     return queued;
   }
   async function shareStory(story: Story) {
-    const url = story.attachment.url;
-    if (!url) {
+    const url = story.attachment?.url;
+    if (!url && !story.text) {
       setNotice("Không có đường dẫn Story để chia sẻ.");
       return;
     }
@@ -139,11 +150,11 @@ export function useStoryActions({
       if (navigator.share) {
         await navigator.share({
           title: "Khoảnh khắc của " + userLabel(story.authorDisplayName, story.author),
-          url,
+          ...(story.text ? { text: story.text } : { url }),
         });
       } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-        setNotice("Đã sao chép liên kết media của Story (liên kết có thể hết hạn).");
+        await navigator.clipboard.writeText(story.text ?? url ?? "");
+        setNotice(story.text ? "Đã sao chép nội dung Story." : "Đã sao chép liên kết media của Story (liên kết có thể hết hạn).");
       } else {
         setNotice("Trình duyệt không hỗ trợ chia sẻ liên kết Story.");
       }

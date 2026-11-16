@@ -57,6 +57,8 @@ let incomingMention = { id: 401, postId: 88, author: 'minhanh', authorDisplayNam
 let rejectNextEdit = false
 let createdFeedPost = null
 let lastStoryCreated = null
+let createdTextStory = null
+let rejectNextTextStory = false
 let presignedUploads = 0
 let friendRequestsSent = 0
 let rejectStoryDirect = false
@@ -225,11 +227,21 @@ try {
     }
     if (path === '/api/stories' && req.method() === 'POST') {
       lastStoryCreated = req.postDataJSON()
-      return json({ id: 101, author: 'soco_user', authorDisplayName: 'SocCO Tester',
-        attachment: { ...lastStoryCreated.attachment, url: origin + '/default-profile-cover.jpg' },
-        createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() })
+      const details = { author: 'soco_user', authorDisplayName: 'SocCO Tester',
+        createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() }
+      if (lastStoryCreated.text) {
+        if (rejectNextTextStory) {
+          rejectNextTextStory = false
+          return route.fulfill({ status: 500, contentType: 'application/json', headers: cors, body: '{"error":"cannot create story"}' })
+        }
+        createdTextStory = { ...details, id: 102, ...lastStoryCreated }
+        return json(createdTextStory)
+      }
+      return json({ ...details, id: 101,
+        attachment: { ...lastStoryCreated.attachment, url: origin + '/default-profile-cover.jpg' } })
     }
-    if (path === '/api/stories') return json([{
+    if (path === '/api/stories') return json([
+      ...(createdTextStory && new URL(req.url()).searchParams.get('includeText') === 'true' ? [createdTextStory] : []), {
       id: 29, author: 'minhanh', authorDisplayName: 'Minh Anh',
       attachment: { storageRef: 'test/story.jpg', kind: 'image', name: 'Tin mới', sizeBytes: 104093,
         contentType: 'image/jpeg', url: origin + '/default-profile-cover.jpg' },
@@ -335,6 +347,104 @@ try {
   await page.goto(origin)
   const sidebar = page.locator('.app-sidebar')
   await sidebar.waitFor()
+  if (process.argv.includes('--story-text-only')) {
+    const enterFeed = async () => {
+      await page.locator('.app-sidebar').getByRole('button', { name: 'Bảng tin' }).click()
+      await page.locator('.social-feed').waitFor({ state: 'visible' })
+    }
+    await enterFeed()
+    const create = page.getByRole('button', { name: 'Tạo Story mới', exact: true })
+    await create.click()
+    const composer = page.getByRole('dialog', { name: 'Tạo Story' })
+    const choice = composer.getByRole('group', { name: 'Chọn loại tin' })
+    const assertChooserLayout = async (width, height) => {
+      await page.setViewportSize({ width, height })
+      const bounds = await composer.boundingBox()
+      const cards = await choice.getByRole('button').all()
+      const [left, right] = await Promise.all(cards.map(card => card.boundingBox()))
+      assert(bounds && left && right, 'Story chooser must render both cards')
+      const edge = bounds.x + bounds.width
+      const bottom = bounds.y + bounds.height
+      const leftInset = left.x - bounds.x
+      const rightInset = edge - right.x - right.width
+      const midpoint = bounds.x + bounds.width / 2
+      const dims = JSON.stringify({ width, height, bounds, left, right })
+      assert(Math.abs(midpoint - width / 2) < 2 && bounds.y >= 0 && bottom <= height + 1,
+        'Story chooser should be horizontally centered and fit the viewport: ' + dims)
+      assert(leftInset >= 14 && rightInset >= 14 && Math.abs(leftInset - rightInset) < 2
+        && bottom - left.y - left.height >= 14 && right.x - left.x - left.width >= 12,
+        'Cards must have even side insets and stay clear of the modal edges: ' + dims)
+      assert(Math.abs(left.width - right.width) < 2 && Math.abs(left.height - right.height) < 2
+        && Math.abs(left.y - right.y) < 2 && left.height >= 140 && left.height <= 300,
+        'Cards must stay the same size without stretching: ' + dims)
+    }
+    await choice.waitFor()
+    await assertChooserLayout(1440, 900)
+    await assertChooserLayout(768, 520)
+    await assertChooserLayout(320, 520)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await composer.getByRole('button', { name: 'Tạo tin dạng văn bản' }).click()
+    const draft = composer.getByRole('textbox', { name: 'Nội dung tin' })
+    const publish = composer.getByRole('button', { name: 'Đăng Story' })
+    assert(await publish.isDisabled(), 'Blank Story must not publish')
+    await draft.fill('ế'.repeat(201))
+    assert(await publish.isDisabled(), 'Oversized Story must not publish')
+    const text = 'Chào bạn!\nHẹn gặp lại ✨'
+    await draft.fill(text)
+    await composer.getByText('Xanh ngọc', { exact: true }).evaluate(label => label.closest('label').click())
+    const preview = composer.getByRole('region', { name: 'Xem trước tin văn bản' })
+    assert(await preview.getAttribute('data-story-background') === 'teal'
+      && await preview.locator('p').textContent() === text, 'Preview must reflect current text and palette')
+    rejectNextTextStory = true
+    const rejected = page.waitForResponse(response => response.url().endsWith('/api/stories') && response.status() === 500)
+    await publish.click()
+    await rejected
+    await composer.getByRole('alert').waitFor()
+    assert(await draft.inputValue() === text, 'Failed publish must retain draft')
+    await publish.click()
+    await composer.waitFor({ state: 'hidden' })
+    assert(lastStoryCreated?.text === text && lastStoryCreated?.background === 'teal'
+      && !('attachment' in lastStoryCreated) && presignedUploads === 0, 'Text Story must be posted without media upload')
+    const viewer = page.getByRole('dialog', { name: 'Khoảnh khắc của SocCO Tester' })
+    const content = viewer.locator('.story-screen-text')
+    await content.waitFor()
+    assert(await content.getAttribute('data-story-background') === 'teal'
+      && await content.locator('p').textContent() === text, 'Viewer must show published text and palette')
+    await viewer.getByRole('button', { name: 'Đóng', exact: true }).click()
+    await page.reload()
+    await enterFeed()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.getByRole('button', { name: 'Xem Story của SocCO Tester' }).click()
+    await content.waitFor()
+    assert(await content.locator('p').isVisible(), 'Persisted text story must render on mobile')
+    await viewer.getByRole('button', { name: 'Đóng', exact: true }).click()
+    await create.click()
+    await composer.getByRole('button', { name: 'Tạo tin dạng văn bản' }).click()
+    await draft.waitFor()
+    const bounds = await composer.boundingBox()
+    assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 391, 'Mobile composer fits viewport')
+    await composer.getByRole('button', { name: 'Quay lại chọn loại tin', exact: true }).click()
+    await assertChooserLayout(390, 844)
+    const mediaPicker = page.waitForEvent('filechooser')
+    await composer.getByRole('button', { name: 'Tạo tin có ảnh hoặc video' }).click()
+    await (await mediaPicker).setFiles({
+      name: 'story-test.png', mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWlMAAAAASUVORK5CYII=', 'base64'),
+    })
+    await composer.locator('.smart-story-frame img').waitFor({ state: 'visible' })
+    assert(presignedUploads === 0, 'Media preview must not upload before publish')
+    await publish.click()
+    await composer.waitFor({ state: 'hidden' })
+    assert(presignedUploads === 1 && lastStoryCreated?.attachment?.storageRef?.startsWith('story/1/'),
+      'Media Story must publish using the unchanged attachment payload')
+    await viewer.locator('.story-screen-media img').waitFor({ state: 'visible' })
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('Story PASS: responsive chooser layout, text preview, validation, failed publish, mobile viewer and media upload')
+    await browser.close()
+    server.kill('SIGTERM')
+    process.exit(0)
+  }
+
   if (headerOnly) {
     const header = page.locator('main > .chatnet-appbar')
     for (const [path, label, navLabel] of [
@@ -1075,11 +1185,12 @@ try {
     await feed.evaluate(root => { root.scrollTop = 0 })
     await page.setViewportSize({ width: 1586, height: 992 })
 
-    await feed.locator('input[aria-label="Chọn ảnh hoặc video cho Story"]').setInputFiles({
+    await feed.getByRole('button', { name: 'Tạo Story mới', exact: true }).click()
+    const storyComposer = page.getByRole('dialog', { name: 'Tạo Story' })
+    await storyComposer.getByLabel('Chọn ảnh hoặc video cho Story', { exact: true }).setInputFiles({
       name: 'story-test.png', mimeType: 'image/png',
       buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWlMAAAAASUVORK5CYII=', 'base64'),
     })
-    const storyComposer = page.getByRole('dialog', { name: 'Tạo Story' })
     await storyComposer.waitFor({ state: 'visible' })
     assert(await storyComposer.locator('.smart-story-frame img').isVisible() && !lastStoryCreated,
       'Selecting Story media must show preview without publishing')

@@ -13,6 +13,7 @@ const load = async (relativePath) => {
 }
 const posts = await load('../src/features/feed/api/posts.ts')
 const comments = await load('../src/features/feed/api/comments.ts')
+const stories = await load('../src/features/feed/api/stories.ts')
 const types = await load('../src/features/feed/types.ts')
 
 const calls = []
@@ -69,4 +70,18 @@ assert.equal(last().init.method, 'POST')
 assert.deepEqual(last().init.headers, JSON_HEADERS)
 assert.equal(last().init.body, '{"targetType":"comment","targetId":9,"reason":"spam"}')
 
-console.log('PASS: feed API requests (paths, methods, headers and bodies) are unchanged')
+// ---- stories
+await stories.listStories(request)
+assert.deepEqual(last(), { path: '/api/stories?includeText=true', init: undefined })
+await stories.submitStory(request, { text: 'Chào bạn', background: 'teal' })
+assert.deepEqual(last(), { path: '/api/stories', init: {
+  method: 'POST', headers: JSON_HEADERS, body: '{"text":"Chào bạn","background":"teal"}',
+} })
+await stories.submitStory(request, { attachment: {
+  storageRef: 'story/1/photo.jpg', name: 'photo.jpg', sizeBytes: 10, contentType: 'image/jpeg', kind: 'image', url: 'https://example.invalid',
+} })
+assert.deepEqual(JSON.parse(last().init.body), { attachment: {
+  storageRef: 'story/1/photo.jpg', name: 'photo.jpg', sizeBytes: 10, contentType: 'image/jpeg', kind: 'image',
+} })
+
+console.log('PASS: feed API requests (paths, methods, headers and bodies)')

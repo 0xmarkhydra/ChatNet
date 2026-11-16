@@ -85,7 +85,7 @@ func (s *server) listModerationReports(w http.ResponseWriter, r *http.Request) {
                COALESCE(CASE fr.target_type
                  WHEN 'post' THEN (SELECT LEFT(p.content,500) FROM posts p WHERE p.id=fr.target_id)
                  WHEN 'comment' THEN (SELECT LEFT(c.content,500) FROM comments c WHERE c.id=fr.target_id)
-                 WHEN 'story' THEN (SELECT 'Story ('||st.kind||')' FROM stories st WHERE st.id=fr.target_id)
+                 WHEN 'story' THEN (SELECT COALESCE(st.text_content,'Story ('||st.kind||')') FROM stories st WHERE st.id=fr.target_id)
                END,'[Nội dung không còn tồn tại]'),
                fr.status,fr.created_at,fr.reviewed_at
         FROM feed_reports fr JOIN users u ON u.id=fr.reporter_id

@@ -32,14 +32,14 @@ export default function StoryComposer({ file, busy, onPublish, onChangeFile }: P
           : <img src={preview} alt="Xem trước ảnh Story đã chọn" />)}
       </div>
       <p className="smart-story-note">Story sẽ hiển thị trong 24 giờ. Kiểm tra ảnh hoặc video trước khi đăng.</p>
-      <footer className="smart-story-actions">
+      <div className="smart-story-actions">
         <button type="button" className="smart-story-change" onClick={() => fileInputRef.current?.click()} disabled={busy}>
           <ImagePlus size={18} aria-hidden="true" /> Chọn tệp khác
         </button>
         <button type="button" className="smart-story-publish" onClick={onPublish} disabled={busy}>
           <Send size={17} aria-hidden="true" /> {busy ? 'Đang đăng...' : 'Đăng Story'}
         </button>
-      </footer>
+      </div>
     </section>
   )
 }
