@@ -3321,7 +3321,7 @@ export default function AuthedApp({
 
         {tab === "market" && (
           <MarketSection
-          searchQuery={globalSearch}
+            searchQuery={globalSearch}
           apiFetch={apiFetch}
           session={session}
           switchTab={switchTab}

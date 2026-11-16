@@ -9,8 +9,9 @@ export function searchLabels(tab: Tab) {
     case "contacts":
       return { placeholder: "Tên, @username hoặc email", ariaLabel: "Tìm bạn bằng tên, username hoặc email" };
     case "discover":
+      return { placeholder: "Tìm người và kết nối...", ariaLabel: "Tìm người trên Khám phá" };
     case "market":
-      return { placeholder: "Tìm kiếm trên SocCo...", ariaLabel: "Tìm kiếm trên SocCo" };
+      return { placeholder: "Tìm kiếm sản phẩm...", ariaLabel: "Tìm sản phẩm trên Marketplace" };
     case "profile":
       return { placeholder: "Tìm kiếm trên SocCo...", ariaLabel: "Tìm bài viết trên SocCo" };
     case "feed":
