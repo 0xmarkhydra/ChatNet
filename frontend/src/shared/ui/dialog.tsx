@@ -14,7 +14,7 @@ function DialogContent({
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
         data-slot="dialog-overlay"
-        className="fixed inset-0 z-100 bg-black/50 data-[state=closed]:animate-none"
+        className="fixed inset-0 z-100 bg-black/50"
       />
       <DialogPrimitive.Content
         data-slot="dialog-content"

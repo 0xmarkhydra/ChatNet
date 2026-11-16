@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Bell, Database, Languages, LockKeyhole, MessageCircle,
   Monitor, Palette, ShieldCheck, UserRound,
@@ -6,7 +7,7 @@ import {
 import type { UserPrivacy } from "../../profile";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 
-type Section =
+export type Section =
   | "account" | "privacy" | "security" | "notifications" | "language"
   | "messages" | "appearance" | "storage" | "devices";
 
@@ -27,7 +28,7 @@ type Props = {
   devices: ReactNode;
 };
 
-const sections = [
+export const SETTINGS_SECTIONS = [
   { id: "account", label: "Thông tin tài khoản", subtitle: "Hồ sơ và thông tin cá nhân", icon: UserRound },
   { id: "privacy", label: "Quyền riêng tư", subtitle: "Kiểm soát dữ liệu và những ai có thể tương tác với bạn.", icon: ShieldCheck },
   { id: "security", label: "Bảo mật & đăng nhập", subtitle: "Quản lý các kết nối và tài khoản bị chặn", icon: LockKeyhole },
@@ -44,8 +45,14 @@ export default function SettingsWorkspace({
   privacy, privacyLoading, privacyBusy, privacyError, onPrivacyRetry, onSavePrivacy,
   account, security, notifications, language, messages, appearance, storage, devices,
 }: Props) {
-  const [selected, setSelected] = useState<Section>("privacy");
-  const currentSection = sections.find((item) => item.id === selected) ?? sections[1];
+  const location = useLocation();
+  const navigate = useNavigate();
+  const segment = location.pathname.startsWith("/settings/")
+    ? location.pathname.slice("/settings/".length).replace(/\/$/, "")
+    : "privacy";
+  const selected: Section = SETTINGS_SECTIONS.some((item) => item.id === segment)
+    ? segment as Section : "privacy";
+  const currentSection = SETTINGS_SECTIONS.find((item) => item.id === selected) ?? SETTINGS_SECTIONS[1];
   const CurrentIcon = currentSection.icon;
 
   const otherContent: Record<Exclude<Section, "privacy">, ReactNode> = {
@@ -57,13 +64,13 @@ export default function SettingsWorkspace({
       <aside className="settings-workspace-menu">
         <h2>Cài đặt tài khoản</h2>
         <nav aria-label="Danh mục cài đặt">
-          {sections.map(({ id, label, icon: Icon }) => (
+          {SETTINGS_SECTIONS.map(({ id, label, icon: Icon }) => (
             <button
               type="button"
               key={id}
               className={"settings-workspace-nav-item" + (selected === id ? " is-selected" : "")}
               aria-current={selected === id ? "page" : undefined}
-              onClick={() => setSelected(id)}
+              onClick={() => navigate(id === "privacy" ? "/settings" : `/settings/${id}`)}
             >
               <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
               <span>{label}</span>

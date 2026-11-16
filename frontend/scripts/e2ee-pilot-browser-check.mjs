@@ -8,6 +8,7 @@ import { chromium } from 'playwright'
 import { createServer } from 'vite'
 
 const autoDefault = process.env.CHATNET_E2EE_AUTO_TEST === '1' || process.argv.includes('--auto')
+const legacyHistory = process.argv.includes('--legacy')
 const members = new Set([401, 402])
 const deviceMap = new Map()
 const challengeMap = new Map()
@@ -42,7 +43,8 @@ async function handleAPI(req, res) {
   const path = parsed.pathname
   if (req.method === 'GET' && path === '/api/conversations/501/e2ee/status') {
     return json(res, 200, { mode: epoch === 0 ? 'legacy' : 'e2ee',
-      epoch, pilotEnabled: true, autoEnabled: autoDefault && epoch === 0 })
+      epoch, pilotEnabled: true, autoEnabled: autoDefault && epoch === 0,
+      legacyHistory })
   }
   if (req.method === 'GET' && path === '/api/auth/e2ee/devices') {
     return json(res, 200, [...deviceMap.values()].filter(d => d.userId === userId)
@@ -230,6 +232,12 @@ try {
     assert.equal(await bob.evaluate(() => window.e2eePilotTestMode), 'e2ee')
     assert.equal(deviceMap.size, 2)
     assert.equal(consents.size, 2)
+    if (legacyHistory) {
+      await Promise.all([
+        alice.getByText(/Tin nhắn trước khi chuyển đổi vẫn là lịch sử không mã hóa/).waitFor(),
+        bob.getByText(/Tin nhắn trước khi chuyển đổi vẫn là lịch sử không mã hóa/).waitFor(),
+      ])
+    }
     await Promise.all([
       alice.evaluate(() => window.unmountE2EEPilotTest()),
       bob.evaluate(() => window.unmountE2EEPilotTest()),

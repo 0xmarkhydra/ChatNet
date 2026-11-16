@@ -44,7 +44,7 @@ export default function DiscoverSection({
   stopNearby,
 }: DiscoverSectionProps) {
   return (
-      <ErrorBoundary fallback={() => <AsyncSectionFallback title="Khám phá" onRetry={() => window.location.reload()} />}>
+      <ErrorBoundary fallback={(retry) => <AsyncSectionFallback title="Khám phá" onRetry={retry} onReload={() => window.location.reload()} />}>
       <Suspense fallback={<AsyncSectionFallback title="Khám phá" loading />}>
             <NearbyExplorer
               query={globalSearch}

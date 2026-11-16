@@ -281,6 +281,16 @@ This is a **transport only**, NOT a working MLS crypto engine or E2EE chat mode.
 
 **Production blockers:** Multi-device linking and recovery, rekey on removal, proper first-contact key transparency, encrypted attachments/media, client translation and migration of old conversations must be implemented and validated. Do **not** set `CHATNET_E2EE_AUTO_DEFAULT=1` in production until then.
 
+## 6.9 Batch 09 — Fix silent plaintext delivery in existing direct rooms (DEV)
+
+**Root cause reproduced in code:** `autoEnabled` previously required `!hasHistory` and the legacy message handler explicitly allowed plaintext in rooms that already contained messages. Users opening an older 1:1 conversation could send via `POST /api/conversations/{id}/messages` without any `/e2ee/events` in DevTools. This was **not** E2EE despite automatic MLS being enabled on DEV.
+
+**Change:** When both `CHATNET_E2EE_EXPERIMENTAL=1` and `CHATNET_E2EE_AUTO_DEFAULT=1` are set, **all direct 1:1 conversations** (including those with historical plaintext) require MLS for their next new message. The backend rejects `POST /messages` and `PATCH /messages/{id}` with HTTP 409 for these conversations before storing plaintext, regardless of existing history. The frontend receives `autoEnabled:true`, automatically attempts device enrollment/pinning/bootstrap, and hides the plaintext composer while E2EE is pending. The server also exposes `legacyHistory:true` for historical rows so the UI explicitly marks their lack of E2EE. **Historical messages are not retroactively encrypted, deleted, or described as secure.**
+
+**Important:** This necessarily interrupts new sending in old direct chats while the second participant is offline or a device cannot initialize. This is intentional fail-closed behavior for **DEV only**; pilot limits still apply (one device/account; first-contact trust-on-first-use; no independent audit, groups/media/translation not E2EE). Do not enable this automatic policy on production before completing device recovery and migration.
+
+**Tests:** `npm --prefix frontend run check:e2ee-legacy-cutover` exercises the real React E2EE panel with `legacyHistory:true`, no manual activation, two Chromium accounts, MLS encryption and DOM rendering. PostgreSQL integration asserts that an existing direct room has `autoEnabled:true`, `legacyHistory:true`, preserves old database rows while refusing any new plaintext insert.
+
 ## 7. Sequence, migration, gates
 
 1. Do not push/deploy this primary checkout until the POC, protocol contract, isolated integration tests and security review pass; keep current chat behavior unchanged.

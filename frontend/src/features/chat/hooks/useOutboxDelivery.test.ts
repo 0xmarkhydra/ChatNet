@@ -63,9 +63,11 @@ async function createDelivery() {
     retry,
     cleanup: async () => { await act(async () => root.unmount()); },
     getOutbox: () => outbox,
+    setOutbox: (next: QueuedChatMessage[]) => { outbox = next; },
     updateChatOutbox,
     setMessages,
     refreshConversations,
+    deps,
   };
 }
 
@@ -152,4 +154,106 @@ describe("outbox delivery session races", () => {
     expect(delivery.updateChatOutbox).not.toHaveBeenCalled();
     await delivery.cleanup();
   });
+  it("ignores an old ACK after A → B → A reuses the same sessionId", async () => {
+    let finishBody!: (message: Message) => void;
+    mocked.postFetch.mockResolvedValue({
+      ok: true,
+      json: () => new Promise<Message>((resolve) => { finishBody = resolve; }),
+    });
+    const delivery = await createDelivery();
+    const task = delivery.retry();
+    await vi.waitFor(() => expect(finishBody).toBeTypeOf("function"));
+    mocked.sessionRef.current = { sessionId: "new-session", user: { id: 22 } };
+    mocked.sessionRef.current = { sessionId: "old-session", user: { id: 17 } };
+    finishBody({ id: 55, conversationId: 12, senderId: 17, clientId: pending.clientId } as Message);
+    await task;
+    expect(delivery.getOutbox()).toEqual([pending]);
+    expect(delivery.setMessages).not.toHaveBeenCalled();
+    expect(delivery.refreshConversations).not.toHaveBeenCalled();
+    await delivery.cleanup();
+  });
+
+  it("does not fail a new A visit's queued message after a stale 4xx response", async () => {
+    let finishBody!: (body: { error: string }) => void;
+    mocked.postFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: () => new Promise((resolve) => { finishBody = resolve; }),
+    });
+    const delivery = await createDelivery();
+    const task = delivery.retry();
+    await vi.waitFor(() => expect(finishBody).toBeTypeOf("function"));
+    mocked.sessionRef.current = { sessionId: "new-session", user: { id: 22 } };
+    mocked.sessionRef.current = { sessionId: "old-session", user: { id: 17 } };
+    finishBody({ error: "Forbidden from old visit" });
+    await task;
+    expect(delivery.getOutbox()).toEqual([pending]);
+    expect(delivery.updateChatOutbox).not.toHaveBeenCalled();
+    await delivery.cleanup();
+  });
+
+  it("does not release the new visit's send/retry locks when the old attempt finishes", async () => {
+    const completions: Array<(message: Message) => void> = [];
+    mocked.postFetch.mockImplementation(() => Promise.resolve({
+      ok: true,
+      json: () => new Promise<Message>(resolve => { completions.push(resolve); }),
+    }));
+    const delivery = await createDelivery();
+    const first = delivery.retry();
+    await vi.waitFor(() => expect(completions).toHaveLength(1));
+    const oldLocks = delivery.deps.sendingClientIDs.current;
+    expect(oldLocks.has(pending.clientId)).toBe(true);
+
+    // App Shell creates a new lock set and resets the retry flag when accounts switch.
+    mocked.sessionRef.current = { sessionId: "new-session", user: { id: 22 } };
+    delivery.deps.sendingClientIDs.current = new Set<string>();
+    delivery.deps.retryOutboxBusyRef.current = false;
+    mocked.sessionRef.current = { sessionId: "old-session", user: { id: 17 } };
+
+    const second = delivery.retry();
+    await vi.waitFor(() => expect(completions).toHaveLength(2));
+    const newLocks = delivery.deps.sendingClientIDs.current;
+    expect(newLocks.has(pending.clientId)).toBe(true);
+    expect(delivery.deps.retryOutboxBusyRef.current).toBe(true);
+
+    completions[0]({ id: 55, conversationId: 12, senderId: 17, clientId: pending.clientId } as Message);
+    await first;
+    expect(newLocks.has(pending.clientId)).toBe(true);
+    expect(delivery.deps.retryOutboxBusyRef.current).toBe(true);
+    expect(delivery.updateChatOutbox).not.toHaveBeenCalled();
+
+    completions[1]({ id: 56, conversationId: 12, senderId: 17, clientId: pending.clientId } as Message);
+    await second;
+    expect(newLocks.has(pending.clientId)).toBe(false);
+    expect(delivery.deps.retryOutboxBusyRef.current).toBe(false);
+    expect(delivery.getOutbox()).toEqual([]);
+    await delivery.cleanup();
+  });
+
+  it("stops an old retry loop before sending the next account's queue", async () => {
+    let finishOld!: (message: Message) => void;
+    mocked.postFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => new Promise<Message>(resolve => { finishOld = resolve; }),
+    });
+    const delivery = await createDelivery();
+    const oldTask = delivery.retry();
+    await vi.waitFor(() => expect(finishOld).toBeTypeOf("function"));
+
+    mocked.sessionRef.current = { sessionId: "new-session", user: { id: 22 } };
+    delivery.deps.chatOutboxSession.current = "new-session";
+    delivery.deps.sendingClientIDs.current = new Set<string>();
+    delivery.setOutbox([{ ...pending, clientId: "new-account-client", conversationId: 29 }]);
+
+    finishOld({ id: 55, conversationId: 12, senderId: 17, clientId: pending.clientId } as Message);
+    await oldTask;
+
+    expect(mocked.postFetch).toHaveBeenCalledTimes(1);
+    expect(delivery.getOutbox()).toEqual([
+      expect.objectContaining({ clientId: "new-account-client", status: "queued" }),
+    ]);
+    expect(delivery.updateChatOutbox).not.toHaveBeenCalled();
+    await delivery.cleanup();
+  });
+
 });
