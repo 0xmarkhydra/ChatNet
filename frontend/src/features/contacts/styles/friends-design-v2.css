@@ -294,3 +294,31 @@
    min-width:0; font-size:11px;
  }
 }
+
+/* Search feedback is intentionally separate from cached result rows. */
+.friends-design-v2 .fd-search-results { min-width: 0; }
+.friends-design-v2 .fd-search-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 126px;
+  padding: 24px 18px;
+  color: #627694;
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.5;
+}
+.friends-design-v2 .fd-search-status svg { flex-shrink: 0; color: #5774cb; }
+.friends-design-v2 .fd-search-status > button {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 36px; padding: 8px 14px;
+}
+.friends-design-v2 .fd-search-results[aria-busy="true"] .fd-search-status svg {
+  animation: fd-search-pulse 1.5s ease-in-out infinite;
+}
+@keyframes fd-search-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.9); } }
+@media (prefers-reduced-motion: reduce) {
+  .friends-design-v2 .fd-search-results[aria-busy="true"] .fd-search-status svg { animation: none; }
+}

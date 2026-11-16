@@ -856,6 +856,8 @@ export default function ChatSection({
                     updateChatOutbox={updateChatOutbox}
                     visibleMessages={visibleMessages}
                     messageReaderMembers={messageReaderMembers}
+                    groupMembers={groupMembers}
+                    onProfile={openVisitor}
                     setReadersTarget={setReadersTarget}
                   />
 
@@ -885,12 +887,14 @@ export default function ChatSection({
                     </div>
                   ) : (mlsPilotMode === 'e2ee' || mlsPilotMode === 'pending') ? null : (
                   <MessageComposer
+                key={`${activeConversationId}:${selectedChannelId}`}
                 activeConversation={activeConversation}
                 activeConversationId={activeConversationId}
                 addChatFiles={addChatFiles}
                 canSend={canSend}
                 chatFileInputRef={chatFileInputRef}
                 groupChannels={groupChannels}
+                groupMembers={groupMembers}
                 isProfileDesktop={isProfileDesktop}
                 mediaUploading={mediaUploading}
                 messageAttachments={messageAttachments}
