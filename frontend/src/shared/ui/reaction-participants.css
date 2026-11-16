@@ -77,7 +77,8 @@
 }
 .reaction-users-tabs button span { font-variant-numeric: tabular-nums; }
 .reaction-users-list {
-  min-height: 80px;
+  /* Let the scroll area shrink inside short mobile viewports. */
+  min-height: 0;
   overflow-y: auto;
   padding: 8px 16px 16px;
   overscroll-behavior: contain;

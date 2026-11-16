@@ -68,3 +68,18 @@ it('wraps Tab and Shift+Tab among controls without losing dialog focus', async (
   expect(document.activeElement).toBe(buttons[buttons.length - 1])
   await act(async () => root.unmount())
 })
+
+it('announces loading as busy while keeping the list available to screen readers', async () => {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  const request = vi.fn(() => new Promise<Response>(() => {}))
+  await act(async () => {
+    root.render(<ReactionParticipantsDialog kind="post" id={21} request={request} onClose={vi.fn()} />)
+  })
+  const list = document.querySelector('.reaction-users-list') as HTMLElement
+  expect(list.getAttribute('aria-live')).toBe('polite')
+  expect(list.getAttribute('aria-busy')).toBe('true')
+  expect(list.textContent).toContain('Đang tải danh sách')
+  await act(async () => root.unmount())
+})
