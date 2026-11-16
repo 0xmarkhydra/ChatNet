@@ -8,25 +8,25 @@ import type { Tab } from "../../../shared/types/navigation";
 const Marketplace = lazy(() => import("./Marketplace"));
 
 export type MarketSectionProps = {
+  searchQuery: string;
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   session: Session;
   switchTab: (nextTab: Tab) => void;
-  searchQuery: string;
 };
 
 export default function MarketSection({
+  searchQuery,
   apiFetch,
   session,
   switchTab,
-  searchQuery,
 }: MarketSectionProps) {
   return (
       <ErrorBoundary resetKey={session.sessionId} fallback={(retry) => <AsyncSectionFallback title="Chợ" onRetry={retry} onReload={() => window.location.reload()} />}>
       <Suspense fallback={<AsyncSectionFallback title="Chợ" loading />}>
             <Marketplace
+              searchQuery={searchQuery}
               key={session.sessionId}
               userId={session.user.id}
-              searchQuery={searchQuery}
               request={apiFetch}
               onBack={() => switchTab("discover")}
             />

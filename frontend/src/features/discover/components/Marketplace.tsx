@@ -22,7 +22,7 @@ type Props = {
 }
 const showMoney = (n: number, unit: string) => n.toLocaleString('vi-VN') + ' ' + unit
 
-export default function Marketplace({ userId, searchQuery, request, onBack }: Props) {
+export default function Marketplace({ userId, searchQuery = '', request, onBack }: Props) {
   const apiRef = useLatest(request)
   const revision = useRef(0)
   const readRevision = useRef(0)
@@ -160,7 +160,7 @@ export default function Marketplace({ userId, searchQuery, request, onBack }: Pr
       if (isCurrent()) setMessage('Đã đăng sản phẩm.')
     })
   }
-  return (
+    return (
     <section className="marketplace-view">
       <header className="marketplace-header">
         <button type="button" aria-label="Quay lại Khám phá" onClick={onBack}><ArrowLeft size={20}/></button>

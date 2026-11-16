@@ -2,13 +2,14 @@
 import { act, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Link, MemoryRouter, Outlet, useLocation } from "react-router-dom";
+import { Link, MemoryRouter, Outlet, parsePath, useLocation, useNavigate } from "react-router-dom";
 import { AppRouteTree } from "./RouteTree";
+import { ROUTE, TAB_PATH } from "./routes";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 const cleanup: Array<() => void> = [];
 
-function renderAt(path: string) {
+function renderAt(path: string, initialState?: unknown) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -16,19 +17,29 @@ function renderAt(path: string) {
 
   function Shell() {
     const location = useLocation();
+    const navigate = useNavigate();
     useEffect(() => { onMount(); }, []);
     return (
       <div>
         <output data-testid="location">{location.pathname + location.search}</output>
+        <output data-testid="hash">{location.hash}</output>
+        <output data-testid="state">{JSON.stringify(location.state)}</output>
         <Link to="/feed">Bảng tin</Link>
+        <Link to="/feed/posts/42">Bài viết 42</Link>
+        <Link to="/chat/123">Hội thoại 123</Link>
+        <Link to="/settings/devices">Thiết bị</Link>
+        <Link to="/calls/translation">Dịch AI</Link>
+        <Link to="/users/alice">Hồ sơ Alice</Link>
         <Link to="/somewhere-unknown">Invalid</Link>
+        <button type="button" onClick={() => navigate(-1)}>History Back</button>
+        <button type="button" onClick={() => navigate(1)}>History Forward</button>
         <Outlet context={<p data-testid="page">Current screen</p>} />
       </div>
     );
   }
 
   act(() => root.render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={[{ ...parsePath(path), state: initialState }]}>
       <AppRouteTree><Shell /></AppRouteTree>
     </MemoryRouter>,
   ));
@@ -42,8 +53,15 @@ function renderAt(path: string) {
     return el;
   };
   const location = () => container.querySelector('[data-testid="location"]')?.textContent;
+  const history = (direction: "Back" | "Forward") => {
+    const button = Array.from(container.querySelectorAll("button")).find((item) => item.textContent === `History ${direction}`);
+    if (!button) throw new Error(`Missing History ${direction}`);
+    act(() => button.click());
+  };
   const page = () => container.querySelector('[data-testid="page"]');
-  return { container, onMount, link, location, page };
+  const hash = () => container.querySelector('[data-testid="hash"]')?.textContent;
+  const state = () => container.querySelector('[data-testid="state"]')?.textContent;
+  return { container, onMount, link, location, page, hash, state, history };
 }
 
 afterEach(() => {
@@ -51,6 +69,14 @@ afterEach(() => {
 });
 
 describe("app route tree", () => {
+  it("provides a working index route for every registered app tab and workspace", () => {
+    for (const path of [...Object.values(TAB_PATH), ...Object.values(ROUTE)]) {
+      const app = renderAt(path);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("keeps the authenticated shell mounted when switching tabs", () => {
     const { onMount, link, location, page } = renderAt("/chat");
     expect(page()?.textContent).toBe("Current screen");
@@ -60,10 +86,55 @@ describe("app route tree", () => {
     expect(onMount).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the signed-in shell and outlet context across nested feature routes", () => {
+    const app = renderAt("/feed");
+    for (const [label, path] of [
+      ["Bài viết 42", "/feed/posts/42"],
+      ["Hội thoại 123", "/chat/123"],
+      ["Thiết bị", "/settings/devices"],
+      ["Dịch AI", "/calls/translation"],
+      ["Hồ sơ Alice", "/users/alice"],
+      ["Bảng tin", "/feed"],
+    ]) {
+      act(() => app.link(label).click());
+      expect(app.location()).toBe(path);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("preserves nested page context across back/forward history", () => {
+    const app = renderAt("/chat");
+    act(() => app.link("Bài viết 42").click());
+    act(() => app.link("Thiết bị").click());
+    expect(app.location()).toBe("/settings/devices");
+    app.history("Back");
+    expect(app.location()).toBe("/feed/posts/42");
+    expect(app.page()?.textContent).toBe("Current screen");
+    app.history("Back");
+    expect(app.location()).toBe("/chat");
+    app.history("Forward");
+    expect(app.location()).toBe("/feed/posts/42");
+    app.history("Forward");
+    expect(app.location()).toBe("/settings/devices");
+    expect(app.page()?.textContent).toBe("Current screen");
+    expect(app.onMount).toHaveBeenCalledTimes(1);
+  });
+
   it("redirects legacy home links without discarding the post deep link", () => {
     const { location, page } = renderAt("/?tab=feed&post=42");
     expect(location()).toBe("/feed?tab=feed&post=42");
     expect(page()).not.toBeNull();
+  });
+
+  it("preserves legacy deep-link fragment and navigation state through home redirect", () => {
+    const payload = { postId: 42, visitorReturnTo: "/contacts/requests" };
+    const app = renderAt("/?tab=feed&post=42#comments", payload);
+    expect(app.location()).toBe("/feed?tab=feed&post=42");
+    expect(app.hash()).toBe("#comments");
+    expect(app.state()).toBe(JSON.stringify(payload));
+    expect(app.page()?.textContent).toBe("Current screen");
+    expect(app.onMount).toHaveBeenCalledTimes(1);
   });
 
   it("renders Not Found for unknown paths without replacing the shell", () => {
@@ -142,6 +213,40 @@ describe("app route tree", () => {
       const invalid = renderAt(path);
       expect(invalid.page()).toBeNull();
       expect(invalid.container.textContent).toContain("Không tìm thấy trang");
+    }
+  });
+
+  it("rejects unknown profile and feed subpaths instead of rendering an unrelated page", () => {
+    for (const path of ["/profile/unknown", "/profile/edit/unknown", "/feed/unknown", "/feed/posts/42/extra"]) {
+      const app = renderAt(path);
+      expect(app.location()).toBe(path);
+      expect(app.page()).toBeNull();
+      expect(app.container.textContent).toContain("Không tìm thấy trang");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    for (const path of ["/profile", "/feed", "/feed/posts/42"]) {
+      expect(renderAt(path).page()?.textContent).toBe("Current screen");
+    }
+  });
+
+  it("offers a parent destination from unsupported deep links", () => {
+    const examples: Array<[string, string, string]> = [
+      ["/feed/broken", "Về Bảng tin", "/feed"],
+      ["/profile/broken", "Về Hồ sơ", "/profile"],
+      ["/users/alice/more", "Về Hồ sơ", "/profile"],
+      ["/settings/broken", "Về Cài đặt", "/settings"],
+      ["/calls/broken", "Về Cuộc gọi", "/calls"],
+      ["/contacts/broken", "Về Danh bạ", "/contacts"],
+      ["/unknown", "Về Tin nhắn", "/chat"],
+    ];
+    for (const [path, label, destination] of examples) {
+      const app = renderAt(path);
+      expect(app.page()).toBeNull();
+      expect(app.container.textContent).toContain("Không tìm thấy trang");
+      act(() => app.link(label).click());
+      expect(app.location()).toBe(destination);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
     }
   });
 
