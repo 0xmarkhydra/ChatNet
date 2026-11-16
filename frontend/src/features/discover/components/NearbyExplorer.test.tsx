@@ -201,6 +201,7 @@ describe('NearbyExplorer location fallback', () => {
     await act(async () => button('Xem danh sách')?.click())
     expect(host.querySelector('[role="alert"]')).toBeNull()
     expect(host.querySelector<HTMLButtonElement>('button[aria-label="Danh sách"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(host.querySelector('button[aria-label="Danh sách"]'))
     consoleError.mockRestore()
   })
 
@@ -232,6 +233,7 @@ describe('NearbyExplorer location fallback', () => {
     expect(host.querySelector('[data-testid="nearby-map"]')).toBeNull()
     const list = host.querySelector<HTMLButtonElement>('button[aria-label="Danh sách"]')
     expect(list?.getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(list)
   })
 
   it('shows an accessible location status while finding a position, without an empty prompt', async () => {

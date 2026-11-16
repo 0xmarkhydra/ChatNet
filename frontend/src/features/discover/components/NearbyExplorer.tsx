@@ -48,6 +48,13 @@ export default function NearbyExplorer({
 }: Props) {
   const [mode, setMode] = useState<'people' | 'places'>('people')
   const [view, setView] = useState<'list' | 'map'>('map')
+  const listViewButton = useRef<HTMLButtonElement>(null)
+  const shouldFocusListView = useRef(false)
+  useEffect(() => {
+    if (view !== 'list' || !shouldFocusListView.current) return
+    shouldFocusListView.current = false
+    listViewButton.current?.focus()
+  }, [view])
   const [category, setCategory] = useState<NearbyPlaceCategory>('all')
   const [radius, setRadius] = useState(1)
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
@@ -110,6 +117,11 @@ export default function NearbyExplorer({
     await onScanPeople()
   }
 
+  function showListAfterMapFailure() {
+    shouldFocusListView.current = true
+    setView('list')
+  }
+
   function directions(place: NearbyPlace) {
     const from = location ? `${location.latitude},${location.longitude};` : ''
     window.open(`https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(`${from}${place.latitude},${place.longitude}`)}`, '_blank', 'noopener,noreferrer')
@@ -143,7 +155,7 @@ export default function NearbyExplorer({
     <div className="nearby-results-heading">
       <strong>{count} {mode === 'people' ? 'người' : 'địa điểm'}</strong>
       {mode === 'people' ? <span>{users.length ? `Trong ${resultRadiusKm} km · gần nhất trước` : ''}</span> : <div className="nearby-view">
-        <button title="Danh sách" aria-label="Danh sách" aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={18} /></button>
+        <button ref={listViewButton} title="Danh sách" aria-label="Danh sách" aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={18} /></button>
         <button title="Bản đồ" aria-label="Bản đồ" aria-pressed={view === 'map'} onClick={() => setView('map')}><MapIcon size={18} /></button>
       </div>}
     </div>
@@ -162,7 +174,7 @@ export default function NearbyExplorer({
     </div> : <>
       {!location && !busy && <div className="nearby-empty"><MapPin size={36} /><h2>Tìm địa điểm gần bạn</h2><button className="nearby-primary" onClick={() => void locate()}>Dùng vị trí hiện tại</button></div>}
       {location && <div className={`nearby-place-content${view === 'map' ? ' map-view' : ''}`}>
-      {view === 'map' && <ErrorBoundary fallback={() => <div className="nearby-map nearby-map-fallback"><div className="nearby-map-error" role="alert">Không thể hiển thị bản đồ.<button type="button" onClick={() => setView('list')}>Xem danh sách</button></div></div>}><Suspense fallback={<p role="status" aria-live="polite" aria-busy="true">Đang tải bản đồ…</p>}><NearbyMap location={location} places={visiblePlaces} selected={visibleSelected} onSelect={setSelected} onShowList={() => setView('list')} /></Suspense></ErrorBoundary>}
+      {view === 'map' && <ErrorBoundary fallback={() => <div className="nearby-map nearby-map-fallback"><div className="nearby-map-error" role="alert">Không thể hiển thị bản đồ.<button type="button" onClick={showListAfterMapFailure}>Xem danh sách</button></div></div>}><Suspense fallback={<p role="status" aria-live="polite" aria-busy="true">Đang tải bản đồ…</p>}><NearbyMap location={location} places={visiblePlaces} selected={visibleSelected} onSelect={setSelected} onShowList={showListAfterMapFailure} /></Suspense></ErrorBoundary>}
       <div className="nearby-place-list" aria-label="Kết quả địa điểm">
       {location && !busy && !error && !count && <div className="nearby-empty"><Search size={30} /><h2>{normalized ? 'Không khớp tìm kiếm' : 'Chưa tìm thấy địa điểm'}</h2><p>{normalized ? 'Thử từ khóa khác hoặc xóa tìm kiếm.' : 'Thử tăng bán kính hoặc tìm lại.'}</p>{normalized && <button type="button" className="nearby-primary" onClick={() => onQueryChange('')}>Xóa tìm kiếm</button>}</div>}
       {visiblePlaces.map((place, index) => <article key={place.id} className={`nearby-place-row${place.id === visibleSelected ? ' selected' : ''}`}>
