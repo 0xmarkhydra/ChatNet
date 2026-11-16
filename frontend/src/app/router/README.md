@@ -18,6 +18,14 @@
 - New tabs require both a `TAB_PATH` entry and an index route. The route-tree unit test checks this invariant.
 - A feature may introduce its own nested layout only once it can keep the current shell/state lifecycle intact and has tests for direct URLs, invalid children, and Back/Forward.
 
+## Navigation ownership after nested routes
+
+- `useAppRouteNavigation` derives active tab, Contacts screen, Settings visibility and visitor identity from React Router, rather than storing duplicate booleans in `AuthedApp`.
+- Use `setTab`, `setContactsScreen`, and `setDesktopProfileSettings` as the existing component callback contracts. Avoid calling two route setters for one click; switching to Profile from Settings requires **one** navigation.
+- Use `openVisitorProfile` to open another user's profile and keep the exact return pathname, query and fragment. Use `closeVisitor` for safe internal return navigation, including when a user arrives via a direct link.
+- App/business state such as profile editor visibility, active conversation and feed modal state stays in the owning feature or app state hook, not in route navigation. A route change must not remount the authenticated shell.
+- Regression tests in `useAppRouteNavigation.test.tsx` cover Contacts-in-Calls behavior, Settings and Profile transitions, username encoding, visitor return URLs, and browser Back.
+
 ## Verification
 
 Run `npm run test:unit`, `npm run lint`, `npm run check:architecture`, `npm run build` and `npm run build:desktop` from `frontend/`. Validate session/outbox/push-deeplink checks for app-shell or navigation changes. Do not claim two-device call/realtime QA from unit tests alone.
