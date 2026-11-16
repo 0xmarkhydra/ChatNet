@@ -128,6 +128,27 @@ describe('Marketplace read fallback', () => {
     expect(host.textContent).toContain('Bàn học')
   })
 
+  it('coalesces rapid read-retry clicks into one group of requests', async () => {
+    let completeRetry: (() => void) | undefined
+    const pending = new Promise<void>((resolve) => { completeRetry = resolve })
+    const request = vi.fn(async (path: string) => {
+      if (request.mock.calls.length <= 4) throw new Error('Không tải được dữ liệu')
+      await pending
+      return response(path, path.endsWith('/products') ? [product] : [])
+    })
+    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    const retry = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Thử tải dữ liệu')
+    expect(retry).toBeTruthy()
+    await act(async () => {
+      retry?.click()
+      retry?.click()
+    })
+    expect(request).toHaveBeenCalledTimes(8)
+    await act(async () => completeRetry?.())
+    expect(host.textContent).toContain('Bàn học')
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+  })
+
   it('ignores the previous user response after switching users', async () => {
     let resolveOld: ((value: Response) => void) | undefined
     const old = new Promise<Response>((resolve) => { resolveOld = resolve })

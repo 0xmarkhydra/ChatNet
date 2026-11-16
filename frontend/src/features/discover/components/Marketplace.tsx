@@ -26,6 +26,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
   const revision = useRef(0)
   const readRevision = useRef(0)
   const mutationFlight = useRef<{ version: number } | null>(null)
+  const retryFlight = useRef<{ version: number } | null>(null)
   const [view, setView] = useState<'products' | 'cart' | 'orders' | 'sell'>('products')
   const { hostRef: tabsPillSetHost, activeRef: tabsPillSetActive, pillRef: tabsPillSetPill } = useSlidingPill<HTMLElement>(view)
   const [products, setProducts] = useState<Product[]>([])
@@ -80,15 +81,21 @@ export default function Marketplace({ userId, request, onBack }: Props) {
     const version = ++requestRevision.current
     setProducts([]); setCart([]); setOrders([]); setMine([])
     mutationFlight.current = null
+    retryFlight.current = null
     setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false)
     void refresh(version)
     return () => { ++requestRevision.current }
   }, [userId])
 
   function retryRead() {
+    if (retryFlight.current) return
+    const flight = { version: revision.current }
+    retryFlight.current = flight
     if (!loaded) setLoading(true)
     setError('')
-    void refresh()
+    void refresh(flight.version).finally(() => {
+      if (retryFlight.current === flight) retryFlight.current = null
+    })
   }
 
   async function execute(fn: (isCurrent: () => boolean) => Promise<void>) {
