@@ -18,6 +18,7 @@ import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
 import { usePhoneSearchLayout } from "./hooks/usePhoneSearchLayout";
 import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
+import { useAppInstallState } from "./hooks/useAppInstallState";
 import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
 import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
@@ -660,7 +661,10 @@ export default function AuthedApp({
   const [translationPreferencesLoaded, setTranslationPreferencesLoaded] =
     useState(false);
   const [status, setStatus] = useState("Đang kết nối...");
-  const [isStandalone, setIsStandalone] = useState(false);
+  const isStandalone = useAppInstallState(() => {
+    setInstallPrompt(null);
+    setNotice("SocCO đã được cài vào thiết bị");
+  });
   const [pushConfigured, setPushConfigured] = useState(false);
   const [pushAppId, setPushAppId] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -1374,26 +1378,7 @@ export default function AuthedApp({
     }));
   }
 
-  useEffect(() => {
-    const navigatorWithStandalone = navigator as Navigator & {
-      standalone?: boolean;
-    };
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      navigatorWithStandalone.standalone === true;
-    setIsStandalone(standalone);
 
-    const handleInstalled = () => {
-      setInstallPrompt(null);
-      setIsStandalone(true);
-      setNotice("SocCO đã được cài vào thiết bị");
-    };
-
-    window.addEventListener("appinstalled", handleInstalled);
-    return () => {
-      window.removeEventListener("appinstalled", handleInstalled);
-    };
-  }, []);
 
 
   async function loadProfileMedia() {
