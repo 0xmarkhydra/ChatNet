@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject, type ClipboardEvent } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type RefObject, type ClipboardEvent } from 'react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import type { GroupMember } from '../types'
 import { shouldSendChatOnEnter } from '../utils/composerKeyboard'
@@ -17,7 +17,7 @@ type Props = {
 
 type Candidate = { key: string; username: string; displayName: string; online?: boolean; all?: boolean }
 
-export default function ChatMentionInput({ conversationId, members, inputRef, text, setText, placeholder, onFilesPaste }: Props) {
+export default function ChatMentionInput({ members, inputRef, text, setText, placeholder, onFilesPaste }: Props) {
   const [cursor, setCursor] = useState(0)
   const [focused, setFocused] = useState(false)
   const [dismissed, setDismissed] = useState(false)
@@ -54,12 +54,6 @@ export default function ChatMentionInput({ conversationId, members, inputRef, te
     if (input.parentElement && observer) observer.observe(input.parentElement)
     return () => observer?.disconnect()
   }, [text, inputRef])
-
-  useEffect(() => {
-    setDismissed(false)
-    setSelected(0)
-    setFocused(false)
-  }, [conversationId])
 
   function choose(candidate: Candidate) {
     const input = inputRef.current

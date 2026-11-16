@@ -1,4 +1,5 @@
-import { Plus, Images } from "lucide-react";
+import { Images } from "lucide-react";
+import ChatComposerPlusMenu from "./ChatComposerPlusMenu";
 import UiIcon from "../../../shared/ui/UiIcon";
 import { userLabel } from "../../../shared/utils/userLabel";
 import { attachmentLabel } from "../../../shared/utils/format";
@@ -11,9 +12,31 @@ import ChatMentionInput from "./ChatMentionInput";
 import type { GroupMember } from "../types";
 import type { ChatSectionProps } from "./ChatSectionProps";
 
+const CHAT_ATTACHMENT_ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip';
+
 type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "chatFileInputRef" | "groupChannels" | "isProfileDesktop" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo" | "t">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[] };
 
 export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, canSend, chatFileInputRef, groupChannels, isProfileDesktop, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, t, groupMembers }: Props) {
+  function openAttachmentPicker(mediaOnly: boolean) {
+    const input = chatFileInputRef.current;
+    if (!input) return;
+    input.accept = mediaOnly ? 'image/*,video/*' : CHAT_ATTACHMENT_ACCEPT;
+    input.click();
+  }
+
+  function insertEmoji(emoji: string) {
+    const input = messageInputRef.current;
+    const start = input?.selectionStart ?? messageText.length;
+    const end = input?.selectionEnd ?? start;
+    const next = messageText.slice(0, start) + emoji + messageText.slice(end);
+    if (next.length > 4000) return;
+    setMessageText(next);
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  }
+
   return (
     <form className="composer media-composer" onSubmit={(event) => {
                     void sendMessage(event)
@@ -24,7 +47,7 @@ export default function MessageComposer({ activeConversation, activeConversation
                       className="hidden-media-input"
                       type="file"
                       multiple
-                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+                      accept={CHAT_ATTACHMENT_ACCEPT}
                       onChange={(event) => {
                         const files = Array.from(event.currentTarget.files || [])
                         event.currentTarget.value = ''
@@ -49,18 +72,14 @@ export default function MessageComposer({ activeConversation, activeConversation
                         />
                       </div>
                     )}
-                    <button
-                      className="ghost-action attach-button"
-                      type="button"
-                      onClick={() => chatFileInputRef.current?.click()}
+                    <ChatComposerPlusMenu
                       disabled={Boolean(mediaUploading) || messageSending}
-                      aria-label="Đính kèm file"
-                    >
-                      <UiIcon name="attach" size={22} />
-                      <Plus className="chat-composer-plus" size={21} aria-hidden="true" />
-                    </button>
+                      onAttachFile={() => openAttachmentPicker(false)}
+                      onAttachMedia={() => openAttachmentPicker(true)}
+                      onInsertEmoji={insertEmoji}
+                    />
                     <button className="ghost-action chat-composer-image" type="button"
-                      onClick={() => chatFileInputRef.current?.click()}
+                      onClick={() => openAttachmentPicker(true)}
                       disabled={Boolean(mediaUploading) || messageSending}
                       aria-label="Đính kèm ảnh hoặc video" title="Chọn ảnh hoặc video">
                       <Images size={19} aria-hidden="true" />
