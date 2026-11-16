@@ -1,6 +1,7 @@
 import { useEffect, type RefObject } from "react";
 import type { Session } from "../../features/auth/lib/session";
 import { isDesktopBuild } from "../../platform/desktop";
+import { useLatest } from "../../shared/hooks/useLatest";
 
 type SessionKeepaliveClient = {
   refresh: () => Promise<Session | null>;
@@ -14,6 +15,8 @@ export function useSessionKeepalive(
   sessionClient: SessionKeepaliveClient,
   setStatus: (status: string) => void,
 ) {
+  const statusRef = useLatest(setStatus);
+
   useEffect(() => {
     if (!sessionId) return;
 
@@ -30,7 +33,7 @@ export function useSessionKeepalive(
         })
         .catch(() => {
           if (active && sessionRef.current?.sessionId === sessionId)
-            setStatus("Đang kết nối lại...");
+            statusRef.current("Đang kết nối lại...");
         })
         .finally(() => { refreshing = false; });
     };
@@ -47,5 +50,5 @@ export function useSessionKeepalive(
       window.removeEventListener("online", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [sessionId, sessionRef, sessionClient, setStatus]);
+  }, [sessionId, sessionRef, sessionClient, statusRef]);
 }
