@@ -64,7 +64,8 @@ import {
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./router/routes";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
+import { useAppRouteNavigation } from "./router/useAppRouteNavigation";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
 import type {
@@ -138,7 +139,7 @@ import GroupSettingsPanel from "../features/chat/components/GroupSettingsPanel";
 import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
 import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
-import ContactsView, { type FriendsScreen } from "../features/contacts/components/ContactsView";
+import ContactsView from "../features/contacts/components/ContactsView";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
@@ -370,11 +371,11 @@ export default function AuthedApp({
 
   const routeLocation = useLocation();
   const navigate = useNavigate();
-  const tab = tabFromPath(routeLocation.pathname, new URLSearchParams(routeLocation.search).get("tab"));
-  const setTab: Dispatch<SetStateAction<Tab>> = useCallback((next) => {
-    const nextTab = typeof next === "function" ? next(tab) : next;
-    if (TAB_PATH[nextTab] !== routeLocation.pathname) navigate(TAB_PATH[nextTab]);
-  }, [navigate, routeLocation.pathname, tab]);
+  const {
+    tab, setTab, contactsScreen, setContactsScreen,
+    desktopProfileSettings, setDesktopProfileSettings,
+    visitorUsername, openVisitorProfile, closeVisitor,
+  } = useAppRouteNavigation();
   const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraftFile, storyBusy, storyDraftFile } = useFeedUiState({ tab });
 
   const tabRef = useLatest(tab);
@@ -535,31 +536,13 @@ export default function AuthedApp({
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
-  const contactsScreen: FriendsScreen = routeLocation.pathname === "/contacts/requests" ? "invitations" : "directory";
-  const setContactsScreen: Dispatch<SetStateAction<FriendsScreen>> = (next) => {
-    const screen = typeof next === "function" ? next(contactsScreen) : next;
-    // Calls embeds the directory; opening it must not navigate away from the call workspace.
-    if ((routeLocation.pathname === ROUTE.calls || routeLocation.pathname.startsWith(`${ROUTE.calls}/`)) && screen === "directory") return;
-    const path = screen === "invitations" ? "/contacts/requests" : TAB_PATH.contacts;
-    if (routeLocation.pathname !== path) navigate(path);
-  };
-  const visitorUsername = visitorUsernameFromPath(routeLocation.pathname);
-  function closeVisitor() {
-    const returnTo = routeLocation.state?.visitorReturnTo;
-    navigate(typeof returnTo === "string" && returnTo.startsWith("/") && !returnTo.startsWith("//")
-      ? returnTo : TAB_PATH.profile, { replace: true });
-  }
   function openVisitor(username: string) {
     if (username === sessionRef.current?.user.username) {
       setTab("profile");
-      setDesktopProfileSettings(false);
       setProfileTimelineOpen(true);
       return;
     }
-    const path = visitorProfilePath(username);
-    if (routeLocation.pathname !== path) {
-      navigate(path, { state: { visitorReturnTo: routeLocation.pathname + routeLocation.search + routeLocation.hash } });
-    }
+    openVisitorProfile(username);
   }
   function setFriendPreview(friend: FriendSearchResult | null) {
     if (friend) openVisitor(friend.username);
@@ -580,12 +563,6 @@ export default function AuthedApp({
     setTranslationSettingsActiveConversationId(activeConversationId);
     setTranslationSettingsConversationId(null);
   }
-  const desktopProfileSettings = routeLocation.pathname === ROUTE.settings || routeLocation.pathname.startsWith(`${ROUTE.settings}/`);
-  const setDesktopProfileSettings: Dispatch<SetStateAction<boolean>> = (next) => {
-    const open = typeof next === "function" ? next(desktopProfileSettings) : next;
-    if (open && !desktopProfileSettings) navigate(ROUTE.settings);
-    if (!open && desktopProfileSettings) navigate(TAB_PATH.profile);
-  };
   const desktopProfileOverview = isProfileDesktop && !desktopProfileSettings;
   useEffect(() => {
     if (
@@ -2490,7 +2467,7 @@ export default function AuthedApp({
     setTranslationSettingsConversationId(null);
 
     if (nextTab === "profile") {
-      setDesktopProfileSettings(false);
+      // setTab owns the URL; a second Settings setter would push /profile twice.
       setProfileEditorOpen(false);
     }
     if (activePostId !== null) {
