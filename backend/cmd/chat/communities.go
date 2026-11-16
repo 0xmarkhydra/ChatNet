@@ -270,6 +270,10 @@ func hasMention(message, username string) bool {
 	return false
 }
 
+func shouldPushGroupMessage(messagesEnabled, mentionsEnabled bool, text, username string) bool {
+	return messagesEnabled || (mentionsEnabled && (hasMention(text, username) || hasMention(text, "all")))
+}
+
 // Only push delivery respects notification preferences; message persistence and SSE do not change.
 func (s *server) groupPushRecipients(ctx context.Context, conversationID int64, channelID int64, candidates []int64, text string) []int64 {
 	if len(candidates) == 0 {
@@ -313,7 +317,7 @@ func (s *server) groupPushRecipients(ctx context.Context, conversationID int64, 
 		if rows.Scan(&uid, &username, &messages, &mentions) != nil {
 			return []int64{}
 		}
-		if messages || (mentions && hasMention(text, username)) {
+		if shouldPushGroupMessage(messages, mentions, text, username) {
 			result = append(result, uid)
 		}
 	}
