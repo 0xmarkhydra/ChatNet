@@ -1,5 +1,6 @@
 import { useLayoutEffect, useState } from 'react'
-import { Image as ImageIcon, MapPin, Palette, SmilePlus, UserRoundPlus, X } from 'lucide-react'
+import { MapPin, X } from 'lucide-react'
+import FeedComposerIconButton from './FeedComposerIconButton'
 import { userLabel } from '../../../shared/utils/userLabel'
 import { feelingPostLine } from '../utils/feelings'
 import PostTagPicker, { type TaggedFriend } from './PostTagPicker'
@@ -181,24 +182,20 @@ export default function PostComposer({
       <div className="composer-shortcuts smart-composer-actions" role="group" aria-label="Thêm vào bài viết">
         <span className="smart-composer-actions-title">Thêm vào bài viết</span>
         <div className="smart-composer-action-icons">
-          <button type="button" disabled={isPosting || !!editingPost} data-tooltip={editingPost ? 'Không thể thay đổi ảnh/video trong bài đã đăng' : 'Thêm ảnh hoặc video'} aria-label="Thêm ảnh hoặc video"
-            onClick={() => { selectTool('media'); feedAlbumInputRef.current?.click() }}><ImageIcon size={21} aria-hidden="true" /></button>
-          <button type="button" disabled={isPosting} data-tooltip="Chọn nền chữ" aria-label="Nền chữ"
+          <FeedComposerIconButton icon="photo" disabled={isPosting || !!editingPost} data-tooltip={editingPost ? 'Không thể thay đổi ảnh/video trong bài đã đăng' : 'Thêm ảnh hoặc video'} aria-label="Thêm ảnh hoặc video"
+            onClick={() => { selectTool('media'); feedAlbumInputRef.current?.click() }} />
+          <FeedComposerIconButton icon="background" disabled={isPosting} data-tooltip="Chọn nền chữ" aria-label="Nền chữ"
             aria-expanded={showPostBackgrounds} aria-pressed={showPostBackgrounds}
-            onClick={() => { selectTool('background'); postComposerRef.current?.focus() }}>
-            <Palette size={21} aria-hidden="true" />
-          </button>
-          <button type="button" disabled={isPosting} data-tooltip="Gắn thẻ bạn bè" aria-label="Gắn thẻ bạn bè"
+            onClick={() => { selectTool('background'); postComposerRef.current?.focus() }} />
+          <FeedComposerIconButton icon="tag" disabled={isPosting} data-tooltip="Gắn thẻ bạn bè" aria-label="Gắn thẻ bạn bè"
             aria-expanded={tagPickerOpen} aria-pressed={taggedFriends.length > 0}
-            onClick={() => selectTool('tag')}>
-            <UserRoundPlus size={21} aria-hidden="true" />
-          </button>
-          <button type="button" disabled={isPosting} data-tooltip="Bạn đang cảm thấy thế nào?" aria-label="Cảm xúc"
+            onClick={() => selectTool('tag')} />
+          <FeedComposerIconButton icon="feeling" disabled={isPosting} data-tooltip="Bạn đang cảm thấy thế nào?" aria-label="Cảm xúc"
             aria-expanded={feelingPickerOpen} aria-pressed={Boolean(feelingId)}
-            onClick={() => selectTool('feeling')}><SmilePlus size={21} aria-hidden="true" /></button>
-          {setCheckInOpen && <button type="button" disabled={isPosting} data-tooltip="Thêm địa điểm check-in" aria-label="Check-in địa điểm"
+            onClick={() => selectTool('feeling')} />
+          {setCheckInOpen && <FeedComposerIconButton icon="location" disabled={isPosting} data-tooltip="Thêm địa điểm check-in" aria-label="Check-in địa điểm"
             aria-expanded={activeTool === 'checkin' && checkInOpen} aria-pressed={checkInOpen && !!checkInLocation.trim()}
-            onClick={() => selectTool('checkin')}><MapPin size={21} aria-hidden="true" /></button>}
+            onClick={() => selectTool('checkin')} />}
         </div>
       </div>
       <div className="feed-composer-settings">

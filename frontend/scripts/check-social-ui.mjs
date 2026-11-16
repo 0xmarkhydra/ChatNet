@@ -338,6 +338,150 @@ try {
     await closeCheckin()
     await page.waitForFunction(button => getComputedStyle(button).transform === 'none', await checkin.elementHandle())
     console.log('PASS: touch opens Check-in and plays the bounce')
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoints: 1 })
+    await page.setViewportSize({ width: 1440, height: 840 })
+    await launcher.getByRole('button', { name: 'Bạn đang nghĩ gì?' }).click()
+    const toolbar = dialog.getByRole('group', { name: 'Thêm vào bài viết' })
+    const glyph = '.feed-shortcut-icon'
+    const action = label => toolbar.getByRole('button', { name: label, exact: true })
+    const allGlyphNodes = glyph + ' :is(svg, g, path)'
+    for (const [label, names] of [
+      ['Thêm ảnh hoặc video', ['feed-shortcut-photo-forward']],
+      ['Nền chữ', ['composer-art-brush-behind', 'composer-art-brush-front', 'composer-art-ink']],
+      ['Gắn thẻ bạn bè', ['composer-tag-visitor', 'composer-tag-resident', 'composer-tag-plus']],
+      ['Cảm xúc', ['composer-face-happy', 'composer-face-sad', 'composer-face-crying']],
+      ['Check-in địa điểm', ['feed-shortcut-pin-hop']],
+    ]) {
+      const button = action(label)
+      await button.hover()
+      const observed = await namesOf(button, allGlyphNodes)
+      assert(names.every(name => observed.includes(name)), label + ' must play all assigned animations')
+    }
+
+    const sample = (button, selectors, phases) => button.locator(glyph).evaluate((root, args) => {
+      const running = root.getAnimations({ subtree: true })
+      const animations = running.filter(animation => animation.effect?.target?.closest('.feed-shortcut-icon') === root)
+      if (!animations.length) throw Error('Toolbar glyph is not playing')
+      const duration = animations[0].effect.getTiming().duration
+      const looping = animations.every(animation => animation.effect.getTiming().iterations === Infinity)
+      animations.forEach(animation => animation.pause())
+      const frames = args.phases.map(phase => {
+        animations.forEach(animation => { animation.currentTime = duration * phase })
+        return Object.fromEntries(args.selectors.map(selector => {
+          const style = getComputedStyle(root.querySelector(selector))
+          const worldOpacity = Number(style.opacity) *
+            (selector === '.composer-face-tear' ? Number(getComputedStyle(root.querySelector('.composer-face-crying')).opacity) : 1)
+          return [selector, { opacity: worldOpacity, transform: style.transform, dash: parseFloat(style.strokeDashoffset) }]
+        }))
+      })
+      return { looping, frames }
+    }, { selectors, phases })
+
+    const art = action('Nền chữ')
+    await art.hover()
+    const back = '.composer-art-brush--behind'
+    const front = '.composer-art-brush--front'
+    const ink = '.composer-art-ink'
+    const paint = await sample(art, [back, front, ink, '.composer-art-board'], [0, .18, .45, .57, .85, 1])
+    assert(paint.looping && paint.frames[1][back].opacity === 1 && paint.frames[1][front].opacity === 0 &&
+      paint.frames[2][front].opacity === 1 && paint.frames[2][ink].dash > 0 &&
+      paint.frames[3][ink].dash === 0 && paint.frames[4][back].opacity === 1 &&
+      paint.frames[5][ink].opacity === 0 && paint.frames[5][front].opacity === 0 &&
+      paint.frames[5]['.composer-art-board'].transform === paint.frames[0]['.composer-art-board'].transform,
+      'The brush must emerge behind the palette, draw in front, duck behind, and return seamlessly')
+
+    const tag = action('Gắn thẻ bạn bè')
+    await tag.hover()
+    const original = '.composer-tag-resident'
+    const visitor = '.composer-tag-visitor'
+    const plus = '.composer-tag-plus'
+    const bump = await sample(tag, [original, visitor, plus], [0, .2, .46, .67, 1])
+    const xOf = value => parseFloat(value.transform.split(',').at(-2))
+    const yOf = value => parseFloat(value.transform.split(',').at(-1))
+    assert(bump.looping && xOf(bump.frames[1][visitor]) > 0 &&
+      xOf(bump.frames[2][original]) < 0 && xOf(bump.frames[2][plus]) < 0 &&
+      bump.frames[3][original].opacity === 0 && yOf(bump.frames[3][plus]) < -4 &&
+      bump.frames[4][plus].transform === bump.frames[0][plus].transform,
+      'The incoming avatar must bump the first left while the plus slides and hops back')
+
+    const mood = action('Cảm xúc')
+    await mood.hover()
+    const faces = ['.composer-face-idle', '.composer-face-happy', '.composer-face-sad', '.composer-face-crying']
+    const expressions = await sample(mood, [...faces, '.composer-face-tear'], [0, .23, .46, .72, .95, 1])
+    assert(expressions.looping &&
+      expressions.frames.every((frame, index) => faces.findIndex(face => frame[face].opacity === 1) === [0, 1, 2, 3, 0, 0][index]) &&
+      expressions.frames[3]['.composer-face-tear'].opacity > 0,
+      'Feeling cycles through smile, sad and crying with tears and ends on the original face')
+
+    // Re-entry gets a fresh animation instead of leaving the glyph at a sampled phase.
+    await page.mouse.move(0, 0)
+    await mood.hover()
+    assert(await mood.locator(glyph).evaluate(root =>
+      root.getAnimations({ subtree: true }).every(animation => animation.playState === 'running')),
+    'Hovering the same icon again must restart its sequence')
+    await page.mouse.move(0, 0)
+    await tag.press('Tab')
+    assert(await mood.locator(glyph).evaluate(root =>
+      root.getAnimations({ subtree: true }).some(animation => animation.effect.getTiming().iterations === 1)),
+    'Keyboard focus must keep finite playback')
+
+    const feeling = toolbar.getByRole('button', { name: 'Cảm xúc', exact: true })
+    await feeling.click()
+    const feelingOptions = dialog.getByRole('group', { name: 'Chọn cảm xúc' })
+    const openFeelingOptions = async () => {
+      if (await feelingOptions.isVisible()) return
+      await feeling.click()
+      // A selected chip keeps the current tool active until the next toggle.
+      if (!(await feelingOptions.isVisible())) await feeling.click()
+      await feelingOptions.waitFor({ state: 'visible' })
+    }
+    const options = feelingOptions.getByRole('button')
+    assert(await options.count() === 9, 'All nine feelings must remain available')
+    const feelingMotions = new Set()
+    for (const option of await options.all()) {
+      await option.hover()
+      const played = await namesOf(option, '.smart-feeling-emoji')
+      assert(played.length === 1, 'Feeling must play one animation on hover')
+      feelingMotions.add(played[0])
+    }
+    assert(feelingMotions.size === 9, 'All nine feelings should have distinct motions')
+    const loved = dialog.getByRole('button', { name: 'hạnh phúc', exact: true })
+    await loved.press('Tab')
+    const excited = dialog.getByRole('button', { name: 'hào hứng', exact: true })
+    await page.mouse.move(0, 0)
+    assert((await namesOf(excited, '.smart-feeling-emoji')).includes('feed-feeling-cheer'),
+      'Tab focus must animate the feeling without a pointer')
+    await excited.press('Enter')
+    const selected = dialog.locator('.smart-feeling-selected')
+    assert((await selected.innerText()).includes('hào hứng') &&
+      (await namesOf(selected, '.smart-feeling-emoji')).includes('feed-feeling-cheer'),
+      'Keyboard selection must animate the selected emoji and preserve its label')
+
+    // A touch selection also plays the feedback in the chip after the options close.
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+    await page.setViewportSize({ width: 390, height: 840 })
+    await openFeelingOptions()
+    const sleepy = dialog.getByRole('button', { name: 'mệt mỏi', exact: true })
+    await sleepy.scrollIntoViewIfNeeded()
+    const sleepyBox = await sleepy.boundingBox()
+    assert(sleepyBox, 'Sleepy feeling must be reachable at 390px')
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchStart', touchPoints: [{ x: sleepyBox.x + sleepyBox.width / 2, y: sleepyBox.y + sleepyBox.height / 2 }],
+    })
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await selected.getByText(/Đang cảm thấy mệt mỏi/).waitFor()
+    assert((await namesOf(selected, '.smart-feeling-emoji')).includes('feed-feeling-nod'),
+      'Touch selection must animate the selected feeling')
+
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoints: 1 })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await openFeelingOptions()
+    await dialog.getByRole('button', { name: 'bình yên', exact: true }).click()
+    assert((await selected.innerText()).includes('bình yên') &&
+      (await namesOf(selected, '.smart-feeling-emoji')).length === 0 &&
+      (await namesOf(feeling, allGlyphNodes)).length === 0,
+      'Reduced motion must suppress toolbar and emoji animations without preventing selection')
+    console.log('PASS: composer icon choreography, loop closure, replay, nine feelings, keyboard, touch and reduced motion')
     assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
     await browser.close()
     browser = null
