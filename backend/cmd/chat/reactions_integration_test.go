@@ -182,7 +182,9 @@ func TestMessageReactionsLocalIntegration(t *testing.T) {
 	call(0, "😢", 200)
 	call(0, "😡", 200)
 	assert(0, "😡", 1, true)
-	call(0, "🦄", 400)
+	call(0, "🦄", 200) // Emoji beyond the original quick reactions are supported.
+	assert(0, "🦄", 1, true)
+	call(0, "not-an-emoji", 400)
 	call(2, "👍", 403)
 
 	// Realtime updates must carry recipient-specific 'mine', not actor's flag.

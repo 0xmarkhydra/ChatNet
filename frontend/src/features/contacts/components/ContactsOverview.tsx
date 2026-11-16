@@ -40,11 +40,11 @@ export default function ContactsOverview({
     <section className="co-stats" aria-label="Thống kê kết nối">
       <button type="button" className="co-stat" onClick={onDirectory}>
         <span className="co-stat-icon co-stat-friends"><Users size={24} aria-hidden="true" /></span>
-        <span><strong>{friendsLoading ? '…' : friends.length.toLocaleString('vi-VN')}</strong><small>Bạn bè</small></span>
+        <span><strong>{friendsLoading ? '…' : friendsError ? '–' : friends.length.toLocaleString('vi-VN')}</strong><small>Bạn bè</small></span>
       </button>
       <button type="button" className="co-stat" onClick={onInvitations}>
         <span className="co-stat-icon co-stat-requests"><UserRoundPlus size={23} aria-hidden="true" /></span>
-        <span><strong>{friendsLoading ? '…' : incoming.length.toLocaleString('vi-VN')}</strong><small>Lời mời đến</small></span>
+        <span><strong>{friendsLoading ? '…' : friendsError ? '–' : incoming.length.toLocaleString('vi-VN')}</strong><small>Lời mời đến</small></span>
       </button>
       <button type="button" className="co-stat" onClick={onDirectory}>
         <span className="co-stat-icon co-stat-suggestions"><Sparkles size={23} aria-hidden="true" /></span>
@@ -56,14 +56,14 @@ export default function ContactsOverview({
       <div className="co-main">
         <section className="co-section" aria-labelledby="co-requests-title">
           <div className="co-section-heading">
-            <div><h2 id="co-requests-title">Lời mời kết bạn {incoming.length > 0 && <span className="co-count-pill">{incoming.length}</span>}</h2><p>{friendsLoading ? 'Đang đồng bộ lời mời' : `${incoming.length} lời mời đang chờ phản hồi`}</p></div>
+            <div><h2 id="co-requests-title">Lời mời kết bạn {!friendsLoading && !friendsError && incoming.length > 0 && <span className="co-count-pill">{incoming.length}</span>}</h2><p>{friendsLoading ? 'Đang đồng bộ lời mời' : friendsError ? 'Không thể cập nhật lời mời' : `${incoming.length} lời mời đang chờ phản hồi`}</p></div>
             <button type="button" onClick={onInvitations}>Xem tất cả <ArrowRight size={16} aria-hidden="true" /></button>
           </div>
           <div className="co-request-card">
             {friendsLoading && <div className="co-skeleton-list" role="status" aria-label="Đang tải bạn bè và lời mời"><span className="co-skeleton-avatar" /><span className="co-skeleton-copy"><i /><i /></span><span className="co-skeleton-button" /></div>}
             {!friendsLoading && friendsError && <div className="co-feedback" role="alert"><span>Không tải được danh sách kết nối. Thử lại để xem thông tin mới nhất.</span><button type="button" onClick={onRetryFriends}><RefreshCw size={15} aria-hidden="true" /> Thử lại</button></div>}
             {!friendsLoading && !friendsError && incoming.length === 0 && <p className="co-empty">Bạn chưa có lời mời kết bạn mới.</p>}
-            {!friendsLoading && incoming.slice(0, 3).map(friend => <div className="co-request" key={friend.id}>
+            {!friendsLoading && !friendsError && incoming.slice(0, 3).map(friend => <div className="co-request" key={friend.id}>
               <UserAvatar username={friend.username} name={displayName(friend)} className="avatar co-avatar" online={friend.online} />
               <div className="co-person">
                 <strong>{displayName(friend)}</strong>
@@ -107,7 +107,7 @@ export default function ContactsOverview({
         <section className="co-privacy">
           <h2><ShieldCheck size={22} aria-hidden="true" /> Quyền riêng tư</h2>
           <p>Chủ động lựa chọn cách bạn xuất hiện và kết nối trên SocCo.</p>
-          <div className="co-privacy-details"><div><ShieldCheck size={16} aria-hidden="true" /><span>Kiểm soát quyền riêng tư</span><ChevronRight size={15} aria-hidden="true" /></div><div><UserRoundPlus size={16} aria-hidden="true" /><span>Quản lý lời mời kết bạn</span><ChevronRight size={15} aria-hidden="true" /></div></div>
+          <div className="co-privacy-details"><button type="button" onClick={onSettings}><ShieldCheck size={16} aria-hidden="true" /><span>Kiểm soát quyền riêng tư</span><ChevronRight size={15} aria-hidden="true" /></button><button type="button" onClick={onInvitations}><UserRoundPlus size={16} aria-hidden="true" /><span>Quản lý lời mời kết bạn</span><ChevronRight size={15} aria-hidden="true" /></button></div>
           <button type="button" onClick={onSettings}>Quản lý quyền riêng tư <ArrowRight size={16} aria-hidden="true" /></button>
         </section>
       </aside>

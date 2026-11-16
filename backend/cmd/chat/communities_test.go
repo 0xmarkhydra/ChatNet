@@ -55,6 +55,30 @@ func TestGroupMentionsMatchExactUsername(t *testing.T) {
 		}
 	}
 }
+func TestGroupPushMentionPreferences(t *testing.T) {
+	cases := []struct {
+		name, text string
+		messages, mentions, want bool
+	}{
+		{"regular messages enabled", "xin chào", true, false, true},
+		{"muted messages without mention", "xin chào", false, true, false},
+		{"direct mention enabled", "Chào @LinhAnh!", false, true, true},
+		{"all mention enabled", "Chào @all!", false, true, true},
+		{"all mention case insensitive", "(@ALL) cập nhật", false, true, true},
+		{"mention preference disabled", "@all", false, false, false},
+		{"not all token", "@all123", false, true, false},
+		{"email not mention", "hi@example.com", false, true, false},
+		{"other member mention", "@david", false, true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := shouldPushGroupMessage(tc.messages, tc.mentions, tc.text, "linhanh"); got != tc.want {
+				t.Fatalf("push=%v want %v for %q", got, tc.want, tc.text)
+			}
+		})
+	}
+}
+
 func TestChannelFingerprintIsolationAndLegacyCompatibility(t *testing.T) {
 	legacy := messageRequestFingerprint(91, "hello", nil, nil)
 	if legacy != messageRequestFingerprint(91, "hello", nil, nil, 0) {
