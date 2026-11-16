@@ -155,7 +155,7 @@ export default function NearbyExplorer({
     </div> : <>
       {!location && !busy && <div className="nearby-empty"><MapPin size={36} /><h2>Tìm địa điểm gần bạn</h2><button className="nearby-primary" onClick={() => void locate()}>Dùng vị trí hiện tại</button></div>}
       {location && <div className={`nearby-place-content${view === 'map' ? ' map-view' : ''}`}>
-      {view === 'map' && <NearbyMap location={location} places={visiblePlaces} selected={selected} onSelect={setSelected} />}
+      {view === 'map' && <NearbyMap location={location} places={visiblePlaces} selected={selected} onSelect={setSelected} onShowList={() => setView('list')} />}
       <div className="nearby-place-list" aria-label="Kết quả địa điểm">
       {location && !busy && !error && !count && <div className="nearby-empty"><Search size={30} /><h2>Chưa tìm thấy địa điểm</h2><p>Thử từ khóa khác hoặc tăng bán kính.</p></div>}
       {visiblePlaces.map((place, index) => <article key={place.id} className={`nearby-place-row${place.id === selected ? ' selected' : ''}`}>

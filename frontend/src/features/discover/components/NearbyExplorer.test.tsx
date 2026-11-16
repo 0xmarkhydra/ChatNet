@@ -6,7 +6,7 @@ import NearbyExplorer from './NearbyExplorer'
 import { getCurrentPositionSmart } from '../lib/geolocation'
 import { loadNearbyPlaces } from '../lib/nearbyPlaces'
 
-vi.mock('./NearbyMap', () => ({ default: () => <div data-testid="nearby-map" /> }))
+vi.mock('./NearbyMap', () => ({ default: ({ onShowList }: { onShowList: () => void }) => <div data-testid="nearby-map"><button onClick={onShowList}>Xem danh sách</button></div> }))
 vi.mock('../lib/nearbyPlaces', () => ({ loadNearbyPlaces: vi.fn(async () => []) }))
 vi.mock('../lib/geolocation', () => ({
   getCurrentPositionSmart: vi.fn(),
@@ -81,6 +81,40 @@ describe('NearbyExplorer location fallback', () => {
     await act(async () => finishPlaces?.([]))
     expect(host.textContent).not.toContain('Đang tải địa điểm')
     expect(host.textContent).toContain('Chưa tìm thấy địa điểm')
+  })
+
+  it('ignores an obsolete place response after changing the category', async () => {
+    let resolveOld: ((value: Awaited<ReturnType<typeof loadNearbyPlaces>>) => void) | undefined
+    const stale = new Promise<Awaited<ReturnType<typeof loadNearbyPlaces>>>(resolve => { resolveOld = resolve })
+    loadPlaces.mockImplementationOnce(() => stale)
+      .mockResolvedValue([])
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    const category = Array.from(host.querySelectorAll<HTMLButtonElement>('.nearby-categories button'))
+      .find(item => item.textContent === 'Cà phê')
+    await act(async () => category?.click())
+    expect(loadPlaces).toHaveBeenCalledTimes(2)
+    expect(loadPlaces.mock.calls[0]?.[0].signal?.aborted).toBe(true)
+    await act(async () => resolveOld?.([{
+      id: 'stale', name: 'Kết quả cũ', latitude: 21, longitude: 105,
+      category: 'food', distanceKm: 0.5,
+    } as Awaited<ReturnType<typeof loadNearbyPlaces>>[number]]))
+    expect(host.textContent).not.toContain('Kết quả cũ')
+    expect(host.textContent).toContain('Chưa tìm thấy địa điểm')
+  })
+
+  it('lets users switch to a list when the map cannot be used', async () => {
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    expect(host.querySelector('[data-testid="nearby-map"]')).not.toBeNull()
+    await act(async () => button('Xem danh sách')?.click())
+    expect(host.querySelector('[data-testid="nearby-map"]')).toBeNull()
+    const list = host.querySelector<HTMLButtonElement>('button[aria-label="Danh sách"]')
+    expect(list?.getAttribute('aria-pressed')).toBe('true')
   })
 
   it('shows an accessible location status while finding a position, without an empty prompt', async () => {
