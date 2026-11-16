@@ -108,7 +108,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 11px;
   gap: 8px;
   font: inherit;
@@ -118,7 +118,7 @@
 .media-viewer-actions a:hover,
 .media-viewer-actions button:hover,
 .media-viewer-nav:hover { background: rgba(255,255,255,.20); }
-.media-viewer-backdrop :is(button, a):focus-visible {
+.media-viewer-backdrop :is(button, a, video):focus-visible {
   outline: 2px solid #a7c7ff;
   outline-offset: 2px;
 }
@@ -156,7 +156,7 @@
   position: absolute;
   z-index: 1;
   top: 50%;
-  width: 42px;
+  width: 44px;
   height: 46px;
   display: grid;
   place-items: center;
@@ -169,10 +169,10 @@
   .media-viewer-header { padding: 6px 2px 12px; }
   .media-viewer-actions a { padding: 0 9px; }
   .media-viewer-actions a span { display: none; }
-  .media-viewer-nav { width: 32px; height: 42px; }
+  .media-viewer-nav { width: 44px; height: 44px; }
   .media-viewer-content > img,
   .media-viewer-content > video {
-    max-width: calc(100% - 68px);
+    max-width: calc(100% - 92px);
     max-height: calc(100% - 16px);
   }
 }

@@ -73,7 +73,14 @@ try {
     await delay(200)
   }
   assert(ready, 'Vite did not start: ' + serverLog)
-  browser = await chromium.launch({ headless: true })
+  for (const channel of [undefined, 'msedge', 'chrome']) {
+    try {
+      browser = await chromium.launch({ headless: true, channel })
+      break
+    } catch (error) {
+      if (!/doesn't exist|not found/.test(String(error)) || channel === 'chrome') throw error
+    }
+  }
   const page = await browser.newPage({ viewport: { width: 1586, height: 992 } })
   const errors = []
   page.on('pageerror', err => errors.push(err.message))
@@ -246,6 +253,85 @@ try {
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     return json({})
   })
+  if (process.argv.includes('--composer-motion-only')) {
+    await page.goto(origin + '/feed')
+    const launcher = page.locator('.social-feed-launcher')
+    const checkin = launcher.getByRole('button', { name: 'Check-in' })
+    const dialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    const animations = [
+      ['Ảnh / Video', '.feed-shortcut-icon > svg', ['feed-shortcut-photo-forward', 'feed-shortcut-photo-back']],
+      ['Story', '.feed-shortcut-clapper-lid', ['feed-shortcut-clap']],
+      ['Check-in', '.feed-shortcut-icon > svg', ['feed-shortcut-pin-hop']],
+    ]
+    const namesOf = (shortcut, selector) => shortcut.locator(selector).evaluateAll(nodes =>
+      nodes.flatMap(node => node.getAnimations().map(animation => animation.animationName)))
+    const closeCheckin = async () => {
+      await dialog.getByRole('textbox', { name: 'Địa điểm check-in' }).waitFor()
+      await dialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+      await dialog.waitFor({ state: 'detached' })
+    }
+    for (const width of [1440, 768, 390, 320]) {
+      await page.setViewportSize({ width, height: 840 })
+      await launcher.waitFor({ state: 'visible' })
+      for (const [label, selector, names] of animations) {
+        const shortcut = launcher.getByRole('button', { name: label })
+        await shortcut.hover()
+        const played = await namesOf(shortcut, selector)
+        assert(names.every(name => played.includes(name)), label + ' must play its own animation: ' + played)
+        if (label === 'Ảnh / Video') {
+          const cards = await shortcut.locator(selector).evaluateAll(nodes => {
+            const snapshot = at => nodes.map(node => {
+              for (const animation of node.getAnimations()) {
+                animation.pause()
+                animation.currentTime = at
+              }
+              const css = getComputedStyle(node)
+              return { transform: css.transform, layer: css.zIndex, angle: new DOMMatrix(css.transform).b,
+                fill: getComputedStyle(node.querySelector('rect')).fill }
+            })
+            const start = snapshot(0)
+            const swapped = snapshot(300)
+            const end = snapshot(599)
+            nodes.forEach(node => node.getAnimations().forEach(animation => animation.finish()))
+            return { start, swapped, end }
+          })
+          assert(cards.start[0].angle < 0 && cards.start[1].angle === 0 &&
+            cards.start[0].layer === '0' && cards.start[1].layer === '1' &&
+            cards.start[1].fill !== 'none' && cards.start[1].fill !== 'transparent' &&
+            cards.swapped[0].layer === '1' && cards.swapped[1].layer === '0' &&
+            Math.abs(cards.end[0].angle) < .02 && cards.end[1].angle < -.2,
+          'Photo cards must be readable, overlap with an opaque front, and exchange the same two poses')
+        }
+      }
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.mouse.move(0, 0)
+      await checkin.hover()
+      assert((await namesOf(checkin, 'svg')).length === 0, 'Reduced motion must disable pin animation')
+      await checkin.click()
+      await closeCheckin()
+      await page.emulateMedia({ reducedMotion: 'no-preference' })
+      console.log('PASS: animated shortcuts and reduced motion at ' + width + 'px')
+    }
+    const touch = await page.context().newCDPSession(page)
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+    await page.setViewportSize({ width: 390, height: 840 })
+    const box = await checkin.boundingBox()
+    assert(box, 'Check-in shortcut must be visible on touch devices')
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchStart', touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }],
+    })
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await dialog.getByRole('textbox', { name: 'Địa điểm check-in' }).waitFor()
+    assert((await namesOf(checkin, 'svg')).includes('feed-shortcut-pin-hop'), 'Touch must replay the pin bounce')
+    await closeCheckin()
+    await page.waitForFunction(button => getComputedStyle(button).transform === 'none', await checkin.elementHandle())
+    console.log('PASS: touch opens Check-in and plays the bounce')
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   await page.goto(origin)
   const sidebar = page.locator('.app-sidebar')
   await sidebar.waitFor()
