@@ -64,7 +64,7 @@ import {
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath, visitorProfilePath } from "./router/routes";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
 import { useAppRouteNavigation } from "./router/useAppRouteNavigation";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
@@ -373,7 +373,8 @@ export default function AuthedApp({
   const navigate = useNavigate();
   const {
     tab, setTab, contactsScreen, setContactsScreen,
-    desktopProfileSettings, setDesktopProfileSettings, visitorUsername, closeVisitor,
+    desktopProfileSettings, setDesktopProfileSettings,
+    visitorUsername, openVisitorProfile, closeVisitor,
   } = useAppRouteNavigation();
   const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraftFile, storyBusy, storyDraftFile } = useFeedUiState({ tab });
 
@@ -538,14 +539,10 @@ export default function AuthedApp({
   function openVisitor(username: string) {
     if (username === sessionRef.current?.user.username) {
       setTab("profile");
-      setDesktopProfileSettings(false);
       setProfileTimelineOpen(true);
       return;
     }
-    const path = visitorProfilePath(username);
-    if (routeLocation.pathname !== path) {
-      navigate(path, { state: { visitorReturnTo: routeLocation.pathname + routeLocation.search + routeLocation.hash } });
-    }
+    openVisitorProfile(username);
   }
   function setFriendPreview(friend: FriendSearchResult | null) {
     if (friend) openVisitor(friend.username);
@@ -2470,7 +2467,7 @@ export default function AuthedApp({
     setTranslationSettingsConversationId(null);
 
     if (nextTab === "profile") {
-      setDesktopProfileSettings(false);
+      // setTab owns the URL; a second Settings setter would push /profile twice.
       setProfileEditorOpen(false);
     }
     if (activePostId !== null) {

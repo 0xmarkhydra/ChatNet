@@ -1,7 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Tab } from "../../shared/types/navigation";
-import { ROUTE, TAB_PATH, tabFromPath, visitorUsernameFromPath } from "./routes";
+import { ROUTE, TAB_PATH, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./routes";
 
 type ContactsScreen = "directory" | "invitations";
 
@@ -42,12 +42,20 @@ export function useAppRouteNavigation() {
   }, [desktopProfileSettings, navigate]);
 
   const visitorUsername = visitorUsernameFromPath(location.pathname);
+  const openVisitorProfile = useCallback((username: string) => {
+    const path = visitorProfilePath(username);
+    if (location.pathname === path) return;
+    navigate(path, {
+      state: { visitorReturnTo: location.pathname + location.search + location.hash },
+    });
+  }, [location.pathname, location.search, location.hash, navigate]);
   const closeVisitor = useCallback(() => {
     navigate(visitorReturnPath(location.state?.visitorReturnTo), { replace: true });
   }, [location.state, navigate]);
 
   return {
     tab, setTab, contactsScreen, setContactsScreen,
-    desktopProfileSettings, setDesktopProfileSettings, visitorUsername, closeVisitor,
+    desktopProfileSettings, setDesktopProfileSettings,
+    visitorUsername, openVisitorProfile, closeVisitor,
   };
 }

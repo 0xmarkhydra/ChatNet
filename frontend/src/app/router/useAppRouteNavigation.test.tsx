@@ -21,15 +21,20 @@ function mount(path: string, state?: unknown) {
     return (
       <>
         <output data-testid="path">{location.pathname + location.search}</output>
+        <output data-testid="hash">{location.hash}</output>
+        <output data-testid="return">{location.state?.visitorReturnTo ?? ""}</output>
         <output data-testid="tab">{navigation.tab}</output>
         <output data-testid="contact">{navigation.contactsScreen}</output>
         <output data-testid="settings">{String(navigation.desktopProfileSettings)}</output>
         <button onClick={() => navigation.setTab("feed")}>Feed</button>
+        <button onClick={() => navigation.setTab("profile")}>Profile tab</button>
         <button onClick={() => navigation.setTab(current => current === "feed" ? "chat" : "feed")}>Toggle</button>
         <button onClick={() => navigation.setContactsScreen("invitations")}>Invitations</button>
         <button onClick={() => navigation.setContactsScreen("directory")}>Directory</button>
         <button onClick={() => navigation.setDesktopProfileSettings(true)}>Settings</button>
         <button onClick={() => navigation.setDesktopProfileSettings(false)}>Profile</button>
+        <button onClick={() => navigation.openVisitorProfile("alice")}>Open Alice</button>
+        <button onClick={() => navigation.openVisitorProfile("alice smith")}>Open encoded visitor</button>
         <button onClick={() => navigation.closeVisitor()}>Close visitor</button>
         <button onClick={() => navigate(-1)}>Back</button>
       </>
@@ -62,6 +67,16 @@ describe("URL-owned app navigation", () => {
     expect(app.read("path")).toBe("/feed");
   });
 
+  it("returns from Settings to Profile with a single history entry", () => {
+    const app = mount("/settings/devices");
+    app.click("Profile tab");
+    expect(app.read("path")).toBe("/profile");
+    expect(app.read("settings")).toBe("false");
+    app.click("Back");
+    expect(app.read("path")).toBe("/settings/devices");
+    expect(app.read("settings")).toBe("true");
+  });
+
   it("maps contacts pages and preserves embedded Calls directory", () => {
     const contacts = mount("/contacts");
     contacts.click("Invitations");
@@ -89,6 +104,29 @@ describe("URL-owned app navigation", () => {
     expect(direct.read("path")).toBe("/settings/devices");
     direct.click("Profile");
     expect(direct.read("path")).toBe("/profile");
+  });
+
+  it("opens a visitor profile with URL-encoded username and preserves return context", () => {
+    const app = mount("/feed");
+    app.click("Open encoded visitor");
+    expect(app.read("path")).toBe("/users/alice%20smith");
+    expect(app.read("return")).toBe("/feed");
+    app.click("Close visitor");
+    expect(app.read("path")).toBe("/feed");
+    app.click("Back");
+    expect(app.read("path")).toBe("/feed");
+  });
+
+  it("preserves the full return location including query and fragment", () => {
+    const app = mount("/feed/posts/42?sort=new#comments");
+    app.click("Open Alice");
+    expect(app.read("path")).toBe("/users/alice");
+    expect(app.read("return")).toBe("/feed/posts/42?sort=new#comments");
+    app.click("Open Alice");
+    expect(app.read("path")).toBe("/users/alice");
+    app.click("Close visitor");
+    expect(app.read("path")).toBe("/feed/posts/42?sort=new");
+    expect(app.read("hash")).toBe("#comments");
   });
 
   it("returns from visitor profile to safe internal return location", () => {
