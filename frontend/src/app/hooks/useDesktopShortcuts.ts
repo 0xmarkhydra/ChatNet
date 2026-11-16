@@ -32,6 +32,7 @@ export function useDesktopShortcuts({
         if (pendingFocus !== null) window.cancelAnimationFrame(pendingFocus);
         pendingFocus = window.requestAnimationFrame(() => {
           pendingFocus = null;
+          if (!sessionRef.current || document.querySelector('[role="dialog"][aria-modal="true"]')) return;
           document.querySelector<HTMLInputElement>(".appbar-search input")?.focus();
         });
       } else if (event.key.toLowerCase() === "l" && event.shiftKey) {
