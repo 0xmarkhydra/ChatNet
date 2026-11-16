@@ -43,3 +43,41 @@ it('keeps keyboard focus inside the media dialog and restores it on close', asyn
   mounted.pop()
   expect(document.activeElement).toBe(opener)
 })
+
+it('preserves video keyboard shortcuts while keeping video focus inside the modal', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  mounted.push(() => { act(() => root.unmount()); host.remove() })
+  const onChange = vi.fn()
+  await act(async () => {
+    root.render(<MediaViewer
+      items={[
+        { storageRef: 'first', name: 'First.mp4', sizeBytes: 10, contentType: 'video/mp4', kind: 'video', url: '/first.mp4' },
+        { storageRef: 'second', name: 'Second.mp4', sizeBytes: 10, contentType: 'video/mp4', kind: 'video', url: '/second.mp4' },
+      ]}
+      activeIndex={1}
+      onChange={onChange}
+      onClose={vi.fn()}
+    />)
+  })
+  const dialog = document.querySelector('[role="dialog"]') as HTMLElement
+  const player = dialog.querySelector('video') as HTMLVideoElement
+  const original = dialog.querySelector('a') as HTMLAnchorElement
+  player.tabIndex = 0 // jsdom does not expose native media-control tab stops
+  player.focus()
+  expect(player.getAttribute('aria-label')).toBe('Video: Second.mp4')
+  const arrow = new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true })
+  player.dispatchEvent(arrow)
+  expect(arrow.defaultPrevented).toBe(false)
+  expect(onChange).not.toHaveBeenCalled()
+
+  player.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+  expect(document.activeElement).toBe(original)
+  original.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }))
+  expect(onChange).toHaveBeenCalledWith(0)
+
+  await act(async () => root.unmount())
+  mounted.pop()
+})

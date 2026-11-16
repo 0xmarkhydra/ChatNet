@@ -11,7 +11,7 @@ function MediaViewerDisplay({ item }: { item: PreviewMedia }) {
   return failed ? (
     <p role="alert" className="media-viewer-error">Không thể tải nội dung này. Liên kết có thể đã hết hạn.</p>
   ) : item.kind === 'video' ? (
-    <video src={item.url} controls playsInline autoPlay onError={() => setFailed(true)} />
+    <video src={item.url} controls playsInline autoPlay aria-label={`Video: ${item.name || 'Tệp đính kèm'}`} onError={() => setFailed(true)} />
   ) : (
     <img src={item.url} alt={item.name || 'Ảnh đính kèm'} onError={() => setFailed(true)} />
   )
@@ -42,7 +42,7 @@ export default function MediaViewer({
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Tab') {
-        const focusable = dialog.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)')
+        const focusable = dialog.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), video[controls], audio[controls]')
         if (!focusable?.length) return
         const first = focusable[0]
         const last = focusable[focusable.length - 1]
@@ -57,6 +57,9 @@ export default function MediaViewer({
         event.preventDefault()
         event.stopImmediatePropagation()
         onClose()
+      } else if (event.target instanceof HTMLMediaElement) {
+        // Let native video/audio controls use arrow keys for seeking and volume.
+        return
       } else if (event.key === 'ArrowLeft' && activeIndex > 0) {
         event.preventDefault()
         event.stopImmediatePropagation()
