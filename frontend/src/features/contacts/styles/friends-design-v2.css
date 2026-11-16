@@ -109,7 +109,8 @@
 .fd-option-popover button:hover{background:#eef2ff}
 .fd-profile-placeholder{margin:auto}
 .fd-invitation-tabs{flex:0 0 auto;min-height:68px;background:#fff;border-radius:15px;display:flex;gap:13px;align-items:center;padding:10px 17px}
-.fd-invitation-tabs .fd-back{flex:0 0 30px;height:30px;border:0;background:#f3f6ff;border-radius:9px;color:#6080bf;display:grid;place-items:center}
+.fd-invitation-tabs .fd-back{flex:0 0 44px;width:44px;height:44px;border:0;background:#f3f6ff;border-radius:11px;color:#6080bf;display:grid;place-items:center}
+.fd-invitation-tabs .fd-back:hover{background:#e6edff;color:#2459c9}
 .fd-invitation-tabs>div{display:flex;gap:6px;align-items:center;flex:1}
 .fd-invitation-tabs [role=tab]{min-height:44px;border:0;background:transparent;color:#7385a7;border-radius:11px;padding:10px 19px;font-size:12px;white-space:nowrap}
 .fd-invitation-tabs [role=tab].active{background:transparent;color:#2563eb;font-weight:800}
