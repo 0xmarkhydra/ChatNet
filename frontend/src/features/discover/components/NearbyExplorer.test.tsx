@@ -110,6 +110,28 @@ describe('NearbyExplorer location fallback', () => {
     expect(host.textContent).toContain('Chưa tìm thấy địa điểm')
   })
 
+  it('allows changing the place radius while a request is pending and aborts the previous request', async () => {
+    let resolveOld: ((items: Awaited<ReturnType<typeof loadNearbyPlaces>>) => void) | undefined
+    loadPlaces.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+      .mockResolvedValueOnce([])
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    const radius = host.querySelector<HTMLSelectElement>('select[aria-label="Bán kính tìm kiếm"]')
+    expect(radius?.disabled).toBe(false)
+    await act(async () => {
+      if (radius) {
+        radius.value = '3'
+        radius.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+    })
+    expect(loadPlaces).toHaveBeenCalledTimes(2)
+    expect(loadPlaces.mock.calls[0]?.[0].signal?.aborted).toBe(true)
+    expect(loadPlaces.mock.calls[1]?.[0].radiusKm).toBe(3)
+    await act(async () => resolveOld?.([]))
+  })
+
   it('keeps the previous place list on a failed refresh with unchanged filters', async () => {
     const place = {
       id: 'cafe:1', name: 'Quán cà phê', category: 'cafe' as const,

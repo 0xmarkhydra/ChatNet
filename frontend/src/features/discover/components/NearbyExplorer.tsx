@@ -140,7 +140,7 @@ export default function NearbyExplorer({
     </div>
     <div className="nearby-toolbar">
       <label className="nearby-search"><Search size={18} /><input aria-label={mode === 'people' ? 'Tìm người quanh đây' : 'Tìm địa điểm'} placeholder={mode === 'people' ? 'Tên hoặc @username' : 'Tên địa điểm hoặc địa chỉ'} value={query} onChange={(event) => onQueryChange(event.target.value)} /></label>
-      <label className="nearby-radius-field"><select aria-label="Bán kính tìm kiếm" title="Bán kính tìm kiếm" value={mode === 'people' ? peopleRadiusKm : radius} disabled={busy} onChange={(event) => mode === 'people' ? onPeopleRadiusChange(Number(event.target.value)) : setRadius(Number(event.target.value))}>
+      <label className="nearby-radius-field"><select aria-label="Bán kính tìm kiếm" title="Bán kính tìm kiếm" value={mode === 'people' ? peopleRadiusKm : radius} disabled={mode === 'people' ? busy : locating} onChange={(event) => mode === 'people' ? onPeopleRadiusChange(Number(event.target.value)) : setRadius(Number(event.target.value))}>
         {(mode === 'people' ? [1, 5, 10, 25, 50] : [0.5, 1, 3, 5]).map((value) => <option key={value} value={value}>{value < 1 ? '500 m' : `${value} km`}</option>)}
       </select></label>
       <button className="nearby-refresh" disabled={busy} title="Tìm lại" aria-label="Tìm lại" onClick={() => void (mode === 'people' ? scan() : location ? setReload((value) => value + 1) : locate())}><RefreshCw size={19} /></button>
