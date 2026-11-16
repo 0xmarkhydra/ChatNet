@@ -152,4 +152,26 @@ describe("session keepalive", () => {
       mounted.unmount();
     }
   });
+  it("pauses browser keepalive while offline and retries on reconnect", async () => {
+    const oldOnline = Object.getOwnPropertyDescriptor(navigator, "onLine");
+    let online = false;
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => online });
+    const sessionRef = { current: { sessionId: "session-a" } } as unknown as RefObject<Session | null>;
+    const refresh = vi.fn(async () => null);
+    const mounted = mountKeepalive("session-a", sessionRef, refresh, vi.fn());
+    try {
+      expect(refresh).not.toHaveBeenCalled();
+      act(() => window.dispatchEvent(new Event("focus")));
+      expect(refresh).not.toHaveBeenCalled();
+      online = true;
+      act(() => window.dispatchEvent(new Event("online")));
+      expect(refresh).toHaveBeenCalledTimes(1);
+      await act(async () => { await Promise.resolve(); });
+    } finally {
+      mounted.unmount();
+      if (oldOnline) Object.defineProperty(navigator, "onLine", oldOnline);
+      else Reflect.deleteProperty(navigator, "onLine");
+    }
+  });
+
 });
