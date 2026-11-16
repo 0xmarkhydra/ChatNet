@@ -13,6 +13,7 @@ let container: HTMLDivElement
 let root: Root
 let accept = vi.fn(async (_friend: FriendConnection | FriendSearchResult) => {})
 let decline = vi.fn(async (_friend: FriendConnection) => {})
+let scanQr = vi.fn()
 
 beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -21,6 +22,7 @@ beforeEach(async () => {
   root = createRoot(container)
   accept = vi.fn(async (_friend: FriendConnection | FriendSearchResult) => {})
   decline = vi.fn(async (_friend: FriendConnection) => {})
+  scanQr = vi.fn()
   await renderInvitations()
 })
 
@@ -34,7 +36,7 @@ async function renderInvitations(busy = new Set<number>()) {
     root.render(<ContactInvitations
       friendRequests={[incoming, outgoing]} friendBusyIds={busy}
       actOnFriend={accept} declineFriendRequest={decline}
-      connectionUrl="https://example.com/connect" onScanQr={vi.fn()}
+      connectionUrl="https://example.com/connect" onScanQr={scanQr}
       onBack={vi.fn()} onSearch={vi.fn()}
     />)
   })
@@ -64,6 +66,38 @@ describe('ContactInvitations interactions', () => {
     })
     expect(tab('Lời mời đến').getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(tab('Lời mời đến'))
+  })
+
+  it('wraps ArrowLeft from the first tab to QR and cycles back', async () => {
+    tab('Lời mời đến').focus()
+    await act(async () => {
+      tab('Lời mời đến').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+    })
+    expect(tab('Quét QR').getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(tab('Quét QR'))
+    await act(async () => {
+      tab('Quét QR').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    })
+    expect(tab('Lời mời đến').getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('keeps outgoing cancellation connected to the real action handler', async () => {
+    await act(async () => tab('Đã gửi').click())
+    const cancel = container.querySelector<HTMLButtonElement>('[aria-label="Hủy lời mời đã gửi cho Bạn gửi"]')
+    expect(cancel).not.toBeNull()
+    await act(async () => cancel?.click())
+    expect(accept).toHaveBeenCalledWith(outgoing)
+    expect(decline).not.toHaveBeenCalled()
+    await renderInvitations(new Set([2]))
+    expect(container.querySelector<HTMLButtonElement>('[aria-label="Hủy lời mời đã gửi cho Bạn gửi"]')?.disabled).toBe(true)
+  })
+
+  it('opens the real scanner from the QR tab', async () => {
+    await act(async () => tab('Quét QR').click())
+    const openScanner = [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.includes('Mở trình quét QR'))
+    expect(openScanner).toBeDefined()
+    await act(async () => openScanner?.click())
+    expect(scanQr).toHaveBeenCalledTimes(1)
   })
 
   it('keeps accept and decline wired to the existing callbacks', async () => {
