@@ -217,6 +217,53 @@ describe('Marketplace read fallback', () => {
     expect(host.textContent).toContain('Bàn học')
   })
 
+  it('shows a non-blocking read-refresh status while preserving the previous catalog', async () => {
+    let finishRefresh: (() => void) | undefined
+    const pending = new Promise<void>((resolve) => { finishRefresh = resolve })
+    let reads = 0
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') throw new Error('Lỗi ghi giỏ hàng')
+      reads += 1
+      if (reads > 4) await pending
+      return response(path, path.endsWith('/products') ? [product] : [])
+    })
+    const button = (label: string) => Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
+      .find((item) => item.textContent === label)
+    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    await act(async () => button('Thêm vào giỏ')?.click())
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Lỗi ghi giỏ hàng')
+    await act(async () => button('Thử tải dữ liệu')?.click())
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Đang cập nhật dữ liệu chợ')
+    expect(host.textContent).toContain('Bàn học')
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    await act(async () => finishRefresh?.())
+    expect(host.textContent).not.toContain('Đang cập nhật dữ liệu chợ')
+    expect(host.textContent).toContain('Bàn học')
+  })
+
+  it('ends refresh progress on read failure and keeps the previous catalog for another retry', async () => {
+    let failRefresh: ((error: Error) => void) | undefined
+    const pending = new Promise<Response>((_, reject) => { failRefresh = reject })
+    let reads = 0
+    const request = vi.fn((path: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return Promise.reject(new Error('Lỗi ghi'))
+      reads += 1
+      if (reads > 4) return pending
+      return Promise.resolve(response(path, path.endsWith('/products') ? [product] : []))
+    })
+    const button = (label: string) => Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
+      .find((item) => item.textContent === label)
+    await act(async () => root.render(<Marketplace userId={1} request={request} onBack={() => {}} />))
+    await act(async () => button('Thêm vào giỏ')?.click())
+    await act(async () => button('Thử tải dữ liệu')?.click())
+    expect(host.textContent).toContain('Đang cập nhật dữ liệu chợ')
+    await act(async () => failRefresh?.(new Error('Mất mạng khi cập nhật')))
+    expect(host.textContent).not.toContain('Đang cập nhật dữ liệu chợ')
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Mất mạng khi cập nhật')
+    expect(host.textContent).toContain('Bàn học')
+    expect(button('Thử tải dữ liệu')).toBeTruthy()
+  })
+
   it('ignores the previous user response after switching users', async () => {
     let resolveOld: ((value: Response) => void) | undefined
     const old = new Promise<Response>((resolve) => { resolveOld = resolve })

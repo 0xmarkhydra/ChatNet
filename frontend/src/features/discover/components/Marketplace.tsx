@@ -34,6 +34,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
   const [orders, setOrders] = useState<Order[]>([])
   const [mine, setMine] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -84,7 +85,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
     retryFlight.current = null
     setView('products')
     setTitle(''); setDescription(''); setPrice(''); setUnit(''); setStock('1')
-    setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false)
+    setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false); setRefreshing(false)
     void refresh(version)
     return () => { ++requestRevision.current }
   }, [userId])
@@ -94,9 +95,13 @@ export default function Marketplace({ userId, request, onBack }: Props) {
     const flight = { version: revision.current }
     retryFlight.current = flight
     if (!loaded) setLoading(true)
+    else setRefreshing(true)
     setError('')
     void refresh(flight.version).finally(() => {
-      if (retryFlight.current === flight) retryFlight.current = null
+      if (retryFlight.current === flight) {
+        retryFlight.current = null
+        setRefreshing(false)
+      }
     })
   }
 
@@ -182,6 +187,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
         <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>
 
         {loading && <p role="status" aria-busy="true">Đang tải dữ liệu chợ…</p>}
+        {refreshing && <p role="status" aria-live="polite" aria-busy="true">Đang cập nhật dữ liệu chợ…</p>}
         {busy && <p role="status" aria-live="polite" aria-busy="true">Đang xử lý yêu cầu…</p>}
         {error && <p role="alert" className="marketplace-error">{error} <button onClick={retryRead} type="button" disabled={busy}>Thử tải dữ liệu</button></p>}
         {message && <p role="status" className="marketplace-message">{message}</p>}
