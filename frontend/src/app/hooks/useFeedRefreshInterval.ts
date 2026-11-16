@@ -25,9 +25,14 @@ export function useFeedRefreshInterval({
       void storiesRef.current();
     };
     refresh();
-    const timer = window.setInterval(() => {
+    const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") refresh();
-    }, 12_000);
-    return () => window.clearInterval(timer);
+    };
+    const timer = window.setInterval(refreshWhenVisible, 12_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [enabled, sessionId, sessionToken, postsRef, storiesRef]);
 }
