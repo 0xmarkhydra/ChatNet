@@ -2902,7 +2902,7 @@ export default function AuthedApp({
               profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
             />
           }
-          search={searchInConversationList || tab === "discover" || tab === "market" ? null : quickSearchControl}
+          search={searchInConversationList ? null : quickSearchControl}
         >
           <AppHeaderActions
             account={
@@ -3313,6 +3313,7 @@ export default function AuthedApp({
 
         {tab === "market" && (
           <MarketSection
+            searchQuery={globalSearch}
           apiFetch={apiFetch}
           session={session}
           switchTab={switchTab}

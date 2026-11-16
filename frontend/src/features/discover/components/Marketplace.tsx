@@ -16,12 +16,13 @@ type Order = {
 }
 type Props = {
   userId: number
+  searchQuery: string
   request: (path: string, init?: RequestInit) => Promise<Response>
   onBack: () => void
 }
 const showMoney = (n: number, unit: string) => n.toLocaleString('vi-VN') + ' ' + unit
 
-export default function Marketplace({ userId, request, onBack }: Props) {
+export default function Marketplace({ userId, searchQuery, request, onBack }: Props) {
   const apiRef = useLatest(request)
   const revision = useRef(0)
   const readRevision = useRef(0)
@@ -109,6 +110,10 @@ export default function Marketplace({ userId, request, onBack }: Props) {
       }
     }
   }
+  const searchTerm = searchQuery.trim().toLocaleLowerCase("vi-VN")
+  const visibleProducts = searchTerm
+    ? products.filter(product => `${product.title} ${product.description}`.toLocaleLowerCase("vi-VN").includes(searchTerm))
+    : products
   const basketSellers = Array.from(new Set(cart.map(item => item.sellerId)))
   function updateCart(productId: number, quantity: number) {
     void execute(async (isCurrent) => {
@@ -177,8 +182,8 @@ export default function Marketplace({ userId, request, onBack }: Props) {
         {message && <p role="status" className="marketplace-message">{message}</p>}
 
         {!loading && loaded && view === 'products' && <div className="marketplace-grid">
-          {products.length === 0 && <p>Chưa có sản phẩm được đăng.</p>}
-          {products.map(p => <article className="marketplace-card" key={p.id}>
+          {visibleProducts.length === 0 && <p>{searchTerm ? 'Không tìm thấy sản phẩm phù hợp.' : 'Chưa có sản phẩm được đăng.'}</p>}
+          {visibleProducts.map(p => <article className="marketplace-card" key={p.id}>
             <div className="marketplace-image"><ShoppingBag size={36}/></div>
             <strong>{p.title}</strong>
             <p>{p.description || 'Chưa có mô tả'}</p>
