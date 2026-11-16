@@ -7,9 +7,9 @@ export type NotificationDeepLink = {
   messageId: number | null;
 };
 
-/** Match the positive decimal IDs accepted by the app's shareable chat routes. */
-function notificationId(value: string | null): number | null {
-  if (value === null || !/^[1-9]\d*$/.test(value)) return null;
+/** Accept canonical positive integer IDs, matching shareable route IDs. */
+function positiveId(value: string | null): number | null {
+  if (!value || !/^[1-9]\d*$/.test(value)) return null;
   const id = Number(value);
   return Number.isSafeInteger(id) ? id : null;
 }
@@ -17,12 +17,10 @@ function notificationId(value: string | null): number | null {
 /** Parse a push/deep link without changing the current browser location. */
 export function notificationDeepLink(params: URLSearchParams): NotificationDeepLink {
   const tab = params.get("tab");
-  const conversationId = notificationId(params.get("conversation"));
-  const messageId = notificationId(params.get("message"));
   return {
     tab: tab === "feed" || tab === "contacts" ? tab : null,
-    conversationId,
-    messageId,
+    conversationId: positiveId(params.get("conversation")),
+    messageId: positiveId(params.get("message")),
   };
 }
 

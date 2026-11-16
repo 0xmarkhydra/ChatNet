@@ -17,7 +17,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    this.props.onError?.(error, info);
+    // Reporting must never break the recovery UI if an optional logger fails.
+    try {
+      this.props.onError?.(error, info);
+    } catch {
+      // Keep the original render-error fallback usable.
+    }
   }
 
   componentDidUpdate(previousProps: ErrorBoundaryProps) {
