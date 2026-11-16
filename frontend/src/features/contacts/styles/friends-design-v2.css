@@ -108,7 +108,7 @@
 .fd-invitation-tabs{flex:0 0 auto;min-height:68px;background:#fff;border-radius:15px;display:flex;gap:13px;align-items:center;padding:10px 17px}
 .fd-invitation-tabs .fd-back{flex:0 0 30px;height:30px;border:0;background:#f3f6ff;border-radius:9px;color:#6080bf;display:grid;place-items:center}
 .fd-invitation-tabs>div{display:flex;gap:6px;align-items:center;flex:1}
-.fd-invitation-tabs [role=tab]{min-height:35px;border:0;background:transparent;color:#7385a7;border-radius:11px;padding:9px 19px;font-size:12px;white-space:nowrap}
+.fd-invitation-tabs [role=tab]{min-height:44px;border:0;background:transparent;color:#7385a7;border-radius:11px;padding:10px 19px;font-size:12px;white-space:nowrap}
 .fd-invitation-tabs [role=tab].active{background:transparent;color:#2563eb;font-weight:800}
 .fd-invitation-tabs .invitation-active-pill{background:#ebf0ff;border-radius:11px}
 .fd-invitation-tabs>small{font-size:12px;color:#8091b0;white-space:nowrap}
@@ -122,7 +122,10 @@
 .fd-request-copy{display:grid;gap:5px;min-width:0;flex:1}
 .fd-request-copy strong{font-size:14px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fd-request-copy span{font-size:11px;color:#8495b4;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.fd-request-row .fd-primary,.fd-request-row .fd-secondary{min-width:103px;min-height:37px;padding:8px 10px;font-size:12px}
+.fd-request-row .fd-primary,.fd-request-row .fd-secondary{min-width:103px;min-height:44px;padding:9px 12px;font-size:12px}
+.fd-request-row[aria-busy="true"]{background:#f4f7ff}
+.fd-request-copy strong,.fd-request-copy span{max-width:100%}
+.fd-request-row button:focus-visible{position:relative;z-index:1}
 .fd-outgoing-summary{width:100%;min-height:78px;display:flex;align-items:center;gap:15px;padding:15px;border:0;border-radius:13px;margin-top:auto;background:#eef2ff;text-align:left;color:#2563eb}
 .fd-outgoing-summary>span{display:grid;flex:1;gap:5px}
 .fd-outgoing-summary strong{font-size:13px;color:#283c5d}

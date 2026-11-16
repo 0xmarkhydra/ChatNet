@@ -28,8 +28,8 @@ describe('ContactInvitations', () => {
     expect(html).toContain('Người bạn thử nghiệm')
     expect(html).toContain('Chấp nhận lời mời của Người bạn thử nghiệm')
     expect(html).toContain('role="tablist"')
-    expect(html).toContain('aria-controls="fd-invitation-tabpanel"')
-    expect(html).toContain('aria-labelledby="fd-tab-incoming"')
+    expect(html).toMatch(/aria-controls="[^"]+-tabpanel"/)
+    expect(html).toMatch(/aria-labelledby="[^"]+-tab-incoming"/)
   })
 
   it('disables conflicting actions for an in-flight request', () => {

@@ -3,39 +3,40 @@ import QRCode from 'qrcode'
 import { Copy, QrCode, ShieldCheck } from 'lucide-react'
 
 type Props = { connectionUrl: string; onScanQr: () => void }
+type QrResult = { key: string; image?: string; error?: boolean }
+type CopyResult = { url: string; message: string }
 
 export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
-  const [qrImage, setQrImage] = useState('')
-  const [qrError, setQrError] = useState(false)
-  const [copyStatus, setCopyStatus] = useState('')
+  const [qrResult, setQrResult] = useState<QrResult | null>(null)
+  const [copyResult, setCopyResult] = useState<CopyResult | null>(null)
   const [retry, setRetry] = useState(0)
+  const qrKey = JSON.stringify([connectionUrl, retry])
+  const qrImage = qrResult?.key === qrKey ? qrResult.image : undefined
+  const qrError = !connectionUrl || (qrResult?.key === qrKey && Boolean(qrResult.error))
+  const copyStatus = copyResult?.url === connectionUrl ? copyResult.message : ''
 
   useEffect(() => {
+    if (!connectionUrl) return
     let cancelled = false
-    Promise.resolve().then(() => {
-      if (cancelled) return
-      setQrImage('')
-      setQrError(!connectionUrl)
-    })
-    if (!connectionUrl) return () => { cancelled = true }
     QRCode.toDataURL(connectionUrl, { width: 400, margin: 2, errorCorrectionLevel: 'M' })
-      .then(image => { if (!cancelled) setQrImage(image) })
-      .catch(() => { if (!cancelled) setQrError(true) })
+      .then(image => { if (!cancelled) setQrResult({ key: qrKey, image }) })
+      .catch(() => { if (!cancelled) setQrResult({ key: qrKey, error: true }) })
     return () => { cancelled = true }
-  }, [connectionUrl, retry])
+  }, [connectionUrl, qrKey])
 
   useEffect(() => {
     if (!copyStatus) return
-    const timer = window.setTimeout(() => setCopyStatus(''), 3500)
+    const timer = window.setTimeout(() => setCopyResult(null), 3500)
     return () => window.clearTimeout(timer)
   }, [copyStatus])
 
   async function copyLink() {
+    if (!connectionUrl) return
     try {
       await navigator.clipboard.writeText(connectionUrl)
-      setCopyStatus('Đã sao chép liên kết kết bạn')
+      setCopyResult({ url: connectionUrl, message: 'Đã sao chép liên kết kết bạn' })
     } catch {
-      setCopyStatus('Không thể sao chép. Kiểm tra quyền clipboard.')
+      setCopyResult({ url: connectionUrl, message: 'Không thể sao chép. Kiểm tra quyền clipboard.' })
     }
   }
 
@@ -46,7 +47,7 @@ export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
       <div className="fd-qr-preview" aria-busy={!qrImage && !qrError}>
         {qrImage ? <img src={qrImage} alt="Mã QR liên kết kết bạn của tôi" /> :
           qrError ? <div className="fd-qr-fallback" role="alert">
-            <span>Không thể tạo mã QR.</span>
+            <span>{connectionUrl ? 'Không thể tạo mã QR.' : 'Chưa có liên kết kết bạn.'}</span>
             {connectionUrl && <button type="button" className="fd-secondary" onClick={() => setRetry(value => value + 1)}>Thử lại</button>}
           </div> : <span className="fd-qr-loading" role="status">Đang tạo mã QR...</span>}
       </div>
