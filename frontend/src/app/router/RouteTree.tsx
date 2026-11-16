@@ -81,8 +81,8 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
         <Route path="feed/posts/:postId" element={<FeedPostPage />} />
         <Route path="feed/posts/*" element={<NotFoundPage />} />
         <Route path="chat/*" element={<NotFoundPage />} />
-        <Route path="profile/*" element={<CurrentPage />} />
-        <Route path="feed/*" element={<CurrentPage />} />
+        <Route path="profile/*" element={<NotFoundPage />} />
+        <Route path="feed/*" element={<NotFoundPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

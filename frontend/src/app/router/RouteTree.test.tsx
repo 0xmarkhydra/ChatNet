@@ -145,6 +145,19 @@ describe("app route tree", () => {
     }
   });
 
+  it("rejects unknown profile and feed subpaths instead of rendering an unrelated page", () => {
+    for (const path of ["/profile/unknown", "/profile/edit/unknown", "/feed/unknown", "/feed/posts/42/extra"]) {
+      const app = renderAt(path);
+      expect(app.location()).toBe(path);
+      expect(app.page()).toBeNull();
+      expect(app.container.textContent).toContain("Không tìm thấy trang");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    for (const path of ["/profile", "/feed", "/feed/posts/42"]) {
+      expect(renderAt(path).page()?.textContent).toBe("Current screen");
+    }
+  });
+
   it("rejects malformed or unsafe conversation IDs", () => {
     for (const path of ["/chat/0", "/chat/nope", "/chat/9007199254740992", "/chat/42/more"]) {
       const { container, page } = renderAt(path);
