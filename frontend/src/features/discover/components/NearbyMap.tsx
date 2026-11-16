@@ -17,9 +17,11 @@ export default function NearbyMap({ location, places, selected, onSelect, onShow
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const [failed, setFailed] = useState(false)
+  const [ready, setReady] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     if (!container.current) return
+    setReady(false)
     let instance: maplibregl.Map
     try {
       instance = new maplibregl.Map({
@@ -33,8 +35,8 @@ export default function NearbyMap({ location, places, selected, onSelect, onShow
     map.current = instance
     const resize = new ResizeObserver(() => instance.resize())
     resize.observe(container.current)
-    instance.on('error', () => { if (!instance.isStyleLoaded()) setFailed(true) })
-    instance.on('load', () => setFailed(false))
+    instance.on('error', () => { if (!instance.isStyleLoaded()) { setFailed(true); setReady(false) } })
+    instance.on('load', () => { setFailed(false); setReady(true) })
     new maplibregl.Marker({ color: '#2464ba' }).setLngLat([location.longitude, location.latitude]).addTo(instance)
     return () => { resize.disconnect(); instance.remove(); map.current = null }
   }, [location, attempt])
@@ -61,9 +63,9 @@ export default function NearbyMap({ location, places, selected, onSelect, onShow
     <div ref={container} className="nearby-map-canvas" />
     {failed && <div className="nearby-map-error" role="alert">Không tải được bản đồ. Bạn có thể xem danh sách địa điểm.<button type="button" onClick={onShowList}>Xem danh sách</button><button type="button" onClick={() => { setFailed(false); setAttempt((value) => value + 1) }}>Thử lại</button></div>}
     <div className="nearby-map-controls">
-      <button type="button" disabled={failed} title="Về vị trí của tôi" aria-label="Về vị trí của tôi" onClick={() => map.current?.easeTo({ center: [location.longitude, location.latitude], zoom: 14 })}><LocateFixed size={20} /></button>
-      <button type="button" disabled={failed} title="Phóng to" aria-label="Phóng to" onClick={() => map.current?.zoomIn()}><Plus size={20} /></button>
-      <button type="button" disabled={failed} title="Thu nhỏ" aria-label="Thu nhỏ" onClick={() => map.current?.zoomOut()}><Minus size={20} /></button>
+      <button type="button" disabled={failed || !ready} title="Về vị trí của tôi" aria-label="Về vị trí của tôi" onClick={() => map.current?.easeTo({ center: [location.longitude, location.latitude], zoom: 14 })}><LocateFixed size={20} /></button>
+      <button type="button" disabled={failed || !ready} title="Phóng to" aria-label="Phóng to" onClick={() => map.current?.zoomIn()}><Plus size={20} /></button>
+      <button type="button" disabled={failed || !ready} title="Thu nhỏ" aria-label="Thu nhỏ" onClick={() => map.current?.zoomOut()}><Minus size={20} /></button>
     </div>
   </div>
 }
