@@ -35,8 +35,8 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 50%;
   background: #f1f3fb;
@@ -58,6 +58,7 @@
   gap: 5px;
   border: 0;
   border-radius: 18px;
+  min-height: 44px;
   padding: 6px 11px;
   background: #f2f4fa;
   color: #606b86;
@@ -100,6 +101,7 @@
 .reaction-users-more {
   display: block;
   margin: 14px auto 0;
+  min-height: 44px;
   padding: 9px 20px;
   background: #eef1ff;
   border: 0;
