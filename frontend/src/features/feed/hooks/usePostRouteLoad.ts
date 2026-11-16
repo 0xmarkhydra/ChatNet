@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import type { ApiRequest } from '../../../shared/types/api'
@@ -26,6 +26,9 @@ export function usePostRouteLoad({
   setTab, setPosts, setActivePostId, onError,
 }: Options) {
   const callbacks = useLatest({ request, setTab, setPosts, setActivePostId, onError })
+  // A deep-linked post may be absent from the current Feed page; keep it outside
+  // the ordered Feed collection so opening comments never changes the timeline.
+  const [loaded, setLoaded] = useState<{ sessionId: string; post: Post } | null>(null)
 
   useEffect(() => {
     if (!sessionToken || !sessionId || sessionRef.current?.sessionId !== sessionId) return
@@ -48,9 +51,11 @@ export function usePostRouteLoad({
       })
       .then((post) => {
         if (!isCurrent()) return
-        callbacks.current.setPosts(current => [
-          post, ...current.filter(item => item.id !== post.id),
-        ])
+        // Refresh an existing Feed card in place; never prepend a viewed post.
+        callbacks.current.setPosts(current => current.map(item =>
+          item.id === post.id ? post : item,
+        ))
+        setLoaded({ sessionId, post })
         callbacks.current.setActivePostId(post.id)
       })
       .catch((error) => {
@@ -59,4 +64,7 @@ export function usePostRouteLoad({
       })
     return () => { cancelled = true }
   }, [sessionId, sessionToken, sessionRef, tab, routeSearch, routePostId, callbacks])
+
+  const currentId = routePostId ?? Number(new URLSearchParams(routeSearch).get('post'))
+  return loaded?.sessionId === sessionId && loaded.post.id === currentId ? loaded.post : null
 }

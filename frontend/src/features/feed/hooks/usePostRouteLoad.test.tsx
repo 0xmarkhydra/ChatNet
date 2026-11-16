@@ -37,24 +37,28 @@ function setup() {
   const onError = vi.fn()
   const setTab = vi.fn()
   let setPosts!: React.Dispatch<React.SetStateAction<Post[]>>
+  let readPosts: () => Post[] = () => []
   let setActivePostId!: React.Dispatch<React.SetStateAction<number | null>>
   function Probe({ session, search, tab = 'feed', routePostId = null }: {
     session: Session; search: string; tab?: 'feed' | 'chat'; routePostId?: number | null
   }) {
     const [posts, updatePosts] = useState<Post[]>([])
+    readPosts = () => posts
     const [activePostId, updateActivePostId] = useState<number | null>(null)
     setPosts = updatePosts
     setActivePostId = updateActivePostId
-    usePostRouteLoad({
+    const routedPost = usePostRouteLoad({
       sessionId: session.sessionId, sessionToken: session.token, sessionRef,
       tab, routeSearch: search, routePostId, request, setTab, setPosts: updatePosts,
       setActivePostId: updateActivePostId, onError,
     })
-    return <div>{posts.map(post => post.id).join(',')}|{activePostId ?? ''}</div>
+    return <div>{posts.map(post => post.id).join(',')}|{activePostId ?? ''}|{routedPost?.id ?? ''}</div>
   }
 
   return {
     host, requests, request, onError, setTab,
+    posts: () => readPosts(),
+    async seedPosts(posts: Post[]) { await act(async () => setPosts(posts)) },
     async render(session: Session, search = '?post=11', tab: 'feed' | 'chat' = 'feed', routePostId: number | null = null) {
       sessionRef.current = session
       await act(async () => root.render(<Probe session={session} search={search} tab={tab} routePostId={routePostId} />))
@@ -70,6 +74,34 @@ function setup() {
 }
 
 describe('deep-linked feed posts and account visits', () => {
+  it('keeps Feed order when visiting an existing post and excludes unseen deep links from Feed', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'), '', 'feed')
+      await app.seedPosts([{ id: 3, content: 'first' }, { id: 2, content: 'old' }, { id: 1, content: 'last' }] as Post[])
+      await app.render(account('A'), '?post=2')
+      await act(async () => {
+        app.requests[0].resolve(Response.json({ id: 2, content: 'updated' }))
+        await Promise.resolve()
+      })
+      expect(app.posts().map(post => post.id)).toEqual([3, 2, 1])
+      expect(app.posts()[1].content).toBe('updated')
+      await app.render(account('A'), '')
+      expect(app.posts().map(post => post.id)).toEqual([3, 2, 1])
+      await app.render(account('A'), '?post=99')
+      await act(async () => {
+        app.requests[1].resolve(Response.json({ id: 99, content: 'linked' }))
+        await Promise.resolve()
+      })
+      expect(app.host.textContent).toBe('3,2,1|99|99')
+      expect(app.posts().map(post => post.id)).toEqual([3, 2, 1])
+      await app.render(account('A'), '')
+      expect(app.host.textContent).toBe('3,2,1|99|')
+    } finally {
+      await app.close()
+    }
+  })
+
   it('rejects old response after switching A → B → A even with the same token and route', async () => {
     const app = setup()
     try {
@@ -84,12 +116,12 @@ describe('deep-linked feed posts and account visits', () => {
         app.requests[1].resolve(Response.json({ id: 88 }))
         await Promise.resolve()
       })
-      expect(app.host.textContent).toBe('|')
+      expect(app.host.textContent).toBe('||')
       await act(async () => {
         app.requests[2].resolve(Response.json({ id: 11 }))
         await Promise.resolve()
       })
-      expect(app.host.textContent).toBe('11|11')
+      expect(app.host.textContent).toBe('|11|11')
       expect(app.onError).not.toHaveBeenCalled()
     } finally {
       await app.close()
@@ -106,7 +138,7 @@ describe('deep-linked feed posts and account visits', () => {
         app.requests[1].resolve(Response.json({ id: 2 }))
         await Promise.resolve()
       })
-      expect(app.host.textContent).toBe('2|2')
+      expect(app.host.textContent).toBe('|2|2')
       expect(app.onError).not.toHaveBeenCalled()
     } finally {
       await app.close()
@@ -147,7 +179,7 @@ describe('deep-linked feed posts and account visits', () => {
         app.requests[0].resolve(Response.json({ id: 42 }))
         await Promise.resolve()
       })
-      expect(app.host.textContent).toBe('42|42')
+      expect(app.host.textContent).toBe('|42|42')
       await app.render(account('A'), '?post=11', 'feed', 43)
       expect(app.request).toHaveBeenCalledWith('/api/posts/43')
     } finally {
