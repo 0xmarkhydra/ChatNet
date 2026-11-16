@@ -7,15 +7,20 @@ export type NotificationDeepLink = {
   messageId: number | null;
 };
 
+/** Accept canonical positive integer IDs, matching shareable route IDs. */
+function positiveId(value: string | null): number | null {
+  if (!value || !/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
 /** Parse a push/deep link without changing the current browser location. */
 export function notificationDeepLink(params: URLSearchParams): NotificationDeepLink {
   const tab = params.get("tab");
-  const conversation = Number(params.get("conversation"));
-  const message = Number(params.get("message"));
   return {
     tab: tab === "feed" || tab === "contacts" ? tab : null,
-    conversationId: Number.isSafeInteger(conversation) && conversation > 0 ? conversation : null,
-    messageId: Number.isSafeInteger(message) && message > 0 ? message : null,
+    conversationId: positiveId(params.get("conversation")),
+    messageId: positiveId(params.get("message")),
   };
 }
 
