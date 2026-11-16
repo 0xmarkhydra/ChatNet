@@ -55,6 +55,7 @@ import ConversationHeader from "./ConversationHeader";
 import MessageTimeline from "./MessageTimeline";
 import PinnedItemsPanel from "./PinnedItemsPanel";
 import type { ChatSectionProps } from "./ChatSectionProps";
+import { useConversationNotificationToggle } from "../hooks/useConversationNotificationToggle";
 
 export type { ChatSectionProps } from "./ChatSectionProps";
 
@@ -306,31 +307,9 @@ export default function ChatSection({
     categories={conversationCategories} search={conversationListSearch} mode="category" />;
   const [groupPhotoBusy, setGroupPhotoBusy] = useState(false);
   const [railListOpen, setRailListOpen] = useState(false);
-  const [notificationBusyId, setNotificationBusyId] = useState<number | null>(null);
-  async function toggleConversationNotifications(conversation: Conversation) {
-    if (notificationBusyId !== null) return;
-    setNotificationBusyId(conversation.id);
-    try {
-      const muted = !conversation.muted;
-      const response = await apiFetch('/api/conversations/' + conversation.id + '/notification-settings', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageNotifications: !muted, mentionNotifications: !muted }),
-      });
-      const result = await response.json().catch(() => null) as
-        { messageNotifications?: boolean; mentionNotifications?: boolean; error?: string } | null;
-      if (!response.ok || typeof result?.messageNotifications !== 'boolean') {
-        throw new Error(result?.error || 'Không cập nhật được thông báo. Backend cần hỗ trợ thiết lập theo hội thoại.');
-      }
-      const nextMuted = !result.messageNotifications && !result.mentionNotifications;
-      setConversations(current => current.map(item =>
-        item.id === conversation.id ? { ...item, muted: nextMuted } : item));
-      setNotice(nextMuted ? 'Đã tắt thông báo hội thoại.' : 'Đã bật thông báo hội thoại.', 'success');
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông báo.', 'error');
-    } finally {
-      setNotificationBusyId(null);
-    }
-  }
+  const { notificationBusyId, toggleConversationNotifications } = useConversationNotificationToggle({
+    apiFetch, setConversations, setNotice,
+  });
   const [desktopChannelPanelOpen, setDesktopChannelPanelOpen] = useState(false);
   const [channelSidebarOpen, setChannelSidebarOpen] = useState(false);
   const [mobileChannelSelected, setMobileChannelSelected] = useState(false);

@@ -29,16 +29,16 @@ export default function ContactFriendProfile({ friend, contactMetadata, friendBu
   )
   return <>
     <div className="fd-profile-cover" aria-hidden="true"/>
-    <div className="fd-profile-core">
+    <div className="fd-profile-core" aria-label={'Hồ sơ của ' + personName(friend)}>
       {avatar(friend, 'fd-profile-avatar')}
       <h2>{contactMetadata[friend.id]?.nickname || personName(friend)}</h2>
-      <p className={friend.online && !isBlocked(friend) ? 'fd-online' : ''}>{friend.blockedByOther ? 'Bạn đã bị chặn' : friend.blockedByMe ? 'Bạn đã chặn người này' : friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
+      <p className={friend.online && !isBlocked(friend) ? 'fd-online' : ''} aria-live="polite">{friend.blockedByOther ? 'Bạn đã bị chặn' : friend.blockedByMe ? 'Bạn đã chặn người này' : friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
         {typeof friend.mutualGroups === 'number' && friend.mutualGroups > 0 ? ' · ' + friend.mutualGroups + ' nhóm chung' : ''}
       </p>
     </div>
     <div className="fd-profile-actions">
-      <button type="button" className="fd-primary" aria-label={isBlocked(friend) ? 'Xem hội thoại' : 'Nhắn tin'} title={isBlocked(friend) ? 'Xem hội thoại' : 'Nhắn tin'} onClick={() => openChat(friend)}><MessageCircle size={20}/>{!iconOnly && (isBlocked(friend) ? 'Xem hội thoại' : 'Nhắn tin')}</button>
-      <button type="button" className="fd-secondary" aria-label="Gọi thoại" title="Gọi thoại" disabled={isBlocked(friend)} onClick={() => startCall(friend)}><Phone size={20}/>{!iconOnly && 'Gọi thoại'}</button>
+      <button type="button" className="fd-primary" aria-label={(isBlocked(friend) ? 'Xem hội thoại với ' : 'Nhắn tin cho ') + personName(friend)} title={isBlocked(friend) ? 'Xem hội thoại' : 'Nhắn tin'} onClick={() => openChat(friend)}><MessageCircle size={20}/>{!iconOnly && (isBlocked(friend) ? 'Xem hội thoại' : 'Nhắn tin')}</button>
+      <button type="button" className="fd-secondary" aria-label={'Gọi thoại cho ' + personName(friend)} title="Gọi thoại" disabled={isBlocked(friend)} onClick={() => startCall(friend)}><Phone size={20}/>{!iconOnly && 'Gọi thoại'}</button>
     </div>
     <div className="fd-profile-info">
       <h3>Thông tin bạn bè</h3>
@@ -49,8 +49,8 @@ export default function ContactFriendProfile({ friend, contactMetadata, friendBu
     </div>
     <div className="fd-profile-options"><h3><MoreHorizontal size={20}/>Tùy chọn</h3>
       <div>
-        <button type="button" onClick={() => void changePersonalContact(friend, 'nickname')}>Đặt biệt danh</button><span>·</span>
-        <button type="button" onClick={() => void changePersonalContact(friend, 'favorite')}>
+        <button type="button" disabled={friendBusyIds.has(friend.id)} onClick={() => void changePersonalContact(friend, 'nickname')}>Đặt biệt danh</button><span>·</span>
+        <button type="button" disabled={friendBusyIds.has(friend.id)} aria-pressed={Boolean(contactMetadata[friend.id]?.favorite)} onClick={() => void changePersonalContact(friend, 'favorite')}>
           {contactMetadata[friend.id]?.favorite ? 'Bỏ yêu thích' : 'Ghim'}
         </button><span>·</span>
         {!friend.blockedByOther && <>
@@ -59,7 +59,7 @@ export default function ContactFriendProfile({ friend, contactMetadata, friendBu
             {friend.blockedByMe ? 'Bỏ chặn' : 'Chặn'}
           </button><span>·</span>
         </>}
-        <button type="button" onClick={() => void reportContact(friend)}>Báo cáo</button><span>·</span>
+        <button type="button" disabled={friendBusyIds.has(friend.id)} onClick={() => void reportContact(friend)}>Báo cáo</button><span>·</span>
         <button type="button" disabled={friendBusyIds.has(friend.id)} onClick={() => void removeAcceptedFriend(friend)}>Hủy kết bạn</button>
       </div>
     </div>

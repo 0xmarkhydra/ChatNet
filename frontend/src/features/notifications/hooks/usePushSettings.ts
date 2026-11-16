@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, type SetStateAction } from "react";
 import { type ToastKind } from "../../../shared/utils/toast";
 import type { Dispatch, RefObject } from "react";
 import { useLatest } from "../../../shared/hooks/useLatest";
+import { desktopBridge, isDesktopBuild } from "../../../platform/desktop";
 
 export type UsePushSettingsDeps = {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
@@ -116,10 +117,17 @@ export function usePushSettings({
   }
   async function previewMessageSound() {
     const startedVisit = sessionVisit;
-    const played = await messageSound.current?.preview();
+    let played = false;
+    try {
+      played = isDesktopBuild
+        ? Boolean(startedVisit.sessionId && await desktopBridge().notifications.preview(startedVisit.sessionId))
+        : Boolean(await messageSound.current?.preview());
+    } catch { /* An unavailable audio device is reported below. */ }
     if (isCurrentSession(startedVisit) && !played)
       setNotice(
-        "Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SocCO.",
+        isDesktopBuild
+          ? "Desktop không phát được âm báo hệ thống. Kiểm tra thiết bị âm thanh và âm lượng Windows."
+          : "Trình duyệt chưa cho phép phát âm thanh. Hãy thử lại sau khi chạm vào SocCO.",
         "warning",
       );
   }

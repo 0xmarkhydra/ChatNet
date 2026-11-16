@@ -9,12 +9,12 @@ import MediaAttachmentsView from '../../../shared/ui/MediaAttachmentsView'
 import GroupGovernancePanel from './GroupGovernancePanel'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import { createGroupChannel } from '../api/conversations'
-import { deleteChannel, getCommunity, getNotificationSettings, joinPublicGroup, listChannelMessages, listChannels, listPublicGroups, saveNotificationSettings, sendChannelMessage as sendChannelMessageRequest, updateChannel, updateCommunity } from '../api/community'
+import { deleteChannel, getCommunity, getNotificationSettings, listChannelMessages, listChannels, saveNotificationSettings, sendChannelMessage as sendChannelMessageRequest, updateChannel, updateCommunity } from '../api/community'
+import { useCommunityDiscovery, type CommunityMetadata } from '../hooks/useCommunityDiscovery'
 import '../styles/community-groups.css'
 
 export type GroupWorkspaceMode = 'list' | 'create' | 'manage' | 'channel'
 type ManageTab = 'members' | 'details' | 'permissions' | 'requests' | 'rules' | 'notifications' | 'files' | 'activity'
-type CommunityMetadata = { id: number; name: string; description: string; topic: string; rules: string; visibility: 'public' | 'private'; memberCount: number }
 type Channel = { id: number; conversationId: number; name: string; description: string }
 type NotificationPreferences = { messageNotifications: boolean; mentionNotifications: boolean }
 type Props = {
@@ -89,9 +89,9 @@ export default function CommunityGroupsPage({
   const [channelUnconfirmed,setChannelUnconfirmed] = useState<{clientId:string;text:string}|null>(null)
   const [preferences,setPreferences] = useState<NotificationPreferences>({messageNotifications:true,mentionNotifications:true})
   const [settingsBusy,setSettingsBusy] = useState(false)
-  const [publicGroups,setPublicGroups] = useState<CommunityMetadata[]>([])
-  const [publicLoading,setPublicLoading] = useState(false)
-  const [joiningId,setJoiningId] = useState<number | null>(null)
+  const { publicGroups, publicLoading, joiningId, joinPublic } = useCommunityDiscovery({
+    active: mode === 'list', query, request, notify, onJoinedGroup,
+  })
   const requestRef=useLatest(request)
   const groupId=selectedGroup?.id ?? null
   useEffect(()=>{
@@ -131,18 +131,6 @@ export default function CommunityGroupsPage({
   },[groupId])
 
   useEffect(()=>{
-    if(mode!=='list'){setPublicGroups([]);return}
-    const ctrl=new AbortController()
-    setPublicLoading(true)
-    void listPublicGroups(requestRef.current,query,ctrl.signal).then(async response=>{
-      if(!response.ok)throw new Error('Không tải được nhóm công khai')
-      const value=await response.json() as CommunityMetadata[]
-      if(!ctrl.signal.aborted)setPublicGroups(Array.isArray(value)?value:[])
-    }).catch(()=>{if(!ctrl.signal.aborted)setPublicGroups([])}).finally(()=>{if(!ctrl.signal.aborted)setPublicLoading(false)})
-    return()=>ctrl.abort()
-  },[mode, query, requestRef])
-
-  useEffect(()=>{
     setChannelMessages([])
     setChannelError('')
     setChannelUnconfirmed(null)
@@ -180,19 +168,6 @@ export default function CommunityGroupsPage({
     window.addEventListener('chatnet:group-channel-event',onChannelMessage)
     return()=>window.removeEventListener('chatnet:group-channel-event',onChannelMessage)
   },[groupId,activeChannelId,userId])
-
-  async function joinPublic(id:number) {
-    if(joiningId!==null)return
-    setJoiningId(id)
-    try{
-      const response=await joinPublicGroup(request,id)
-      const result=await response.json().catch(()=>null) as {status?:string;error?:string}|null
-      if(!response.ok)throw new Error(result?.error||'Không tham gia được cộng đồng.')
-      if(result?.status==='member'){notify('Đã tham gia cộng đồng.');await onJoinedGroup(id)}
-      else notify('Đã gửi yêu cầu tham gia. Chờ quản trị viên duyệt.')
-    }catch(e){notify(e instanceof Error?e.message:'Không thể tham gia cộng đồng.')}
-    finally{setJoiningId(null)}
-  }
 
   async function saveMetadata() {
     if(!groupId||!canEdit||settingsBusy)return

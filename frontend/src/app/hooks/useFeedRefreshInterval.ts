@@ -22,9 +22,17 @@ export function useFeedRefreshInterval({
     if (!enabled || !sessionId || !sessionToken) return;
     // A slow refresh must not race with the next timer tick or visibility event.
     // Each effect owns its own guard so a new session can refresh immediately.
+    let active = true;
     let refreshing = false;
-    const refresh = () => {
-      if (refreshing) return;
+    let refreshAfterCurrent = false;
+    const isOnline = () => navigator.onLine !== false;
+    const refresh = (onDemand = false) => {
+      if (!active || !isOnline()) return;
+      if (refreshing) {
+        // Visibility/online events should not be lost behind a slow request.
+        if (onDemand) refreshAfterCurrent = true;
+        return;
+      }
       refreshing = true;
       const call = (callback: () => Promise<unknown>) => {
         try {
@@ -37,17 +45,26 @@ export function useFeedRefreshInterval({
       void Promise.allSettled([
         call(postsRef.current),
         call(storiesRef.current),
-      ]).then(() => { refreshing = false; });
+      ]).then(() => {
+        refreshing = false;
+        if (!active || !refreshAfterCurrent) return;
+        refreshAfterCurrent = false;
+        if (document.visibilityState === "visible") refresh();
+      });
     };
     refresh();
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") refresh();
+      if (document.visibilityState === "visible") refresh(true);
     };
     const timer = window.setInterval(refreshWhenVisible, 12_000);
     document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("online", refreshWhenVisible);
     return () => {
+      active = false;
+      refreshAfterCurrent = false;
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("online", refreshWhenVisible);
     };
   }, [enabled, sessionId, sessionToken, postsRef, storiesRef]);
 }

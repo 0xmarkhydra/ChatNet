@@ -4,8 +4,11 @@ import { ROUTE, TAB_PATH, chatConversationIdFromPath, fallbackPathForRoute, feed
 
 function LegacyHomeRedirect() {
   const { search, hash, state } = useLocation();
-  const tab = tabFromPath("/", new URLSearchParams(search).get("tab"));
-  return <Navigate to={{ pathname: TAB_PATH[tab], search, hash }} state={state} replace />;
+  const params = new URLSearchParams(search);
+  const tab = tabFromPath("/", params.get("tab"));
+  params.delete("tab");
+  const remaining = params.toString();
+  return <Navigate to={{ pathname: TAB_PATH[tab], search: remaining ? `?${remaining}` : "", hash }} state={state} replace />;
 }
 
 // The signed-in app owns live feature state; changing routes only replaces its page slot.

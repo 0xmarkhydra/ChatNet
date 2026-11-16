@@ -16,11 +16,15 @@ import { useSession } from "../shared/context/SessionContext";
 import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
+import { applyPostLikePreviews } from "./applyPostLikePreviews";
 import { usePhoneSearchLayout } from "./hooks/usePhoneSearchLayout";
 import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
 import { useAppInstallState } from "./hooks/useAppInstallState";
 import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
+import { useQuickSearchDismiss } from "./hooks/useQuickSearchDismiss";
+import { useChatOutboxReconnect } from "./hooks/useChatOutboxReconnect";
+import { useUnreadDocumentTitle } from "./hooks/useUnreadDocumentTitle";
 import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
@@ -64,7 +68,8 @@ import {
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath, tabFromPath, visitorProfilePath, visitorUsernameFromPath } from "./router/routes";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
+import { useAppRouteNavigation } from "./router/useAppRouteNavigation";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
 import type {
@@ -138,7 +143,7 @@ import GroupSettingsPanel from "../features/chat/components/GroupSettingsPanel";
 import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
 import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
-import ContactsView, { type FriendsScreen } from "../features/contacts/components/ContactsView";
+import ContactsView from "../features/contacts/components/ContactsView";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
@@ -264,7 +269,7 @@ import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
 import AppPageErrorBoundary from "./layouts/AppPageErrorBoundary";
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
-import { consumeInviteDeepLink } from "./navigation/inviteDeepLink";
+import { inviteRouteTarget } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
@@ -370,12 +375,12 @@ export default function AuthedApp({
 
   const routeLocation = useLocation();
   const navigate = useNavigate();
-  const tab = tabFromPath(routeLocation.pathname, new URLSearchParams(routeLocation.search).get("tab"));
-  const setTab: Dispatch<SetStateAction<Tab>> = useCallback((next) => {
-    const nextTab = typeof next === "function" ? next(tab) : next;
-    if (TAB_PATH[nextTab] !== routeLocation.pathname) navigate(TAB_PATH[nextTab]);
-  }, [navigate, routeLocation.pathname, tab]);
-  const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraftFile, storyBusy, storyDraftFile } = useFeedUiState({ tab });
+  const {
+    tab, setTab, contactsScreen, setContactsScreen,
+    desktopProfileSettings, setDesktopProfileSettings,
+    visitorUsername, openVisitorProfile, closeVisitor,
+  } = useAppRouteNavigation();
+  const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraft, storyBusy, storyDraft } = useFeedUiState({ tab });
 
   const tabRef = useLatest(tab);
   const [globalSearch, setGlobalSearch] = useState("");
@@ -393,25 +398,7 @@ export default function AuthedApp({
   const chatSearchJumpRevision = useRef(0);
   const nextChatSearchJumpRevision = useCallback(() => ++chatSearchJumpRevision.current, []);
   const lastScrolledSearchJump = useRef(0);
-  useEffect(() => {
-    if (!quickSearchOpen) return;
-    const outside = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !quickSearchAnchorRef.current?.contains(event.target)
-      )
-        setQuickSearchOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setQuickSearchOpen(false);
-    };
-    document.addEventListener("pointerdown", outside);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", outside);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [quickSearchOpen]);
+  useQuickSearchDismiss(quickSearchOpen, quickSearchAnchorRef, setQuickSearchOpen);
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
@@ -535,33 +522,13 @@ export default function AuthedApp({
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
-  const contactsScreen: FriendsScreen = routeLocation.pathname === "/contacts/requests"
-    ? "invitations" : routeLocation.pathname === "/contacts/directory" ? "directory" : "overview";
-  const setContactsScreen: Dispatch<SetStateAction<FriendsScreen>> = (next) => {
-    const screen = typeof next === "function" ? next(contactsScreen) : next;
-    // Calls embeds the directory; opening it must not navigate away from the call workspace.
-    if ((routeLocation.pathname === ROUTE.calls || routeLocation.pathname.startsWith(`${ROUTE.calls}/`)) && screen === "directory") return;
-    const path = screen === "invitations" ? "/contacts/requests"
-      : screen === "directory" ? "/contacts/directory" : TAB_PATH.contacts;
-    if (routeLocation.pathname !== path) navigate(path);
-  };
-  const visitorUsername = visitorUsernameFromPath(routeLocation.pathname);
-  function closeVisitor() {
-    const returnTo = routeLocation.state?.visitorReturnTo;
-    navigate(typeof returnTo === "string" && returnTo.startsWith("/") && !returnTo.startsWith("//")
-      ? returnTo : TAB_PATH.profile, { replace: true });
-  }
-  function openVisitor(username: string) {
+  function openVisitor(username: string, returnTo?: string) {
     if (username === sessionRef.current?.user.username) {
       setTab("profile");
-      setDesktopProfileSettings(false);
       setProfileTimelineOpen(true);
       return;
     }
-    const path = visitorProfilePath(username);
-    if (routeLocation.pathname !== path) {
-      navigate(path, { state: { visitorReturnTo: routeLocation.pathname + routeLocation.search + routeLocation.hash } });
-    }
+    openVisitorProfile(username, returnTo);
   }
   function setFriendPreview(friend: FriendSearchResult | null) {
     if (friend) openVisitor(friend.username);
@@ -582,12 +549,6 @@ export default function AuthedApp({
     setTranslationSettingsActiveConversationId(activeConversationId);
     setTranslationSettingsConversationId(null);
   }
-  const desktopProfileSettings = routeLocation.pathname === ROUTE.settings || routeLocation.pathname.startsWith(`${ROUTE.settings}/`);
-  const setDesktopProfileSettings: Dispatch<SetStateAction<boolean>> = (next) => {
-    const open = typeof next === "function" ? next(desktopProfileSettings) : next;
-    if (open && !desktopProfileSettings) navigate(ROUTE.settings);
-    if (!open && desktopProfileSettings) navigate(TAB_PATH.profile);
-  };
   const desktopProfileOverview = isProfileDesktop && !desktopProfileSettings;
   useEffect(() => {
     if (
@@ -738,7 +699,6 @@ export default function AuthedApp({
   }, []);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
   const feedAlbumInputRef = useRef<HTMLInputElement>(null);
-  const storyFileInputRef = useRef<HTMLInputElement>(null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1222,23 +1182,7 @@ export default function AuthedApp({
     () => Object.fromEntries(friends.map(friend => [friend.username, friend.displayName || friend.username])),
     [friends],
   );
-  const visiblePosts = posts.map((post) =>
-    likePreviews[post.id] === undefined
-      ? post
-      : {
-          ...post,
-          liked: likePreviews[post.id],
-          likes: Math.max(
-            0,
-            post.likes +
-              (likePreviews[post.id] === post.liked
-                ? 0
-                : likePreviews[post.id]
-                  ? 1
-                  : -1),
-          ),
-        },
-  );
+  const visiblePosts = applyPostLikePreviews(posts, likePreviews);
   const visibleMessages = messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
     reactionPreviews[message.id]
       ? {
@@ -1247,23 +1191,7 @@ export default function AuthedApp({
         }
       : message,
   );
-  const visibleProfilePosts = profilePosts.map((post) =>
-    likePreviews[post.id] === undefined
-      ? post
-      : {
-          ...post,
-          liked: likePreviews[post.id],
-          likes: Math.max(
-            0,
-            post.likes +
-              (likePreviews[post.id] === post.liked
-                ? 0
-                : likePreviews[post.id]
-                  ? 1
-                  : -1),
-          ),
-        },
-  );
+  const visibleProfilePosts = applyPostLikePreviews(profilePosts, likePreviews);
   // Route is authoritative for Feed details, including synchronous browser Back/Forward.
   // Local selection state may briefly lag behind history navigation.
   const feedRoutePostId = feedPostIdFromPath(routeLocation.pathname)
@@ -1345,15 +1273,15 @@ export default function AuthedApp({
 
   useEffect(() => {
     if (!session?.token) return;
-    const requestedUser = consumeInviteDeepLink(new URL(window.location.href));
-    if (
-      requestedUser &&
-      requestedUser.toLocaleLowerCase("vi-VN") !==
-        session.user.username.toLocaleLowerCase("vi-VN")
-    ) {
-      openVisitor(requestedUser);
+    const target = inviteRouteTarget(routeLocation);
+    if (!target) return;
+    const returnTo = target.to.pathname + target.to.search + target.to.hash;
+    navigate(target.to, { replace: true, state: routeLocation.state });
+    if (target.username.toLocaleLowerCase("vi-VN") !==
+        session.user.username.toLocaleLowerCase("vi-VN")) {
+      openVisitor(target.username, returnTo);
     }
-  }, [session?.token]);
+  }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, navigate]);
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
@@ -2122,14 +2050,7 @@ export default function AuthedApp({
     },
   });
 
-  useEffect(() => {
-    const title = 'SocCO – Understand. Connect. Together.';
-    const count = nativeNotifications.unreadCount;
-    document.title = count !== null && count > 0
-      ? `(${count > 99 ? '99+' : count}) ${title}`
-      : title;
-    return () => { document.title = title; };
-  }, [nativeNotifications.unreadCount]);
+  useUnreadDocumentTitle(nativeNotifications.unreadCount);
 
   useAppRealtime({
     onCategoryAssignmentChanged: conversationCategories.applyAssignment,
@@ -2283,39 +2204,15 @@ export default function AuthedApp({
   const { sendMessage } = useMessageSender({ activeConversationId, canSend, channelDraftKey, draft, messageAttachments, messageText, ownSendScrollConversationRef: ownSendScrollConversation, replyingTo, retryQueuedChatMessages, selectedChannelId, sendingRef, setChannelDrafts, setChatOnline, setMessageDrafts, setReplyingTo, updateChatOutbox });
   const { editOwnMessage, recallOwnMessage } = useMessageEdits({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReplyingTo, setTranslations });
   const { toggleReaction } = useMessageReactions({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReactionPreviews });
-  const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraftFile, storyBusy, updateChatOutbox, uploadMediaFiles });
+  const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraft, storyBusy, updateChatOutbox, uploadMediaFiles });
 
   const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId: selectRoutedConversation, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
 
-  useEffect(() => {
-    if (!session?.sessionId) return;
-    const onOnline = () => {
-      setChatOnline(true);
-      void retryQueuedChatMessages();
-    };
-    const onOffline = () => setChatOnline(false);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") onOnline();
-    };
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    document.addEventListener("visibilitychange", onVisible);
-    const timer = window.setInterval(
-      () => void retryQueuedChatMessages(),
-      15_000,
-    );
-    const initial = window.setTimeout(
-      () => void retryQueuedChatMessages(),
-      250,
-    );
-    return () => {
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.clearInterval(timer);
-      window.clearTimeout(initial);
-    };
-  }, [session?.sessionId]);
+  useChatOutboxReconnect({
+    sessionId: session?.sessionId ?? null,
+    retryQueuedMessages: retryQueuedChatMessages,
+    setChatOnline,
+  });
 
   useEffect(() => {
     if (!session || !messages.length || !chatOutboxRef.current.length) return;
@@ -2492,7 +2389,7 @@ export default function AuthedApp({
     setTranslationSettingsConversationId(null);
 
     if (nextTab === "profile") {
-      setDesktopProfileSettings(false);
+      // setTab owns the URL; a second Settings setter would push /profile twice.
       setProfileEditorOpen(false);
     }
     if (activePostId !== null) {
@@ -3400,10 +3297,9 @@ export default function AuthedApp({
           setSavedPosts={setSavedPosts}
           setSearchHasScrolled={setSearchHasScrolled}
           setStories={setStories}
-          setStoryDraftFile={setStoryDraftFile}
+          setStoryDraft={setStoryDraft}
           stories={stories}
           storyBusy={storyBusy}
-          storyFileInputRef={storyFileInputRef}
           switchTab={switchTab}
         />
         )}
@@ -3614,13 +3510,13 @@ export default function AuthedApp({
         </section>
       } />
 
-      {storyDraftFile && tab === "feed" && (
+      {storyDraft && tab === "feed" && (
           <StoryDraftOverlay
           createStory={createStory}
           mediaUploading={mediaUploading}
-          setStoryDraftFile={setStoryDraftFile}
+          setStoryDraft={setStoryDraft}
           storyBusy={storyBusy}
-          storyDraftFile={storyDraftFile}
+          storyDraft={storyDraft}
         />
         )}
       {feedComposerOpen && tab === "feed" && (

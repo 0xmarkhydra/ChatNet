@@ -83,6 +83,12 @@ func TestStoryValidation(t *testing.T) {
 		`{}`,
 		`{"attachment":{},"unknown":true}`,
 		`{"attachment":{}} {}`,
+		`{"text":"  "}`,
+		`{"text":"a\u0000b"}`,
+		`{"text":"hello","background":"url(https://example.invalid)"}`,
+		`{"text":"hello","attachment":{}}`,
+		`{"background":"berry"}`,
+		fmt.Sprintf(`{"text":%q}`, strings.Repeat("ế", storyTextLimit+1)),
 	} {
 		r := httptest.NewRequest(http.MethodPost, "/api/stories", strings.NewReader(body))
 		r.Header.Set("Authorization", "Bearer "+token)
@@ -196,8 +202,10 @@ func TestStoryExpiryAndOwnershipIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if err := database.Migrate(ctx, db); err != nil {
-		t.Fatal(err)
+	for i := 0; i < 2; i++ {
+		if err := database.Migrate(ctx, db); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	base := fmt.Sprintf("story_test_%d", time.Now().UnixNano())
@@ -235,14 +243,25 @@ func TestStoryExpiryAndOwnershipIntegration(t *testing.T) {
 	s := &server{db: db}
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/stories", authx.Middleware("test", http.HandlerFunc(s.listStories)))
+	mux.Handle("POST /api/stories", authx.Middleware("test", http.HandlerFunc(s.createStory)))
 	mux.Handle("DELETE /api/stories/{id}", authx.Middleware("test", http.HandlerFunc(s.deleteStory)))
-	call := func(method, path string) *httptest.ResponseRecorder {
+	call := func(method, path string, body ...string) *httptest.ResponseRecorder {
 		t.Helper()
-		r := httptest.NewRequest(method, path, nil)
+		r := httptest.NewRequest(method, path, strings.NewReader(strings.Join(body, "")))
 		r.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		mux.ServeHTTP(w, r)
 		return w
+	}
+
+	created := call(http.MethodPost, "/api/stories", `{"text":"  Chào bạn!\nHẹn gặp lại.  ","background":"teal"}`)
+	var textStory story
+	if created.Code != http.StatusCreated || json.Unmarshal(created.Body.Bytes(), &textStory) != nil {
+		t.Fatalf("create text story got %d: %s", created.Code, created.Body.String())
+	}
+	if textStory.Attachment != nil || textStory.Text != "Chào bạn!\nHẹn gặp lại." ||
+		textStory.Background != "teal" || textStory.ExpiresAt.Sub(textStory.CreatedAt) != 24*time.Hour {
+		t.Fatalf("unexpected text story: %+v", textStory)
 	}
 
 	w := call(http.MethodGet, "/api/stories")
@@ -253,8 +272,18 @@ func TestStoryExpiryAndOwnershipIntegration(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &items); err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 2 || items[0].ID != activeID {
-		t.Fatalf("active stories/order incorrect: %+v", items)
+	if len(items) != 2 || items[0].ID != activeID || items[0].Attachment == nil {
+		t.Fatalf("legacy media list/order incorrect: %+v", items)
+	}
+	all := call(http.MethodGet, "/api/stories?includeText=true")
+	var allItems []story
+	if all.Code != http.StatusOK || json.Unmarshal(all.Body.Bytes(), &allItems) != nil ||
+		len(allItems) != 3 || allItems[0].ID != textStory.ID || allItems[0].Text != textStory.Text ||
+		allItems[0].Background != "teal" || allItems[0].Attachment != nil {
+		t.Fatalf("text story missing from opt-in list: %d %s", all.Code, all.Body.String())
+	}
+	if got := call(http.MethodDelete, fmt.Sprintf("/api/stories/%d", textStory.ID)); got.Code != http.StatusNoContent {
+		t.Fatalf("delete own text story got %d: %s", got.Code, got.Body.String())
 	}
 	var expiredCount int
 	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM stories WHERE id=$1`, expiredID).Scan(&expiredCount); err != nil || expiredCount != 0 {

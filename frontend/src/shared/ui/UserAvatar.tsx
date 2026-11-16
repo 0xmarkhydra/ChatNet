@@ -45,10 +45,11 @@ export default function UserAvatar({
   return (
     <div
       className={`${className} smart-avatar avatar-tone-${avatarTone(name)} ${group ? 'group' : ''} ${online ? 'is-online' : ''}`}
+      role="img"
       aria-label={name}
       title={name}
     >
-      <span className="avatar-initials">{group ? '👥' : avatarInitials(name)}</span>
+      <span className="avatar-initials" aria-hidden="true">{group ? '👥' : avatarInitials(name)}</span>
       {imageUrl && !imageFailed && (
         <img
           className="avatar-photo"

@@ -16,6 +16,10 @@ describe("app URL routing", () => {
     expect(tabFromPath("/", "contacts")).toBe("contacts");
     expect(tabFromPath("/unknown", "feed")).toBe("chat");
     expect(tabFromPath("/", "unknown")).toBe("chat");
+    // These belong to Object.prototype, not to the declared tab registry.
+    for (const inherited of ["__proto__", "constructor", "toString", "hasOwnProperty"]) {
+      expect(tabFromPath("/", inherited)).toBe("chat");
+    }
   });
   it("supports shareable visitor profile URLs and safely rejects malformed paths", () => {
     expect(visitorProfilePath("alice")).toBe("/users/alice");
