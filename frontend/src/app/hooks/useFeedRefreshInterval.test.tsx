@@ -79,14 +79,17 @@ describe("useFeedRefreshInterval", () => {
       act(() => vi.advanceTimersByTime(12_000));
       expect(posts).toHaveBeenCalledTimes(1);
       visible = true;
-      act(() => vi.advanceTimersByTime(12_000));
+      act(() => document.dispatchEvent(new Event("visibilitychange")));
       expect(posts).toHaveBeenCalledTimes(2);
-      act(() => root.render(<Probe enabled sessionId="B" sessionToken="t-B" />));
+      act(() => vi.advanceTimersByTime(12_000));
       expect(posts).toHaveBeenCalledTimes(3);
+      act(() => root.render(<Probe enabled sessionId="B" sessionToken="t-B" />));
+      expect(posts).toHaveBeenCalledTimes(4);
       act(() => root.render(<Probe enabled={false} sessionId="B" sessionToken="t-B" />));
       act(() => vi.advanceTimersByTime(24_000));
-      expect(posts).toHaveBeenCalledTimes(3);
-      expect(stories).toHaveBeenCalledTimes(3);
+      act(() => document.dispatchEvent(new Event("visibilitychange")));
+      expect(posts).toHaveBeenCalledTimes(4);
+      expect(stories).toHaveBeenCalledTimes(4);
     } finally {
       act(() => root.unmount());
       host.remove();

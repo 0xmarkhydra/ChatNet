@@ -20,6 +20,7 @@ import { usePhoneSearchLayout } from "./hooks/usePhoneSearchLayout";
 import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
 import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
+import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
@@ -712,40 +713,21 @@ export default function AuthedApp({
     chatDragDepth.current = 0;
   }, [activeConversationId, tab]);
 
+  useDesktopShortcuts({
+    sessionRef,
+    onOpenChat: () => setTab("chat"),
+    messageInputRef,
+  });
   useEffect(() => {
     const preventFileNavigation = (event: DragEvent) => {
       // Never navigate away from the chat when a file is dropped outside it.
       if (transferHasFiles(event.dataTransfer)) event.preventDefault();
     };
-    const keyboard = (event: KeyboardEvent) => {
-      if (
-        !sessionRef.current ||
-        event.isComposing ||
-        event.altKey ||
-        !(event.ctrlKey || event.metaKey) ||
-        document.querySelector('[role="dialog"][aria-modal="true"]')
-      )
-        return;
-      if (event.key.toLowerCase() === "k" && !event.shiftKey) {
-        event.preventDefault();
-        setTab("chat");
-        requestAnimationFrame(() =>
-          document
-            .querySelector<HTMLInputElement>(".appbar-search input")
-            ?.focus(),
-        );
-      } else if (event.key.toLowerCase() === "l" && event.shiftKey) {
-        event.preventDefault();
-        messageInputRef.current?.focus();
-      }
-    };
     document.addEventListener("dragover", preventFileNavigation);
     document.addEventListener("drop", preventFileNavigation);
-    if (isDesktopBuild) window.addEventListener("keydown", keyboard);
     return () => {
       document.removeEventListener("dragover", preventFileNavigation);
       document.removeEventListener("drop", preventFileNavigation);
-      if (isDesktopBuild) window.removeEventListener("keydown", keyboard);
     };
   }, []);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
