@@ -170,16 +170,15 @@
   background: #f5f7fa;
   color: #526987;
   cursor: pointer;
-  transition: background-color .16s ease, color .16s ease, border-color .16s ease;
+  touch-action: manipulation;
+  transition: background-color .16s ease, color .16s ease, border-color .16s ease,
+    filter var(--soco-motion-touch) ease-out,
+    transform var(--soco-motion-touch) var(--soco-motion-ease),
+    box-shadow var(--soco-motion-quick) ease-out;
 }
 .social-feed-launcher .social-feed-launcher-shortcuts > button svg {
   display: block;
   color: inherit;
-}
-.social-feed-launcher .social-feed-launcher-shortcuts > button:hover {
-  color: #2563eb;
-  background: #edf3ff;
-  border-color: #dae7ff;
 }
 .social-feed-launcher :is(button):disabled {
   opacity: .45;
@@ -522,7 +521,8 @@
 /* Launcher: independent accent colors, all three actions alongside the prompt. */
 .modern-shell.app-layout .social-feed-launcher .social-feed-launcher-shortcuts > button[aria-label="Ảnh / Video"] {
   color: #168658;
-  background: #e9f8ef;
+  --feed-shortcut-photo-surface: #e9f8ef;
+  background: var(--feed-shortcut-photo-surface);
   border-color: #e0f0e6;
 }
 .modern-shell.app-layout .social-feed-launcher .social-feed-launcher-shortcuts > button[aria-label="Story"] {
@@ -535,8 +535,100 @@
   background: #fff3e6;
   border-color: #f9e7d3;
 }
-.modern-shell.app-layout .social-feed-launcher .social-feed-launcher-shortcuts > button:hover {
-  filter: brightness(.965);
+@media (hover: hover) and (pointer: fine) {
+  .social-feed-launcher .social-feed-launcher-shortcuts > button:enabled:hover {
+    filter: brightness(.97);
+    box-shadow: 0 5px 12px color-mix(in srgb, currentColor 21%, transparent);
+  }
+}
+.social-feed-launcher .social-feed-launcher-shortcuts > button:enabled:active {
+  filter: brightness(.92);
+  box-shadow: none;
+}
+.feed-shortcut-icon {
+  display: inline-grid;
+  place-items: center;
+  pointer-events: none;
+}
+.feed-shortcut-icon > svg {
+  grid-area: 1 / 1;
+  overflow: visible;
+}
+.feed-shortcut-photo-surface {
+  fill: var(--feed-shortcut-photo-surface, transparent);
+}
+.feed-shortcut-icon--photo > svg:first-child {
+  transform: translate(-2.4px, -2.3px) rotate(-15deg) scale(.88);
+  z-index: 0;
+}
+.feed-shortcut-icon--photo > svg:last-child {
+  transform: translate(1.7px, 1.2px) scale(.94);
+  z-index: 1;
+}
+.feed-shortcut-clapper-lid {
+  transform-origin: 3px 11px;
+  transform: rotate(-16deg);
+}
+.feed-shortcut-icon--location > svg {
+  transform-origin: 50% 85%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  @media (hover: hover) and (pointer: fine) {
+    .social-feed-launcher .social-feed-launcher-shortcuts > button:enabled:hover:not(:active) {
+      transform: translateY(-2px);
+    }
+  }
+  .social-feed-launcher .social-feed-launcher-shortcuts > button:enabled:active {
+    transform: scale(.93);
+  }
+  .feed-shortcut-icon--photo.is-playing > svg:first-child {
+    animation: feed-shortcut-photo-forward .6s var(--soco-motion-ease),
+      feed-shortcut-photo-layer .6s step-end;
+  }
+  .feed-shortcut-icon--photo.is-playing > svg:last-child {
+    animation: feed-shortcut-photo-back .6s var(--soco-motion-ease),
+      feed-shortcut-photo-layer-back .6s step-end;
+  }
+  .feed-shortcut-icon--story.is-playing .feed-shortcut-clapper-lid {
+    animation: feed-shortcut-clap .46s ease-in-out;
+  }
+  .feed-shortcut-icon--location.is-playing > svg {
+    animation: feed-shortcut-pin-hop .7s ease-out;
+  }
+}
+/* The two identical cards finish in each other's exact poses, hiding the reset. */
+@keyframes feed-shortcut-photo-forward {
+  0% { transform: translate(-2.4px, -2.3px) rotate(-15deg) scale(.88); }
+  40% { transform: translate(-7px, -3.5px) rotate(-22deg) scale(.9); }
+  100% { transform: translate(1.7px, 1.2px) rotate(0deg) scale(.94); }
+}
+@keyframes feed-shortcut-photo-back {
+  0% { transform: translate(1.7px, 1.2px) rotate(0deg) scale(.94); }
+  40% { transform: translate(5.5px, 2.5px) rotate(7deg) scale(.91); }
+  100% { transform: translate(-2.4px, -2.3px) rotate(-15deg) scale(.88); }
+}
+@keyframes feed-shortcut-photo-layer {
+  0%, 40% { z-index: 0; }
+  41%, 100% { z-index: 1; }
+}
+@keyframes feed-shortcut-photo-layer-back {
+  0%, 40% { z-index: 1; }
+  41%, 100% { z-index: 0; }
+}
+@keyframes feed-shortcut-clap {
+  0%, 100% { transform: rotate(-16deg); }
+  24% { transform: rotate(-31deg); }
+  48%, 57% { transform: rotate(0deg); }
+  79% { transform: rotate(-23deg); }
+}
+@keyframes feed-shortcut-pin-hop {
+  0%, 100% { transform: translateY(0); }
+  23% { transform: translateY(-10px); animation-timing-function: ease-in; }
+  46% { transform: scale(1.08, .92); }
+  61% { transform: translateY(-5px); animation-timing-function: ease-in; }
+  75% { transform: scale(1.045, .96); }
+  85% { transform: translateY(-2px); animation-timing-function: ease-in; }
+  95% { transform: translateY(0); }
 }
 .modern-shell.app-layout .social-feed-launcher .social-feed-launcher-shortcuts > button svg {
   color: currentColor;
