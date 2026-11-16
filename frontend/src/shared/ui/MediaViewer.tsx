@@ -26,9 +26,11 @@ export default function MediaViewer({
   onClose: () => void
 }) {
   const item = items[activeIndex]
+  const hasActiveItem = Boolean(item)
   const closeButton = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (!hasActiveItem) return
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const oldOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -37,9 +39,10 @@ export default function MediaViewer({
       document.body.style.overflow = oldOverflow
       previousFocus?.focus()
     }
-  }, [])
+  }, [hasActiveItem])
 
   useEffect(() => {
+    if (!hasActiveItem) return
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Tab') {
         const focusable = dialog.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), video[controls], audio[controls]')
@@ -72,7 +75,7 @@ export default function MediaViewer({
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [activeIndex, items.length, onChange, onClose])
+  }, [activeIndex, hasActiveItem, items.length, onChange, onClose])
 
   if (!item) return null
 

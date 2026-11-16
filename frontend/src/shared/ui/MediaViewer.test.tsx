@@ -44,6 +44,32 @@ it('keeps keyboard focus inside the media dialog and restores it on close', asyn
   expect(document.activeElement).toBe(opener)
 })
 
+it('does not lock background scrolling or capture keys with no active media item', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const opener = document.createElement('button')
+  document.body.append(opener)
+  opener.focus()
+  document.body.style.overflow = 'auto'
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  mounted.push(() => { act(() => root.unmount()); host.remove() })
+  const onClose = vi.fn()
+  await act(async () => {
+    root.render(<MediaViewer items={[]} activeIndex={0} onChange={vi.fn()} onClose={onClose} />)
+  })
+  expect(document.querySelector('.media-viewer-backdrop')).toBeNull()
+  expect(document.body.style.overflow).toBe('auto')
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+  opener.dispatchEvent(escape)
+  expect(escape.defaultPrevented).toBe(false)
+  expect(onClose).not.toHaveBeenCalled()
+  expect(document.activeElement).toBe(opener)
+  await act(async () => root.unmount())
+  mounted.pop()
+  document.body.style.overflow = ''
+})
+
 it('preserves video keyboard shortcuts while keeping video focus inside the modal', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   const host = document.createElement('div')
