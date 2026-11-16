@@ -1,0 +1,45 @@
+// @vitest-environment jsdom
+import { act } from 'react'
+import { createRoot } from 'react-dom/client'
+import { afterEach, expect, it, vi } from 'vitest'
+import MediaViewer from './MediaViewer'
+
+const mounted: Array<() => void> = []
+
+afterEach(() => {
+  for (const cleanup of mounted.splice(0)) cleanup()
+  document.body.innerHTML = ''
+  vi.unstubAllGlobals()
+})
+
+it('keeps keyboard focus inside the media dialog and restores it on close', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const opener = document.createElement('button')
+  document.body.append(opener)
+  opener.focus()
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  mounted.push(() => { act(() => root.unmount()); host.remove() })
+  const onClose = vi.fn()
+  await act(async () => {
+    root.render(<MediaViewer
+      items={[{ storageRef: 'test', name: 'Ảnh thử', sizeBytes: 10, contentType: 'image/png', kind: 'image', url: '/test.png' }]}
+      activeIndex={0}
+      onChange={vi.fn()}
+      onClose={onClose}
+    />)
+  })
+  const dialog = document.querySelector('[role="dialog"]') as HTMLElement
+  const controls = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button'))
+  expect(document.activeElement).toBe(controls[1])
+
+  controls[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+  expect(document.activeElement).toBe(controls[0])
+  controls[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))
+  expect(document.activeElement).toBe(controls[1])
+
+  await act(async () => root.unmount())
+  mounted.pop()
+  expect(document.activeElement).toBe(opener)
+})

@@ -27,6 +27,7 @@ export default function MediaViewer({
 }) {
   const item = items[activeIndex]
   const closeButton = useRef<HTMLButtonElement>(null)
+  const dialog = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const oldOverflow = document.body.style.overflow
@@ -40,7 +41,19 @@ export default function MediaViewer({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
+      if (event.key === 'Tab') {
+        const focusable = dialog.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)')
+        if (!focusable?.length) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (event.shiftKey && (document.activeElement === first || !dialog.current?.contains(document.activeElement))) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && (document.activeElement === last || !dialog.current?.contains(document.activeElement))) {
+          event.preventDefault()
+          first.focus()
+        }
+      } else if (event.key === 'Escape') {
         event.preventDefault()
         event.stopImmediatePropagation()
         onClose()
@@ -63,6 +76,7 @@ export default function MediaViewer({
   return createPortal(
     <div
       className="media-viewer-backdrop"
+      ref={dialog}
       role="dialog"
       aria-modal="true"
       aria-label="Xem ảnh và video"
@@ -82,7 +96,7 @@ export default function MediaViewer({
               <ExternalLink size={18} aria-hidden="true" />
               <span>Mở bản gốc</span>
             </a>
-            <button ref={closeButton} type="button" onClick={onClose} aria-label="Đóng trình xem ảnh">
+            <button ref={closeButton} type="button" onClick={onClose} aria-label="Đóng trình xem ảnh hoặc video">
               <X size={22} aria-hidden="true" />
             </button>
           </div>
