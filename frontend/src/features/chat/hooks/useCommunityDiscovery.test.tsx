@@ -86,3 +86,29 @@ it('stops discovery when leaving the list and preserves the existing join respon
   expect(view.state.publicGroups).toEqual([])
   expect(mocks.list).toHaveBeenCalledTimes(1)
 })
+
+it('allows only one join request before React commits busy state and releases the guard afterward', async () => {
+  mocks.list.mockResolvedValue({ ok: true, json: async () => [] } as Response)
+  const first = deferred<Response>()
+  mocks.join.mockImplementationOnce(() => first.promise)
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'requested' }) } as Response)
+  const view = mount()
+  await view.render()
+
+  let firstCall!: Promise<void>
+  await act(async () => {
+    firstCall = view.state.joinPublic(12)
+    await view.state.joinPublic(13)
+  })
+  expect(mocks.join).toHaveBeenCalledTimes(1)
+  expect(view.state.joiningId).toBe(12)
+
+  await act(async () => {
+    first.resolve({ ok: true, json: async () => ({ status: 'member' }) } as Response)
+    await firstCall
+  })
+  expect(view.onJoinedGroup).toHaveBeenCalledTimes(1)
+  expect(view.state.joiningId).toBeNull()
+  await act(async () => view.state.joinPublic(13))
+  expect(mocks.join).toHaveBeenCalledTimes(2)
+})
