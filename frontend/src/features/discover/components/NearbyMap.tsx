@@ -61,9 +61,9 @@ export default function NearbyMap({ location, places, selected, onSelect, onShow
     <div ref={container} className="nearby-map-canvas" />
     {failed && <div className="nearby-map-error" role="alert">Không tải được bản đồ. Bạn có thể xem danh sách địa điểm.<button type="button" onClick={onShowList}>Xem danh sách</button><button type="button" onClick={() => { setFailed(false); setAttempt((value) => value + 1) }}>Thử lại</button></div>}
     <div className="nearby-map-controls">
-      <button title="Về vị trí của tôi" aria-label="Về vị trí của tôi" onClick={() => map.current?.easeTo({ center: [location.longitude, location.latitude], zoom: 14 })}><LocateFixed size={20} /></button>
-      <button title="Phóng to" aria-label="Phóng to" onClick={() => map.current?.zoomIn()}><Plus size={20} /></button>
-      <button title="Thu nhỏ" aria-label="Thu nhỏ" onClick={() => map.current?.zoomOut()}><Minus size={20} /></button>
+      <button type="button" disabled={failed} title="Về vị trí của tôi" aria-label="Về vị trí của tôi" onClick={() => map.current?.easeTo({ center: [location.longitude, location.latitude], zoom: 14 })}><LocateFixed size={20} /></button>
+      <button type="button" disabled={failed} title="Phóng to" aria-label="Phóng to" onClick={() => map.current?.zoomIn()}><Plus size={20} /></button>
+      <button type="button" disabled={failed} title="Thu nhỏ" aria-label="Thu nhỏ" onClick={() => map.current?.zoomOut()}><Minus size={20} /></button>
     </div>
   </div>
 }

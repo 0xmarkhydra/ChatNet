@@ -6,7 +6,11 @@ import NearbyExplorer from './NearbyExplorer'
 import { getCurrentPositionSmart } from '../lib/geolocation'
 import { loadNearbyPlaces } from '../lib/nearbyPlaces'
 
-vi.mock('./NearbyMap', () => ({ default: ({ onShowList }: { onShowList: () => void }) => <div data-testid="nearby-map"><button onClick={onShowList}>Xem danh sách</button></div> }))
+const mapBehavior = vi.hoisted(() => ({ crash: false }))
+vi.mock('./NearbyMap', () => ({ default: ({ onShowList, selected }: { onShowList: () => void; selected: string | null }) => {
+  if (mapBehavior.crash) throw new Error('Map rendering failed')
+  return <div data-testid="nearby-map" data-selected={selected ?? ''}><button onClick={onShowList}>Xem danh sách</button></div>
+} }))
 vi.mock('../lib/nearbyPlaces', () => ({ loadNearbyPlaces: vi.fn(async () => []) }))
 vi.mock('../lib/geolocation', () => ({
   getCurrentPositionSmart: vi.fn(),
@@ -32,6 +36,7 @@ beforeEach(() => {
   document.body.append(host)
   root = createRoot(host)
   vi.clearAllMocks()
+  mapBehavior.crash = false
 })
 afterEach(async () => {
   await act(async () => root.unmount())
@@ -163,6 +168,40 @@ describe('NearbyExplorer location fallback', () => {
     expect(host.textContent).not.toContain('Quán ăn cũ')
     await act(async () => complete?.([]))
     expect(host.textContent).toContain('Chưa tìm thấy địa điểm')
+  })
+
+  it('does not keep a filtered-out location selected on the map', async () => {
+    const first = { id: 'shop:1', name: 'Tiệm sách', category: 'shopping' as const,
+      kind: 'Bookstore', latitude: 21, longitude: 105, distanceKm: 0.4 }
+    const second = { ...first, id: 'shop:2', name: 'Tiệm hoa' }
+    loadPlaces.mockResolvedValue([first, second])
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} query="" />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Xem Tiệm sách trên bản đồ"]')?.click())
+    expect(host.querySelector('[data-testid="nearby-map"]')?.getAttribute('data-selected')).toBe('shop:1')
+    await act(async () => root.render(<NearbyExplorer {...props} query="hoa" />))
+    expect(host.querySelector('[data-testid="nearby-map"]')?.getAttribute('data-selected')).toBe('')
+    expect(host.querySelector<HTMLButtonElement>('button[aria-label="Xem Tiệm hoa trên bản đồ"]')?.getAttribute('aria-pressed')).toBe('false')
+    await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Xem Tiệm hoa trên bản đồ"]')?.click())
+    expect(host.querySelector('[data-testid="nearby-map"]')?.getAttribute('data-selected')).toBe('shop:2')
+    expect(host.querySelector<HTMLButtonElement>('button[aria-label="Xem Tiệm hoa trên bản đồ"]')?.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('isolates a map render crash without losing the nearby places list', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mapBehavior.crash = true
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Không thể hiển thị bản đồ')
+    expect(host.textContent).toContain('Quanh đây')
+    await act(async () => button('Xem danh sách')?.click())
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    expect(host.querySelector<HTMLButtonElement>('button[aria-label="Danh sách"]')?.getAttribute('aria-pressed')).toBe('true')
+    consoleError.mockRestore()
   })
 
   it('lets users switch to a list when the map cannot be used', async () => {

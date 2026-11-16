@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { MapPin, Users, Search, RefreshCw, Navigation, List, Map as MapIcon, ShieldCheck } from 'lucide-react'
-import NearbyMap from './NearbyMap'
+const NearbyMap = lazy(() => import('./NearbyMap'))
 import { loadNearbyPlaces, type NearbyPlace, type NearbyPlaceCategory } from '../lib/nearbyPlaces'
 import { getCurrentPositionSmart, geolocationErrorMessage } from '../lib/geolocation'
+import { ErrorBoundary } from '../../../shared/ui/ErrorBoundary'
 
 export type NearbyUser = {
   id: number
@@ -67,6 +68,7 @@ export default function NearbyExplorer({
     .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)), [users, normalized])
   const visiblePlaces = useMemo(() => places.filter((place) =>
     `${place.name} ${place.address || ''}`.toLocaleLowerCase('vi-VN').includes(normalized)), [places, normalized])
+  const visibleSelected = visiblePlaces.some(place => place.id === selected) ? selected : null
   const busy = mode === 'people' ? peopleBusy || peopleScanning : loading || locating
   const count = mode === 'people' ? visibleUsers.length : visiblePlaces.length
 
@@ -160,11 +162,11 @@ export default function NearbyExplorer({
     </div> : <>
       {!location && !busy && <div className="nearby-empty"><MapPin size={36} /><h2>Tìm địa điểm gần bạn</h2><button className="nearby-primary" onClick={() => void locate()}>Dùng vị trí hiện tại</button></div>}
       {location && <div className={`nearby-place-content${view === 'map' ? ' map-view' : ''}`}>
-      {view === 'map' && <NearbyMap location={location} places={visiblePlaces} selected={selected} onSelect={setSelected} onShowList={() => setView('list')} />}
+      {view === 'map' && <ErrorBoundary fallback={() => <div className="nearby-map-error" role="alert">Không thể hiển thị bản đồ.<button type="button" onClick={() => setView('list')}>Xem danh sách</button></div>}><Suspense fallback={<p role="status" aria-live="polite" aria-busy="true">Đang tải bản đồ…</p>}><NearbyMap location={location} places={visiblePlaces} selected={visibleSelected} onSelect={setSelected} onShowList={() => setView('list')} /></Suspense></ErrorBoundary>}
       <div className="nearby-place-list" aria-label="Kết quả địa điểm">
       {location && !busy && !error && !count && <div className="nearby-empty"><Search size={30} /><h2>Chưa tìm thấy địa điểm</h2><p>Thử từ khóa khác hoặc tăng bán kính.</p></div>}
-      {visiblePlaces.map((place, index) => <article key={place.id} className={`nearby-place-row${place.id === selected ? ' selected' : ''}`}>
-        <button className="nearby-place-number" aria-label={`Xem ${place.name} trên bản đồ`} onClick={() => { setSelected(place.id); setView('map') }}>{index + 1}</button>
+      {visiblePlaces.map((place, index) => <article key={place.id} className={`nearby-place-row${place.id === visibleSelected ? ' selected' : ''}`}>
+        <button className="nearby-place-number" aria-label={`Xem ${place.name} trên bản đồ`} aria-pressed={place.id === visibleSelected} onClick={() => { setSelected(place.id); setView('map') }}>{index + 1}</button>
         <div><strong>{place.name}</strong><span>{categories.find((item) => item.id === place.category)?.label} · {distance(place.distanceKm)}</span>{place.address && <small>{place.address}</small>}{place.openingHours && <small>{place.openingHours}</small>}</div>
         <button className="nearby-route" title={`Chỉ đường đến ${place.name}`} aria-label={`Chỉ đường đến ${place.name}`} onClick={() => directions(place)}><Navigation size={19} /></button>
       </article>)}</div>
