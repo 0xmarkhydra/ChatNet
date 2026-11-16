@@ -85,4 +85,40 @@ describe("session keepalive", () => {
     expect(refresh).not.toHaveBeenCalled();
     mounted.unmount();
   });
+
+  it("uses the latest status handler without restarting a pending refresh", async () => {
+    let rejectRefresh!: (reason: Error) => void;
+    const refresh = vi.fn(() => new Promise<Session | null>((_resolve, reject) => {
+      rejectRefresh = reject;
+    }));
+    const sessionRef = { current: { sessionId: "session-a" } } as unknown as RefObject<Session | null>;
+    const firstStatus = vi.fn();
+    const latestStatus = vi.fn();
+    const client = { refresh, check: vi.fn(async () => true) };
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+
+    function Probe({ status }: { status: (message: string) => void }) {
+      useSessionKeepalive("session-a", sessionRef, client, status);
+      return null;
+    }
+
+    try {
+      act(() => root.render(<Probe status={firstStatus} />));
+      expect(refresh).toHaveBeenCalledTimes(1);
+      act(() => root.render(<Probe status={latestStatus} />));
+      expect(refresh).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        rejectRefresh(new Error("connection interrupted"));
+        await Promise.resolve();
+      });
+      expect(firstStatus).not.toHaveBeenCalled();
+      expect(latestStatus).toHaveBeenCalledWith("Đang kết nối lại...");
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
 });
