@@ -3305,7 +3305,6 @@ export default function AuthedApp({
           setFeedCommunitiesOpen={setFeedCommunitiesOpen}
           setFeedComposerOpen={setFeedComposerOpen}
           setFeedFilter={setFeedFilter}
-          setGlobalSearch={setGlobalSearch}
           setPosts={setPosts}
           setSavedPosts={setSavedPosts}
           setSearchHasScrolled={setSearchHasScrolled}
