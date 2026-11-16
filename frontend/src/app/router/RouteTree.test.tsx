@@ -2,13 +2,13 @@
 import { act, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Link, MemoryRouter, Outlet, useLocation } from "react-router-dom";
+import { Link, MemoryRouter, Outlet, parsePath, useLocation } from "react-router-dom";
 import { AppRouteTree } from "./RouteTree";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 const cleanup: Array<() => void> = [];
 
-function renderAt(path: string) {
+function renderAt(path: string, initialState?: unknown) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -20,6 +20,8 @@ function renderAt(path: string) {
     return (
       <div>
         <output data-testid="location">{location.pathname + location.search}</output>
+        <output data-testid="hash">{location.hash}</output>
+        <output data-testid="state">{JSON.stringify(location.state)}</output>
         <Link to="/feed">Bảng tin</Link>
         <Link to="/somewhere-unknown">Invalid</Link>
         <Outlet context={<p data-testid="page">Current screen</p>} />
@@ -28,7 +30,7 @@ function renderAt(path: string) {
   }
 
   act(() => root.render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={[{ ...parsePath(path), state: initialState }]}>
       <AppRouteTree><Shell /></AppRouteTree>
     </MemoryRouter>,
   ));
@@ -43,7 +45,9 @@ function renderAt(path: string) {
   };
   const location = () => container.querySelector('[data-testid="location"]')?.textContent;
   const page = () => container.querySelector('[data-testid="page"]');
-  return { container, onMount, link, location, page };
+  const hash = () => container.querySelector('[data-testid="hash"]')?.textContent;
+  const state = () => container.querySelector('[data-testid="state"]')?.textContent;
+  return { container, onMount, link, location, page, hash, state };
 }
 
 afterEach(() => {
@@ -64,6 +68,16 @@ describe("app route tree", () => {
     const { location, page } = renderAt("/?tab=feed&post=42");
     expect(location()).toBe("/feed?tab=feed&post=42");
     expect(page()).not.toBeNull();
+  });
+
+  it("preserves legacy deep-link fragment and navigation state through home redirect", () => {
+    const payload = { postId: 42, visitorReturnTo: "/contacts/requests" };
+    const app = renderAt("/?tab=feed&post=42#comments", payload);
+    expect(app.location()).toBe("/feed?tab=feed&post=42");
+    expect(app.hash()).toBe("#comments");
+    expect(app.state()).toBe(JSON.stringify(payload));
+    expect(app.page()?.textContent).toBe("Current screen");
+    expect(app.onMount).toHaveBeenCalledTimes(1);
   });
 
   it("renders Not Found for unknown paths without replacing the shell", () => {

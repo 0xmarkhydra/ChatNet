@@ -3,9 +3,9 @@ import { Link, Navigate, Outlet, Route, Routes, useLocation, useOutletContext, u
 import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, tabFromPath, visitorUsernameFromPath } from "./routes";
 
 function LegacyHomeRedirect() {
-  const { search } = useLocation();
+  const { search, hash, state } = useLocation();
   const tab = tabFromPath("/", new URLSearchParams(search).get("tab"));
-  return <Navigate to={{ pathname: TAB_PATH[tab], search }} replace />;
+  return <Navigate to={{ pathname: TAB_PATH[tab], search, hash }} state={state} replace />;
 }
 
 // The signed-in app owns live feature state; changing routes only replaces its page slot.
