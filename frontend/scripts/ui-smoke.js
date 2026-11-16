@@ -410,12 +410,13 @@ async (page) => {
   await page.getByText('A day working with the design team.', { exact: true }).waitFor()
   check(await page.getByRole('button', { name: 'Xem Story của @expired', exact: true }).count() === 0, 'Expired story remains visible')
   await page.getByRole('button', { name: 'Xem Story của @minhanh', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Story của @minhanh', exact: true }).waitFor()
-  check(await page.locator('.story-viewer-media img').isVisible(), 'Story image viewer missing')
-  const storyAvatar = await page.locator('.story-viewer-avatar').boundingBox()
-  check(storyAvatar && storyAvatar.width === 38 && storyAvatar.height === 38, 'Story header avatar is stretched')
+  await page.getByRole('dialog', { name: 'Khoảnh khắc của @minhanh', exact: true }).waitFor()
+  check(await page.locator('.story-screen-media img').isVisible(), 'Story image viewer missing')
+  const storyAvatar = await page.locator('.story-screen-author-avatar').boundingBox()
+  check(storyAvatar && storyAvatar.width === 35 && storyAvatar.height === 35, 'Story header avatar is stretched')
+  check(!(await page.locator('.story-screen-people').isVisible()), 'Mobile Story user list should collapse')
   await page.screenshot({ path: 'output/playwright/story-mobile.png' })
-  await page.getByRole('button', { name: 'Đóng Story', exact: true }).click()
+  await page.getByRole('button', { name: 'Đóng', exact: true }).click()
   await page.getByLabel('Chọn ảnh hoặc video cho Story', { exact: true }).setInputFiles({
     name: 'new-story.jpg',
     mimeType: 'image/jpeg',
@@ -426,6 +427,7 @@ async (page) => {
   check(storyRequests.length === 1 && storyRequests[0].attachment.storageRef === 's3://mock/story/upload.jpg', 'Story create payload is wrong')
   await page.getByRole('button', { name: `Xem Story của @${session.user.username}`, exact: true }).click()
   await page.evaluate(() => { window.confirm = () => true })
+  await page.getByRole('button', { name: 'Tùy chọn Story', exact: true }).click()
   await page.getByRole('button', { name: 'Xóa Story', exact: true }).click()
   await page.getByRole('button', { name: `Xem Story của @${session.user.username}`, exact: true }).waitFor({ state: 'detached' })
   check(await page.getByRole('button', { name: 'Khác', exact: true }).count() === 0, 'Other feed tab remains')

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -54,7 +55,12 @@ func TestFeedBlockThreeAccountsIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Both A and B comment on C's unrelated, public post.
+	// Both A and B react and comment on C's unrelated, public post.
+	for _, i := range []int{0, 1} {
+		if _, err := db.Exec(ctx, `INSERT INTO post_likes(post_id,user_id,emoji) VALUES($1,$2,'❤️')`, posts[2], ids[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for _, i := range []int{0, 1} {
 		if _, err := db.Exec(ctx, `INSERT INTO comments(post_id,user_id,content)
              VALUES($1,$2,$3)`, posts[2], ids[i], fmt.Sprintf("comment-from-%d", i)); err != nil {
@@ -96,6 +102,14 @@ func TestFeedBlockThreeAccountsIntegration(t *testing.T) {
 		if strings.Contains(raw, fmt.Sprintf("comment-from-%d", tc.hidden)) {
 			t.Fatalf("blocked commenter exposed to %d: %s", tc.viewer, raw)
 		}
+		users := request(tc.viewer, "GET", "/api/posts/id/reactions", "", s.listPostReactionUsers, posts[2], 200)
+		if strings.Contains(users, fmt.Sprintf(`"userId":%d`, ids[tc.hidden])) {
+			t.Fatalf("blocked reactor exposed to %d: %s", tc.viewer, users)
+		}
+		if !strings.Contains(users, fmt.Sprintf(`"userId":%d`, ids[tc.viewer])) {
+			t.Fatalf("own reaction missing for %d: %s", tc.viewer, users)
+		}
+		request(tc.viewer, "GET", "/api/posts/id/reactions", "", s.listPostReactionUsers, posts[tc.hidden], 404)
 		request(tc.viewer, "GET", "/api/posts/id", "", s.detailPost, posts[tc.hidden], 404)
 		request(tc.viewer, "POST", "/api/posts/id/like", "", s.like, posts[tc.hidden], 404)
 		request(tc.viewer, "POST", "/api/posts/id/comments", `{"content":"not allowed"}`, s.addComment, posts[tc.hidden], 404)
@@ -108,6 +122,17 @@ func TestFeedBlockThreeAccountsIntegration(t *testing.T) {
 	if !strings.Contains(raw, "post-from-0") || !strings.Contains(raw, "post-from-1") {
 		t.Fatalf("C must see both posts: %s", raw)
 	}
+	reactions := request(2, "GET", "/api/posts/id/reactions", "", s.listPostReactionUsers, posts[2], 200)
+	for _, uid := range ids[:2] {
+		if !strings.Contains(reactions, fmt.Sprintf(`"userId":%d`, uid)) {
+			t.Fatalf("visible reactor %d missing: %s", uid, reactions)
+		}
+	}
+	filtered := request(2, "GET", "/api/posts/id/reactions?emoji="+url.QueryEscape("👍"), "", s.listPostReactionUsers, posts[2], 200)
+	if !strings.Contains(filtered, `"items":[]`) {
+		t.Fatalf("emoji filter should exclude heart-only reactors: %s", filtered)
+	}
+	request(2, "GET", "/api/posts/id/reactions?offset=-1", "", s.listPostReactionUsers, posts[2], 400)
 	if _, err := db.Exec(ctx, "DELETE FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2", ids[0], ids[1]); err != nil {
 		t.Fatal(err)
 	}

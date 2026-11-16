@@ -21,12 +21,12 @@ function fixture({ packaged = true, hasFeed = true, confirm = 1 } = {}) {
   const updater = Object.assign(emitter, {
     checkForUpdates: async () => {
       calls.checks++
-      emitter.emit('update-available', { version: '0.2.0' })
+      emitter.emit('update-available', { version: '0.4.0' })
     },
     downloadUpdate: async () => {
       calls.downloads++
       emitter.emit('download-progress', { percent: 42.9 })
-      emitter.emit('update-downloaded', { version: '0.2.0' })
+      emitter.emit('update-downloaded', { version: '0.4.0' })
     },
     quitAndInstall: () => { calls.installs++ },
   })
@@ -78,7 +78,7 @@ test('checks and downloads are user controlled, never restart automatically', as
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(f.calls.checks, 1)
   assert.equal(f.updates.snapshot().status, 'available')
-  assert.equal(f.updates.snapshot().version, '0.2.0')
+  assert.equal(f.updates.snapshot().version, '0.4.0')
   assert.equal(f.calls.downloads, 0)
   assert.equal(f.calls.installs, 0)
   await f.invoke('soco:update:download')
@@ -103,7 +103,7 @@ test('native confirmation can defer install; download failure keeps current vers
   assert.equal((await f.invoke('soco:update:download')).status, 'error')
   assert.equal(f.calls.installs, 0)
   await f.invoke('soco:update:check')
-  f.updater.emit('update-downloaded', { version: '0.2.0' })
+  f.updater.emit('update-downloaded', { version: '0.4.0' })
   assert.equal(await f.invoke('soco:update:install', { hasPendingWork: false }), false)
   assert.equal(f.calls.installs, 0)
 })

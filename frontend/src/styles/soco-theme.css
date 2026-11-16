@@ -482,7 +482,7 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
     gap: 10px;
     border-radius: 16px;
   }
-  .zalo-conversation-list .conversation-avatar { width: 50px; height: 50px; flex-basis: 50px; border-radius: 17px; }
+  .zalo-conversation-list .conversation-avatar { width: 50px; height: 50px; flex-basis: 50px; border-radius: var(--avatar-radius); }
   .zalo-conversation-list .conversation-copy { min-width: 0; }
   .zalo-conversation-list .conversation-copy strong { font-size: 15px; }
   .zalo-conversation-list .conversation-copy span { font-size: 12px; }
@@ -493,7 +493,7 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   }
   .chat-head .room-info { gap: 7px; }
   .chat-head .room-info strong { font-size: 14px; }
-  .chat-head .room-avatar { width: 36px; height: 36px; flex-basis: 36px; border-radius: 13px; }
+  .chat-head .room-avatar { width: 36px; height: 36px; flex-basis: 36px; border-radius: var(--avatar-radius); }
   .chat-head .mobile-back { color: var(--soco-blue); }
   .call-header-actions { gap: 3px; margin-right: 2px; }
   .call-header-actions button { width: 35px; height: 35px; border-radius: 11px; }

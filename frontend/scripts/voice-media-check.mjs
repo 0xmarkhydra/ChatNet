@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { preferredVoiceMime, voiceFileType } from '../src/features/chat/voiceMedia.ts'
+import { preferredVoiceMime, voiceFileType } from '../src/features/chat/utils/voiceMedia.ts'
 
 assert.equal(preferredVoiceMime((mime) => mime.startsWith('audio/webm')), 'audio/webm;codecs=opus', 'Chromium Opus preferred')
 assert.equal(preferredVoiceMime((mime) => mime === 'audio/mp4'), 'audio/mp4', 'Safari uses MP4')

@@ -1,0 +1,385 @@
+/* Compact group management workspace, adapted from the three-pane community design. */
+.modern-shell .group-settings-sidebar .group-settings-panel {
+  color: #253857;
+}
+.modern-shell .group-settings-sidebar .group-management-navigation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin: 0 0 17px;
+  padding: 7px;
+  border: 1px solid #e9eef8;
+  border-radius: 14px;
+  background: #f7f9fd;
+}
+.modern-shell .group-settings-sidebar .group-management-navigation button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #627796;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+.modern-shell .group-settings-sidebar .group-management-navigation button svg {
+  flex: 0 0 16px;
+}
+.modern-shell .group-settings-sidebar .group-management-navigation button span {
+  min-width: 0;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.modern-shell .group-settings-sidebar .group-management-navigation button:hover:not(.active) {
+  background: #ecf2ff;
+  color: #315fba;
+}
+.modern-shell .group-settings-sidebar .group-management-navigation button.active,
+.modern-shell .group-settings-sidebar .group-management-navigation button[aria-current="page"] {
+  background: #e8efff;
+  color: #2462d6;
+  font-weight: 760;
+}
+.modern-shell .group-settings-sidebar .group-management-navigation button:focus-visible,
+.modern-shell .group-settings-sidebar .group-management-section-body button:focus-visible {
+  outline: 2px solid #739cfa;
+  outline-offset: 2px;
+}
+.modern-shell .group-settings-sidebar .group-management-section-title {
+  margin-bottom: 13px;
+}
+.modern-shell .group-settings-sidebar .group-management-section-title h3 {
+  margin: 0;
+  color: #1e304e;
+  font-size: 17px;
+  font-weight: 800;
+}
+.modern-shell .group-settings-sidebar .group-management-section-title p {
+  margin: 5px 0 0;
+  color: #8494ae;
+  font-size: 11px;
+}
+.modern-shell .group-settings-sidebar .group-management-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 42px;
+  margin-bottom: 9px;
+  padding: 0 12px;
+  border: 1px solid #e1e8f5;
+  border-radius: 11px;
+  background: #f7f9fd;
+  color: #8296b4;
+}
+.modern-shell .group-settings-sidebar .group-management-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: #304766;
+}
+.modern-shell .group-settings-sidebar .group-management-member-preview {
+  display: grid;
+  gap: 0;
+  margin-bottom: 9px;
+}
+.modern-shell .group-settings-sidebar .group-management-member-preview-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: 10px;
+  padding: 10px 3px;
+  border: 0;
+  border-bottom: 1px solid #e9eef7;
+  background: transparent;
+  text-align: left;
+  color: #263b5b;
+  cursor: pointer;
+}
+.modern-shell .group-settings-sidebar .group-management-member-preview-row:hover {
+  background: #f7f9ff;
+  border-radius: 9px;
+}
+.modern-shell .group-settings-sidebar .group-management-member-preview-row .group-member-avatar {
+  width: 37px;
+  height: 37px;
+  flex: 0 0 37px;
+  border-radius: 50%;
+}
+.modern-shell .group-settings-sidebar .group-management-preview-copy {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.modern-shell .group-settings-sidebar .group-management-preview-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.modern-shell .group-settings-sidebar .group-management-preview-copy small {
+  color: #5575b7;
+  font-size: 11px;
+}
+.modern-shell .group-settings-sidebar .group-management-owner-tag {
+  flex: 0 0 auto;
+  max-width: 75px;
+  padding: 5px 7px;
+  border-radius: 9px;
+  background: #edf2ff;
+  color: #3665d5;
+  font-size: 10px;
+  font-weight: 700;
+}
+.modern-shell .group-settings-sidebar .group-members-preview {
+  min-height: 52px;
+  margin: 9px 0 16px;
+  padding: 8px 10px;
+  background: #f5f8ff;
+  border-color: #e4ebfa;
+}
+.modern-shell .group-settings-sidebar .group-members-preview-copy strong {
+  font-size: 12px;
+}
+.modern-shell .group-settings-sidebar .group-management-permission-summary {
+  display: grid;
+  gap: 9px;
+  margin: 16px 0 22px;
+  padding: 15px 13px;
+  border: 1px solid #e8edf6;
+  border-radius: 13px;
+  background: #fbfcff;
+}
+.modern-shell .group-settings-sidebar .group-management-permission-summary h4 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: #253958;
+  font-size: 13px;
+  font-weight: 760;
+}
+.modern-shell .group-settings-sidebar .group-management-permission-summary h4 svg {
+  color: #346ad7;
+}
+.modern-shell .group-settings-sidebar .group-management-permission-summary > p {
+  margin: 0 0 2px;
+  color: #8191a8;
+  font-size: 11px;
+}
+.modern-shell .group-settings-sidebar .group-management-permission-summary > p strong {
+  color: #4268bd;
+}
+.modern-shell .group-settings-sidebar .group-management-permission-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 29px;
+  padding: 5px 7px;
+  border-radius: 8px;
+  background: #f2f5fb;
+  font-size: 11px;
+  color: #415471;
+}
+.modern-shell .group-settings-sidebar .group-management-permission-row > span:first-child {
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #dde4ee;
+  color: #8997aa;
+}
+.modern-shell .group-settings-sidebar .group-management-permission-row > span:first-child.allowed {
+  background: #e0edff;
+  color: #2768d0;
+}
+.modern-shell .group-settings-sidebar .group-management-section-body {
+  min-width: 0;
+  padding-bottom: 16px;
+}
+.modern-shell .group-settings-sidebar .group-management-section-body .group-governance {
+  border-top: 0;
+  padding: 0;
+  gap: 12px;
+}
+.modern-shell .group-settings-sidebar .group-management-section-body .group-governance > h3 {
+  font-size: 15px;
+  color: #273b5b;
+}
+.modern-shell .group-settings-sidebar .group-management-section-body .group-governance section {
+  padding: 12px;
+  border: 1px solid #e7eef9;
+  background: #f8faff;
+}
+.modern-shell .group-settings-sidebar .group-management-detail,
+.modern-shell .group-settings-sidebar .group-management-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.modern-shell .group-settings-sidebar .group-management-help {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: #7589a4;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.modern-shell .group-settings-sidebar .group-management-help svg {
+  flex: 0 0 16px;
+  margin-top: 2px;
+  color: #5681d0;
+}
+.modern-shell .group-settings-sidebar .group-management-form > label:not(.group-management-check) {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #344b69;
+  font-size: 12px;
+  font-weight: 700;
+}
+.modern-shell .group-settings-sidebar .group-management-form input:not([type="checkbox"]),
+.modern-shell .group-settings-sidebar .group-management-form textarea,
+.modern-shell .group-settings-sidebar .group-management-form select {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid #dde6f4;
+  border-radius: 10px;
+  outline: 0;
+  background: #f9fbff;
+  color: #304664;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 450;
+  resize: vertical;
+}
+.modern-shell .group-settings-sidebar .group-management-form input:focus-visible,
+.modern-shell .group-settings-sidebar .group-management-form textarea:focus-visible,
+.modern-shell .group-settings-sidebar .group-management-form select:focus-visible {
+  border-color: #86a9f1;
+  box-shadow: 0 0 0 3px rgba(87,135,224,.12);
+}
+.modern-shell .group-settings-sidebar .group-management-form input:disabled,
+.modern-shell .group-settings-sidebar .group-management-form textarea:disabled,
+.modern-shell .group-settings-sidebar .group-management-form select:disabled {
+  color: #63758e;
+  opacity: .8;
+}
+.modern-shell .group-settings-sidebar .group-management-form .group-management-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e6edf8;
+  border-radius: 11px;
+  background: #f8faff;
+  font-size: 12px;
+  color: #354b68;
+  cursor: pointer;
+}
+.modern-shell .group-settings-sidebar .group-management-form .group-management-check input {
+  flex: 0 0 17px;
+  height: 17px;
+  width: 17px;
+  accent-color: #3b6be0;
+}
+.modern-shell .group-settings-sidebar .group-management-form .group-management-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 39px;
+  padding: 9px 12px;
+  border: 1px solid #346ce0;
+  border-radius: 10px;
+  background: #346ce0;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.modern-shell .group-settings-sidebar .group-management-form .group-management-save.secondary {
+  background: #eef4ff;
+  border-color: #dfebff;
+  color: #3262bb;
+}
+.modern-shell .group-settings-sidebar .group-management-form .group-management-save:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+.modern-shell .group-settings-sidebar .group-management-empty {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 0;
+  padding: 13px;
+  border-radius: 11px;
+  background: #f6f8fc;
+  color: #7788a4;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.modern-shell .group-settings-sidebar .group-management-error {
+  margin: 0;
+  border-radius: 10px;
+  background: #fff0f0;
+  color: #b44755;
+  padding: 10px;
+  font-size: 12px;
+}
+.modern-shell .group-settings-sidebar .group-management-file {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 10px;
+  border: 1px solid #e7edf7;
+  border-radius: 10px;
+  background: #f8faff;
+  font-size: 11px;
+}
+.modern-shell .group-settings-sidebar .group-management-file svg {
+  color: #4775ca;
+  flex: 0 0 18px;
+}
+.modern-shell .group-settings-sidebar .group-management-file span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .modern-shell .group-settings-sidebar .group-management-navigation {
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: 13px;
+    padding: 6px;
+    gap: 4px;
+  }
+  .modern-shell .group-settings-sidebar .group-management-navigation button {
+    min-height: 38px;
+    padding: 7px;
+    font-size: 11px;
+  }
+}

@@ -1,8 +1,1 @@
-export type ManagedAccountSession = {
-  id: string
-  userAgent: string
-  createdAt: string
-  lastSeenAt: string
-  expiresAt: string
-  current: boolean
-}
+export type { ManagedAccountSession } from '../../shared/types/session'

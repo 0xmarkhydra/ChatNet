@@ -23,6 +23,9 @@ export function mutationTags(path: string): string[] {
  if (p.startsWith('/api/conversations') || p.startsWith('/api/messages')) return ['messages','conversations']
  return []
 }
+export class SessionCacheInvalidatedError extends Error {
+ constructor() { super('Dữ liệu đã thay đổi. Hãy thử lại.'); this.name = 'SessionCacheInvalidatedError' }
+}
 export class SessionResponseCache {
  private scope = ''
  private entries = new Map<string, Entry & { tag: string }>()
@@ -42,7 +45,7 @@ export class SessionResponseCache {
   const previous = this.entries.get(key)
   if (previous?.pending) {
    const response = await previous.pending
-   if (this.scope !== scope || !previous.valid) throw new Error('Dữ liệu đã thay đổi. Hãy thử lại.')
+   if (this.scope !== scope || !previous.valid) throw new SessionCacheInvalidatedError()
    return response.clone()
   }
   if (previous?.response && previous.expires > Date.now()) return previous.response.clone()
@@ -58,7 +61,7 @@ export class SessionResponseCache {
   entry.pending = pending
   try {
    const response = await pending
-   if (this.scope !== scope || !entry.valid) throw new Error('Dữ liệu đã thay đổi. Hãy thử lại.')
+   if (this.scope !== scope || !entry.valid) throw new SessionCacheInvalidatedError()
    return response.clone()
   }
   finally {

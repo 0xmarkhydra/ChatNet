@@ -5,6 +5,8 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 COPY backend/cmd/call/translation.go /backend/cmd/call/translation.go
 COPY backend/cmd/call/main.go /backend/cmd/call/main.go
+COPY backend/cmd/call/revocations.go /backend/cmd/call/revocations.go
+COPY backend/cmd/chat/groups.go /backend/cmd/chat/groups.go
 RUN npm run build \
     && npm run check:pwa \
     && npm run check:session \

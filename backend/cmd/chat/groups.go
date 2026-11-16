@@ -487,6 +487,12 @@ func (s *server) removeGroupMember(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusForbidden, "group permission changed; try again")
 		return
 	}
+	if _, err := tx.Exec(r.Context(), `
+		INSERT INTO call_revocations(reason,conversation_id,actor_user_id,target_user_id)
+		VALUES('member_removed',$1,$2,$3)`, conversationID, claims.UserID, targetID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot remove group member")
+		return
+	}
 	action := "member.removed"
 	if targetID == claims.UserID {
 		action = "member.left"

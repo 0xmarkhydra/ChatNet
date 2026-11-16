@@ -1,0 +1,420 @@
+import type { SessionResponseCache } from '../../shared/lib/sessionCache'
+import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { API } from '../../shared/lib/config'
+import { useLatest } from '../../shared/hooks/useLatest'
+import { isDesktopBuild } from '../../platform/desktop'
+import { notifyDesktopMessage, clearDesktopNotifications, refreshDesktopUnread } from '../../features/chat/hooks/useDesktopNotifications'
+import { attachmentLabel } from '../../shared/utils/format'
+import { mergeById } from '../../shared/utils/optimistic'
+import { canMarkConversationRead } from '../../features/chat/utils/conversationRead'
+import { clearPendingSend, loadPendingSend } from '../../features/chat/lib/chatPersistence'
+import type { Message, MessageDraft } from '../../features/chat/types'
+import { parseRealtimeEvent } from './parseRealtimeEvent'
+import type { IncomingMessageSound } from '../../features/notifications/lib/incomingSound'
+import type { AppDataContext } from '../../shared/types/api'
+import type { Tab } from '../../shared/types/navigation'
+import type { useConversationData } from '../../features/chat/hooks/useConversationData'
+import type { useFeedData } from '../../features/feed/hooks/useFeedData'
+import type { useContactData } from '../../features/contacts/hooks/useContactData'
+
+type Options = Omit<AppDataContext, 'setNotice'> &
+  Pick<ReturnType<typeof useConversationData>,
+    'refreshConversations' | 'reconcileConversationMemberships' | 'revokedConversationIds' |
+    'membershipSnapshot' | 'membershipEventSequence' | 'membershipSyncSequence' | 'setConversations'> &
+  Pick<ReturnType<typeof useFeedData>, 'refreshPosts' | 'refreshStories'> &
+  Pick<ReturnType<typeof useContactData>, 'refreshFriendConnections'> & {
+    onCategoryAssignmentChanged: (id: number, categoryId: number | null) => void
+    onCategoriesChanged: () => void
+    refreshCategoryConversations: () => void
+    responseCache: RefObject<SessionResponseCache>
+    expireSession: () => void
+    checkSession: () => Promise<boolean>
+    purgeConversation: (id: number) => void
+    activeConversationIdRef: RefObject<number | null>
+    activeChannelIdRef: RefObject<number>
+    activeConversationTypeRef: RefObject<'group' | 'direct' | null>
+    refreshGroupMembers: (id: number) => Promise<void>
+    refreshPinnedMessages: (id: number) => Promise<void>
+    clearPinnedMessages: () => void
+    setMessages: Dispatch<SetStateAction<Message[]>>
+    messageChanges: RefObject<Set<number>>
+    setTranslations: Dispatch<SetStateAction<Record<number, string>>>
+    messageSound: RefObject<IncomingMessageSound | null>
+    messageSoundEnabledRef: RefObject<boolean>
+    tabRef: RefObject<Tab>
+    pendingSend: RefObject<{
+      sessionId: string; conversationId: number; signature: string; clientId: string; draft: MessageDraft
+    } | null>
+    setMessageDrafts: Dispatch<SetStateAction<Record<number, MessageDraft>>>
+    messageReceipts: RefObject<Map<string, Message | null>>
+    setOutgoingMessage: Dispatch<SetStateAction<Message | null>>
+    onMessageConfirmed: (message: Message) => void
+  }
+
+export function useAppRealtime({
+  onCategoryAssignmentChanged,
+  onCategoriesChanged,
+  refreshCategoryConversations,
+  responseCache,
+  expireSession,
+  checkSession,
+  session,
+  sessionRef,
+  apiFetch,
+  setStatus,
+  refreshConversations,
+  refreshPosts,
+  refreshStories,
+  refreshFriendConnections,
+  reconcileConversationMemberships,
+  purgeConversation,
+  revokedConversationIds,
+  membershipSnapshot,
+  membershipEventSequence,
+  membershipSyncSequence,
+  activeConversationIdRef,
+  activeChannelIdRef,
+  activeConversationTypeRef,
+  refreshGroupMembers,
+  refreshPinnedMessages,
+  clearPinnedMessages,
+  setMessages,
+  messageChanges,
+  setTranslations,
+  messageSound,
+  messageSoundEnabledRef,
+  tabRef,
+  pendingSend,
+  setMessageDrafts,
+  messageReceipts,
+  setOutgoingMessage,
+  setConversations,
+  onMessageConfirmed,
+}: Options) {
+  // Long-lived SSE/timer listeners need current callbacks without re-subscribing.
+  const handlers = useLatest({
+    onCategoryAssignmentChanged,
+    onCategoriesChanged,
+    refreshCategoryConversations,
+    expireSession,
+    checkSession,
+    apiFetch,
+    setStatus,
+    refreshConversations,
+    refreshPosts,
+    refreshStories,
+    refreshFriendConnections,
+    reconcileConversationMemberships,
+    purgeConversation,
+    refreshGroupMembers,
+    refreshPinnedMessages,
+    clearPinnedMessages,
+    onMessageConfirmed
+  })
+
+  useEffect(() => {
+    if (!session?.token || sessionRef.current?.sessionId !== session.sessionId) return
+
+    void handlers.current.refreshConversations()
+    void handlers.current.refreshPosts()
+    void handlers.current.refreshStories()
+
+    let active = true
+    let hasOpened = false
+    let hadConnectionError = false
+    let lastSSECheckAt = 0
+    const events = new EventSource(
+      `${API}/api/events?token=${encodeURIComponent(session.token)}`,
+    )
+    events.onopen = () => {
+      if (!active || sessionRef.current !== session) return
+      const reconnected = hasOpened || hadConnectionError
+      hasOpened = true
+      hadConnectionError = false
+      lastSSECheckAt = Date.now()
+      handlers.current.setStatus('Đang online')
+      // EventSource can silently miss messages while disconnected. Refresh the
+      // active conversation only on a genuine reopen, not the initial connect.
+      if (reconnected) window.dispatchEvent(new CustomEvent('chatnet:sse-reconnected', {
+        detail: { sessionId: session.sessionId },
+      }))
+      void handlers.current.refreshFriendConnections()
+      void handlers.current.reconcileConversationMemberships()
+    }
+    events.onerror = () => {
+      if (!active || sessionRef.current !== session) return
+      hadConnectionError = true
+      handlers.current.setStatus('Đang kết nối lại...')
+      if (Date.now() - lastSSECheckAt < 30_000) return
+      lastSSECheckAt = Date.now()
+      if (document.visibilityState === 'visible' && sessionRef.current?.sessionId === session.sessionId) {
+        void handlers.current.checkSession().catch(() => undefined)
+      }
+    }
+    events.addEventListener('session-revoked', () => {
+      if (active && sessionRef.current?.sessionId === session.sessionId) handlers.current.expireSession()
+    })
+    events.addEventListener('update', (event) => {
+      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
+      const update = parseRealtimeEvent((event as MessageEvent).data)
+      if (!update) return
+      if (['message', 'conversation.read', 'conversation.created', 'conversation.removed', 'privacy.updated'].includes(update.type)) refreshDesktopUnread()
+      if (update.type === 'privacy.updated' || update.type === 'conversation.removed') clearDesktopNotifications(session.sessionId)
+      if (update.type === 'privacy.updated') {
+        // Remove potentially forbidden content immediately; refetch using current access rules.
+        responseCache.current.invalidate(['messages', 'conversations', 'friends', 'feed', 'stories', 'profiles', 'notes'])
+        setMessages([])
+        window.dispatchEvent(new Event('chatnet:privacy-updated'))
+        handlers.current.clearPinnedMessages()
+        if (activeConversationIdRef.current) void handlers.current.refreshPinnedMessages(activeConversationIdRef.current)
+        void handlers.current.refreshConversations()
+        void handlers.current.refreshFriendConnections()
+        void handlers.current.refreshPosts()
+        void handlers.current.refreshStories()
+        void handlers.current.reconcileConversationMemberships()
+        return
+      }
+      if (update.type === 'group.activity') {
+        window.dispatchEvent(new CustomEvent('chatnet:group-activity', { detail: update.conversationId }))
+        return
+      }
+      if (update.type === 'category.updated') {
+        if (update.conversationId > 0) {
+          responseCache.current.invalidate(['conversations'])
+          handlers.current.onCategoryAssignmentChanged(update.conversationId, update.categoryId || null)
+          return
+        }
+        responseCache.current.invalidate(['categories','conversations'])
+        handlers.current.onCategoriesChanged()
+        void handlers.current.refreshConversations()
+        return
+      }
+      if (update.type === 'friend.updated') {
+        responseCache.current.invalidate(['friends','feed','stories','profiles','notes'])
+        void handlers.current.refreshFriendConnections()
+        return
+      }
+
+      if (update.type === 'conversation.removed') {
+        responseCache.current.invalidate(['conversations','messages'])
+        if (activeConversationIdRef.current === update.conversationId) handlers.current.clearPinnedMessages()
+        handlers.current.purgeConversation(update.conversationId)
+        handlers.current.refreshCategoryConversations()
+        return
+      }
+
+      if (update.type === 'pins.updated') {
+        if (activeConversationIdRef.current === update.conversationId) {
+          void handlers.current.refreshPinnedMessages(update.conversationId)
+        }
+        return
+      }
+
+      if (update.type === 'conversation.created' || update.type === 'conversation.updated') {
+        responseCache.current.invalidate(['conversations','messages'])
+        window.dispatchEvent(new CustomEvent('chatnet:group-community-updated',{detail:{conversationId:update.conversationId}}))
+        revokedConversationIds.current.delete(update.conversationId)
+        membershipSnapshot.current?.add(update.conversationId)
+        membershipEventSequence.current += 1
+        void handlers.current.refreshConversations()
+        handlers.current.refreshCategoryConversations()
+        if (activeConversationIdRef.current === update.conversationId) {
+          void handlers.current.refreshGroupMembers(update.conversationId)
+        }
+        return
+      }
+
+      if (
+        update.type === 'conversation.read' &&
+        update.readerId &&
+        update.lastReadMessageId &&
+        update.readerId !== session.user.id
+      ) {
+        if (activeConversationIdRef.current === update.conversationId) {
+          setMessages((current) =>
+            current.map((message) => {
+              if (
+                message.senderId !== session.user.id ||
+                message.id > (update.lastReadMessageId || 0)
+              ) return message
+              const readers = message.readByUserIds || []
+              if (readers.includes(update.readerId as number)) return message
+              messageChanges.current.add(message.id)
+              return { ...message, readByUserIds: [...readers, update.readerId as number] }
+            }),
+          )
+        }
+        return
+      }
+
+      if (update.type === 'message.updated' && update.message) {
+        responseCache.current.invalidate(['messages','conversations'])
+        const changed = update.message
+        if (activeConversationTypeRef.current === 'group' && activeConversationIdRef.current === changed.conversationId)
+          window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'updated',message:changed}}))
+        messageChanges.current.add(changed.id)
+        if ((changed.channelId || 0) === activeChannelIdRef.current && activeConversationIdRef.current === update.conversationId) {
+          setMessages((current) => {
+            const item = current.find((message) => message.id === changed.id)
+            return mergeById(current, {
+              ...changed,
+              readByUserIds: [...new Set([...(item?.readByUserIds || []), ...(changed.readByUserIds || [])])],
+              // The backend now personalizes "mine" for each realtime recipient.
+              reactions: changed.reactions || [],
+            }).sort((a, b) => a.id - b.id)
+          })
+          setTranslations((current) => {
+            const next = { ...current }
+            delete next[changed.id]
+            return next
+          })
+          // Edits and recalls must refresh the preview shown in the pinned banner.
+          void handlers.current.refreshPinnedMessages(update.conversationId)
+        }
+        void handlers.current.refreshConversations()
+        handlers.current.refreshCategoryConversations()
+        return
+      }
+
+      if (update.type === 'message' && update.message) {
+        responseCache.current.invalidate(['messages','conversations'])
+        const incoming = update.message
+        if (activeConversationTypeRef.current === 'group' && activeConversationIdRef.current === incoming.conversationId)
+          window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'message',message:incoming}}))
+        // SSE messages are live; neither renderer nor Desktop Main compares
+        // createdAt against the local clock. Desktop Main plays the alert even
+        // in the background, independent of Windows toast delivery.
+        if (!isDesktopBuild) {
+          const sound = messageSound.current
+          sound?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
+          if (import.meta.env.DEV) {
+            const diagnostic = sound?.getDiagnostic()
+            console.info('[ChatNet incoming sound]', {
+              result: diagnostic?.result ?? 'audio-not-initialized',
+              audioState: diagnostic?.audioState ?? 'not-initialized',
+              enabled: messageSoundEnabledRef.current,
+              fromAnotherAccount: incoming.senderId !== session.user.id,
+            })
+          }
+        }
+        notifyDesktopMessage(session, incoming)
+        messageChanges.current.add(incoming.id)
+        if (incoming.senderId === session.user.id && incoming.clientId) {
+          handlers.current.onMessageConfirmed(incoming)
+          const recovered = loadPendingSend(session.user.id, session.sessionId)
+          if (recovered?.clientId === incoming.clientId && recovered.conversationId === incoming.conversationId) {
+            clearPendingSend(session.user.id, incoming.clientId)
+            if (!incoming.channelId) setMessageDrafts((current) => {
+              const existing = current[incoming.conversationId]
+              if (!existing || existing.text.trim() !== incoming.text || existing.attachments.length > 0) return current
+              const next = { ...current }
+              delete next[incoming.conversationId]
+              return next
+            })
+          }
+          if (pendingSend.current?.clientId === incoming.clientId) {
+            const confirmed = pendingSend.current
+            pendingSend.current = null
+            // A late SSE receipt also resolves an ambiguous HTTP send. Keep any newer draft.
+            setMessageDrafts((current) => {
+              if (current[confirmed.conversationId] !== confirmed.draft) return current
+              const next = { ...current }
+              delete next[confirmed.conversationId]
+              return next
+            })
+          }
+          if (messageReceipts.current.has(incoming.clientId)) messageReceipts.current.set(incoming.clientId, incoming)
+          setOutgoingMessage((current) => current?.clientId === incoming.clientId ? null : current)
+        }
+        const currentId = activeConversationIdRef.current
+
+        setConversations((current) => {
+          const existing = current.find((item) => item.id === update.conversationId)
+          if (!existing) return current
+          const next = current.map((item) =>
+            item.id === update.conversationId
+              ? {
+                  ...item,
+                  lastMessage: incoming.text || attachmentLabel(incoming.attachments),
+                  lastMessageAt: incoming.createdAt,
+                  unreadCount:
+                    incoming.senderId !== session.user.id &&
+                      (!canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus()) ||
+                        (activeConversationTypeRef.current === 'group' && activeChannelIdRef.current !== (incoming.channelId || 0)))
+                      ? item.unreadCount + 1
+                      : item.unreadCount,
+                }
+              : item,
+          )
+          return next.sort((a, b) =>
+            (b.lastMessageAt || b.createdAt).localeCompare(a.lastMessageAt || a.createdAt),
+          )
+        })
+
+        void handlers.current.refreshConversations()
+        handlers.current.refreshCategoryConversations()
+
+        if ((incoming.channelId || 0) === activeChannelIdRef.current && currentId === update.conversationId) {
+          setMessages((current) =>
+            current.some((item) => item.id === incoming.id)
+              ? current
+              : [...current, incoming],
+          )
+          if (incoming.senderId !== session.user.id &&
+              canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) {
+            const group = activeConversationTypeRef.current === 'group'
+            void handlers.current.apiFetch(group
+              ? `/api/conversations/${update.conversationId}/channel-read`
+              : `/api/conversations/${update.conversationId}/read`, group
+              ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ channelId: activeChannelIdRef.current }) }
+              : { method: 'POST' })
+              .then(response => {
+                if (active && sessionRef.current?.sessionId === session.sessionId && response.ok && group)
+                  window.dispatchEvent(new CustomEvent('chatnet:channel-read',{detail:{
+                    conversationId:update.conversationId, channelId:incoming.channelId || 0,
+                  }}))
+              })
+              .catch(() => {
+                if (active && sessionRef.current?.sessionId === session.sessionId) handlers.current.setStatus('Đang kết nối lại...')
+              })
+          }
+        }
+      }
+    })
+
+    const refreshTimer = window.setInterval(() => {
+      if (!active || sessionRef.current?.sessionId !== session.sessionId || document.visibilityState !== 'visible') return
+      void handlers.current.refreshConversations()
+      void handlers.current.refreshFriendConnections()
+      handlers.current.refreshCategoryConversations()
+    }, 20000)
+    const membershipTimer = window.setInterval(() => {
+      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
+      void handlers.current.reconcileConversationMemberships()
+    }, 90000)
+    const checkMembership = () => {
+      if (active && sessionRef.current?.sessionId === session.sessionId) void handlers.current.reconcileConversationMemberships()
+    }
+    const checkVisibleMembership = () => {
+      if (active && sessionRef.current?.sessionId === session.sessionId && document.visibilityState === 'visible') {
+        checkMembership()
+        void handlers.current.refreshConversations()
+        handlers.current.refreshCategoryConversations()
+        void handlers.current.refreshFriendConnections()
+      }
+    }
+    window.addEventListener('online', checkMembership)
+    document.addEventListener('visibilitychange', checkVisibleMembership)
+    return () => {
+      active = false
+      events.close()
+      window.clearInterval(refreshTimer)
+      window.clearInterval(membershipTimer)
+      window.removeEventListener('online', checkMembership)
+      document.removeEventListener('visibilitychange', checkVisibleMembership)
+      membershipSyncSequence.current += 1
+    }
+  }, [session?.token, session?.sessionId, handlers, sessionRef])
+
+}

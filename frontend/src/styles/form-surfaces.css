@@ -1,0 +1,69 @@
+/* Form surfaces: wrappers provide the only visible field boundary.
+   Scope is intentionally limited to controls with an existing outer container.
+   Standalone fields (login, profile fields, invite forms, selects) retain their
+   individual boundaries so independent controls remain distinguishable. */
+:is(
+  .appbar-search,
+  .social-chat-list-search,
+  .communication-hub-search,
+  .friend-search-input-wrap,
+  .connect-search-input,
+  .nearby-search,
+  .locale-picker-search,
+  .translation-language-search,
+  .profile-username-input,
+  .social-feed-checkin-field
+) input:not([type='checkbox']):not([type='radio']):not([type='file']),
+:is(.post-box) textarea {
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}
+:is(
+  .appbar-search,
+  .social-chat-list-search,
+  .communication-hub-search,
+  .friend-search-input-wrap,
+  .connect-search-input,
+  .nearby-search,
+  .locale-picker-search,
+  .translation-language-search,
+  .profile-username-input,
+  .social-feed-checkin-field
+) input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+:is(
+  .appbar-search,
+  .social-chat-list-search,
+  .communication-hub-search,
+  .friend-search-input-wrap,
+  .connect-search-input,
+  .nearby-search,
+  .locale-picker-search,
+  .translation-language-search,
+  .profile-username-input,
+  .social-feed-checkin-field
+) input:not([type='checkbox']):not([type='radio']):not([type='file']):focus-visible,
+.post-box textarea:focus,
+.post-box textarea:focus-visible {
+  border: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}
+/* Check-in and older post composer used to draw an extra input rectangle
+   inside an already-bordered card. Keep one border on the card only. */
+.social-feed-checkin-field input {
+  min-height: 40px;
+  padding: 0;
+  color: #253955;
+}
+.social-feed-checkin-field:focus-within,
+.post-box:focus-within {
+  border-color: #91b3f8;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .10);
+}
+.social-chat-list-search {
+  border-color: #e0e8f5;
+}

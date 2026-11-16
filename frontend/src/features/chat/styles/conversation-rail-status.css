@@ -1,0 +1,215 @@
+/* Shared passive status labels in the expanded conversation/avatar lists. */
+.conversation-rail-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 54%;
+  gap: 7px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.conversation-rail-status .conversation-category-badge.category-plain {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  max-width: 105px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none;
+  color: var(--category-text);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.conversation-rail-status .conversation-category-badge.category-plain svg {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+}
+.conversation-rail-notification-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 18px;
+  color: #278b63;
+}
+.conversation-rail-notification-state.is-muted {
+  color: #8190a6;
+}
+.conversation-rail-notification-state svg {
+  width: 14px;
+  height: 14px;
+}
+.desktop-conversation-rail-meta .conversation-rail-status,
+.conversation-avatar-rail-meta .conversation-rail-status {
+  opacity: 1;
+}
+/* Name and time on the first line; preview, plain category, then bell state. */
+.modern-shell.app-layout .desktop-conversation-rail-meta-bottom,
+.modern-shell.app-layout .conversation-avatar-rail-meta-bottom {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  gap: 6px;
+}
+.modern-shell.app-layout .desktop-conversation-rail-meta-bottom > small,
+.modern-shell.app-layout .conversation-avatar-rail-meta-bottom > small {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modern-shell.app-layout .desktop-conversation-rail-meta-top,
+.modern-shell.app-layout .conversation-avatar-rail-meta-top {
+  align-items: center;
+}
+.modern-shell.app-layout .desktop-conversation-rail-meta-bottom .conversation-rail-status,
+.modern-shell.app-layout .conversation-avatar-rail-meta-bottom .conversation-rail-status {
+  flex-shrink: 0;
+  max-width: 48%;
+}
+.modern-shell.app-layout .desktop-conversation-rail-entry:has(.desktop-conversation-rail-unread) .conversation-rail-status,
+.modern-shell.app-layout .conversation-avatar-rail-item:has(.conversation-avatar-rail-count) .conversation-rail-status {
+  padding-right: 9px;
+}
+/* Place the colored tag immediately after the name; show a quiet crossed bell
+   only when notifications are muted. No badge background or category text. */
+.modern-shell.app-layout .desktop-conversation-rail-meta-top,
+.modern-shell.app-layout .conversation-avatar-rail-meta-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.modern-shell.app-layout .conversation-rail-title-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1 1 0;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+.modern-shell.app-layout .conversation-rail-title-group > strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modern-shell.app-layout .conversation-rail-title-group > .conversation-rail-status {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  gap: 5px;
+  min-width: 0;
+  max-width: none;
+}
+.modern-shell.app-layout .conversation-rail-title-group > .conversation-rail-status .conversation-category-badge.category-plain.category-icon-only {
+  display: inline-flex;
+  flex: 0 0 13px;
+  width: 13px;
+  min-width: 13px;
+  height: 16px;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none;
+  color: var(--category-text) !important;
+}
+.modern-shell.app-layout .conversation-rail-title-group > .conversation-rail-status .conversation-category-badge.category-plain.category-icon-only svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  stroke: currentColor;
+}
+.modern-shell.app-layout .conversation-rail-title-group .conversation-rail-notification-state.is-muted {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 16px;
+  color: #9ca8ba;
+  opacity: .75;
+}
+.modern-shell.app-layout .desktop-conversation-rail-meta-top > time,
+.modern-shell.app-layout .conversation-avatar-rail-meta-top > time {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+/* Status chips remain on the compact avatar dock without shifting avatars.
+   The selected conversation marker stays in the top corner. */
+.modern-shell.app-layout .conversation-rail-compact-status {
+  position: absolute;
+  z-index: 6;
+  left: 1px;
+  bottom: 0;
+  display: inline-flex;
+  pointer-events: none;
+}
+.modern-shell.app-layout .conversation-rail-compact-status > .conversation-rail-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: none;
+  min-width: 16px;
+  box-sizing: border-box;
+  height: 18px;
+  padding: 1px 3px;
+  border: 1px solid #fff;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(28,61,108,.13);
+}
+.modern-shell.app-layout .conversation-rail-compact-status .conversation-category-badge.category-plain.category-icon-only {
+  flex: 0 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 13px;
+  min-width: 12px;
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  color: var(--category-text) !important;
+}
+.modern-shell.app-layout .conversation-rail-compact-status .conversation-category-badge.category-plain.category-icon-only svg {
+  width: 11px;
+  height: 11px;
+  fill: currentColor;
+}
+.modern-shell.app-layout .conversation-rail-compact-status .conversation-rail-notification-state.is-muted {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 13px;
+  color: #8d9bad;
+  opacity: .8;
+}
+.modern-shell.app-layout .conversation-rail-compact-status .conversation-rail-notification-state svg {
+  width: 11px;
+  height: 11px;
+}
+.modern-shell.app-layout .desktop-conversation-rail.is-expanded .conversation-rail-compact-status,
+.modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-rail-compact-status {
+  display: none;
+}

@@ -104,7 +104,7 @@ try {
   page.on('pageerror', e => errors.push(e.message))
   await page.route(origin + '/mock-story-upload', route =>
     route.fulfill({ status: 200, body: '' }))
-  await page.route('**/api/**', route => {
+  await page.route(url => url.pathname.startsWith('/api/'), route => {
     const req = route.request()
     const currentURL = new URL(req.url())
     const path = currentURL.pathname
@@ -268,9 +268,10 @@ try {
   await page.locator('.conversation-item').first().click()
   await page.locator('.message-press-target').last().waitFor()
   await page.getByRole('button', { name: 'Tìm tin nhắn trong cuộc trò chuyện' }).click()
-  const localSearch = page.getByRole('dialog', { name: 'Tìm trong hội thoại' })
+  const localSearch = page.getByRole('dialog', { name: 'Tìm kiếm trong trò chuyện' })
   await localSearch.locator('input[aria-label="Từ khóa tin nhắn"]').fill('Lịch sử tin nhắn 2')
-  await localSearch.getByText('Lịch sử tin nhắn 2', { exact: true }).click()
+  await localSearch.locator('.message-search-section').first().getByRole('button', { name: 'Xem thêm' }).click()
+  await localSearch.getByRole('button', { name: /Lịch sử tin nhắn 2$/ }).click()
   await localSearch.waitFor({ state: 'hidden' })
   await page.locator('[data-message-id="2"]').waitFor()
   check(await page.locator('.message-press-target').count() === 45,
@@ -561,21 +562,73 @@ try {
     await page.locator('.conversation-item').first().click()
     await geometry('chat-room', width, ['.modern-frame', '.conversation-panel', '.chat-head'])
     if ([390, 1440].includes(width)) {
-      const translationMenu = page.getByRole('dialog', { name: 'Cài đặt dịch AI' })
-      const openTranslationFromDetails = async () => {
-        await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
-        await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
+      await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      const settingsPage = page.locator('.chat-translation-settings-page')
+      await settingsPage.waitFor()
+      check(await page.getByRole('heading', { name: 'Dịch tin nhắn tự động' }).isVisible(),
+        'Conversation details must navigate to the S21 translation settings page: ' + width)
+      check(await page.getByLabel('Ngôn ngữ của bạn').count() === 1 &&
+        await page.getByLabel('Ngôn ngữ người kia').count() === 1 &&
+        await page.getByLabel('Chế độ hiển thị').count() === 1 &&
+        await page.getByRole('button', { name: 'Lưu thay đổi' }).count() === 1,
+        'S21 controls missing: ' + width)
+      const autoSwitch = page.getByRole('checkbox', { name: 'Bật dịch cho cuộc trò chuyện này' })
+      const initialAuto = await autoSwitch.isChecked()
+      const initialTarget = await page.getByLabel('Ngôn ngữ của bạn').inputValue()
+      await autoSwitch.setChecked(!initialAuto)
+      await page.getByLabel('Ngôn ngữ của bạn').selectOption('vi')
+      await page.getByLabel('Ngôn ngữ người kia').selectOption('en')
+      await page.getByLabel('Chế độ hiển thị').selectOption('bilingual')
+      const bounds = await settingsPage.boundingBox()
+      const form = await settingsPage.locator('.chat-translation-settings-form').boundingBox()
+      const preview = await settingsPage.locator('.chat-translation-settings-preview').boundingBox()
+      check(bounds && form && preview && form.width > 0 && preview.width > 0,
+        'S21 content is not visible at ' + width)
+      if (width > 830) check(preview.x > form.x + form.width,
+        'S21 preview must be in the right column at ' + width)
+      else check(preview.y >= form.y + form.height - 1,
+        'S21 preview must be below the form on mobile: ' + width)
+      await page.getByRole('button', { name: 'Hủy' }).click()
+      await settingsPage.waitFor({ state: 'hidden' })
+      await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
+      await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      await settingsPage.waitFor()
+      check(await autoSwitch.isChecked() === initialAuto, 'Cancel must discard unsaved auto translation: ' + width)
+      check(await page.getByLabel('Ngôn ngữ của bạn').inputValue() === initialTarget,
+        'Cancel must discard language changes: ' + width)
+      await autoSwitch.check()
+      await page.getByLabel('Ngôn ngữ của bạn').selectOption('vi')
+      await page.getByLabel('Chế độ hiển thị').selectOption('bilingual')
+      await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
+      await settingsPage.waitFor({ state: 'hidden' })
+      const stored = await page.evaluate(() => JSON.parse(
+        localStorage.getItem('chatnet-conversation-translations:1') || '{}'))
+      check(stored[1]?.enabled && stored[1]?.targetLanguage === 'vi' &&
+        stored[1]?.display === 'bilingual',
+        'Saved S21 settings must persist only for the active conversation: ' + JSON.stringify(stored))
+      await page.locator('.chat-head button[aria-label="Thông tin hội thoại"]:visible').first().click()
+      await page.locator('.social-chat-details').getByRole('button', { name: 'Dịch AI' }).click()
+      await settingsPage.waitFor()
+      check(await autoSwitch.isChecked() && await page.getByLabel('Ngôn ngữ của bạn').inputValue() === 'vi',
+        'S21 must restore saved settings on reopening: ' + width)
+      await page.getByRole('button', { name: 'Hủy' }).click()
+      await settingsPage.waitFor({ state: 'hidden' })
+      if (width === 1440) {
+        await page.locator('.social-chat-ai-banner button[aria-label="Cài đặt dịch AI"]').click()
+        const translationMenu = page.getByRole('dialog', { name: 'Cài đặt dịch AI' })
+        await translationMenu.waitFor()
+        const modalBounds = await translationMenu.boundingBox()
+        const viewport = page.viewportSize()
+        check(modalBounds && viewport &&
+          Math.abs(modalBounds.x + modalBounds.width / 2 - viewport.width / 2) < 3 &&
+          Math.abs(modalBounds.y + modalBounds.height / 2 - viewport.height / 2) < 3,
+          'Translation dialog must be centered in viewport: ' + JSON.stringify({ width, modalBounds, viewport }))
+        await translationMenu.locator('.translation-language-search input').fill('en')
+        check(await translationMenu.isVisible(), 'Dialog closed while typing: ' + width)
+        await page.keyboard.press('Escape')
+        await translationMenu.waitFor({ state: 'hidden' })
       }
-      await openTranslationFromDetails()
-      await translationMenu.waitFor()
-      await translationMenu.locator('.translation-language-search input').fill('en')
-      check(await translationMenu.isVisible(), 'Translation menu closed while interacting inside: ' + width)
-      await page.locator('.chat-head .room-info').click()
-      await translationMenu.waitFor({ state: 'hidden' })
-      await openTranslationFromDetails()
-      await translationMenu.waitFor()
-      await page.keyboard.press('Escape')
-      await translationMenu.waitFor({ state: 'hidden' })
     }
     if (width <= 760) await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
   }
@@ -858,26 +911,42 @@ try {
       'Tapping outside must close create menu')
   }
 
-  // Logout must be one full-width settings row, not a detached right-aligned button.
+  // The desktop settings redesign uses a sectioned workspace, while mobile
+  // retains the full-width account row. Neither layout may hide logout.
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 320 ? 667 : width === 390 ? 844 : 900 })
-    if (width > 760) await page.locator('.app-sidebar').getByRole('button', { name: 'Cài đặt' }).click()
-    else await page.getByRole('button', { name: /Cá nhân/ }).click()
-    const signout = page.locator('.settings-card .settings-logout-row')
-    await signout.waitFor()
-    check(await page.locator('.profile-actions').count() === 0,
-      'Detached account actions footer must be removed')
-    const placement = await page.evaluate(() => {
-      const button = document.querySelector('.settings-logout-row').getBoundingClientRect()
-      const card = document.querySelector('.profile-view .settings-card').getBoundingClientRect()
-      return { button: { x: button.x, right: button.right, width: button.width, y: button.y },
-        card: { x: card.x, right: card.right, width: card.width } }
-    })
-    check(Math.abs(placement.button.x - placement.card.x) < 2 &&
-      Math.abs(placement.button.right - placement.card.right) < 2 &&
-      placement.button.width > 250,
-      'Sign-out row must fill settings card: ' + JSON.stringify({ width, placement }))
-    await signout.scrollIntoViewIfNeeded()
+    if (width > 760) {
+      await page.locator('.app-sidebar').getByRole('button', { name: 'Cài đặt' }).click()
+      const workspace = page.locator('.settings-workspace')
+      await workspace.waitFor({ state: 'visible' })
+      await workspace.getByRole('button', { name: 'Thông tin tài khoản' }).click()
+      const account = workspace.locator('.settings-workspace-account')
+      const signout = account.locator('button').last()
+      await signout.waitFor({ state: 'visible' })
+      const rects = await page.evaluate(() => {
+        const account = document.querySelector('.settings-workspace-account').getBoundingClientRect()
+        const button = document.querySelector('.settings-workspace-account button:last-of-type').getBoundingClientRect()
+        return { account: { x:account.x, right:account.right }, button: { x:button.x, right:button.right, width:button.width } }
+      })
+      check(rects.button.width > 90 && rects.button.x >= rects.account.x - 2 &&
+        rects.button.right <= rects.account.right + 2,
+        'Desktop logout must stay within the settings account card: ' + JSON.stringify({ width, rects }))
+    } else {
+      await page.getByRole('button', { name: /Cá nhân/ }).click()
+      const signout = page.locator('.settings-card .settings-logout-row')
+      await signout.waitFor({ state: 'visible' })
+      check(await page.locator('.profile-actions').count() === 0,
+        'Detached account actions footer must be removed')
+      const rects = await page.evaluate(() => {
+        const button = document.querySelector('.settings-logout-row').getBoundingClientRect()
+        const card = document.querySelector('.profile-view .settings-card').getBoundingClientRect()
+        return { button: { x: button.x, right: button.right, width: button.width }, card: { x: card.x, right: card.right } }
+      })
+      check(Math.abs(rects.button.x - rects.card.x) < 2 &&
+        Math.abs(rects.button.right - rects.card.right) < 2 &&
+        rects.button.width > 250, 'Mobile logout row must fill settings card: ' + JSON.stringify({ width, rects }))
+      await signout.scrollIntoViewIfNeeded()
+    }
     if (width === 390 || width === 1440)
       await page.screenshot({ path: 'output/playwright/layout/profile-actions-' + width + '.png' })
   }

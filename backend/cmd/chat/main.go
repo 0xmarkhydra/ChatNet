@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -32,10 +33,12 @@ type message struct {
 	ID                  int64               `json:"id"`
 	ClientID            string              `json:"clientId,omitempty"`
 	ConversationID      int64               `json:"conversationId"`
+	ChannelID           int64               `json:"channelId,omitempty"`
 	SenderID            int64               `json:"senderId"`
 	Sender              string              `json:"sender"`
 	SenderDisplayName   string              `json:"senderDisplayName,omitempty"`
 	Text                string              `json:"text"`
+	Forwarded           bool                `json:"forwarded,omitempty"`
 	ReplyToMessageID    *int64              `json:"replyToMessageId,omitempty"`
 	ReplyToSender       string              `json:"replyToSender,omitempty"`
 	ReplyToDisplayName  string              `json:"replyToDisplayName,omitempty"`
@@ -57,18 +60,25 @@ type messageReaction struct {
 }
 
 type conversation struct {
-	CategoryID    *int64     `json:"categoryId,omitempty"`
-	ID            int64      `json:"id"`
-	Type          string     `json:"type"`
-	Name          string     `json:"name"`
-	OtherUserID   *int64     `json:"otherUserId,omitempty"`
-	OtherUsername string     `json:"otherUsername,omitempty"`
-	MemberCount   int        `json:"memberCount"`
-	UnreadCount   int        `json:"unreadCount"`
-	LastMessage   string     `json:"lastMessage"`
-	LastMessageAt *time.Time `json:"lastMessageAt,omitempty"`
-	Online        bool       `json:"online"`
-	CreatedAt     time.Time  `json:"createdAt"`
+	BlockedByMe    bool       `json:"blockedByMe,omitempty"`
+	BlockedByOther bool       `json:"blockedByOther,omitempty"`
+	CategoryID     *int64     `json:"categoryId,omitempty"`
+	PinnedAt       *time.Time `json:"pinnedAt,omitempty"`
+	ID             int64      `json:"id"`
+	Type           string     `json:"type"`
+	Name           string     `json:"name"`
+	OtherUserID    *int64     `json:"otherUserId,omitempty"`
+	OtherUsername  string     `json:"otherUsername,omitempty"`
+	MemberCount    int        `json:"memberCount"`
+	UnreadCount    int        `json:"unreadCount"`
+	LastMessage    string     `json:"lastMessage"`
+	LastMessageAt  *time.Time `json:"lastMessageAt,omitempty"`
+	AvatarURL      string     `json:"avatarUrl,omitempty"`
+	AvatarMembers  []string   `json:"avatarMembers,omitempty"`
+	Muted          bool       `json:"muted"`
+
+	Online    bool      `json:"online"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 type realtimeEvent struct {
@@ -96,6 +106,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	if err := database.Migrate(ctx, db); err != nil {
+		log.Fatalf("chat schema migration: %v", err)
+	}
 
 	rdb, err := redisx.Open(ctx)
 	if err != nil {
@@ -111,6 +124,7 @@ func main() {
 		storage:   objectstore.NewFromEnv(),
 	}
 	go s.expireNearby(ctx)
+	go s.cleanupOrphanChatMedia(ctx)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
@@ -120,6 +134,8 @@ func main() {
 	mux.Handle("DELETE /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deletePushSubscription)))
 	mux.Handle("POST /api/push/test", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.testPushNotification)))
 	mux.Handle("POST /api/media/presign", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.presignMedia)))
+	mux.Handle("PUT /api/media/relay", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.relayMediaUpload)))
+	mux.HandleFunc("GET /api/media/chat/{id}", s.serveChatMedia)
 	mux.Handle("GET /api/users/{username}/profile", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getUserProfile)))
 	mux.Handle("GET /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getProfileNote)))
 	mux.Handle("POST /api/profile/note", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveProfileNote)))
@@ -156,12 +172,44 @@ func main() {
 	mux.Handle("PUT /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.saveCategory)))
 	mux.Handle("DELETE /api/conversation-categories/{categoryId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteCategory)))
 	mux.Handle("PUT /api/conversations/{id}/category", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.assignCategory)))
+	mux.Handle("GET /api/link-preview", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getLinkPreview)))
 	mux.Handle("GET /api/conversations", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversations)))
+	mux.Handle("PUT /api/conversations/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setConversationPin)))
+	mux.Handle("DELETE /api/conversations/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setConversationPin)))
+	mux.Handle("GET /api/conversations/{id}/pins", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPinnedMessages)))
 	mux.Handle("GET /api/chat/search", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.quickChatSearch)))
 	mux.Handle("GET /api/conversations/unread", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.unreadSummary)))
 	mux.Handle("GET /api/conversations/memberships", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listConversationMemberships)))
 	mux.Handle("POST /api/conversations/direct", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createDirect)))
 	mux.Handle("POST /api/conversations/groups", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroup)))
+	mux.Handle("GET /api/groups/public", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPublicCommunities)))
+	mux.Handle("POST /api/groups/{id}/join", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.joinPublicCommunity)))
+	mux.Handle("GET /api/conversations/{id}/community", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getCommunityProfile)))
+	mux.Handle("PATCH /api/conversations/{id}/community", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.patchCommunityProfile)))
+	mux.Handle("GET /api/conversations/{id}/notification-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getGroupNotificationPreferences)))
+	mux.Handle("PUT /api/conversations/{id}/notification-settings", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.putGroupNotificationPreferences)))
+	mux.Handle("GET /api/conversations/{id}/avatar", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.groupAvatarCapability)))
+	mux.Handle("PUT /api/conversations/{id}/avatar", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupAvatar)))
+	mux.Handle("GET /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupChannels)))
+	mux.Handle("POST /api/conversations/{id}/channel-read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markGroupChannelRead)))
+	mux.Handle("POST /api/conversations/{id}/channels", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupChannel)))
+	mux.Handle("PATCH /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroupChannel)))
+	mux.Handle("DELETE /api/conversations/{id}/channels/{channelId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteGroupChannel)))
+	mux.Handle("GET /api/conversations/{id}/channels/{channelId}/notifications", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getChannelNotifications)))
+	mux.Handle("PUT /api/conversations/{id}/channels/{channelId}/notifications", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.putChannelNotifications)))
+	mux.Handle("GET /api/conversations/{id}/channels/{channelId}/avatar", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.channelAvatarCapability)))
+	mux.Handle("PUT /api/conversations/{id}/channels/{channelId}/avatar", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateChannelAvatar)))
+	mux.Handle("GET /api/conversations/{id}/activities", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupActivities)))
+	mux.Handle("POST /api/conversations/{id}/activities", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createGroupActivity)))
+	mux.Handle("POST /api/conversations/{id}/activities/{activityId}/vote", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.voteGroupActivity)))
+	mux.Handle("PUT /api/conversations/{id}/activities/{activityId}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setGroupActivityPin)))
+	mux.Handle("DELETE /api/conversations/{id}/activities/{activityId}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setGroupActivityPin)))
+	mux.Handle("GET /api/conversations/{id}/e2ee/status", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getMLSConversationStatus)))
+	mux.Handle("GET /api/conversations/{id}/e2ee/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMLSEvents)))
+	mux.Handle("GET /api/conversations/{id}/e2ee/consents", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getMLSPilotConsents)))
+	mux.Handle("POST /api/conversations/{id}/e2ee/consents", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.approveMLSPilot)))
+	mux.Handle("POST /api/conversations/{id}/e2ee/bootstrap", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.bootstrapMLSConversation)))
+	mux.Handle("POST /api/conversations/{id}/e2ee/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.publishMLSEvent)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessages)))
 	mux.Handle("DELETE /api/conversations/{id}/history", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.clearConversationHistory)))
 	mux.Handle("GET /api/conversations/{id}/shared", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listSharedContent)))
@@ -169,6 +217,9 @@ func main() {
 	mux.Handle("PATCH /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editMessage)))
 	mux.Handle("DELETE /api/messages/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteMessage)))
 	mux.Handle("POST /api/messages/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.toggleMessageReaction)))
+	mux.Handle("GET /api/messages/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessageReactionUsers)))
+	mux.Handle("PUT /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
+	mux.Handle("DELETE /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
 	mux.Handle("POST /api/conversations/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markRead)))
 	mux.Handle("PATCH /api/conversations/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroup)))
 	mux.Handle("GET /api/conversations/{id}/members", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupMembers)))
@@ -202,8 +253,19 @@ func (s *server) pushConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) presignMedia(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
+	const maxMetadataBytes = 8 << 10
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxMetadataBytes))
+	if err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			httpx.Error(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.Error(w, http.StatusBadRequest, "invalid body")
+		return
+	}
 	var body mediax.UploadRequest
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := json.Unmarshal(data, &body); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -216,6 +278,7 @@ func (s *server) presignMedia(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, status, err.Error())
 		return
 	}
+	ticket.RelayToken = s.mediaRelayToken(claims.UserID, ticket.StorageRef, body.SizeBytes, body.ContentType, ticket.ExpiresAt)
 	httpx.JSON(w, http.StatusOK, ticket)
 }
 
@@ -558,8 +621,22 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	unreadOnly := false
+	if raw := r.URL.Query().Get("unread"); raw != "" {
+		var err error
+		unreadOnly, err = strconv.ParseBool(raw)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid unread filter")
+			return
+		}
+	}
+	conversationType := r.URL.Query().Get("type")
+	if conversationType != "" && conversationType != "direct" && conversationType != "group" {
+		httpx.Error(w, http.StatusBadRequest, "invalid conversation type")
+		return
+	}
 	rows, err := s.db.Query(r.Context(), `
-		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,
+		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,cm.pinned_at,
 		       COALESCE((SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id=c.id),0),
 		       COALESCE((
 		           SELECT CASE
@@ -578,42 +655,76 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		               ), '')
 		           END
 		           FROM messages m
-		           WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		             (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))
+		           WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		             (m.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=m.channel_id AND active_channel.deleted_at IS NULL)) AND
+		             (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		               (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)))
 		           ORDER BY m.id DESC
 		           LIMIT 1
 		       ),''),
-		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)) ORDER BY m.id DESC LIMIT 1),c.created_at),
-		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.last_read_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0)
+		       COALESCE((SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+		         (m.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=m.channel_id AND active_channel.deleted_at IS NULL)) AND
+		         (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		           (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))) ORDER BY m.id DESC LIMIT 1),c.created_at),
+		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id
+             AND (m.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=m.channel_id AND active_channel.deleted_at IS NULL))
+             AND m.id>CASE WHEN c.type='group' THEN COALESCE((
+               SELECT gcr.last_read_message_id FROM group_channel_reads gcr
+               WHERE gcr.conversation_id=c.id AND gcr.user_id=$1 AND gcr.channel_id=COALESCE(m.channel_id,0)
+             ),cm.last_read_message_id) ELSE cm.last_read_message_id END
+             AND m.id>cm.cleared_through_message_id AND m.user_id<>$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))),0), COALESCE(c.group_avatar_ref,''),
+             CASE WHEN c.type='group' THEN ARRAY(
+               SELECT u.username
+               FROM conversation_members avatar_member
+               JOIN users u ON u.id=avatar_member.user_id
+               WHERE avatar_member.conversation_id=c.id
+               ORDER BY CASE WHEN avatar_member.user_id=$1 THEN 1 ELSE 0 END, avatar_member.user_id
+               LIMIT 3
+             ) ELSE ARRAY[]::text[] END,
+             COALESCE((SELECT NOT p.message_notifications AND NOT p.mention_notifications
+               FROM group_notification_preferences p
+               WHERE p.conversation_id=c.id AND p.user_id=$1),FALSE)
+
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversation_id=c.id
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
         WHERE cm.user_id=$1
           AND ($5::bigint=0 OR c.id=$5)
           AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
+		  AND ($8::text='' OR c.type=$8)
+		  AND ($7::boolean=FALSE OR EXISTS (
+		    SELECT 1 FROM messages unread
+		    WHERE unread.conversation_id=c.id
+              AND unread.id>CASE WHEN c.type='group' THEN COALESCE((
+                SELECT gcr.last_read_message_id FROM group_channel_reads gcr
+                WHERE gcr.conversation_id=c.id AND gcr.user_id=$1 AND gcr.channel_id=COALESCE(unread.channel_id,0)
+              ),cm.last_read_message_id) ELSE cm.last_read_message_id END
+              AND unread.id>cm.cleared_through_message_id AND unread.user_id<>$1
+              AND (unread.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=unread.channel_id AND active_channel.deleted_at IS NULL))
+		      AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		        (b.blocker_id=$1 AND b.blocked_id=unread.user_id) OR (b.blocked_id=$1 AND b.blocker_id=unread.user_id))
+		  ))
 		  AND ($6::text='' OR strpos(`+searchx.FoldSQL("COALESCE(c.name,'')")+`, `+searchx.FoldSQL("$6")+`)>0
 		    OR EXISTS (SELECT 1 FROM conversation_members other
 		       JOIN users u ON u.id=other.user_id
+		       LEFT JOIN friend_contact_metadata meta ON meta.owner_id=$1 AND meta.contact_id=other.user_id
 		       WHERE other.conversation_id=c.id AND other.user_id<>$1
-		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$6")+`)>0))
+		         AND (strpos(`+searchx.FoldSQL("u.username")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("u.display_name")+`, `+searchx.FoldSQL("$6")+`)>0 OR strpos(`+searchx.FoldSQL("meta.nickname")+`, `+searchx.FoldSQL("$6")+`)>0))
 		    OR EXISTS (SELECT 1 FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>cm.cleared_through_message_id
-		       AND msg.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$6")+`)>0
-		       AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id))))
-		  AND (c.type <> 'direct' OR NOT EXISTS (
-		    SELECT 1 FROM conversation_members other
-		    JOIN user_blocks b ON
-		      (b.blocker_id=$1 AND b.blocked_id=other.user_id)
-		      OR (b.blocked_id=$1 AND b.blocker_id=other.user_id)
-		    WHERE other.conversation_id=c.id AND other.user_id<>$1
-		  ))
-		ORDER BY COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		         (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id))), c.created_at) DESC, c.id DESC
+		       AND msg.deleted_at IS NULL
+               AND (msg.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=msg.channel_id AND active_channel.deleted_at IS NULL))
+               AND strpos(`+searchx.FoldSQL("msg.text")+`, `+searchx.FoldSQL("$6")+`)>0
+		       AND (c.type='direct' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+		         (b.blocker_id=$1 AND b.blocked_id=msg.user_id) OR (b.blocked_id=$1 AND b.blocker_id=msg.user_id)))))
+		ORDER BY (cm.pinned_at IS NOT NULL) DESC,cm.pinned_at DESC,COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id AND m.id>cm.cleared_through_message_id AND
+                 (m.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=m.channel_id AND active_channel.deleted_at IS NULL)) AND
+		         (c.type='direct' OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		           (b.blocker_id=$1 AND b.blocked_id=m.user_id) OR (b.blocked_id=$1 AND b.blocker_id=m.user_id)))), c.created_at) DESC, c.id DESC
 		LIMIT $2 OFFSET $3`,
-		claims.UserID, limit, offset, categoryID, conversationID, keyword)
+		claims.UserID, limit, offset, categoryID, conversationID, keyword, unreadOnly, conversationType)
 	if err != nil {
+		log.Printf("list conversations query failed: %v", err)
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
 	}
@@ -623,32 +734,45 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var c conversation
 		var lastRead, memberCount, unreadCount int64
+		var groupAvatarRef string
 		var lastMessageAt time.Time
-		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount); err != nil {
-			continue
+		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef, &c.AvatarMembers, &c.Muted); err != nil {
+			log.Printf("list conversations scan failed: %v", err)
+			httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
+			return
 		}
 		c.MemberCount = int(memberCount)
 		c.UnreadCount = int(unreadCount)
 		c.LastMessageAt = &lastMessageAt
+		if c.Type == "group" && groupAvatarRef != "" && s.storage != nil && s.storage.Configured() {
+			c.AvatarURL, _ = s.storage.SignedGetURL(groupAvatarRef, time.Hour)
+		}
 
 		if c.Type == "direct" {
 			var otherID int64
 			var username, displayName string
 			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status
+				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status,
+				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=$2 AND b.blocked_id=u.id),
+				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=u.id AND b.blocked_id=$2)
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
-				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline)
+				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline, &c.BlockedByMe, &c.BlockedByOther)
 			if err == nil {
 				c.Name = displayName
 				c.OtherUsername = username
 				c.OtherUserID = &otherID
-				c.Online = showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
+				c.Online = !c.BlockedByMe && !c.BlockedByOther && showOnline && s.redis.Exists(r.Context(), presenceKey(otherID)).Val() > 0
 			}
 		}
 		items = append(items, c)
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("list conversations rows failed: %v", err)
+		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
+		return
 	}
 	httpx.JSON(w, http.StatusOK, items)
 }
@@ -735,10 +859,14 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	var body struct {
-		Name      string   `json:"name"`
-		Usernames []string `json:"usernames"`
+		Name        string   `json:"name"`
+		Usernames   []string `json:"usernames"`
+		Description string   `json:"description"`
+		Topic       string   `json:"topic"`
+		Rules       string   `json:"rules"`
+		Visibility  string   `json:"visibility"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body) != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -747,14 +875,25 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "group name is required and must be <= 120 characters")
 		return
 	}
+	if body.Visibility == "" {
+		body.Visibility = "private"
+	}
+	if !validCommunityFields(communityFields{body.Description, body.Topic, body.Rules, body.Visibility}) {
+		httpx.Error(w, http.StatusBadRequest, "invalid community fields")
+		return
+	}
+	if len(body.Usernames) > 50 {
+		httpx.Error(w, 400, "maximum 50 invited members")
+		return
+	}
 
 	userIDs, missing := s.resolveGroupMembers(r.Context(), claims.UserID, claims.Username, body.Usernames)
 	if len(missing) > 0 {
 		httpx.Error(w, http.StatusBadRequest, "users not found: "+strings.Join(missing, ", "))
 		return
 	}
-	if len(userIDs) < 2 {
-		httpx.Error(w, http.StatusBadRequest, "group needs at least 2 members")
+	if len(userIDs) < 1 {
+		httpx.Error(w, http.StatusBadRequest, "group owner is required")
 		return
 	}
 
@@ -785,9 +924,9 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 	var id int64
 	var createdAt time.Time
 	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO conversations(type,name,created_by)
-		VALUES('group',$1,$2) RETURNING id,created_at`,
-		name, claims.UserID).Scan(&id, &createdAt); err != nil {
+		INSERT INTO conversations(type,name,created_by,group_description,group_topic,group_rules,group_visibility)
+		VALUES('group',$1,$2,$3,$4,$5,$6) RETURNING id,created_at`,
+		name, claims.UserID, strings.TrimSpace(body.Description), strings.TrimSpace(body.Topic), strings.TrimSpace(body.Rules), body.Visibility).Scan(&id, &createdAt); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create group")
 		return
 	}
@@ -855,10 +994,21 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
+	// Existing participants may read their chat history after a block.
+	// Mutations and media downloads still enforce the block policy.
+	channelID := int64(0)
+	if raw := r.URL.Query().Get("channelId"); raw != "" {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || value < 0 {
+			httpx.Error(w, 400, "invalid channel id")
+			return
+		}
+		channelID = value
+	}
+	if channelID > 0 && !s.groupChannelExists(r.Context(), conversationID, channelID) {
+		httpx.Error(w, 404, "channel not found")
 		return
 	}
-
 	target := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("target")))
 	if target != "" && !validTranslationTarget(target) {
 		httpx.Error(w, http.StatusBadRequest, "unsupported translation language")
@@ -925,9 +1075,9 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	from, to := searchDateBounds(fromDate, toDate, tzOffset)
 
 	rows, err := s.db.Query(r.Context(), `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
+		SELECT m.id,m.conversation_id,COALESCE(m.channel_id,0),m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
 		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
-		       m.edited_at,(m.deleted_at IS NOT NULL),
+		       m.forwarded,m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
 		           FROM conversation_members cmr
@@ -942,19 +1092,22 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
 		JOIN conversation_members viewer ON viewer.conversation_id=m.conversation_id AND viewer.user_id=$5
-		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND rm.id>viewer.cleared_through_message_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		  (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id))
+		LEFT JOIN messages rm ON rm.id=m.reply_to_message_id AND rm.id>viewer.cleared_through_message_id
+		  AND (EXISTS(SELECT 1 FROM conversations rc WHERE rc.id=m.conversation_id AND rc.type='direct')
+		    OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$5 AND b.blocked_id=rm.user_id) OR (b.blocked_id=$5 AND b.blocker_id=rm.user_id)))
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
-		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id AND ($3::bigint=0 OR m.id<$3)
-		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
-		    (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id))
+		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id AND COALESCE(m.channel_id,0)=$10 AND ($3::bigint=0 OR m.id<$3)
+		  AND (EXISTS(SELECT 1 FROM conversations dc WHERE dc.id=m.conversation_id AND dc.type='direct')
+		    OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+		      (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id)))
 		  AND ($6::text='' OR (m.deleted_at IS NULL AND strpos(`+searchx.FoldSQL("m.text")+`, `+searchx.FoldSQL("$6")+`)>0))
 		  AND ($7::text='' OR lower(u.username)=lower($7))
 		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)
 		  AND ($9::timestamptz IS NULL OR m.created_at < $9)
-		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to))
+		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to), channelID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return
@@ -965,9 +1118,9 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m message
 		if rows.Scan(
-			&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
+			&m.ID, &m.ConversationID, &m.ChannelID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
-			&m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
+			&m.Forwarded, &m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
 			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
 		) == nil {
 			if m.Deleted {
@@ -980,7 +1133,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
 		items[i], items[j] = items[j], items[i]
 	}
-	if err := s.attachMessageMedia(r.Context(), items); err != nil {
+	if err := s.attachMessageMedia(r.Context(), items, claims.UserID); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load message attachments")
 		return
 	}
@@ -999,22 +1152,36 @@ func validClientID(id string) bool {
 
 // messageRequestFingerprint is computed from the *original* validated request,
 // not the mutable message row. An edit/recall cannot turn a valid retry into 409.
-func messageRequestFingerprint(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) string {
+func messageRequestFingerprint(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput, channelIDs ...int64) string {
 	refs := make([]string, 0, len(attachments))
 	for _, attachment := range attachments {
 		refs = append(refs, strings.TrimSpace(attachment.StorageRef))
+	}
+	var channelID int64
+	if len(channelIDs) > 0 {
+		channelID = channelIDs[0]
 	}
 	payload, _ := json.Marshal(struct {
 		ConversationID int64    `json:"conversationId"`
 		Text           string   `json:"text"`
 		ReplyTo        *int64   `json:"replyTo"`
 		StorageRefs    []string `json:"storageRefs"`
-	}{conversationID, text, replyTo, refs})
+		ChannelID      int64    `json:"channelId,omitempty"`
+	}{conversationID, text, replyTo, refs, channelID})
 	digest := sha256.Sum256(payload)
 	return hex.EncodeToString(digest[:])
 }
 
-func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+// The forwarded flag is part of the immutable request identity. Keep the
+// original signature for callers validating ordinary chat messages.
+func sameMessageRequest(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput, channelIDs ...int64) bool {
+	var channelID int64
+	if len(channelIDs) > 0 {
+		channelID = channelIDs[0]
+	}
+	if m.ChannelID != channelID {
+		return false
+	}
 	if m.ConversationID != conversationID || m.Text != text || len(m.Attachments) != len(attachments) {
 		return false
 	}
@@ -1032,8 +1199,26 @@ func sameMessageRequest(m message, conversationID int64, text string, replyTo *i
 	return true
 }
 
+func sameMessageRequestForwarded(m message, conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput, forwarded bool, channelID int64) bool {
+	return m.Forwarded == forwarded && sameMessageRequest(m, conversationID, text, replyTo, attachments, channelID)
+}
+
+// Preserve the existing SHA-256 digest for ordinary sends and retries.
+func messageRequestFingerprintForwarded(conversationID int64, text string, replyTo *int64, attachments []mediax.AttachmentInput, forwarded bool, channelID int64) string {
+	base := messageRequestFingerprint(conversationID, text, replyTo, attachments, channelID)
+	if !forwarded {
+		return base
+	}
+	digest := sha256.Sum256([]byte("forwarded:" + base))
+	return hex.EncodeToString(digest[:])
+}
+
 // replyExistingMessage returns true once it wrote a response for an existing client ID.
-func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput) bool {
+func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, senderID, conversationID int64, clientID, text string, replyTo *int64, attachments []mediax.AttachmentInput, forwarded bool, channelIDs ...int64) bool {
+	var channelID int64
+	if len(channelIDs) > 0 {
+		channelID = channelIDs[0]
+	}
 	var messageID int64
 	var fingerprint *string
 	err := s.db.QueryRow(r.Context(), `
@@ -1052,11 +1237,11 @@ func (s *server) replyExistingMessage(w http.ResponseWriter, r *http.Request, se
 		return true
 	}
 	if fingerprint != nil {
-		if *fingerprint != messageRequestFingerprint(conversationID, text, replyTo, attachments) {
+		if *fingerprint != messageRequestFingerprintForwarded(conversationID, text, replyTo, attachments, forwarded, channelID) {
 			httpx.Error(w, http.StatusConflict, "client id was already used for another message")
 			return true
 		}
-	} else if !sameMessageRequest(m, conversationID, text, replyTo, attachments) {
+	} else if !sameMessageRequestForwarded(m, conversationID, text, replyTo, attachments, forwarded, channelID) {
 		// Compatibility for rows created before the additive fingerprint migration.
 		httpx.Error(w, http.StatusConflict, "client id was already used for another message")
 		return true
@@ -1082,6 +1267,8 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		Text             string                   `json:"text"`
 		ClientID         string                   `json:"clientId"`
 		ReplyToMessageID *int64                   `json:"replyToMessageId"`
+		Forwarded        bool                     `json:"forwarded"`
+		ChannelID        int64                    `json:"channelId"`
 		Attachments      []mediax.AttachmentInput `json:"attachments"`
 	}
 	if json.NewDecoder(r.Body).Decode(&body) != nil {
@@ -1089,6 +1276,10 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Text = strings.TrimSpace(body.Text)
+	if body.ChannelID < 0 || (body.ChannelID > 0 && !s.groupChannelExists(r.Context(), conversationID, body.ChannelID)) {
+		httpx.Error(w, 404, "channel not found")
+		return
+	}
 	if !validClientID(body.ClientID) {
 		httpx.Error(w, http.StatusBadRequest, "invalid client id")
 		return
@@ -1097,7 +1288,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "text must be <= 4000 characters")
 		return
 	}
-	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
+	if body.ClientID != "" && s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments, body.Forwarded, body.ChannelID) {
 		return
 	}
 
@@ -1120,9 +1311,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	if body.ReplyToMessageID != nil {
 		var replyConversationID int64
 		if err := s.db.QueryRow(r.Context(), `
-			SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+			SELECT m.conversation_id FROM messages m WHERE m.id=$1 AND COALESCE(m.channel_id,0)=$3 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 			  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))
-		`, *body.ReplyToMessageID, claims.UserID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
+		`, *body.ReplyToMessageID, claims.UserID, body.ChannelID).Scan(&replyConversationID); err != nil || replyConversationID != conversationID {
 			httpx.Error(w, http.StatusBadRequest, "invalid reply message")
 			return
 		}
@@ -1134,6 +1325,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if !s.guardPlaintextDuringMLS(w, r, tx, conversationID) {
+		return
+	}
 
 	// Lock active membership until the message commits. A group removal cannot
 	// race a slow S3 validation and leave a message sent after removal.
@@ -1153,15 +1347,17 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	m := message{
 		ClientID:         body.ClientID,
 		ConversationID:   conversationID,
+		ChannelID:        body.ChannelID,
 		SenderID:         claims.UserID,
 		Sender:           claims.Username,
 		ReplyToMessageID: body.ReplyToMessageID,
+		Forwarded:        body.Forwarded,
 		Attachments:      attachments,
 		Reactions:        []messageReaction{},
 	}
 	fingerprint := ""
 	if body.ClientID != "" {
-		fingerprint = messageRequestFingerprint(conversationID, body.Text, body.ReplyToMessageID, body.Attachments)
+		fingerprint = messageRequestFingerprintForwarded(conversationID, body.Text, body.ReplyToMessageID, body.Attachments, body.Forwarded, body.ChannelID)
 	}
 	if err := tx.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&m.Sender, &m.SenderDisplayName); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load message sender")
@@ -1169,15 +1365,15 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint)
-		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''))
+		INSERT INTO messages(conversation_id,user_id,text,reply_to_message_id,client_id,request_fingerprint,channel_id,forwarded)
+		VALUES($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''),NULLIF($7,0),$8)
 		ON CONFLICT (user_id,client_id) WHERE client_id IS NOT NULL DO NOTHING
 		RETURNING id,text,created_at`,
-		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint,
+		conversationID, claims.UserID, body.Text, body.ReplyToMessageID, body.ClientID, fingerprint, body.ChannelID, body.Forwarded,
 	).Scan(&m.ID, &m.Text, &m.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = tx.Rollback(r.Context())
-		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments) {
+		if !s.replyExistingMessage(w, r, claims.UserID, conversationID, body.ClientID, body.Text, body.ReplyToMessageID, body.Attachments, body.Forwarded, body.ChannelID) {
 			httpx.Error(w, http.StatusConflict, "message retry could not be resolved")
 		}
 		return
@@ -1188,10 +1384,11 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for position, attachment := range attachments {
-		if _, err := tx.Exec(r.Context(), `
+		var savedID int64
+		if err := tx.QueryRow(r.Context(), `
 			INSERT INTO message_attachments(
 				message_id,storage_ref,original_name,content_type,size_bytes,kind,position
-			) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+			) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
 			m.ID,
 			attachment.StorageRef,
 			attachment.Name,
@@ -1199,10 +1396,11 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 			attachment.SizeBytes,
 			attachment.Kind,
 			position,
-		); err != nil {
+		).Scan(&savedID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot save message attachment")
 			return
 		}
+		m.Attachments[position].ID = savedID
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
@@ -1224,6 +1422,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		log.Printf("cannot filter message recipients: %v", visibilityErr)
 		visibleIDs = []int64{claims.UserID} // Message persisted; never notify blocked peers on failure.
 	}
+	s.signChatAttachments(&m, claims.UserID)
 	s.publishConversationEvent(r.Context(), visibleIDs, realtimeEvent{Type: "message", ConversationID: conversationID, Message: &m})
 
 	recipients := make([]int64, 0, len(visibleIDs))
@@ -1232,6 +1431,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 			recipients = append(recipients, uid)
 		}
 	}
+	recipients = s.groupPushRecipients(r.Context(), conversationID, body.ChannelID, recipients, body.Text)
 	notificationBody := "Bạn có một tin nhắn mới."
 	if body.Text == "" && len(attachments) > 0 {
 		notificationBody = "Bạn nhận được " + mediax.PreviewLabel(attachments[0].Kind) + "."
@@ -1239,7 +1439,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 	s.sendPushAsync(recipients, onesignalx.Notification{
 		Title: "ChatNet",
 		Body:  notificationBody,
-		URL:   fmt.Sprintf("https://chat.codelocal.cloud/?conversation=%d", conversationID),
+		URL:   fmt.Sprintf("https://chat.codelocal.cloud/?conversation=%d&message=%d", conversationID, m.ID),
 		Data:  map[string]any{"type": "message", "conversationId": conversationID, "messageId": m.ID},
 	})
 
@@ -1249,9 +1449,9 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (message, error) {
 	var m message
 	err := s.db.QueryRow(ctx, `
-		SELECT m.id,m.conversation_id,m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
+		SELECT m.id,m.conversation_id,COALESCE(m.channel_id,0),m.user_id,u.username,u.display_name,COALESCE(m.client_id,''),m.text,
 		       CASE WHEN rm.id IS NULL THEN NULL ELSE m.reply_to_message_id END,COALESCE(ru.username,''),COALESCE(ru.display_name,''),COALESCE(rm.text,''),
-		       m.edited_at,(m.deleted_at IS NOT NULL),
+		       m.forwarded,m.edited_at,(m.deleted_at IS NOT NULL),
 		       ARRAY(
 		           SELECT cmr.user_id
 		           FROM conversation_members cmr
@@ -1270,9 +1470,9 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		WHERE m.id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		  (b.blocker_id=$2 AND b.blocked_id=m.user_id) OR (b.blocked_id=$2 AND b.blocker_id=m.user_id))`, messageID, viewerID).Scan(
-		&m.ID, &m.ConversationID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
+		&m.ID, &m.ConversationID, &m.ChannelID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 		&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
-		&m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
+		&m.Forwarded, &m.EditedAt, &m.Deleted, &m.ReadByUserIDs, &m.CreatedAt,
 	)
 	if err != nil {
 		return message{}, err
@@ -1281,7 +1481,7 @@ func (s *server) loadMessage(ctx context.Context, messageID, viewerID int64) (me
 		m.Text = ""
 	}
 	items := []message{m}
-	if err := s.attachMessageMedia(ctx, items); err != nil {
+	if err := s.attachMessageMedia(ctx, items, viewerID); err != nil {
 		return message{}, err
 	}
 	if err := s.attachMessageReactions(ctx, viewerID, items); err != nil {
@@ -1310,8 +1510,24 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify message encryption status")
+		return
+	}
+	defer tx.Rollback(r.Context())
 	var conversationID int64
-	if err := s.db.QueryRow(r.Context(), `
+	if err := tx.QueryRow(r.Context(), `
+		SELECT conversation_id FROM messages
+		WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
+	`, messageID, claims.UserID).Scan(&conversationID); err != nil {
+		httpx.Error(w, http.StatusNotFound, "message not found or cannot be edited")
+		return
+	}
+	if !s.guardPlaintextDuringMLS(w, r, tx, conversationID) {
+		return
+	}
+	if err := tx.QueryRow(r.Context(), `
 		UPDATE messages m
 		SET text=$1,edited_at=NOW()
 		WHERE m.id=$2 AND m.user_id=$3 AND m.deleted_at IS NULL
@@ -1324,7 +1540,14 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be edited")
 		return
 	}
-	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_translations WHERE message_id=$1`, messageID)
+	if _, err := tx.Exec(r.Context(), `DELETE FROM message_translations WHERE message_id=$1`, messageID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot clear message translation")
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot save updated message")
+		return
+	}
 
 	m, err := s.loadMessage(r.Context(), messageID, claims.UserID)
 	if err != nil {
@@ -1358,6 +1581,7 @@ func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "message not found or cannot be recalled")
 		return
 	}
+	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_pins WHERE message_id=$1`, messageID)
 	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_attachments WHERE message_id=$1`, messageID)
 	_, _ = s.db.Exec(r.Context(), `DELETE FROM message_translations WHERE message_id=$1`, messageID)
 
@@ -1368,6 +1592,9 @@ func (s *server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
 		Type: "message.updated", ConversationID: conversationID, Message: &m,
+	})
+	s.publishConversationEvent(r.Context(), s.memberIDs(r.Context(), conversationID), realtimeEvent{
+		Type: "pins.updated", ConversationID: conversationID,
 	})
 	httpx.JSON(w, http.StatusOK, m)
 }
@@ -1387,7 +1614,8 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	allowed := map[string]bool{
-		"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "🙏": true,
+		"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "😡": true,
+		"🙏": true, // Legacy reaction remains removable on existing messages.
 	}
 	if !allowed[body.Emoji] {
 		httpx.Error(w, http.StatusBadRequest, "unsupported reaction")
@@ -1408,30 +1636,52 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var exists bool
-	_ = s.db.QueryRow(r.Context(), `
-		SELECT EXISTS(
-			SELECT 1 FROM message_reactions
-			WHERE message_id=$1 AND user_id=$2 AND emoji=$3
-		)`, messageID, claims.UserID, body.Emoji).Scan(&exists)
+	if !s.allowDirectConversation(w, r, conversationID, claims.UserID) {
+		return
+	}
 
-	if exists {
-		if _, err := s.db.Exec(r.Context(), `
-			DELETE FROM message_reactions
-			WHERE message_id=$1 AND user_id=$2 AND emoji=$3
-		`, messageID, claims.UserID, body.Emoji); err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot remove reaction")
-			return
-		}
-	} else {
-		if _, err := s.db.Exec(r.Context(), `
-			INSERT INTO message_reactions(message_id,user_id,emoji)
-			VALUES($1,$2,$3)
-			ON CONFLICT DO NOTHING
+	// Serialize changes to the same message, including requests from multiple tabs.
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot update reaction")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var lockedID int64
+	if err := tx.QueryRow(r.Context(), `
+		SELECT id FROM messages WHERE id=$1 AND deleted_at IS NULL FOR UPDATE
+	`, messageID).Scan(&lockedID); err != nil {
+		httpx.Error(w, http.StatusNotFound, "message not found")
+		return
+	}
+	var previous string
+	err = tx.QueryRow(r.Context(), `
+		SELECT emoji FROM message_reactions
+		WHERE message_id=$1 AND user_id=$2 ORDER BY created_at DESC, emoji DESC LIMIT 1
+	`, messageID, claims.UserID).Scan(&previous)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, http.StatusInternalServerError, "cannot read reaction")
+		return
+	}
+	// Also works before the one-per-user index is installed, during a rolling deploy.
+	if _, err := tx.Exec(r.Context(), `
+		DELETE FROM message_reactions WHERE message_id=$1 AND user_id=$2
+	`, messageID, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update reaction")
+		return
+	}
+	if previous != body.Emoji {
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO message_reactions(message_id,user_id,emoji) VALUES($1,$2,$3)
 		`, messageID, claims.UserID, body.Emoji); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot save reaction")
 			return
 		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot save reaction")
+		return
 	}
 
 	m, err := s.loadMessage(r.Context(), messageID, claims.UserID)
@@ -1445,7 +1695,7 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, m)
 }
 
-func (s *server) attachMessageMedia(ctx context.Context, items []message) error {
+func (s *server) attachMessageMedia(ctx context.Context, items []message, viewerID int64) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -1481,7 +1731,7 @@ func (s *server) attachMessageMedia(ctx context.Context, items []message) error 
 		); err != nil {
 			return err
 		}
-		mediax.SignAttachment(s.storage, &attachment)
+		attachment.URL = s.mediaTicket(attachment.ID, viewerID)
 		if idx, ok := indexByID[messageID]; ok {
 			items[idx].Attachments = append(items[idx].Attachments, attachment)
 		}
@@ -1649,6 +1899,9 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 					continue
 				} // Also cover in-flight messages after a block.
 			}
+			if event.Type == "pins.updated" && !s.isMember(r.Context(), event.ConversationID, claims.UserID) {
+				continue
+			}
 			// Reload in the recipient's privacy scope. C replying to B
 			// must not expose B's quoted text or reaction identities to A.
 			payload := item.Payload
@@ -1797,8 +2050,28 @@ func (s *server) publishConversationEvent(ctx context.Context, userIDs []int64, 
 		}
 		userIDs = visible
 	}
-	data, _ := json.Marshal(event)
 	for _, userID := range userIDs {
+		outgoing := event
+		if event.Type == "message.updated" && event.Message != nil {
+			// "mine" and blocked-user counts depend on the recipient.
+			personalized, err := s.loadMessage(ctx, event.Message.ID, userID)
+			if err != nil {
+				log.Printf("cannot personalize message update for recipient: %v", err)
+				continue
+			}
+			outgoing.Message = &personalized
+		}
+		if outgoing.Message != nil {
+			// Each recipient receives a distinct, revocable media capability.
+			copyMessage := *outgoing.Message
+			copyMessage.Attachments = append([]mediax.Attachment(nil), outgoing.Message.Attachments...)
+			s.signChatAttachments(&copyMessage, userID)
+			outgoing.Message = &copyMessage
+		}
+		data, err := json.Marshal(outgoing)
+		if err != nil {
+			continue
+		}
 		_ = s.redis.Publish(ctx, userChannel(userID), data).Err()
 	}
 }

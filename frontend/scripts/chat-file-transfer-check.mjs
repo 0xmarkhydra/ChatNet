@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chatFilesFromClipboard, transferHasFiles } from '../src/features/chat/chatFileTransfer.ts'
+import { chatFilesFromClipboard, transferHasFiles } from '../src/features/chat/utils/chatFileTransfer.ts'
 
 const screenshot = new File([new Uint8Array([1, 2, 3])], '', { type: 'image/png' })
 const wordDoc = new File([new Uint8Array([4])], 'report.docx', {

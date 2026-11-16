@@ -1,0 +1,56 @@
+/* Three participant portraits make an image-less group recognizable at any chat size. */
+.conversation-avatar-cluster.conversation-avatar-cluster {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.conversation-avatar-cluster .conversation-avatar-member.smart-avatar {
+  position: absolute;
+  box-sizing: border-box;
+  width: 65%;
+  height: 65%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  font-size: 12px;
+  box-shadow: 0 1px 4px rgba(26, 49, 92, .16);
+}
+
+.conversation-avatar-cluster .conversation-avatar-member:nth-child(1) {
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.conversation-avatar-cluster .conversation-avatar-member:nth-child(2) {
+  top: 0;
+  right: 0;
+  z-index: 2;
+}
+
+.conversation-avatar-cluster .conversation-avatar-member:nth-child(3) {
+  bottom: 0;
+  left: 18%;
+  z-index: 3;
+}
+
+.conversation-avatar-cluster.members-2 .conversation-avatar-member {
+  width: 76%;
+  height: 76%;
+}
+
+.conversation-avatar-cluster.members-2 .conversation-avatar-member:nth-child(2) {
+  top: auto;
+  bottom: 0;
+}
+
+.conversation-avatar-cluster.members-1 .conversation-avatar-member {
+  width: 100%;
+  height: 100%;
+}

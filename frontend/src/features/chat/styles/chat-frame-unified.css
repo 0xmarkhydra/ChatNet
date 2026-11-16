@@ -1,0 +1,152 @@
+/* Shared frame for direct and group/channel conversations.
+   Channel-specific content may differ, but the chat surface and its chrome
+   always occupy the same sized panel at a given viewport. */
+.modern-shell.app-layout .social-chat-layout > .conversation-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.modern-shell.app-layout .social-chat-layout > .conversation-panel > .messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+.modern-shell.app-layout .social-chat-layout > .conversation-panel > .media-composer {
+  flex: 0 0 auto;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* The online badge is anchored to the avatar, not cropped by the portrait.
+   Leave space for the two-pixel white rim on both desktop and mobile. */
+.modern-shell.app-layout .social-chat-layout .smart-avatar.is-online,
+.modern-shell.app-layout .desktop-conversation-rail-entry .desktop-conversation-rail-avatar.is-online,
+.modern-shell.app-layout .conversation-avatar-rail-photo.is-online,
+.modern-shell.app-layout .chat-head .room-avatar.is-online {
+  overflow: visible;
+}
+.modern-shell.app-layout .social-chat-layout .smart-avatar.is-online > .presence-dot,
+.modern-shell.app-layout .chat-head .room-avatar.is-online > .presence-dot {
+  display: block;
+  position: absolute;
+  z-index: 9;
+  right: -3px;
+  bottom: -2px;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #16bd70;
+  box-shadow: 0 0 0 1px rgba(14, 137, 82, .18);
+}
+.modern-shell.app-layout .conversation-avatar-rail-photo.is-online > .presence-dot {
+  width: 12px;
+  height: 12px;
+}
+.group-channel-sidebar-avatar-back {
+  appearance: none;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+.group-channel-sidebar-avatar-back:hover {
+  outline: 2px solid #cadcff;
+  outline-offset: 2px;
+}
+.group-channel-sidebar-avatar-back:focus-visible {
+  outline: 2px solid #5483e6;
+  outline-offset: 3px;
+}
+
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout > .conversation-panel > .chat-head,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .conversation-panel.group-chat-panel > .chat-head {
+    box-sizing: border-box;
+    flex: 0 0 79px;
+    height: 79px;
+    min-height: 79px;
+    max-height: 79px;
+    padding: 11px 14px;
+    border-bottom: 1px solid #e8ecf5;
+    background: #fff;
+  }
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout > .conversation-panel > .chat-head,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .conversation-panel.group-chat-panel > .chat-head {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    flex: 0 0 58px;
+    width: 100%;
+    height: 58px;
+    min-height: 58px;
+    max-height: 58px;
+    padding: 6px 8px;
+    gap: 5px;
+    border-bottom: 1px solid #e8ecf5;
+    background: #fff;
+  }
+  .modern-shell.app-layout .social-chat-layout > .conversation-panel > .chat-head > .room-info {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+}
+/* Keep the compact 320px search input inside its flex column. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-search-line {
+    box-sizing: border-box;
+    width: calc(100% - 12px);
+    max-width: calc(100% - 12px);
+    min-width: 0;
+  }
+}
+/* The options menu is reached through the existing chat header ellipsis. */
+.conversation-info-group-menu-trigger[aria-expanded="true"] {
+  background: #e9f1ff !important;
+  color: #2d65ce !important;
+}
+.conversation-info-group-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 7px;
+  border-radius: 12px;
+  background: #f7f9fd;
+}
+.conversation-info-group-menu > button,
+.conversation-info-group-menu > .conversation-options-danger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 9px;
+  background: #fff;
+  color: #344b6b;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.conversation-info-group-menu > button:hover {
+  color: #2867d4;
+  background: #edf4ff;
+}
+.conversation-info-group-menu > button:disabled { opacity: .48; cursor: not-allowed; }
+.conversation-info-group-menu > .conversation-options-danger { color: #b54b5c; }
+.conversation-info-group-menu .group-channel-create-form { min-width: 0; max-width: 100%; }

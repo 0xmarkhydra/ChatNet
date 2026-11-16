@@ -28,6 +28,17 @@ func TestSameMessageRequest(t *testing.T) {
 	if !sameMessageRequest(base, 3, "hello", &reply, inputs) {
 		t.Fatal("same request must be accepted")
 	}
+	if !sameMessageRequestForwarded(base, 3, "hello", &reply, inputs, false, 0) {
+		t.Fatal("ordinary message must retain its non-forwarded identity")
+	}
+	if sameMessageRequestForwarded(base, 3, "hello", &reply, inputs, true, 0) {
+		t.Fatal("forwarded requests cannot reuse client IDs of ordinary messages")
+	}
+	base.Forwarded = true
+	if !sameMessageRequestForwarded(base, 3, "hello", &reply, inputs, true, 0) {
+		t.Fatal("forwarded request should match its own message")
+	}
+	base.Forwarded = false
 	for _, tc := range []struct {
 		name           string
 		conversationID int64
@@ -58,6 +69,12 @@ func TestMessageRequestFingerprint(t *testing.T) {
 	baseline := messageRequestFingerprint(3, "hello", &reply, refs)
 	if baseline != messageRequestFingerprint(3, "hello", &reply, refs) || len(baseline) != 64 {
 		t.Fatal("fingerprint must be deterministic and SHA-256 hex")
+	}
+	if regular := messageRequestFingerprintForwarded(3, "hello", &reply, refs, false, 0); regular != baseline {
+		t.Fatal("ordinary message fingerprints must remain backward compatible")
+	}
+	if forwarded := messageRequestFingerprintForwarded(3, "hello", &reply, refs, true, 0); forwarded == baseline || forwarded != messageRequestFingerprintForwarded(3, "hello", &reply, refs, true, 0) {
+		t.Fatal("forwarded fingerprints must differ from regular messages and remain deterministic")
 	}
 	for _, tc := range []struct {
 		name         string

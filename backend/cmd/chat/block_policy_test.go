@@ -108,7 +108,7 @@ func TestBlockedGroupVisibilityThreeAccountsIntegration(t *testing.T) {
 			}
 		}
 	}
-	// A and B start as friends: blocking removes the friendship, but unblock must not restore it.
+	// A and B remain in one another's accepted friend lists, even while blocked.
 	if _, err := db.Exec(ctx, `INSERT INTO friend_connections(user_low,user_high,requested_by,status)
 		VALUES($1,$2,$3,'accepted')`, min(ids[0], ids[1]), max(ids[0], ids[1]), ids[0]); err != nil {
 		t.Fatal(err)
@@ -162,8 +162,8 @@ func TestBlockedGroupVisibilityThreeAccountsIntegration(t *testing.T) {
 	read(0, []string{"A says hello", "C says hello", "B-secret"}, nil)
 	var stillFriends bool
 	if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM friend_connections
-		WHERE user_low=$1 AND user_high=$2)`, min(ids[0], ids[1]), max(ids[0], ids[1])).Scan(&stillFriends); err != nil || stillFriends {
-		t.Fatalf("unblock must not restore friendship: %v, %v", stillFriends, err)
+		WHERE user_low=$1 AND user_high=$2 AND status='accepted')`, min(ids[0], ids[1]), max(ids[0], ids[1])).Scan(&stillFriends); err != nil || !stillFriends {
+		t.Fatalf("block/unblock must preserve accepted friendship: %v, %v", stillFriends, err)
 	}
 	// B can now block A without sending or accepting a new friend request.
 	request(1, "POST", "/api/users/id/block", s.blockUser, ids[0], "", 200)

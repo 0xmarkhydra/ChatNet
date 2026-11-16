@@ -43,7 +43,7 @@
 - `desktop/src/ipc-policy.cjs` + `desktop/test/security.test.cjs`: validate source/link/path, negative tests.
 - `desktop/package.json` + lockfile: `electron`, `electron-builder`, unsigned internal build only; no publishing.
 - `frontend/src/platform/desktop.ts` + `frontend/src/main.tsx`: Desktop adapter, stop PWAUpdate for desktop mode.
-- `frontend/src/features/notifications/onesignal.ts`: Desktop mode không tải OneSignal Web SDK; native notifications còn pending.
+- `frontend/src/features/notifications/lib/onesignal.ts`: Desktop mode không tải OneSignal Web SDK; native notifications còn pending.
 - `frontend/package.json`: `build:desktop` dựa chung React.
 - `frontend/scripts/desktop-shell-smoke.mjs`: GUI packaged smoke.
 - `backend/cmd/call/translation.go` + `translation_test.go`: origin `app://soco` cho translation WSS, vẫn bắt buộc ticket một lần + consent theo code hiện có.

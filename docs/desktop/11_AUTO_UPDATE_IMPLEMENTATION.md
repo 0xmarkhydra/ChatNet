@@ -1,6 +1,6 @@
 # SocCO Desktop — signed updates implementation & release runbook
 
-Status (2026-11-06): **implemented and unit-tested on `feat/desktop-auto-update`, NOT released**. This document supplements the historical B05 report. Do not interpret passing unit tests as signed install/update acceptance.
+Status (2026-11-16): **implemented on `feat/desktop-auto-update`, NOT released**. This document supplements the historical B05 report. Do not interpret passing unit tests as signed install/update acceptance.
 
 ## Runtime behavior
 
@@ -9,7 +9,7 @@ Status (2026-11-06): **implemented and unit-tested on `feat/desktop-auto-update`
 - `autoDownload=false`, `autoInstallOnAppQuit=false`, `allowDowngrade=false`. Errors retain the running app and offer retry; no update can replace a live renderer remotely.
 - Updates are controlled exclusively by Electron Main through four frame-validated IPC handlers. Renderer never selects a URL, writes update files or gets privileged filesystem APIs.
 - Installation is blocked in the UI while there is an active/ringing call, a call transition, or persisted unconfirmed/queued messages. The native confirmation instructs users to finish transfers and unsaved work. Account data, drafts and outbox live in the existing user data directory and are not intentionally cleared on update. **Unsent attachment/reply drafts and N→N+1 persistence remain unverified release gates.**
-- `0.2.0` introduces the updater. **Existing `0.1.x` Electron builds cannot bootstrap their own updater**: offer those users a one-time signed installer upgrade (in-place, preserving user data) and validate the actual update from 0.2.0 to 0.2.1 on Windows/macOS before broad release.
+- `0.4.0` introduces the updater above previously distributed `0.3.1` installers. **Existing `0.3.x` Electron builds (and all earlier builds without an updater) cannot bootstrap their own updater**: offer those users a one-time signed `0.4.0` installer upgrade (in-place, preserving user data) and validate the actual update from 0.4.0 to 0.4.1 on Windows/macOS before broad release.
 
 ## Release prerequisites
 
@@ -37,7 +37,7 @@ Release directory should include platform-specific signed installer files, Windo
 
 ## Acceptance gates (do not release until passed)
 
-- Windows x64: signed 0.2.0 clean/in-place install, 0.2.0→0.2.1 update, offline/retry, invalid-signature rejection, restart, and preserves session + local drafts/outbox.
+- Windows x64: signed 0.4.0 clean/in-place install, 0.4.0→0.4.1 update, offline/retry, invalid-signature rejection, restart, and preserves session + local drafts/outbox.
 - macOS arm64 & Intel: signed/notarized/stapled install, ZIP update, Gatekeeper, no untrusted downgrade, offline/retry and preserved local data.
 - While a call is active/ringing or a queued/unconfirmed message exists, installation must not proceed. Ensure restart does not lose media, unsent attachments or conversation state.
 - Revoke/login, startup without credentials/feed, tampered update manifest and update server outage cannot bypass authentication or prevent the old app from running.

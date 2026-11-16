@@ -1,6 +1,6 @@
 # SocCO Desktop — native shell and shared React integration
 
-Desktop core originated on `feat/chatnet-desktop-electron`. Auto-update development is on `feat/desktop-auto-update` (version 0.2.0). **Not approved for beta or production release.**
+Desktop core originated on `feat/chatnet-desktop-electron`. Auto-update development continues on `feat/desktop-auto-update` (version 0.4.0). **Not approved for beta or production release.**
 Read `docs/desktop/07_BATCH_02_STATUS.md` through `10_BATCH_05_STATUS.md` for actual tests, artifacts and remaining acceptance gates. B03/B04 implementation was pushed as `2330cc3` / `76b56f1`; the B05 report accompanies its packaging commit.
 
 ## Development
@@ -69,7 +69,7 @@ The installer icon derives from `frontend/public/soco-mark.svg`. To regenerate a
 
 ## Remaining release blockers
 
-GitHub Actions jobs are blocked by an account billing lock (details and job IDs in B05 report); local tests are not CI approval. Signing/notarization credentials and an approved update channel are not available. A runtime Electron updater (opt-in install, background version checks, authenticated IPC and user-visible progress) is now implemented on `feat/desktop-auto-update`, but a **signed, notarized N→N+1 update has not been verified or published**. Existing 0.1.x desktop installs without an updater need a one-time manual installer upgrade.
+GitHub Actions jobs are blocked by an account billing lock (details and job IDs in B05 report); local tests are not CI approval. Signing/notarization credentials and an approved update channel are not available. A runtime Electron updater (opt-in install, background version checks, authenticated IPC and user-visible progress) is now implemented on `feat/desktop-auto-update`, but a **signed, notarized N→N+1 update has not been verified or published**. Existing 0.3.x desktop installs (and earlier builds without an updater) need a one-time in-place installer upgrade.
 
 Real packaged login/revoke, Desktop↔Web parity, two-device LiveKit/Gemini consent/media, Windows/Intel UAT, signed notifications, signed update/rollback and full security review remain open. B01 queue migration, unsent attachment/reply drafts, private disk cache purge, broad media/connect CSP and SSE query-token review are explicit outstanding engineering work. Marketplace/payment rules are unchanged.
 

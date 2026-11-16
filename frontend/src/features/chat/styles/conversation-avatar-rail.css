@@ -1,0 +1,590 @@
+/* Mobile PWA: compact dock for ALL conversations, not group channels. */
+.conversation-avatar-rail { display: none; }
+
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible {
+    position: relative;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 42;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 56px;
+    height: 100%;
+    min-height: 0;
+    padding: 10px 4px max(8px, env(safe-area-inset-bottom));
+    border-right: 1px solid #e4eaf5;
+    background: #f7f9fe;
+    box-shadow: 1px 0 8px rgba(37, 74, 140, .025);
+  }
+  /* Chat list and group channel picker both sit beside the same fixed dock. */
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-sidebar {
+    width: calc(100% - 56px);
+    max-width: calc(100% - 56px);
+    margin-left: 56px;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible > .group-channel-sidebar,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-channel-picker-open > .group-channel-sidebar {
+    inset: 0 auto 0 56px;
+    width: calc(100% - 56px);
+    max-width: calc(100% - 56px);
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-channel-picker-open > .group-channel-sidebar {
+    transform: translate3d(0, 0, 0);
+  }
+  .conversation-avatar-rail-home,
+  .conversation-avatar-rail-create,
+  .conversation-avatar-rail-more {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #dfe8fa;
+    border-radius: 15px;
+    background: #fff;
+    color: #3f70d8;
+    cursor: pointer;
+  }
+  .conversation-avatar-rail-create {
+    background: #eef3ff;
+    border-color: #dce7ff;
+  }
+  .conversation-avatar-rail-more {
+    width: 37px;
+    height: 37px;
+    border-radius: 13px;
+  }
+  .conversation-avatar-rail-divider {
+    flex: 0 0 1px;
+    width: 28px;
+    background: #e2e9f6;
+  }
+  .conversation-avatar-rail-scroll {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    min-height: 0;
+    padding: 3px 0 6px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+  .conversation-avatar-rail-scroll::-webkit-scrollbar { display: none; }
+  .conversation-avatar-rail-item {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: 0 0 46px;
+    box-sizing: border-box;
+    width: 46px;
+    height: 46px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .conversation-avatar-rail-item.selected {
+    background: #eaf0ff;
+  }
+  .conversation-avatar-rail-indicator {
+    position: absolute;
+    left: -4px;
+    top: 14px;
+    width: 3px;
+    height: 18px;
+    border-radius: 0 3px 3px 0;
+    background: transparent;
+  }
+  .conversation-avatar-rail-item.selected .conversation-avatar-rail-indicator {
+    background: #4276e6;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-photo {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: none;
+    box-sizing: border-box;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    overflow: visible;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: #e7eeff;
+    box-shadow: 0 1px 5px rgba(31, 66, 127, .09);
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-item.selected .conversation-avatar-rail-photo {
+    border-color: #4278f0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-photo > .avatar-photo {
+    border-radius: inherit;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-photo .avatar-initials {
+    font-size: 12px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-photo .presence-dot {
+    width: 9px;
+    height: 9px;
+    border: 2px solid #f7f9fe;
+  }
+  .conversation-avatar-rail-count {
+    position: absolute;
+    z-index: 2;
+    right: -2px;
+    bottom: 0;
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 3px;
+    border: 1.5px solid #f7f9fe;
+    border-radius: 10px;
+    background: #3479eb;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 750;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .conversation-avatar-rail :is(button:focus-visible) {
+    outline: 2px solid #4278e9;
+    outline-offset: 1px;
+  }
+  /* Feedback may change color, never scale or reposition an avatar. */
+  .conversation-avatar-rail-item:active {
+    background: #e9f0ff;
+  }
+  .conversation-avatar-rail-more:disabled { opacity: .55; }
+  .conversation-avatar-rail .rail-spinning { animation: conversation-rail-spin 1s linear infinite; }
+  @keyframes conversation-rail-spin { to { transform: rotate(360deg); } }
+}
+@media (max-width: 350px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail {
+    width: 52px;
+    padding-inline: 2px;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-sidebar {
+    width: calc(100% - 52px);
+    max-width: calc(100% - 52px);
+    margin-left: 52px;
+  }
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible > .group-channel-sidebar,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-channel-picker-open > .group-channel-sidebar {
+    left: 52px;
+    width: calc(100% - 52px);
+    max-width: calc(100% - 52px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conversation-avatar-rail .rail-spinning { animation: none; }
+}
+
+/* No separate conversation-list screen on PWA. This same dock opens to show
+   names and previews; the avatar elements stay in the same column and scroll. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail {
+    z-index: 45;
+    width: 56px;
+    transition: width .3s cubic-bezier(.22,1,.36,1);
+    will-change: width;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail.is-expanded {
+    width: min(100%, 375px);
+    background: #fff;
+    box-shadow: 4px 0 25px rgba(34,55,94,.08);
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout > .conversation-sidebar.social-chat-list {
+    display: none;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.avatar-rail-creation-open > .conversation-sidebar.social-chat-list {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    z-index: 55;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    margin: 0;
+    background: #fff;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible.has-active > .conversation-panel {
+    width: calc(100% - 56px);
+    max-width: calc(100% - 56px);
+    min-width: 0;
+    flex: 1 1 auto;
+    margin-left: 56px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-heading,
+  .modern-shell.app-layout .conversation-avatar-rail-search-line {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    gap: 7px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-heading { height: 42px; }
+  .modern-shell.app-layout .conversation-avatar-rail-home { flex: 0 0 42px; }
+  .modern-shell.app-layout .conversation-avatar-rail-heading-title {
+    display: block;
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 17px;
+    font-weight: 750;
+    color: #243752;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .18s ease;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-heading-create {
+    display: none;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-heading-create {
+    display: grid;
+    flex: 0 0 35px;
+    place-items: center;
+    box-sizing: border-box;
+    width: 35px;
+    height: 35px;
+    padding: 0;
+    border: 1px solid #e4ebfa;
+    border-radius: 11px;
+    color: #3268db;
+    background: #f0f5ff;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-heading-title {
+    opacity: 1;
+    visibility: visible;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-search-line {
+    height: 32px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-search-icon {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    color: #6d84a6;
+    background: transparent;
+    cursor: pointer;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-search-line input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 0;
+    height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 10px;
+    outline: none;
+    background: #f3f6fc;
+    color: #233d5e;
+    font: inherit;
+    font-size: 13px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .18s ease;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-search-line input {
+    opacity: 1;
+    visibility: visible;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-scroll { flex: 1 1 0; }
+  .modern-shell.app-layout .conversation-avatar-rail-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 11px;
+    flex: 0 0 46px;
+    box-sizing: border-box;
+    width: calc(100% - 2px);
+    min-width: 0;
+    height: 46px;
+    min-height: 46px;
+    padding: 0 0 0 4px;
+    text-align: left;
+    overflow: hidden;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-item > .conversation-avatar-rail-photo {
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-meta {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    padding-right: 12px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .16s ease;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-meta {
+    opacity: 1;
+    visibility: visible;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-meta-top {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-meta-top strong {
+    flex: 1 1 0;
+    font-size: 13px;
+    font-weight: 750;
+    color: #243752;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-meta-top time {
+    flex: 0 0 auto;
+    font-size: 10px;
+    color: #8b9bb0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-meta small {
+    font-size: 11px;
+    color: #8292a8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-count {
+    right: 8px;
+    bottom: 1px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-empty {
+    padding: 8px;
+    font-size: 12px;
+    color: #8596ad;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-create {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+@media (max-width: 350px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail:not(.is-expanded) { width: 52px; }
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible.has-active > .conversation-panel {
+    width: calc(100% - 52px);
+    max-width: calc(100% - 52px);
+    margin-left: 52px;
+  }
+}
+/* Preserve the app header in the Chat tab so the rail always starts at the
+   same screen coordinate when entering or leaving a conversation. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout.chat-rail-screen > .chatnet-appbar {
+    display: flex;
+    box-sizing: border-box;
+    flex: 0 0 68px;
+    height: 68px;
+    min-height: 68px;
+    max-height: 68px;
+  }
+  .modern-shell.app-layout.chat-rail-screen.conversation-open > .chatnet-appbar {
+    display: flex;
+    box-sizing: border-box;
+    flex: 0 0 68px;
+    height: 68px;
+    min-height: 68px;
+    max-height: 68px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail,
+  .modern-shell.app-layout .conversation-avatar-rail-meta,
+  .modern-shell.app-layout .conversation-avatar-rail-heading-title { transition: none; }
+}
+
+/* Mobile footer: category and new chat always share the bottom action area. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .conversation-avatar-rail-heading {
+    justify-content: flex-start;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-search-area {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-search-field {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    min-width: 0;
+    gap: 7px;
+    box-sizing: border-box;
+    height: 32px;
+    border-radius: 10px;
+    padding: 0 9px;
+    background: #f3f6fc;
+    color: #7287a8;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-search-field > svg {
+    flex: 0 0 18px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-search-field:focus-within {
+    outline: 1px solid #bad0f4;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-search-field input {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    padding: 0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-footer {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    gap: 6px;
+    box-sizing: border-box;
+    border-top: 1px solid #e5ebf6;
+    padding-top: 8px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-footer-category {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: center;
+    width: 42px;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-footer-category .conversation-categories {
+    width: 100%;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: transparent;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-footer-category .category-toolbar {
+    justify-content: center;
+    width: 100%;
+    min-height: 0;
+    gap: 4px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-footer-category .category-filter-trigger {
+    display: flex;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 40px;
+    max-width: 100%;
+    min-width: 0;
+    height: 40px;
+    min-height: 40px;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+    border-radius: 13px;
+    color: #2c6bd0;
+    background: #eaf2ff;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-footer-category .category-filter-trigger > span,
+  .modern-shell.app-layout .conversation-avatar-rail-footer-category .category-filter-trigger > svg:last-child,
+  .modern-shell.app-layout .conversation-avatar-rail-footer-category .category-filter-mobile-icon,
+  .modern-shell.app-layout .conversation-avatar-rail-footer-category .category-manage-trigger,
+  .modern-shell.app-layout .conversation-avatar-rail-footer-category .category-clear {
+    display: none;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-create,
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-create {
+    display: grid;
+    flex: 0 0 40px;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border-radius: 13px;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-footer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 8px 3px 0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-footer-category {
+    flex: 1 1 0;
+    justify-content: flex-start;
+    width: auto;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-footer-category .category-toolbar {
+    justify-content: flex-start;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-footer-category .category-filter-trigger {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 0 9px;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-footer-category .category-filter-trigger > span,
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-footer-category .category-filter-trigger > svg:last-child,
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-footer-category .category-manage-trigger {
+    display: inline-flex;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-footer-category .category-manage-trigger {
+    flex: 0 0 32px;
+    min-width: 0;
+    width: 32px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    margin: 0;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-footer-category .category-clear {
+    display: inline-flex;
+    flex: 0 0 25px;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+  }
+}

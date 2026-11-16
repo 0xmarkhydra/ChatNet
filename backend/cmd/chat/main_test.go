@@ -187,3 +187,36 @@ func TestConversationPaginationRejectsInvalidParameters(t *testing.T) {
 		}
 	}
 }
+
+func TestPresignMediaMetadataBody(t *testing.T) {
+	const limit = 8 << 10
+	const valid = `{"scope":"chat","name":"photo.jpg","sizeBytes":1,"contentType":"image/jpeg"}`
+	const secret = "test"
+	token, err := authx.Sign(secret, 1, "test", "Test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := authx.Middleware(secret, http.HandlerFunc((&server{}).presignMedia))
+
+	for _, tc := range []struct {
+		name       string
+		body       string
+		wantStatus int
+	}{
+		{"valid", valid, http.StatusServiceUnavailable},
+		{"at limit", valid + strings.Repeat(" ", limit-len(valid)), http.StatusServiceUnavailable},
+		{"over limit", valid + strings.Repeat(" ", limit-len(valid)+1), http.StatusRequestEntityTooLarge},
+		{"malformed", "{", http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/api/media/presign", strings.NewReader(tc.body))
+			request.ContentLength = -1
+			request.Header.Set("Authorization", "Bearer "+token)
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != tc.wantStatus {
+				t.Fatalf("got %d, want %d: %s", response.Code, tc.wantStatus, response.Body.String())
+			}
+		})
+	}
+}

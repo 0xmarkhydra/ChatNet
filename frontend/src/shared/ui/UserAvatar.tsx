@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useScopedState } from '../hooks/useScopedState'
 import { API } from '../lib/config'
 
 function avatarInitials(name: string) {
@@ -29,29 +29,28 @@ export default function UserAvatar({
   className = 'avatar',
   online = false,
   group = false,
+  imageUrl: suppliedImageUrl,
 }: {
   name: string
   username?: string
   className?: string
   online?: boolean
   group?: boolean
+  imageUrl?: string
 }) {
   const version = avatarRefreshVersions.get(username)
-  const imageUrl = group ? '' : profileAssetUrl(username, 'avatar', version)
-  const [imageFailed, setImageFailed] = useState(false)
-
-  useEffect(() => {
-    setImageFailed(false)
-  }, [imageUrl])
+  const imageUrl = group ? (suppliedImageUrl || '') : profileAssetUrl(username, 'avatar', version)
+  const [imageFailed, setImageFailed] = useScopedState(imageUrl, false)
 
   return (
     <div
-      className={`${className} smart-avatar avatar-tone-${avatarTone(name)} ${group ? 'group' : ''}`}
+      className={`${className} smart-avatar avatar-tone-${avatarTone(name)} ${group ? 'group' : ''} ${online ? 'is-online' : ''}`}
+      role="img"
       aria-label={name}
       title={name}
     >
-      <span className="avatar-initials">{group ? '👥' : avatarInitials(name)}</span>
-      {!group && !imageFailed && (
+      <span className="avatar-initials" aria-hidden="true">{group ? '👥' : avatarInitials(name)}</span>
+      {imageUrl && !imageFailed && (
         <img
           className="avatar-photo"
           src={imageUrl}
@@ -61,7 +60,7 @@ export default function UserAvatar({
         />
       )}
       <span className="avatar-shine" aria-hidden="true" />
-      {online && <span className="presence-dot" />}
+      {online && <span className="presence-dot" aria-hidden="true" />}
     </div>
   )
 }

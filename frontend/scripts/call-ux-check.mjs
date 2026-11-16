@@ -3,8 +3,16 @@ import { readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 
 const read = (file) => readFileSync(new URL(file, import.meta.url), 'utf8')
-const ui = read('../src/features/calls/CallManager.tsx')
-const css = read('../src/features/calls/call.css')
+const ui = [
+  read('../src/features/calls/components/CallManager.tsx'),
+  read('../src/features/calls/components/SecureCallRoom.tsx'),
+  read('../src/features/calls/hooks/useCallRemoteConsent.ts'),
+  read('../src/features/calls/components/CallRoomPanels.tsx'),
+  read('../src/features/calls/components/CallRoomNotices.tsx'),
+  read('../src/features/calls/components/CallRoomControls.tsx'),
+  read('../src/features/calls/components/CallRoomStage.tsx'),
+].join('\n')
+const css = read('../src/features/calls/styles/call.css')
 const required = [
   'call-live-panel', 'call-sheet-backdrop', 'call-translation-consent-prompt',
   'call-permission-prompt', 'call-primary-controls', 'call-more-popover',
@@ -18,6 +26,10 @@ assert.ok(ui.includes('ParticipantConnected, onJoined'), 'translation request mu
 assert.ok(ui.includes('ParticipantDisconnected, onLeft'), 'consent must be cleared when member exits')
 assert.ok(!ui.includes('type="checkbox"'), 'no consent checkboxes in call UI')
 assert.ok(css.includes('prefers-reduced-motion'), 'reduced motion support missing')
+assert.ok(ui.includes("source.addEventListener('update', onCallEvent)"), 'incoming calls must listen for the named update SSE event')
+assert.ok(ui.includes('source.onopen = () => void refresh()'), 'reconnecting SSE must recover missed calls')
+assert.ok(ui.includes('await joinExistingCall(existing)'), 'call button must join an existing conversation call')
+assert.ok(ui.includes("document.visibilityState === 'visible'"), 'incoming calls must recover after missed SSE events')
 
 const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">
   <div class="secure-call-layer"><div class="secure-call-stage">
@@ -49,7 +61,7 @@ try {
     assert.ok(m.scroll <= width + 1, `horizontal overflow ${width}: ${m.scroll}`)
     assert.ok(m.header.height > 40 && m.controls.height >= 60 && m.stage.height > 120, 'invalid stage geometry ' + width)
     assert.ok(m.panel.width > 0 && m.panel.right <= width + 1, 'translation panel overflows ' + width)
-    assert.ok(m.controls.bottom <= height + 1, 'control dock overflows viewport ' + width)
+    assert.ok(m.controls.bottom <= height + 1, 'control dock overflows viewport ' + width + ': ' + JSON.stringify(m))
     assert.ok(m.buttons.every(v=>v >= 40), 'control too narrow ' + width)
     await page.close()
     console.log(`PASS ${width}x${height}: stage, sheet, controls no horizontal overflow`)

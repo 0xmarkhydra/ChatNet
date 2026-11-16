@@ -1,0 +1,372 @@
+/* The channel name is read-only; only the chevron is an interactive target. */
+.group-room-title > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-channel-picker {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.group-channel-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  min-width: 0;
+  color: #61758f;
+}
+.group-channel-current-hash {
+  flex: 0 0 auto;
+  color: #8192aa;
+}
+.group-channel-current-name {
+  display: block;
+  min-width: 0;
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 550;
+  cursor: default;
+}
+.modern-shell .group-chat-panel .group-channel-selector {
+  display: grid;
+  flex: 0 0 27px;
+  place-items: center;
+  width: 27px;
+  min-width: 27px;
+  height: 27px;
+  min-height: 27px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: none;
+  color: #617a9c;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.group-channel-selector svg {
+  width: 15px;
+  height: 15px;
+  transition: transform .16s ease;
+}
+.modern-shell.app-layout .group-chat-panel .chat-head .group-channel-picker .group-channel-selector:hover,
+.modern-shell.app-layout .group-chat-panel .chat-head .group-channel-picker .group-channel-selector[aria-expanded="true"] {
+  background-color: #eef3fb;
+  color: #315db2;
+}
+.modern-shell .group-chat-panel .group-channel-selector[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.modern-shell .group-chat-panel .group-channel-selector:focus-visible {
+  outline: 2px solid #83a9eb;
+  outline-offset: 2px;
+}
+.group-channel-dropdown {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 0;
+  z-index: 200;
+  width: 310px;
+  max-width: calc(100vw - 28px);
+  padding: 9px;
+  border: 1px solid #e7edf6;
+  border-radius: 15px;
+  box-shadow: 0 14px 40px rgba(30, 53, 91, .17);
+  background: #fff;
+  color: #243954;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.group-channel-dropdown-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 10px 11px;
+}
+.group-channel-dropdown-title {
+  color: #203553;
+  font-size: 13px;
+  font-weight: 750;
+}
+.group-channel-dropdown-heading small {
+  color: #8191a8;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.group-channel-dropdown > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 10px;
+  border: 0;
+  border-radius: 9px;
+  color: #445a77;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.group-channel-dropdown > button:hover,
+.group-channel-dropdown > button.selected {
+  background: #eef4ff;
+  color: #2458a7;
+}
+.group-channel-dropdown > button span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-channel-menu-unread {
+  display:grid; place-items:center; flex-shrink:0;
+  min-width:19px; height:19px; padding:1px 4px;
+  border-radius:12px; background:#4c81ea; color:#fff;
+  font-size:10px; font-weight:800; font-variant-numeric:tabular-nums;
+}
+.group-channel-creator {
+  margin-top: 5px;
+  padding-top: 8px;
+  border-top: 1px solid #e8edf5;
+}
+.group-channel-creator button.group-channel-create-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 0;
+  border-radius: 9px;
+  background: #f1f5fc;
+  color: #2b5dbb;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.group-channel-creator button.group-channel-create-trigger:hover {
+  background: #e5edfc;
+}
+.group-channel-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 10px 10px;
+  border: 1px solid #e9eef7;
+  border-radius: 12px;
+  background: #f9fbff;
+  min-width: 0;
+}
+.group-channel-create-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.group-channel-create-intro {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  gap: 9px;
+  min-width: 0;
+}
+.group-channel-create-symbol {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  color: #3167cb;
+  background: #e7efff;
+}
+.group-channel-create-intro > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.group-channel-create-intro strong {
+  color: #203856;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+.group-channel-create-intro small {
+  color: #7b8ca5;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.group-channel-create-heading button.group-channel-create-close {
+  display: grid;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #8090a6;
+  cursor: pointer;
+}
+.group-channel-create-heading button.group-channel-create-close:hover {
+  background: #e9eef7;
+  color: #304766;
+}
+.group-channel-create-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.group-channel-create-field > span {
+  color: #364d69;
+  font-size: 12px;
+  font-weight: 650;
+}
+.group-channel-create-field b {
+  color: #db5559;
+}
+.group-channel-create-field small {
+  font-size: 10px;
+  font-weight: 450;
+  color: #8a99ac;
+}
+.group-channel-creator .group-channel-create-field input,
+.group-channel-creator .group-channel-create-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid #dfe7f1;
+  border-radius: 9px;
+  outline: none;
+  background: #fff;
+  color: #253955;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.group-channel-creator .group-channel-create-field input::placeholder,
+.group-channel-creator .group-channel-create-field textarea::placeholder {
+  color: #a1acba;
+}
+.group-channel-creator .group-channel-create-field input:focus,
+.group-channel-creator .group-channel-create-field textarea:focus {
+  border-color: #88acf1;
+  box-shadow: 0 0 0 3px rgba(77, 131, 229, .11);
+}
+.group-channel-create-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 3px;
+}
+.group-channel-create-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 8px 13px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.group-channel-create-actions .group-channel-create-cancel {
+  border: 1px solid #dde5f0;
+  background: #fff;
+  color: #62758e;
+}
+.group-channel-create-actions .group-channel-create-cancel:hover {
+  background: #eef3f9;
+}
+.group-channel-create-actions button.group-channel-create-submit {
+  border: 1px solid #2d64c7;
+  background: #2d64c7;
+  color: #fff;
+}
+.group-channel-create-actions button.group-channel-create-submit:hover:not(:disabled) {
+  background: #2355b1;
+}
+.group-channel-create-actions button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.conversation-channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.conversation-channel-list button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #405571;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.conversation-channel-list button:hover,
+.conversation-channel-list button[aria-current="true"] {
+  background: #eff4ff;
+  color: #225fc4;
+}
+.conversation-channel-list button span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conversation-channel-list-header {
+  margin: 8px 3px 4px;
+  color: #7388a1;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .group-channel-current-name {
+    max-width: 104px;
+    font-size: 10px;
+  }
+  .modern-shell .group-chat-panel .group-channel-selector {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+    flex-basis: 28px;
+  }
+  .group-channel-dropdown {
+    left: auto;
+    right: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .group-channel-selector svg,
+  .group-channel-creator .group-channel-create-field input,
+  .group-channel-creator .group-channel-create-field textarea {
+    transition: none;
+  }
+}

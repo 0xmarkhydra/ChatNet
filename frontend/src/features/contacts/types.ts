@@ -13,5 +13,7 @@ export type FriendSearchResult = {
 export type FriendConnection = FriendSearchResult & {
   status: 'accepted' | 'pending'
   direction?: 'incoming' | 'outgoing'
+  blockedByMe?: boolean
+  blockedByOther?: boolean
   updatedAt: string
 }

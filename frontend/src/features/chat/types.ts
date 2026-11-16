@@ -1,4 +1,4 @@
-import type { MediaAttachment } from '../../shared/lib/media'
+import type { MediaAttachment } from '../../shared/utils/media'
 
 export type MessageReaction = {
   emoji: string
@@ -10,10 +10,12 @@ export type Message = {
   id: number
   clientId?: string
   conversationId: number
+  channelId?: number
   senderId: number
   sender: string
   senderDisplayName?: string
   text: string
+  forwarded?: boolean
   replyToMessageId?: number
   replyToSender?: string
   replyToDisplayName?: string
@@ -28,6 +30,8 @@ export type Message = {
   createdAt: string
 }
 
+export type PinnedMessage = { message: Message; pinnedAt: string }
+
 export type MessageDraft = { text: string; attachments: MediaAttachment[] }
 export const emptyDraft: MessageDraft = { text: '', attachments: [] }
 export const CHAT_LIST_PAGE_SIZE = 25
@@ -35,13 +39,20 @@ export const MESSAGE_PAGE_SIZE = 40
 
 export type Conversation = {
   categoryId?: number
+  pinnedAt?: string
   id: number
   type: 'direct' | 'group'
+  blockedByMe?: boolean
+  blockedByOther?: boolean
   name: string
   otherUserId?: number
   otherUsername?: string
   memberCount: number
   unreadCount: number
+  avatarUrl?: string
+  avatarMembers?: string[]
+  muted?: boolean
+
   lastMessage: string
   lastMessageAt?: string
   online: boolean
@@ -50,7 +61,7 @@ export type Conversation = {
 
 export type RealtimeEvent = {
   categoryId?: number | null
-  type: 'category.updated' | 'privacy.updated' | 'message' | 'message.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated'
+  type: 'category.updated' | 'privacy.updated' | 'message' | 'message.updated' | 'pins.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated' | 'group.activity'
   conversationId: number
   message?: Message
   conversation?: Conversation

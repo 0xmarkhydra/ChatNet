@@ -11,12 +11,13 @@ const server = await createServer({
   logLevel: 'error',
 })
 try {
-  const { default: MessageActions } = await server.ssrLoadModule('/src/features/chat/MessageActions.tsx')
-  const { resolveMessageCopyTarget } = await server.ssrLoadModule('/src/features/chat/messageCopyTarget.ts')
-  const render = (message, target = resolveMessageCopyTarget(message, null)) =>
+  const { default: MessageActions } = await server.ssrLoadModule('/src/features/chat/components/MessageActions.tsx')
+  const { resolveMessageCopyTarget } = await server.ssrLoadModule('/src/features/chat/utils/messageCopyTarget.ts')
+  const render = (message, target = resolveMessageCopyTarget(message, null), pin = {}, mode = 'actions') =>
     renderToStaticMarkup(React.createElement(MessageActions, {
-      activeMessageAction: message, userId: 1, setMessageActionId() {},
+      mode, activeMessageAction: message, userId: 1, setMessageActionId() {},
       toggleReaction: async () => {}, setReplyingTo() {},
+      isPinned: false, toggleMessagePin: async () => {}, ...pin,
       copyTarget: target, copyMessageContent: async () => {},
       translateMessage: async () => {}, editOwnMessage: async () => {}, recallOwnMessage: async () => {},
     }))
@@ -34,7 +35,7 @@ try {
     const buttons = html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? []
     const copyButtons = buttons.filter((button) => button.includes('>Sao chép</b>'))
     assert.equal(copyButtons.length, 1, description + ': expected exactly one copy button')
-    assert.match(copyButtons[0], /aria-hidden="true">▣<\/span>/)
+    assert.match(copyButtons[0], /class="lucide lucide-copy"/)
     assert.doesNotMatch(html, /Sao chép (ảnh|liên kết|link|tệp)/i, description + ': no special copy buttons')
     return html
   }
@@ -83,7 +84,23 @@ try {
   assertSingleCopy(mixed, resolveMessageCopyTarget(mixed, fileElement), 'mixed message file')
 
   assert.doesNotMatch(render(message), />Sao chép<\/b>/)
-  console.log('PASS: exactly one Sao chép button for text, links, images, files, mixed targets and missing URLs')
+  const allowed = render({ ...message, text: 'Lời chào' })
+  assert.match(allowed, /Ghim tin nhắn/)
+  assert.doesNotMatch(allowed, /Chỉ quản trị viên|chỉ chủ nhóm|disabled=""/i)
+  assert.match(render({ ...message, text: 'Lời chào' }, undefined, { isPinned: true }), /Bỏ ghim tin nhắn/)
+  const picker = render({ ...message, text: 'Lời chào' }, undefined, {}, 'reactions')
+  assert.match(picker, /class="message-context-reactions"/)
+  assert.match(picker, /Chọn cảm xúc/)
+  assert.match(picker, /❤️/)
+  assert.doesNotMatch(picker, /Ghim tin nhắn|Trả lời|Sao chép|Dịch|Thu hồi|Đóng|message-context-preview/)
+  assert.doesNotMatch(allowed, /class="message-context-reactions"/)
+  assert.match(allowed, /Trả lời|Sao chép|Dịch/)
+  const { readFileSync } = await import('node:fs')
+  const appSource = ['../src/app/App.tsx', '../src/app/AuthedApp.tsx', '../src/features/chat/components/ChatSection.tsx', '../src/features/chat/hooks/useMessageLongPress.ts'].map((file) => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8')).join('\n')
+  assert.match(appSource, /onClick=\{\(\) => openMessageReactions\(message\)\}/)
+  assert.match(appSource, /openMessageActions\(message, event\.target\)/)
+  assert.match(appSource, /openMessageActions\(message, target\)/)
+  console.log('PASS: Copy actions for text, links, images and files; every member can pin and unpin; reaction picker and message actions are separate')
 } finally {
   await server.close()
 }

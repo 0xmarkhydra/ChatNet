@@ -9,6 +9,7 @@ Read this project policy and the relevant local skills before editing code.
 - Preserve private/group chat, feed/social interactions, notifications, calls and translations. Never put AI provider secrets, privileged Gemini calls or server-only translation logic into client bundles.
 - Retain server-side authorization, validation, API/data contracts, rate limits, migration integrity and safe error handling.
 - Respect unrelated dirty files, parallel agent worktrees and untracked assets. Only stage task files; never force-push or change deployments implicitly. Use a focused branch, verify, then integrate according to repository policy.
+- Write commit subjects as a single-line Conventional Commit in English; do not add a commit body unless requested.
 - Truthfully report PASS/FAIL/NOT RUN/BLOCKED and independently identify commit, push, merge, CI and deployment status.
 
 See `docs/AI_SKILLS_SETUP.md` for source provenance, dispatch and update instructions.
@@ -44,3 +45,7 @@ This block was installed by CodeLocal Skills. Existing project instructions rema
 in effect. Ponytail is third-party MIT-licensed; provenance is under
 `.codelocal-skills/ponytail/`. No marketplace plugin or hooks are installed.
 <!-- CODELOCAL-SKILLS:END -->
+
+## Frontend architecture and React requirements (mandatory)
+
+The authoritative shared policy for Claude, ChatGPT and human contributors is **`docs/engineering/FRONTEND_STANDARDS.md`**. Read and follow it for every `frontend/` change, alongside `docs/FRONTEND_STRUCTURE.md` and the relevant React and Ponytail skills. The architecture, React 19, API ownership, session isolation, layout, testing and PR rules are enforced there. Do not imitate known legacy violations, expand lint/architecture baselines or bypass CI to make a change pass.

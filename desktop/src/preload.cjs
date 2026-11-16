@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('socoDesktop', Object.freeze({
   notifications: Object.freeze({
     sync: (input) => ipcRenderer.invoke('soco:notification:sync', input),
     show: (input) => ipcRenderer.invoke('soco:notification:show', input),
+    preview: (sessionId) => ipcRenderer.invoke('soco:notification:preview', sessionId),
     clear: (sessionId) => ipcRenderer.invoke('soco:notification:clear', sessionId),
     dismiss: (input) => ipcRenderer.invoke('soco:notification:dismiss', input),
     onClicked: (callback) => {
