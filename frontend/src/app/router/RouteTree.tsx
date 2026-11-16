@@ -87,6 +87,7 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
         </Route>
         <Route path={TAB_PATH.contacts.slice(1)} element={<FeatureRouteLayout />}>
           <Route index element={<CurrentPage />} />
+          <Route path="directory" element={<CurrentPage />} />
           <Route path="requests" element={<CurrentPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

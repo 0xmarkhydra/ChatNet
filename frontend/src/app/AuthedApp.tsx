@@ -535,12 +535,14 @@ export default function AuthedApp({
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
-  const contactsScreen: FriendsScreen = routeLocation.pathname === "/contacts/requests" ? "invitations" : "directory";
+  const contactsScreen: FriendsScreen = routeLocation.pathname === "/contacts/requests"
+    ? "invitations" : routeLocation.pathname === "/contacts/directory" ? "directory" : "overview";
   const setContactsScreen: Dispatch<SetStateAction<FriendsScreen>> = (next) => {
     const screen = typeof next === "function" ? next(contactsScreen) : next;
     // Calls embeds the directory; opening it must not navigate away from the call workspace.
     if ((routeLocation.pathname === ROUTE.calls || routeLocation.pathname.startsWith(`${ROUTE.calls}/`)) && screen === "directory") return;
-    const path = screen === "invitations" ? "/contacts/requests" : TAB_PATH.contacts;
+    const path = screen === "invitations" ? "/contacts/requests"
+      : screen === "directory" ? "/contacts/directory" : TAB_PATH.contacts;
     if (routeLocation.pathname !== path) navigate(path);
   };
   const visitorUsername = visitorUsernameFromPath(routeLocation.pathname);
@@ -2675,6 +2677,10 @@ export default function AuthedApp({
       onOpenBlockedChat={(id) => { void openBlockedFriendConversation(id) }}
       reportContact={reportContact}
       friendRequests={friendRequests}
+      suggestions={friendResults}
+      suggestionsLoading={friendSearching}
+      suggestionsError={friendSearchError}
+      onSettings={() => navigate("/settings/privacy")}
       declineFriendRequest={declineFriendRequest}
       friends={friends}
       friendsLoading={friendSyncBusy}
@@ -2888,7 +2894,8 @@ export default function AuthedApp({
               groupWorkspaceMode={groupWorkspaceMode}
               groupCreateStep={groupCreateStep}
               activeConversationName={activeConversation?.name}
-              contactsDirectory={contactsScreen === "directory"}
+              contactsDirectory={contactsScreen !== "invitations"}
+              contactsOverview={contactsScreen === "overview"}
               feedPostOpenOnDesktop={Boolean(isProfileDesktop && activePost)}
               profileSettings={desktopProfileSettings}
               profileDesktop={isProfileDesktop}
