@@ -21,11 +21,19 @@ export type Post = {
   createdAt: string
 }
 
+export type StoryBackground = 'berry' | 'indigo' | 'teal' | 'sunset'
+
+export type TextStoryInput = { text: string; background: StoryBackground }
+
+export type StoryDraft = { kind: 'choose' } | { kind: 'media'; file: File } | { kind: 'text' }
+
 export type Story = {
   id: number
   author: string
   authorDisplayName?: string
-  attachment: MediaAttachment
   createdAt: string
   expiresAt: string
-}
+} & (
+  | { attachment: MediaAttachment; text?: never; background?: never }
+  | (TextStoryInput & { attachment?: never })
+)
