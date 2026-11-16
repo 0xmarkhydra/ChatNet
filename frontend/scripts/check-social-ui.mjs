@@ -65,6 +65,8 @@ let rejectStoryDirect = false
 const storyReplyRequests = []
 const mediaOnly = process.argv.includes('--media-only')
 const headerOnly = process.argv.includes('--header-only')
+const postPreviewOnly = process.argv.includes('--post-preview-only')
+let genericPreviewRequests = 0
 
 
 try {
@@ -86,13 +88,34 @@ try {
   const page = await browser.newPage({ viewport: { width: 1586, height: 992 } })
   const errors = []
   page.on('pageerror', err => errors.push(err.message))
+  if (postPreviewOnly) page.on('console', message => {
+    if (message.type() === 'error') console.error(message.text().slice(0, 1200))
+  })
   await page.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
+  if (postPreviewOnly) {
+    await page.addInitScript(() => {
+      window.EventSource = class extends EventTarget { close() {} }
+    })
+  }
   await page.route('**/mock-upload**', route => route.fulfill({ status: 200, headers: cors, body: '' }))
   await page.route(url => url.pathname.startsWith('/api/'), route => {
     const req = route.request(), path = new URL(req.url()).pathname
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(body) })
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
     if (path === '/api/events') return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: ': connected\n\n' })
+    if (postPreviewOnly && path === '/api/conversations/1/messages' && req.method() === 'GET') {
+      return json(['/feed?tab=feed&post=88', '/feed/posts/88', '/feed/posts/999'].map((link, index) => ({
+        id: 20 + index, conversationId: 1, senderId: 2, sender: 'minhanh',
+        text: 'https://chat.codelocal.cloud' + link, attachments: [],
+        createdAt: '2026-11-06T08:00:00Z', readByUserIds: [],
+      })))
+    }
+    if (postPreviewOnly && path === '/api/posts/999') return route.fulfill({ status: 404, headers: cors })
+    if (postPreviewOnly && path === '/api/conversations/memberships') return json({ ids: [1, 3], nextAfter: null })
+    if (postPreviewOnly && path === '/api/link-preview') {
+      genericPreviewRequests++
+      return json({ url: origin, domain: 'chat.codelocal.cloud', title: 'Generic site banner' })
+    }
     if (path === '/api/feed/moderation/reports') return route.fulfill({ status: 403, contentType: 'application/json', headers: cors, body: JSON.stringify({error: 'forbidden'}) })
     if (path === '/api/conversations/direct' && req.method() === 'POST') {
       if (req.postDataJSON().username !== 'minhanh') return json({})
@@ -135,7 +158,7 @@ try {
         ],
       }], nextBefore: null,
     })
-    if (mediaOnly && /\/api\/conversations\/\d+\/pins$/.test(path)) return json([])
+    if ((mediaOnly || postPreviewOnly) && /\/api\/conversations\/\d+\/pins$/.test(path)) return json([])
     if (path === '/api/conversations') return json(conversations)
     if (path === '/api/conversation-categories') return json([])
     if (path.endsWith('/messages')) return json([])
@@ -435,6 +458,42 @@ try {
     await page.waitForURL(origin + '/feed')
     assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
     console.log('SOCCO-60/62/63 PASS: popover without scroll, inline comments, responsive post dialog, legacy link, filled heart')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
+  if (postPreviewOnly) {
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport)
+      await page.goto(origin + '/chat', { waitUntil: 'domcontentloaded' })
+      await page.locator('.conversation-avatar-rail button[title="Minh Anh"], .desktop-conversation-rail-entry[title="Minh Anh"], .conversation-item')
+        .filter({ visible: true }).first().click({ timeout: 12000 })
+      const cards = page.getByRole('link', { name: 'Mở bài viết của Minh Anh', exact: true })
+      const messages = page.locator('.message-link-preview-holder')
+      await page.locator('[data-message-id="20"]').waitFor({ timeout: 15000 }).catch(async error => {
+        throw new Error(error.message + '\n' + errors.join(', ') + '\n' + (await page.locator('body').innerText()).slice(0, 1600))
+      })
+      for (const holder of await messages.all()) {
+        await holder.scrollIntoViewIfNeeded()
+        await holder.getByText('Đang tải bài viết…').waitFor({ state: 'hidden', timeout: 15000 })
+      }
+      await cards.nth(1).waitFor({ timeout: 15000 })
+      assert(await cards.count() === 2, 'Legacy and canonical links should both render post previews')
+      for (const card of await cards.all()) {
+        assert((await card.textContent()).includes(fixturePost.content), 'Shared post preview must show the caption')
+        assert(await card.locator('img').getAttribute('src') === fixturePost.attachments[0].url,
+          'Shared post preview must use the post image')
+      }
+      const unavailable = page.getByRole('link', { name: 'Mở bài viết ChatNet', exact: true })
+      await unavailable.getByText('Bài viết không còn hoặc bạn không có quyền xem.').waitFor()
+      assert(await unavailable.locator('img').count() === 0 && genericPreviewRequests === 0,
+        'Unreadable posts must not reveal media or request a generic banner')
+      await cards.first().click()
+      await page.waitForURL(origin + '/feed/posts/88')
+      await page.getByRole('dialog', { name: 'Bài viết của Minh Anh' }).waitFor()
+    }
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('PASS: legacy/canonical post cards, attachment, unavailable post and same-tab opening on desktop and mobile')
     await browser.close()
     server.kill()
     process.exit(0)

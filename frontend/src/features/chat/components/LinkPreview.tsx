@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
+import { feedPostIdFromUrl, feedPostPath } from '../../../shared/utils/feedPostPath'
+import { getSharedPostPreview, type SharedPostPreview } from '../../feed'
 import { messageLinkHref, messageTextParts } from '../lib/messageClipboard'
 import '../styles/link-preview.css'
 import { fetchLinkPreview } from '../api/linkPreview'
@@ -17,6 +20,8 @@ type LinkPreviewData = {
 type RequestPreview = (path: string, init?: RequestInit) => Promise<Response>
 type CacheEntry = { expires: number; promise: Promise<LinkPreviewData | null> }
 const previewCache = new Map<string, CacheEntry>()
+type PostPreviewState = { status: 'loading' | 'unavailable' } | { status: 'ready'; post: SharedPostPreview }
+const loadingPost: PostPreviewState = { status: 'loading' }
 
 function loadPreview(url: string, scope: string, request: RequestPreview): Promise<LinkPreviewData | null> {
   const key = `${scope}:${url}`
@@ -66,12 +71,15 @@ export default function LinkPreview({
   request: RequestPreview
 }) {
   const url = firstPreviewURL(text)
+  const parsed = url ? new URL(url) : null
+  const postId = parsed ? feedPostIdFromUrl(parsed, window.location.origin) : null
   const holder = useRef<HTMLSpanElement>(null)
   const requestRef = useLatest(request)
   const [observedVisible, setObservedVisible] = useScopedState(url, false)
   const visible = typeof IntersectionObserver === 'undefined' || observedVisible
   const previewScope = `${cacheScope}:${url ?? ''}`
   const [preview, setPreview] = useScopedState<LinkPreviewData | null>(previewScope, null)
+  const [postPreview, setPostPreview] = useScopedState<PostPreviewState>(previewScope, loadingPost)
   const [imageFailed, setImageFailed] = useScopedState(previewScope, false)
 
   useEffect(() => {
@@ -87,15 +95,65 @@ export default function LinkPreview({
   }, [url, setObservedVisible])
 
   useEffect(() => {
-    if (!visible || !url) return
+    if (!visible || !url || postId !== null) return
     let mounted = true
     void loadPreview(url, cacheScope, (path, init) => requestRef.current(path, init))
       .then((data) => { if (mounted) setPreview(data) })
     return () => { mounted = false }
-  }, [url, cacheScope, visible, requestRef, setPreview])
+  }, [url, cacheScope, visible, postId, requestRef, setPreview])
 
-  if (!url) return null
-  const domain = new URL(url).hostname
+  useEffect(() => {
+    if (!visible || postId === null || !cacheScope) return
+    const id = postId
+    let revision = 0
+    function load() {
+      const current = ++revision
+      void getSharedPostPreview(requestRef.current, id)
+        .catch(() => null)
+        .then(post => {
+          if (current !== revision) return
+          setPostPreview(post ? { status: 'ready', post } : { status: 'unavailable' })
+        })
+    }
+    function refresh() {
+      setPostPreview(loadingPost)
+      setImageFailed(false)
+      load()
+    }
+    load()
+    window.addEventListener('chatnet:privacy-updated', refresh)
+    return () => {
+      revision++
+      window.removeEventListener('chatnet:privacy-updated', refresh)
+    }
+  }, [cacheScope, postId, requestRef, setImageFailed, setPostPreview, visible])
+
+  if (!url || !parsed) return null
+  if (postId !== null) {
+    const post = postPreview.status === 'ready' ? postPreview.post : null
+    const description = post ? post.text || post.mediaLabel : postPreview.status === 'unavailable'
+      ? 'Bài viết không còn hoặc bạn không có quyền xem.' : 'Đang tải bài viết…'
+    return (
+      <span ref={holder} className="message-link-preview-holder">
+        <Link className={`message-link-preview${post ? '' : ' message-link-preview-fallback'}`}
+          to={feedPostPath(postId)}
+          aria-label={post ? `Mở bài viết của ${post.author}` : 'Mở bài viết ChatNet'}>
+          <span className="message-link-preview-details">
+            <span className="message-link-preview-domain">Bài viết · ChatNet</span>
+            <strong className="message-link-preview-title">{post?.author ?? 'Bài viết ChatNet'}</strong>
+            {description && <span className="message-link-preview-description whitespace-pre-line">{description}</span>}
+          </span>
+          {post?.image && !imageFailed && (
+            <span className="message-link-preview-image">
+              <img src={post.image} alt="" loading="lazy" referrerPolicy="no-referrer"
+                onError={() => setImageFailed(true)} />
+            </span>
+          )}
+        </Link>
+      </span>
+    )
+  }
+  const domain = parsed.hostname
   const card: LinkPreviewData = preview || { url, title: domain, domain }
   return (
     <span ref={holder} className="message-link-preview-holder">
