@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, type Dispatch, type SetStateAction } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { chatConversationIdFromPath, chatConversationPath, TAB_PATH } from "./routes";
 
@@ -10,19 +10,14 @@ export function useChatConversationRoute(
   const location = useLocation();
   const navigate = useNavigate();
   const routeId = chatConversationIdFromPath(location.pathname);
-  const previousRouteIdRef = useRef<number | null>(null);
-
   useEffect(() => {
-    const applyRoute = () => {
-      const previousId = previousRouteIdRef.current;
-      previousRouteIdRef.current = routeId;
-      if (routeId !== null) {
-        setActiveConversationId((current) => current === routeId ? current : routeId);
-      } else if (previousId !== null && location.pathname === TAB_PATH.chat) {
-        setActiveConversationId(null);
-      }
-    };
-    applyRoute();
+    if (routeId !== null) {
+      setActiveConversationId((current) => current === routeId ? current : routeId);
+    } else if (location.pathname === TAB_PATH.chat) {
+      // The chat index is an unselected list, including after leaving a detail
+      // route for another tab and returning via browser history or sidebar.
+      setActiveConversationId((current) => current === null ? current : null);
+    }
   }, [routeId, location.pathname, setActiveConversationId]);
 
   const selectConversation: Dispatch<SetStateAction<number | null>> = useCallback((next) => {
