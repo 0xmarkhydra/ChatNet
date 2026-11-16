@@ -6,11 +6,12 @@ import type { Conversation } from '../../chat'
 import ContactCallConversationSection from './ContactCallConversationSection'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import ContactInvitations from './ContactInvitations'
+import ContactsOverview from './ContactsOverview'
 import ContactFriendProfile from './ContactFriendProfile'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
 import { useContactDirectory, type DirectoryFilter } from '../hooks/useContactDirectory'
 
-export type FriendsScreen = 'directory' | 'invitations'
+export type FriendsScreen = 'overview' | 'directory' | 'invitations'
 type Props = {
   screen: FriendsScreen
   onScreenChange: (screen: FriendsScreen) => void
@@ -30,6 +31,11 @@ type Props = {
   onOpenBlockedChat: (id: number) => void
   reportContact: (friend: FriendSearchResult | FriendConnection) => Promise<void>
   friendRequests: FriendConnection[]
+  suggestions: FriendSearchResult[]
+  suggestionsLoading: boolean
+  suggestionsError: boolean
+  onRetrySuggestions: () => void
+  onSettings: () => void
   declineFriendRequest: (friend: FriendConnection) => Promise<void>
   friends: FriendConnection[]
   friendsLoading: boolean
@@ -57,7 +63,7 @@ export default function ContactsView({
   setFriendSearchRetry, contactSearchResults, friendRelationship, friendBusyIds, actOnFriend,
   setFriendMenuId, friendMenuId, blockContact, unblockContact, onOpenBlockedChat, reportContact, friendRequests, declineFriendRequest,
   friends, friendsLoading, friendsError, onRetryFriends, contactMetadata, openDirectByUsername, setFriendPreview, changePersonalContact,
-  removeAcceptedFriend, connectionUrl, onScanQr, embeddedInCalls = false,
+  removeAcceptedFriend, connectionUrl, onScanQr, suggestions, suggestionsLoading, suggestionsError, onRetrySuggestions, onSettings, embeddedInCalls = false,
   callConversations = [], onOpenCallChat,
 }: Props) {
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
@@ -162,6 +168,15 @@ export default function ContactsView({
       blockContact={blockContact} unblockContact={unblockContact} reportContact={reportContact}
       openChat={openChat} startCall={startCall} isBlocked={isBlocked} />
   )
+
+  if (screen === 'overview' && !embeddedInCalls) return <ContactsOverview
+    friends={friends} friendRequests={friendRequests} suggestions={suggestions}
+    suggestionsLoading={suggestionsLoading} suggestionsError={suggestionsError}
+    friendsLoading={friendsLoading} friendsError={friendsError}
+    onRetryFriends={onRetryFriends} onRetrySuggestions={onRetrySuggestions}
+    friendBusyIds={friendBusyIds} actOnFriend={actOnFriend} declineFriendRequest={declineFriendRequest}
+    onDirectory={() => onScreenChange('directory')} onInvitations={() => onScreenChange('invitations')}
+    onSettings={onSettings} connectionUrl={connectionUrl} onScanQr={onScanQr} />
 
   return <div className={'friends-design-v2' + (embeddedInCalls ? ' is-call-directory' : '')} aria-label={screen === 'directory' ? 'Danh bạ' : 'Lời mời kết bạn'}>
     {screen === 'directory' ? <>

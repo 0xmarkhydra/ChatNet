@@ -378,6 +378,8 @@ try {
     }
     if (phone) await bottom.locator('button').nth(2).click()
     else await rail.getByRole('button', { name: 'Bạn bè' }).click()
+    await page.locator('.contacts-overview').waitFor({ state: 'visible' })
+    await page.goto(origin + '/contacts/directory')
     await page.locator('.friends-design-v2 .fd-searchbar').waitFor({ state: 'visible' })
     await page.locator('.fd-person-row').first().waitFor({ state: 'visible', timeout: 8000 })
     if (width === 320) assert.equal(optionalContactsFinished, false,

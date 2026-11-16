@@ -2574,6 +2574,11 @@ export default function AuthedApp({
       onOpenBlockedChat={(id) => { void openBlockedFriendConversation(id) }}
       reportContact={reportContact}
       friendRequests={friendRequests}
+      suggestions={friendResults}
+      suggestionsLoading={friendSearching}
+      suggestionsError={friendSearchError}
+      onRetrySuggestions={() => setFriendSearchRetry(value => value + 1)}
+      onSettings={() => navigate("/settings/privacy")}
       declineFriendRequest={declineFriendRequest}
       friends={friends}
       friendsLoading={friendSyncBusy}
@@ -2787,7 +2792,8 @@ export default function AuthedApp({
               groupWorkspaceMode={groupWorkspaceMode}
               groupCreateStep={groupCreateStep}
               activeConversationName={activeConversation?.name}
-              contactsDirectory={contactsScreen === "directory"}
+              contactsDirectory={contactsScreen !== "invitations"}
+              contactsOverview={contactsScreen === "overview"}
               feedPostOpenOnDesktop={Boolean(isProfileDesktop && activePost)}
               profileSettings={desktopProfileSettings}
               profileDesktop={isProfileDesktop}
