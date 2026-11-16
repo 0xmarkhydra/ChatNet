@@ -34,6 +34,7 @@ function mount(path: string, state?: unknown) {
         <button onClick={() => navigation.setDesktopProfileSettings(true)}>Settings</button>
         <button onClick={() => navigation.setDesktopProfileSettings(false)}>Profile</button>
         <button onClick={() => navigation.openVisitorProfile("alice")}>Open Alice</button>
+        <button onClick={() => navigation.openVisitorProfile("alice", "/contacts/requests?invite=alice")}>Open invite visitor</button>
         <button onClick={() => navigation.openVisitorProfile("alice smith")}>Open encoded visitor</button>
         <button onClick={() => navigation.closeVisitor()}>Close visitor</button>
         <button onClick={() => navigate(-1)}>Back</button>
@@ -127,6 +128,15 @@ describe("URL-owned app navigation", () => {
     app.click("Close visitor");
     expect(app.read("path")).toBe("/feed/posts/42?sort=new");
     expect(app.read("hash")).toBe("#comments");
+  });
+
+  it("preserves an explicit invite return location instead of the current legacy URL", () => {
+    const app = mount("/contacts?invite=alice");
+    app.click("Open invite visitor");
+    expect(app.read("path")).toBe("/users/alice");
+    expect(app.read("return")).toBe("/contacts/requests?invite=alice");
+    app.click("Close visitor");
+    expect(app.read("path")).toBe("/contacts/requests?invite=alice");
   });
 
   it("returns from visitor profile to safe internal return location", () => {

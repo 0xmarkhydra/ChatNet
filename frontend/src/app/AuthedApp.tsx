@@ -265,7 +265,7 @@ import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
 import AppPageErrorBoundary from "./layouts/AppPageErrorBoundary";
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
-import { consumeInviteDeepLink } from "./navigation/inviteDeepLink";
+import { inviteRouteTarget } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
@@ -536,13 +536,13 @@ export default function AuthedApp({
   }, [session?.sessionId]);
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
-  function openVisitor(username: string) {
+  function openVisitor(username: string, returnTo?: string) {
     if (username === sessionRef.current?.user.username) {
       setTab("profile");
       setProfileTimelineOpen(true);
       return;
     }
-    openVisitorProfile(username);
+    openVisitorProfile(username, returnTo);
   }
   function setFriendPreview(friend: FriendSearchResult | null) {
     if (friend) openVisitor(friend.username);
@@ -1320,15 +1320,15 @@ export default function AuthedApp({
 
   useEffect(() => {
     if (!session?.token) return;
-    const requestedUser = consumeInviteDeepLink(new URL(window.location.href));
-    if (
-      requestedUser &&
-      requestedUser.toLocaleLowerCase("vi-VN") !==
-        session.user.username.toLocaleLowerCase("vi-VN")
-    ) {
-      openVisitor(requestedUser);
+    const target = inviteRouteTarget(routeLocation);
+    if (!target) return;
+    const returnTo = target.to.pathname + target.to.search + target.to.hash;
+    navigate(target.to, { replace: true, state: routeLocation.state });
+    if (target.username.toLocaleLowerCase("vi-VN") !==
+        session.user.username.toLocaleLowerCase("vi-VN")) {
+      openVisitor(target.username, returnTo);
     }
-  }, [session?.token]);
+  }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, navigate]);
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
