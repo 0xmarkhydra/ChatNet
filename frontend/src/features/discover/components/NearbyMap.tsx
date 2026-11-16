@@ -16,6 +16,9 @@ export default function NearbyMap({ location, places, selected, onSelect, onShow
 }) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
+  const markerButtons = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const onSelectRef = useRef(onSelect)
+  useEffect(() => { onSelectRef.current = onSelect }, [onSelect])
   const [failed, setFailed] = useState(false)
   const [ready, setReady] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -33,32 +36,46 @@ export default function NearbyMap({ location, places, selected, onSelect, onShow
       return () => window.clearTimeout(timer)
     }
     map.current = instance
+    let disposed = false
     const resize = new ResizeObserver(() => instance.resize())
     resize.observe(container.current)
-    instance.on('error', () => { if (!instance.isStyleLoaded()) { setFailed(true); setReady(false) } })
-    instance.on('load', () => { setFailed(false); setReady(true) })
+    instance.on('error', () => { if (!disposed && !instance.isStyleLoaded()) { setFailed(true); setReady(false) } })
+    instance.on('load', () => { if (!disposed) { setFailed(false); setReady(true) } })
     new maplibregl.Marker({ color: '#2464ba' }).setLngLat([location.longitude, location.latitude]).addTo(instance)
-    return () => { resize.disconnect(); instance.remove(); map.current = null }
-  }, [location, attempt])
+    return () => { disposed = true; resize.disconnect(); instance.remove(); map.current = null }
+  }, [location.latitude, location.longitude, attempt])
 
   useEffect(() => {
     if (!map.current) return
     const instance = map.current
+    const buttons = markerButtons.current
     const markers = places.map((place, index) => {
       const button = document.createElement('button')
-      button.className = `nearby-place-marker${selected === place.id ? ' selected' : ''}`
+      button.className = 'nearby-place-marker'
       button.type = 'button'
       button.textContent = String(index + 1)
       button.title = place.name
       button.setAttribute('aria-label', place.name)
-      button.setAttribute('aria-pressed', String(selected === place.id))
-      button.onclick = () => onSelect(place.id)
+      button.setAttribute('aria-pressed', 'false')
+      buttons.set(place.id, button)
+      button.onclick = () => onSelectRef.current(place.id)
       return new maplibregl.Marker({ element: button }).setLngLat([place.longitude, place.latitude]).addTo(instance)
     })
+    return () => {
+      markers.forEach((marker) => marker.remove())
+      buttons.clear()
+    }
+  }, [places, location.latitude, location.longitude, attempt])
+
+  useEffect(() => {
+    for (const [id, button] of markerButtons.current) {
+      const isSelected = id === selected
+      button.classList.toggle('selected', isSelected)
+      button.setAttribute('aria-pressed', String(isSelected))
+    }
     const place = places.find((item) => item.id === selected)
-    if (place) instance.easeTo({ center: [place.longitude, place.latitude], duration: 300 })
-    return () => markers.forEach((marker) => marker.remove())
-  }, [places, selected, onSelect, location, attempt])
+    if (place) map.current?.easeTo({ center: [place.longitude, place.latitude], duration: 300 })
+  }, [places, selected, attempt])
 
   return <div className="nearby-map">
     <div ref={container} className="nearby-map-canvas" />

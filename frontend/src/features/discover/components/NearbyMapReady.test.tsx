@@ -78,11 +78,19 @@ describe('NearbyMap marker selection', () => {
     second?.click()
     expect(onSelect).toHaveBeenCalledWith('b')
 
-    harness.markerElements = []
-    await act(async () => root.render(<NearbyMap location={location} places={places}
-      selected="b" onSelect={onSelect} onShowList={() => {}} />))
-    expect(harness.markerElements[0]?.getAttribute('aria-pressed')).toBe('false')
-    expect(harness.markerElements[1]?.getAttribute('aria-pressed')).toBe('true')
+    const nextOnSelect = vi.fn()
+    await act(async () => root.render(<NearbyMap location={{ ...location }} places={places}
+      selected="b" onSelect={nextOnSelect} onShowList={() => {}} />))
+    expect(harness.markerElements).toHaveLength(2)
+    expect(harness.markerElements[0]).toBe(first)
+    expect(harness.markerElements[1]).toBe(second)
+    expect(first?.getAttribute('aria-pressed')).toBe('false')
+    expect(second?.getAttribute('aria-pressed')).toBe('true')
+    expect(first?.classList.contains('selected')).toBe(false)
+    expect(second?.classList.contains('selected')).toBe(true)
+    first?.click()
+    expect(nextOnSelect).toHaveBeenCalledWith('a')
+    expect(harness.remove).not.toHaveBeenCalled()
   })
 })
 
