@@ -21,10 +21,19 @@ type Props = {
 
 export default function GroupInviteJoinDialog({ request, onJoined, notify }: Props) {
   const requestRef = useLatest(request)
+  const onJoinedRef = useLatest(onJoined)
+  const notifyRef = useLatest(notify)
   const [token, setToken] = useState(() => new URL(window.location.href).searchParams.get('groupInvite'))
   const [preview, setPreview] = useState<Preview | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const joiningRef = useRef(false)
+  const mountedRef = useRef(false)
+  const tokenRef = useLatest(token)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     if (!token) return
@@ -51,29 +60,33 @@ export default function GroupInviteJoinDialog({ request, onJoined, notify }: Pro
   }, [token])
 
   async function join() {
-    if (!token || !preview || busy) return
-    if (preview.isMember) {
-      await onJoined(preview.conversationId)
-      setToken(null)
-      return
-    }
+    if (!token || !preview || joiningRef.current) return
+    const inviteToken = token
+    const isCurrent = () => mountedRef.current && tokenRef.current === inviteToken
+    joiningRef.current = true
     setBusy(true)
     setError('')
     try {
-      const response = await joinGroupInvite(request, token)
-      const value = await response.json() as { error?: string; status?: string; conversationId?: number }
-      if (!response.ok) throw new Error(value.error || 'Không thể tham gia nhóm.')
-      if (value.status === 'pending') {
-        notify('Đã gửi yêu cầu. Bạn sẽ tham gia khi quản trị viên phê duyệt.')
+      if (preview.isMember) {
+        await onJoinedRef.current(preview.conversationId)
       } else {
-        await onJoined(value.conversationId || preview.conversationId)
-        notify('Đã tham gia nhóm thành công.')
+        const response = await joinGroupInvite(requestRef.current, inviteToken)
+        const value = await response.json() as { error?: string; status?: string; conversationId?: number }
+        if (!isCurrent()) return
+        if (!response.ok) throw new Error(value.error || 'Không thể tham gia nhóm.')
+        if (value.status === 'pending') {
+          notifyRef.current('Đã gửi yêu cầu. Bạn sẽ tham gia khi quản trị viên phê duyệt.')
+        } else {
+          await onJoinedRef.current(value.conversationId || preview.conversationId)
+          if (isCurrent()) notifyRef.current('Đã tham gia nhóm thành công.')
+        }
       }
-      setToken(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể tham gia nhóm.')
+      if (isCurrent()) setToken(null)
+    } catch (error) {
+      if (isCurrent()) setError(error instanceof Error ? error.message : 'Không thể tham gia nhóm.')
     } finally {
-      setBusy(false)
+      joiningRef.current = false
+      if (isCurrent()) setBusy(false)
     }
   }
 
