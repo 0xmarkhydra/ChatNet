@@ -118,7 +118,8 @@ describe('Friends overview', () => {
     act(() => { retryButtons[0].click(); retryButtons[1].click() })
     expect(app.onRetryFriends).toHaveBeenCalledTimes(1)
     expect(app.onRetrySuggestions).toHaveBeenCalledTimes(1)
-    expect(app.container.querySelectorAll('.co-suggestion:not(.co-skeleton-card)')).toHaveLength(0)
+    // A failed background revalidation keeps the previously rendered suggestions visible.
+    expect(app.container.querySelectorAll('.co-suggestion:not(.co-skeleton-card)')).toHaveLength(4)
   })
 
   it('disables busy invitation and suggestion actions with visible feedback', () => {

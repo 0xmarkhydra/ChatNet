@@ -1819,18 +1819,25 @@ export default function AuthedApp({
     }
   }, [session?.token, tab, desktopSection, newChatMode, chatFriend?.id]);
 
+  const friendSearchSessionRef = useRef(session?.sessionId);
   useEffect(() => {
     const friendSurfaceOpen = newChatMode === "friends" || tab === "contacts";
-    if (!session?.token || !friendSurfaceOpen) {
+    if (friendSearchSessionRef.current !== session?.sessionId) {
+      friendSearchSessionRef.current = session?.sessionId;
+      setFriendResults([]);
+    }
+    if (!session?.token) {
       setFriendResults([]);
       setFriendSearching(false);
       setFriendSearchError(false);
       return;
     }
+    if (!friendSurfaceOpen) return;
 
     const controller = new AbortController();
     const query = friendQuery.trim();
-    setFriendResults([]);
+    // Keep the last successful suggestions visible while refreshing in the background.
+    if (query) setFriendResults([]);
     setFriendSearching(true);
     setFriendSearchError(false);
 
@@ -1845,7 +1852,7 @@ export default function AuthedApp({
         })
         .catch(() => {
           if (!controller.signal.aborted) {
-            setFriendResults([]);
+            // Retain last-known suggestions on a transient network failure.
             setFriendSearchError(true);
           }
         })
@@ -1880,7 +1887,7 @@ export default function AuthedApp({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, tab, desktopSection]);
+  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, session?.sessionId, tab, desktopSection]);
 
   function purgeConversation(id: number) {
     responseCache.current.invalidate(["conversations", "messages"]);
@@ -2575,13 +2582,13 @@ export default function AuthedApp({
       reportContact={reportContact}
       friendRequests={friendRequests}
       suggestions={friendResults}
-      suggestionsLoading={friendSearching}
+      suggestionsLoading={friendSearching && friendResults.length === 0}
       suggestionsError={friendSearchError}
       onRetrySuggestions={() => setFriendSearchRetry(value => value + 1)}
       onSettings={() => navigate("/settings/privacy")}
       declineFriendRequest={declineFriendRequest}
       friends={friends}
-      friendsLoading={friendSyncBusy}
+      friendsLoading={friendSyncBusy && friendSyncSessionId !== session.sessionId}
       friendsError={friendSyncError}
       onRetryFriends={() => void refreshFriendConnections()}
       contactMetadata={contactMetadata}
