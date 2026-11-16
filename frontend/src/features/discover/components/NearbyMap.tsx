@@ -7,11 +7,12 @@ import type { NearbyPlace } from '../lib/nearbyPlaces'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
-export default function NearbyMap({ location, places, selected, onSelect }: {
+export default function NearbyMap({ location, places, selected, onSelect, onShowList }: {
   location: { latitude: number; longitude: number }
   places: NearbyPlace[]
   selected: string | null
   onSelect: (id: string) => void
+  onShowList: () => void
 }) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
@@ -58,7 +59,7 @@ export default function NearbyMap({ location, places, selected, onSelect }: {
 
   return <div className="nearby-map">
     <div ref={container} className="nearby-map-canvas" />
-    {failed && <div className="nearby-map-error" role="status">Không tải được bản đồ. Danh sách vẫn dùng được.<button onClick={() => { setFailed(false); setAttempt((value) => value + 1) }}>Thử lại</button></div>}
+    {failed && <div className="nearby-map-error" role="alert">Không tải được bản đồ. Bạn có thể xem danh sách địa điểm.<button type="button" onClick={onShowList}>Xem danh sách</button><button type="button" onClick={() => { setFailed(false); setAttempt((value) => value + 1) }}>Thử lại</button></div>}
     <div className="nearby-map-controls">
       <button title="Về vị trí của tôi" aria-label="Về vị trí của tôi" onClick={() => map.current?.easeTo({ center: [location.longitude, location.latitude], zoom: 14 })}><LocateFixed size={20} /></button>
       <button title="Phóng to" aria-label="Phóng to" onClick={() => map.current?.zoomIn()}><Plus size={20} /></button>

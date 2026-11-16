@@ -27,6 +27,7 @@ export default function Marketplace({ userId, searchQuery = '', request, onBack 
   const revision = useRef(0)
   const readRevision = useRef(0)
   const mutationFlight = useRef<{ version: number } | null>(null)
+  const retryFlight = useRef<{ version: number } | null>(null)
   const [view, setView] = useState<'products' | 'cart' | 'orders' | 'sell'>('products')
   const { hostRef: tabsPillSetHost, activeRef: tabsPillSetActive, pillRef: tabsPillSetPill } = useSlidingPill<HTMLElement>(view)
   const [products, setProducts] = useState<Product[]>([])
@@ -34,6 +35,7 @@ export default function Marketplace({ userId, searchQuery = '', request, onBack 
   const [orders, setOrders] = useState<Order[]>([])
   const [mine, setMine] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -81,15 +83,27 @@ export default function Marketplace({ userId, searchQuery = '', request, onBack 
     const version = ++requestRevision.current
     setProducts([]); setCart([]); setOrders([]); setMine([])
     mutationFlight.current = null
-    setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false)
+    retryFlight.current = null
+    setView('products')
+    setTitle(''); setDescription(''); setPrice(''); setUnit(''); setStock('1')
+    setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false); setRefreshing(false)
     void refresh(version)
     return () => { ++requestRevision.current }
   }, [userId])
 
   function retryRead() {
+    if (retryFlight.current) return
+    const flight = { version: revision.current }
+    retryFlight.current = flight
     if (!loaded) setLoading(true)
+    else setRefreshing(true)
     setError('')
-    void refresh()
+    void refresh(flight.version).finally(() => {
+      if (retryFlight.current === flight) {
+        retryFlight.current = null
+        setRefreshing(false)
+      }
+    })
   }
 
   async function execute(fn: (isCurrent: () => boolean) => Promise<void>) {
@@ -101,7 +115,15 @@ export default function Marketplace({ userId, searchQuery = '', request, onBack 
     setBusy(true)
     setMessage('')
     setError('')
-    try { await fn(isCurrent); if (isCurrent()) await refresh(version) }
+    try {
+      await fn(isCurrent)
+      if (isCurrent()) {
+        // A completed write supersedes any older read retry and its spinner.
+        retryFlight.current = null
+        setRefreshing(false)
+        await refresh(version)
+      }
+    }
     catch (e) { if (version === revision.current) setError(e instanceof Error ? e.message : 'Không thể thực hiện') }
     finally {
       if (mutationFlight.current === flight) {
@@ -169,15 +191,17 @@ export default function Marketplace({ userId, searchQuery = '', request, onBack 
       </header>
       <nav ref={tabsPillSetHost} className="marketplace-tabs sliding-pill-host" aria-label="Sàn mua bán">
         <span ref={tabsPillSetPill} className="sliding-pill marketplace-active-pill" aria-hidden="true" />
-        <button ref={view === 'products' ? tabsPillSetActive : undefined} type="button" className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><ShoppingBag size={17}/> Sản phẩm</button>
-        <button ref={view === 'cart' ? tabsPillSetActive : undefined} type="button" className={view === 'cart' ? 'active' : ''} onClick={() => setView('cart')}><ShoppingCart size={17}/> Giỏ ({cart.length})</button>
-        <button ref={view === 'orders' ? tabsPillSetActive : undefined} type="button" className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ClipboardList size={17}/> Đơn hàng</button>
-        <button ref={view === 'sell' ? tabsPillSetActive : undefined} type="button" className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}>+ Bán hàng</button>
+        <button ref={view === 'products' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'products'} className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><ShoppingBag size={17}/> Sản phẩm</button>
+        <button ref={view === 'cart' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'cart'} className={view === 'cart' ? 'active' : ''} onClick={() => setView('cart')}><ShoppingCart size={17}/> Giỏ ({cart.length})</button>
+        <button ref={view === 'orders' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'orders'} className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ClipboardList size={17}/> Đơn hàng</button>
+        <button ref={view === 'sell' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'sell'} className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}>+ Bán hàng</button>
       </nav>
       <div className="marketplace-body">
         <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>
 
         {loading && <p role="status" aria-busy="true">Đang tải dữ liệu chợ…</p>}
+        {refreshing && <p role="status" aria-live="polite" aria-busy="true">Đang cập nhật dữ liệu chợ…</p>}
+        {busy && <p role="status" aria-live="polite" aria-busy="true">Đang xử lý yêu cầu…</p>}
         {error && <p role="alert" className="marketplace-error">{error} <button onClick={retryRead} type="button" disabled={busy}>Thử tải dữ liệu</button></p>}
         {message && <p role="status" className="marketplace-message">{message}</p>}
 
