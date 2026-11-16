@@ -97,6 +97,7 @@ describe('ContactQrPanel', () => {
       await renderQr('https://example.com/user-a')
       await act(async () => host.querySelector<HTMLButtonElement>('.fd-qr-actions button')?.click())
       expect(host.textContent).toContain('Không thể sao chép')
+      expect(host.querySelector('.fd-copy-status.is-error')).not.toBeNull()
       expect(host.querySelector<HTMLButtonElement>('.fd-qr-actions button')?.disabled).toBe(false)
     } finally {
       Reflect.deleteProperty(navigator, 'clipboard')

@@ -27,6 +27,7 @@ describe('ContactInvitations', () => {
     )
     expect(html).toContain('Người bạn thử nghiệm')
     expect(html).toContain('Chấp nhận lời mời của Người bạn thử nghiệm')
+    expect(html).toContain('1 lời mời đến · 0 đã gửi')
     expect(html).toContain('role="tablist"')
     expect(html).toMatch(/aria-controls="[^"]+-tabpanel"/)
     expect(html).toMatch(/aria-labelledby="[^"]+-tab-incoming"/)
@@ -45,6 +46,7 @@ describe('ContactInvitations', () => {
         onSearch={vi.fn()}
       />,
     )
+    expect(html).toContain('Đang xử lý...')
     expect(html).toMatch(/disabled=""[^>]*aria-label="Chấp nhận lời mời/)
     expect(html).toMatch(/disabled=""[^>]*aria-label="Từ chối lời mời/)
   })

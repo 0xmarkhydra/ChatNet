@@ -145,7 +145,9 @@
 .fd-qr-panel>small{text-align:center;color:#8b9ab4;font-size:11px}
 .fd-qr-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:25px}
 .fd-qr-actions button{padding:8px 7px;min-width:0;font-size:12px}
-.fd-copy-status{margin-top:9px;font-size:11px;color:#13996d}
+.fd-copy-status{margin-top:9px;font-size:12px;line-height:1.45;color:#147d5a;overflow-wrap:anywhere}
+.fd-copy-status.is-error{color:#ac3434}
+.fd-request-row[aria-busy="true"] .fd-request-copy span{color:#345db0}
 .fd-security-tip{display:flex;align-items:flex-start;gap:13px;margin-top:auto;min-height:81px;padding:20px 14px;border-radius:12px;background:#edf2ff;color:#245dec}
 .fd-security-tip span{display:grid;gap:8px}
 .fd-security-tip strong{font-size:12px;color:#1d2d4d}

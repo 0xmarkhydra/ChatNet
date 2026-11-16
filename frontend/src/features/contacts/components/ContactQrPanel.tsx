@@ -4,7 +4,7 @@ import { Copy, QrCode, ShieldCheck } from 'lucide-react'
 
 type Props = { connectionUrl: string; onScanQr: () => void }
 type QrResult = { key: string; image?: string; error?: boolean }
-type CopyResult = { url: string; message: string }
+type CopyResult = { url: string; message: string; failed: boolean }
 
 export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
   const [qrResult, setQrResult] = useState<QrResult | null>(null)
@@ -39,9 +39,9 @@ export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
     setCopyPendingUrl(url)
     try {
       await navigator.clipboard.writeText(url)
-      setCopyResult({ url, message: 'Đã sao chép liên kết kết bạn' })
+      setCopyResult({ url, message: 'Đã sao chép liên kết kết bạn', failed: false })
     } catch {
-      setCopyResult({ url, message: 'Không thể sao chép. Kiểm tra quyền clipboard.' })
+      setCopyResult({ url, message: 'Không thể sao chép. Kiểm tra quyền clipboard.', failed: true })
     } finally {
       setCopyPendingUrl(current => current === url ? null : current)
     }
@@ -63,7 +63,7 @@ export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
         <button type="button" className="fd-secondary" disabled={!connectionUrl || copying} aria-busy={copying} onClick={() => void copyLink()}><Copy size={17} aria-hidden="true" />{copying ? 'Đang sao chép...' : 'Sao chép link'}</button>
         <button type="button" className="fd-primary" onClick={onScanQr}><QrCode size={18} aria-hidden="true" />Quét QR</button>
       </div>
-      {copyStatus && <p className="fd-copy-status" role="status">{copyStatus}</p>}
+      {copyStatus && <p className={'fd-copy-status' + (copyResult?.failed ? ' is-error' : '')} role="status">{copyStatus}</p>}
       <div className="fd-security-tip"><ShieldCheck size={20} aria-hidden="true" />
         <span><strong>An toàn khi kết nối</strong><small>Bạn quyết định ai có thể gửi yêu cầu.</small></span></div>
     </aside>
