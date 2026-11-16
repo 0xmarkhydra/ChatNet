@@ -1,8 +1,4 @@
 /* Isolated, experimental direct-chat E2EE test surface; no global overrides. */
-.mls-pilot-legacy-notice {
-  padding: 8px 14px; margin: 0; font-size: 11px;
-  color: var(--text-secondary, #667085); text-align: center;
-}
 .mls-pilot-panel {
   display: flex;
   flex-direction: column;
