@@ -39,6 +39,7 @@ const records = new Map()
 const requests = []
 let loseNextAck = false
 let blockPost = false
+let networkAvailable = true
 let heldPostText = ''
 let heldPostStarted
 let releaseHeldPost
@@ -80,6 +81,10 @@ try {
     if (path === '/api/conversation-categories') return answer(route, [])
     if (path === '/api/conversations' && method === 'GET') return answer(route, [conversation])
     if (path === '/api/conversations/memberships') return answer(route, { ids: [conversation.id], nextAfter: null })
+    if (path === '/api/conversations/42/e2ee/status' && method === 'GET') {
+      if (!networkAvailable) return route.abort('internetdisconnected')
+      return answer(route, { mode: 'legacy', epoch: 0, autoEnabled: false })
+    }
     if (path === '/api/conversations/42/pins' && method === 'GET') return answer(route, [])
     if (path === '/api/conversations/42/messages' && method === 'GET') return answer(route,
       [...records.values()].sort((a, b) => a.id - b.id))
@@ -106,7 +111,8 @@ try {
       }
       return answer(route, saved, requests.filter(q => q.clientId === body.clientId).length === 1 ? 201 : 200)
     }
-    if (path === '/api/friends' || path === '/api/friends/requests' ||
+    if (path === '/api/friends') return answer(route, [{ id: 2, username: 'account_b', displayName: 'Account B', online: true }])
+    if (path === '/api/friends/requests' ||
         path === '/api/stories' || path === '/api/posts' ||
         path === '/api/users/suggestions' || path === '/api/calls') return answer(route, [])
     if (path === '/api/profile') return answer(route, { username: 'account_a', displayName: 'Account A', avatarSet: false, coverSet: false })
@@ -119,27 +125,50 @@ try {
     return answer(route, {})
   })
 
-  await page.goto(origin)
-  try { await page.locator('.conversation-item').first().waitFor({ timeout: 10000 }) }
+  const openConversation = targetPage => targetPage.getByRole('navigation', { name: 'Thanh avatar và hội thoại' })
+    .getByRole('button', { name: `Mở tin nhắn ${conversation.name}`, exact: true })
+    .click({ timeout: 30000 })
+
+  await page.goto(origin, { waitUntil: 'commit' })
+  try { await openConversation(page) }
   catch (error) {
     console.error('Browser UI diagnostic:', (await page.locator('body').innerText()).slice(0, 2500))
     console.error('Browser runtime errors:', pageErrors)
     throw error
   }
-  await page.locator('.conversation-item').first().click()
   let field = page.getByRole('textbox', { name: 'Tin nhắn' })
   let sendButton = page.getByRole('button', { name: 'Gửi tin nhắn' })
   await field.waitFor({ timeout: 10000 })
 
-  // P0: Offline A -> B must show a durable, visible pending bubble.
+  // Legacy plaintext cannot be queued without a fresh encryption status check.
+  networkAvailable = false
   await context.setOffline(true)
   await page.evaluate(() => window.dispatchEvent(new Event('offline')))
-  await field.fill('P0-02 offline message from A to B')
+  const message = 'P0-02 offline message from A to B'
+  await field.fill(message)
   await sendButton.click()
-  let pending = page.locator('.chat-outbox-message').filter({ hasText: 'P0-02 offline message from A to B' })
-  await pending.waitFor({ timeout: 5000 })
-  assert.match(await pending.textContent(), /Chờ có mạng|Đang gửi|Đang xác nhận/)
-  assert.equal(records.size, 0, 'nothing should be POSTed while offline')
+  await page.getByText('Không xác minh được chế độ mã hóa.', { exact: false }).waitFor({ timeout: 10000 })
+  assert.equal(await field.inputValue(), message, 'an unverified draft remains in the composer')
+  assert.equal(await page.locator('.chat-outbox-message').count(), 0, 'no plaintext in the outbox without verified mode')
+  assert.equal(requests.length, 0, 'no POST while offline')
+
+  // Verify legacy mode online, then simulate a delivery outage. The verified
+  // message must stay visible and durable when the browser goes offline.
+  blockPost = true
+  networkAvailable = true
+  await context.setOffline(false)
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await sendButton.click()
+  let pending = page.locator('.chat-outbox-message').filter({ hasText: message })
+  await pending.getByRole('button', { name: 'Gửi lại tin nhắn đang chờ' }).waitFor({ timeout: 10000 })
+  const initialAttempts = requests.length
+  assert.equal(initialAttempts, 1, 'a verified legacy draft attempts delivery')
+  networkAvailable = false
+  await context.setOffline(true)
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')))
+  assert.match(await pending.textContent(), /Chờ có mạng|Đang gửi|Đang xác nhận|Gửi lại/)
+  assert.equal(records.size, 0, 'the unavailable server must not have saved the pending message')
+  assert.equal(requests.length, initialAttempts, 'going offline cannot submit the pending message')
   const savedOutbox = await page.evaluate(() =>
     Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
       .filter(key => key?.startsWith('chatnet:outbox:v2:1:'))
@@ -150,31 +179,29 @@ try {
   // Closing the tab/PWA must not erase the queue. Reopen while the message API is unavailable.
   blockPost = true
   await page.close()
+  networkAvailable = true
   await context.setOffline(false)
   page = await context.newPage()
   watchPage(page)
-  await page.goto(origin)
-  await page.locator('.conversation-item').first().waitFor({ timeout: 10000 })
-  await page.locator('.conversation-item').first().click()
+  await page.goto(origin, { waitUntil: 'commit' })
+  await openConversation(page)
   field = page.getByRole('textbox', { name: 'Tin nhắn' })
   sendButton = page.getByRole('button', { name: 'Gửi tin nhắn' })
   await field.waitFor({ timeout: 10000 })
   pending = page.locator('.chat-outbox-message').filter({ hasText: 'P0-02 offline message from A to B' })
-  await pending.waitFor({ timeout: 10000 })
-  assert.match(await pending.textContent(), /Chờ có mạng|Đang gửi|Đang xác nhận|Gửi lại/)
+  await pending.getByRole('button', { name: 'Gửi lại tin nhắn đang chờ' }).waitFor({ timeout: 10000 })
 
   // Ensure the simulated outage actually intercepted one attempted POST.
-  for (let i = 0; i < 40 && requests.length === 0; i += 1) await delay(125)
-  assert.equal(requests.length, 1, 'the reopened tab should attempt a send while the API is unavailable')
+  assert.equal(requests.length, initialAttempts + 1, 'the reopened tab should attempt a send while delivery is unavailable')
 
   // Reconnect must automatically flush with the same clientId and one DB row.
   blockPost = false
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
-  await page.waitForFunction(() => document.querySelectorAll('.chat-outbox-message').length === 0, { timeout: 10000 })
+  await page.waitForFunction(() => document.querySelectorAll('.chat-outbox-message').length === 0, undefined, { timeout: 10000 })
   assert.equal(records.size, 1)
   const firstClientId = [...records.keys()][0]
-  assert.equal(requests.filter(x => x.clientId === firstClientId).length, 2,
-    'reopen outage and successful retry must reuse the same clientId')
+  assert.equal(requests.filter(x => x.clientId === firstClientId).length, 3,
+    'initial attempt, reopen outage and successful retry must reuse the same clientId')
   assert.equal(await page.locator('.message .bubble').filter({ hasText: 'P0-02 offline message from A to B' }).count(), 1)
 
   // All online sends use one pump: a second message cannot overtake a slow first request.
@@ -195,7 +222,7 @@ try {
     [orderedFirst], 'second POST must wait for the first receipt')
   assert.ok(releaseHeldPost, 'first POST gate was not installed')
   releaseHeldPost()
-  await page.waitForFunction(() => document.querySelectorAll('.chat-outbox-message').length === 0,
+  await page.waitForFunction(() => document.querySelectorAll('.chat-outbox-message').length === 0, undefined,
     { timeout: 10000 })
   assert.deepEqual(requests.filter(x => x.text === orderedFirst || x.text === orderedSecond).map(x => x.text),
     [orderedFirst, orderedSecond])
@@ -222,15 +249,15 @@ try {
   await sendButton.click()
   const recovering = page.locator('.chat-outbox-message').filter({ hasText: 'P0-02 reload during outage' })
   await recovering.waitFor({ timeout: 5000 })
-  await page.reload()
-  await page.locator('.conversation-item').first().click()
+  await page.reload({ waitUntil: 'commit' })
+  await openConversation(page)
   await recovering.waitFor({ timeout: 10000 })
   blockPost = false
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await recovering.waitFor({ state: 'detached', timeout: 25000 })
   assert.equal(records.size, 5)
   assert.deepEqual(pageErrors, [], 'page must not throw while offline/recovering')
-  console.log('PASS: durable close/reopen queue, serialized sends, automatic resend, lost-ACK idempotency, reload recovery')
+  console.log('PASS: fail-closed encryption status, durable close/reopen queue, serialized sends, automatic resend, lost-ACK idempotency, reload recovery')
 } finally {
   await browser?.close()
   vite.kill('SIGTERM')
