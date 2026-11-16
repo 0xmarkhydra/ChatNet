@@ -41,15 +41,17 @@ export function useMessageEdits({
       return;
     }
 
-    const sessionId = session?.sessionId;
-    actionLocks.current.add(key);
+    const identity = sessionRef.current;
+    if (!identity || identity !== session || !identity.sessionId) return;
+    const locks = actionLocks.current;
+    locks.add(key);
     try {
       const response = await editMessage(apiFetch, message.id, next.trim());
       const result = (await response.json().catch(() => null)) as
         | Message
         | { error?: string }
         | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
+      if (sessionRef.current !== identity) return;
       if (
         !response.ok ||
         !result ||
@@ -83,8 +85,7 @@ export function useMessageEdits({
         return nextTranslations;
       });
     } finally {
-      if (sessionRef.current?.sessionId === sessionId)
-        actionLocks.current.delete(key);
+      locks.delete(key);
     }
   }
   async function recallOwnMessage(message: Message) {
@@ -96,15 +97,17 @@ export function useMessageEdits({
     )
       return;
     if (!window.confirm("Thu hồi tin nhắn này?")) return;
-    const sessionId = session?.sessionId;
-    actionLocks.current.add(key);
+    const identity = sessionRef.current;
+    if (!identity || identity !== session || !identity.sessionId) return;
+    const locks = actionLocks.current;
+    locks.add(key);
     try {
       const response = await recallMessage(apiFetch, message.id);
       const result = (await response.json().catch(() => null)) as
         | Message
         | { error?: string }
         | null;
-      if (sessionRef.current?.sessionId !== sessionId) return;
+      if (sessionRef.current !== identity) return;
       if (
         !response.ok ||
         !result ||
@@ -131,8 +134,7 @@ export function useMessageEdits({
       });
       setReplyingTo((current) => (current?.id === message.id ? null : current));
     } finally {
-      if (sessionRef.current?.sessionId === sessionId)
-        actionLocks.current.delete(key);
+      locks.delete(key);
     }
   }
 

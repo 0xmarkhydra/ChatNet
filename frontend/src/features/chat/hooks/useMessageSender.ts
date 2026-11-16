@@ -1,4 +1,4 @@
-import { FormEvent, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { FormEvent, useRef, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { useApi } from "../../../shared/context/ApiContext";
 import { useNotice } from "../../../shared/context/NoticeContext";
 import { useSession } from "../../../shared/context/SessionContext";
@@ -48,18 +48,21 @@ export function useMessageSender({
   const { setNotice } = useNotice();
   const { apiFetch } = useApi();
   const { session, sessionRef } = useSession();
+  const activeAttempt = useRef<object | null>(null);
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
-    if (!canSend || !activeConversationId || sendingRef.current || !session)
+    if (!canSend || !activeConversationId || sendingRef.current || !session ||
+        sessionRef.current !== session)
       return;
     sendingRef.current = true;
-    const submittingSessionId = session.sessionId;
+    const attempt = {};
+    activeAttempt.current = attempt;
     const conversationId = activeConversationId;
     try {
       // Fail closed before the plaintext outbox. Do not queue local plaintext
       // for a room that has cut over to MLS, or when the status is unknown.
       const mode = await getConversationEncryptionStatus(apiFetch, conversationId);
-      if (sessionRef.current?.sessionId !== submittingSessionId) return;
+      if (sessionRef.current !== session) return;
       if (mode !== 'legacy') {
         setNotice('Cuộc trò chuyện yêu cầu E2EE. Hãy gửi qua ô nhập mã hóa khi thiết bị đã sẵn sàng.', 'warning');
         return;
@@ -112,11 +115,14 @@ export function useMessageSender({
     if (navigator.onLine) void retryQueuedChatMessages();
     else setChatOnline(false);
     } catch {
-      if (sessionRef.current?.sessionId === submittingSessionId) {
+      if (sessionRef.current === session) {
         setNotice('Không xác minh được chế độ mã hóa. Tin nhắn chưa được gửi hoặc lưu vào hàng đợi.', 'warning');
       }
     } finally {
-      sendingRef.current = false;
+      if (activeAttempt.current === attempt) {
+        activeAttempt.current = null;
+        sendingRef.current = false;
+      }
     }
   }
 

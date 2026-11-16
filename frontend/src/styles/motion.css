@@ -209,6 +209,60 @@
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
+/* Radix owns mounting, keyboard behavior and focus. Distinct exit keyframes
+ * let Presence keep the portal around just long enough to paint the exit. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-slot="dialog-overlay"][data-state="open"] {
+    animation: soco-dim-in var(--soco-motion-quick) var(--soco-motion-ease) both;
+  }
+  [data-slot="dialog-overlay"][data-state="closed"] {
+    animation: soco-overlay-out var(--soco-motion-touch) ease-in both;
+  }
+  [data-slot="dialog-content"][data-state="open"] {
+    animation: soco-dialog-in var(--soco-motion-standard) var(--soco-motion-ease) both;
+  }
+  [data-slot="dialog-content"][data-state="closed"] {
+    animation: soco-dialog-out var(--soco-motion-touch) ease-in both;
+  }
+  [data-slot="dropdown-menu-content"] {
+    transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  }
+  [data-slot="dropdown-menu-content"][data-state="open"] {
+    animation: soco-dialog-in var(--soco-motion-quick) var(--soco-motion-ease) both;
+  }
+  [data-slot="dropdown-menu-content"][data-state="closed"] {
+    animation: soco-dialog-out var(--soco-motion-touch) ease-in both;
+  }
+  .reaction-motion-glyph {
+    display: inline-block;
+    animation: soco-reaction-pop var(--soco-motion-standard) var(--soco-motion-ease) both;
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+  .app-sidebar .app-sidebar-link:is(:hover, :focus-visible) > svg {
+    animation: soco-nav-icon-pop var(--soco-motion-standard) var(--soco-motion-ease);
+  }
+}
+@keyframes soco-overlay-out {
+  to { opacity: 0; }
+}
+@keyframes soco-dialog-in {
+  from { opacity: 0; scale: .98; }
+  to { opacity: 1; scale: 1; }
+}
+@keyframes soco-dialog-out {
+  from { opacity: 1; scale: 1; }
+  to { opacity: 0; scale: .98; }
+}
+@keyframes soco-reaction-pop {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.24) rotate(-7deg); }
+}
+@keyframes soco-nav-icon-pop {
+  0%, 100% { transform: none; }
+  45% { transform: translateY(-1px) scale(1.13); }
+}
+
 /* Respect accessibility preference; also avoid animating during automation. */
 @media (prefers-reduced-motion: reduce) {
   .modern-shell :is(

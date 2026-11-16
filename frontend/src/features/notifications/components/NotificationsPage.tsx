@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { useSession } from '../../../shared/context/SessionContext'
 import { AtSign, Bell, Check, MessageCircle, Settings, UserRoundPlus, Users, X } from 'lucide-react'
@@ -39,6 +39,9 @@ export default function NotificationsPage({
   const [filter, setFilter] = useState<NotificationFilter>('all')
   const { hostRef: filtersPillSetHost, activeRef: filtersPillSetActive, pillRef: filtersPillSetPill } = useSlidingPill<HTMLDivElement>(filter)
   const { session } = useSession()
+  const sessionId = session.sessionId
+  const notificationList = useRef<HTMLDivElement>(null)
+  const previousNotifications = useRef<{ sessionId: string; keys: Set<string> } | null>(null)
   const [selectedKey, setSelectedKey] = useScopedState<string | null>(session.sessionId, null)
   const [readKeys, setReadKeys] = useScopedState<Set<string>>(session.sessionId, new Set())
   const notifications = useMemo(() => buildNotificationItems(requests, conversations, mentions), [requests, conversations, mentions])
@@ -56,6 +59,27 @@ export default function NotificationsPage({
       return next.size === previous.size ? previous : next
     })
   }, [notifications, setReadKeys])
+
+  useLayoutEffect(() => {
+    const previous = previousNotifications.current
+    const keys = new Set(notifications.map(item => item.key))
+    previousNotifications.current = { sessionId, keys }
+    if (previous?.sessionId !== sessionId || !notificationList.current
+      || !window.matchMedia?.('(prefers-reduced-motion: no-preference)').matches) return
+
+    // Compare source keys, not filtered rows, so search and tab changes never replay the entry.
+    const rows = notificationList.current.querySelectorAll<HTMLElement>('[data-notification-key]')
+    let animated = 0
+    for (const row of rows) {
+      const key = row.dataset.notificationKey
+      if (!key || previous.keys.has(key) || !row.animate) continue
+      row.animate([
+        { opacity: .45, transform: 'translateY(-6px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ], { duration: 190, delay: animated * 30, easing: 'cubic-bezier(.2,.8,.2,1)' })
+      if (++animated === 4) break
+    }
+  }, [notifications, sessionId])
 
   const markRead = (key: string) => {
     const item = notifications.find(value => value.key === key)
@@ -82,8 +106,8 @@ export default function NotificationsPage({
               className={filter === key ? 'active' : ''} aria-selected={filter === key}
               onClick={() => setFilter(key)}>{label}</button>)}
         </div>
-        <div className="np-notification-list">
-          {filtered.map(item => <button key={item.key} type="button"
+        <div className="np-notification-list" ref={notificationList}>
+          {filtered.map(item => <button key={item.key} type="button" data-notification-key={item.key}
             className={'np-notification-row' + (selected?.key === item.key ? ' selected' : '') + ((item.mention ? Boolean(item.mention.readAt) : readKeys.has(item.key)) ? ' is-read' : '')}
             onClick={() => { setSelectedKey(item.key); markRead(item.key) }}>
             {(item.kind === 'friend' || item.kind === 'mention') && item.username

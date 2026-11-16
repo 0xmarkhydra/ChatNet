@@ -1,4 +1,4 @@
-import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward } from "lucide-react";
+import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward, ShieldAlert } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { useScopedState } from "../../../shared/hooks/useScopedState";
@@ -813,10 +813,20 @@ export default function ChatSection({
                       }}
                     />
                   )}
-                  {mlsPilotMode === 'e2ee' && (
-                    <p className="mls-pilot-legacy-notice">
-                      Tin nhắn cũ ở phía trên được gửi trước E2EE và chưa được mã hóa đầu cuối.
-                    </p>
+                  {activeConversation.type === 'direct' && mlsPilotMode !== 'unknown' && (
+                    <div role="status" className="flex min-w-0 shrink-0 justify-center gap-1.5 px-3 py-1 text-xs leading-4 text-foreground">
+                      <ShieldAlert size={14} className="mt-px shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 wrap-break-word">
+                        <strong className="font-semibold">
+                          {mlsPilotMode === 'legacy'
+                            ? 'Hội thoại chưa mã hóa đầu cuối'
+                            : 'Tin nhắn cũ chưa mã hóa đầu cuối'}
+                        </strong>{' · '}
+                        {mlsPilotMode === 'legacy'
+                          ? 'Tin nhắn mới vẫn có thể được lưu trên máy chủ.'
+                          : 'Tin nhắn mới chỉ được gửi khi phiên MLS sẵn sàng.'}
+                      </span>
+                    </div>
                   )}
                   <MessageTimeline
                     activeChatTranslationSettings={activeChatTranslationSettings}

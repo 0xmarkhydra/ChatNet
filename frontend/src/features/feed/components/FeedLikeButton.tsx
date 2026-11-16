@@ -1,5 +1,7 @@
 import { Heart } from 'lucide-react'
 import type { Post } from '../types'
+import { burstPostHearts } from '../utils/postHeartBurst'
+import '../styles/feed-actions.css'
 
 // A single like affordance across feed cards, profile timelines and post details.
 export default function FeedLikeButton({
@@ -19,7 +21,10 @@ export default function FeedLikeButton({
       aria-pressed={liked}
       aria-busy={busy}
       aria-label={liked ? 'Bỏ thích bài viết' : 'Thích bài viết'}
-      onClick={() => onLike(selectedReaction || '❤️')}
+      onClick={(event) => {
+        if (!liked) burstPostHearts(event.currentTarget)
+        onLike(selectedReaction || '❤️')
+      }}
     >
       <Heart size={22} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
       <span>{liked ? 'Đã thích' : 'Thích'}</span>

@@ -1,4 +1,5 @@
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import { useMemo, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { useLatest } from "../../../shared/hooks/useLatest";
 import { useApi } from "../../../shared/context/ApiContext";
 import { useNotice } from "../../../shared/context/NoticeContext";
 import { useSession } from "../../../shared/context/SessionContext";
@@ -44,11 +45,16 @@ export function useConversationHistory({
 }: UseConversationHistoryDeps) {
   const { apiFetch } = useApi();
   const { setNotice } = useNotice();
-  const { sessionRef } = useSession();
+  const { session, sessionRef } = useSession();
+  // Guard the whole visit, not just sessionId: returning A → B → A is a new visit.
+  const visit = useMemo(() => ({ sessionId: session?.sessionId, userId: session?.user.id }),
+    [session?.sessionId, session?.user.id]);
+  const latestVisit = useLatest(visit);
   async function clearActiveConversationHistory() {
     const current = conversations.find((item) => item.id === activeConversationId)
-    const sessionId = sessionRef.current?.sessionId
-    if (!current || !sessionId || historyActionBusy) return
+    const sessionId = session?.sessionId
+    const isCurrent = () => latestVisit.current === visit && sessionRef.current?.sessionId === sessionId
+    if (!current || !sessionId || !isCurrent() || historyActionBusy) return
     if (!window.confirm(`Xóa lịch sử trò chuyện với ${current.name} trên tài khoản của bạn?\nNgười khác vẫn giữ lịch sử của họ. Bạn không thể khôi phục các tin nhắn cũ sau thao tác này.`)) return
     setHistoryActionBusy(true)
     try {
@@ -57,7 +63,7 @@ export function useConversationHistory({
         const data = await response.json().catch(() => null) as { error?: string } | null
         throw new Error(data?.error || 'Không xóa được lịch sử trò chuyện.')
       }
-      if (sessionRef.current?.sessionId !== sessionId) return
+      if (!isCurrent()) return
       responseCache.current.invalidate(['conversations', 'messages'])
       if (activeConversationIdRef.current === current.id) {
         setActiveConversationId(null)
@@ -72,7 +78,7 @@ export function useConversationHistory({
       setNotice('Đã xóa lịch sử trò chuyện khỏi tài khoản của bạn.', 'success')
       void refreshConversations()
     } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) setNotice(error instanceof Error ? error.message : 'Không xóa được lịch sử trò chuyện.', 'error')
+      if (isCurrent()) setNotice(error instanceof Error ? error.message : 'Không xóa được lịch sử trò chuyện.', 'error')
     } finally {
       setHistoryActionBusy(false)
     }

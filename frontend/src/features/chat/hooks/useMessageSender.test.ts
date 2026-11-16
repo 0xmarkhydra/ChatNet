@@ -55,8 +55,12 @@ async function setup() {
   const submit = async () => act(async () => {
     await send({ preventDefault: () => {} } as unknown as FormEvent)
   })
+  const begin = () => send({ preventDefault: () => {} } as unknown as FormEvent)
   return {
     submit,
+    begin,
+    sendingRef: deps.sendingRef,
+    rerender: async () => act(async () => root.render(createElement(Harness))),
     updateChatOutbox,
     retryQueuedChatMessages,
     setMessageDrafts,
@@ -69,7 +73,8 @@ describe('message composer E2EE no-downgrade gate', () => {
     vi.clearAllMocks()
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     vi.stubGlobal('navigator', { onLine: true })
-    mocked.sessionRef.current = { sessionId: 'sess1', user: { id: 18 } }
+    mocked.session = { sessionId: 'sess1', user: { id: 18 } }
+    mocked.sessionRef.current = mocked.session
     mocked.apiFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ mode: 'e2ee', epoch: 1 }),
@@ -129,4 +134,56 @@ describe('message composer E2EE no-downgrade gate', () => {
     )
     await sender.cleanup()
   })
+  it('ignores stale encryption approval after A → B → A reuses a session ID', async () => {
+    let resolveStatus!: (value: unknown) => void
+    mocked.apiFetch.mockImplementation(() => new Promise(resolve => { resolveStatus = resolve }))
+    const sender = await setup()
+    const first = sender.submit()
+    await vi.waitFor(() => expect(resolveStatus).toBeTypeOf('function'))
+
+    mocked.session = { sessionId: 'sess2', user: { id: 19 } }
+    mocked.sessionRef.current = mocked.session
+    await sender.rerender()
+    mocked.session = { sessionId: 'sess1', user: { id: 18 } }
+    mocked.sessionRef.current = mocked.session
+    await sender.rerender()
+
+    resolveStatus({ ok: true, json: async () => ({ mode: 'legacy' }) })
+    await first
+    expect(sender.updateChatOutbox).not.toHaveBeenCalled()
+    expect(sender.retryQueuedChatMessages).not.toHaveBeenCalled()
+    expect(sender.setMessageDrafts).not.toHaveBeenCalled()
+    await sender.cleanup()
+  })
+
+  it('does not release the newer send lock when the old verification finishes', async () => {
+    const approvals: Array<(value: unknown) => void> = []
+    mocked.apiFetch.mockImplementation(() => new Promise(resolve => { approvals.push(resolve) }))
+    const sender = await setup()
+    const first = sender.begin()
+    await vi.waitFor(() => expect(approvals).toHaveLength(1))
+
+    mocked.session = { sessionId: 'sess2', user: { id: 19 } }
+    mocked.sessionRef.current = mocked.session
+    sender.sendingRef.current = false
+    await sender.rerender()
+    mocked.session = { sessionId: 'sess1', user: { id: 18 } }
+    mocked.sessionRef.current = mocked.session
+    await sender.rerender()
+    const second = sender.begin()
+    await vi.waitFor(() => expect(approvals).toHaveLength(2))
+    expect(sender.sendingRef.current).toBe(true)
+
+    approvals[0]({ ok: true, json: async () => ({ mode: 'legacy' }) })
+    await first
+    expect(sender.sendingRef.current).toBe(true)
+    expect(sender.updateChatOutbox).not.toHaveBeenCalled()
+
+    approvals[1]({ ok: true, json: async () => ({ mode: 'e2ee' }) })
+    await second
+    expect(sender.sendingRef.current).toBe(false)
+    expect(sender.updateChatOutbox).not.toHaveBeenCalled()
+    await sender.cleanup()
+  })
+
 })

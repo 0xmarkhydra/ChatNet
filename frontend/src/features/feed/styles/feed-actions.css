@@ -697,3 +697,25 @@
     font-size: 12px;
   }
 }
+
+.feed-heart-burst {
+  position: fixed;
+  width: 0;
+  height: 0;
+  z-index: 100000;
+  pointer-events: none;
+}
+.feed-heart-particle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  line-height: 1;
+  opacity: 0;
+  color: #f04268;
+  text-shadow: 0 2px 7px #be185d40;
+}
+.feed-heart-particle:nth-child(3n + 2) { color: #fb7185; }
+.feed-heart-particle:nth-child(3n) { color: #e11d48; }
+@media (prefers-reduced-motion: reduce) {
+  .feed-heart-burst { display: none; }
+}

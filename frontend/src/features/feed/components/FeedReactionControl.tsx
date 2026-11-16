@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Heart, ThumbsUp } from "lucide-react";
 import type { Post } from "../types";
 import { reactionOptions } from "../../../shared/utils/reactions";
+import { burstPostHearts } from "../utils/postHeartBurst";
 import "../styles/feed-actions.css";
 
 export default function FeedReactionControl({
@@ -16,6 +17,7 @@ export default function FeedReactionControl({
   showCount?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [reactionPulse, setReactionPulse] = useState(0);
   const host = useRef<HTMLDivElement>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreNextClick = useRef(false);
@@ -101,18 +103,21 @@ export default function FeedReactionControl({
             return;
           }
           setOpen(false);
+          if (selected !== "👍") setReactionPulse(pulse => pulse + 1);
           void react(post, "👍");
         }}
       >
         <span className="feed-reaction-current" aria-hidden="true">
-          {selected && selected !== "👍" ? (
-            selected
-          ) : (
-            <ThumbsUp
-              size={20}
-              fill={selected === "👍" ? "currentColor" : "none"}
-            />
-          )}
+          <span key={reactionPulse} className={reactionPulse ? "reaction-motion-glyph" : undefined}>
+            {selected && selected !== "👍" ? (
+              selected
+            ) : (
+              <ThumbsUp
+                size={20}
+                fill={selected === "👍" ? "currentColor" : "none"}
+              />
+            )}
+          </span>
         </span>
         <span>{label}</span>
         {showCount && post.likes > 0 && <b>{post.likes}</b>}
@@ -139,8 +144,10 @@ export default function FeedReactionControl({
               aria-pressed={selected === emoji}
               title={reactionLabel}
               disabled={busy}
-              onClick={() => {
+              onClick={(event) => {
+                if (emoji === "❤️" && selected !== emoji) burstPostHearts(event.currentTarget);
                 setOpen(false);
+                if (selected !== emoji) setReactionPulse(pulse => pulse + 1);
                 void react(post, emoji);
               }}
             >

@@ -94,7 +94,8 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                               onClick={() => onReactionUsers(message, reaction.emoji)}
                               aria-label={`Xem ${reaction.count} người thả ${messageReactionLabel(reaction.emoji)}`}
                             >
-                              {reaction.emoji} {reaction.count}
+                              <span className={reaction.mine && reactionPreviews[message.id] !== undefined ? 'reaction-motion-glyph' : undefined}
+                                aria-hidden="true">{reaction.emoji}</span>{' '}{reaction.count}
                             </button>
                           ))}
                           <button type="button" className="reaction-add"

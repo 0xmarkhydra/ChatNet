@@ -120,19 +120,30 @@ export function useAppRealtime({
     void handlers.current.refreshStories()
 
     let active = true
+    let hasOpened = false
+    let hadConnectionError = false
     let lastSSECheckAt = 0
     const events = new EventSource(
       `${API}/api/events?token=${encodeURIComponent(session.token)}`,
     )
     events.onopen = () => {
-      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
+      if (!active || sessionRef.current !== session) return
+      const reconnected = hasOpened || hadConnectionError
+      hasOpened = true
+      hadConnectionError = false
       lastSSECheckAt = Date.now()
       handlers.current.setStatus('Đang online')
+      // EventSource can silently miss messages while disconnected. Refresh the
+      // active conversation only on a genuine reopen, not the initial connect.
+      if (reconnected) window.dispatchEvent(new CustomEvent('chatnet:sse-reconnected', {
+        detail: { sessionId: session.sessionId },
+      }))
       void handlers.current.refreshFriendConnections()
       void handlers.current.reconcileConversationMemberships()
     }
     events.onerror = () => {
-      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
+      if (!active || sessionRef.current !== session) return
+      hadConnectionError = true
       handlers.current.setStatus('Đang kết nối lại...')
       if (Date.now() - lastSSECheckAt < 30_000) return
       lastSSECheckAt = Date.now()
