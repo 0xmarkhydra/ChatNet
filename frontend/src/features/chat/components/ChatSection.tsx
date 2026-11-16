@@ -1,4 +1,4 @@
-import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward } from "lucide-react";
+import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward, ShieldAlert } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { useScopedState } from "../../../shared/hooks/useScopedState";
@@ -55,6 +55,7 @@ import ConversationHeader from "./ConversationHeader";
 import MessageTimeline from "./MessageTimeline";
 import PinnedItemsPanel from "./PinnedItemsPanel";
 import type { ChatSectionProps } from "./ChatSectionProps";
+import { useConversationNotificationToggle } from "../hooks/useConversationNotificationToggle";
 
 export type { ChatSectionProps } from "./ChatSectionProps";
 
@@ -374,31 +375,9 @@ export default function ChatSection({
     cancelSplitTransitionFrames();
     cancelQueuedRailNavigation();
   }, []);
-  const [notificationBusyId, setNotificationBusyId] = useState<number | null>(null);
-  async function toggleConversationNotifications(conversation: Conversation) {
-    if (notificationBusyId !== null) return;
-    setNotificationBusyId(conversation.id);
-    try {
-      const muted = !conversation.muted;
-      const response = await apiFetch('/api/conversations/' + conversation.id + '/notification-settings', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageNotifications: !muted, mentionNotifications: !muted }),
-      });
-      const result = await response.json().catch(() => null) as
-        { messageNotifications?: boolean; mentionNotifications?: boolean; error?: string } | null;
-      if (!response.ok || typeof result?.messageNotifications !== 'boolean') {
-        throw new Error(result?.error || 'Không cập nhật được thông báo. Backend cần hỗ trợ thiết lập theo hội thoại.');
-      }
-      const nextMuted = !result.messageNotifications && !result.mentionNotifications;
-      setConversations(current => current.map(item =>
-        item.id === conversation.id ? { ...item, muted: nextMuted } : item));
-      setNotice(nextMuted ? 'Đã tắt thông báo hội thoại.' : 'Đã bật thông báo hội thoại.', 'success');
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông báo.', 'error');
-    } finally {
-      setNotificationBusyId(null);
-    }
-  }
+  const { notificationBusyId, toggleConversationNotifications } = useConversationNotificationToggle({
+    apiFetch, setConversations, setNotice,
+  });
   const [desktopChannelPanelOpen, setDesktopChannelPanelOpen] = useState(false);
   const [channelSidebarOpen, setChannelSidebarOpen] = useState(false);
   const [mobileChannelSelected, setMobileChannelSelected] = useState(false);
@@ -946,16 +925,20 @@ export default function ChatSection({
                       }}
                     />
                   )}
-                  {activeConversation.type === 'direct' && (mlsPilotMode === 'e2ee' || mlsPilotMode === 'pending') && (
-                    <p className="mls-pilot-legacy-notice" role="status">
-                      Tin nhắn cũ ở phía trên được gửi trước E2EE và chưa được mã hóa đầu cuối.
-                      Tin nhắn mới chỉ được gửi khi phiên MLS sẵn sàng.
-                    </p>
-                  )}
-                  {activeConversation.type === 'direct' && mlsPilotMode === 'legacy' && (
-                    <p className="mls-pilot-legacy-notice" role="status">
-                      Hội thoại này chưa mã hóa đầu cuối. Tin nhắn mới vẫn có thể được lưu trên máy chủ.
-                    </p>
+                  {activeConversation.type === 'direct' && mlsPilotMode !== 'unknown' && (
+                    <div role="status" className="flex min-w-0 shrink-0 justify-center gap-1.5 px-3 py-1 text-xs leading-4 text-foreground">
+                      <ShieldAlert size={14} className="mt-px shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 wrap-break-word">
+                        <strong className="font-semibold">
+                          {mlsPilotMode === 'legacy'
+                            ? 'Hội thoại chưa mã hóa đầu cuối'
+                            : 'Tin nhắn cũ chưa mã hóa đầu cuối'}
+                        </strong>{' · '}
+                        {mlsPilotMode === 'legacy'
+                          ? 'Tin nhắn mới vẫn có thể được lưu trên máy chủ.'
+                          : 'Tin nhắn mới chỉ được gửi khi phiên MLS sẵn sàng.'}
+                      </span>
+                    </div>
                   )}
                   <MessageTimeline
                     activeChatTranslationSettings={activeChatTranslationSettings}
@@ -1006,6 +989,8 @@ export default function ChatSection({
                     updateChatOutbox={updateChatOutbox}
                     visibleMessages={visibleMessages}
                     messageReaderMembers={messageReaderMembers}
+                    groupMembers={groupMembers}
+                    onProfile={openVisitor}
                     setReadersTarget={setReadersTarget}
                   />
 
@@ -1035,12 +1020,14 @@ export default function ChatSection({
                     </div>
                   ) : (mlsPilotMode === 'e2ee' || mlsPilotMode === 'pending') ? null : (
                   <MessageComposer
+                key={`${activeConversationId}:${selectedChannelId}`}
                 activeConversation={activeConversation}
                 activeConversationId={activeConversationId}
                 addChatFiles={addChatFiles}
                 canSend={canSend}
                 chatFileInputRef={chatFileInputRef}
                 groupChannels={groupChannels}
+                groupMembers={groupMembers}
                 isProfileDesktop={isProfileDesktop}
                 mediaUploading={mediaUploading}
                 messageAttachments={messageAttachments}

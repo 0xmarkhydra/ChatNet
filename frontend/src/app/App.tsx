@@ -2,6 +2,7 @@ import AuthScreen from "../features/auth/components/AuthScreen";
 import type { Session } from "../features/auth/lib/session";
 import AuthedApp from "./AuthedApp";
 import AuthedProviders from "./providers/AuthedProviders";
+import AppPageErrorBoundary from "./layouts/AppPageErrorBoundary";
 import { useAppSession } from "./hooks/useAppSession";
 import { useInstallPrompt } from "./hooks/useInstallPrompt";
 
@@ -11,24 +12,32 @@ export default function App({ initialSession }: { initialSession?: Session | nul
     useAppSession(initialSession);
   const { installPrompt, setInstallPrompt } = useInstallPrompt();
 
-  if (!session) return <AuthScreen {...auth} />;
+  if (!session) {
+    return (
+      <AppPageErrorBoundary>
+        <AuthScreen {...auth} />
+      </AppPageErrorBoundary>
+    );
+  }
 
   return (
     <AuthedProviders
-      key={session.sessionId}
+      key={`${session.user.id}:${session.sessionId}`}
       session={session}
       sessionRef={sessionRef}
       sessionClient={sessionClient}
       responseCache={responseCache}
     >
-      <AuthedApp
-        responseCache={responseCache}
-        sessionClient={sessionClient}
-        saveSession={saveSession}
-        endSession={endSession}
-        installPrompt={installPrompt}
-        setInstallPrompt={setInstallPrompt}
-      />
+      <AppPageErrorBoundary>
+        <AuthedApp
+          responseCache={responseCache}
+          sessionClient={sessionClient}
+          saveSession={saveSession}
+          endSession={endSession}
+          installPrompt={installPrompt}
+          setInstallPrompt={setInstallPrompt}
+        />
+      </AppPageErrorBoundary>
     </AuthedProviders>
   );
 }

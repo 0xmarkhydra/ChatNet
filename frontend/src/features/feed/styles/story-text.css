@@ -1,0 +1,38 @@
+/* Content palettes are shared by creation tiles, preview, thumbnails and the viewer. */
+[data-story-background="berry"] { background-image: linear-gradient(155deg, #672cb5, #ad255f); }
+[data-story-background="indigo"] { background-image: linear-gradient(145deg, #4229a7, #245a9d); }
+[data-story-background="teal"] { background-image: linear-gradient(155deg, #134e62, #11705d); }
+[data-story-background="sunset"] { background-image: linear-gradient(155deg, #8a350b, #9e2956); }
+
+.social-feed-story-cover.story-text-avatar {
+  display: grid;
+  place-items: center;
+}
+
+.story-screen-text {
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: clamp(3.75rem, 16dvh, 7rem) clamp(3rem, 12%, 5rem);
+  color: white;
+  text-align: center;
+  font-size: clamp(1.15rem, 3vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.story-screen-text p {
+  margin: 0;
+  width: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .story-screen-text { padding: clamp(3.75rem, 13dvh, 5.5rem) 3.1rem; }
+}

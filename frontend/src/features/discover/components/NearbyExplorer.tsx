@@ -52,7 +52,8 @@ export default function NearbyExplorer({
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
   const [locating, setLocating] = useState(false)
   const locationRevision = useRef(0)
-  useEffect(() => () => { ++locationRevision.current }, [])
+  const locatingFlight = useRef(false)
+  useEffect(() => () => { ++locationRevision.current; locatingFlight.current = false }, [])
   const [locationError, setLocationError] = useState('')
   const [places, setPlaces] = useState<NearbyPlace[]>([])
   const [loading, setLoading] = useState(false)
@@ -80,7 +81,8 @@ export default function NearbyExplorer({
   }, [location, category, radius, reload, mode])
 
   async function locate() {
-    if (locating) return
+    if (locatingFlight.current) return
+    locatingFlight.current = true
     const revision = ++locationRevision.current
     setLocating(true); setLocationError('')
     try {
@@ -89,7 +91,12 @@ export default function NearbyExplorer({
     } catch (error) {
       const message = await geolocationErrorMessage(error)
       if (revision === locationRevision.current) setLocationError(message)
-    } finally { if (revision === locationRevision.current) setLocating(false) }
+    } finally {
+      if (revision === locationRevision.current) {
+        locatingFlight.current = false
+        setLocating(false)
+      }
+    }
   }
 
   async function scan() {
@@ -122,8 +129,10 @@ export default function NearbyExplorer({
     {mode === 'places' && <div className="nearby-categories" aria-label="Loại địa điểm">{categories.map((item) =>
       <button key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>}
     {mode === 'people' && <p className="nearby-privacy"><ShieldCheck size={16} />Vị trí chính xác của bạn không được chia sẻ.</p>}
+    {locating && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang xác định vị trí…</p>}
+    {loading && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang tải địa điểm…</p>}
     {locationError && mode === 'places' && <p className="nearby-error" role="alert">{locationError}</p>}
-    {error && mode === 'places' && <div className="nearby-error" role="alert">{error}<button onClick={() => setReload((value) => value + 1)}>Thử lại</button></div>}
+    {error && mode === 'places' && <div className="nearby-error" role="alert">{error}<button type="button" disabled={loading} onClick={() => setReload((value) => value + 1)}>Thử lại</button></div>}
     <div className="nearby-results-heading">
       <strong>{count} {mode === 'people' ? 'người' : 'địa điểm'}</strong>
       {mode === 'people' ? <span>{users.length ? `Trong ${resultRadiusKm} km · gần nhất trước` : ''}</span> : <div className="nearby-view">
@@ -146,7 +155,7 @@ export default function NearbyExplorer({
     </div> : <>
       {!location && !busy && <div className="nearby-empty"><MapPin size={36} /><h2>Tìm địa điểm gần bạn</h2><button className="nearby-primary" onClick={() => void locate()}>Dùng vị trí hiện tại</button></div>}
       {location && <div className={`nearby-place-content${view === 'map' ? ' map-view' : ''}`}>
-      {view === 'map' && <NearbyMap location={location} places={visiblePlaces} selected={selected} onSelect={setSelected} />}
+      {view === 'map' && <NearbyMap location={location} places={visiblePlaces} selected={selected} onSelect={setSelected} onShowList={() => setView('list')} />}
       <div className="nearby-place-list" aria-label="Kết quả địa điểm">
       {location && !busy && !error && !count && <div className="nearby-empty"><Search size={30} /><h2>Chưa tìm thấy địa điểm</h2><p>Thử từ khóa khác hoặc tăng bán kính.</p></div>}
       {visiblePlaces.map((place, index) => <article key={place.id} className={`nearby-place-row${place.id === selected ? ' selected' : ''}`}>

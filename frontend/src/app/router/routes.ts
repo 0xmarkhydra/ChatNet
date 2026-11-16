@@ -56,6 +56,23 @@ export function chatConversationIdFromPath(pathname: string): number | null {
   return Number.isSafeInteger(id) ? id : null;
 }
 
+/** Choose a useful parent destination for unsupported deep links. */
+export function fallbackPathForRoute(pathname: string): string {
+  const segment = pathname.split("/")[1];
+  switch (segment) {
+    case "feed": return TAB_PATH.feed;
+    case "profile":
+    case "users": return TAB_PATH.profile;
+    case "settings": return ROUTE.settings;
+    case "calls": return ROUTE.calls;
+    case "contacts": return TAB_PATH.contacts;
+    case "discover": return TAB_PATH.discover;
+    case "marketplace": return TAB_PATH.market;
+    case "notifications": return TAB_PATH.notifications;
+    default: return TAB_PATH.chat;
+  }
+}
+
 /** Keep route ownership in app; business state stays with the owning feature. */
 export function tabFromPath(pathname: string, legacyTab?: string | null): Tab {
   const segment = pathname.split("/")[1];
@@ -65,7 +82,7 @@ export function tabFromPath(pathname: string, legacyTab?: string | null): Tab {
     (key) => TAB_PATH[key].slice(1) === segment,
   );
   if (tab) return tab;
-  if (pathname === "/" && legacyTab && legacyTab in TAB_PATH) {
+  if (pathname === "/" && legacyTab && Object.hasOwn(TAB_PATH, legacyTab)) {
     return legacyTab as Tab;
   }
   return "chat";

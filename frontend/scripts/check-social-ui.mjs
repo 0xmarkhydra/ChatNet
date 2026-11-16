@@ -57,11 +57,14 @@ let incomingMention = { id: 401, postId: 88, author: 'minhanh', authorDisplayNam
 let rejectNextEdit = false
 let createdFeedPost = null
 let lastStoryCreated = null
+let createdTextStory = null
+let rejectNextTextStory = false
 let presignedUploads = 0
 let friendRequestsSent = 0
 let rejectStoryDirect = false
 const storyReplyRequests = []
 const mediaOnly = process.argv.includes('--media-only')
+const headerOnly = process.argv.includes('--header-only')
 
 
 try {
@@ -72,7 +75,14 @@ try {
     await delay(200)
   }
   assert(ready, 'Vite did not start: ' + serverLog)
-  browser = await chromium.launch({ headless: true })
+  for (const channel of [undefined, 'msedge', 'chrome']) {
+    try {
+      browser = await chromium.launch({ headless: true, channel })
+      break
+    } catch (error) {
+      if (!/doesn't exist|not found/.test(String(error)) || channel === 'chrome') throw error
+    }
+  }
   const page = await browser.newPage({ viewport: { width: 1586, height: 992 } })
   const errors = []
   page.on('pageerror', err => errors.push(err.message))
@@ -217,11 +227,21 @@ try {
     }
     if (path === '/api/stories' && req.method() === 'POST') {
       lastStoryCreated = req.postDataJSON()
-      return json({ id: 101, author: 'soco_user', authorDisplayName: 'SocCO Tester',
-        attachment: { ...lastStoryCreated.attachment, url: origin + '/default-profile-cover.jpg' },
-        createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() })
+      const details = { author: 'soco_user', authorDisplayName: 'SocCO Tester',
+        createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() }
+      if (lastStoryCreated.text) {
+        if (rejectNextTextStory) {
+          rejectNextTextStory = false
+          return route.fulfill({ status: 500, contentType: 'application/json', headers: cors, body: '{"error":"cannot create story"}' })
+        }
+        createdTextStory = { ...details, id: 102, ...lastStoryCreated }
+        return json(createdTextStory)
+      }
+      return json({ ...details, id: 101,
+        attachment: { ...lastStoryCreated.attachment, url: origin + '/default-profile-cover.jpg' } })
     }
-    if (path === '/api/stories') return json([{
+    if (path === '/api/stories') return json([
+      ...(createdTextStory && new URL(req.url()).searchParams.get('includeText') === 'true' ? [createdTextStory] : []), {
       id: 29, author: 'minhanh', authorDisplayName: 'Minh Anh',
       attachment: { storageRef: 'test/story.jpg', kind: 'image', name: 'Tin mới', sizeBytes: 104093,
         contentType: 'image/jpeg', url: origin + '/default-profile-cover.jpg' },
@@ -245,9 +265,225 @@ try {
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     return json({})
   })
+  if (process.argv.includes('--composer-motion-only')) {
+    await page.goto(origin + '/feed')
+    const launcher = page.locator('.social-feed-launcher')
+    const checkin = launcher.getByRole('button', { name: 'Check-in' })
+    const dialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    const animations = [
+      ['Ảnh / Video', '.feed-shortcut-icon > svg', ['feed-shortcut-photo-forward', 'feed-shortcut-photo-back']],
+      ['Story', '.feed-shortcut-clapper-lid', ['feed-shortcut-clap']],
+      ['Check-in', '.feed-shortcut-icon > svg', ['feed-shortcut-pin-hop']],
+    ]
+    const namesOf = (shortcut, selector) => shortcut.locator(selector).evaluateAll(nodes =>
+      nodes.flatMap(node => node.getAnimations().map(animation => animation.animationName)))
+    const closeCheckin = async () => {
+      await dialog.getByRole('textbox', { name: 'Địa điểm check-in' }).waitFor()
+      await dialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+      await dialog.waitFor({ state: 'detached' })
+    }
+    for (const width of [1440, 768, 390, 320]) {
+      await page.setViewportSize({ width, height: 840 })
+      await launcher.waitFor({ state: 'visible' })
+      for (const [label, selector, names] of animations) {
+        const shortcut = launcher.getByRole('button', { name: label })
+        await shortcut.hover()
+        const played = await namesOf(shortcut, selector)
+        assert(names.every(name => played.includes(name)), label + ' must play its own animation: ' + played)
+        if (label === 'Ảnh / Video') {
+          const cards = await shortcut.locator(selector).evaluateAll(nodes => {
+            const snapshot = at => nodes.map(node => {
+              for (const animation of node.getAnimations()) {
+                animation.pause()
+                animation.currentTime = at
+              }
+              const css = getComputedStyle(node)
+              return { transform: css.transform, layer: css.zIndex, angle: new DOMMatrix(css.transform).b,
+                fill: getComputedStyle(node.querySelector('rect')).fill }
+            })
+            const start = snapshot(0)
+            const swapped = snapshot(300)
+            const end = snapshot(599)
+            nodes.forEach(node => node.getAnimations().forEach(animation => animation.finish()))
+            return { start, swapped, end }
+          })
+          assert(cards.start[0].angle < 0 && cards.start[1].angle === 0 &&
+            cards.start[0].layer === '0' && cards.start[1].layer === '1' &&
+            cards.start[1].fill !== 'none' && cards.start[1].fill !== 'transparent' &&
+            cards.swapped[0].layer === '1' && cards.swapped[1].layer === '0' &&
+            Math.abs(cards.end[0].angle) < .02 && cards.end[1].angle < -.2,
+          'Photo cards must be readable, overlap with an opaque front, and exchange the same two poses')
+        }
+      }
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.mouse.move(0, 0)
+      await checkin.hover()
+      assert((await namesOf(checkin, 'svg')).length === 0, 'Reduced motion must disable pin animation')
+      await checkin.click()
+      await closeCheckin()
+      await page.emulateMedia({ reducedMotion: 'no-preference' })
+      console.log('PASS: animated shortcuts and reduced motion at ' + width + 'px')
+    }
+    const touch = await page.context().newCDPSession(page)
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+    await page.setViewportSize({ width: 390, height: 840 })
+    const box = await checkin.boundingBox()
+    assert(box, 'Check-in shortcut must be visible on touch devices')
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchStart', touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }],
+    })
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await dialog.getByRole('textbox', { name: 'Địa điểm check-in' }).waitFor()
+    assert((await namesOf(checkin, 'svg')).includes('feed-shortcut-pin-hop'), 'Touch must replay the pin bounce')
+    await closeCheckin()
+    await page.waitForFunction(button => getComputedStyle(button).transform === 'none', await checkin.elementHandle())
+    console.log('PASS: touch opens Check-in and plays the bounce')
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   await page.goto(origin)
   const sidebar = page.locator('.app-sidebar')
   await sidebar.waitFor()
+  if (process.argv.includes('--story-text-only')) {
+    const enterFeed = async () => {
+      await page.locator('.app-sidebar').getByRole('button', { name: 'Bảng tin' }).click()
+      await page.locator('.social-feed').waitFor({ state: 'visible' })
+    }
+    await enterFeed()
+    const create = page.getByRole('button', { name: 'Tạo Story mới', exact: true })
+    await create.click()
+    const composer = page.getByRole('dialog', { name: 'Tạo Story' })
+    const choice = composer.getByRole('group', { name: 'Chọn loại tin' })
+    const assertChooserLayout = async (width, height) => {
+      await page.setViewportSize({ width, height })
+      const bounds = await composer.boundingBox()
+      const cards = await choice.getByRole('button').all()
+      const [left, right] = await Promise.all(cards.map(card => card.boundingBox()))
+      assert(bounds && left && right, 'Story chooser must render both cards')
+      const edge = bounds.x + bounds.width
+      const bottom = bounds.y + bounds.height
+      const leftInset = left.x - bounds.x
+      const rightInset = edge - right.x - right.width
+      const midpoint = bounds.x + bounds.width / 2
+      const dims = JSON.stringify({ width, height, bounds, left, right })
+      assert(Math.abs(midpoint - width / 2) < 2 && bounds.y >= 0 && bottom <= height + 1,
+        'Story chooser should be horizontally centered and fit the viewport: ' + dims)
+      assert(leftInset >= 14 && rightInset >= 14 && Math.abs(leftInset - rightInset) < 2
+        && bottom - left.y - left.height >= 14 && right.x - left.x - left.width >= 12,
+        'Cards must have even side insets and stay clear of the modal edges: ' + dims)
+      assert(Math.abs(left.width - right.width) < 2 && Math.abs(left.height - right.height) < 2
+        && Math.abs(left.y - right.y) < 2 && left.height >= 140 && left.height <= 300,
+        'Cards must stay the same size without stretching: ' + dims)
+    }
+    await choice.waitFor()
+    await assertChooserLayout(1440, 900)
+    await assertChooserLayout(768, 520)
+    await assertChooserLayout(320, 520)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await composer.getByRole('button', { name: 'Tạo tin dạng văn bản' }).click()
+    const draft = composer.getByRole('textbox', { name: 'Nội dung tin' })
+    const publish = composer.getByRole('button', { name: 'Đăng Story' })
+    assert(await publish.isDisabled(), 'Blank Story must not publish')
+    await draft.fill('ế'.repeat(201))
+    assert(await publish.isDisabled(), 'Oversized Story must not publish')
+    const text = 'Chào bạn!\nHẹn gặp lại ✨'
+    await draft.fill(text)
+    await composer.getByText('Xanh ngọc', { exact: true }).evaluate(label => label.closest('label').click())
+    const preview = composer.getByRole('region', { name: 'Xem trước tin văn bản' })
+    assert(await preview.getAttribute('data-story-background') === 'teal'
+      && await preview.locator('p').textContent() === text, 'Preview must reflect current text and palette')
+    rejectNextTextStory = true
+    const rejected = page.waitForResponse(response => response.url().endsWith('/api/stories') && response.status() === 500)
+    await publish.click()
+    await rejected
+    await composer.getByRole('alert').waitFor()
+    assert(await draft.inputValue() === text, 'Failed publish must retain draft')
+    await publish.click()
+    await composer.waitFor({ state: 'hidden' })
+    assert(lastStoryCreated?.text === text && lastStoryCreated?.background === 'teal'
+      && !('attachment' in lastStoryCreated) && presignedUploads === 0, 'Text Story must be posted without media upload')
+    const viewer = page.getByRole('dialog', { name: 'Khoảnh khắc của SocCO Tester' })
+    const content = viewer.locator('.story-screen-text')
+    await content.waitFor()
+    assert(await content.getAttribute('data-story-background') === 'teal'
+      && await content.locator('p').textContent() === text, 'Viewer must show published text and palette')
+    await viewer.getByRole('button', { name: 'Đóng', exact: true }).click()
+    await page.reload()
+    await enterFeed()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.getByRole('button', { name: 'Xem Story của SocCO Tester' }).click()
+    await content.waitFor()
+    assert(await content.locator('p').isVisible(), 'Persisted text story must render on mobile')
+    await viewer.getByRole('button', { name: 'Đóng', exact: true }).click()
+    await create.click()
+    await composer.getByRole('button', { name: 'Tạo tin dạng văn bản' }).click()
+    await draft.waitFor()
+    const bounds = await composer.boundingBox()
+    assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 391, 'Mobile composer fits viewport')
+    await composer.getByRole('button', { name: 'Quay lại chọn loại tin', exact: true }).click()
+    await assertChooserLayout(390, 844)
+    const mediaPicker = page.waitForEvent('filechooser')
+    await composer.getByRole('button', { name: 'Tạo tin có ảnh hoặc video' }).click()
+    await (await mediaPicker).setFiles({
+      name: 'story-test.png', mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWlMAAAAASUVORK5CYII=', 'base64'),
+    })
+    await composer.locator('.smart-story-frame img').waitFor({ state: 'visible' })
+    assert(presignedUploads === 0, 'Media preview must not upload before publish')
+    await publish.click()
+    await composer.waitFor({ state: 'hidden' })
+    assert(presignedUploads === 1 && lastStoryCreated?.attachment?.storageRef?.startsWith('story/1/'),
+      'Media Story must publish using the unchanged attachment payload')
+    await viewer.locator('.story-screen-media img').waitFor({ state: 'visible' })
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('Story PASS: responsive chooser layout, text preview, validation, failed publish, mobile viewer and media upload')
+    await browser.close()
+    server.kill('SIGTERM')
+    process.exit(0)
+  }
+
+  if (headerOnly) {
+    const header = page.locator('main > .chatnet-appbar')
+    for (const [path, label, navLabel] of [
+      ['/chat', 'Tin nhắn', 'Tin nhắn'], ['/feed', 'Bảng tin', 'Bảng tin'],
+      ['/discover', 'Khám phá', 'Khám phá'], ['/marketplace', 'Marketplace', 'Marketplace'],
+      ['/contacts', 'Bạn bè', 'Bạn bè'], ['/notifications', 'Thông báo', 'Thông báo'], ['/profile', 'Hồ sơ cá nhân', 'Cá nhân'],
+    ]) {
+      await sidebar.getByRole('button', { name: navLabel, exact: true }).click()
+      await header.waitFor({ state: 'visible' })
+      await header.locator('.app-page-heading strong').getByText(label, { exact: true }).waitFor()
+      await page.waitForFunction(() => document.querySelector('main > .chatnet-appbar')?.getBoundingClientRect().height >= 85)
+      const size = await header.evaluate(node => ({
+        height: node.getBoundingClientRect().height,
+        background: getComputedStyle(node).backgroundColor,
+      }))
+      assert(Math.abs(size.height - 86) < 2 && size.background === 'rgb(255, 255, 255)',
+        path + ': desktop Header must match 86px white Penpot shell: ' + JSON.stringify(size))
+      await header.locator('.appbar-search-anchor input').waitFor({ state: 'visible' })
+      await header.locator('.notification-appbar').waitFor({ state: 'visible' })
+      await header.locator('.app-header-account').waitFor({ state: 'visible' })
+    }
+    await sidebar.getByRole('button', { name: 'Khám phá' }).click()
+    const search = header.locator('.appbar-search')
+    const box = await search.boundingBox()
+    assert(Math.abs(box.height - 46) < 2 && Math.abs(box.width - 321) < 2,
+      'Desktop Header search should be 321x46: ' + JSON.stringify(box))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(origin + '/chat')
+    await page.locator('.conversation-avatar-rail').waitFor({ state: 'visible' })
+    assert(await page.locator('.app-sidebar').isHidden(), 'Mobile desktop sidebar must remain hidden')
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2),
+      'Mobile layout must not overflow horizontally')
+    assert(errors.length === 0, 'Header smoke test must not throw browser errors: ' + JSON.stringify(errors))
+    console.log('Header Penpot smoke PASS: shared desktop topbar, seven routes, search and mobile conversation rail')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   // A compact sidebar must not draw a vertical scrollbar over the chat content.
   const navScrollbars = await sidebar.locator('.app-sidebar-nav').evaluate(node => ({
     scrollbarWidth: getComputedStyle(node).scrollbarWidth,
@@ -256,10 +492,11 @@ try {
   assert(navScrollbars.scrollbarWidth === 'none' && navScrollbars.overflowY === 'auto',
     'Navigation should remain scrollable without a visible scrollbar: ' + JSON.stringify(navScrollbars))
   await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
-  const chatList = page.locator('.conversation-list.zalo-conversation-list')
+  const chatList = page.locator('.desktop-conversation-rail')
   await chatList.waitFor({ state: 'visible' })
-  assert(await chatList.evaluate(node => getComputedStyle(node).overflowX === 'hidden'),
-    'Conversation list must not show an accidental horizontal scrollbar')
+  await chatList.locator('.desktop-conversation-rail-entry').first().waitFor({ state: 'visible' })
+  assert(await chatList.locator('.desktop-conversation-rail-scroller').evaluate(node => getComputedStyle(node).overflowX === 'hidden'),
+    'Avatar conversation rail must not show an accidental horizontal scrollbar')
 
   // Hover must stay open across the entire 250px flyout, not just the 76px icon rail.
   const mainBeforeHover = await page.locator('.modern-frame').boundingBox()
@@ -407,7 +644,7 @@ try {
     // Start the chat portion without the post=... deep-link that keeps Feed active.
     await page.goto(origin)
     await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
-    await page.locator('.zalo-conversation-list .conversation-item').first().click()
+    await page.locator('.desktop-conversation-rail-entry').first().click()
     const chatImages = page.locator('.chat-message-media .media-image-button')
     try {
       await chatImages.first().waitFor({ state: 'visible', timeout: 9000 })
@@ -948,11 +1185,12 @@ try {
     await feed.evaluate(root => { root.scrollTop = 0 })
     await page.setViewportSize({ width: 1586, height: 992 })
 
-    await feed.locator('input[aria-label="Chọn ảnh hoặc video cho Story"]').setInputFiles({
+    await feed.getByRole('button', { name: 'Tạo Story mới', exact: true }).click()
+    const storyComposer = page.getByRole('dialog', { name: 'Tạo Story' })
+    await storyComposer.getByLabel('Chọn ảnh hoặc video cho Story', { exact: true }).setInputFiles({
       name: 'story-test.png', mimeType: 'image/png',
       buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWlMAAAAASUVORK5CYII=', 'base64'),
     })
-    const storyComposer = page.getByRole('dialog', { name: 'Tạo Story' })
     await storyComposer.waitFor({ state: 'visible' })
     assert(await storyComposer.locator('.smart-story-frame img').isVisible() && !lastStoryCreated,
       'Selecting Story media must show preview without publishing')
@@ -1244,7 +1482,7 @@ try {
   await page.getByRole('dialog', { name: 'Tùy chọn bài viết' }).waitFor({ state: 'hidden' })
   assert(await page.getByRole('dialog', { name: /Chi tiết bài viết/ }).count() === 0,
     'Desktop post comments must replace the old post-detail modal')
-  assert(new URL(page.url()).searchParams.get('post') === '88',
+  assert(new URL(page.url()).pathname === '/feed/posts/88',
     'Comment navigation must update the shareable post URL')
   assert(await commentsPage.locator('.post-comments-original').isVisible() &&
     await commentsPage.locator('.post-comments-thread').isVisible(),
@@ -1289,7 +1527,7 @@ try {
   await commentsPage.waitFor({ state: 'visible' })
   await page.goBack()
   await feed.waitFor({ state: 'visible' })
-  assert(new URL(page.url()).searchParams.get('post') === null,
+  assert(new URL(page.url()).pathname === '/feed',
     'Browser Back must return to the feed from post comments')
   await feedCards.first().getByRole('button', { name: 'Bình luận', exact: true }).click()
   await commentsPage.waitFor({ state: 'visible' })
@@ -1368,7 +1606,7 @@ try {
   // Sidebar navigation was simplified: group and call workflows are now covered
   // by the dedicated group/chat/call checks, not the retired hub menu.
   await sidebar.getByRole('button', { name: 'Tin nhắn' }).click()
-  await page.locator('.conversation-item').filter({ hasText: 'Minh Anh' }).first().waitFor({ state: 'visible' })
+  await page.locator('.desktop-conversation-rail-entry[title="Minh Anh"]').waitFor({ state: 'visible' })
   await sidebar.getByRole('button', { name: 'Bảng tin' }).click()
   await feed.waitFor({ state: 'visible' })
 
@@ -1469,7 +1707,10 @@ try {
   await workspace.getByRole('button', { name: 'Hủy', exact: true }).click()
   assert(await nameAudience.inputValue() === 'private', 'Cancel must restore saved privacy')
   await nameAudience.selectOption('everyone')
-  await workspace.getByRole('button', { name: 'Lưu thay đổi' }).click()
+  await Promise.all([
+    page.waitForResponse(response => response.url().endsWith('/api/privacy') && response.request().method() === 'PUT'),
+    workspace.getByRole('button', { name: 'Lưu thay đổi' }).click(),
+  ])
   await workspace.locator('.settings-workspace-save:disabled').waitFor()
   assert(storedPrivacy.searchableByName === true, 'Save changes must persist privacy through /api/privacy')
   await workspace.getByRole('button', { name: 'Ngôn ngữ & dịch AI' }).click()

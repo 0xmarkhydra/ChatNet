@@ -1,6 +1,7 @@
 import { useEffect, type RefObject } from "react";
 import type { Session } from "../../features/auth/lib/session";
 import { isDesktopBuild } from "../../platform/desktop";
+import { useLatest } from "../../shared/hooks/useLatest";
 
 type SessionKeepaliveClient = {
   refresh: () => Promise<Session | null>;
@@ -14,6 +15,8 @@ export function useSessionKeepalive(
   sessionClient: SessionKeepaliveClient,
   setStatus: (status: string) => void,
 ) {
+  const statusRef = useLatest(setStatus);
+
   useEffect(() => {
     if (!sessionId) return;
 
@@ -21,16 +24,26 @@ export function useSessionKeepalive(
     let refreshing = false;
     const refresh = () => {
       if (!active || refreshing || sessionRef.current?.sessionId !== sessionId) return;
-      if (!isDesktopBuild && document.visibilityState === "hidden") return;
+      // Browser offline/hidden refresh attempts cannot succeed; the online and
+      // visibility listeners retry as soon as the connection becomes usable.
+      if (!isDesktopBuild && (document.visibilityState === "hidden" || navigator.onLine === false)) return;
       refreshing = true;
-      void sessionClient.refresh()
+      // Preserve the initial immediate refresh while normalizing synchronous
+      // transport throws into the existing rejection/cleanup path.
+      let attempt: Promise<Session | null>;
+      try {
+        attempt = sessionClient.refresh();
+      } catch (error) {
+        attempt = Promise.reject(error);
+      }
+      void attempt
         .then((current) => {
           if (active && sessionRef.current?.sessionId === sessionId && isDesktopBuild && current)
             return sessionClient.check();
         })
         .catch(() => {
           if (active && sessionRef.current?.sessionId === sessionId)
-            setStatus("Đang kết nối lại...");
+            statusRef.current("Đang kết nối lại...");
         })
         .finally(() => { refreshing = false; });
     };
@@ -47,5 +60,5 @@ export function useSessionKeepalive(
       window.removeEventListener("online", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [sessionId, sessionRef, sessionClient, setStatus]);
+  }, [sessionId, sessionRef, sessionClient, statusRef]);
 }

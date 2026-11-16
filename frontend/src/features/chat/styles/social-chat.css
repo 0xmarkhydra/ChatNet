@@ -743,14 +743,10 @@
     margin-bottom: 0;
   }
   .modern-shell.app-layout .social-chat-layout .messages .message .message-content:has(.message-reactions > .reaction-chip) {
-    margin-bottom: 12px;
+    margin-bottom: 26px;
   }
-  .modern-shell.app-layout
-    .social-chat-layout
-    .message
-    .message-content
-    > .bubble:has(> .message-reactions > .reaction-chip) {
-    padding-bottom: 22px;
+  .modern-shell.app-layout .social-chat-layout .messages .message .message-content:has(.message-reactions > .reaction-chip) .message-reactions {
+    bottom: -24px;
   }
   .modern-shell.app-layout .social-chat-layout .message-stamp {
     margin-top: 4px;
@@ -1472,9 +1468,9 @@
 }
 
 /* A multi-line message field keeps the original compact chat-toolbar layout. */
-.modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input,
-.modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input:focus,
-.modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input:focus-visible {
+.modern-shell.app-layout .social-chat-layout .media-composer > .chat-mention-input .chat-mention-editor > textarea.chat-message-input,
+.modern-shell.app-layout .social-chat-layout .media-composer > .chat-mention-input .chat-mention-editor > textarea.chat-message-input:focus,
+.modern-shell.app-layout .social-chat-layout .media-composer > .chat-mention-input .chat-mention-editor > textarea.chat-message-input:focus-visible {
   position: relative;
   z-index: 1;
   box-sizing: border-box;
@@ -1500,7 +1496,7 @@
   line-height: 22px;
 }
 @media (max-width: 760px) {
-  .modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input {
+  .modern-shell.app-layout .social-chat-layout .media-composer > .chat-mention-input .chat-mention-editor > textarea.chat-message-input {
     font-size: 16px;
   }
 }
@@ -1633,9 +1629,9 @@
     padding-inline: 5px;
     gap: 3px;
   }
-  .modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input,
-  .modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input:focus,
-  .modern-shell.app-layout .social-chat-layout .media-composer > textarea.chat-message-input:focus-visible {
+  .modern-shell.app-layout .social-chat-layout .media-composer > .chat-mention-input .chat-mention-editor > textarea.chat-message-input,
+  .modern-shell.app-layout .social-chat-layout .media-composer > .chat-mention-input .chat-mention-editor > textarea.chat-message-input:focus,
+  .modern-shell.app-layout .social-chat-layout .media-composer > .chat-mention-input .chat-mention-editor > textarea.chat-message-input:focus-visible {
     flex: 1 1 0;
     width: 0;
     min-width: 60px;

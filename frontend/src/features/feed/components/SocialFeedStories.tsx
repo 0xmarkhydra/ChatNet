@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronRight, Plus } from 'lucide-react'
 import type { Story } from '../types'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import '../styles/story-text.css'
 
 type Props = {
   username: string
@@ -36,7 +37,10 @@ export default function SocialFeedStories({
           <button type="button" className="social-feed-story" key={story.id} onClick={() => onOpen(story.id)}
             aria-label={`Xem Story của ${story.authorDisplayName || story.author}`}>
             <span className={index % 2 ? 'social-feed-story-ring is-purple' : 'social-feed-story-ring'}>
-              {story.attachment.kind === 'image' && story.attachment.url
+              {!story.attachment
+                ? <div className="social-feed-story-cover story-text-avatar text-center text-sm font-bold text-white"
+                    data-story-background={story.background ?? 'berry'} aria-hidden="true">Aa</div>
+                : story.attachment.kind === 'image' && story.attachment.url
                 ? <img className="social-feed-story-cover" src={story.attachment.url} alt="" loading="lazy" />
                 : story.attachment.kind === 'video' && story.attachment.url
                   ? <video className="social-feed-story-cover" src={story.attachment.url} muted playsInline preload="metadata" aria-hidden="true" />
