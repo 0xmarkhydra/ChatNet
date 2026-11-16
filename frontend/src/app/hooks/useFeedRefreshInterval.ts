@@ -45,9 +45,11 @@ export function useFeedRefreshInterval({
     };
     const timer = window.setInterval(refreshWhenVisible, 12_000);
     document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("online", refreshWhenVisible);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("online", refreshWhenVisible);
     };
   }, [enabled, sessionId, sessionToken, postsRef, storiesRef]);
 }

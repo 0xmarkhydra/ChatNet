@@ -181,4 +181,71 @@ describe("useFeedRefreshInterval", () => {
       host.remove();
     }
   });
+
+  it("refreshes immediately on reconnect, without overlapping a pending request", async () => {
+    vi.useFakeTimers();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    let finishPosts!: () => void;
+    let finishStories!: () => void;
+    const posts = vi.fn(() => new Promise<void>((resolve) => { finishPosts = resolve; }));
+    const stories = vi.fn(() => new Promise<void>((resolve) => { finishStories = resolve; }));
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    function Probe() {
+      useFeedRefreshInterval({
+        enabled: true, sessionId: "A", sessionToken: "token-A",
+        refreshPosts: posts, refreshStories: stories,
+      });
+      return null;
+    }
+    try {
+      act(() => root.render(<Probe />));
+      act(() => window.dispatchEvent(new Event("online")));
+      expect(posts).toHaveBeenCalledTimes(1);
+      expect(stories).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        finishPosts();
+        finishStories();
+        await Promise.resolve();
+      });
+      act(() => window.dispatchEvent(new Event("online")));
+      expect(posts).toHaveBeenCalledTimes(2);
+      expect(stories).toHaveBeenCalledTimes(2);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+    window.dispatchEvent(new Event("online"));
+    expect(posts).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not refresh a hidden Feed when connectivity returns", async () => {
+    vi.useFakeTimers();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    const posts = vi.fn(async () => undefined);
+    const stories = vi.fn(async () => undefined);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    function Probe() {
+      useFeedRefreshInterval({
+        enabled: true, sessionId: "A", sessionToken: "token-A",
+        refreshPosts: posts, refreshStories: stories,
+      });
+      return null;
+    }
+    try {
+      act(() => root.render(<Probe />));
+      await act(async () => { await Promise.resolve(); });
+      act(() => window.dispatchEvent(new Event("online")));
+      expect(posts).toHaveBeenCalledTimes(1);
+      expect(stories).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
 });
