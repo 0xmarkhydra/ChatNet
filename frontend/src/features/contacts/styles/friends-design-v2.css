@@ -199,8 +199,11 @@
  }
  .fd-profile-cover{height:123px;min-height:123px}
  .fd-invitation-tabs{padding:8px;gap:5px;flex-wrap:wrap}
- .fd-invitation-tabs>div{flex:1 1 auto}
- .fd-invitation-tabs [role=tab]{padding:8px 10px;font-size:11px}
+ .fd-invitation-tabs>div{flex:1 1 auto;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
+ .fd-invitation-tabs [role=tab]{padding:8px 10px;font-size:11px;flex:0 0 auto;min-height:44px}
+ .fd-request-copy{overflow-wrap:anywhere}
+ .fd-request-copy strong,.fd-request-copy span{white-space:normal;overflow-wrap:anywhere}
+ .fd-qr-actions button{min-height:44px;white-space:normal}
  .fd-invitation-tabs>small{flex-basis:100%;text-align:right;padding-right:8px}
  .fd-qr-panel{min-height:420px}
  .fd-request-row .fd-primary,.fd-request-row .fd-secondary{min-width:0}

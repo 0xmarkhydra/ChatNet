@@ -54,6 +54,18 @@ describe('ContactQrPanel', () => {
     expect(host.querySelector('img')?.getAttribute('src')).toContain('recovered')
   })
 
+  it('ignores late QR generation from an account that is no longer active', async () => {
+    let finishOld: (image: string) => void = () => {}
+    generateQr
+      .mockImplementationOnce(() => new Promise<string>(resolve => { finishOld = resolve }))
+      .mockResolvedValueOnce('data:image/png;base64,current')
+    await renderQr('https://example.com/old-user')
+    await renderQr('https://example.com/current-user')
+    expect(host.querySelector('img')?.getAttribute('src')).toContain('current')
+    await act(async () => finishOld('data:image/png;base64,stale'))
+    expect(host.querySelector('img')?.getAttribute('src')).toContain('current')
+  })
+
   it('does not offer copying a missing link', async () => {
     await renderQr('')
     expect(host.textContent).toContain('Chưa có liên kết kết bạn')
