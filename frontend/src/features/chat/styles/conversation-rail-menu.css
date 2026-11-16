@@ -1,0 +1,341 @@
+/* The avatar header now contains only the hamburger and the name-search.
+   The hamburger replaces the former blue arrow at the SAME fixed coordinate,
+   regardless of the mutually exclusive avatar/channel slide state. */
+.modern-shell.app-layout .conversation-avatar-rail-top-actions,
+.modern-shell.app-layout .desktop-conversation-rail-top-actions {
+  position: relative !important;
+  min-height: 38px;
+}
+.modern-shell.app-layout .conversation-rail-menu-host {
+  position: absolute !important;
+  z-index: 35;
+  top: 3px;
+  left: 8px;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+}
+.modern-shell.app-layout .conversation-rail-menu-trigger {
+  display: grid !important;
+  place-items: center !important;
+  box-sizing: border-box;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #2b66e8 !important;
+  cursor: pointer;
+}
+.modern-shell.app-layout .conversation-rail-menu-trigger:hover,
+.modern-shell.app-layout .conversation-rail-menu-trigger[aria-expanded="true"] {
+  background: #eaf2ff !important;
+}
+.modern-shell.app-layout .conversation-rail-menu-trigger:focus-visible {
+  outline: 2px solid #3674e8 !important;
+  outline-offset: 2px !important;
+}
+@media (min-width: 761px) {
+  .modern-shell.app-layout .desktop-conversation-rail-top-actions > .conversation-rail-menu-host {
+    left: 14px;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-top-actions:has(> .desktop-conversation-rail-search-area) {
+    padding-left: 55px !important;
+  }
+  /* Keep conversation-name search behind the compact dock's clipping edge. */
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.desktop-channel-panel-open
+  > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-top-actions {
+    padding-left: 88px !important;
+  }
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout .conversation-avatar-rail-top-actions:has(> .conversation-avatar-rail-search-area) {
+    padding-left: 50px !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view
+  > .conversation-avatar-rail .conversation-avatar-rail-top-actions {
+    /* The list uses the same 240/306px input width as the group channel
+       search at 320/390px. Do not move the fixed hamburger itself. */
+    padding-left: 63px !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view
+  > .conversation-avatar-rail.is-revealing .conversation-avatar-rail-top-actions {
+    padding-left: 68px !important;
+  }
+}
+
+/* Keep the conversation-name field at the channel-search width in both
+   full-list and group-picker states. The split should clip the fixed-width
+   field, never reflow its input while the avatar/channel seam moves. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible
+  > .conversation-avatar-rail .conversation-avatar-rail-top-actions
+  > .conversation-avatar-rail-search-area {
+    flex: 0 0 calc(100vw - var(--chatnet-picker-compact-width, 56px) - 28px) !important;
+    width: calc(100vw - var(--chatnet-picker-compact-width, 56px) - 28px) !important;
+    min-width: calc(100vw - var(--chatnet-picker-compact-width, 56px) - 28px) !important;
+    max-width: calc(100vw - var(--chatnet-picker-compact-width, 56px) - 28px) !important;
+    margin-right: 0 !important;
+  }
+  /* Older mobile rules subtract 12px from the input *inside* the area.
+     Remove that second subtraction so its visible border is identical to
+     the channel field, not merely its invisible flex wrapper. */
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible
+  > .conversation-avatar-rail .conversation-avatar-rail-search-line,
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible
+  > .conversation-avatar-rail .conversation-avatar-rail-search-field {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0;
+  }
+}
+@media (max-width: 350px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible {
+    --chatnet-picker-compact-width: 52px;
+  }
+  /* Extra compact PWA widths retain a 4px nested full-list gutter. */
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view
+  > .conversation-avatar-rail .conversation-avatar-rail-top-actions
+  > .conversation-avatar-rail-search-area {
+    flex-basis: calc(100vw - var(--chatnet-picker-compact-width) - 24px) !important;
+    width: calc(100vw - var(--chatnet-picker-compact-width) - 24px) !important;
+    min-width: calc(100vw - var(--chatnet-picker-compact-width) - 24px) !important;
+    max-width: calc(100vw - var(--chatnet-picker-compact-width) - 24px) !important;
+  }
+}
+
+/* Native popover lives in the browser top layer; it must not be clipped by
+   the narrow avatar dock or the animated group/channel border. */
+.conversation-rail-menu-popover {
+  position: fixed;
+  inset: auto;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px;
+  width: 292px;
+  max-width: calc(100vw - 24px);
+  border: 1px solid #dce5f4;
+  border-radius: 15px;
+  color: #263b55;
+  background: #fff;
+  box-shadow: 0 14px 35px rgba(27,49,82,.17);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.conversation-rail-menu-popover:not(:popover-open) {
+  display: none;
+}
+.conversation-rail-menu-title {
+  padding: 8px 10px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #70819a;
+  letter-spacing: .15px;
+}
+.conversation-rail-menu-classification {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 2px;
+  min-height: 44px;
+  color: #3971dc;
+}
+.conversation-rail-menu-classification > svg {
+  flex: 0 0 auto;
+  margin-left: 8px;
+}
+.conversation-rail-menu-classification > .conversation-categories {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.conversation-rail-menu-classification .category-toolbar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 4px;
+}
+.conversation-rail-menu-classification .category-filter-trigger {
+  display: inline-flex !important;
+  flex: 1 1 auto !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 8px 9px !important;
+  border-radius: 9px !important;
+  color: #263b55 !important;
+  background: transparent !important;
+  gap: 7px !important;
+  font-size: 13px !important;
+  text-align: left !important;
+}
+.conversation-rail-menu-classification .category-filter-trigger:hover {
+  background: #edf3ff !important;
+}
+.conversation-rail-menu-classification .category-filter-trigger > span,
+.conversation-rail-menu-classification .category-filter-trigger > svg:last-child {
+  display: inline-flex !important;
+}
+.conversation-rail-menu-classification .category-filter-trigger > span {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conversation-rail-menu-classification .category-filter-tag-icon {
+  display: none !important; /* The menu row already includes its own tag icon. */
+}
+.conversation-rail-menu-classification .category-clear {
+  flex: 0 0 30px;
+  width: 30px;
+  min-width: 30px;
+}
+.modern-shell.app-layout .conversation-rail-menu-popover .conversation-rail-menu-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  min-height: 44px !important;
+  padding: 9px 10px !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  color: #263b55 !important;
+  text-align: left !important;
+  font-size: 13px !important;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  gap: 11px;
+}
+.modern-shell.app-layout .conversation-rail-menu-popover .conversation-rail-menu-item:hover {
+  background: #edf3ff !important;
+}
+.conversation-rail-menu-item > svg {
+  flex: 0 0 18px;
+  color: #3971dc;
+}
+
+/* The group picker retains the avatar search DOM without remounting it.
+   Its React 'expanded' prop remains false while the shared divider visually
+   expands through data-split-expanded. Override the legacy hidden-input
+   rule in THAT state, otherwise the field looks present but cannot be typed. */
+@media (max-width: 760px) {
+  /* Legacy compact-rail styles hide the *parent*, not only the input.
+     Opening the joined group picker changes a CSS attribute rather than the
+     React expanded prop, so the search must be shown in that visual state. */
+  /* Keep the entire search field laid out at its full, channel-matched
+     width on BOTH sides of the split. The avatar viewport, not the input,
+     is what shrinks and clips during the transition. */
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view
+  > .conversation-avatar-rail.is-revealing .conversation-avatar-rail-search-area {
+    display: flex !important;
+    visibility: visible !important;
+    pointer-events: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view
+  > .conversation-avatar-rail.is-revealing .conversation-avatar-rail-search-line input {
+    width: 100% !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view[data-split-expanded="true"]
+  > .conversation-avatar-rail.is-revealing .conversation-avatar-rail-search-area {
+    pointer-events: auto !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view[data-split-expanded="true"]
+  > .conversation-avatar-rail.is-revealing .conversation-avatar-rail-top-actions {
+    /* Both fields use the same width: channel pane = viewport - compact rail
+       - channel topbar's 18px/10px gutters. Keep the existing search origin. */
+    padding-right: calc(var(--chatnet-picker-compact-width) - 48px) !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view[data-split-expanded="true"]
+  > .conversation-avatar-rail.is-revealing .conversation-avatar-rail-search-line input {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    width: 100% !important;
+  }
+}
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout
+  > .desktop-conversation-rail.is-expanded .desktop-conversation-rail-top-actions,
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open
+  > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-top-actions {
+    /* Override the older 88px picker gutter in BOTH split states. In the
+       72px desktop dock the fixed 80px offset gives the search exactly the
+       channel field's width; the compact rail clips, not reflows, it. */
+    padding-left: calc(var(--avatar-rail-w) + 8px) !important;
+  }
+  /* Desktop uses the same fixed-size, clipped search during collapse.
+     Removing it with display:none shrank the field to zero every time. */
+  .modern-shell.app-layout .social-chat-layout.desktop-channel-panel-open
+  > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-search-area {
+    display: flex !important;
+    visibility: visible !important;
+    pointer-events: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.desktop-channel-panel-open
+  > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-search-line input {
+    width: 100% !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.desktop-channel-panel-open[data-split-expanded="true"]
+  > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-search-area {
+    pointer-events: auto !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.desktop-channel-panel-open[data-split-expanded="true"]
+  > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-search-line input {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    width: 100% !important;
+  }
+
+  /* Private-chat avatar dock: keep the search mounted at its expanded
+     dimensions while the rail itself is narrow. The moving/clipped viewport
+     is the only part allowed to change width. */
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.has-active:not(.group-channel-workspace)
+  > .desktop-conversation-rail:not(.is-expanded) {
+    overflow: hidden !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.has-active:not(.group-channel-workspace)
+  > .desktop-conversation-rail:not(.is-expanded) .desktop-conversation-rail-top-actions {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    box-sizing: border-box;
+    width: calc(var(--avatar-rail-w) + var(--desktop-channels-w) + var(--chat-rail-gap, 12px) - 12px) !important;
+    min-width: calc(var(--avatar-rail-w) + var(--desktop-channels-w) + var(--chat-rail-gap, 12px) - 12px) !important;
+    padding-left: calc(var(--avatar-rail-w) + 8px) !important;
+    gap: 7px !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.has-active:not(.group-channel-workspace)
+  > .desktop-conversation-rail:not(.is-expanded) .desktop-conversation-rail-search-area {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    visibility: visible !important;
+    pointer-events: none !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.has-active:not(.group-channel-workspace)
+  > .desktop-conversation-rail:not(.is-expanded) .desktop-conversation-rail-search-line input {
+    opacity: 1 !important;
+    visibility: visible !important;
+    width: 100% !important;
+  }
+}

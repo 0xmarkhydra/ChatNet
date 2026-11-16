@@ -1372,7 +1372,9 @@ export default function AuthedApp({
     activeConversationIdRef.current = activeConversationId;
     messageScrollAtBottom.current = true;
     cancelMessageLongPress();
-    setMessages([]);
+    // useMessageData owns room-specific clearing and its recently-visited
+    // cache. A second reset here caused an unnecessary blank render between
+    // PWA conversation selections.
     setHasMoreMessages(false);
     setMessagesLoadingMore(false);
     messagesPagingBusy.current = false;
@@ -2401,8 +2403,14 @@ export default function AuthedApp({
               (!membershipSnapshot.current ||
                 membershipSnapshot.current.has(item.id)),
           );
-  // Search uses the backend's authorized, accent-insensitive full-history query.
-  // Keep the normal paginated list intact when the search is cleared.
+  // Avatar-rail search matches conversation NAMES only (including custom
+  // contact nicknames). The server's q query may also return message-body
+  // matches, so explicitly discard those rather than showing unrelated chats.
+  // Normalize Vietnamese accents so "Linh" can match "Lĩnh", etc.
+  const normalizeChatName = (value: string) => value
+    .toLocaleLowerCase('vi-VN').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+  const chatNameKeyword = normalizeChatName(chatListQuery.trim())
   const chatListConversations = conversationListSearch.active
     ? conversationListSearch.items
         .filter((conversation) => !revokedConversationIds.current.has(conversation.id))
@@ -2412,6 +2420,7 @@ export default function AuthedApp({
             ? contactMetadata[conversation.otherUserId]?.nickname || conversation.name
             : conversation.name,
         }))
+        .filter(conversation => normalizeChatName(conversation.name).includes(chatNameKeyword))
     : visibleConversations.filter((conversation) => {
         if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
         if (chatListFilter === 'groups' && conversation.type !== 'group') return false

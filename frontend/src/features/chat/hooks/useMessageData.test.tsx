@@ -83,6 +83,50 @@ function setup() {
 }
 
 describe('chat message pagination visit isolation', () => {
+  it('reuses only the selected channel history without a blank flash and purges cleared history', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'), 0)
+      await app.respond(0, [message(10, 42, 0)])
+      expect(app.current.messages.map(item => item.id)).toEqual([10])
+
+      await app.render(account('A'), 1)
+      expect(app.current.messages).toEqual([])
+      await app.respond(1, [message(20, 42, 1)])
+      expect(app.current.messages.map(item => item.id)).toEqual([20])
+
+      await app.render(account('A'), 0)
+      // The delayed request is still unresolved, but authorized channel 0
+      // history is present on the first render; channel 1 cannot leak into it.
+      expect(app.jobs).toHaveLength(3)
+      expect(app.current.messages.map(item => item.id)).toEqual([10])
+      await app.respond(2, [message(11, 42, 0)])
+      expect(app.current.messages.map(item => item.id)).toEqual([11])
+
+      await act(async () => window.dispatchEvent(new CustomEvent('chatnet:message-history-cleared', {
+        detail: { conversationId: 42 },
+      })))
+      expect(app.current.messages).toEqual([])
+    } finally { await app.close() }
+  })
+
+  it('never shows another signed-in account cached chat messages', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      await app.respond(0, [message(101)])
+      expect(app.current.messages.map(item => item.id)).toEqual([101])
+
+      await app.render(account('B'))
+      expect(app.current.messages).toEqual([])
+      await app.respond(1, [message(202)])
+      expect(app.current.messages.map(item => item.id)).toEqual([202])
+
+      await app.render(account('A'))
+      expect(app.current.messages).toEqual([])
+    } finally { await app.close() }
+  })
+
   it('does not merge an old history page into a new A visit after A → B → A', async () => {
     const app = setup()
     try {

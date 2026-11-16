@@ -1,0 +1,58 @@
+/* One immutable text origin for the avatar list, the private-chat rail and
+   the group picker. Changing the divider may clip this content but must
+   NEVER reposition, resize or reflow the user name itself. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view
+  > .conversation-avatar-rail .conversation-avatar-rail-scroll {
+    /* Normalize the 1px gutter and top inset between list and picker.
+       The row itself never animates or moves with the sliding divider. */
+    transform: translate(1px, -1px);
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible
+  > .conversation-avatar-rail .conversation-avatar-rail-item {
+    gap: 16px !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible
+  > .conversation-avatar-rail .conversation-avatar-rail-meta {
+    margin-left: 0 !important;
+    flex: 0 0 calc(100vw - 80px) !important;
+    width: calc(100vw - 80px) !important;
+    max-width: none !important;
+  }
+}
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout
+  > .desktop-conversation-rail .desktop-conversation-rail-scroller {
+    /* Both private and group rails use the same left edge; centering the
+       shorter private-chat row causes a visible 3.5px name displacement. */
+    align-items: flex-start !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout
+  > .desktop-conversation-rail .desktop-conversation-rail-row {
+    box-sizing: border-box;
+    flex-shrink: 0;
+    /* Compact direct-chat dock must keep a clickable 55px avatar target.
+       Only the group split uses the fixed full-width clipped row. */
+    width: calc(100% - 7px) !important;
+    min-width: 0 !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout
+  > .desktop-conversation-rail .desktop-conversation-rail-entry {
+    gap: 25px !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout
+  > .desktop-conversation-rail .desktop-conversation-rail-meta {
+    margin-left: 0 !important;
+    flex: 0 0 calc(var(--avatar-rail-w) + var(--desktop-channels-w) + var(--chat-rail-gap, 12px) - 105px) !important;
+    width: calc(var(--avatar-rail-w) + var(--desktop-channels-w) + var(--chat-rail-gap, 12px) - 105px) !important;
+    max-width: none !important;
+  }
+  /* Direct chats and channel-picker mode should use the same toolbar anchor;
+     the title must not jerk when React changes between is-expanded/revealing. */
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout
+  > .desktop-conversation-rail.is-expanded .desktop-conversation-rail-top-actions,
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout
+  > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-top-actions {
+    padding-left: 88px !important;
+  }
+}

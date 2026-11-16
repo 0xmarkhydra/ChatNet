@@ -1,9 +1,8 @@
 import type { ReactNode, MouseEvent, PointerEvent } from 'react'
-import { createPortal } from 'react-dom'
-import { useRailSearchPopover } from '../hooks/useRailSearchPopover'
 import { Pin } from 'lucide-react'
 import ConversationRailStatus from './ConversationRailStatus'
-import { Plus, Search, RefreshCw, Check, ChevronRight } from 'lucide-react'
+import ConversationRailMenu from './ConversationRailMenu'
+import { Search, RefreshCw, Check } from 'lucide-react'
 import ConversationAvatar from './ConversationAvatar'
 import { formatTime } from '../../../shared/utils/format'
 import type { Conversation } from '../types'
@@ -14,6 +13,8 @@ type Props = {
   conversations: Conversation[]
   selectedId: number | null
   expanded: boolean
+  /** Keep the rail search/rows stable while the shared splitter moves. */
+  keepDetailsMounted?: boolean
   onSelect: (conversation: Conversation) => void
   onCreate: () => void
   onSearchCompact: () => void
@@ -24,9 +25,7 @@ type Props = {
   loadError: string
   onRetry: () => Promise<void>
   searchValue: string
-  searchControl?: ReactNode
   onSearchChange: (next: string) => void
-  controls: ReactNode
   categoryControls: ReactNode
   categories: { id: number; name: string; color: string }[]
   visibleConversationIds: readonly number[]
@@ -38,50 +37,32 @@ type Props = {
 
 /** Mobile uses the same conversation avatar DOM in both sizes; only details reveal. */
 export default function ConversationAvatarRail({
-  conversations, selectedId, expanded, onSelect, onCreate, onSearchCompact, onCollapse,
-  hasMore, loadingMore, onLoadMore, loadError, onRetry, searchValue, searchControl, onSearchChange, controls, categoryControls, categories, visibleConversationIds,
+  conversations, selectedId, expanded, keepDetailsMounted = false, onSelect, onCreate, onSearchCompact, onCollapse,
+  hasMore, loadingMore, onLoadMore, loadError, onRetry, searchValue, onSearchChange, categoryControls, categories, visibleConversationIds,
   onEntryContextMenu, onEntryPointerDown, onEntryPointerMove, onEntryPointerEnd,
 }: Props) {
-  const { open, setOpen, searchRef, filterRef, style } = useRailSearchPopover(expanded)
+  const showDetails = expanded || keepDetailsMounted
   const visibleIds = new Set(visibleConversationIds)
-  const items = expanded ? conversations.filter(conversation => visibleIds.has(conversation.id)) : conversations
+  const items = showDetails ? conversations.filter(conversation => visibleIds.has(conversation.id)) : conversations
   return (
-    <nav className={`conversation-avatar-rail${expanded ? ' is-expanded' : ''}`}
+    <nav className={`conversation-avatar-rail${expanded ? ' is-expanded' : ''}${keepDetailsMounted ? ' is-revealing' : ''}`}
       aria-label="Cuộc trò chuyện" data-expanded={expanded}>
       <div className="conversation-avatar-rail-top">
       <div className="conversation-avatar-rail-top-actions">
-        <button type="button" className="conversation-avatar-rail-expand-toggle"
-          aria-label={expanded ? 'Thu gọn cột avatar' : 'Mở rộng cột avatar'}
-          title={expanded ? 'Thu gọn cột avatar' : 'Mở rộng cột avatar'}
-          aria-expanded={expanded}
-          onClick={expanded ? onCollapse : onSearchCompact}>
-          <ChevronRight size={19} aria-hidden="true" />
-        </button>
-        {expanded && <div ref={searchRef} className="conversation-avatar-rail-search-area"
-          onFocusCapture={() => setOpen(true)}>
+        <ConversationRailMenu categoryControls={categoryControls} expanded={expanded}
+          onCreate={onCreate} onExpand={onSearchCompact} onCollapse={onCollapse} />
+        {showDetails && <div className="conversation-avatar-rail-search-area">
           <div className="conversation-avatar-rail-search-line">
-        {searchControl
-          ? <div className="conversation-avatar-rail-external-search">{searchControl}</div>
-          : <label className="conversation-avatar-rail-search-field">
+            <label className="conversation-avatar-rail-search-field">
               <Search size={16} aria-hidden="true" />
               <input aria-label="Tìm trong danh sách hội thoại" type="search"
                 value={searchValue} onChange={event => onSearchChange(event.target.value)}
-                onClick={() => setOpen(true)}
                 placeholder="Tìm hội thoại..." />
-            </label>}
+            </label>
           </div>
         </div>}
-        {expanded && <div className="conversation-avatar-rail-top-category">{categoryControls}</div>}
-        {expanded && <button type="button" className="conversation-avatar-rail-create"
-          onClick={onCreate}
-          aria-label="Tạo cuộc trò chuyện mới" title="Tạo cuộc trò chuyện mới">
-          <Plus size={18} aria-hidden="true" />
-        </button>}
       </div>
     </div>
-    {open && style && createPortal(
-      <div ref={filterRef} className="conversation-rail-floating-filters" style={style}>{controls}</div>,
-      document.body)}
     <div className="conversation-avatar-rail-divider" aria-hidden="true" />
       <div className="conversation-avatar-rail-scroll" onScroll={event => {
       const { scrollTop, scrollHeight, clientHeight } = event.currentTarget
@@ -105,7 +86,7 @@ export default function ConversationAvatarRail({
                 <ConversationRailStatus category={categories.find(category => category.id === conversation.categoryId)} muted={conversation.muted} />
               </span>
             )}
-            <span className="conversation-avatar-rail-meta" aria-hidden={!expanded}>
+            <span className="conversation-avatar-rail-meta" aria-hidden={!showDetails}>
               <span className="conversation-avatar-rail-meta-top">
                 <span className="conversation-rail-title-group">
                   <strong>{conversation.pinnedAt && <Pin className="conversation-rail-pin" size={12} aria-label="Đã ghim" />} {conversation.name}</strong>

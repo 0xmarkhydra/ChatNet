@@ -628,10 +628,13 @@
     height: 32px;
     min-height: 32px;
     padding: 0;
-    border: 1px solid #dbe6fa;
-    border-radius: 10px;
-    background: #eaf2ff;
-    color: #3369d4;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #2b66e8;
+    box-shadow: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
   .modern-shell.app-layout .desktop-conversation-rail-top-actions > .desktop-conversation-rail-expand-toggle svg {
     transition: transform .28s cubic-bezier(.22,1,.36,1);
@@ -653,10 +656,13 @@
     min-height: 32px;
     margin: 0;
     padding: 0;
-    border: 1px solid #dbe6fa;
-    border-radius: 10px;
-    background: #eaf2ff;
-    color: #3369d4;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #2b66e8;
+    box-shadow: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
   .modern-shell.app-layout .conversation-avatar-rail-top-actions > .conversation-avatar-rail-expand-toggle svg {
     transition: transform .28s cubic-bezier(.22,1,.36,1);
@@ -680,7 +686,7 @@
     position: absolute;
     z-index: 1;
     top: 3px;
-    left: 7px;
+    left: 14px;
   }
   .modern-shell.app-layout .desktop-conversation-rail.is-expanded .desktop-conversation-rail-top-actions {
     box-sizing: border-box;
@@ -689,6 +695,7 @@
   .modern-shell.app-layout .desktop-conversation-rail:not(.is-expanded) .desktop-conversation-rail-top-actions {
     padding: 0;
   }
+  /* Fixed X coordinate in both states: the icon never slides when rail width changes. */
 }
 @media (max-width: 760px) {
   .modern-shell.app-layout .conversation-avatar-rail-top-actions {
@@ -698,7 +705,7 @@
     position: absolute;
     z-index: 1;
     top: 3px;
-    left: 6px;
+    left: 8px;
   }
   .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-avatar-rail-top-actions {
     box-sizing: border-box;
@@ -707,4 +714,11 @@
   .modern-shell.app-layout .conversation-avatar-rail:not(.is-expanded) .conversation-avatar-rail-top-actions {
     padding: 0;
   }
+  /* The mobile arrow stays over the same avatar column during channel selection. */
+}
+
+/* No horizontal separator beneath the chevron in either avatar dock. */
+.modern-shell.app-layout .desktop-conversation-rail > .desktop-conversation-rail-divider,
+.modern-shell.app-layout .conversation-avatar-rail > .conversation-avatar-rail-divider {
+  display: none !important;
 }
