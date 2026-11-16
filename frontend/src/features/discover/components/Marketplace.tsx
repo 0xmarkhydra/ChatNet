@@ -115,7 +115,15 @@ export default function Marketplace({ userId, searchQuery, request, onBack }: Pr
     setBusy(true)
     setMessage('')
     setError('')
-    try { await fn(isCurrent); if (isCurrent()) await refresh(version) }
+    try {
+      await fn(isCurrent)
+      if (isCurrent()) {
+        // A completed write supersedes any older read retry and its spinner.
+        retryFlight.current = null
+        setRefreshing(false)
+        await refresh(version)
+      }
+    }
     catch (e) { if (version === revision.current) setError(e instanceof Error ? e.message : 'Không thể thực hiện') }
     finally {
       if (mutationFlight.current === flight) {
@@ -183,10 +191,10 @@ export default function Marketplace({ userId, searchQuery, request, onBack }: Pr
       </header>
       <nav ref={tabsPillSetHost} className="marketplace-tabs sliding-pill-host" aria-label="Sàn mua bán">
         <span ref={tabsPillSetPill} className="sliding-pill marketplace-active-pill" aria-hidden="true" />
-        <button ref={view === 'products' ? tabsPillSetActive : undefined} type="button" className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><ShoppingBag size={17}/> Sản phẩm</button>
-        <button ref={view === 'cart' ? tabsPillSetActive : undefined} type="button" className={view === 'cart' ? 'active' : ''} onClick={() => setView('cart')}><ShoppingCart size={17}/> Giỏ ({cart.length})</button>
-        <button ref={view === 'orders' ? tabsPillSetActive : undefined} type="button" className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ClipboardList size={17}/> Đơn hàng</button>
-        <button ref={view === 'sell' ? tabsPillSetActive : undefined} type="button" className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}>+ Bán hàng</button>
+        <button ref={view === 'products' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'products'} className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><ShoppingBag size={17}/> Sản phẩm</button>
+        <button ref={view === 'cart' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'cart'} className={view === 'cart' ? 'active' : ''} onClick={() => setView('cart')}><ShoppingCart size={17}/> Giỏ ({cart.length})</button>
+        <button ref={view === 'orders' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'orders'} className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ClipboardList size={17}/> Đơn hàng</button>
+        <button ref={view === 'sell' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'sell'} className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}>+ Bán hàng</button>
       </nav>
       <div className="marketplace-body">
         <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>

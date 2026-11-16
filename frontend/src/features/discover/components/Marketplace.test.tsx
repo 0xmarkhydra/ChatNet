@@ -264,6 +264,70 @@ describe('Marketplace read fallback', () => {
     expect(button('Thử tải dữ liệu')).toBeTruthy()
   })
 
+  it('announces the selected marketplace panel to assistive technology', async () => {
+    const request = vi.fn(async (path: string) => response(path))
+    await act(async () => root.render(<Marketplace searchQuery="" userId={1} request={request} onBack={() => {}} />))
+    const nav = Array.from(host.querySelectorAll<HTMLButtonElement>('nav button'))
+    expect(nav).toHaveLength(4)
+    expect(nav.map(button => button.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false', 'false'])
+    await act(async () => nav[1].click())
+    expect(nav.map(button => button.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false', 'false'])
+    expect(host.textContent).toContain('Giỏ hàng đang trống')
+    await act(async () => nav[3].click())
+    expect(nav.map(button => button.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false', 'true'])
+    expect(host.querySelector('form')).not.toBeNull()
+  })
+
+  it('preserves Marketplace search when recovering from a read failure', async () => {
+    let attempts = 0
+    const request = vi.fn(async (path: string) => {
+      attempts += 1
+      if (attempts <= 4) throw new Error('Không kết nối được')
+      return response(path, path.endsWith('/products') ? [product] : [])
+    })
+    await act(async () => root.render(<Marketplace searchQuery="không có" userId={1} request={request} onBack={() => {}} />))
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Không kết nối được')
+    await act(async () => root.render(<Marketplace searchQuery="BÀN" userId={1} request={request} onBack={() => {}} />))
+    const retry = Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent === 'Thử tải dữ liệu')
+    await act(async () => retry?.click())
+    expect(host.textContent).toContain('Bàn học')
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    await act(async () => root.render(<Marketplace searchQuery="không có" userId={1} request={request} onBack={() => {}} />))
+    expect(host.textContent).toContain('Không tìm thấy sản phẩm phù hợp')
+    expect(host.textContent).not.toContain('Bàn học')
+  })
+
+  it('ends an obsolete pending retry when a successful mutation refresh supersedes it', async () => {
+    let completeOldRetry: (() => void) | undefined
+    const oldRetry = new Promise<void>(resolve => { completeOldRetry = resolve })
+    let reads = 0
+    let writes = 0
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        writes += 1
+        if (writes === 1) throw new Error('Lỗi ghi')
+        return Response.json({})
+      }
+      reads += 1
+      if (reads > 4 && reads <= 8) await oldRetry
+      return response(path, path.endsWith('/products') ? [product] : [])
+    })
+    const button = (label: string) => Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
+      .find(item => item.textContent === label)
+    await act(async () => root.render(<Marketplace searchQuery="" userId={1} request={request} onBack={() => {}} />))
+    await act(async () => button('Thêm vào giỏ')?.click())
+    await act(async () => button('Thử tải dữ liệu')?.click())
+    expect(host.textContent).toContain('Đang cập nhật dữ liệu chợ')
+    await act(async () => button('Thêm vào giỏ')?.click())
+    expect(writes).toBe(2)
+    expect(host.textContent).not.toContain('Đang cập nhật dữ liệu chợ')
+    expect(host.textContent).toContain('Bàn học')
+    await act(async () => completeOldRetry?.())
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    expect(host.textContent).not.toContain('Đang cập nhật dữ liệu chợ')
+  })
+
   it('ignores the previous user response after switching users', async () => {
     let resolveOld: ((value: Response) => void) | undefined
     const old = new Promise<Response>((resolve) => { resolveOld = resolve })
