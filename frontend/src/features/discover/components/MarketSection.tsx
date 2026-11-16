@@ -11,12 +11,14 @@ export type MarketSectionProps = {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   session: Session;
   switchTab: (nextTab: Tab) => void;
+  searchQuery: string;
 };
 
 export default function MarketSection({
   apiFetch,
   session,
   switchTab,
+  searchQuery,
 }: MarketSectionProps) {
   return (
       <ErrorBoundary resetKey={session.sessionId} fallback={(retry) => <AsyncSectionFallback title="Chợ" onRetry={retry} onReload={() => window.location.reload()} />}>
@@ -24,6 +26,7 @@ export default function MarketSection({
             <Marketplace
               key={session.sessionId}
               userId={session.user.id}
+              searchQuery={searchQuery}
               request={apiFetch}
               onBack={() => switchTab("discover")}
             />
