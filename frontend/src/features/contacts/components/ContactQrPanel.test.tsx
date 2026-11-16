@@ -66,6 +66,43 @@ describe('ContactQrPanel', () => {
     expect(host.querySelector('img')?.getAttribute('src')).toContain('current')
   })
 
+  it('prevents duplicate clipboard requests and shows scoped success feedback', async () => {
+    const writeText = vi.fn<(_url: string) => Promise<void>>()
+    let finishCopy: () => void = () => {}
+    writeText.mockImplementation(() => new Promise<void>(resolve => { finishCopy = resolve }))
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    try {
+      generateQr.mockResolvedValue('data:image/png;base64,qr')
+      await renderQr('https://example.com/user-a')
+      const copyButton = () => host.querySelector<HTMLButtonElement>('.fd-qr-actions button')!
+      await act(async () => copyButton().click())
+      expect(writeText).toHaveBeenCalledTimes(1)
+      expect(writeText).toHaveBeenCalledWith('https://example.com/user-a')
+      expect(copyButton().disabled).toBe(true)
+      expect(copyButton().textContent).toContain('Đang sao chép')
+      await renderQr('https://example.com/user-b')
+      expect(copyButton().disabled).toBe(false)
+      await act(async () => finishCopy())
+      expect(host.textContent).not.toContain('Đã sao chép liên kết')
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
+  it('reports clipboard denial and re-enables copying', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('Permission denied'))
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    try {
+      generateQr.mockResolvedValue('data:image/png;base64,qr')
+      await renderQr('https://example.com/user-a')
+      await act(async () => host.querySelector<HTMLButtonElement>('.fd-qr-actions button')?.click())
+      expect(host.textContent).toContain('Không thể sao chép')
+      expect(host.querySelector<HTMLButtonElement>('.fd-qr-actions button')?.disabled).toBe(false)
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
   it('does not offer copying a missing link', async () => {
     await renderQr('')
     expect(host.textContent).toContain('Chưa có liên kết kết bạn')

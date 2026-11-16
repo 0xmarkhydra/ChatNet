@@ -9,11 +9,13 @@ type CopyResult = { url: string; message: string }
 export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
   const [qrResult, setQrResult] = useState<QrResult | null>(null)
   const [copyResult, setCopyResult] = useState<CopyResult | null>(null)
+  const [copyPendingUrl, setCopyPendingUrl] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
   const qrKey = JSON.stringify([connectionUrl, retry])
   const qrImage = qrResult?.key === qrKey ? qrResult.image : undefined
   const qrError = !connectionUrl || (qrResult?.key === qrKey && Boolean(qrResult.error))
   const copyStatus = copyResult?.url === connectionUrl ? copyResult.message : ''
+  const copying = Boolean(connectionUrl) && copyPendingUrl === connectionUrl
 
   useEffect(() => {
     if (!connectionUrl) return
@@ -31,12 +33,17 @@ export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
   }, [copyStatus])
 
   async function copyLink() {
-    if (!connectionUrl) return
+    if (!connectionUrl || copying) return
+    const url = connectionUrl
+    setCopyResult(null)
+    setCopyPendingUrl(url)
     try {
-      await navigator.clipboard.writeText(connectionUrl)
-      setCopyResult({ url: connectionUrl, message: 'Đã sao chép liên kết kết bạn' })
+      await navigator.clipboard.writeText(url)
+      setCopyResult({ url, message: 'Đã sao chép liên kết kết bạn' })
     } catch {
-      setCopyResult({ url: connectionUrl, message: 'Không thể sao chép. Kiểm tra quyền clipboard.' })
+      setCopyResult({ url, message: 'Không thể sao chép. Kiểm tra quyền clipboard.' })
+    } finally {
+      setCopyPendingUrl(current => current === url ? null : current)
     }
   }
 
@@ -53,7 +60,7 @@ export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
       </div>
       <small>Mã QR của tài khoản hiện tại</small>
       <div className="fd-qr-actions">
-        <button type="button" className="fd-secondary" disabled={!connectionUrl} onClick={() => void copyLink()}><Copy size={17} aria-hidden="true" />Sao chép link</button>
+        <button type="button" className="fd-secondary" disabled={!connectionUrl || copying} aria-busy={copying} onClick={() => void copyLink()}><Copy size={17} aria-hidden="true" />{copying ? 'Đang sao chép...' : 'Sao chép link'}</button>
         <button type="button" className="fd-primary" onClick={onScanQr}><QrCode size={18} aria-hidden="true" />Quét QR</button>
       </div>
       {copyStatus && <p className="fd-copy-status" role="status">{copyStatus}</p>}
