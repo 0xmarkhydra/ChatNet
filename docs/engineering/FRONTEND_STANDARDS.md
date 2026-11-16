@@ -8,6 +8,10 @@ Ship correct Web/PWA and Desktop-compatible React 19 + strict TypeScript code **
 
 Do not treat existing legacy patterns as permission to repeat them. Legacy violations in `frontend/lint-baseline.json` and `frontend/scripts/architecture-baseline.json` are **debt ceilings, not design examples**.
 
+## Concurrent-agent ownership
+
+Follow `docs/engineering/AGENT_FILE_OWNERSHIP.md` before changing files while other agents work. Agree on an exclusive writer for each modified file, especially `app/AuthedApp.tsx`, router/navigation, `shared/` and contract files. A worktree isolates local edits but does not reserve files; if ownership is unclear or overlaps, stop that edit and coordinate a handoff. Review the final diff against the agreed scope before PR.
+
 ## File ownership and dependency direction
 
 - `app/`: application composition, top-level providers, layouts and navigation. Domain behavior belongs to its feature. `platform/`: environment adapters, receiving domain dependencies through explicit interfaces.

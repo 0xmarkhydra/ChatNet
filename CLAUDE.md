@@ -2,6 +2,8 @@
 
 Read this project policy and the relevant local skills before editing code.
 
+**Parallel-agent requirement:** follow `docs/engineering/AGENT_FILE_OWNERSHIP.md`. Only one active writer may edit a given file; coordinate ownership and check other worktrees/PRs before editing. Isolated branches alone do not prevent conflicts.
+
 ## Product and implementation context
 - Phase 1 delivers **Web and PWA**. Do not add native iOS/Android release work without an explicit request; preserve existing mobile source and compatibility.
 - Current stack: React + TypeScript + Vite/PWA frontend; Go services, PostgreSQL and Redis backend. Inspect actual modules, APIs and configuration before choosing an approach.
