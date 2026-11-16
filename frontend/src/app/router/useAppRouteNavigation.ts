@@ -42,11 +42,11 @@ export function useAppRouteNavigation() {
   }, [desktopProfileSettings, navigate]);
 
   const visitorUsername = visitorUsernameFromPath(location.pathname);
-  const openVisitorProfile = useCallback((username: string) => {
+  const openVisitorProfile = useCallback((username: string, returnTo?: string) => {
     const path = visitorProfilePath(username);
     if (location.pathname === path) return;
     navigate(path, {
-      state: { visitorReturnTo: location.pathname + location.search + location.hash },
+      state: { visitorReturnTo: visitorReturnPath(returnTo ?? (location.pathname + location.search + location.hash)) },
     });
   }, [location.pathname, location.search, location.hash, navigate]);
   const closeVisitor = useCallback(() => {

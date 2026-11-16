@@ -16,6 +16,10 @@ describe("notification deep links", () => {
       .toEqual({ tab: "contacts", conversationId: null, messageId: null });
     expect(notificationDeepLink(new URLSearchParams("conversation=0&message=1.5")))
       .toEqual({ tab: null, conversationId: null, messageId: null });
+    for (const invalid of ["0x10", "1e2", "+12", " 12", "012", "1.0", "9007199254740992"]) {
+      expect(notificationDeepLink(new URLSearchParams(`conversation=${encodeURIComponent(invalid)}&message=${encodeURIComponent(invalid)}`)))
+        .toEqual({ tab: null, conversationId: null, messageId: null });
+    }
   });
 
   it("routes valid conversation links to chat, keeping unrelated invite parameters and hash", () => {

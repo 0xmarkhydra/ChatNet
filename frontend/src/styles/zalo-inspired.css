@@ -3800,15 +3800,17 @@ select:focus-visible {
   margin-left: auto;
 }
 
-/* Keep reactions at the lower-right of the bubble without allowing short
-   messages to push the picker beyond the chat viewport. On incoming messages
-   the reaction row grows RIGHT from the bubble's left edge; on outgoing
-   messages it grows LEFT from the bubble's right edge. A long bubble still
-   right-aligns its reaction row naturally. */
-.message-content > .bubble:has(> .message-reactions > .reaction-chip) {
-  padding-bottom: 22px;
+/* Reactions extend below the bubble instead of adding empty background
+   beneath the message text. Reserve space outside for the chips and stamp. */
+.message-content:has(.message-reactions > .reaction-chip) {
+  margin-bottom: 25px;
 }
 
+.message-content:has(.message-reactions > .reaction-chip) .message-reactions {
+  bottom: -22px;
+}
+
+/* Incoming chips grow right from the bubble; outgoing chips grow left. */
 .message-content .message-reactions {
   position: absolute;
   z-index: 2;
