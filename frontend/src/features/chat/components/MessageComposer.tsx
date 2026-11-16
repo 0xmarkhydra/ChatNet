@@ -8,14 +8,15 @@ import { GroupActivityComposerMenu } from "./GroupActivities";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import { isDesktopBuild } from "../../../platform/desktop";
 import VoiceRecorder from "./VoiceRecorder";
-import { shouldSendChatOnEnter } from "../utils/composerKeyboard";
+import ChatMentionInput from "./ChatMentionInput";
+import type { GroupMember } from "../types";
 import type { ChatSectionProps } from "./ChatSectionProps";
 
 const CHAT_ATTACHMENT_ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip';
 
-type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "chatFileInputRef" | "groupChannels" | "isProfileDesktop" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo" | "t">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]> };
+type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "chatFileInputRef" | "groupChannels" | "isProfileDesktop" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo" | "t">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[] };
 
-export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, canSend, chatFileInputRef, groupChannels, isProfileDesktop, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, t }: Props) {
+export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, canSend, chatFileInputRef, groupChannels, isProfileDesktop, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, t, groupMembers }: Props) {
   function openAttachmentPicker(mediaOnly: boolean) {
     const input = chatFileInputRef.current;
     if (!input) return;
@@ -95,27 +96,20 @@ export default function MessageComposer({ activeConversation, activeConversation
                         onCreate={setGroupActivityCreateKind}
                       />
                     )}
-                    <textarea
-                      ref={messageInputRef}
-                      className="chat-message-input"
-                      rows={1}
-                      aria-label="Tin nhắn"
+                    <ChatMentionInput
+                      key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
+                      conversationId={activeConversation.id}
+                      members={activeConversation.type === 'group' ? groupMembers.filter(member => member.id !== session.user.id) : []}
+                      inputRef={messageInputRef}
+                      text={messageText}
+                      setText={setMessageText}
                       placeholder={isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? selectedChannelId ? `Nhắn vào # ${groupChannels.find(channel => channel.id === selectedChannelId)?.name || 'kênh hội thoại'}...` : `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
-                      value={messageText}
-                      onChange={(event) => setMessageText(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (!shouldSendChatOnEnter(event.nativeEvent)) return;
-                        event.preventDefault();
-                        event.currentTarget.form?.requestSubmit();
-                      }}
-                      onPaste={(event) => {
+                      onFilesPaste={(event) => {
                         const files = chatFilesFromClipboard(event.clipboardData)
-                        if (files.length === 0) return // Preserve normal text paste (Cmd/Ctrl+V).
+                        if (files.length === 0) return
                         event.preventDefault()
                         void addChatFiles(files)
                       }}
-                      title="Dán ảnh/tệp bằng Cmd/Ctrl+V hoặc kéo thả vào cuộc trò chuyện"
-                      maxLength={4000}
                     />
                     <button className="send-button polished-send" disabled={!canSend} aria-label="Gửi tin nhắn">
                       <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>

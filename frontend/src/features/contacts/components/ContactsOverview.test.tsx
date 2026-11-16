@@ -81,6 +81,20 @@ describe('Friends overview', () => {
     expect(app.onSettings).toHaveBeenCalledTimes(1)
   })
 
+  it('makes privacy shortcuts keyboard-accessible and routes to actual settings and invitations', () => {
+    const app = setup()
+    const actions = [...app.container.querySelectorAll<HTMLButtonElement>('.co-privacy-details button')]
+    expect(actions).toHaveLength(2)
+    expect(actions[0].textContent).toContain('Kiểm soát quyền riêng tư')
+    expect(actions[1].textContent).toContain('Quản lý lời mời kết bạn')
+    expect(actions.every(button => button.type === 'button')).toBe(true)
+    act(() => { actions[0].focus(); actions[0].click() })
+    expect(document.activeElement).toBe(actions[0])
+    expect(app.onSettings).toHaveBeenCalledTimes(1)
+    act(() => actions[1].click())
+    expect(app.onInvitations).toHaveBeenCalledTimes(1)
+  })
+
   it('shows loading instead of transient zero counts and prevents stale suggestion cards', () => {
     const app = setup({ friendsLoading: true, suggestionsLoading: true })
     expect(app.container.querySelector('[aria-label="Đang tải bạn bè và lời mời"]')).not.toBeNull()
@@ -96,6 +110,9 @@ describe('Friends overview', () => {
   it('exposes meaningful retry actions for connection and suggestion errors', () => {
     const app = setup({ friendsError: 'Network error', suggestionsError: true })
     expect(app.container.querySelectorAll('[role="alert"]')).toHaveLength(2)
+    expect(app.container.querySelectorAll('.co-request')).toHaveLength(0)
+    expect(app.container.textContent).toContain('Không thể cập nhật lời mời')
+    expect(app.container.textContent).toContain('–Bạn bè')
     const retryButtons = [...app.container.querySelectorAll<HTMLButtonElement>('.co-feedback button')]
     expect(retryButtons).toHaveLength(2)
     act(() => { retryButtons[0].click(); retryButtons[1].click() })
