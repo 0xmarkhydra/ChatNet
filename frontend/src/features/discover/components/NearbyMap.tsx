@@ -51,6 +51,7 @@ export default function NearbyMap({ location, places, selected, onSelect, onShow
       button.textContent = String(index + 1)
       button.title = place.name
       button.setAttribute('aria-label', place.name)
+      button.setAttribute('aria-pressed', String(selected === place.id))
       button.onclick = () => onSelect(place.id)
       return new maplibregl.Marker({ element: button }).setLngLat([place.longitude, place.latitude]).addTo(instance)
     })

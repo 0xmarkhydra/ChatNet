@@ -6,6 +6,7 @@ import NearbyMap from './NearbyMap'
 
 const harness = vi.hoisted(() => ({
   events: {} as Record<string, () => void>,
+  markerElements: [] as HTMLButtonElement[],
   zoomIn: vi.fn(),
   zoomOut: vi.fn(),
   easeTo: vi.fn(),
@@ -23,6 +24,9 @@ vi.mock('maplibre-gl', () => ({
     easeTo(options: unknown) { harness.easeTo(options) }
   },
   Marker: class {
+    constructor(options: { element?: HTMLButtonElement }) {
+      if (options.element) harness.markerElements.push(options.element)
+    }
     setLngLat() { return this }
     addTo() { return this }
     remove() {}
@@ -38,6 +42,7 @@ const initialResizeObserver = globalThis.ResizeObserver
 beforeEach(() => {
   actGlobal.IS_REACT_ACT_ENVIRONMENT = true
   harness.events = {}
+  harness.markerElements = []
   vi.clearAllMocks()
   globalThis.ResizeObserver = class {
     observe() {}
@@ -54,6 +59,31 @@ afterEach(async () => {
   host.remove()
   actGlobal.IS_REACT_ACT_ENVIRONMENT = initialAct
   globalThis.ResizeObserver = initialResizeObserver
+})
+
+describe('NearbyMap marker selection', () => {
+  it('announces the selected marker and updates its selected state', async () => {
+    const location = { latitude: 21, longitude: 105 }
+    const places = [
+      { id: 'a', name: 'Cà phê A', category: 'cafe' as const, kind: 'Cafe', latitude: 21, longitude: 105, distanceKm: 0.1 },
+      { id: 'b', name: 'Cà phê B', category: 'cafe' as const, kind: 'Cafe', latitude: 21.01, longitude: 105.01, distanceKm: 0.2 },
+    ]
+    const onSelect = vi.fn()
+    await act(async () => root.render(<NearbyMap location={location} places={places}
+      selected="a" onSelect={onSelect} onShowList={() => {}} />))
+    const [first, second] = harness.markerElements
+    expect(first?.getAttribute('aria-pressed')).toBe('true')
+    expect(second?.getAttribute('aria-pressed')).toBe('false')
+    expect(first?.getAttribute('aria-label')).toBe('Cà phê A')
+    second?.click()
+    expect(onSelect).toHaveBeenCalledWith('b')
+
+    harness.markerElements = []
+    await act(async () => root.render(<NearbyMap location={location} places={places}
+      selected="b" onSelect={onSelect} onShowList={() => {}} />))
+    expect(harness.markerElements[0]?.getAttribute('aria-pressed')).toBe('false')
+    expect(harness.markerElements[1]?.getAttribute('aria-pressed')).toBe('true')
+  })
 })
 
 describe('NearbyMap interactive controls', () => {
