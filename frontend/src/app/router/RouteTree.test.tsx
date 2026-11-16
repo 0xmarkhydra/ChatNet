@@ -62,8 +62,14 @@ describe("app route tree", () => {
 
   it("redirects legacy home links without discarding the post deep link", () => {
     const { location, page } = renderAt("/?tab=feed&post=42");
-    expect(location()).toBe("/feed?tab=feed&post=42");
+    expect(location()).toBe("/feed?post=42");
     expect(page()).not.toBeNull();
+  });
+
+  it("canonicalizes legacy tab links while keeping unrelated search parameters", () => {
+    expect(renderAt("/?tab=contacts&invite=alice").location()).toBe("/contacts?invite=alice");
+    expect(renderAt("/?tab=unknown&message=12").location()).toBe("/chat?message=12");
+    expect(renderAt("/?tab=feed").location()).toBe("/feed");
   });
 
   it("renders Not Found for unknown paths without replacing the shell", () => {
