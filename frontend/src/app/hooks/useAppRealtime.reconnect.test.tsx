@@ -12,8 +12,10 @@ class TestEventSource {
   onopen: (() => void) | null = null
   onerror: (() => void) | null = null
   closed = false
+  private listeners = new Map<string, EventListener>()
+  emit(name: string, event = new Event(name)) { this.listeners.get(name)?.(event) }
   constructor(_url: string) { TestEventSource.instances.push(this) }
-  addEventListener(_name: string, _listener: EventListener) {}
+  addEventListener(name: string, listener: EventListener) { this.listeners.set(name, listener) }
   close() { this.closed = true }
 }
 beforeEach(() => {
@@ -41,15 +43,18 @@ async function setup() {
     events.push((event as CustomEvent<{ sessionId: string }>).detail.sessionId)
   }
   window.addEventListener('chatnet:sse-reconnected', listener)
+  const refreshFriendConnections = vi.fn(async () => {})
+  const expireSession = vi.fn()
   const opts = {
     session, sessionRef,
     refreshConversations: vi.fn(async () => {}),
     refreshPosts: vi.fn(async () => {}),
     refreshStories: vi.fn(async () => {}),
-    refreshFriendConnections: vi.fn(async () => {}),
+    refreshFriendConnections,
     reconcileConversationMemberships: vi.fn(async () => {}),
     setStatus: vi.fn(),
     checkSession: vi.fn(async () => true),
+    expireSession,
     membershipSyncSequence: { current: 0 },
   } as unknown as Parameters<typeof useAppRealtime>[0]
   function Probe() { useAppRealtime(opts); return null }
@@ -57,7 +62,7 @@ async function setup() {
   const transport = TestEventSource.instances[0]
   if (!transport) throw new Error('EventSource not constructed')
   return {
-    events, transport,
+    events, transport, sessionRef, session, refreshFriendConnections, expireSession,
     async close() {
       await act(async () => { root.unmount() })
       window.removeEventListener('chatnet:sse-reconnected', listener)
@@ -83,6 +88,29 @@ describe('SSE reconnect backfill signal', () => {
       await act(async () => app.transport.onerror?.())
       await act(async () => app.transport.onopen?.())
       expect(app.events).toEqual(['A'])
+    } finally { await app.close() }
+  })
+
+
+  it('ignores obsolete SSE frames when a different user takes over the same session ID', async () => {
+    const app = await setup()
+    try {
+      await act(async () => app.transport.onopen?.())
+      const initialRefreshes = app.refreshFriendConnections.mock.calls.length
+      app.sessionRef.current = {
+        ...app.session,
+        user: { ...app.session.user, id: 2, username: 'B' },
+      }
+      await act(async () => {
+        app.transport.emit('session-revoked')
+        app.transport.emit('update', new MessageEvent('update', {
+          data: JSON.stringify({ type: 'friend.updated' }),
+        }))
+        app.transport.onopen?.()
+      })
+      expect(app.expireSession).not.toHaveBeenCalled()
+      expect(app.refreshFriendConnections).toHaveBeenCalledTimes(initialRefreshes)
+      expect(app.events).toEqual([])
     } finally { await app.close() }
   })
 

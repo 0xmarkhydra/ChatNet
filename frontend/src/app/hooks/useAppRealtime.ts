@@ -113,7 +113,7 @@ export function useAppRealtime({
   })
 
   useEffect(() => {
-    if (!session?.token || sessionRef.current?.sessionId !== session.sessionId) return
+    if (!session?.token || sessionRef.current !== session) return
 
     void handlers.current.refreshConversations()
     void handlers.current.refreshPosts()
@@ -147,15 +147,15 @@ export function useAppRealtime({
       handlers.current.setStatus('Đang kết nối lại...')
       if (Date.now() - lastSSECheckAt < 30_000) return
       lastSSECheckAt = Date.now()
-      if (document.visibilityState === 'visible' && sessionRef.current?.sessionId === session.sessionId) {
+      if (document.visibilityState === 'visible' && sessionRef.current === session) {
         void handlers.current.checkSession().catch(() => undefined)
       }
     }
     events.addEventListener('session-revoked', () => {
-      if (active && sessionRef.current?.sessionId === session.sessionId) handlers.current.expireSession()
+      if (active && sessionRef.current === session) handlers.current.expireSession()
     })
     events.addEventListener('update', (event) => {
-      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
+      if (!active || sessionRef.current !== session) return
       const update = parseRealtimeEvent((event as MessageEvent).data)
       if (!update) return
       if (['message', 'conversation.read', 'conversation.created', 'conversation.removed', 'privacy.updated'].includes(update.type)) refreshDesktopUnread()
@@ -370,13 +370,13 @@ export function useAppRealtime({
                   body: JSON.stringify({ channelId: activeChannelIdRef.current }) }
               : { method: 'POST' })
               .then(response => {
-                if (active && sessionRef.current?.sessionId === session.sessionId && response.ok && group)
+                if (active && sessionRef.current === session && response.ok && group)
                   window.dispatchEvent(new CustomEvent('chatnet:channel-read',{detail:{
                     conversationId:update.conversationId, channelId:incoming.channelId || 0,
                   }}))
               })
               .catch(() => {
-                if (active && sessionRef.current?.sessionId === session.sessionId) handlers.current.setStatus('Đang kết nối lại...')
+                if (active && sessionRef.current === session) handlers.current.setStatus('Đang kết nối lại...')
               })
           }
         }
@@ -384,20 +384,20 @@ export function useAppRealtime({
     })
 
     const refreshTimer = window.setInterval(() => {
-      if (!active || sessionRef.current?.sessionId !== session.sessionId || document.visibilityState !== 'visible') return
+      if (!active || sessionRef.current !== session || document.visibilityState !== 'visible') return
       void handlers.current.refreshConversations()
       void handlers.current.refreshFriendConnections()
       handlers.current.refreshCategoryConversations()
     }, 20000)
     const membershipTimer = window.setInterval(() => {
-      if (!active || sessionRef.current?.sessionId !== session.sessionId) return
+      if (!active || sessionRef.current !== session) return
       void handlers.current.reconcileConversationMemberships()
     }, 90000)
     const checkMembership = () => {
-      if (active && sessionRef.current?.sessionId === session.sessionId) void handlers.current.reconcileConversationMemberships()
+      if (active && sessionRef.current === session) void handlers.current.reconcileConversationMemberships()
     }
     const checkVisibleMembership = () => {
-      if (active && sessionRef.current?.sessionId === session.sessionId && document.visibilityState === 'visible') {
+      if (active && sessionRef.current === session && document.visibilityState === 'visible') {
         checkMembership()
         void handlers.current.refreshConversations()
         handlers.current.refreshCategoryConversations()
