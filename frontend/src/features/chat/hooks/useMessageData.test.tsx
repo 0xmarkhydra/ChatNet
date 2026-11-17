@@ -84,6 +84,39 @@ function setup() {
 }
 
 describe('chat message pagination visit isolation', () => {
+  it('exposes an initial loading state, then resolves after a slow history request', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      expect(app.current.messageHistoryLoading).toBe(true)
+      expect(app.current.messageHistoryError).toBe(false)
+      await app.respond(0, [message(10)])
+      expect(app.current.messageHistoryLoading).toBe(false)
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.current.messages.map(item => item.id)).toEqual([10])
+    } finally { await app.close() }
+  })
+
+  it('offers a retry after a failed first load and preserves cached history during retry', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      await act(async () => app.jobs[0].reject(new Error('offline')))
+      expect(app.current.messageHistoryError).toBe(true)
+      expect(app.current.messageHistoryLoading).toBe(false)
+      await act(async () => app.current.retryMessageHistory())
+      expect(app.jobs).toHaveLength(2)
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await app.respond(1, [message(10)])
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.current.messages.map(item => item.id)).toEqual([10])
+      await act(async () => app.current.retryMessageHistory())
+      expect(app.current.messages.map(item => item.id)).toEqual([10])
+      await app.respond(2, [message(11)])
+      expect(app.current.messages.map(item => item.id)).toEqual([11])
+    } finally { await app.close() }
+  })
+
   it('reuses only the selected channel history without a blank flash and purges cleared history', async () => {
     const app = setup()
     try {

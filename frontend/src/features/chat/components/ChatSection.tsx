@@ -155,6 +155,9 @@ export default function ChatSection({
   messageSearchOpen,
   messageSending,
   messagesLoadingMore,
+  messageHistoryLoading,
+  messageHistoryError,
+  retryMessageHistory,
   messagesScrollRef,
   messageText,
   moveConversationLongPress,
@@ -964,6 +967,9 @@ export default function ChatSection({
                     messageInputRef={messageInputRef}
                     setMessageScrollAtBottom={setMessageScrollAtBottom}
                     messagesLoadingMore={messagesLoadingMore}
+                    messageHistoryLoading={messageHistoryLoading}
+                    messageHistoryError={messageHistoryError}
+                    retryMessageHistory={retryMessageHistory}
                     messagesScrollRef={messagesScrollRef}
                     moveMessageLongPress={moveMessageLongPress}
                     openMessageActions={openMessageActions}
