@@ -5,7 +5,7 @@ Read `docs/desktop/07_BATCH_02_STATUS.md` through `10_BATCH_05_STATUS.md` for ac
 
 ## Development
 
-Development/build requires Node.js 24+ and Go for backend checks. End users of a packaged application do not install Node.js.
+Development/build requires Node.js 24+ and Go for backend checks. End users of a packaged application do not install Node.js. Windows screen capture builds compile a small helper using the Windows .NET Framework C# compiler. The Windows package includes the helper next to its resources, and the app falls back to the Electron capture path if the helper is unavailable.
 Electron is pinned to 45.1.0, macOS runtime minimum is 13.0.0. Physical Windows/Intel compatibility and signed installers remain release gates.
 
 ```bash

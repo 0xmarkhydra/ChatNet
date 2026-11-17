@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><title>Desktop screenshot navigation fixture</title></head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React from 'react'
+    import { createRoot } from 'react-dom/client'
+    import AppSidebar from '../../src/app/navigation/AppSidebar'
+    import { useDesktopScreenshot } from '../../src/app/navigation/useDesktopScreenshot'
+    import '../../src/styles/tailwind.css'
+    import '../../src/styles/app-shell.css'
+
+    let emitShortcut
+    const state = window.qa = {
+      calls: [], notices: [], navigations: [], next: true, hold: false,
+      shortcut: mode => emitShortcut?.(mode),
+    }
+    window.socoDesktop = { screenshot: {
+      capture(mode) {
+        state.calls.push(mode)
+        if (state.hold) return new Promise(resolve => { state.release = resolve })
+        return Promise.resolve(state.next)
+      },
+      onShortcut(listener) {
+        emitShortcut = listener
+        return () => { if (emitShortcut === listener) emitShortcut = undefined }
+      },
+    } }
+
+    function Harness() {
+      const capture = useDesktopScreenshot((message, kind) => state.notices.push({ message, kind }))
+      const noop = () => {}
+      return React.createElement('div', { className: 'app-shell modern-shell app-layout' },
+        React.createElement(AppSidebar, {
+          tab: 'feed', section: null, username: 'tester', displayName: 'Tester',
+          unreadTotal: 0, notificationCount: 0, feedSaved: false, settingsActive: false,
+          onNavigate: tab => state.navigations.push(tab), onCalls: noop, onSaved: noop, onSettings: noop,
+          onScreenshot: capture.captureWithoutWindow, screenshotBusy: capture.busy,
+        }),
+      )
+    }
+
+    createRoot(document.getElementById('root')).render(React.createElement(Harness))
+  </script>
+</body>
+</html>
