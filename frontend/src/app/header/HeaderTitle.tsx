@@ -4,6 +4,7 @@ import type { DesktopSection } from "./headerContext";
 
 export type HeaderTitleProps = {
   tab: Tab;
+  searchResults?: boolean;
   desktopSection: DesktopSection;
   translationSettingsOpen: boolean;
   groupWorkspaceMode: GroupWorkspaceMode;
@@ -55,7 +56,7 @@ export default function HeaderTitle(p: HeaderTitleProps) {
       ? "Cài đặt tài khoản và quyền riêng tư"
       : p.profileEditing ? "Thông tin cá nhân và quyền hiển thị" : "Trang cá nhân, bài viết và thông tin của bạn",
   };
-  const heading = p.tab === "chat" && p.translationSettingsOpen
+  const heading = p.searchResults ? "Kết quả tìm kiếm" : p.tab === "chat" && p.translationSettingsOpen
     ? "Ngôn ngữ & dịch AI"
     : p.tab === "chat" && p.desktopSection === "groups"
       ? groupTitle(p)
@@ -65,7 +66,7 @@ export default function HeaderTitle(p: HeaderTitleProps) {
   return (
     <div className="app-page-heading">
       <strong>{heading}</strong>
-      <small>{subtitle[p.tab]}</small>
+      <small>{p.searchResults ? "Tìm người, bài viết, cộng đồng và sản phẩm" : subtitle[p.tab]}</small>
     </div>
   );
 }

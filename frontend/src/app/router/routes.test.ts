@@ -7,6 +7,11 @@ describe("app URL routing", () => {
       expect(tabFromPath(path)).toBe(tab);
     }
   });
+  it("keeps the global search page under Discover navigation", () => {
+    expect(ROUTE.search).toBe("/search");
+    expect(tabFromPath("/search")).toBe("discover");
+    expect(fallbackPathForRoute("/search/unsupported")).toBe("/discover");
+  });
   it("keeps calls and settings under their parent tabs", () => {
     expect(tabFromPath(ROUTE.calls)).toBe("contacts");
     expect(tabFromPath(ROUTE.settings)).toBe("profile");

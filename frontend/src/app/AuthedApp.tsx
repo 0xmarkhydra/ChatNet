@@ -277,6 +277,7 @@ import HeaderTitle from "./header/HeaderTitle";
 import { searchLabels } from "./header/headerContext";
 import NotificationsSection from "../features/notifications/components/NotificationsSection";
 import DiscoverSection from "../features/discover/components/DiscoverSection";
+import SearchResultsPage from "../features/search/SearchResultsPage";
 import MarketSection from "../features/discover/components/MarketSection";
 import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
@@ -373,6 +374,7 @@ export default function AuthedApp({
 
 
   const routeLocation = useLocation();
+  const isSearchResultsRoute = routeLocation.pathname === "/search";
   const navigate = useNavigate();
   const {
     tab, setTab, contactsScreen, setContactsScreen,
@@ -2633,6 +2635,10 @@ export default function AuthedApp({
       expanded={tab === "chat" && conversationSearching && quickSearchOpen}
       controls={tab === "chat" ? "chat-quick-search-results" : undefined}
       onKeyDown={(event) => {
+        if (tab === "discover" && event.key === "Enter") {
+          event.preventDefault();
+          navigate('/search?q=' + encodeURIComponent(globalSearch.trim()))
+        }
         if (tab === "chat" && event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
@@ -2799,6 +2805,7 @@ export default function AuthedApp({
           title={
             <HeaderTitle
               tab={tab}
+              searchResults={isSearchResultsRoute}
               desktopSection={desktopSection}
               translationSettingsOpen={translationSettingsConversationId !== null}
               groupWorkspaceMode={groupWorkspaceMode}
@@ -3217,7 +3224,16 @@ export default function AuthedApp({
           onNavigate={switchTab}
         />}
 
-        {tab === "discover" && (
+        {isSearchResultsRoute && (
+          <SearchResultsPage
+            request={apiFetch}
+            sessionId={session.sessionId}
+            onOpenProfile={username => openVisitorProfile(username)}
+            onOpenPost={postId => navigate(feedPostPath(postId))}
+          />
+        )}
+
+        {tab === "discover" && !isSearchResultsRoute && (
           <DiscoverSection
           actOnFriend={actOnFriend}
           findNearby={findNearby}

@@ -682,7 +682,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
                ORDER BY CASE WHEN avatar_member.user_id=$1 THEN 1 ELSE 0 END, avatar_member.user_id
                LIMIT 3
              ) ELSE ARRAY[]::text[] END,
-             COALESCE((SELECT NOT p.message_notifications AND NOT p.mention_notifications
+             COALESCE((SELECT NOT p.message_notifications
                FROM group_notification_preferences p
                WHERE p.conversation_id=c.id AND p.user_id=$1),FALSE)
 

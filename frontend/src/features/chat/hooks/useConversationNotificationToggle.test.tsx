@@ -21,7 +21,7 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function mount(apiFetch: (path: string, init?: RequestInit) => Promise<Response>) {
+function mount(apiFetch: (path: string, init?: RequestInit) => Promise<Response>, initialConversation = conversation) {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
@@ -30,7 +30,7 @@ function mount(apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   let conversations: Conversation[] = []
 
   function Test() {
-    const [items, setItems] = useState([conversation])
+    const [items, setItems] = useState([initialConversation])
     conversations = items
     state = useConversationNotificationToggle({ apiFetch, setConversations: setItems, setNotice: notify })
     return null
@@ -100,5 +100,46 @@ it('does not optimistically mute after an ambiguous successful response and allo
   )
   await act(async () => view.state.toggleConversationNotifications(conversation))
   expect(apiFetch).toHaveBeenCalledTimes(2)
+  expect(view.conversations[0].muted).toBe(true)
+})
+
+it('muting a group keeps @mention notifications enabled while silencing ordinary messages', async () => {
+  const group = { ...conversation, type: 'group' as const }
+  const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => ({
+    ok: true,
+    json: async () => init?.method === 'PUT'
+      ? JSON.parse(init.body as string)
+      : { messageNotifications: true, mentionNotifications: true },
+  }) as Response)
+  const view = mount(apiFetch, group)
+  await view.render()
+  await act(async () => view.state.toggleConversationNotifications(group))
+  expect(apiFetch).toHaveBeenCalledTimes(2)
+  expect(apiFetch).toHaveBeenNthCalledWith(1, '/api/conversations/42/notification-settings', { cache: 'no-store' })
+  expect(apiFetch).toHaveBeenNthCalledWith(2, '/api/conversations/42/notification-settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messageNotifications: false, mentionNotifications: true }),
+  })
+  expect(view.conversations[0].muted).toBe(true)
+  expect(view.notify).toHaveBeenCalledWith('Đã tắt thông báo hội thoại.', 'success')
+})
+
+it('preserves a separately disabled @mention preference when muting a group', async () => {
+  const group = { ...conversation, type: 'group' as const }
+  const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => ({
+    ok: true,
+    json: async () => init?.method === 'PUT'
+      ? JSON.parse(init.body as string)
+      : { messageNotifications: true, mentionNotifications: false },
+  }) as Response)
+  const view = mount(apiFetch, group)
+  await view.render()
+  await act(async () => view.state.toggleConversationNotifications(group))
+  expect(apiFetch).toHaveBeenNthCalledWith(2, '/api/conversations/42/notification-settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messageNotifications: false, mentionNotifications: false }),
+  })
   expect(view.conversations[0].muted).toBe(true)
 })

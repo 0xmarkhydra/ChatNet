@@ -21,16 +21,29 @@ export function useConversationNotificationToggle({
     setNotificationBusyId(conversation.id)
     try {
       const muted = !conversation.muted
+      const isGroup = conversation.type === 'group'
+      let mentionNotifications = !muted
+      if (isGroup) {
+        // Muting a group silences ordinary messages, not explicit @mentions.
+        // Preserve an independently disabled mention preference.
+        const currentResponse = await apiFetch('/api/conversations/' + conversation.id + '/notification-settings', { cache: 'no-store' })
+        const current = await currentResponse.json().catch(() => null) as
+          { mentionNotifications?: boolean; error?: string } | null
+        if (!currentResponse.ok || typeof current?.mentionNotifications !== 'boolean') {
+          throw new Error(current?.error || 'Không đọc được tùy chọn nhắc tên của nhóm.')
+        }
+        mentionNotifications = current.mentionNotifications
+      }
       const response = await apiFetch('/api/conversations/' + conversation.id + '/notification-settings', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageNotifications: !muted, mentionNotifications: !muted }),
+        body: JSON.stringify({ messageNotifications: !muted, mentionNotifications }),
       })
       const result = await response.json().catch(() => null) as
         { messageNotifications?: boolean; mentionNotifications?: boolean; error?: string } | null
       if (!response.ok || typeof result?.messageNotifications !== 'boolean') {
         throw new Error(result?.error || 'Không cập nhật được thông báo. Backend cần hỗ trợ thiết lập theo hội thoại.')
       }
-      const nextMuted = !result.messageNotifications && !result.mentionNotifications
+      const nextMuted = isGroup ? !result.messageNotifications : !result.messageNotifications && !result.mentionNotifications
       setConversations(current => current.map(item =>
         item.id === conversation.id ? { ...item, muted: nextMuted } : item))
       setNotice(nextMuted ? 'Đã tắt thông báo hội thoại.' : 'Đã bật thông báo hội thoại.', 'success')
