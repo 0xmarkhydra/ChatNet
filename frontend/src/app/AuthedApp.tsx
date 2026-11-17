@@ -113,6 +113,7 @@ import MessageSearchPanel from "../features/chat/components/MessageSearchPanel";
 import ProfileIdentityForm from "../features/profile/components/ProfileIdentityForm";
 import BottomNavigation from "./navigation/BottomNavigation";
 import AppSidebar from "./navigation/AppSidebar";
+import { useDesktopScreenshot } from "./navigation/useDesktopScreenshot";
 import { countNotificationItems, formatNotificationBadge } from "../features/notifications/utils/notification-count";
 import NotificationsPage from "../features/notifications/components/NotificationsPage";
 import type { PostMentionNotification } from "../features/feed/utils/postMentionNotifications";
@@ -356,6 +357,7 @@ export default function AuthedApp({
   const { session, sessionRef } = useSession();
   const { apiFetch, pendingRequests, mutationRequests } = useApi();
   const { notice, setNotice, dismissNotice } = useNotice();
+  const screenshot = useDesktopScreenshot(setNotice);
   const { chatCreateError, directUsername, groupCreateStep, groupWorkspaceMode, newChatMode, quickCreateOpen, setChatCreateError, setDirectUsername, setGroupCreateStep, setGroupWorkspaceMode, setNewChatMode, setQuickCreateOpen } = useGroupWorkspaceState({  });
 
   const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({ sessionId: session?.sessionId ?? null });
@@ -2696,6 +2698,8 @@ export default function AuthedApp({
         feedSaved={feedFilter === "saved"}
         settingsActive={desktopProfileSettings}
         onNavigate={switchTab}
+        onScreenshot={screenshot.captureWithoutWindow}
+        screenshotBusy={screenshot.busy}
         onSaved={() => {
           switchTab("feed");
           setFeedFilter("saved");

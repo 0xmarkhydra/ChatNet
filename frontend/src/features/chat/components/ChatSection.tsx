@@ -31,7 +31,7 @@ import ConversationDetailsPanel from "./ConversationDetailsPanel";
 import GroupSettingsPanel, { type GroupManagementSection } from "./GroupSettingsPanel";
 import type { GroupPhotoTarget } from "./GroupAvatarEditor";
 import { type ChatTranslationSettings } from "../lib/conversationTranslationSettings";
-import { type GroupMember, type Message, type Conversation, type NewChatMode, type MessageReaction } from "../types";
+import { type ConversationEncryptionMode, type GroupMember, type Message, type Conversation, type NewChatMode, type MessageReaction } from "../types";
 import type { FriendSearchResult, FriendConnection } from "../../contacts";
 import { type QueuedChatMessage } from "../lib/chatOutbox";
 import { type GroupChannel } from "../utils/groupChannels";
@@ -245,7 +245,10 @@ export default function ChatSection({
 }: ChatSectionProps) {
   const readersScope = `${session.sessionId}:${activeConversationId ?? ''}`;
   const [readersTarget, setReadersTarget] = useScopedState<{ message: Message; readerIds: number[]; sessionId: string } | null>(readersScope, null);
-  const [mlsPilotMode, setMlsPilotMode] = useState<'unknown' | 'legacy' | 'pending' | 'e2ee'>('unknown');
+  const encryptionScope = activeConversation?.type === 'direct' && activeConversation.otherUserId && !conversationBlocked
+    ? `${session.sessionId}:${session.user.id}:${activeConversation.id}:${activeConversation.otherUserId}`
+    : null;
+  const [mlsPilotMode, setMlsPilotMode] = useScopedState<ConversationEncryptionMode | 'unknown'>(encryptionScope, 'unknown');
   const readersMessage = readersTarget?.sessionId === session.sessionId ? readersTarget.message : null;
   const messageReaderMembers = useMemo(() => {
     if (!activeConversation) return [];
@@ -1002,7 +1005,7 @@ export default function ChatSection({
 
                   {activeConversation.type === 'direct' && activeConversation.otherUserId && !conversationBlocked && (
                     <E2EEPilotGate
-                      key={session.sessionId + ':' + activeConversation.id}
+                      key={encryptionScope}
                       conversationId={activeConversation.id}
                       userId={session.user.id}
                       otherUserId={activeConversation.otherUserId}
