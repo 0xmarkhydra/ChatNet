@@ -1,0 +1,19 @@
+{
+  "name": "dms-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Demo nhỏ: Distributed Media Storage & Paid Re-access (POC, dữ liệu giả lập)",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --no-warnings --experimental-strip-types src/server.ts",
+    "agent": "node --no-warnings --experimental-strip-types src/agent.ts",
+    "demo": "node --no-warnings --experimental-strip-types src/demo-cli.ts",
+    "test": "node --no-warnings --experimental-strip-types --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}
