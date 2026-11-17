@@ -13,9 +13,15 @@ Installed from [0xmarkhydra/master-skill](https://github.com/0xmarkhydra/master-
 | `.codelocal-skills/ponytail/LICENSE` | MIT license for Ponytail |
 | `.codelocal-skills/ponytail/SOURCE.md` | Upstream and provenance details |
 
-The 9 skills are **backend-engineering**, **react-frontend-engineering**,
+The original 9 skills are **backend-engineering**, **react-frontend-engineering**,
 **ios-inspired-ui-design**, **ponytail**, **ponytail-review**, **ponytail-audit**,
 **ponytail-debt**, **ponytail-gain** and **ponytail-help**.
+
+An additional **UI UX Pro Max** skill is vendored independently in
+`.agents/skills/ui-ux-pro-max/` and `.claude/skills/ui-ux-pro-max/`.
+See `docs/engineering/UI_SKILL_ORCHESTRATION.md` for dispatch, precedence,
+Python requirements and the prohibition on overwriting SocCo themes.
+The original CodeLocal Skills updater still manages only its original nine skills.
 
 ## Agent workflow
 
