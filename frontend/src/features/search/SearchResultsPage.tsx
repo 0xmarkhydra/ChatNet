@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Search, Plus, ArrowRight, UsersRound, FileText, Package, SlidersHorizontal, RotateCcw, ChevronDown, Eye, Sparkles } from 'lucide-react'
-import { usePostSearch } from '../feed/hooks/usePostSearch'
+import { usePostSearch } from '../feed'
 import type { ApiRequest } from '../../shared/types/api'
 import './SearchResultsPage.css'
 
