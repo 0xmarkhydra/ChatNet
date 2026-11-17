@@ -1,0 +1,105 @@
+/* One Zalo-style address book for friends, groups, invitations and calls. */
+.unified-contacts {
+  display: flex; width: 100%; flex: 1; min-width: 0; min-height: 0; height: 100%;
+  overflow: hidden; background: #f5f7fb; color: #1d3050;
+}
+.unified-contacts * { box-sizing: border-box; }
+.unified-contacts-nav {
+  width: 240px; flex: 0 0 240px; min-width: 0; overflow-y: auto;
+  background: #fff; border-right: 1px solid #e7ebf3; padding: 22px 12px;
+}
+.unified-contacts-nav-title {
+  display: flex; align-items: center; gap: 11px; padding: 4px 12px 22px;
+  font-size: 19px; font-weight: 750; color: #182a48;
+}
+.unified-contacts-nav-title svg { color: #2563eb; }
+.unified-contacts-nav nav { display: grid; gap: 5px; }
+.unified-contacts-nav-item {
+  display: flex; align-items: center; width: 100%; min-height: 45px; gap: 12px;
+  border: 0; border-radius: 10px; padding: 10px 13px; text-align: left;
+  background: transparent; color: #4e607d; font: inherit; font-size: 13px;
+  font-weight: 570; cursor: pointer;
+}
+.unified-contacts-nav-item > span { flex: 1; min-width: 0; }
+.unified-contacts-nav-item svg { flex: 0 0 auto; }
+.unified-contacts-nav-item:hover { background: #f1f5fd; }
+.unified-contacts-nav-item.active { background: #eaf1ff; color: #1e59da; font-weight: 740; }
+.unified-contacts-nav-item.separated { margin-top: 12px; position: relative; }
+.unified-contacts-nav-item.separated::before {
+  content: ''; position: absolute; height: 1px; background: #e9eef5;
+  top: -8px; left: 12px; right: 12px;
+}
+.unified-contacts-count {
+  background: #e94164; color: white; min-width: 21px; height: 21px;
+  display: grid; place-items: center; border-radius: 12px; padding: 0 5px; font-size: 11px;
+}
+.unified-contacts-nav button:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+.unified-contacts-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.unified-contacts-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: 15px;
+  min-height: 78px; padding: 15px 26px; border-bottom: 1px solid #e8edf5; background: white;
+}
+.unified-contacts-heading h1 { margin: 0 0 4px; font-size: 19px; font-weight: 780; }
+.unified-contacts-heading p { margin: 0; font-size: 12px; color: #8391a8; }
+.unified-contacts-heading-note { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #6e7f9c; }
+.unified-contacts-content { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+.unified-contacts-content > .friends-design-v2, .unified-contacts-content > .contacts-overview { height: 100%; }
+.unified-contacts-content .friends-design-v2 { background: transparent; }
+.unified-contacts-content .call-center.is-contact-panel { width: 100%; height: 100%; min-height: 0; }
+.unified-contacts-content .call-center.is-contact-panel .call-center-sidebar,
+.unified-contacts-content .call-center.is-contact-panel .call-center-header { display: none; }
+.unified-contacts-content .call-center.is-contact-panel .call-center-content { padding: 20px 24px; }
+.unified-contacts-groups { height: 100%; overflow: auto; padding: 20px 26px; }
+.unified-contacts-group-search {
+  display: flex; align-items: center; gap: 10px; background: white;
+  color: #2563eb; border: 1px solid #e5ebf5; border-radius: 12px;
+  padding: 0 14px; min-height: 46px; margin-bottom: 16px;
+}
+.unified-contacts-group-search:focus-within { border-color: #7ca6fc; box-shadow: 0 0 0 3px #dce9ff; }
+.unified-contacts-group-search input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font: inherit; font-size: 13px; }
+.unified-contacts-group-search button { border: 0; background: transparent; color: #647eab; cursor: pointer; display: grid; place-items: center; }
+
+.unified-contacts-groups .fd-call-extra-section {
+  display: grid; gap: 5px; border: 1px solid #e9eef8; border-radius: 15px;
+  background: white; padding: 15px; margin-bottom: 16px;
+}
+.unified-contacts-groups .fd-call-section-heading { margin: 0; font-size: 15px; padding: 4px 10px 13px; }
+.unified-contacts-groups .fd-call-section-heading small { margin-left: 8px; color: #8795ad; }
+.unified-contacts-groups .fd-call-conversation-row { display: flex; align-items: center; padding: 8px; border-radius: 10px; }
+.unified-contacts-groups .fd-call-conversation-row:hover { background: #f4f7fc; }
+.unified-contacts-groups .fd-person-identity { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.unified-contacts-groups .fd-person-identity > span { display: grid; min-width: 0; gap: 3px; }
+.unified-contacts-groups .fd-person-identity strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unified-contacts-groups .fd-person-identity small { font-size: 11px; color: #8090a8; }
+.unified-contacts-groups .fd-call-conversation-row .call-header-actions { display: flex; align-items: center; gap: 5px; }
+.unified-contacts-groups .call-header-actions button { display: grid; place-items: center; background: #edf3ff; color: #2563eb; border: 0; border-radius: 9px; width: 35px; height: 35px; cursor: pointer; }
+.unified-contacts-empty { display: grid; justify-items: center; gap: 10px; padding: 55px 15px; text-align: center; color: #8b9aaf; }
+.unified-contacts-empty strong { color: #273950; }
+.unified-contacts-empty p { margin: 0; font-size: 12px; }
+@media (max-width: 1080px) and (min-width: 761px) {
+  .unified-contacts-nav { width: 198px; flex-basis: 198px; }
+  .unified-contacts-nav-item { gap: 9px; padding-inline: 9px; font-size: 12px; }
+}
+@media (max-width: 760px) {
+  .unified-contacts { flex-direction: column; }
+  .unified-contacts-nav {
+    width: 100%; flex: 0 0 auto; overflow-x: auto; overflow-y: hidden;
+    padding: 7px 10px 9px; scrollbar-width: thin;
+  }
+  .unified-contacts-nav-title { display: none; }
+  .unified-contacts-nav nav { display: flex; align-items: center; gap: 7px; width: max-content; }
+  .unified-contacts-nav-item { flex: 0 0 auto; width: auto; min-height: 39px; padding: 8px 11px; gap: 7px; font-size: 11px; white-space: nowrap; }
+  .unified-contacts-nav-item svg { width: 17px; height: 17px; }
+  .unified-contacts-nav-item.separated { margin-top: 0; }
+  .unified-contacts-nav-item.separated::before { display: none; }
+  .unified-contacts-heading { min-height: 58px; padding: 10px 15px; }
+  .unified-contacts-heading h1 { font-size: 16px; }
+  .unified-contacts-heading p { font-size: 10px; }
+  .unified-contacts-content { overflow-y: auto; }
+  .unified-contacts-content .friends-design-v2 { height: 100%; }
+  .unified-contacts-content .call-center.is-contact-panel .call-center-content { padding: 11px; }
+  .unified-contacts-groups { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .unified-contacts-nav-item { transition: none; }
+}

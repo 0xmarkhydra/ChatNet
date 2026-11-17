@@ -54,7 +54,7 @@ export function fallbackPathForRoute(pathname: string): string {
     case "profile":
     case "users": return TAB_PATH.profile;
     case "settings": return ROUTE.settings;
-    case "calls": return ROUTE.calls;
+    case "calls": return "/contacts/calls";
     case "contacts": return TAB_PATH.contacts;
     case "discover": return TAB_PATH.discover;
     case "marketplace": return TAB_PATH.market;
@@ -66,7 +66,7 @@ export function fallbackPathForRoute(pathname: string): string {
 /** Keep route ownership in app; business state stays with the owning feature. */
 export function tabFromPath(pathname: string, legacyTab?: string | null): Tab {
   const segment = pathname.split("/")[1];
-  if (segment === "calls") return "chat";
+  if (segment === "calls") return "contacts";
   if (segment === "settings" || segment === "users") return "profile";
   const tab = (Object.keys(TAB_PATH) as Tab[]).find(
     (key) => TAB_PATH[key].slice(1) === segment,
