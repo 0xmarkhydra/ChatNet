@@ -146,12 +146,14 @@ export async function loadNearbyPlaces({
   let lastError: unknown
 
   for (const endpoint of endpoints) {
+    signal?.throwIfAborted()
     const timeoutController = new AbortController()
     const timer = window.setTimeout(() => timeoutController.abort(), 14000)
     const abort = () => timeoutController.abort()
     signal?.addEventListener('abort', abort, { once: true })
     try {
       const payload = await fetchEndpoint(endpoint, query, timeoutController.signal)
+      signal?.throwIfAborted()
       const seen = new Set<string>()
       return (payload.elements || [])
         .map((element): NearbyPlace | null => {
