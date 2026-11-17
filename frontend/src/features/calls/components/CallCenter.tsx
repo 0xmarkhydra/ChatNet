@@ -242,44 +242,46 @@ export default function CallCenter({ request, userId, token, conversations, targ
 
         {view === 'history' && (
           <div className="call-center-content call-center-history">
-            <section className="call-center-stats" aria-label="Thống kê lịch sử đã tải">
-              <div><strong>{monthCount}</strong><span>Cuộc gọi tháng này</span></div>
-              <div><strong className="danger">{missedCount}</strong><span>Cuộc gọi nhỡ</span></div>
-              <div><strong className="teal">{latestCallDuration(entries)}</strong><span>Thời lượng cuộc gọi gần nhất</span></div>
-            </section>
-            <div ref={filterPillSetHost} className="call-center-filters sliding-pill-host" role="group" aria-label="Lọc lịch sử">
-              <span ref={filterPillSetPill} className="sliding-pill call-filters-active-pill" aria-hidden="true" />
-              {([['all', 'Tất cả'], ['missed', 'Gọi nhỡ'], ['outgoing', 'Đã gọi'], ['group', 'Gọi nhóm']] as const).map(([id, label]) =>
-                <button ref={filter === id ? filterPillSetActive : undefined} key={id} type="button" className={filter === id ? 'active' : ''} aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>)}
-              <button type="button" className="call-center-refresh" onClick={() => setRefreshId((n) => n + 1)} disabled={loading} aria-label="Tải lại lịch sử" title="Tải lại lịch sử"><RefreshCw size={17} /></button>
-            </div>
             <div className="call-history-layout">
-              <section className="call-history-list call-center-card" aria-label="Danh sách lịch sử">
-                <h2>Cuộc gọi gần đây</h2>
+              <div className="call-history-main-column">
+                <section className="call-center-stats" aria-label="Thống kê lịch sử đã tải">
+                  <div><strong>{monthCount}</strong><span>Cuộc gọi tháng này</span></div>
+                  <div><strong className="danger">{missedCount}</strong><span>Cuộc gọi nhỡ</span></div>
+                  <div><strong className="teal">{latestCallDuration(entries)}</strong><span>Thời lượng cuộc gọi gần nhất</span></div>
+                </section>
+                <div ref={filterPillSetHost} className="call-center-filters sliding-pill-host" role="group" aria-label="Lọc lịch sử">
+                  <span ref={filterPillSetPill} className="sliding-pill call-filters-active-pill" aria-hidden="true" />
+                  {([['all', 'Tất cả'], ['missed', 'Gọi nhỡ'], ['outgoing', 'Đã gọi'], ['group', 'Gọi nhóm']] as const).map(([id, label]) =>
+                    <button ref={filter === id ? filterPillSetActive : undefined} key={id} type="button" className={filter === id ? 'active' : ''} aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>)}
+                  <button type="button" className="call-center-refresh" onClick={() => setRefreshId((n) => n + 1)} disabled={loading} aria-label="Tải lại lịch sử" title="Tải lại lịch sử"><RefreshCw size={17} /></button>
+                </div>
+                  <section className="call-history-list call-center-card" aria-label="Danh sách lịch sử">
+                  <h2>Cuộc gọi gần đây</h2>
 
-                {!loading && error && <div className="call-center-state" role="alert"><strong>Không thể tải lịch sử</strong><p>{error}</p><button type="button" onClick={() => setRefreshId((n) => n + 1)}>Thử lại</button></div>}
-                {!loading && !error && filtered.length === 0 && <div className="call-center-state"><PhoneMissed size={31} /><strong>{query || filter !== 'all' ? 'Không có kết quả phù hợp' : 'Chưa có cuộc gọi nào'}</strong><p>Lịch sử thật từ máy chủ sẽ xuất hiện tại đây khi bạn thực hiện cuộc gọi.</p><button type="button" onClick={() => showView('directory')}>Mở danh bạ</button></div>}
-                {!loading && !error && filtered.map((entry) => {
-                  const conversation = conversationMap.get(entry.conversationId)
-                  const isMissed = missed(entry)
-                  const duration = formatDuration(entry)
-                  return (
-                    <button type="button" key={entry.id} className={'call-history-item' + (selected?.id === entry.id && (!isMobileLayout || mobileDetailsOpen) ? ' selected' : '')} onClick={(event) => {
-                      setSelectedId(entry.id)
-                      if (isMobileLayout) {
-                        selectedTriggerRef.current = event.currentTarget
-                        setMobileDetailsOpen(true)
-                      }
-                    }} aria-pressed={selected?.id === entry.id && (!isMobileLayout || mobileDetailsOpen)}>
-                      <UserAvatar name={conversation?.name || 'Cuộc trò chuyện'} username={conversation?.otherUsername} group={entry.isGroup} className="call-history-avatar" />
-                      <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {callOutcome(entry, userId)}{' · ' + duration}</small></span>
-                      <span className="call-history-time">{formatCallDate(entry.createdAt)}</span>
-                      {isMissed ? <PhoneMissed size={19} className="call-history-icon" /> : entry.createdBy === userId ? <PhoneOutgoing size={19} className="call-history-icon" /> : <PhoneIncoming size={19} className="call-history-icon" />}
-                    </button>
-                  )
-                })}
-                <small className="call-center-limit">Hiển thị tối đa 100 cuộc gọi gần nhất mà bạn có quyền truy cập.</small>
-              </section>
+                  {!loading && error && <div className="call-center-state" role="alert"><strong>Không thể tải lịch sử</strong><p>{error}</p><button type="button" onClick={() => setRefreshId((n) => n + 1)}>Thử lại</button></div>}
+                  {!loading && !error && filtered.length === 0 && <div className="call-center-state"><PhoneMissed size={31} /><strong>{query || filter !== 'all' ? 'Không có kết quả phù hợp' : 'Chưa có cuộc gọi nào'}</strong><p>Lịch sử thật từ máy chủ sẽ xuất hiện tại đây khi bạn thực hiện cuộc gọi.</p><button type="button" onClick={() => showView('directory')}>Mở danh bạ</button></div>}
+                  {!loading && !error && filtered.map((entry) => {
+                    const conversation = conversationMap.get(entry.conversationId)
+                    const isMissed = missed(entry)
+                    const duration = formatDuration(entry)
+                    return (
+                      <button type="button" key={entry.id} className={'call-history-item' + (selected?.id === entry.id && (!isMobileLayout || mobileDetailsOpen) ? ' selected' : '')} onClick={(event) => {
+                        setSelectedId(entry.id)
+                        if (isMobileLayout) {
+                          selectedTriggerRef.current = event.currentTarget
+                          setMobileDetailsOpen(true)
+                        }
+                      }} aria-pressed={selected?.id === entry.id && (!isMobileLayout || mobileDetailsOpen)}>
+                        <UserAvatar name={conversation?.name || 'Cuộc trò chuyện'} username={conversation?.otherUsername} group={entry.isGroup} className="call-history-avatar" />
+                        <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {callOutcome(entry, userId)}{' · ' + duration}</small></span>
+                        <span className="call-history-time">{formatCallDate(entry.createdAt)}</span>
+                        {isMissed ? <PhoneMissed size={19} className="call-history-icon" /> : entry.createdBy === userId ? <PhoneOutgoing size={19} className="call-history-icon" /> : <PhoneIncoming size={19} className="call-history-icon" />}
+                      </button>
+                    )
+                  })}
+                  <small className="call-center-limit">Hiển thị tối đa 100 cuộc gọi gần nhất mà bạn có quyền truy cập.</small>
+                </section>
+              </div>
               {isMobileLayout && mobileDetailsOpen && <button type="button" tabIndex={-1} className="call-detail-scrim" onClick={closeMobileDetails} aria-label="Đóng chi tiết cuộc gọi" />}
               <aside
                 ref={detailPanelRef}
