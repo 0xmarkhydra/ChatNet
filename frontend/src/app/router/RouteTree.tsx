@@ -124,6 +124,7 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
           <Route path=":username" element={<VisitorProfilePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
+        <Route path={ROUTE.search.slice(1)} element={<CurrentPage />} />
         {[TAB_PATH.discover, TAB_PATH.market, TAB_PATH.notifications].map((path) => (
           <Route key={path} path={path.slice(1)} element={<CurrentPage />} />
         ))}
