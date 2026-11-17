@@ -288,6 +288,59 @@ try {
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     return json({})
   })
+  if (process.argv.includes('--post-detail-dock-only')) {
+    await page.goto(origin + '/feed', { waitUntil: 'domcontentloaded', timeout: 90000 })
+    const post = page.locator('.feed-post-card').first()
+    await post.getByRole('button', { name: 'Mở bài viết' }).press('Enter')
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    await details.getByRole('textbox', { name: 'Viết bình luận' }).waitFor()
+    for (const viewport of [{ width: 1352, height: 977 }, { width: 1000, height: 460 }]) {
+      await page.setViewportSize(viewport)
+      const dock = await details.evaluate(modal => {
+        const actions = modal.querySelector('.post-comments-post-footer').getBoundingClientRect()
+        const composer = modal.querySelector('.post-comments-composer').getBoundingClientRect()
+        const dialog = modal.getBoundingClientRect()
+        const controls = [...modal.querySelectorAll('.post-comments-post-actions > button, .feed-comment-compose textarea')]
+        return {
+          aligned: Math.abs(actions.top - composer.top) < 1 && Math.abs(actions.right - composer.left) < 1,
+          bounded: actions.bottom <= dialog.bottom && composer.bottom <= dialog.bottom,
+          hitTargets: controls.length === 4 && controls.every(control => {
+            const rect = control.getBoundingClientRect()
+            const center = rect.left + rect.width / 2
+            return [rect.top + 4, rect.bottom - 4].every(y => control.contains(document.elementFromPoint(center, y)))
+          }),
+        }
+      })
+      assert(Object.values(dock).every(Boolean),
+        'Desktop details must show every control in the aligned bottom row at ' + viewport.width + '×' + viewport.height + ': ' + JSON.stringify(dock))
+    }
+    await page.setViewportSize({ width: 390, height: 700 })
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 700 })
+      const mobile = await details.evaluate(node => {
+        const bounds = selector => node.querySelector(selector).getBoundingClientRect()
+        const post = bounds('.post-comments-original')
+        const actions = bounds('.post-comments-post-footer')
+        const thread = bounds('.post-comments-thread')
+        const composer = bounds('.post-comments-composer')
+        return {
+          stacked: post.bottom <= actions.top && actions.bottom <= thread.top,
+          composerVisible: composer.bottom <= innerHeight && composer.width <= innerWidth,
+          noHorizontalScroll: node.scrollWidth <= node.clientWidth,
+        }
+      })
+      assert(Object.values(mobile).every(Boolean),
+        'Mobile details should preserve post, actions, and comments reading order: ' + JSON.stringify(mobile))
+      await details.getByRole('button', { name: 'Bình luận', exact: true }).click()
+      assert(await details.getByRole('textbox', { name: 'Viết bình luận' })
+        .evaluate(input => input === document.activeElement), 'The post action should focus the commentary input')
+    }
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('Post detail dock PASS: footer hit targets and aligned columns on desktop, stacked layout and composer focus on mobile')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
   if (process.argv.includes('--socco-feed-layout-only')) {
     await page.goto(origin + '/feed')
     const headerAccount = page.locator('header.chatnet-appbar').getByRole('button', { name: 'Mở trang cá nhân' })
