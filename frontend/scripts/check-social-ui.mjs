@@ -335,6 +335,8 @@ try {
           })
       })
       assert(fits, 'All audience options should fit and be clickable before scrolling at ' + viewport.width + '×' + viewport.height)
+      const bounds = await menu.boundingBox()
+      assert(bounds && bounds.width <= 336, 'The audience picker should stay compact: ' + JSON.stringify(bounds))
       if (viewport.width === 1440) assert(await dialog.evaluate(node => node.clientWidth >= 650),
         'Desktop composer should use the widened dialog')
       await publicOption.press('End')
@@ -432,6 +434,8 @@ try {
       const form = rect('.feed-comment-form')
       const header = rect('.post-comments-modal-heading')
       return { stacked: thread.top >= post.bottom && Math.abs(thread.left - post.left) < 2,
+        split: Math.abs(thread.top - post.top) < 2 && thread.left >= post.right - 1 && post.width > thread.width,
+        composerOnRight: form.left >= post.right - 16,
         composerInViewport: form.bottom <= innerHeight && form.top > header.bottom,
         overflow: node.scrollWidth - node.clientWidth }
     })
@@ -439,8 +443,9 @@ try {
       await page.setViewportSize(viewport)
       await checkCommentTools(details)
       const layout = await measure()
-      assert(layout.stacked && layout.composerInViewport && layout.overflow <= 1,
-        'The dialog should stack the thread and keep the composer visible: ' + JSON.stringify(layout))
+      const expected = viewport.width >= 900 ? layout.split && layout.composerOnRight : layout.stacked
+      assert(expected && layout.composerInViewport && layout.overflow <= 1,
+        'The dialog should split on desktop, stack on mobile and keep the composer visible: ' + JSON.stringify(layout))
     }
     await details.getByRole('button', { name: 'Bình luận', exact: true }).click()
     assert(await details.getByRole('textbox', { name: 'Viết bình luận' }).evaluate(input => input === document.activeElement),
@@ -522,11 +527,13 @@ try {
     await page.getByRole('button', { name: 'Sao chép liên kết' }).click()
     await page.getByText('Đã sao chép liên kết bài viết.', { exact: true }).waitFor()
     const copied = await page.evaluate(() => navigator.clipboard.readText())
-    assert(copied === origin + '/feed/posts/88', 'Copied permalink should omit the current query and fragment: ' + copied)
+    assert(copied === origin + '/feed/posts/88?ref=share', 'Copied permalink should include only the share source: ' + copied)
     const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
-    for (const link of [copied, origin + '/?tab=feed&post=88']) {
+    for (const link of [copied, origin + '/feed/posts/88', origin + '/?tab=feed&post=88']) {
       await page.goto(link)
       await details.getByText(fixturePost.content, { exact: true }).waitFor()
+      await details.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
+      await page.waitForURL(origin + '/feed')
     }
     assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
     console.log('SOCCO-61/65 PASS: responsive suggestions, hidden sidebar cards, clipboard, direct and legacy post links')
@@ -1856,7 +1863,7 @@ try {
   assert(commentRequests === 2 && lastCommentPayload?.parentId === 501,
     'Replies from post comments must preserve the parent comment ID')
   await page.screenshot({ path: 'output/playwright/layout/social-post-comments-desktop-1586.png' })
-  await page.setViewportSize({ width: 1000, height: 820 })
+  await page.setViewportSize({ width: 768, height: 820 })
   const commentsCompact = await page.evaluate(() => {
     const post = document.querySelector('.post-comments-original')?.getBoundingClientRect()
     const thread = document.querySelector('.post-comments-thread')?.getBoundingClientRect()

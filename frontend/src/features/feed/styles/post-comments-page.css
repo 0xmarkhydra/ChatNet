@@ -1,5 +1,5 @@
 /* Hallmark · shape: app screen · genre: modern-minimal · theme: SocCO · v2.0.0 */
-/* The post and its conversation are one reading surface, separated by a rule. */
+/* A compact split view on desktop, with one reading column on smaller screens. */
 /* Keep the discussion composer in view while the post and comments scroll. */
 .post-detail-backdrop.post-comments-page {
   --detail-secondary: color-mix(in srgb, var(--soco-text) 62%, var(--soco-muted));
@@ -271,6 +271,28 @@
 .post-comments-thread .feed-comment-error { margin: 8px 0 0; }
 .post-comments-page button:focus-visible,
 .post-comments-page select:focus-visible { outline: 2px solid var(--chatnet-accent-ink); outline-offset: 2px; }
+@media (min-width: 900px) {
+  .post-detail-backdrop.post-comments-page {
+    --detail-thread-width: 40%;
+    width: min(1060px, calc(100% - 48px));
+  }
+  .post-comments-scroll {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--detail-thread-width);
+    align-items: start;
+  }
+  .post-comments-original { padding-block-end: 12px; }
+  .post-comments-thread {
+    min-width: 0;
+    border-inline-start: 1px solid var(--detail-rule);
+  }
+  .post-comments-composer {
+    box-sizing: border-box;
+    align-self: flex-end;
+    width: var(--detail-thread-width);
+    border-inline-start: 1px solid var(--detail-rule);
+  }
+}
 @media (max-width: 480px) {
   :is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions {
     padding-inline-start: 8px;
