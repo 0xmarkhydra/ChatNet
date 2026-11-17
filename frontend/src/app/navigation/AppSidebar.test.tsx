@@ -13,7 +13,7 @@ vi.stubGlobal("ResizeObserver", class {
 
 const roots: Array<{ unmount: () => void; element: HTMLElement }> = [];
 
-function renderSidebar(tab: Tab, settingsActive = false, feedSaved = false) {
+function renderSidebar(tab: Tab, settingsActive = false, feedSaved = false, screenshot?: { onScreenshot: () => void; screenshotBusy?: boolean }) {
   const element = document.createElement("div");
   document.body.append(element);
   const root = createRoot(element);
@@ -36,6 +36,7 @@ function renderSidebar(tab: Tab, settingsActive = false, feedSaved = false) {
       onSettings={onSettings}
       onSaved={onSaved}
       onCalls={onCalls}
+      {...screenshot}
     />,
   ));
   const button = (label: string) => {
@@ -56,6 +57,33 @@ afterEach(() => {
 });
 
 describe("AppSidebar navigation", () => {
+  it('groups capture with notifications, saved posts and settings without changing the route', () => {
+    const onScreenshot = vi.fn();
+    const { button, onNavigate } = renderSidebar('feed', false, false, { onScreenshot });
+    const capture = button('Chụp màn hình không kèm cửa sổ SocCO');
+    expect(capture.closest('nav')).toBeNull();
+    const utilities = capture.closest('[role="group"][aria-label="Tiện ích"]');
+    expect(utilities).not.toBeNull();
+    for (const label of ['Thông báo', 'Đã lưu', 'Cài đặt']) {
+      expect(utilities?.contains(button(label)), label).toBe(true);
+    }
+    expect(capture.hasAttribute('aria-current')).toBe(false);
+    act(() => capture.click());
+    expect(onScreenshot).toHaveBeenCalledOnce();
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(button('Bảng tin').getAttribute('aria-current')).toBe('page');
+  });
+
+  it('hides capture when unavailable and disables it during an active selection', () => {
+    expect(() => renderSidebar('feed').button('Chụp màn hình không kèm cửa sổ SocCO')).toThrow();
+    const onScreenshot = vi.fn();
+    const { button } = renderSidebar('feed', false, false, { onScreenshot, screenshotBusy: true });
+    const capture = button('Chụp màn hình không kèm cửa sổ SocCO');
+    expect(capture.disabled).toBe(true);
+    act(() => capture.click());
+    expect(onScreenshot).not.toHaveBeenCalled();
+  });
+
   it("left-aligns icons for collapsed and expanded sidebar buttons", () => {
     const { button } = renderSidebar("chat");
     for (const label of ["Bảng tin", "Tin nhắn", "Khám phá", "Bạn bè", "Cuộc gọi", "Marketplace", "Thông báo", "Đã lưu", "Cài đặt", "Cá nhân"]) {
