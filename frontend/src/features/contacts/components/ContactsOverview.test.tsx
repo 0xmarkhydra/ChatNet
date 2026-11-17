@@ -23,7 +23,7 @@ function setup(overrides: Partial<OverviewProps> = {}) {
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
-  const onDirectory = vi.fn(), onInvitations = vi.fn(), onSettings = vi.fn()
+  const onDirectory = vi.fn(), onInvitations = vi.fn(), onSettings = vi.fn(), onOpenProfile = vi.fn()
   const onRetryFriends = vi.fn(), onRetrySuggestions = vi.fn()
   const actOnFriend = vi.fn(async () => {}), declineFriendRequest = vi.fn(async () => {})
   const props: OverviewProps = {
@@ -35,7 +35,7 @@ function setup(overrides: Partial<OverviewProps> = {}) {
     onRetryFriends, onRetrySuggestions,
     friendBusyIds: new Set(),
     actOnFriend, declineFriendRequest,
-    onDirectory, onInvitations, onSettings,
+    onDirectory, onInvitations, onSettings, onOpenProfile,
     connectionUrl: 'https://example.invalid/connect', onScanQr: vi.fn(),
     ...overrides,
   }
@@ -51,7 +51,7 @@ function setup(overrides: Partial<OverviewProps> = {}) {
     if (!button) throw new Error('Missing button: ' + label)
     act(() => button.click())
   }
-  return { container, render, click, onDirectory, onInvitations, onSettings, onRetryFriends, onRetrySuggestions, actOnFriend, declineFriendRequest }
+  return { container, render, click, onDirectory, onInvitations, onSettings, onOpenProfile, onRetryFriends, onRetrySuggestions, actOnFriend, declineFriendRequest }
 }
 afterEach(() => { while (mounts.length) mounts.pop()!() })
 
@@ -79,6 +79,25 @@ describe('Friends overview', () => {
     expect(app.onDirectory).toHaveBeenCalledTimes(1)
     app.click('Quản lý quyền riêng tư')
     expect(app.onSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens visitor profiles from invitation and suggestion names and avatars without triggering friend actions', () => {
+    const app = setup()
+    const request = app.container.querySelector('.co-request')!
+    const suggestion = app.container.querySelector('.co-suggestion:not(.co-skeleton-card)')!
+    const requestName = request.querySelector<HTMLButtonElement>('.co-profile-name')!
+    const requestAvatar = request.querySelector<HTMLButtonElement>('.co-profile-avatar')!
+    const suggestionName = suggestion.querySelector<HTMLButtonElement>('.co-profile-name')!
+    const suggestionAvatar = suggestion.querySelector<HTMLButtonElement>('.co-profile-avatar')!
+    expect(requestName.textContent).toBe('Người dùng 3')
+    expect(suggestionName.textContent).toBe('Gợi ý 5')
+    act(() => { requestName.click(); requestAvatar.click(); suggestionName.click(); suggestionAvatar.click() })
+    expect(app.onOpenProfile).toHaveBeenNthCalledWith(1, expect.objectContaining({ username: 'user3' }))
+    expect(app.onOpenProfile).toHaveBeenNthCalledWith(2, expect.objectContaining({ username: 'user3' }))
+    expect(app.onOpenProfile).toHaveBeenNthCalledWith(3, expect.objectContaining({ username: 'candidate5' }))
+    expect(app.onOpenProfile).toHaveBeenNthCalledWith(4, expect.objectContaining({ username: 'candidate5' }))
+    expect(app.actOnFriend).not.toHaveBeenCalled()
+    expect(app.declineFriendRequest).not.toHaveBeenCalled()
   })
 
   it('makes privacy shortcuts keyboard-accessible and routes to actual settings and invitations', () => {
@@ -125,7 +144,7 @@ describe('Friends overview', () => {
   it('disables busy invitation and suggestion actions with visible feedback', () => {
     const app = setup({ friendBusyIds: new Set([3, 5]) })
     expect(app.container.querySelector<HTMLButtonElement>('.co-request .co-primary')?.disabled).toBe(true)
-    expect(app.container.querySelector<HTMLButtonElement>('.co-suggestion button')?.disabled).toBe(true)
+    expect(app.container.querySelector<HTMLButtonElement>('.co-suggestion .co-suggestion-action')?.disabled).toBe(true)
     expect(app.container.textContent).toContain('Đang xử lý')
     expect(app.container.textContent).toContain('Đang gửi')
     expect(app.container.querySelector<HTMLButtonElement>('[aria-label="Kết bạn với Gợi ý 5"]')).not.toBeNull()

@@ -174,6 +174,7 @@ export default function ContactsView({
     onRetryFriends={onRetryFriends} onRetrySuggestions={onRetrySuggestions}
     friendBusyIds={friendBusyIds} actOnFriend={actOnFriend} declineFriendRequest={declineFriendRequest}
     onDirectory={() => onScreenChange('directory')} onInvitations={() => onScreenChange('invitations')}
+    onOpenProfile={setFriendPreview}
     onSettings={onSettings} connectionUrl={connectionUrl} onScanQr={onScanQr} />
 
   return <div className={'friends-design-v2' + (embeddedInCalls ? ' is-call-directory' : '')} aria-label={screen === 'directory' ? 'Danh bạ' : 'Lời mời kết bạn'}>
