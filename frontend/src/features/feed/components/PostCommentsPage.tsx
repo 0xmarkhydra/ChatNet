@@ -54,7 +54,6 @@ export default function PostCommentsPage({
   sortOrder, onSortChange, children,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
-  const scrollBody = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null)
   const [composerTarget, setComposerTarget] = useState<HTMLDivElement | null>(null)
@@ -89,7 +88,7 @@ export default function PostCommentsPage({
         <h2 id={titleId}>Bài viết của {authorName}</h2>
         <button type="button" aria-label="Đóng chi tiết bài viết" onClick={onClose}><X size={22} aria-hidden="true" /></button>
       </header>
-      <div ref={scrollBody} className="post-comments-scroll">
+      <div className="post-comments-scroll">
         <ModalPortalContext.Provider value={portalContainer}>
 
           <article className="post-comments-original" aria-label="Nội dung bài viết">
@@ -111,25 +110,26 @@ export default function PostCommentsPage({
             {Boolean(post.attachments?.length) && (
               <div className="post-comments-media"><MediaAttachmentsView items={post.attachments} /></div>
             )}
-            <div className="post-comments-post-footer">
-              <div className="post-comments-stats">
-                <button type="button" className="feed-post-likes feed-reaction-users-trigger"
-                  disabled={post.likes === 0} onClick={() => onReactionUsers(post, portalContainer ?? undefined)}
-                  aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`}>
-                  <Heart size={20} fill="currentColor" aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích
-                </button>
-                <div className="post-comments-totals"><span>{commentCount.toLocaleString('vi-VN')} bình luận</span><span>{sharesLabel}</span></div>
-              </div>
-              <div className="post-comments-post-actions post-toolbar post-toolbar-compact">
-                <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void onLike(post, emoji)} />
-                <button type="button" aria-label="Bình luận" title="Bình luận"
-                  onClick={() => composerTarget?.querySelector<HTMLTextAreaElement>('textarea')?.focus()}>
-                  <MessageCircle size={21} aria-hidden="true" /><span>Bình luận</span>
-                </button>
-                <FeedShareAction postId={post.id} onFeedback={onFeedback} />
-              </div>
-            </div>
           </article>
+
+          <div className="post-comments-post-footer">
+            <div className="post-comments-stats">
+              <button type="button" className="feed-post-likes feed-reaction-users-trigger"
+                disabled={post.likes === 0} onClick={() => onReactionUsers(post, portalContainer ?? undefined)}
+                aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`}>
+                <Heart size={20} fill="currentColor" aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích
+              </button>
+              <div className="post-comments-totals"><span>{commentCount.toLocaleString('vi-VN')} bình luận</span><span>{sharesLabel}</span></div>
+            </div>
+            <div className="post-comments-post-actions post-toolbar post-toolbar-compact">
+              <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void onLike(post, emoji)} />
+              <button type="button" aria-label="Bình luận" title="Bình luận"
+                onClick={() => composerTarget?.querySelector<HTMLTextAreaElement>('textarea')?.focus()}>
+                <MessageCircle size={21} aria-hidden="true" /><span>Bình luận</span>
+              </button>
+              <FeedShareAction postId={post.id} onFeedback={onFeedback} />
+            </div>
+          </div>
 
           <section className="post-comments-thread" aria-label="Thảo luận về bài viết">
             <header className="post-comments-thread-heading">
@@ -150,7 +150,7 @@ export default function PostCommentsPage({
         </ModalPortalContext.Provider>
       </div>
       <div ref={setComposerTarget} className="post-comments-composer" />
-      <div ref={setPortalContainer} />
+      <div ref={setPortalContainer} className="post-comments-portals" />
     </dialog>
   )
 }
