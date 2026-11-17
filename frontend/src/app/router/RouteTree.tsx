@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import PageRoute, { type AppPageContext } from "./PageRoute";
 import { Link, Navigate, Outlet, Route, Routes, useLocation, useOutletContext, useParams } from "react-router-dom";
 import { ROUTE, TAB_PATH, chatConversationIdFromPath, fallbackPathForRoute, feedPostIdFromPath, tabFromPath, visitorUsernameFromPath } from "./routes";
 
@@ -13,7 +14,7 @@ function LegacyHomeRedirect() {
 
 // The signed-in app owns live feature state; changing routes only replaces its page slot.
 function CurrentPage() {
-  return useOutletContext<ReactNode>() ?? null;
+  return <PageRoute />;
 }
 
 /**
@@ -21,7 +22,7 @@ function CurrentPage() {
  * feature children without adding DOM or remounting auth/realtime providers.
  */
 function FeatureRouteLayout() {
-  const page = useOutletContext<ReactNode>();
+  const page = useOutletContext<AppPageContext>();
   return <Outlet context={page} />;
 }
 
@@ -32,7 +33,7 @@ function NotFoundPage() {
     : fallbackPath === TAB_PATH.feed ? "Bảng tin"
     : fallbackPath === TAB_PATH.profile ? "Hồ sơ"
     : fallbackPath === ROUTE.settings ? "Cài đặt"
-    : fallbackPath === ROUTE.calls ? "Cuộc gọi"
+    : (fallbackPath === ROUTE.calls || fallbackPath === "/contacts/calls") ? "Cuộc gọi"
     : fallbackPath === TAB_PATH.contacts ? "Danh bạ"
     : fallbackPath === TAB_PATH.discover ? "Khám phá"
     : fallbackPath === TAB_PATH.market ? "Marketplace" : "Thông báo";

@@ -33,7 +33,7 @@ function renderAt(path: string, initialState?: unknown) {
         <Link to="/somewhere-unknown">Invalid</Link>
         <button type="button" onClick={() => navigate(-1)}>History Back</button>
         <button type="button" onClick={() => navigate(1)}>History Forward</button>
-        <Outlet context={<p data-testid="page">Current screen</p>} />
+        <Outlet context={{ content: <p data-testid="page">Current screen</p>, frameClassName: "" }} />
       </div>
     );
   }
@@ -72,7 +72,7 @@ describe("app route tree", () => {
   it("provides a working index route for every registered app tab and workspace", () => {
     for (const path of [...Object.values(TAB_PATH), ...Object.values(ROUTE)]) {
       const app = renderAt(path);
-      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.page()?.textContent, `Missing route content: ${path}`).toBe("Current screen");
       expect(app.onMount).toHaveBeenCalledTimes(1);
     }
   });
@@ -92,7 +92,7 @@ describe("app route tree", () => {
       ["Bài viết 42", "/feed/posts/42"],
       ["Hội thoại 123", "/chat/123"],
       ["Thiết bị", "/settings/devices"],
-      ["Dịch AI", "/calls/translation"],
+      ["Dịch AI", "/contacts/translation"],
       ["Hồ sơ Alice", "/users/alice"],
       ["Bảng tin", "/feed"],
     ]) {
@@ -210,10 +210,15 @@ describe("app route tree", () => {
     }
   });
 
-  it("supports call workspace subroutes and rejects unknown call screens", () => {
-    for (const path of ["/calls", "/calls/history", "/calls/directory", "/calls/translation"]) {
+  it("redirects legacy call routes into Contacts without remounting the shell", () => {
+    for (const [path, target] of [
+      ["/calls", "/contacts/calls"],
+      ["/calls/history", "/contacts/calls"],
+      ["/calls/directory", "/contacts"],
+      ["/calls/translation", "/contacts/translation"],
+    ]) {
       const app = renderAt(path);
-      expect(app.location()).toBe(path);
+      expect(app.location()).toBe(target);
       expect(app.page()?.textContent).toBe("Current screen");
       expect(app.onMount).toHaveBeenCalledTimes(1);
     }
@@ -252,7 +257,7 @@ describe("app route tree", () => {
       ["/profile/broken", "Về Hồ sơ", "/profile"],
       ["/users/alice/more", "Về Hồ sơ", "/profile"],
       ["/settings/broken", "Về Cài đặt", "/settings"],
-      ["/calls/broken", "Về Cuộc gọi", "/calls"],
+      ["/calls/broken", "Về Cuộc gọi", "/contacts/calls"],
       ["/contacts/broken", "Về Danh bạ", "/contacts"],
       ["/unknown", "Về Tin nhắn", "/chat"],
     ];

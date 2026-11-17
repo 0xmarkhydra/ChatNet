@@ -67,7 +67,7 @@ import {
 } from "../features/chat/types";
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
 import { useAppRouteNavigation } from "./router/useAppRouteNavigation";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
@@ -267,7 +267,7 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
-import AppPageErrorBoundary from "./layouts/AppPageErrorBoundary";
+
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { inviteRouteTarget } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
@@ -2900,7 +2900,8 @@ export default function AuthedApp({
           </AppHeaderActions>
         </AppHeader>
       }
-    >{pushPrompt && !pushPromptDismissed && !pushEnabled && (
+      beforePage={<>
+{pushPrompt && !pushPromptDismissed && !pushEnabled && (
         <section
           className="push-onboarding"
           aria-label="Thông báo tin nhắn"
@@ -2964,11 +2965,10 @@ export default function AuthedApp({
           </button>
         </div>
       )}
-      <Outlet context={
-        <section
-          className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
-        >
-          <AppPageErrorBoundary>
+      </>}
+      outletContext={{
+        frameClassName: tab === "chat" && activeConversation ? "mobile-conversation-open" : "",
+        content: <>
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
           activeChatTranslationSettings={activeChatTranslationSettings}
@@ -3534,9 +3534,9 @@ export default function AuthedApp({
           visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
         />
         )}
-          </AppPageErrorBoundary>
-        </section>
-      } />
+        </>,
+      }}
+    >
 
       {storyDraft && tab === "feed" && (
           <StoryDraftOverlay
