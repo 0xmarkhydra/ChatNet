@@ -32,7 +32,7 @@ function NotFoundPage() {
     : fallbackPath === TAB_PATH.feed ? "Bảng tin"
     : fallbackPath === TAB_PATH.profile ? "Hồ sơ"
     : fallbackPath === ROUTE.settings ? "Cài đặt"
-    : fallbackPath === ROUTE.calls ? "Cuộc gọi"
+    : fallbackPath === "/contacts/calls" ? "Cuộc gọi"
     : fallbackPath === TAB_PATH.contacts ? "Danh bạ"
     : fallbackPath === TAB_PATH.discover ? "Khám phá"
     : fallbackPath === TAB_PATH.market ? "Marketplace" : "Thông báo";
