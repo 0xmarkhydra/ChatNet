@@ -13,6 +13,7 @@ export const TAB_PATH: Record<Tab, string> = {
 export const ROUTE = {
   calls: "/calls",
   settings: "/settings",
+  search: "/search",
 } as const;
 
 /** Shareable user profiles; username is encoded as exactly one URL segment. */
@@ -56,7 +57,8 @@ export function fallbackPathForRoute(pathname: string): string {
     case "settings": return ROUTE.settings;
     case "calls": return ROUTE.calls;
     case "contacts": return TAB_PATH.contacts;
-    case "discover": return TAB_PATH.discover;
+    case "discover":
+    case "search": return TAB_PATH.discover;
     case "marketplace": return TAB_PATH.market;
     case "notifications": return TAB_PATH.notifications;
     default: return TAB_PATH.chat;
@@ -67,6 +69,7 @@ export function fallbackPathForRoute(pathname: string): string {
 export function tabFromPath(pathname: string, legacyTab?: string | null): Tab {
   const segment = pathname.split("/")[1];
   if (segment === "calls") return "chat";
+  if (segment === "search") return "discover";
   if (segment === "settings" || segment === "users") return "profile";
   const tab = (Object.keys(TAB_PATH) as Tab[]).find(
     (key) => TAB_PATH[key].slice(1) === segment,
