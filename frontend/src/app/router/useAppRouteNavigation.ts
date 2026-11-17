@@ -24,14 +24,11 @@ export function useAppRouteNavigation() {
 
   const contactsScreen: ContactsScreen =
     location.pathname === "/contacts/requests" ? "invitations"
-      : location.pathname === "/contacts/directory" ? "directory" : "overview";
+      : location.pathname === "/contacts/overview" ? "overview" : "directory";
   const setContactsScreen: Dispatch<SetStateAction<ContactsScreen>> = useCallback((next) => {
     const screen = typeof next === "function" ? next(contactsScreen) : next;
-    // The Calls workspace embeds the directory and must remain mounted.
-    if ((location.pathname === ROUTE.calls || location.pathname.startsWith(`${ROUTE.calls}/`))
-      && screen === "directory") return;
     const path = screen === "invitations" ? "/contacts/requests"
-      : screen === "directory" ? "/contacts/directory" : TAB_PATH.contacts;
+      : screen === "overview" ? "/contacts/overview" : TAB_PATH.contacts;
     if (location.pathname !== path) navigate(path);
   }, [contactsScreen, location.pathname, navigate]);
 
