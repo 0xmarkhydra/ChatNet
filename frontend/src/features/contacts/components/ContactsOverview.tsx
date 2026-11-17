@@ -19,6 +19,7 @@ type Props = {
   declineFriendRequest: (friend: FriendConnection) => Promise<void>
   onDirectory: () => void
   onInvitations: () => void
+  onOpenProfile: (friend: FriendSearchResult) => void
   onSettings: () => void
   connectionUrl: string
   onScanQr: () => void
@@ -29,7 +30,7 @@ const displayName = (friend: FriendSearchResult) => friend.displayName || friend
 export default function ContactsOverview({
   friends, friendRequests, suggestions, suggestionsLoading, suggestionsError,
   friendsLoading, friendsError, onRetryFriends, onRetrySuggestions, friendBusyIds,
-  actOnFriend, declineFriendRequest, onDirectory, onInvitations, onSettings, connectionUrl, onScanQr,
+  actOnFriend, declineFriendRequest, onDirectory, onInvitations, onOpenProfile, onSettings, connectionUrl, onScanQr,
 }: Props) {
   const incoming = friendRequests.filter(friend => friend.direction === 'incoming')
   const connectedIds = new Set([...friends, ...friendRequests].map(friend => friend.id))
@@ -64,9 +65,11 @@ export default function ContactsOverview({
             {!friendsLoading && friendsError && <div className="co-feedback" role="alert"><span>Không tải được danh sách kết nối. Thử lại để xem thông tin mới nhất.</span><button type="button" onClick={onRetryFriends}><RefreshCw size={15} aria-hidden="true" /> Thử lại</button></div>}
             {!friendsLoading && !friendsError && incoming.length === 0 && <p className="co-empty">Bạn chưa có lời mời kết bạn mới.</p>}
             {!friendsLoading && !friendsError && incoming.slice(0, 3).map(friend => <div className="co-request" key={friend.id}>
-              <UserAvatar username={friend.username} name={displayName(friend)} className="avatar co-avatar" online={friend.online} />
+              <button type="button" className="co-profile-avatar" aria-label={`Xem trang cá nhân của ${displayName(friend)}`} onClick={() => onOpenProfile(friend)}>
+                <UserAvatar username={friend.username} name={displayName(friend)} className="avatar co-avatar" online={friend.online} />
+              </button>
               <div className="co-person">
-                <strong>{displayName(friend)}</strong>
+                <button type="button" className="co-profile-name" onClick={() => onOpenProfile(friend)}>{displayName(friend)}</button>
                 <small>{typeof friend.mutualGroups === 'number' ? `${friend.mutualGroups} nhóm chung · ` : ''}Đang chờ phản hồi</small>
               </div>
               <div className="co-request-actions">
@@ -91,10 +94,12 @@ export default function ContactsOverview({
           {!suggestionsLoading && !suggestionsError && recommended.length === 0 && <p className="co-empty">Chưa có gợi ý kết nối phù hợp.</p>}
           {!suggestionsLoading && recommended.length > 0 && <div className="co-suggestion-grid">
             {recommended.map(friend => <article className="co-suggestion" key={friend.id}>
-              <div className="co-suggestion-avatar-wrap"><UserAvatar username={friend.username} name={displayName(friend)} className="avatar co-suggestion-avatar" online={friend.online} /></div>
-              <strong title={displayName(friend)}>{displayName(friend)}</strong>
+              <button type="button" className="co-profile-avatar co-suggestion-profile-avatar" aria-label={`Xem trang cá nhân của ${displayName(friend)}`} onClick={() => onOpenProfile(friend)}>
+                <span className="co-suggestion-avatar-wrap"><UserAvatar username={friend.username} name={displayName(friend)} className="avatar co-suggestion-avatar" online={friend.online} /></span>
+              </button>
+              <button type="button" className="co-profile-name co-suggestion-profile-name" title={displayName(friend)} onClick={() => onOpenProfile(friend)}>{displayName(friend)}</button>
               <small className="co-mutual">{typeof friend.mutualGroups === 'number' ? <><Users size={12} aria-hidden="true" /> {friend.mutualGroups} nhóm chung</> : `@${friend.username}`}</small>
-              <button type="button" className="co-secondary" aria-label={`Kết bạn với ${displayName(friend)}`} disabled={friendBusyIds.has(friend.id)} onClick={() => void actOnFriend(friend)}>
+              <button type="button" className="co-secondary co-suggestion-action" aria-label={`Kết bạn với ${displayName(friend)}`} disabled={friendBusyIds.has(friend.id)} onClick={() => void actOnFriend(friend)}>
                 <UserRoundPlus size={17} aria-hidden="true" /> {friendBusyIds.has(friend.id) ? 'Đang gửi…' : 'Kết bạn'}
               </button>
             </article>)}
