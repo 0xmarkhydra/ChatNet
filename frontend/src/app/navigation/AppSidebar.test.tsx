@@ -21,7 +21,6 @@ function renderSidebar(tab: Tab, settingsActive = false, feedSaved = false) {
   const onNavigate = vi.fn();
   const onSettings = vi.fn();
   const onSaved = vi.fn();
-  const onCalls = vi.fn();
   act(() => root.render(
     <AppSidebar
       tab={tab}
@@ -35,7 +34,6 @@ function renderSidebar(tab: Tab, settingsActive = false, feedSaved = false) {
       onNavigate={onNavigate}
       onSettings={onSettings}
       onSaved={onSaved}
-      onCalls={onCalls}
     />,
   ));
   const button = (label: string) => {
@@ -58,7 +56,7 @@ afterEach(() => {
 describe("AppSidebar navigation", () => {
   it("left-aligns icons for collapsed and expanded sidebar buttons", () => {
     const { button } = renderSidebar("chat");
-    for (const label of ["Bảng tin", "Tin nhắn", "Khám phá", "Bạn bè", "Cuộc gọi", "Marketplace", "Thông báo", "Đã lưu", "Cài đặt", "Cá nhân"]) {
+    for (const label of ["Bảng tin", "Tin nhắn", "Khám phá", "Danh bạ", "Marketplace", "Thông báo", "Đã lưu", "Cài đặt", "Cá nhân"]) {
       const classList = button(label).classList;
       expect(classList.contains("justify-start"), label).toBe(true);
       expect(classList.contains("justify-center"), label).toBe(false);
@@ -71,7 +69,7 @@ describe("AppSidebar navigation", () => {
     expect(button("Thông báo").getAttribute("data-slot")).toBe("button");
     expect(button("Tin nhắn").getAttribute("type")).toBe("button");
     expect(button("Bảng tin").hasAttribute("aria-current")).toBe(false);
-    expect(button("Bạn bè").hasAttribute("aria-current")).toBe(false);
+    expect(button("Danh bạ").hasAttribute("aria-current")).toBe(false);
     expect(button("Thông báo").textContent).toContain("3");
     act(() => button("Bảng tin").click());
     expect(onNavigate).toHaveBeenCalledWith("feed");
@@ -80,7 +78,7 @@ describe("AppSidebar navigation", () => {
   it("distinguishes profile and settings from contacts", () => {
     const profile = renderSidebar("profile");
     expect(profile.button("Cá nhân").getAttribute("aria-current")).toBe("page");
-    expect(profile.button("Bạn bè").hasAttribute("aria-current")).toBe(false);
+    expect(profile.button("Danh bạ").hasAttribute("aria-current")).toBe(false);
 
     const settings = renderSidebar("profile", true);
     expect(settings.button("Cài đặt").getAttribute("aria-current")).toBe("page");

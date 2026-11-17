@@ -29,6 +29,9 @@ type Props = {
   onNavigate: (tab: 'feed' | 'chat' | 'contacts') => void
   onOpenChat: (id: number) => void
   embedded?: boolean
+  /** Render history or translation settings inside the unified contacts screen. */
+  contactMode?: 'history' | 'settings'
+  onContactModeChange?: (view: View) => void
 }
 
 const ENABLE_KEY = 'chatnet.call.translation.autostart.v1'
@@ -36,15 +39,15 @@ const LANGUAGE_KEY = 'chatnet.call.target-language.v1'
 const CAPTION_KEY = 'chatnet.call.subtitle-mode.v1'
 
 
-export default function CallCenter({ request, userId, token, conversations, targetLanguage, directoryContent, directoryQuery, onDirectoryQueryChange, onDirectoryOpen, onNavigate, onOpenChat, embedded = false }: Props) {
+export default function CallCenter({ request, userId, token, conversations, targetLanguage, directoryContent, directoryQuery, onDirectoryQueryChange, onDirectoryOpen, onNavigate, onOpenChat, embedded = false, contactMode, onContactModeChange }: Props) {
   const requestRef = useLatest(request)
   const location = useLocation()
   const navigate = useNavigate()
   const [localView, setLocalView] = useState<View>('history')
-  const view: View = embedded && location.pathname.startsWith('/calls')
+  const view: View = contactMode ?? (embedded && location.pathname.startsWith('/calls')
     ? location.pathname === '/calls/directory' ? 'directory'
       : location.pathname === '/calls/translation' ? 'settings' : 'history'
-    : localView
+    : localView)
   const previousViewRef = useRef<Exclude<View, 'settings'>>('history')
   // Browser Back/Forward can change the active tab without going through showView.
   useEffect(() => {
@@ -183,7 +186,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
   }
   const showView = (next: View) => {
     setMobileDetailsOpen(false)
-    if (next === 'directory' && view !== 'settings' && view !== 'directory') onDirectoryOpen()
+    if (!contactMode && next === 'directory' && view !== 'settings' && view !== 'directory') onDirectoryOpen()
     if (view === 'directory' && next !== 'directory' && next !== 'settings') onDirectoryQueryChange('')
     if (next === 'settings' && view !== 'settings') previousViewRef.current = view
     if (view === 'settings' && next !== 'settings') {
@@ -191,7 +194,8 @@ export default function CallCenter({ request, userId, token, conversations, targ
       setLanguage(localStorage.getItem(LANGUAGE_KEY) || targetLanguage.split('-')[0] || 'vi')
       setCaptionMode(localStorage.getItem(CAPTION_KEY) || 'both')
     }
-    if (embedded) {
+    if (contactMode && onContactModeChange) onContactModeChange(next)
+    else if (embedded) {
       const path = next === 'history' ? '/calls/history'
         : next === 'directory' ? '/calls/directory' : '/calls/translation'
       if (location.pathname !== path) navigate(path)
@@ -201,7 +205,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
   }
 
   return (
-    <div className={'call-center' + (embedded ? ' is-embedded' : '')}>
+    <div className={'call-center' + (embedded ? ' is-embedded' : '') + (contactMode ? ' is-contact-panel' : '')}>
       <aside className="call-center-sidebar" aria-label="Điều hướng SocCo">
         <div className="call-center-brand">
           <span className="call-center-logo">S</span><span><strong>SocCo</strong><small>ChatNet · Kết nối cộng đồng</small></span>

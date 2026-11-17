@@ -143,6 +143,7 @@ import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
 import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
 import ContactsView from "../features/contacts/components/ContactsView";
+import UnifiedContactsPage from "../features/contacts/components/UnifiedContactsPage";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
@@ -2695,11 +2696,6 @@ export default function AuthedApp({
         feedSaved={feedFilter === "saved"}
         settingsActive={desktopProfileSettings}
         onNavigate={switchTab}
-        onCalls={() => {
-          switchTab("chat");
-          setDesktopSection("calls");
-          navigate(ROUTE.calls, { replace: true });
-        }}
         onSaved={() => {
           switchTab("feed");
           setFeedFilter("saved");
@@ -3213,7 +3209,20 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "contacts" && contactsContent}
+        {tab === "contacts" && <UnifiedContactsPage
+          contactsContent={contactsContent}
+          conversations={displayConversations}
+          friends={friends}
+          incomingRequests={friendRequests.filter(friend => friend.direction === "incoming").length}
+          request={apiFetch}
+          userId={session.user.id}
+          token={session.token}
+          targetLanguage={targetLanguage}
+          friendQuery={friendQuery}
+          setFriendQuery={setFriendQuery}
+          onOpenChat={(id) => { switchTab("chat"); selectRoutedConversation(id); }}
+          onNavigate={switchTab}
+        />}
 
         {isSearchResultsRoute && (
           <SearchResultsPage
@@ -3638,8 +3647,6 @@ export default function AuthedApp({
         tab={tab}
         t={t}
         switchTab={switchTab}
-        onCalls={() => { switchTab("chat"); setDesktopSection("calls"); navigate(ROUTE.calls, { replace: true }); }}
-        callsActive={tab === "chat" && desktopSection === "calls"}
         unreadTotal={unreadTotal}
         pushEnabled={pushEnabled}
       />

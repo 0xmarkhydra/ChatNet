@@ -2,7 +2,6 @@ import { useLayoutEffect, useRef } from 'react'
 import type { Tab } from '../../shared/types/navigation'
 import type { UI_MESSAGES } from '../../features/i18n/lib/i18n'
 import UiIcon from '../../shared/ui/UiIcon'
-import { PhoneCall } from 'lucide-react'
 
 type Props = {
   tab: Tab
@@ -10,8 +9,6 @@ type Props = {
   switchTab: (tab: Tab) => void
   unreadTotal: number
   pushEnabled: boolean
-  onCalls: () => void
-  callsActive: boolean
 }
 
 export default function BottomNavigation({
@@ -20,10 +17,8 @@ export default function BottomNavigation({
   switchTab,
   unreadTotal,
   pushEnabled,
-  onCalls,
-  callsActive,
 }: Props) {
-  const activeKey = callsActive ? 'calls' : tab
+  const activeKey = tab
   const navRef = useRef<HTMLElement>(null)
   const activeButtonRef = useRef<HTMLButtonElement>(null)
   const pillRef = useRef<HTMLSpanElement>(null)
@@ -89,17 +84,13 @@ export default function BottomNavigation({
         type="button"
         aria-label={t('nav.chat')}
         title={t('nav.chat')}
-        className={tab === 'chat' && !callsActive ? 'active' : ''}
-        aria-current={tab === 'chat' && !callsActive ? 'page' : undefined}
-        ref={tab === 'chat' && !callsActive ? activeButtonRef : undefined}
+        className={tab === 'chat' ? 'active' : ''}
+        aria-current={tab === 'chat' ? 'page' : undefined}
+        ref={tab === 'chat' ? activeButtonRef : undefined}
         onClick={() => switchTab('chat')}
       >
         <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b>{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
         <span className="nav-label">{t('nav.chat')}</span>
-      </button>
-      <button type="button" aria-label="Cuộc gọi" title="Cuộc gọi" className={callsActive ? 'active' : ''} aria-current={callsActive ? 'page' : undefined} ref={callsActive ? activeButtonRef : undefined} onClick={onCalls}>
-        <span className="nav-icon"><PhoneCall size={24} /></span>
-        <span className="nav-label">Cuộc gọi</span>
       </button>
       <button
         type="button"

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
-import { Bell, Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings, ShoppingBag, UserRoundCheck } from 'lucide-react'
+import { Bell, Bookmark, Compass, MessageCircle, Newspaper, Settings, ShoppingBag, BookUser } from 'lucide-react'
 import type { Tab } from '../../shared/types/navigation'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import { Button } from '../../shared/ui/button'
@@ -15,14 +15,13 @@ type Props = {
   feedSaved: boolean
   settingsActive: boolean
   onNavigate: (tab: Tab) => void
-  onCalls: () => void
   onSaved: () => void
   onSettings: () => void
 }
 
 export default function AppSidebar({
   tab, section, username, displayName, unreadTotal, notificationCount, feedSaved, settingsActive,
-  onNavigate, onCalls, onSaved, onSettings,
+  onNavigate, onSaved, onSettings,
 }: Props) {
   const activeKey = `${tab}:${section ?? ''}:${feedSaved}:${settingsActive}`
   const navRef = useRef<HTMLElement>(null)
@@ -92,8 +91,7 @@ export default function AppSidebar({
     { label: 'Bảng tin', Icon: Newspaper, active: tab === 'feed' && !feedSaved, action: () => onNavigate('feed') },
     { label: 'Tin nhắn', Icon: MessageCircle, active: tab === 'chat' && section === null, action: () => onNavigate('chat'), count: unreadTotal },
     { label: 'Khám phá', Icon: Compass, active: tab === 'discover', action: () => onNavigate('discover') },
-    { label: 'Bạn bè', Icon: UserRoundCheck, active: tab === 'contacts', action: () => onNavigate('contacts') },
-    { label: 'Cuộc gọi', Icon: Phone, active: section === 'calls', action: onCalls },
+    { label: 'Danh bạ', Icon: BookUser, active: tab === 'contacts', action: () => onNavigate('contacts') },
     { label: 'Marketplace', Icon: ShoppingBag, active: tab === 'market', action: () => onNavigate('market') },
   ]
 
