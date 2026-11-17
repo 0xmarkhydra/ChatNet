@@ -84,6 +84,10 @@
   .nearby-results-heading > span { max-width: 150px; }
   .nearby-place-content.map-view { display: flex; flex-direction: column; overflow: visible; }
   .nearby-map { flex: 1; height: auto; }
-  .map-view .nearby-place-list { flex-shrink: 0; max-height: 116px; padding: 0; overflow-y: auto; }
-  .map-view .nearby-place-list > :not(.selected) { display: none; }
+  .map-view .nearby-place-list { flex-shrink: 0; max-height: min(40vh, 240px); padding: 0; overflow-y: auto; overscroll-behavior: contain; }
+  /* Preserve access to every place on narrow screens, including keyboard navigation. */
+  .map-view .nearby-place-row { min-height: 56px; }
+  .nearby-map-error { right: 12px; top: auto; bottom: 12px; z-index: 2; }
+  .nearby-map-controls { right: 8px; top: 8px; }
+  .nearby-error { flex-wrap: wrap; }
 }

@@ -36,6 +36,7 @@ describe('NearbyMap failure fallback', () => {
     await act(async () => new Promise(resolve => setTimeout(resolve, 20)))
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('Không tải được bản đồ')
     expect(host.textContent).not.toContain('WebGL unavailable')
+    expect(Array.from(host.querySelectorAll<HTMLButtonElement>('.nearby-map-controls button')).every(button => button.disabled)).toBe(true)
     const list = Array.from(host.querySelectorAll<HTMLButtonElement>('button'))
       .find(button => button.textContent === 'Xem danh sách')
     expect(list).toBeTruthy()
