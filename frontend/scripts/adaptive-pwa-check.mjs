@@ -55,7 +55,7 @@ try {
   }
   assert.ok(ready, 'Vite did not start')
   browser = await chromium.launch({ headless: true })
-  const widths = [320, 375, 390, 430, 768, 1440]
+  const widths = process.argv.includes('--nav-only') ? [320, 375, 390, 430] : [320, 375, 390, 430, 768, 1440]
   const selectedWidth = process.argv.find(arg => arg.startsWith('--width='))
   for (const width of (selectedWidth ? widths.filter(value => value === Number(selectedWidth.slice(8))) : widths)) {
     const phone = width <= 760
@@ -128,8 +128,112 @@ try {
     if (phone) {
       assert.equal(await rail.isVisible(), false, width + ': desktop rail must be hidden')
       assert.equal(await bottom.isVisible(), true, width + ': bottom tabs must remain visible')
-      assert.equal(await bottom.locator('button').count(), 6, width + ': six original tabs')
-      assert.equal(await bottom.locator('.nav-label:visible').count(), 6, width + ': six visible labels')
+      assert.equal(await bottom.locator('button').count(), 5, width + ': five primary navigation tabs')
+      assert.equal(await bottom.locator('.nav-label:visible').count(), 5, width + ': five visible labels')
+      if (process.argv.includes('--nav-only')) {
+        await bottom.locator('.nav-liquid-pill.is-ready').waitFor()
+        const inspect = async () => bottom.evaluate(nav => {
+          const items = [...nav.querySelectorAll(':scope > button')].map(button => {
+            const box = button.getBoundingClientRect()
+            const icon = button.querySelector('.nav-icon').getBoundingClientRect()
+            const label = button.querySelector('.nav-label')
+            const text = label.getBoundingClientRect()
+            return { left: box.left, right: box.right, width: box.width, height: box.height,
+              center: (box.left + box.right) / 2,
+              iconCenter: (icon.left + icon.right) / 2,
+              labelCenter: (text.left + text.right) / 2,
+              labelY: text.top, clipped: label.scrollWidth > label.clientWidth + 1 }
+          })
+          const icon = nav.querySelector('button.active .nav-icon').getBoundingClientRect()
+          const pill = nav.querySelector('.nav-liquid-pill').getBoundingClientRect()
+          return { items, iconCenter: (icon.left + icon.right) / 2,
+            pillCenter: (pill.left + pill.right) / 2, pillWidth: pill.width }
+        })
+        for (const index of [0, 1, 2, 3, 4, 0]) {
+          await bottom.locator('button').nth(index).click()
+          await page.waitForFunction(selected =>
+            document.querySelectorAll('.bottom-navigation > button')[selected]?.getAttribute('aria-current') === 'page',
+            index, { timeout: 5000 })
+          await page.waitForTimeout(450)
+          const layout = await inspect()
+          const widths = layout.items.map(item => item.width)
+          assert.ok(Math.max(...widths) - Math.min(...widths) < 1,
+            width + 'px: tab cells must be the same width: ' + JSON.stringify(layout))
+          assert.ok(layout.items.every((item, i) =>
+            item.height >= 44 && !item.clipped &&
+            Math.abs(item.center - item.iconCenter) <= 1 &&
+            Math.abs(item.labelCenter - item.iconCenter) <= 1 &&
+            Math.abs(item.labelY - layout.items[0].labelY) <= 1 &&
+            (i === 0 || Math.abs(item.left - layout.items[i - 1].right) <= 1)),
+            width + 'px: tab icon/label alignment is not consistent: ' + JSON.stringify(layout))
+          assert.ok(Math.abs(layout.iconCenter - layout.pillCenter) <= 2 &&
+            layout.pillWidth < layout.items[0].width,
+            width + 'px: selected indicator must be centered behind the icon: ' + JSON.stringify(layout))
+        }
+        await page.screenshot({ path: 'output/playwright/layout/mobile-bottom-nav-' + width + '.png' })
+        assert.deepEqual(errors, [], width + 'px: unexpected browser errors')
+        console.log('PASS: 5 evenly spaced mobile tabs, labels, indicator and navigation at ' + width + 'px')
+        // Selecting a group keeps activeConversation set while the joined
+        // channel picker is shown. The bottom tabs must still be available
+        // both before and after tapping the same avatar to retract it.
+        const groupAvatar = list.getByRole('button', { name: /Mở nhóm SocCo Design Team/ })
+        await groupAvatar.click()
+        await page.locator('.social-chat-layout.mobile-rail-picker-view').waitFor({ state: 'visible' })
+        await page.waitForTimeout(600)
+        const pickerBefore = await page.locator('.social-chat-layout').evaluate(layout => ({
+          expanded: layout.getAttribute('data-split-expanded'),
+          priming: layout.getAttribute('data-split-priming'),
+          railWidth: layout.querySelector('.conversation-avatar-rail')?.getBoundingClientRect().width,
+          classes: layout.className,
+        }))
+        assert.ok(pickerBefore.railWidth < width / 2,
+          width + 'px: selecting a group must show the compact avatar dock and channel picker')
+        assert.equal(await bottom.isVisible(), true, width + 'px: group channel picker must preserve bottom tabs')
+        await groupAvatar.click()
+        await page.waitForTimeout(500)
+        const pickerAfter = await page.locator('.social-chat-layout').evaluate(layout => ({
+          expanded: layout.getAttribute('data-split-expanded'),
+          railWidth: layout.querySelector('.conversation-avatar-rail')?.getBoundingClientRect().width,
+        }))
+        assert.ok(pickerAfter.railWidth > width * .9 && pickerAfter.expanded === 'true',
+          width + 'px: second group-avatar tap must expand the conversation rail again: ' + JSON.stringify(pickerAfter))
+        assert.equal(await bottom.isVisible(), true, width + 'px: collapsing the group picker must restore bottom tabs')
+        await page.screenshot({ path: 'output/playwright/layout/mobile-group-picker-collapsed-' + width + '.png' })
+        console.log('PASS: group avatar collapse preserves bottom navigation at ' + width + 'px')
+        if (width === 390) {
+          await page.goto(origin)
+          const avatarRail = page.locator('.conversation-avatar-rail')
+          await avatarRail.waitFor({ state: 'visible' })
+          await avatarRail.getByRole('button', { name: /Mở cuộc trò chuyện Linh Anh/ }).click()
+          const composer = page.locator('.social-chat-layout.mobile-rail-chat-view > .conversation-panel .media-composer')
+          await composer.waitFor({ state: 'visible' })
+          await composer.locator('.attach-button').waitFor({ state: 'visible' })
+          await composer.locator('.chat-composer-image').waitFor({ state: 'visible' })
+          await composer.locator('.voice-record-trigger').waitFor({ state: 'visible' })
+          assert.equal(await bottom.isVisible(), false,
+            'Opening a message thread must still hide the bottom navigation')
+          const actionButtons = await composer.evaluate(form =>
+            ['.attach-button', '.chat-composer-image', '.voice-record-trigger'].map(selector => {
+              const button = form.querySelector(selector)
+              const box = button.getBoundingClientRect()
+              const svg = button.querySelector('svg')
+              const icon = svg?.getBoundingClientRect()
+              return { width: box.width, height: box.height, bg: getComputedStyle(button).backgroundColor,
+                icons: button.querySelectorAll('svg').length,
+                iconWidth: icon?.width, iconHeight: icon?.height,
+                iconOffset: icon ? Math.abs((icon.left + icon.right - box.left - box.right) / 2) : 999 }
+            }))
+          assert.ok(actionButtons.every(button => button.icons === 1 &&
+            button.width === actionButtons[0].width &&
+            button.height === actionButtons[0].height &&
+            button.bg === 'rgba(0, 0, 0, 0)' &&
+            button.iconWidth === 20 && button.iconHeight === 20 && button.iconOffset <= 1),
+            'Mobile composer icons must match the desktop single-glyph styling: ' + JSON.stringify(actionButtons))
+          console.log('PASS: mobile chat attachment, image and mic are single unboxed web-style icons')
+        }
+        await context.close()
+        continue
+      }
       assert.equal(await list.getAttribute('data-expanded'), 'true', width + ': mobile rail must start expanded')
       assert.equal(await header.isVisible(), false, width + ': legacy sidebar header must remain hidden')
       assert.equal(await list.locator('.conversation-avatar-rail-item').count(), conversations.length,
@@ -150,6 +254,38 @@ try {
         return { x: box.x, right: box.right, height: box.height }
       }))
       assert.ok(tabs.every(tab => tab.x >= -1 && tab.right <= width + 1 && tab.height >= 44), width + ': tabs must fit the screen and remain touch-friendly')
+      const navLayout = await bottom.evaluate(nav => {
+        const items = [...nav.querySelectorAll(':scope > button')].map(button => {
+          const box = button.getBoundingClientRect()
+          const icon = button.querySelector('.nav-icon').getBoundingClientRect()
+          const label = button.querySelector('.nav-label')
+          const text = label.getBoundingClientRect()
+          return {
+            x: box.left, right: box.right, width: box.width, height: box.height,
+            iconCenter: (icon.left + icon.right) / 2,
+            textCenter: (text.left + text.right) / 2,
+            textY: text.top, clipped: label.scrollWidth > label.clientWidth + 1,
+          }
+        })
+        const activeIcon = nav.querySelector('button.active .nav-icon').getBoundingClientRect()
+        const highlight = nav.querySelector('.nav-liquid-pill').getBoundingClientRect()
+        return { items, activeIconCenter: (activeIcon.left + activeIcon.right) / 2,
+          highlightCenter: (highlight.left + highlight.right) / 2, highlightWidth: highlight.width }
+      })
+      const tabWidths = navLayout.items.map(item => item.width)
+      assert.ok(Math.max(...tabWidths) - Math.min(...tabWidths) <= 1,
+        width + 'px: five tabs must share the width equally: ' + JSON.stringify(navLayout))
+      assert.ok(navLayout.items.every((item, i) =>
+        Math.abs(item.iconCenter - (item.x + item.right) / 2) <= 1 &&
+        Math.abs(item.textCenter - item.iconCenter) <= 1 &&
+        Math.abs(item.textY - navLayout.items[0].textY) <= 1 &&
+        !item.clipped &&
+        (i === 0 || Math.abs(navLayout.items[i - 1].right - item.x) <= 1)),
+        width + 'px: icons and labels must stay centered, aligned and legible')
+      assert.ok(Math.abs(navLayout.highlightCenter - navLayout.activeIconCenter) <= 2 &&
+        navLayout.highlightWidth < navLayout.items[0].width,
+        width + 'px: the active indicator must hug its icon, not the full tab')
+      console.log('PASS: evenly spaced, compact mobile navigation at ' + width + 'px')
       assert.equal(await page.locator('.conversation-pin-menu-trigger').count(), 0,
         width + 'px: no ellipsis beside conversations')
       if (width === 390) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, FileText, Images, Plus, Smile } from 'lucide-react'
+import { ArrowLeft, FileText, Images, Smile } from 'lucide-react'
 import UiIcon from '../../../shared/ui/UiIcon'
 import ChatEmojiPicker from './ChatEmojiPicker'
 import { positionChatComposerMenu, type ChatComposerMenuPosition } from '../utils/positionChatComposerMenu'
@@ -99,7 +99,6 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
         onClick={() => mode === 'closed' ? show('actions') : setMode('closed')}
       >
         <UiIcon name="attach" size={22} />
-        <Plus className="chat-composer-plus" size={21} aria-hidden="true" />
       </button>
       {mode !== 'closed' && position && createPortal(
         <div

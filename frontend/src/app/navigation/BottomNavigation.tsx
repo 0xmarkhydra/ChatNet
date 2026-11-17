@@ -41,11 +41,17 @@ export default function BottomNavigation({
     const measure = (animate = false) => {
       const navRect = nav.getBoundingClientRect()
       const buttonRect = activeButton.getBoundingClientRect()
-      const left = buttonRect.left - navRect.left - nav.clientLeft
+      // On phones the highlight should sit behind the icon, not fill the tab.
+      // Keep the original full-button highlight on wider screens.
+      const icon = activeButton.querySelector<HTMLElement>('.nav-icon')
+      const targetRect = window.matchMedia('(max-width: 760px)').matches && icon
+        ? icon.getBoundingClientRect()
+        : buttonRect
+      const left = targetRect.left - navRect.left - nav.clientLeft
       pill.style.setProperty('--pill-x', `${left}px`)
-      pill.style.setProperty('--pill-y', `${buttonRect.top - navRect.top - nav.clientTop}px`)
-      pill.style.setProperty('--pill-w', `${buttonRect.width}px`)
-      pill.style.setProperty('--pill-h', `${buttonRect.height}px`)
+      pill.style.setProperty('--pill-y', `${targetRect.top - navRect.top - nav.clientTop}px`)
+      pill.style.setProperty('--pill-w', `${targetRect.width}px`)
+      pill.style.setProperty('--pill-h', `${targetRect.height}px`)
 
       if (!pill.classList.contains('is-ready')) {
         void pill.offsetWidth
