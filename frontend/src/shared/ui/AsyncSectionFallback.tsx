@@ -1,3 +1,5 @@
+import { Button } from "./button";
+
 type AsyncSectionFallbackProps = {
   title: string;
   loading?: boolean;
@@ -5,6 +7,7 @@ type AsyncSectionFallbackProps = {
   onReload?: () => void;
 };
 
+/** Shared async boundary for route code-splitting and recoverable render errors. */
 export function AsyncSectionFallback({ title, loading = false, onRetry, onReload }: AsyncSectionFallbackProps) {
   return (
     <section
@@ -13,19 +16,18 @@ export function AsyncSectionFallback({ title, loading = false, onRetry, onReload
       aria-live={loading ? "polite" : undefined}
       aria-busy={loading}
     >
+      {loading && (
+        <div data-slot="loading-skeleton" aria-hidden="true" className="flex w-full max-w-xs flex-col gap-3">
+          <div className="h-5 w-3/5 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />
+          <div className="h-3 w-full animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
+          <div className="h-3 w-4/5 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
+        </div>
+      )}
       <p className="text-sm text-muted-foreground">{loading ? `Đang tải ${title}…` : `Không thể hiển thị ${title}.`}</p>
       {!loading && (onRetry || onReload) && (
         <div className="flex flex-wrap justify-center gap-2">
-          {onRetry && (
-            <button type="button" className="inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={onRetry}>
-              Thử lại
-            </button>
-          )}
-          {onReload && (
-            <button type="button" className="inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={onReload}>
-              Tải lại trang
-            </button>
-          )}
+          {onRetry && <Button variant="outline" className="min-h-11" onClick={onRetry}>Thử lại</Button>}
+          {onReload && <Button variant="outline" className="min-h-11" onClick={onReload}>Tải lại trang</Button>}
         </div>
       )}
     </section>
