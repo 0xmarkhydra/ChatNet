@@ -108,6 +108,9 @@ export type ChatSectionProps = {
   messageSearchOpen: boolean;
   messageSending: boolean;
   messagesLoadingMore: boolean;
+  messageHistoryLoading: boolean;
+  messageHistoryError: boolean;
+  retryMessageHistory: () => void;
   messagesScrollRef: RefObject<HTMLDivElement | null>;
   messageText: string;
   moveConversationLongPress: (x: number, y: number) => void;

@@ -895,6 +895,9 @@ export default function AuthedApp({
     hasMoreMessages,
     setHasMoreMessages,
     messagesLoadingMore,
+    messageHistoryLoading,
+    messageHistoryError,
+    retryMessageHistory,
     setMessagesLoadingMore,
     messageGapBefore,
     messageGapLoading,
@@ -3059,6 +3062,9 @@ export default function AuthedApp({
           messageSearchOpen={messageSearchOpen}
           messageSending={messageSending}
           messagesLoadingMore={messagesLoadingMore}
+          messageHistoryLoading={messageHistoryLoading}
+          messageHistoryError={messageHistoryError}
+          retryMessageHistory={retryMessageHistory}
           messagesScrollRef={messagesScrollRef}
           messageText={messageText}
           moveConversationLongPress={moveConversationLongPress}
