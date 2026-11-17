@@ -135,7 +135,7 @@
 .co-profile-avatar { display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 50%; }
 .co-profile-name { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; text-align: left; }
 .co-profile-avatar:hover, .co-profile-name:hover { color: #245bce; }
-.co-profile-name:hover { text-decoration: underline; text-underline-offset: 2px; }
+.co-profile-name:hover { text-decoration: none; }
 .co-profile-avatar:focus-visible, .co-profile-name:focus-visible { outline: 2px solid #3468df; outline-offset: 4px; }
 .co-suggestion-profile-name { text-align: center; }
 .co-person { min-width: 0; flex: 1; display: grid; gap: 7px; }
