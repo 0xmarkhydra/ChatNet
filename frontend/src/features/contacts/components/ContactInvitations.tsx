@@ -42,6 +42,8 @@ export default function ContactInvitations({ friendRequests, friendBusyIds, actO
     <UserAvatar username={friend.username} name={personName(friend)} className="avatar fd-avatar" online={friend.online} />
   )
   return <>
+    <div className="fd-invitation-layout">
+      <div className="fd-invitation-main">
       <div className="fd-invitation-tabs">
         <button type="button" className="fd-back" onClick={onBack} aria-label="Quay lại Danh bạ"><ArrowLeft size={17}/></button>
         <div ref={hostRef} className="sliding-pill-host" role="tablist" aria-label="Lời mời kết bạn" aria-orientation="horizontal">
@@ -53,7 +55,6 @@ export default function ContactInvitations({ friendRequests, friendBusyIds, actO
         </div>
         <small aria-live="polite">{incoming.length} lời mời đến · {outgoing.length} đã gửi</small>
       </div>
-      <div className="fd-invitation-layout">
         <section className="fd-card fd-invitation-list" id={panelId} role="tabpanel" aria-labelledby={tabId(invitationTab)} tabIndex={0}>
           {invitationTab === 'incoming' ? <>
             <div className="fd-invitation-heading"><h2>Lời mời đến</h2><p>Lời mời sẽ không tự động được chấp nhận</p></div>
@@ -85,6 +86,7 @@ export default function ContactInvitations({ friendRequests, friendBusyIds, actO
               <button type="button" className="fd-primary" onClick={onScanQr}><QrCode size={19}/>Mở trình quét QR</button></div>
           </>}
         </section>
+      </div>
         <ContactQrPanel connectionUrl={connectionUrl} onScanQr={onScanQr} />
       </div>
 
