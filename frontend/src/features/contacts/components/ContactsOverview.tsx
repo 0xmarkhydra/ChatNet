@@ -38,23 +38,23 @@ export default function ContactsOverview({
   const recommended = availableSuggestions.slice(0, 4)
 
   return <div className="contacts-overview" aria-label="Tổng quan Bạn bè">
-    <section className="co-stats" aria-label="Thống kê kết nối">
-      <button type="button" className="co-stat" onClick={onDirectory}>
-        <span className="co-stat-icon co-stat-friends"><Users size={24} aria-hidden="true" /></span>
-        <span><strong>{friendsLoading ? '…' : friendsError ? '–' : friends.length.toLocaleString('vi-VN')}</strong><small>Bạn bè</small></span>
-      </button>
-      <button type="button" className="co-stat" onClick={onInvitations}>
-        <span className="co-stat-icon co-stat-requests"><UserRoundPlus size={23} aria-hidden="true" /></span>
-        <span><strong>{friendsLoading ? '…' : friendsError ? '–' : incoming.length.toLocaleString('vi-VN')}</strong><small>Lời mời đến</small></span>
-      </button>
-      <button type="button" className="co-stat" onClick={onDirectory}>
-        <span className="co-stat-icon co-stat-suggestions"><Sparkles size={23} aria-hidden="true" /></span>
-        <span><strong>{suggestionsLoading ? '…' : suggestionsError ? '–' : availableSuggestions.length.toLocaleString('vi-VN')}</strong><small>Gợi ý kết nối hiện có</small></span>
-      </button>
-    </section>
-
     <div className="co-layout">
       <div className="co-main">
+        <section className="co-stats" aria-label="Thống kê kết nối">
+          <button type="button" className="co-stat" onClick={onDirectory}>
+            <span className="co-stat-icon co-stat-friends"><Users size={24} aria-hidden="true" /></span>
+            <span><strong>{friendsLoading ? '…' : friendsError ? '–' : friends.length.toLocaleString('vi-VN')}</strong><small>Bạn bè</small></span>
+          </button>
+          <button type="button" className="co-stat" onClick={onInvitations}>
+            <span className="co-stat-icon co-stat-requests"><UserRoundPlus size={23} aria-hidden="true" /></span>
+            <span><strong>{friendsLoading ? '…' : friendsError ? '–' : incoming.length.toLocaleString('vi-VN')}</strong><small>Lời mời đến</small></span>
+          </button>
+          <button type="button" className="co-stat" onClick={onDirectory}>
+            <span className="co-stat-icon co-stat-suggestions"><Sparkles size={23} aria-hidden="true" /></span>
+            <span><strong>{suggestionsLoading ? '…' : suggestionsError ? '–' : availableSuggestions.length.toLocaleString('vi-VN')}</strong><small>Gợi ý kết nối hiện có</small></span>
+          </button>
+        </section>
+
         <section className="co-section" aria-labelledby="co-requests-title">
           <div className="co-section-heading">
             <div><h2 id="co-requests-title">Lời mời kết bạn {!friendsLoading && !friendsError && incoming.length > 0 && <span className="co-count-pill">{incoming.length}</span>}</h2><p>{friendsLoading ? 'Đang đồng bộ lời mời' : friendsError ? 'Không thể cập nhật lời mời' : `${incoming.length} lời mời đang chờ phản hồi`}</p></div>

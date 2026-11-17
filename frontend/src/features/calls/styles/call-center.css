@@ -73,6 +73,21 @@
 }
 .call-center-history .call-center-stats,
 .call-center-history .call-center-filters { flex-shrink: 0; }
+/* Keep the statistics and recent calls exactly as wide as the left column. */
+.call-center-history .call-history-main-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.call-center-history .call-history-main-column .call-history-list {
+  flex: 1;
+  min-height: 0;
+}
+.call-center-history .call-history-main-column .call-center-stats {
+  width: 100%;
+  box-sizing: border-box;
+}
 .call-center-history .call-history-layout {
   flex: 1;
   min-height: 0;

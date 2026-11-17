@@ -340,7 +340,7 @@
 }
 .co-layout { grid-template-columns: minmax(0, 1.95fr) minmax(300px, .85fr); gap: 22px; }
 .co-main, .co-side { gap: 21px; }
-.co-side { position: sticky; top: 12px; align-self: start; }
+.co-side { position: sticky; top: 0; align-self: start; }
 .co-stats { min-height: 101px; padding-block: 13px; }
 .co-stat { transition: background .2s ease, transform .2s ease, box-shadow .2s ease; }
 .co-stat:hover { transform: translateY(-2px); }
