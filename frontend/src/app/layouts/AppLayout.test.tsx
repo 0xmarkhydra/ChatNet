@@ -32,6 +32,11 @@ it("renders header and sidebar around the outlet without extra DOM wrappers", ()
         outletContext={{
           frameClassName: "",
           content: <p data-testid="page">Stable page content</p>,
+          contacts: <p data-testid="page">Stable page content</p>,
+          search: null,
+          discover: null,
+          market: null,
+          notifications: null,
         }}
       >
         <div data-testid="after-page">Dialogs</div>
