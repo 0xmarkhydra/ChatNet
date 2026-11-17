@@ -43,7 +43,7 @@ describe('feed post sharing', () => {
     await click('Chia sẻ bài viết')
     expect(share).toHaveBeenCalledWith({
       title: 'Bài viết ChatNet',
-      url: `${window.location.origin}/feed/posts/42`,
+      url: `${window.location.origin}/feed/posts/42?ref=share`,
     })
     expect(writeText).not.toHaveBeenCalled()
   })
@@ -55,7 +55,7 @@ describe('feed post sharing', () => {
     ))
     await click('Tùy chọn bài viết')
     await click('Sao chép liên kết', true)
-    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/feed/posts/42`)
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/feed/posts/42?ref=share`)
     expect(share).not.toHaveBeenCalled()
     expect(onFeedback).toHaveBeenCalledWith('Đã sao chép liên kết bài viết.', 'success')
   })
@@ -64,6 +64,6 @@ describe('feed post sharing', () => {
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     act(() => root.render(<FeedShareAction postId={post.id} onFeedback={onFeedback} />))
     await click('Chia sẻ bài viết')
-    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/feed/posts/42`)
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/feed/posts/42?ref=share`)
   })
 })

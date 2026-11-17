@@ -18,7 +18,9 @@ export function usePostDetailNavigation({
     const params = new URLSearchParams(location.search);
     params.delete("post");
     params.delete("tab");
-    if (location.pathname.startsWith("/feed/posts/") || new URLSearchParams(location.search).has("post")) {
+    const isPostPath = location.pathname.startsWith("/feed/posts/");
+    if (isPostPath && params.get("ref") === "share") params.delete("ref");
+    if (isPostPath || new URLSearchParams(location.search).has("post")) {
       navigate(
         { pathname: "/feed", search: params.size ? `?${params}` : "", hash: location.hash },
         { replace: true, state: location.state },

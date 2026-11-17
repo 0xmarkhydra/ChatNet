@@ -287,7 +287,7 @@
   inset: calc(100% + 6px) auto auto 0;
   margin: 0;
   box-sizing: border-box;
-  width: min(384px, calc(100dvw - 24px));
+  width: min(336px, calc(100dvw - 24px));
   overflow: auto;
   overscroll-behavior: contain;
   padding: 4px;

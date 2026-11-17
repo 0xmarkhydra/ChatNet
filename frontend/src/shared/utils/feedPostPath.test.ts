@@ -8,6 +8,7 @@ describe('feedPostIdFromUrl', () => {
     'https://chat.codelocal.cloud/feed?post=15&tab=feed',
     'https://chat.codelocal.cloud/?tab=feed&post=15',
     'http://localhost:5173/feed/posts/15',
+    'http://localhost:5173/feed/posts/15?ref=share',
   ])('recognizes %s', url => expect(feedPostIdFromUrl(new URL(url), origin)).toBe(15))
 
   it.each([

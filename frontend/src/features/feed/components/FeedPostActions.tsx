@@ -29,7 +29,9 @@ const reasons = ['Nội dung spam', 'Quấy rối hoặc xúc phạm', 'Lừa đ
 function postUrl(id: number) {
   const { origin, protocol } = window.location
   const webOrigin = protocol === 'https:' || protocol === 'http:' ? origin : 'https://chat.codelocal.cloud'
-  return new URL(feedPostPath(id), webOrigin).href
+  const url = new URL(feedPostPath(id), webOrigin)
+  url.searchParams.set('ref', 'share')
+  return url.href
 }
 
 async function sharePost(id: number, feedback: Feedback, copyOnly = false) {
