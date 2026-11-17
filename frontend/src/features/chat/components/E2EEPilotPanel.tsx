@@ -3,6 +3,7 @@ import { CheckCircle2, Fingerprint, KeyRound, LoaderCircle, LockKeyhole, Refresh
 import {
   MLSPilotService, identitySafetyCode, type PilotStatus,
 } from '../lib/mlsPilotService'
+import type { ConversationEncryptionMode } from '../types'
 import type { ApiRequest } from '../../../shared/types/api'
 import type { MLSLocalMessage } from '../lib/mlsStateVault'
 import './e2ee-pilot.css'
@@ -12,7 +13,7 @@ type Props = {
   userId: number
   otherUserId: number
   request: ApiRequest
-  onModeChange: (mode: 'unknown' | 'legacy' | 'pending' | 'e2ee') => void
+  onModeChange: (mode: ConversationEncryptionMode) => void
 }
 
 export default function E2EEPilotPanel({
@@ -86,7 +87,6 @@ export default function E2EEPilotPanel({
 
   useEffect(() => {
     aliveRef.current = true
-    onModeChange('unknown')
     let cancelled = false
     const startup = window.setTimeout(() => {
       if (busyRef.current) return
@@ -107,9 +107,8 @@ export default function E2EEPilotPanel({
       aliveRef.current = false
       window.clearTimeout(startup)
       window.clearInterval(timer)
-      onModeChange('unknown')
     }
-  }, [refresh, onModeChange])
+  }, [refresh])
 
   async function perform(action: () => Promise<unknown>) {
     if (busyRef.current) return

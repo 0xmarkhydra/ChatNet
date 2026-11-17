@@ -1,0 +1,63 @@
+:root {
+  color-scheme: dark;
+  font: 14px/1.4 system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #111827;
+  cursor: crosshair;
+  user-select: none;
+  touch-action: none;
+}
+
+#bitmap, .shade {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#bitmap { object-fit: fill; }
+.shade { background: rgb(11 18 32 / 50%); }
+body.selecting .shade { display: none; }
+
+#selection {
+  position: fixed;
+  outline: 2px solid #93c5fd;
+  box-shadow: 0 0 0 200vmax rgb(11 18 32 / 50%);
+  pointer-events: none;
+}
+
+.help {
+  position: fixed;
+  inset: auto auto 16px 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 10px;
+  color: #fff;
+  background: #111827;
+  white-space: nowrap;
+}
+
+body.selecting .help { visibility: hidden; }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  color: #fff;
+  background: #334155;
+  border: 1px solid #64748b;
+  border-radius: 5px;
+  padding: 3px 7px;
+}
+
+button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+kbd { color: #dbeafe; font: inherit; font-size: .8em; }

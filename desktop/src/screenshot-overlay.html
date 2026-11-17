@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chụp vùng màn hình — SocCO</title>
+  <link rel="stylesheet" href="./screenshot-overlay.css">
+  <script defer src="./screenshot-overlay-renderer.js"></script>
+</head>
+<body>
+  <img id="bitmap" alt="" draggable="false">
+  <div class="shade" aria-hidden="true"></div>
+  <div id="selection" aria-hidden="true" hidden></div>
+  <div class="help" role="group" aria-label="Chụp vùng màn hình">
+    <span>Kéo để chọn vùng chụp</span>
+    <button id="cancel" type="button">Hủy <kbd>Esc</kbd></button>
+  </div>
+</body>
+</html>
