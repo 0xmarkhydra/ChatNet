@@ -36,7 +36,11 @@
 .fd-searchbar>label>input::placeholder{color:#7486a9}
 .fd-searchbar>label>button{display:grid;place-items:center;min-width:30px;height:30px;border:0;background:#f0f3ff;color:#5879c9;border-radius:50%}
 .friends-design-v2 .fd-add-new{min-width:188px;min-height:44px;font-size:13px}
-.fd-directory-layout{display:grid;grid-template-columns:minmax(0,1.43fr) minmax(310px,1fr);gap:18px;flex:1;min-height:0;align-items:stretch}
+/* Search and friend list share the left column; the profile begins at its top. */
+.fd-directory-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.95fr);gap:16px;flex:1;min-height:0;align-items:stretch}
+.fd-directory-main,.fd-invitation-main{display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0}
+.fd-directory-main>.fd-list-card,.fd-invitation-main>.fd-invitation-list{flex:1;min-height:0}
+.fd-directory-main>.fd-searchbar,.fd-invitation-main>.fd-invitation-tabs{width:100%;min-width:0}
 .fd-card{background:#fff;border:1px solid var(--fd-border);border-radius:17px;min-width:0;box-shadow:0 5px 25px #1d336408}
 .fd-list-card{padding:17px 15px 18px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .fd-list-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:1px 11px 11px}
@@ -116,7 +120,8 @@
 .fd-invitation-tabs [role=tab].active{background:transparent;color:#2563eb;font-weight:800}
 .fd-invitation-tabs .invitation-active-pill{background:#ebf0ff;border-radius:11px}
 .fd-invitation-tabs>small{font-size:12px;color:#8091b0;white-space:nowrap}
-.fd-invitation-layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(290px,1fr);gap:17px;flex:1;min-height:0}
+/* Tabs and invitation list are the same width; QR starts beside the tabs. */
+.fd-invitation-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.95fr);gap:16px;flex:1;min-height:0;align-items:stretch}
 .fd-invitation-list{padding:25px 16px;display:flex;flex-direction:column;min-height:0;overflow:auto}
 .fd-invitation-heading{padding:0 6px 20px}
 .fd-invitation-heading h2{font-size:19px}
@@ -158,8 +163,15 @@
 .fd-scan-feature p{font-size:12px;color:#7d8eac;max-width:300px}
 @media(min-width:761px) and (max-width:1120px){
  .friends-design-v2{padding:16px;gap:14px}
- .fd-directory-layout{grid-template-columns:minmax(0,1.2fr) minmax(245px,1fr);gap:12px}
- .fd-invitation-layout{grid-template-columns:minmax(0,1.4fr) minmax(245px,1fr);gap:12px}
+ .fd-directory-layout,.fd-invitation-layout{grid-template-columns:minmax(0,1.25fr) minmax(245px,.95fr);gap:12px}
+ .fd-directory-main,.fd-invitation-main{gap:12px}
+ .fd-directory-main .fd-searchbar{min-height:70px;padding:10px;gap:8px}
+ .fd-directory-main .fd-searchbar>label{gap:8px}
+ .fd-directory-main .fd-add-new{min-width:0;padding:8px 10px;font-size:11px}
+ .fd-invitation-main .fd-invitation-tabs{flex-wrap:wrap;gap:6px;padding:9px}
+ .fd-invitation-main .fd-invitation-tabs>div{min-width:0;flex:1;overflow-x:auto;scrollbar-width:thin}
+ .fd-invitation-main .fd-invitation-tabs [role=tab]{padding:8px 10px}
+ .fd-invitation-main .fd-invitation-tabs>small{flex-basis:100%;text-align:right;white-space:normal}
  .fd-person-row{padding:7px 6px;gap:5px}
  .fd-person-identity{gap:9px}
  .fd-avatar{width:43px!important;height:43px!important;flex-basis:43px}
@@ -179,7 +191,8 @@
    display:flex;flex:0 0 auto;flex-direction:column;align-items:stretch;
    width:100%;height:auto;min-height:0;gap:12px;
  }
- .fd-directory-layout>.fd-card,.fd-invitation-layout>.fd-card{
+ .fd-directory-main,.fd-invitation-main{flex:0 0 auto;height:auto;min-height:0;width:100%}
+ .fd-directory-main>.fd-card,.fd-invitation-main>.fd-card,.fd-invitation-layout>.fd-card{
    flex:0 0 auto;height:auto;min-height:0;
  }
  .fd-list-card,.fd-invitation-list{max-height:none;min-height:0;overflow:visible}

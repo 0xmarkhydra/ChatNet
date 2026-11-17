@@ -179,6 +179,8 @@ export default function ContactsView({
 
   return <div className={'friends-design-v2' + (embeddedInCalls ? ' is-call-directory' : '')} aria-label={screen === 'directory' ? 'Danh bạ' : 'Lời mời kết bạn'}>
     {screen === 'directory' ? <>
+      <div className={'fd-directory-layout' + (embeddedInCalls ? ' fd-list-only' : '')}>
+        <div className="fd-directory-main">
       {!embeddedInCalls && <section className="fd-searchbar">
         <label><Search size={22} aria-hidden="true"/>
           <input ref={searchRef} type="search" value={friendQuery} onChange={event => setFriendQuery(event.target.value)}
@@ -187,7 +189,6 @@ export default function ContactsView({
         </label>
         <button type="button" className="fd-primary fd-add-new" onClick={enterInvitations} title="Kết bạn mới"><Plus size={18}/>Kết bạn mới</button>
       </section>}
-      <div className={'fd-directory-layout' + (embeddedInCalls ? ' fd-list-only' : '')}>
         <section className="fd-card fd-list-card">
           {searching ? <>
             <div className="fd-list-header"><div><h2>Kết quả tìm kiếm</h2><p>Tìm người dùng theo tên, username hoặc email</p></div>
@@ -249,6 +250,7 @@ export default function ContactsView({
             </div>
           </>}
         </section>
+        </div>
         {!embeddedInCalls && <section className="fd-card fd-profile-panel" aria-label="Thông tin bạn bè">
           {selectedFriend && !searching ? profileDetails(selectedFriend) : <div className="fd-empty fd-profile-placeholder"><Users size={38}/>
             <h2>{searching ? 'Kết nối bạn bè' : 'Chưa chọn bạn bè'}</h2><p>{searching ? 'Chọn một kết quả tìm kiếm để xem hồ sơ.' : 'Kết bạn mới để xem thông tin ở đây.'}</p></div>}
