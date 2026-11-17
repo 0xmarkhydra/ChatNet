@@ -204,9 +204,12 @@ try {
           await page.goto(origin)
           const avatarRail = page.locator('.conversation-avatar-rail')
           await avatarRail.waitFor({ state: 'visible' })
-          await avatarRail.locator('.conversation-avatar-rail-item').first().click()
-          const composer = page.locator('.social-chat-layout.mobile-rail-chat-view .media-composer')
+          await avatarRail.getByRole('button', { name: /Mở cuộc trò chuyện Linh Anh/ }).click()
+          const composer = page.locator('.social-chat-layout.mobile-rail-chat-view > .conversation-panel .media-composer')
           await composer.waitFor({ state: 'visible' })
+          await composer.locator('.attach-button').waitFor({ state: 'visible' })
+          await composer.locator('.chat-composer-image').waitFor({ state: 'visible' })
+          await composer.locator('.voice-record-trigger').waitFor({ state: 'visible' })
           assert.equal(await bottom.isVisible(), false,
             'Opening a message thread must still hide the bottom navigation')
           const actionButtons = await composer.evaluate(form =>
