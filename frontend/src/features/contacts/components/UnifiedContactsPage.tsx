@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { BookUser, Clock3, Languages, PhoneCall, Search, UserRoundPlus, Users, UsersRound, X } from 'lucide-react'
 import type { Conversation } from '../../chat'
 import type { FriendConnection } from '../types'
-import CallCenter from '../../calls/components/CallCenter'
+import { CallCenter } from '../../calls'
 import ContactCallConversationSection from './ContactCallConversationSection'
 import '../styles/unified-contacts.css'
 

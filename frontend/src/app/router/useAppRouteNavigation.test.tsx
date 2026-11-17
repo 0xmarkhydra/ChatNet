@@ -81,19 +81,19 @@ describe("URL-owned app navigation", () => {
 
   it("maps contacts pages and preserves embedded Calls directory", () => {
     const contacts = mount("/contacts");
-    expect(contacts.read("contact")).toBe("overview");
+    expect(contacts.read("contact")).toBe("directory");
     contacts.click("Invitations");
     expect(contacts.read("path")).toBe("/contacts/requests");
     expect(contacts.read("contact")).toBe("invitations");
     contacts.click("Directory");
-    expect(contacts.read("path")).toBe("/contacts/directory");
+    expect(contacts.read("path")).toBe("/contacts");
     expect(contacts.read("contact")).toBe("directory");
     contacts.click("Overview");
-    expect(contacts.read("path")).toBe("/contacts");
+    expect(contacts.read("path")).toBe("/contacts/overview");
     expect(contacts.read("contact")).toBe("overview");
-    const calls = mount("/calls/translation");
+    const calls = mount("/contacts/translation");
     calls.click("Directory");
-    expect(calls.read("path")).toBe("/calls/translation");
+    expect(calls.read("path")).toBe("/contacts");
     calls.click("Invitations");
     expect(calls.read("path")).toBe("/contacts/requests");
   });

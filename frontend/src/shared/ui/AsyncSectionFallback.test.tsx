@@ -24,6 +24,9 @@ it('announces loading without exposing recovery controls before loading finishes
   expect(status?.getAttribute('aria-busy')).toBe('true')
   expect(status?.textContent).toContain('Đang tải bảng tin')
   expect(host.querySelector('button')).toBeNull()
+  const skeleton = status?.querySelector('[data-slot="loading-skeleton"]')
+  expect(skeleton?.getAttribute('aria-hidden')).toBe('true')
+  expect(skeleton?.querySelectorAll('.motion-reduce\\:animate-none')).toHaveLength(3)
   await act(async () => root.unmount())
 })
 
@@ -40,11 +43,13 @@ it('renders accessible recovery controls with mobile-friendly targets', async ()
   const alert = host.querySelector('[role="alert"]')
   expect(alert?.getAttribute('aria-busy')).toBe('false')
   expect(alert?.textContent).toContain('Không thể hiển thị thông báo')
+  expect(host.querySelector('[data-slot="loading-skeleton"]')).toBeNull()
   const controls = Array.from(host.querySelectorAll('button'))
   expect(controls.map(button => button.textContent)).toEqual(['Thử lại', 'Tải lại trang'])
   for (const button of controls) {
     expect(button.classList.contains('min-h-11')).toBe(true)
-    expect(button.classList.contains('focus-visible:outline-ring')).toBe(true)
+    expect(button.dataset.slot).toBe('button')
+    expect(button.classList.contains('focus-visible:ring-ring')).toBe(true)
     expect(button.type).toBe('button')
   }
 

@@ -92,7 +92,7 @@ describe("app route tree", () => {
       ["Bài viết 42", "/feed/posts/42"],
       ["Hội thoại 123", "/chat/123"],
       ["Thiết bị", "/settings/devices"],
-      ["Dịch AI", "/calls/translation"],
+      ["Dịch AI", "/contacts/translation"],
       ["Hồ sơ Alice", "/users/alice"],
       ["Bảng tin", "/feed"],
     ]) {
@@ -211,11 +211,21 @@ describe("app route tree", () => {
   });
 
   it("supports call workspace subroutes and rejects unknown call screens", () => {
-    for (const path of ["/calls", "/calls/history", "/calls/directory", "/calls/translation"]) {
+    for (const [legacy, canonical] of [
+      ["/calls", "/contacts/calls"],
+      ["/calls/history", "/contacts/calls"],
+      ["/calls/directory", "/contacts"],
+      ["/calls/translation", "/contacts/translation"],
+    ]) {
+      const app = renderAt(legacy);
+      expect(app.location()).toBe(canonical);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    for (const path of ["/contacts/calls", "/contacts/translation"]) {
       const app = renderAt(path);
       expect(app.location()).toBe(path);
       expect(app.page()?.textContent).toBe("Current screen");
-      expect(app.onMount).toHaveBeenCalledTimes(1);
     }
     const invalid = renderAt("/calls/unknown");
     expect(invalid.page()).toBeNull();
@@ -252,7 +262,7 @@ describe("app route tree", () => {
       ["/profile/broken", "Về Hồ sơ", "/profile"],
       ["/users/alice/more", "Về Hồ sơ", "/profile"],
       ["/settings/broken", "Về Cài đặt", "/settings"],
-      ["/calls/broken", "Về Cuộc gọi", "/calls"],
+      ["/calls/broken", "Về Cuộc gọi", "/contacts/calls"],
       ["/contacts/broken", "Về Danh bạ", "/contacts"],
       ["/unknown", "Về Tin nhắn", "/chat"],
     ];

@@ -42,6 +42,8 @@
     "check:chat-copy-image-proxy": "node --experimental-strip-types scripts/chat-copy-image-proxy-check.mjs",
     "check:voice": "node --experimental-strip-types scripts/voice-media-check.mjs",
     "check:ui": "node scripts/run-ui-layout.mjs",
+    "check:chat-rail-responsive": "node scripts/check-responsive-chat-shell.mjs",
+    "check:unified-contacts-layout": "node scripts/unified-contacts-layout-check.mjs",
     "check:social-ui": "node scripts/check-social-ui.mjs",
     "check:smart-composer": "node scripts/check-social-ui.mjs --smart-composer-only",
     "check:friends-redesign": "node scripts/check-friends-redesign.mjs",
