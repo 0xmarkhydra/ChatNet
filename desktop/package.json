@@ -7,13 +7,13 @@
   "main": "src/main.cjs",
   "scripts": {
     "dev:web": "npm --prefix ../frontend run dev -- --host 127.0.0.1 --mode desktop",
-    "dev": "electron . --dev",
+    "dev": "node scripts/build-screenshot-helper.cjs && electron . --dev",
     "build:web": "npm --prefix ../frontend run build:desktop",
-    "build": "npm run build:web && electron-builder --dir --publish never",
+    "build": "node scripts/build-screenshot-helper.cjs && npm run build:web && electron-builder --dir --publish never",
     "dist:mac": "npm run build:web && electron-builder --mac --arm64 --x64 --config.forceCodeSigning=true --publish never",
-    "dist:win": "npm run build:web && electron-builder --win --x64 --config.forceCodeSigning=true --publish never",
+    "dist:win": "node scripts/build-screenshot-helper.cjs && npm run build:web && electron-builder --win --x64 --config.forceCodeSigning=true --publish never",
     "dist:internal:mac": "npm run build:web && electron-builder --mac --arm64 --x64 --publish never",
-    "dist:internal:win": "npm run build:web && electron-builder --win --x64 --publish never",
+    "dist:internal:win": "node scripts/build-screenshot-helper.cjs && npm run build:web && electron-builder --win --x64 --publish never",
     "manifest:internal": "node scripts/artifact-manifest.cjs",
     "test": "node --test test/*.test.cjs",
     "check": "npm run test && npm run build:web"
@@ -28,19 +28,48 @@
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "icon": "assets/icon.png",
     "asar": true,
-    "directories": { "output": "release" },
-    "files": ["src/**/*", "dist/renderer/**/*", "package.json", "!**/*.test.*", "!**/*.map"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "dist/renderer/**/*",
+      "package.json",
+      "!**/*.test.*",
+      "!**/*.map"
+    ],
     "mac": {
       "category": "public.app-category.social-networking",
       "minimumSystemVersion": "13.0.0",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "hardenedRuntime": true,
       "extendInfo": {
         "NSMicrophoneUsageDescription": "SocCO sử dụng microphone khi bạn gọi thoại/video hoặc ghi tin nhắn thoại.",
         "NSCameraUsageDescription": "SocCO sử dụng camera khi bạn gọi video hoặc quét mã QR."
       }
     },
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "extraResources": [
+        {
+          "from": "native/build",
+          "to": "native",
+          "filter": [
+            "soco-screenshot.exe"
+          ]
+        }
+      ]
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,

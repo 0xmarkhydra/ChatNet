@@ -40,6 +40,12 @@ Follow `docs/engineering/AGENT_FILE_OWNERSHIP.md` before changing files while ot
 - Prefer lazy-loading genuinely heavy routes or features only after identifying a measured bundle or UX problem. No automatic dependency additions (router, query/cache, state manager, form library) just to follow trends.
 - Keep render and API responsibilities separate but avoid unnecessary `useMemo`, `useCallback`, providers and abstractions.
 
+## UI design skills and conflict precedence
+
+For UI design, UI implementation, responsive fixes and visual review, follow [UI skill orchestration](UI_SKILL_ORCHESTRATION.md) in addition to this standard. The vendored `ui-ux-pro-max` skill is a **read-only design/UX advisory**, not an alternative design authority or automatic theme generator. Approved SocCo tokens, existing shadcn/Tailwind source, Penpot references and `ios-inspired-ui-design` keep precedence. Never apply externally generated colors/fonts, install packages, or rewrite CSS resets without explicit review.
+
+When present and approved, `socco-ui-fidelity` and `docs/DESIGN.md` add screen-specific visual checks. These currently may be pending integration in another agent's worktree; do not overwrite that uncommitted work. Review responsive and accessibility evidence, and report when Python-based UI UX Pro Max search is unavailable rather than claiming it ran.
+
 ## Shared UI and design system
 
 - New reusable controls belong in `frontend/src/shared/ui/`, with feature logic staying in the owning feature. Check for an existing shared control before adding another variant.

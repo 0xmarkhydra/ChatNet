@@ -78,3 +78,5 @@ export type GroupMember = {
 }
 
 export type NewChatMode = 'none' | 'friends' | 'direct' | 'group'
+
+export type ConversationEncryptionMode = 'legacy' | 'pending' | 'e2ee'
