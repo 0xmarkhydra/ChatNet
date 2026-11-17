@@ -7,9 +7,9 @@ contextBridge.exposeInMainWorld('socoDesktop', Object.freeze({
   getPlatformInfo: () => ipcRenderer.invoke('soco:platform-info'),
   openExternal: (url) => ipcRenderer.invoke('soco:open-external', url),
   notifications: Object.freeze({
+    preview: (sessionId) => ipcRenderer.invoke('soco:notification:preview', sessionId),
     sync: (input) => ipcRenderer.invoke('soco:notification:sync', input),
     show: (input) => ipcRenderer.invoke('soco:notification:show', input),
-    preview: (sessionId) => ipcRenderer.invoke('soco:notification:preview', sessionId),
     clear: (sessionId) => ipcRenderer.invoke('soco:notification:clear', sessionId),
     dismiss: (input) => ipcRenderer.invoke('soco:notification:dismiss', input),
     onClicked: (callback) => {
@@ -32,6 +32,20 @@ contextBridge.exposeInMainWorld('socoDesktop', Object.freeze({
       return () => ipcRenderer.removeListener('soco:screen:picker', listener)
     },
   }),
+  screenshot: process.platform === 'win32' ? Object.freeze({
+    capture: (mode) => {
+      if (mode !== 'include' && mode !== 'exclude') throw new TypeError('SCREENSHOT_INVALID_MODE')
+      return ipcRenderer.invoke('soco:screenshot:capture', mode)
+    },
+    onShortcut: (callback) => {
+      if (typeof callback !== 'function') throw new TypeError('Callback required')
+      const listener = (_event, mode) => {
+        if (mode === 'include' || mode === 'exclude') callback(mode)
+      }
+      ipcRenderer.on('soco:screenshot:shortcut', listener)
+      return () => ipcRenderer.removeListener('soco:screenshot:shortcut', listener)
+    },
+  }) : undefined,
   auth: Object.freeze({
     restore: () => ipcRenderer.invoke('soco:auth:restore'),
     verifyEmail: (input) => ipcRenderer.invoke('soco:auth:verify-email', input),

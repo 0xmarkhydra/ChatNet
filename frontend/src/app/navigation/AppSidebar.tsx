@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
-import { Bell, Bookmark, Compass, MessageCircle, Newspaper, Settings, ShoppingBag, BookUser } from 'lucide-react'
+import { Bell, Bookmark, BookUser, Compass, MessageCircle, Newspaper, Scan, Settings, ShoppingBag } from 'lucide-react'
 import type { Tab } from '../../shared/types/navigation'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import { Button } from '../../shared/ui/button'
@@ -17,11 +17,13 @@ type Props = {
   onNavigate: (tab: Tab) => void
   onSaved: () => void
   onSettings: () => void
+  onScreenshot?: () => void
+  screenshotBusy?: boolean
 }
 
 export default function AppSidebar({
   tab, section, username, displayName, unreadTotal, notificationCount, feedSaved, settingsActive,
-  onNavigate, onSaved, onSettings,
+  onNavigate, onSaved, onSettings, onScreenshot, screenshotBusy,
 }: Props) {
   const activeKey = `${tab}:${section ?? ''}:${feedSaved}:${settingsActive}`
   const navRef = useRef<HTMLElement>(null)
@@ -119,7 +121,22 @@ export default function AppSidebar({
           </Button>
         ))}
       </nav>
-      <div className="app-sidebar-secondary">
+      <div className="app-sidebar-secondary" role="group" aria-label="Tiện ích">
+      {onScreenshot && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="app-sidebar-link justify-start"
+          aria-label="Chụp màn hình không kèm cửa sổ SocCO"
+          aria-keyshortcuts="Control+Alt+A"
+          title="Chụp màn hình không kèm cửa sổ SocCO (Ctrl+Alt+A)"
+          disabled={screenshotBusy}
+          onClick={onScreenshot}
+        >
+          <Scan size={22} strokeWidth={1.8} aria-hidden="true" />
+          <span>Chụp màn hình</span>
+        </Button>
+      )}
         <Button variant="ghost" className={cn('app-sidebar-link justify-start', tab === 'notifications' && 'is-active')} aria-label="Thông báo" aria-current={tab === 'notifications' ? 'page' : undefined} onClick={() => onNavigate('notifications')}>
           <Bell size={22} strokeWidth={1.8} aria-hidden="true" /><span>Thông báo</span>
           {notificationCount > 0 && <b className="app-sidebar-count">{notificationCount > 99 ? '99+' : notificationCount}</b>}
