@@ -37,7 +37,13 @@ import './styles/form-surfaces.css'
 import './features/settings/styles/settings-workspace.css'
 import './features/auth/styles/auth-screen.css'
 import './styles/adaptive-pwa.css'
+import './features/chat/styles/mobile-chat-control-consistency.css'
+import './features/chat/styles/desktop-mutual-split.css'
+import './features/chat/styles/split-motion-polish.css'
 import './features/feed/styles/story-viewer.css'
+import './features/chat/styles/rail-header-compact-actions.css'
+import './features/chat/styles/rail-names-stable.css'
+import './features/chat/styles/conversation-rail-menu.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)

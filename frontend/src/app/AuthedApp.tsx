@@ -133,7 +133,6 @@ import SocialFeedSidebar from "../features/feed/components/SocialFeedSidebar";
 import SocialFeedStories from "../features/feed/components/SocialFeedStories";
 import StoryComposer from "../features/feed/components/StoryComposer";
 import { parsePostExtras, composePostContent } from "../features/feed/utils/postExtras";
-import PostCommentsPage from "../features/feed/components/PostCommentsPage";
 import CommunicationHub from "../features/chat/components/CommunicationHub";
 import CallCenter from "../features/calls/components/CallCenter";
 import type { GroupWorkspaceMode } from "../features/chat/components/CommunityGroupsPage";
@@ -145,6 +144,7 @@ import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
 import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
 import ContactsView from "../features/contacts/components/ContactsView";
+import UnifiedContactsPage from "../features/contacts/components/UnifiedContactsPage";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
@@ -278,6 +278,7 @@ import HeaderTitle from "./header/HeaderTitle";
 import { searchLabels } from "./header/headerContext";
 import NotificationsSection from "../features/notifications/components/NotificationsSection";
 import DiscoverSection from "../features/discover/components/DiscoverSection";
+import SearchResultsPage from "../features/search/SearchResultsPage";
 import MarketSection from "../features/discover/components/MarketSection";
 import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
@@ -285,7 +286,6 @@ import FeedPostDetail from "../features/feed/components/FeedPostDetail";
 import FeedSection from "../features/feed/components/FeedSection";
 import ConversationActionDialog from "../features/chat/components/ConversationActionDialog";
 import MessageActionDialog from "../features/chat/components/MessageActionDialog";
-import PostDetailOverlay from "../features/feed/components/PostDetailOverlay";
 import StoryOverlay from "../features/feed/components/StoryOverlay";
 import ProfileOverviewSection from "../features/profile/components/ProfileOverviewSection";
 import ProfileSection from "../features/profile/components/ProfileSection";
@@ -376,14 +376,16 @@ export default function AuthedApp({
 
 
   const routeLocation = useLocation();
+  const isSearchResultsRoute = routeLocation.pathname === "/search";
   const navigate = useNavigate();
   const {
     tab, setTab, contactsScreen, setContactsScreen,
     desktopProfileSettings, setDesktopProfileSettings,
     visitorUsername, openVisitorProfile, closeVisitor,
   } = useAppRouteNavigation();
-  const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedScrollBeforeComments, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraft, storyBusy, storyDraft } = useFeedUiState({ tab });
+  const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraft, storyBusy, storyDraft } = useFeedUiState({ tab });
 
+  const [inlineCommentsId, setInlineCommentsId] = useScopedState<number | null>(tab, null);
   const tabRef = useLatest(tab);
   const [globalSearch, setGlobalSearch] = useState("");
   const [chatListQuery, setChatListQuery] = useState('');
@@ -461,6 +463,7 @@ export default function AuthedApp({
   const [forwardSource, setForwardSource] = useScopedState<Message | null>(session?.sessionId ?? null, null);
   const [reactionTarget, setReactionTarget] = useScopedState<{
     kind: "message" | "post"; id: number; initialEmoji?: string;
+    portalContainer?: HTMLElement;
     reactions?: { emoji: string; count: number }[];
   } | null>(session?.sessionId ?? null, null);
   const messageChanges = useRef(new Set<number>());
@@ -839,7 +842,6 @@ export default function AuthedApp({
     request: apiFetch,
     setTab,
     setPosts,
-    setActivePostId,
     onError: message => setNotice(message, "error"),
   });
 
@@ -898,6 +900,9 @@ export default function AuthedApp({
     hasMoreMessages,
     setHasMoreMessages,
     messagesLoadingMore,
+    messageHistoryLoading,
+    messageHistoryError,
+    retryMessageHistory,
     setMessagesLoadingMore,
     messageGapBefore,
     messageGapLoading,
@@ -1194,12 +1199,11 @@ export default function AuthedApp({
       : message,
   );
   const visibleProfilePosts = applyPostLikePreviews(profilePosts, likePreviews);
-  // Route is authoritative for Feed details, including synchronous browser Back/Forward.
-  // Local selection state may briefly lag behind history navigation.
+  // Shared links are routed, while opening a card in the feed is local UI state.
   const feedRoutePostId = feedPostIdFromPath(routeLocation.pathname)
     ?? Number(new URLSearchParams(routeLocation.search).get("post"));
-  const visibleActivePostId = tab === "feed"
-    ? (Number.isSafeInteger(feedRoutePostId) && feedRoutePostId > 0 ? feedRoutePostId : null)
+  const visibleActivePostId = tab === "feed" && Number.isSafeInteger(feedRoutePostId) && feedRoutePostId > 0
+    ? feedRoutePostId
     : activePostId;
   const activePost = visibleActivePostId
     ? [
@@ -1256,10 +1260,10 @@ export default function AuthedApp({
   const { createPost, draftBeforeEdit, editingPost, openEditPost, postAttachments, postBackground, postEditBusy, postFeelingId, postTaggedFriends, postText, postVisibility, restoreDraftAfterEdit, setEditingPost, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostTaggedFriends, setPostText, setPostVisibility, setShowPostBackgrounds, showPostBackgrounds } = usePostComposer({ actionLocks, feedCheckInLocation, feedCheckInOpen, feedRevisionRef: feedRevision, friends, mediaUploading, name, pendingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setPendingPost, setPosts, setPostSubmitError, setProfileComposerOpen, setProfilePosts, syncFeedPost, tab });
   const { like } = usePostReactions({ actionLocks, feedRevisionRef: feedRevision, followingFeed, postSearch, refreshPosts, setLikePreviews, setPosts, setProfilePosts, setSavedPosts });
   const { addComment, manageFeedComment, reportFeedComment } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
-  const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ feedScrollBeforeComments, feedViewRef, isProfileDesktop, setActivePostId, tab });
+  const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ setActivePostId });
 
   const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
-  const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setMessages, setReplyingTo });
+  const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setReplyingTo });
   const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
   const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
 
@@ -1289,7 +1293,9 @@ export default function AuthedApp({
     activeConversationIdRef.current = activeConversationId;
     messageScrollAtBottom.current = true;
     cancelMessageLongPress();
-    setMessages([]);
+    // useMessageData owns room-specific clearing and its recently-visited
+    // cache. A second reset here caused an unnecessary blank render between
+    // PWA conversation selections.
     setHasMoreMessages(false);
     setMessagesLoadingMore(false);
     messagesPagingBusy.current = false;
@@ -1821,18 +1827,25 @@ export default function AuthedApp({
     }
   }, [session?.token, tab, desktopSection, newChatMode, chatFriend?.id]);
 
+  const friendSearchSessionRef = useRef(session?.sessionId);
   useEffect(() => {
     const friendSurfaceOpen = newChatMode === "friends" || tab === "contacts";
-    if (!session?.token || !friendSurfaceOpen) {
+    if (friendSearchSessionRef.current !== session?.sessionId) {
+      friendSearchSessionRef.current = session?.sessionId;
+      setFriendResults([]);
+    }
+    if (!session?.token) {
       setFriendResults([]);
       setFriendSearching(false);
       setFriendSearchError(false);
       return;
     }
+    if (!friendSurfaceOpen) return;
 
     const controller = new AbortController();
     const query = friendQuery.trim();
-    setFriendResults([]);
+    // Keep the last successful suggestions visible while refreshing in the background.
+    if (query) setFriendResults([]);
     setFriendSearching(true);
     setFriendSearchError(false);
 
@@ -1847,7 +1860,7 @@ export default function AuthedApp({
         })
         .catch(() => {
           if (!controller.signal.aborted) {
-            setFriendResults([]);
+            // Retain last-known suggestions on a transient network failure.
             setFriendSearchError(true);
           }
         })
@@ -1882,10 +1895,11 @@ export default function AuthedApp({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, tab, desktopSection]);
+  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, session?.sessionId, tab, desktopSection]);
 
   function purgeConversation(id: number) {
     responseCache.current.invalidate(["conversations", "messages"]);
+    window.dispatchEvent(new CustomEvent("chatnet:message-history-cleared", { detail: { conversationId: id } }));
     revokedConversationIds.current.add(id);
     membershipSnapshot.current?.delete(id);
     membershipEventSequence.current += 1;
@@ -1898,7 +1912,6 @@ export default function AuthedApp({
     if (activeConversationIdRef.current === id) {
       activeConversationIdRef.current = null;
       setActiveConversationId(null);
-      setMessages([]);
       setHasMoreMessages(false);
       setGroupMembers([]);
       setGroupSettingsOpen(false);
@@ -2046,7 +2059,6 @@ export default function AuthedApp({
         conversation,
         ...current.filter((item) => item.id !== conversation.id),
       ]);
-      if (activeConversationIdRef.current !== conversation.id) setMessages([]);
       switchTab("chat");
       selectRoutedConversation(conversation.id);
     },
@@ -2264,8 +2276,14 @@ export default function AuthedApp({
               (!membershipSnapshot.current ||
                 membershipSnapshot.current.has(item.id)),
           );
-  // Search uses the backend's authorized, accent-insensitive full-history query.
-  // Keep the normal paginated list intact when the search is cleared.
+  // Avatar-rail search matches conversation NAMES only (including custom
+  // contact nicknames). The server's q query may also return message-body
+  // matches, so explicitly discard those rather than showing unrelated chats.
+  // Normalize Vietnamese accents so "Linh" can match "Lĩnh", etc.
+  const normalizeChatName = (value: string) => value
+    .toLocaleLowerCase('vi-VN').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+  const chatNameKeyword = normalizeChatName(chatListQuery.trim())
   const chatListConversations = conversationListSearch.active
     ? conversationListSearch.items
         .filter((conversation) => !revokedConversationIds.current.has(conversation.id))
@@ -2275,6 +2293,7 @@ export default function AuthedApp({
             ? contactMetadata[conversation.otherUserId]?.nickname || conversation.name
             : conversation.name,
         }))
+        .filter(conversation => normalizeChatName(conversation.name).includes(chatNameKeyword))
     : visibleConversations.filter((conversation) => {
         if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
         if (chatListFilter === 'groups' && conversation.type !== 'group') return false
@@ -2376,7 +2395,6 @@ export default function AuthedApp({
       setPosts(current => [post, ...current.filter(item => item.id !== post.id)]);
       setFeedCommunitiesOpen(false);
       setTab("feed");
-      setActivePostId(post.id);
       navigate(feedPostPath(post.id), { state: { postId: post.id } });
       void readPostMention(mention.id);
     } catch (error) {
@@ -2396,7 +2414,6 @@ export default function AuthedApp({
     }
     if (activePostId !== null) {
       setActivePostId(null);
-      feedScrollBeforeComments.current = null;
       if (new URLSearchParams(routeLocation.search).has("post")) {
         navigate({ pathname: routeLocation.pathname, search: "" }, { replace: true });
       }
@@ -2482,52 +2499,52 @@ export default function AuthedApp({
     />
   );
 
-  const postDiscussion = activePost ? (
-                    <FeedDiscussion
-                      key={activePost.id}
-                      variant={tab === 'feed' && isProfileDesktop ? 'post-page' : 'default'}
-                      sortOrder={commentSortOrder}
-                      pending={pendingComments[activePost.id]}
-                      comments={activePost.comments || []}
-                      editor={
-                        commentEditors[activePost.id] || {
-                          replyTo: null,
-                          drafts: {},
-                        }
-                      }
-                      updateEditor={(editor) => {
-                        if (
-                          sessionRef.current?.sessionId === session.sessionId
-                        ) {
-                          setCommentEditors((current) => ({
-                            ...current,
-                            [activePost.id]: editor,
-                          }));
-                        }
-                      }}
-                      api={API}
-                      token={session.token}
-                      target={
-                        translationPreferencesLoaded ? targetLanguage : ""
-                      }
-                      submit={(content, parentId) =>
-                        addComment(activePost, content, parentId)
-                      }
-                      currentUser={name}
-                      onEdit={(commentId, content) =>
-                        manageFeedComment(
-                          activePost,
-                          commentId,
-                          "PATCH",
-                          content,
-                        )
-                      }
-                      onDelete={(commentId) =>
-                        manageFeedComment(activePost, commentId, "DELETE")
-                      }
-                      onReport={reportFeedComment}
-                    />
-  ) : null;
+  const renderPostDiscussion = (discussionPost: Post) => (
+    <FeedDiscussion
+      key={discussionPost.id}
+      variant="post-page"
+      sortOrder={commentSortOrder}
+      pending={pendingComments[discussionPost.id]}
+      comments={discussionPost.comments || []}
+      editor={
+        commentEditors[discussionPost.id] || {
+          replyTo: null,
+          drafts: {},
+        }
+      }
+      updateEditor={(editor) => {
+        if (
+          sessionRef.current?.sessionId === session.sessionId
+        ) {
+          setCommentEditors((current) => ({
+            ...current,
+            [discussionPost.id]: editor,
+          }));
+        }
+      }}
+      api={API}
+      token={session.token}
+      target={
+        translationPreferencesLoaded ? targetLanguage : ""
+      }
+      submit={(content, parentId) =>
+        addComment(discussionPost, content, parentId)
+      }
+      currentUser={name}
+      onEdit={(commentId, content) =>
+        manageFeedComment(
+          discussionPost,
+          commentId,
+          "PATCH",
+          content,
+        )
+      }
+      onDelete={(commentId) =>
+        manageFeedComment(discussionPost, commentId, "DELETE")
+      }
+      onReport={reportFeedComment}
+    />
+  );
 
   const renderPosts = (items: Post[], showSave = false) =>
     items.map((post) => (
@@ -2547,6 +2564,8 @@ export default function AuthedApp({
         translationPreferencesLoaded={translationPreferencesLoaded}
         targetLanguage={targetLanguage}
         setActivePostId={openFeedPostDetails}
+        onToggleComments={() => setInlineCommentsId((current) => current === post.id ? null : post.id)}
+        discussion={inlineCommentsId === post.id ? renderPostDiscussion(post) : null}
         showSave={showSave}
         likePreviews={likePreviews}
         like={like}
@@ -2576,9 +2595,14 @@ export default function AuthedApp({
       onOpenBlockedChat={(id) => { void openBlockedFriendConversation(id) }}
       reportContact={reportContact}
       friendRequests={friendRequests}
+      suggestions={friendResults}
+      suggestionsLoading={friendSearching && friendResults.length === 0}
+      suggestionsError={friendSearchError}
+      onRetrySuggestions={() => setFriendSearchRetry(value => value + 1)}
+      onSettings={() => navigate("/settings/privacy")}
       declineFriendRequest={declineFriendRequest}
       friends={friends}
-      friendsLoading={friendSyncBusy}
+      friendsLoading={friendSyncBusy && friendSyncSessionId !== session.sessionId}
       friendsError={friendSyncError}
       onRetryFriends={() => void refreshFriendConnections()}
       contactMetadata={contactMetadata}
@@ -2613,6 +2637,10 @@ export default function AuthedApp({
       expanded={tab === "chat" && conversationSearching && quickSearchOpen}
       controls={tab === "chat" ? "chat-quick-search-results" : undefined}
       onKeyDown={(event) => {
+        if (tab === "discover" && event.key === "Enter") {
+          event.preventDefault();
+          navigate('/search?q=' + encodeURIComponent(globalSearch.trim()))
+        }
         if (tab === "chat" && event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
@@ -2672,11 +2700,6 @@ export default function AuthedApp({
         onNavigate={switchTab}
         onScreenshot={screenshot.captureWithoutWindow}
         screenshotBusy={screenshot.busy}
-        onCalls={() => {
-          switchTab("chat");
-          setDesktopSection("calls");
-          navigate(ROUTE.calls, { replace: true });
-        }}
         onSaved={() => {
           switchTab("feed");
           setFeedFilter("saved");
@@ -2786,13 +2809,14 @@ export default function AuthedApp({
           title={
             <HeaderTitle
               tab={tab}
+              searchResults={isSearchResultsRoute}
               desktopSection={desktopSection}
               translationSettingsOpen={translationSettingsConversationId !== null}
               groupWorkspaceMode={groupWorkspaceMode}
               groupCreateStep={groupCreateStep}
               activeConversationName={activeConversation?.name}
-              contactsDirectory={contactsScreen === "directory"}
-              feedPostOpenOnDesktop={Boolean(isProfileDesktop && activePost)}
+              contactsDirectory={contactsScreen !== "invitations"}
+              contactsOverview={contactsScreen === "overview"}
               profileSettings={desktopProfileSettings}
               profileDesktop={isProfileDesktop}
               profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
@@ -3045,6 +3069,9 @@ export default function AuthedApp({
           messageSearchOpen={messageSearchOpen}
           messageSending={messageSending}
           messagesLoadingMore={messagesLoadingMore}
+          messageHistoryLoading={messageHistoryLoading}
+          messageHistoryError={messageHistoryError}
+          retryMessageHistory={retryMessageHistory}
           messagesScrollRef={messagesScrollRef}
           messageText={messageText}
           moveConversationLongPress={moveConversationLongPress}
@@ -3186,9 +3213,31 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "contacts" && contactsContent}
+        {tab === "contacts" && <UnifiedContactsPage
+          contactsContent={contactsContent}
+          conversations={displayConversations}
+          friends={friends}
+          incomingRequests={friendRequests.filter(friend => friend.direction === "incoming").length}
+          request={apiFetch}
+          userId={session.user.id}
+          token={session.token}
+          targetLanguage={targetLanguage}
+          friendQuery={friendQuery}
+          setFriendQuery={setFriendQuery}
+          onOpenChat={(id) => { switchTab("chat"); selectRoutedConversation(id); }}
+          onNavigate={switchTab}
+        />}
 
-        {tab === "discover" && (
+        {isSearchResultsRoute && (
+          <SearchResultsPage
+            request={apiFetch}
+            sessionId={session.sessionId}
+            onOpenProfile={username => openVisitorProfile(username)}
+            onOpenPost={postId => navigate(feedPostPath(postId))}
+          />
+        )}
+
+        {tab === "discover" && !isSearchResultsRoute && (
           <DiscoverSection
           actOnFriend={actOnFriend}
           findNearby={findNearby}
@@ -3216,7 +3265,7 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "feed" && isProfileDesktop && activePost && (
+        {activePost && (
           <FeedPostDetail
           activePost={activePost}
           apiFetch={apiFetch}
@@ -3225,11 +3274,11 @@ export default function AuthedApp({
           friendTaggedNames={friendTaggedNames}
           like={like}
           likePreviews={likePreviews}
-          onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
+          onReactionUsers={(post, portalContainer) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions, portalContainer})}
           name={name}
           openEditPost={openEditPost}
           openVisitor={openVisitor}
-          postDiscussion={postDiscussion}
+          postDiscussion={renderPostDiscussion(activePost)}
           profileMedia={profileMedia}
           removeFeedPost={removeFeedPost}
           session={session}
@@ -3241,7 +3290,7 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "feed" && (!isProfileDesktop || !activePost || feedCommunitiesOpen) && (
+        {tab === "feed" && (
           <FeedSection
           activePostId={activePostId}
           activeStoryId={activeStoryId}
@@ -3290,7 +3339,6 @@ export default function AuthedApp({
           setFeedCommunitiesOpen={setFeedCommunitiesOpen}
           setFeedComposerOpen={setFeedComposerOpen}
           setFeedFilter={setFeedFilter}
-          setGlobalSearch={setGlobalSearch}
           setPosts={setPosts}
           setSavedPosts={setSavedPosts}
           setSearchHasScrolled={setSearchHasScrolled}
@@ -3339,20 +3387,6 @@ export default function AuthedApp({
           toggleMessagePin={toggleMessagePin}
           toggleReaction={toggleReaction}
           translateMessage={translateMessage}
-        />
-        )}
-
-        {activePost && !(tab === "feed" && isProfileDesktop) && (
-          <PostDetailOverlay
-          activePost={activePost}
-          like={like}
-          likePreviews={likePreviews}
-          onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
-          postDiscussion={postDiscussion}
-          session={session}
-          onClose={closeFeedPostDetails}
-          targetLanguage={targetLanguage}
-          translationPreferencesLoaded={translationPreferencesLoaded}
         />
         )}
 
@@ -3579,6 +3613,7 @@ export default function AuthedApp({
           kind={reactionTarget.kind}
           id={reactionTarget.id}
           initialEmoji={reactionTarget.initialEmoji}
+          portalContainer={reactionTarget.portalContainer}
           reactions={reactionTarget.reactions}
           request={apiFetch}
           onClose={() => setReactionTarget(null)}
@@ -3616,8 +3651,6 @@ export default function AuthedApp({
         tab={tab}
         t={t}
         switchTab={switchTab}
-        onCalls={() => { switchTab("chat"); setDesktopSection("calls"); navigate(ROUTE.calls, { replace: true }); }}
-        callsActive={tab === "chat" && desktopSection === "calls"}
         unreadTotal={unreadTotal}
         pushEnabled={pushEnabled}
       />

@@ -49,7 +49,7 @@ export default function ConversationHeader({ activeConversation, changeAutoTrans
                                     setGroupMemberViewOpen(true)
                                   }}>
                                   <Users size={15} aria-hidden="true" />
-                                  <span>{activeConversation.name} · {activeConversation.memberCount} thành viên</span>
+                                  <span>{activeConversation.memberCount} thành viên</span>
                                 </button>
                                 <CategoryAssignment model={conversationCategories}
                                   conversationId={activeConversation.id}

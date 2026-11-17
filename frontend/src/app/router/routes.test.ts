@@ -7,8 +7,13 @@ describe("app URL routing", () => {
       expect(tabFromPath(path)).toBe(tab);
     }
   });
+  it("keeps the global search page under Discover navigation", () => {
+    expect(ROUTE.search).toBe("/search");
+    expect(tabFromPath("/search")).toBe("discover");
+    expect(fallbackPathForRoute("/search/unsupported")).toBe("/discover");
+  });
   it("keeps calls and settings under their parent tabs", () => {
-    expect(tabFromPath(ROUTE.calls)).toBe("chat");
+    expect(tabFromPath(ROUTE.calls)).toBe("contacts");
     expect(tabFromPath(ROUTE.settings)).toBe("profile");
   });
   it("supports root legacy links without treating unknown URLs as a match", () => {
@@ -16,6 +21,10 @@ describe("app URL routing", () => {
     expect(tabFromPath("/", "contacts")).toBe("contacts");
     expect(tabFromPath("/unknown", "feed")).toBe("chat");
     expect(tabFromPath("/", "unknown")).toBe("chat");
+    // These belong to Object.prototype, not to the declared tab registry.
+    for (const inherited of ["__proto__", "constructor", "toString", "hasOwnProperty"]) {
+      expect(tabFromPath("/", inherited)).toBe("chat");
+    }
   });
   it("supports shareable visitor profile URLs and safely rejects malformed paths", () => {
     expect(visitorProfilePath("alice")).toBe("/users/alice");
@@ -44,7 +53,7 @@ describe("app URL routing", () => {
     expect(fallbackPathForRoute("/profile/missing")).toBe("/profile");
     expect(fallbackPathForRoute("/users/missing/extra")).toBe("/profile");
     expect(fallbackPathForRoute("/settings/missing")).toBe("/settings");
-    expect(fallbackPathForRoute("/calls/missing")).toBe("/calls");
+    expect(fallbackPathForRoute("/calls/missing")).toBe("/contacts/calls");
     expect(fallbackPathForRoute("/contacts/missing")).toBe("/contacts");
     expect(fallbackPathForRoute("/discover/missing")).toBe("/discover");
     expect(fallbackPathForRoute("/marketplace/missing")).toBe("/marketplace");

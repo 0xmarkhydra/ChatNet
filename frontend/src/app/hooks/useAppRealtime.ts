@@ -123,6 +123,13 @@ export function useAppRealtime({
     let hasOpened = false
     let hadConnectionError = false
     let lastSSECheckAt = 0
+    let lastFriendPollAt = 0
+    const pollFriendsIfStale = () => {
+      const now = Date.now()
+      if (now - lastFriendPollAt < 60_000) return
+      lastFriendPollAt = now
+      void handlers.current.refreshFriendConnections()
+    }
     const events = new EventSource(
       `${API}/api/events?token=${encodeURIComponent(session.token)}`,
     )
@@ -138,6 +145,7 @@ export function useAppRealtime({
       if (reconnected) window.dispatchEvent(new CustomEvent('chatnet:sse-reconnected', {
         detail: { sessionId: session.sessionId },
       }))
+      lastFriendPollAt = Date.now()
       void handlers.current.refreshFriendConnections()
       void handlers.current.reconcileConversationMemberships()
     }
@@ -386,7 +394,7 @@ export function useAppRealtime({
     const refreshTimer = window.setInterval(() => {
       if (!active || sessionRef.current?.sessionId !== session.sessionId || document.visibilityState !== 'visible') return
       void handlers.current.refreshConversations()
-      void handlers.current.refreshFriendConnections()
+      pollFriendsIfStale()
       handlers.current.refreshCategoryConversations()
     }, 20000)
     const membershipTimer = window.setInterval(() => {
@@ -401,7 +409,7 @@ export function useAppRealtime({
         checkMembership()
         void handlers.current.refreshConversations()
         handlers.current.refreshCategoryConversations()
-        void handlers.current.refreshFriendConnections()
+        pollFriendsIfStale()
       }
     }
     window.addEventListener('online', checkMembership)

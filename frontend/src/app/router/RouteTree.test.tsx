@@ -127,6 +127,17 @@ describe("app route tree", () => {
     expect(page()).not.toBeNull();
   });
 
+  it("rejects prototype-named legacy tabs while preserving non-tab query and redirect context", () => {
+    for (const name of ["__proto__", "constructor", "toString", "hasOwnProperty"]) {
+      const app = renderAt(`/?tab=${name}&post=42#comments`, { context: "legacy" });
+      expect(app.location()).toBe("/chat?post=42");
+      expect(app.hash()).toBe("#comments");
+      expect(app.state()).toBe(JSON.stringify({ context: "legacy" }));
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("preserves legacy deep-link fragment and navigation state through a canonical home redirect", () => {
     const payload = { postId: 42, visitorReturnTo: "/contacts/requests" };
     const app = renderAt("/?tab=feed&post=42#comments", payload);

@@ -47,7 +47,7 @@ describe('group channel creation races', () => {
       setChannelSelection, setGroupChannelState, setGroupChannelBusy,
       setChatSearchJump: vi.fn(), setConversationDetailsOpen: vi.fn(),
       setHasMoreMessages: vi.fn(), setMessageActionId: vi.fn(),
-      setMessageSearchOpen: vi.fn(), setMessages: vi.fn(), setReplyingTo: vi.fn(),
+      setMessageSearchOpen: vi.fn(), setReplyingTo: vi.fn(),
     } as unknown as UseGroupChannelsDeps
     let create!: ReturnType<typeof useGroupChannels>['createGroupChannel']
     const root = createRoot(document.createElement('div'))

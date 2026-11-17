@@ -65,6 +65,10 @@ export function useConversationHistory({
       }
       if (!isCurrent()) return
       responseCache.current.invalidate(['conversations', 'messages'])
+      // A cleared history must never be resurrected from the mobile
+      // recently-visited conversation cache.
+      window.dispatchEvent(new CustomEvent('chatnet:message-history-cleared',
+        { detail: { conversationId: current.id } }))
       if (activeConversationIdRef.current === current.id) {
         setActiveConversationId(null)
         setMessages([])

@@ -65,6 +65,8 @@ let rejectStoryDirect = false
 const storyReplyRequests = []
 const mediaOnly = process.argv.includes('--media-only')
 const headerOnly = process.argv.includes('--header-only')
+const postPreviewOnly = process.argv.includes('--post-preview-only')
+let genericPreviewRequests = 0
 
 
 try {
@@ -86,13 +88,34 @@ try {
   const page = await browser.newPage({ viewport: { width: 1586, height: 992 } })
   const errors = []
   page.on('pageerror', err => errors.push(err.message))
+  if (postPreviewOnly) page.on('console', message => {
+    if (message.type() === 'error') console.error(message.text().slice(0, 1200))
+  })
   await page.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
+  if (postPreviewOnly) {
+    await page.addInitScript(() => {
+      window.EventSource = class extends EventTarget { close() {} }
+    })
+  }
   await page.route('**/mock-upload**', route => route.fulfill({ status: 200, headers: cors, body: '' }))
   await page.route(url => url.pathname.startsWith('/api/'), route => {
     const req = route.request(), path = new URL(req.url()).pathname
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(body) })
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
     if (path === '/api/events') return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: ': connected\n\n' })
+    if (postPreviewOnly && path === '/api/conversations/1/messages' && req.method() === 'GET') {
+      return json(['/feed?tab=feed&post=88', '/feed/posts/88', '/feed/posts/999'].map((link, index) => ({
+        id: 20 + index, conversationId: 1, senderId: 2, sender: 'minhanh',
+        text: 'https://chat.codelocal.cloud' + link, attachments: [],
+        createdAt: '2026-11-06T08:00:00Z', readByUserIds: [],
+      })))
+    }
+    if (postPreviewOnly && path === '/api/posts/999') return route.fulfill({ status: 404, headers: cors })
+    if (postPreviewOnly && path === '/api/conversations/memberships') return json({ ids: [1, 3], nextAfter: null })
+    if (postPreviewOnly && path === '/api/link-preview') {
+      genericPreviewRequests++
+      return json({ url: origin, domain: 'chat.codelocal.cloud', title: 'Generic site banner' })
+    }
     if (path === '/api/feed/moderation/reports') return route.fulfill({ status: 403, contentType: 'application/json', headers: cors, body: JSON.stringify({error: 'forbidden'}) })
     if (path === '/api/conversations/direct' && req.method() === 'POST') {
       if (req.postDataJSON().username !== 'minhanh') return json({})
@@ -135,7 +158,7 @@ try {
         ],
       }], nextBefore: null,
     })
-    if (mediaOnly && /\/api\/conversations\/\d+\/pins$/.test(path)) return json([])
+    if ((mediaOnly || postPreviewOnly) && /\/api\/conversations\/\d+\/pins$/.test(path)) return json([])
     if (path === '/api/conversations') return json(conversations)
     if (path === '/api/conversation-categories') return json([])
     if (path.endsWith('/messages')) return json([])
@@ -265,6 +288,252 @@ try {
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     return json({})
   })
+  if (process.argv.includes('--socco-feed-layout-only')) {
+    await page.goto(origin + '/feed')
+    const headerAccount = page.locator('header.chatnet-appbar').getByRole('button', { name: 'Mở trang cá nhân' })
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 740 })
+      await headerAccount.waitFor({ state: 'visible' })
+      const geometry = await headerAccount.evaluate(button => {
+        const rect = button.getBoundingClientRect()
+        const avatar = button.querySelector('.app-header-avatar').getBoundingClientRect()
+        const initials = button.querySelector('.avatar-initials').getBoundingClientRect()
+        const centerY = (box) => box.top + box.height / 2
+        return { target: rect.width >= 44 && rect.height >= 44 && rect.right <= innerWidth,
+          circle: avatar.width >= 32 && avatar.width === avatar.height,
+          centered: Math.abs(centerY(avatar) - centerY(rect)) < 1 &&
+            Math.abs((avatar.left + avatar.right - rect.left - rect.right) / 2) < 1,
+          initialsFit: initials.left >= avatar.left && initials.right <= avatar.right &&
+            initials.top >= avatar.top && initials.bottom <= avatar.bottom,
+          sameRow: [...button.parentElement.querySelectorAll('button')].every(action =>
+            Math.abs(centerY(action.getBoundingClientRect()) - centerY(rect)) < 1) }
+      })
+      assert(Object.values(geometry).every(Boolean),
+        'Mobile account avatar and header actions should stay centered and tappable at ' + width + 'px: ' + JSON.stringify(geometry))
+    }
+    const launcher = page.locator('.social-feed-launcher-prompt')
+    const dialog = page.getByRole('dialog', { name: 'Tạo bài viết' })
+    const audience = dialog.getByRole('button', { name: 'Ai có thể xem bài viết' })
+    const menu = dialog.getByRole('menu', { name: 'Ai có thể xem bài viết' })
+    for (const viewport of [{ width: 1440, height: 820 }, { width: 320, height: 380 }]) {
+      await page.setViewportSize(viewport)
+      await launcher.click()
+      await audience.press('ArrowDown')
+      const publicOption = menu.getByRole('menuitemradio', { name: 'Công khai' })
+      await publicOption.waitFor()
+      assert(await publicOption.evaluate(button => button === document.activeElement),
+        'Opening the audience menu should focus the selected option')
+      const privateOption = menu.getByRole('menuitemradio', { name: 'Chỉ mình tôi' })
+      const fits = await menu.evaluate(panel => {
+        const area = panel.getBoundingClientRect()
+        return area.left >= 0 && area.right <= innerWidth && area.top >= 0 && area.bottom <= innerHeight
+          && panel.scrollHeight <= panel.clientHeight + 1
+          && [...panel.querySelectorAll('[role="menuitemradio"]')].every(option => {
+            const rect = option.getBoundingClientRect()
+            const topmost = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
+            return rect.top >= area.top && rect.bottom <= area.bottom && option.contains(topmost)
+          })
+      })
+      assert(fits, 'All audience options should fit and be clickable before scrolling at ' + viewport.width + '×' + viewport.height)
+      if (viewport.width === 1440) assert(await dialog.evaluate(node => node.clientWidth >= 650),
+        'Desktop composer should use the widened dialog')
+      await publicOption.press('End')
+      assert(await privateOption.evaluate(button => button === document.activeElement), 'End should reach the last option')
+      await privateOption.press('Escape')
+      assert(await menu.count() === 0 && await audience.evaluate(button => button === document.activeElement),
+        'Escape must close only the audience menu and restore focus')
+      await audience.click()
+      await privateOption.click()
+      assert((await audience.textContent()).includes('Chỉ mình tôi'),
+        'All three options should remain reachable in a short viewport')
+      await audience.click()
+      await publicOption.click()
+      await dialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+    }
+
+    await page.setViewportSize({ width: 1440, height: 820 })
+    const card = page.locator('.feed-post-card').first()
+    const like = card.locator('.feed-like-button')
+    const total = card.locator('.feed-post-likes svg')
+    assert(await total.getAttribute('fill') === 'currentColor' && await like.locator('svg').getAttribute('fill') === 'none',
+      'The total uses a filled heart independently of the outline on an unselected action')
+    await Promise.all([
+      page.waitForResponse(response => response.url().endsWith('/api/posts/88/reactions') && response.ok()),
+      like.click(),
+    ])
+    await card.locator('.feed-post-likes').getByText('13 lượt thích').waitFor()
+    await card.getByRole('button', { name: 'Bỏ thích bài viết' }).click()
+    await card.locator('.feed-post-likes').getByText('12 lượt thích').waitFor()
+
+    const commentToggle = card.getByRole('button', { name: 'Bình luận', exact: true })
+    const inline = card.getByRole('region', { name: 'Bình luận về bài viết' })
+    const originalURL = page.url()
+    await commentToggle.click()
+    await inline.getByRole('textbox', { name: 'Viết bình luận' }).waitFor()
+    for (const width of [1440, 320]) {
+      await page.setViewportSize({ width, height: 820 })
+      const avatarFits = await inline.locator('.feed-comment-composer-avatar').evaluate(node => {
+        const avatar = node.getBoundingClientRect()
+        const initials = node.querySelector('.avatar-initials').getBoundingClientRect()
+        const row = node.parentElement.getBoundingClientRect()
+        return avatar.width === 36 && avatar.height === 36 &&
+          Math.abs(avatar.top + avatar.height / 2 - row.top - row.height / 2) < 1 &&
+          initials.left >= avatar.left && initials.right <= avatar.right &&
+          initials.top >= avatar.top && initials.bottom <= avatar.bottom
+      })
+      assert(avatarFits, 'Inline comment initials must fit inside a centered circular avatar at ' + width + 'px')
+    }
+    await page.setViewportSize({ width: 1440, height: 820 })
+    assert(page.url() === originalURL && await commentToggle.getAttribute('aria-expanded') === 'true',
+      'Comments must expand below the card without leaving the feed')
+    await inline.getByRole('textbox', { name: 'Viết bình luận' }).fill('Bình luận thử ngay trong bảng tin')
+    await inline.getByRole('button', { name: 'Gửi bình luận' }).click()
+    await inline.locator('.feed-comment-bubble').getByText('Bình luận thử ngay trong bảng tin', { exact: true }).waitFor()
+    await inline.getByRole('button', { name: 'Trả lời SocCO Tester' }).click()
+    await inline.getByRole('textbox', { name: 'Phản hồi SocCO Tester' }).fill('Phản hồi thử trong bảng tin')
+    await inline.getByRole('button', { name: 'Gửi bình luận' }).click()
+    await inline.locator('.feed-comment-replies .feed-comment-bubble').getByText('Phản hồi thử trong bảng tin').waitFor()
+    const checkCommentTools = async (host) => {
+      const rows = await host.locator('.feed-comment-actions').evaluateAll(actions => actions.map(row => {
+        const centerY = node => { const box = node.getBoundingClientRect(); return box.top + box.height / 2 }
+        const controls = [...row.children].filter(node => getComputedStyle(node).display !== 'none')
+        const heart = row.querySelector('.lucide-heart')
+        const menu = row.querySelector('.feed-comment-menu button')
+        const bounds = row.getBoundingClientRect()
+        return controls.every(node => Math.abs(centerY(node) - centerY(controls[0])) < 1 &&
+          node.getBoundingClientRect().right <= bounds.right + 1) &&
+          Math.abs(centerY(heart) - centerY(heart.parentElement)) < 1 &&
+          Math.abs(centerY(menu.querySelector('svg')) - centerY(menu)) < 1
+      }))
+      assert(rows.length === 2 && rows.every(Boolean), 'Comment and reply actions must align without clipping: ' + JSON.stringify(rows))
+    }
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 820 })
+      await checkCommentTools(inline)
+    }
+    await page.setViewportSize({ width: 1440, height: 820 })
+    await commentToggle.click()
+    assert(await inline.count() === 0 && await commentToggle.getAttribute('aria-expanded') === 'false',
+      'The comment button should collapse the inline thread')
+
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    await card.locator('.feed-post-text').click()
+    await details.waitFor()
+    assert(page.url() === originalURL && await launcher.count() === 1 &&
+      await details.evaluate(node => node.matches(':modal')), 'Opening post content should overlay the existing feed on the same URL')
+    assert(await details.locator('.post-comments-stats .lucide-heart').getAttribute('fill') === 'currentColor',
+      'The dialog must also show a filled summary heart')
+    await details.getByText('Bình luận thử ngay trong bảng tin', { exact: true }).waitFor()
+    await details.getByRole('button', { name: 'Xem 1 phản hồi' }).click()
+    const measure = () => details.evaluate(node => {
+      const rect = selector => node.querySelector(selector).getBoundingClientRect()
+      const post = rect('.post-comments-original')
+      const thread = rect('.post-comments-thread')
+      const form = rect('.feed-comment-form')
+      const header = rect('.post-comments-modal-heading')
+      return { stacked: thread.top >= post.bottom && Math.abs(thread.left - post.left) < 2,
+        composerInViewport: form.bottom <= innerHeight && form.top > header.bottom,
+        overflow: node.scrollWidth - node.clientWidth }
+    })
+    for (const viewport of [{ width: 1440, height: 820 }, { width: 390, height: 700 }]) {
+      await page.setViewportSize(viewport)
+      await checkCommentTools(details)
+      const layout = await measure()
+      assert(layout.stacked && layout.composerInViewport && layout.overflow <= 1,
+        'The dialog should stack the thread and keep the composer visible: ' + JSON.stringify(layout))
+    }
+    await details.getByRole('button', { name: 'Bình luận', exact: true }).click()
+    assert(await details.getByRole('textbox', { name: 'Viết bình luận' }).evaluate(input => input === document.activeElement),
+      'The comment action should focus the pinned input')
+    await page.keyboard.press('Escape')
+    await details.waitFor({ state: 'hidden' })
+    const openPost = card.getByRole('button', { name: 'Mở bài viết' })
+    await openPost.press('Enter')
+    await details.waitFor()
+    await details.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
+    assert(await openPost.evaluate(button => button === document.activeElement), 'Closing the post should restore focus')
+    await page.goto(origin + '/feed/posts/88')
+    await details.waitFor()
+    await details.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
+    await page.waitForURL(origin + '/feed')
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('SOCCO-60/62/63 PASS: popover without scroll, inline comments, responsive post dialog, legacy link, filled heart')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
+  if (postPreviewOnly) {
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport)
+      await page.goto(origin + '/chat', { waitUntil: 'domcontentloaded' })
+      await page.locator('.conversation-avatar-rail button[title="Minh Anh"], .desktop-conversation-rail-entry[title="Minh Anh"], .conversation-item')
+        .filter({ visible: true }).first().click({ timeout: 12000 })
+      const cards = page.getByRole('link', { name: 'Mở bài viết của Minh Anh', exact: true })
+      const messages = page.locator('.message-link-preview-holder')
+      await page.locator('[data-message-id="20"]').waitFor({ timeout: 15000 }).catch(async error => {
+        throw new Error(error.message + '\n' + errors.join(', ') + '\n' + (await page.locator('body').innerText()).slice(0, 1600))
+      })
+      for (const holder of await messages.all()) {
+        await holder.scrollIntoViewIfNeeded()
+        await holder.getByText('Đang tải bài viết…').waitFor({ state: 'hidden', timeout: 15000 })
+      }
+      await cards.nth(1).waitFor({ timeout: 15000 })
+      assert(await cards.count() === 2, 'Legacy and canonical links should both render post previews')
+      for (const card of await cards.all()) {
+        assert((await card.textContent()).includes(fixturePost.content), 'Shared post preview must show the caption')
+        assert(await card.locator('img').getAttribute('src') === fixturePost.attachments[0].url,
+          'Shared post preview must use the post image')
+      }
+      const unavailable = page.getByRole('link', { name: 'Mở bài viết ChatNet', exact: true })
+      await unavailable.getByText('Bài viết không còn hoặc bạn không có quyền xem.').waitFor()
+      assert(await unavailable.locator('img').count() === 0 && genericPreviewRequests === 0,
+        'Unreadable posts must not reveal media or request a generic banner')
+      await cards.first().click()
+      await page.waitForURL(origin + '/feed/posts/88')
+      await page.getByRole('dialog', { name: 'Bài viết của Minh Anh' }).waitFor()
+    }
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('PASS: legacy/canonical post cards, attachment, unavailable post and same-tab opening on desktop and mobile')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
+  if (process.argv.includes('--socco-61-65-only')) {
+    await page.goto(origin + '/feed?filter=latest#unused-fragment')
+    const feed = page.locator('.social-feed')
+    const card = feed.locator('.feed-post-card').first()
+    const rail = feed.locator('.social-feed-side')
+    const suggestions = rail.getByRole('region', { name: 'Gợi ý kết nối' })
+    const forbiddenCards = feed.locator('.social-feed-trending, .social-feed-translation')
+    for (const viewport of [{ width: 1586, height: 992 }, { width: 1240, height: 640 }, { width: 1000, height: 820 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport)
+      await card.waitFor({ state: 'visible' })
+      if (viewport.width > 760) {
+        await suggestions.getByRole('button', { name: 'Kết bạn' }).waitFor({ state: 'visible' })
+        assert(await rail.locator('section').count() === 1, 'The rail should contain only connection suggestions')
+      } else {
+        await rail.waitFor({ state: 'hidden' })
+      }
+      assert(await forbiddenCards.count() === 0, 'Unused sidebar sections should stay out of the DOM, including with hashtagged posts')
+    }
+    await page.setViewportSize({ width: 1586, height: 992 })
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
+    await card.getByRole('button', { name: 'Tùy chọn bài viết' }).click()
+    await page.getByRole('button', { name: 'Sao chép liên kết' }).click()
+    await page.getByText('Đã sao chép liên kết bài viết.', { exact: true }).waitFor()
+    const copied = await page.evaluate(() => navigator.clipboard.readText())
+    assert(copied === origin + '/feed/posts/88', 'Copied permalink should omit the current query and fragment: ' + copied)
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    for (const link of [copied, origin + '/?tab=feed&post=88']) {
+      await page.goto(link)
+      await details.getByText(fixturePost.content, { exact: true }).waitFor()
+    }
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('SOCCO-61/65 PASS: responsive suggestions, hidden sidebar cards, clipboard, direct and legacy post links')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
   if (process.argv.includes('--composer-motion-only')) {
     await page.goto(origin + '/feed')
     const launcher = page.locator('.social-feed-launcher')
@@ -338,6 +607,150 @@ try {
     await closeCheckin()
     await page.waitForFunction(button => getComputedStyle(button).transform === 'none', await checkin.elementHandle())
     console.log('PASS: touch opens Check-in and plays the bounce')
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoints: 1 })
+    await page.setViewportSize({ width: 1440, height: 840 })
+    await launcher.getByRole('button', { name: 'Bạn đang nghĩ gì?' }).click()
+    const toolbar = dialog.getByRole('group', { name: 'Thêm vào bài viết' })
+    const glyph = '.feed-shortcut-icon'
+    const action = label => toolbar.getByRole('button', { name: label, exact: true })
+    const allGlyphNodes = glyph + ' :is(svg, g, path)'
+    for (const [label, names] of [
+      ['Thêm ảnh hoặc video', ['feed-shortcut-photo-forward']],
+      ['Nền chữ', ['composer-art-brush-behind', 'composer-art-brush-front', 'composer-art-ink']],
+      ['Gắn thẻ bạn bè', ['composer-tag-visitor', 'composer-tag-resident', 'composer-tag-plus']],
+      ['Cảm xúc', ['composer-face-happy', 'composer-face-sad', 'composer-face-crying']],
+      ['Check-in địa điểm', ['feed-shortcut-pin-hop']],
+    ]) {
+      const button = action(label)
+      await button.hover()
+      const observed = await namesOf(button, allGlyphNodes)
+      assert(names.every(name => observed.includes(name)), label + ' must play all assigned animations')
+    }
+
+    const sample = (button, selectors, phases) => button.locator(glyph).evaluate((root, args) => {
+      const running = root.getAnimations({ subtree: true })
+      const animations = running.filter(animation => animation.effect?.target?.closest('.feed-shortcut-icon') === root)
+      if (!animations.length) throw Error('Toolbar glyph is not playing')
+      const duration = animations[0].effect.getTiming().duration
+      const looping = animations.every(animation => animation.effect.getTiming().iterations === Infinity)
+      animations.forEach(animation => animation.pause())
+      const frames = args.phases.map(phase => {
+        animations.forEach(animation => { animation.currentTime = duration * phase })
+        return Object.fromEntries(args.selectors.map(selector => {
+          const style = getComputedStyle(root.querySelector(selector))
+          const worldOpacity = Number(style.opacity) *
+            (selector === '.composer-face-tear' ? Number(getComputedStyle(root.querySelector('.composer-face-crying')).opacity) : 1)
+          return [selector, { opacity: worldOpacity, transform: style.transform, dash: parseFloat(style.strokeDashoffset) }]
+        }))
+      })
+      return { looping, frames }
+    }, { selectors, phases })
+
+    const art = action('Nền chữ')
+    await art.hover()
+    const back = '.composer-art-brush--behind'
+    const front = '.composer-art-brush--front'
+    const ink = '.composer-art-ink'
+    const paint = await sample(art, [back, front, ink, '.composer-art-board'], [0, .18, .45, .57, .85, 1])
+    assert(paint.looping && paint.frames[1][back].opacity === 1 && paint.frames[1][front].opacity === 0 &&
+      paint.frames[2][front].opacity === 1 && paint.frames[2][ink].dash > 0 &&
+      paint.frames[3][ink].dash === 0 && paint.frames[4][back].opacity === 1 &&
+      paint.frames[5][ink].opacity === 0 && paint.frames[5][front].opacity === 0 &&
+      paint.frames[5]['.composer-art-board'].transform === paint.frames[0]['.composer-art-board'].transform,
+      'The brush must emerge behind the palette, draw in front, duck behind, and return seamlessly')
+
+    const tag = action('Gắn thẻ bạn bè')
+    await tag.hover()
+    const original = '.composer-tag-resident'
+    const visitor = '.composer-tag-visitor'
+    const plus = '.composer-tag-plus'
+    const bump = await sample(tag, [original, visitor, plus], [0, .2, .46, .67, 1])
+    const xOf = value => parseFloat(value.transform.split(',').at(-2))
+    const yOf = value => parseFloat(value.transform.split(',').at(-1))
+    assert(bump.looping && xOf(bump.frames[1][visitor]) > 0 &&
+      xOf(bump.frames[2][original]) < 0 && xOf(bump.frames[2][plus]) < 0 &&
+      bump.frames[3][original].opacity === 0 && yOf(bump.frames[3][plus]) < -4 &&
+      bump.frames[4][plus].transform === bump.frames[0][plus].transform,
+      'The incoming avatar must bump the first left while the plus slides and hops back')
+
+    const mood = action('Cảm xúc')
+    await mood.hover()
+    const faces = ['.composer-face-idle', '.composer-face-happy', '.composer-face-sad', '.composer-face-crying']
+    const expressions = await sample(mood, [...faces, '.composer-face-tear'], [0, .23, .46, .72, .95, 1])
+    assert(expressions.looping &&
+      expressions.frames.every((frame, index) => faces.findIndex(face => frame[face].opacity === 1) === [0, 1, 2, 3, 0, 0][index]) &&
+      expressions.frames[3]['.composer-face-tear'].opacity > 0,
+      'Feeling cycles through smile, sad and crying with tears and ends on the original face')
+
+    // Re-entry gets a fresh animation instead of leaving the glyph at a sampled phase.
+    await page.mouse.move(0, 0)
+    await mood.hover()
+    assert(await mood.locator(glyph).evaluate(root =>
+      root.getAnimations({ subtree: true }).every(animation => animation.playState === 'running')),
+    'Hovering the same icon again must restart its sequence')
+    await page.mouse.move(0, 0)
+    await tag.press('Tab')
+    assert(await mood.locator(glyph).evaluate(root =>
+      root.getAnimations({ subtree: true }).some(animation => animation.effect.getTiming().iterations === 1)),
+    'Keyboard focus must keep finite playback')
+
+    const feeling = toolbar.getByRole('button', { name: 'Cảm xúc', exact: true })
+    await feeling.click()
+    const feelingOptions = dialog.getByRole('group', { name: 'Chọn cảm xúc' })
+    const openFeelingOptions = async () => {
+      if (await feelingOptions.isVisible()) return
+      await feeling.click()
+      // A selected chip keeps the current tool active until the next toggle.
+      if (!(await feelingOptions.isVisible())) await feeling.click()
+      await feelingOptions.waitFor({ state: 'visible' })
+    }
+    const options = feelingOptions.getByRole('button')
+    assert(await options.count() === 9, 'All nine feelings must remain available')
+    const feelingMotions = new Set()
+    for (const option of await options.all()) {
+      await option.hover()
+      const played = await namesOf(option, '.smart-feeling-emoji')
+      assert(played.length === 1, 'Feeling must play one animation on hover')
+      feelingMotions.add(played[0])
+    }
+    assert(feelingMotions.size === 9, 'All nine feelings should have distinct motions')
+    const loved = dialog.getByRole('button', { name: 'hạnh phúc', exact: true })
+    await loved.press('Tab')
+    const excited = dialog.getByRole('button', { name: 'hào hứng', exact: true })
+    await page.mouse.move(0, 0)
+    assert((await namesOf(excited, '.smart-feeling-emoji')).includes('feed-feeling-cheer'),
+      'Tab focus must animate the feeling without a pointer')
+    await excited.press('Enter')
+    const selected = dialog.locator('.smart-feeling-selected')
+    assert((await selected.innerText()).includes('hào hứng') &&
+      (await namesOf(selected, '.smart-feeling-emoji')).includes('feed-feeling-cheer'),
+      'Keyboard selection must animate the selected emoji and preserve its label')
+
+    // A touch selection also plays the feedback in the chip after the options close.
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+    await page.setViewportSize({ width: 390, height: 840 })
+    await openFeelingOptions()
+    const sleepy = dialog.getByRole('button', { name: 'mệt mỏi', exact: true })
+    await sleepy.scrollIntoViewIfNeeded()
+    const sleepyBox = await sleepy.boundingBox()
+    assert(sleepyBox, 'Sleepy feeling must be reachable at 390px')
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchStart', touchPoints: [{ x: sleepyBox.x + sleepyBox.width / 2, y: sleepyBox.y + sleepyBox.height / 2 }],
+    })
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await selected.getByText(/Đang cảm thấy mệt mỏi/).waitFor()
+    assert((await namesOf(selected, '.smart-feeling-emoji')).includes('feed-feeling-nod'),
+      'Touch selection must animate the selected feeling')
+
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false, maxTouchPoints: 1 })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await openFeelingOptions()
+    await dialog.getByRole('button', { name: 'bình yên', exact: true }).click()
+    assert((await selected.innerText()).includes('bình yên') &&
+      (await namesOf(selected, '.smart-feeling-emoji')).length === 0 &&
+      (await namesOf(feeling, allGlyphNodes)).length === 0,
+      'Reduced motion must suppress toolbar and emoji animations without preventing selection')
+    console.log('PASS: composer icon choreography, loop closure, replay, nine feelings, keyboard, touch and reduced motion')
     assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join('; '))
     await browser.close()
     browser = null
@@ -534,7 +947,7 @@ try {
   await feedCards.first().waitFor({ state: 'visible' })
   const socialGeometry = await page.evaluate(() => {
     const keys = ['.social-feed-stories-card', '.social-feed-launcher', '.social-feed-filter-bar',
-      '.social-feed-center .post.zalo-post', '.social-feed-suggestions', '.social-feed-trending', '.social-feed-translation']
+      '.social-feed-center .post.zalo-post', '.social-feed-suggestions']
     return Object.fromEntries(keys.map(key => {
       const rect = document.querySelector(key)?.getBoundingClientRect()
       return [key, rect ? {x:rect.x,y:rect.y,width:rect.width,height:rect.height} : null]
@@ -545,8 +958,6 @@ try {
     ['.social-feed-stories-card', 107],
     ['.social-feed-launcher', 286],
     ['.social-feed-suggestions', 107],
-    ['.social-feed-trending', 425],
-    ['.social-feed-translation', 702],
   ]) {
     const rect = socialGeometry[selector]
     assert(rect && approx(rect.y, y),
@@ -768,6 +1179,11 @@ try {
     && likeLayout.likesCentered,
     'Post engagement count must align left and comments right in one row: ' + JSON.stringify(likeLayout))
   if (process.argv.includes('--likes-only')) {
+    const summaryHeart = postCard.locator('.feed-post-likes svg.lucide-heart')
+    assert(await summaryHeart.getAttribute('fill') === 'currentColor',
+      'The likes total uses a filled heart before the viewer likes the post')
+    assert(await postCard.locator('.feed-like-button svg').getAttribute('fill') === 'none',
+      'The unselected like action remains outlined')
     const firstLike = postCard.getByRole('button', { name: 'Thích bài viết' })
     await firstLike.click()
     await postCard.getByRole('button', { name: 'Bỏ thích bài viết' }).waitFor()
@@ -789,7 +1205,7 @@ try {
       'Profile timeline must share the heart button')
     await visitor.getByRole('button', { name: 'Quay lại', exact: true }).click()
     await visitor.waitFor({ state: 'detached' })
-    await postCard.getByRole('button', { name: 'Bình luận', exact: true }).click()
+    await postCard.getByRole('button', { name: 'Mở bài viết', exact: true }).click()
     const detail = page.locator('.post-comments-page')
     await detail.waitFor({ state: 'visible' })
     await page.mouse.move(500, 250)
@@ -799,20 +1215,11 @@ try {
       'Post detail must not force the sidebar open')
     assert(detailFrame && Math.abs(detailFrame.x - mainBeforeHover.x) < 1,
       'Post detail must not shift main content to accommodate a permanently expanded sidebar')
-    await page.mouse.move(45, navY)
-    await page.waitForTimeout(180)
-    assert(Math.abs((await sidebar.boundingBox()).width - 250) < 2,
-      'Post detail should retain sidebar hover expansion')
-    const detailFrameHovered = await page.locator('.modern-frame').boundingBox()
-    assert(detailFrameHovered && Math.abs(detailFrameHovered.x - detailFrame.x) < 1,
-      'Hovering sidebar in post detail must not shift the main page')
-    await page.mouse.move(500, 250)
-    await page.waitForTimeout(180)
-    assert(Math.abs((await sidebar.boundingBox()).width - 76) < 2,
-      'Sidebar must collapse after the pointer leaves on post detail')
+    assert(await detail.evaluate(node => node.matches(':modal')),
+      'Opening a post should keep underlying navigation in place but inactive until dismissed')
     const detailLike = detail.getByRole('button', { name: 'Bỏ thích bài viết' })
     assert(await detailLike.locator('svg.lucide-heart').count() === 1
-      && await detail.locator('.post-comments-stats .lucide-heart').count() === 1,
+      && await detail.locator('.post-comments-stats .lucide-heart').getAttribute('fill') === 'currentColor',
       'Post detail must use the same heart for controls and stats')
     assert(await detail.locator('.feed-reaction-control,.feed-reaction-picker').count() === 0,
       'Post detail must not show legacy multi-reaction picker')
@@ -1099,7 +1506,7 @@ try {
     await restoredDraftDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
 
     const detailCard = feed.locator('.feed-post-card').filter({ hasText: 'Ngày mới đã chỉnh sửa' }).first()
-    await detailCard.getByRole('button', { name: 'Bình luận' }).click()
+    await detailCard.getByRole('button', { name: 'Mở bài viết' }).click()
     const detailPage = page.locator('.post-comments-page')
     await detailPage.waitFor({ state: 'visible' })
     assert(await detailPage.locator('.feed-post-extras').getByRole('link', { name: 'Xem địa điểm Hồ Tây trên bản đồ' }).count() === 1
@@ -1113,7 +1520,7 @@ try {
     assert(await detailEdit.getByRole('textbox', { name: 'Nội dung bài viết' }).inputValue() === 'Ngày mới đã chỉnh sửa',
       'Editing from the details screen must reuse the same full composer')
     await detailEdit.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
-    await page.goBack()
+    await detailPage.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
     await detailPage.waitFor({ state: 'detached' })
 
     await launcher.getByRole('button', { name: 'Ảnh / Video' }).waitFor()
@@ -1142,8 +1549,7 @@ try {
     assert(presignedUploads > 0, 'Media launcher must select and upload the chosen file')
     await mediaDialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
 
-    // Discovery rail stays pinned as the main feed scrolls; on short laptop
-    // screens it gets a separate scrollbar so the AI card stays reachable.
+    // Connection suggestions stay pinned as the main feed scrolls.
     await page.setViewportSize({ width: 1240, height: 640 })
     const railMeasurements = await feed.evaluate(root => {
       const center = root.querySelector('.social-feed-center')
@@ -1157,10 +1563,10 @@ try {
         railScrollHeight: rail.scrollHeight, feedScrollTop: root.scrollTop }
     })
     assert(railMeasurements.position === 'sticky' && railMeasurements.overflowY === 'auto'
-      && railMeasurements.railScrollHeight > railMeasurements.railClientHeight + 40
+      && railMeasurements.railScrollHeight <= railMeasurements.railClientHeight + 1
       && railMeasurements.railClientHeight <= 640 - railMeasurements.viewportTop - 16
       && railMeasurements.centerRight + 8 < railMeasurements.railRight,
-      'Compact laptop rail must remain beside posts with a separate scrollbar: ' + JSON.stringify(railMeasurements))
+      'Connection suggestions must fit beside posts on a compact laptop: ' + JSON.stringify(railMeasurements))
     await feed.evaluate(root => { root.scrollTop = 240 })
     const stickyMeasurement = await feed.evaluate(root => {
       const railRect = root.querySelector('.social-feed-side').getBoundingClientRect()
@@ -1170,18 +1576,6 @@ try {
       && stickyMeasurement.railTop >= stickyMeasurement.viewportTop + 10
       && stickyMeasurement.railTop <= railMeasurements.railTop + 2,
       'Rail should remain visible while feed scrolls: ' + JSON.stringify(stickyMeasurement))
-    await feed.locator('.social-feed-side').evaluate(rail => { rail.scrollTop = rail.scrollHeight })
-    const independentScroll = await feed.evaluate(root => {
-      const rail = root.querySelector('.social-feed-side')
-      const translation = rail.querySelector('.social-feed-translation').getBoundingClientRect()
-      const railRect = rail.getBoundingClientRect()
-      return { railScrollTop: rail.scrollTop, feedScrollTop: root.scrollTop,
-        translationBottom: translation.bottom, railBottom: railRect.bottom }
-    })
-    assert(independentScroll.railScrollTop > 0
-      && independentScroll.feedScrollTop === stickyMeasurement.feedScrollTop
-      && independentScroll.translationBottom <= independentScroll.railBottom + 2,
-      'The three menu cards must scroll independently to reveal Dịch AI: ' + JSON.stringify(independentScroll))
     await feed.evaluate(root => { root.scrollTop = 0 })
     await page.setViewportSize({ width: 1586, height: 992 })
 
@@ -1261,7 +1655,7 @@ try {
     await taggedAlert.waitFor({ state: 'visible' })
     await taggedAlert.click()
     await notificationScreen.getByRole('button', { name: 'Mở bài viết được gắn thẻ' }).click()
-    await page.waitForURL(url => url.searchParams.get('post') === '88' && url.searchParams.get('tab') === 'feed')
+    await page.waitForURL(url => url.pathname === '/feed/posts/88')
     await page.locator('.post-comments-page').waitFor({ state: 'visible' })
     assert(mentionReadCalls === 1 && incomingMention.readAt,
       'Mentions must be marked read through the backend and navigate to the exact tagged post')
@@ -1367,7 +1761,6 @@ try {
   assert(await feed.locator('.social-feed-story-strip.is-expanded').count() === 1, 'View all stories must expand story row')
   await feed.getByRole('button', { name: 'Thu gọn' }).click()
   await feed.locator('.social-feed-suggestion-row').first().waitFor({ state: 'visible' })
-  await feed.locator('.social-feed-trend').first().waitFor({ state: 'visible' })
   mkdirSync('output/playwright/layout', { recursive: true })
   await page.screenshot({ path: 'output/playwright/layout/social-feed-desktop-1586.png' })
   const reactionTestStyle = await page.addStyleTag({ content: '.app-sidebar, .app-sidebar * { pointer-events: none !important }' })
@@ -1377,46 +1770,20 @@ try {
 
   // Post comments open as a dedicated desktop page, not the legacy modal.
   const commentsOnly = process.argv.includes('--comments-only')
+  const feedBeforeDetail = page.url()
   if (commentsOnly) {
-    // The sidebar flyout covers the tiny feed action during test navigation.
-    // Trigger the existing React click handler to exercise the comments page itself.
-    await feedCards.first().getByRole('button', { name: 'Bình luận', exact: true })
-      .evaluate(button => button.click())
+    await feedCards.first().getByRole('button', { name: 'Mở bài viết' }).press('Enter')
   } else {
-    await feedCards.first().getByRole('button', { name: 'Bình luận', exact: true }).click()
+    await feedCards.first().getByRole('button', { name: 'Mở bài viết' }).click()
     await reactionTestStyle.evaluate(style => style.remove())
   }
   const commentsPage = page.locator('.post-comments-page')
   await commentsPage.waitFor({ state: 'visible' })
   await commentsPage.locator('.post-comments-thread-heading h2').waitFor({ state: 'visible' })
-  assert(await page.locator('.app-page-heading strong').innerText() === 'Bình luận',
-    'Post comments page title must match the expected UI')
-  assert(await page.locator('.app-page-heading small').innerText() === 'Tương tác với mọi người trong cộng đồng',
-    'Post comments subtitle must match the expected UI')
-  const commentsLayout = await page.evaluate(() => {
-    const rect = (selector) => {
-      const element = document.querySelector(selector)
-      const bounds = element?.getBoundingClientRect()
-      return bounds ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : null
-    }
-    return {
-      sidebar: rect('.app-sidebar'),
-      post: rect('.post-comments-original'),
-      comments: rect('.post-comments-thread'),
-      header: rect('.chatnet-appbar'),
-    }
-  })
-  const near = (a,b,t=5) => Math.abs(a-b) <= t
-  // The navigation is a 76px rail; expanding its flyout must not shift the page.
-  // The two fixed-width panels remain centered within the content region.
-  assert(commentsLayout.sidebar && near(commentsLayout.sidebar.width, 76) &&
-    commentsLayout.header && near(commentsLayout.header.x, 76) &&
-    commentsLayout.post && near(commentsLayout.post.x, 195) && near(commentsLayout.post.y, 110) &&
-    near(commentsLayout.post.width, 821) && near(commentsLayout.post.height, 841) &&
-    commentsLayout.comments && near(commentsLayout.comments.x, commentsLayout.post.x + commentsLayout.post.width + 20) &&
-    near(commentsLayout.comments.y, 110) && near(commentsLayout.comments.width, 428) &&
-    near(commentsLayout.comments.height, 841),
-    'Post comments frame mismatch: ' + JSON.stringify(commentsLayout))
+  assert(await commentsPage.getByRole('heading', { name: 'Bài viết của Minh Anh' }).isVisible(),
+    'Post dialog should identify the author')
+  assert(page.url() === feedBeforeDetail && await commentsPage.evaluate(node => node.matches(':modal')),
+    'Opening a post from the feed must not navigate away')
   const commentsActions = commentsPage.locator('.post-comments-post-actions')
   assert(await commentsActions.locator('.feed-like-button').count() === 1
     && await commentsActions.getByRole('button', { name: 'Bình luận' }).count() === 1
@@ -1445,26 +1812,17 @@ try {
   assert(await commentsPage.locator('.post-comments-author-avatar').isVisible() &&
     await commentsPage.locator('.post-comments-media img').first().isVisible(),
     'post comments must display post author avatar and media from real post data')
-  const commentElementBounds = await page.evaluate(() => {
-    const keys = ['.post-comments-author-avatar', '.post-comments-media img',
-      '.post-comments-thread .feed-comment-form',
-      '.post-comments-thread .feed-comment-compose textarea']
-    return Object.fromEntries(keys.map(key => {
-      const bounds = document.querySelector(key)?.getBoundingClientRect()
-      return [key, bounds ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : null]
-    }))
+  const detailSpacing = await commentsPage.evaluate(node => {
+    const measure = selector => node.querySelector(selector).getBoundingClientRect()
+    const media = measure('.post-comments-media img')
+    const footer = measure('.post-comments-post-footer')
+    const form = measure('.feed-comment-form')
+    const composer = measure('.post-comments-composer')
+    return { afterMedia: footer.top - media.bottom, afterForm: composer.bottom - form.bottom }
   })
-  const panelOffset = commentsLayout.post.x - 282
-  for (const [key,x,y,width,height] of [
-    ['.post-comments-author-avatar',306,134,51,51],
-    ['.post-comments-media img',308,261,767,489],
-    ['.post-comments-thread .feed-comment-form',1139,803,389,113],
-    ['.post-comments-thread .feed-comment-compose textarea',1203,827,306,51],
-  ]) {
-    const rect = commentElementBounds[key]
-    assert(rect && near(rect.x,x + panelOffset,6) && near(rect.y,y,7) && near(rect.width,width,8) && near(rect.height,height,8),
-      'Post comments inner geometry mismatch ' + key + ': ' + JSON.stringify(commentElementBounds))
-  }
+  assert(detailSpacing.afterMedia >= 0 && detailSpacing.afterMedia < 48
+    && detailSpacing.afterForm >= 0 && detailSpacing.afterForm < 30,
+    'Details should not insert blank space before actions or below the composer: ' + JSON.stringify(detailSpacing))
   assert(await commentsPage.locator('.feed-comment-composer-avatar').isVisible() &&
     await commentsPage.getByRole('button', { name: 'Gửi bình luận' }).isVisible(),
     'post comments must display composer avatar and send icon')
@@ -1480,10 +1838,6 @@ try {
   await page.getByRole('dialog', { name: 'Tùy chọn bài viết' }).waitFor({ state: 'visible' })
   await page.getByRole('button', { name: 'Đóng', exact: true }).first().click()
   await page.getByRole('dialog', { name: 'Tùy chọn bài viết' }).waitFor({ state: 'hidden' })
-  assert(await page.getByRole('dialog', { name: /Chi tiết bài viết/ }).count() === 0,
-    'Desktop post comments must replace the old post-detail modal')
-  assert(new URL(page.url()).pathname === '/feed/posts/88',
-    'Comment navigation must update the shareable post URL')
   assert(await commentsPage.locator('.post-comments-original').isVisible() &&
     await commentsPage.locator('.post-comments-thread').isVisible(),
     'post comments must show original post and comment thread')
@@ -1509,7 +1863,7 @@ try {
     return { overflow: document.documentElement.scrollWidth - innerWidth,
       postBottom: post?.bottom, threadTop: thread?.top }
   })
-  assert(commentsCompact.overflow <= 2 && commentsCompact.threadTop > commentsCompact.postBottom,
+  assert(commentsCompact.overflow <= 2 && commentsCompact.threadTop >= commentsCompact.postBottom,
     'Compact post comments must stack comments below the post without overflow: ' + JSON.stringify(commentsCompact))
   await page.setViewportSize({ width: 1586, height: 992 })
   if (commentsOnly) {
@@ -1519,32 +1873,16 @@ try {
     server.kill()
     process.exit(0)
   }
-  await sidebar.getByRole('button', { name: 'Bảng tin' }).click()
+  await commentsPage.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
+  await commentsPage.waitFor({ state: 'hidden' })
   await feed.waitFor({ state: 'visible' })
-  assert(new URL(page.url()).searchParams.get('post') === null,
-    'Sidebar navigation from post comments must clear the active post URL')
-  await feedCards.first().getByRole('button', { name: 'Bình luận', exact: true }).click()
-  await commentsPage.waitFor({ state: 'visible' })
-  await page.goBack()
-  await feed.waitFor({ state: 'visible' })
-  assert(new URL(page.url()).pathname === '/feed',
-    'Browser Back must return to the feed from post comments')
-  await feedCards.first().getByRole('button', { name: 'Bình luận', exact: true }).click()
-  await commentsPage.waitFor({ state: 'visible' })
-  await sidebar.getByRole('button', { name: 'Cá nhân' }).click()
-  assert(await page.locator('.post-detail-backdrop').count() === 0,
-    'Leaving post comments via sidebar must not reopen the old post-detail modal')
-  await sidebar.getByRole('button', { name: 'Bảng tin' }).click()
-  await feed.waitFor({ state: 'visible' })
+  assert(page.url() === feedBeforeDetail, 'Dismissal must leave the user on the same feed')
   await feed.getByRole('button', { name: 'Đang theo dõi' }).click()
   await feedCards.first().waitFor({ state: 'visible' })
   await page.waitForFunction(() => document.querySelector('.social-feed-filter-options [aria-pressed="true"]')?.textContent?.includes('Đang theo dõi'))
   assert(followingRequests > 0, 'Following tab must request backend scope=following')
   await feed.getByRole('button', { name: 'Mới nhất', exact: true }).click()
   await feed.getByRole('button', { name: 'Dành cho bạn' }).click()
-  await feed.locator('.social-feed-trend').first().click()
-  assert((await page.getByRole('searchbox', { name: 'Tìm bài viết' }).inputValue()).startsWith('#'), 'Trend click must search posts')
-  await page.getByRole('searchbox', { name: 'Tìm bài viết' }).fill('')
   // After sidebar navigation, the hover flyout can intercept a pointer gesture.
   // The normal pointer flow is exercised by check:smart-composer; trigger the
   // existing React click handler here to test the composer after deep navigation.
@@ -1575,7 +1913,7 @@ try {
   await feed.locator('.social-feed-suggestion-row').first().getByRole('button', { name: 'Kết bạn' }).click()
   await page.waitForFunction(() => Array.from(document.querySelectorAll('.social-feed-suggestion-row')).length === 0)
   assert(friendRequestsSent > 0, 'Connection recommendation must use friend request API')
-  await feed.locator('.social-feed-translation').getByRole('button', { name: /Mở tin nhắn/ }).click()
+  await sidebar.getByRole('button', { name: 'Tin nhắn', exact: true }).click()
   await page.locator('.modern-messenger').waitFor({ state: 'visible' })
 
   // Social V4 at compact desktop and original mobile breakpoint.
@@ -1593,10 +1931,10 @@ try {
   await page.setViewportSize({ width: 390, height: 844 })
   await feed.locator('.stories-row .story-card').first().waitFor({ state: 'visible' })
   await feed.locator('.social-feed-launcher-prompt').waitFor({ state: 'visible' })
-  await feed.locator('.feed.zalo-feed .post.zalo-post').first().getByRole('button', { name: 'Bình luận', exact: true }).click()
-  await page.getByRole('dialog', { name: /Chi tiết bài viết của/ }).waitFor({ state: 'visible' })
+  await feed.locator('.feed.zalo-feed .post.zalo-post').first().getByRole('button', { name: 'Mở bài viết', exact: true }).click()
+  await page.getByRole('dialog', { name: /Bài viết của/ }).waitFor({ state: 'visible' })
   await page.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
-  await page.getByRole('dialog', { name: /Chi tiết bài viết của/ }).waitFor({ state: 'hidden' })
+  await page.getByRole('dialog', { name: /Bài viết của/ }).waitFor({ state: 'hidden' })
   assert(await feed.locator('.social-feed-side').isHidden(), 'Mobile must not display Social V4 discovery rail')
   const mobileFeedOverflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
   assert(mobileFeedOverflow <= 2, 'Social V4 mobile layout must not overflow: ' + mobileFeedOverflow)
@@ -1638,7 +1976,7 @@ try {
   await profile.getByRole('tab', { name: 'Ảnh & video' }).click()
   assert(await page.locator('.profile-page-media-item').count() === 1, 'Profile media tab must use actual loaded post attachments')
   await page.locator('.profile-page-media-item').first().click()
-  await page.getByRole('dialog', { name: /Chi tiết bài viết/ }).waitFor()
+  await page.getByRole('dialog', { name: /Bài viết của/ }).waitFor()
   await page.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
   await profile.getByRole('tab', { name: 'Bài viết' }).click()
   // The desktop profile editor opens as a full page, not a drawer.

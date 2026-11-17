@@ -16,7 +16,7 @@ type Options = {
   request: ApiRequest
   setTab: (tab: Tab) => void
   setPosts: Dispatch<SetStateAction<Post[]>>
-  setActivePostId: Dispatch<SetStateAction<number | null>>
+  setActivePostId?: Dispatch<SetStateAction<number | null>>
   onError: (message: string) => void
 }
 
@@ -56,7 +56,7 @@ export function usePostRouteLoad({
           item.id === post.id ? post : item,
         ))
         setLoaded({ sessionId, post })
-        callbacks.current.setActivePostId(post.id)
+        callbacks.current.setActivePostId?.(post.id)
       })
       .catch((error) => {
         if (isCurrent())

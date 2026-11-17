@@ -6,11 +6,13 @@ import type { Conversation } from '../../chat'
 import ContactCallConversationSection from './ContactCallConversationSection'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import ContactInvitations from './ContactInvitations'
+import ContactsOverview from './ContactsOverview'
+import ContactSearchResults from './ContactSearchResults'
 import ContactFriendProfile from './ContactFriendProfile'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
 import { useContactDirectory, type DirectoryFilter } from '../hooks/useContactDirectory'
 
-export type FriendsScreen = 'directory' | 'invitations'
+export type FriendsScreen = 'overview' | 'directory' | 'invitations'
 type Props = {
   screen: FriendsScreen
   onScreenChange: (screen: FriendsScreen) => void
@@ -30,6 +32,11 @@ type Props = {
   onOpenBlockedChat: (id: number) => void
   reportContact: (friend: FriendSearchResult | FriendConnection) => Promise<void>
   friendRequests: FriendConnection[]
+  suggestions: FriendSearchResult[]
+  suggestionsLoading: boolean
+  suggestionsError: boolean
+  onRetrySuggestions: () => void
+  onSettings: () => void
   declineFriendRequest: (friend: FriendConnection) => Promise<void>
   friends: FriendConnection[]
   friendsLoading: boolean
@@ -48,16 +55,13 @@ type Props = {
 }
 
 const personName = (friend: FriendSearchResult) => friend.displayName || friend.username
-const actionText = (relationship: ReturnType<Props['friendRelationship']>) => ({
-  accepted: 'Nhắn tin', incoming: 'Chấp nhận', outgoing: 'Hủy lời mời', none: 'Kết bạn',
-}[relationship])
 
 export default function ContactsView({
   screen, onScreenChange, friendQuery, setFriendQuery, friendSearching, friendSearchError,
   setFriendSearchRetry, contactSearchResults, friendRelationship, friendBusyIds, actOnFriend,
   setFriendMenuId, friendMenuId, blockContact, unblockContact, onOpenBlockedChat, reportContact, friendRequests, declineFriendRequest,
   friends, friendsLoading, friendsError, onRetryFriends, contactMetadata, openDirectByUsername, setFriendPreview, changePersonalContact,
-  removeAcceptedFriend, connectionUrl, onScanQr, embeddedInCalls = false,
+  removeAcceptedFriend, connectionUrl, onScanQr, suggestions, suggestionsLoading, suggestionsError, onRetrySuggestions, onSettings, embeddedInCalls = false,
   callConversations = [], onOpenCallChat,
 }: Props) {
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
@@ -163,6 +167,16 @@ export default function ContactsView({
       openChat={openChat} startCall={startCall} isBlocked={isBlocked} />
   )
 
+  if (screen === 'overview' && !embeddedInCalls) return <ContactsOverview
+    friends={friends} friendRequests={friendRequests} suggestions={suggestions}
+    suggestionsLoading={suggestionsLoading} suggestionsError={suggestionsError}
+    friendsLoading={friendsLoading} friendsError={friendsError}
+    onRetryFriends={onRetryFriends} onRetrySuggestions={onRetrySuggestions}
+    friendBusyIds={friendBusyIds} actOnFriend={actOnFriend} declineFriendRequest={declineFriendRequest}
+    onDirectory={() => onScreenChange('directory')} onInvitations={() => onScreenChange('invitations')}
+    onOpenProfile={setFriendPreview}
+    onSettings={onSettings} connectionUrl={connectionUrl} onScanQr={onScanQr} />
+
   return <div className={'friends-design-v2' + (embeddedInCalls ? ' is-call-directory' : '')} aria-label={screen === 'directory' ? 'Danh bạ' : 'Lời mời kết bạn'}>
     {screen === 'directory' ? <>
       {!embeddedInCalls && <section className="fd-searchbar">
@@ -179,14 +193,10 @@ export default function ContactsView({
             <div className="fd-list-header"><div><h2>Kết quả tìm kiếm</h2><p>Tìm người dùng theo tên, username hoặc email</p></div>
               <button type="button" className="fd-text-button" onClick={() => setFriendQuery('')}>Xóa tìm kiếm</button></div>
 
-            {friendSearchError && !friendSearching && <p className="fd-empty" role="alert">Không thể tìm người dùng.
-              <button type="button" className="fd-text-button" onClick={() => setFriendSearchRetry(value => value + 1)}>Thử lại</button></p>}
-            {!friendSearching && !friendSearchError && contactSearchResults.length === 0 && <p className="fd-empty">Không tìm thấy người dùng phù hợp.</p>}
-            <div className="fd-person-list">{contactSearchResults.map(friend => <div className="fd-person-row" key={friend.id}>
-              <button type="button" className="fd-person-identity" onClick={() => setFriendPreview(friend)}>{avatar(friend)}
-                <span><strong>{personName(friend)}</strong><small>@{friend.username}</small></span></button>
-              <button type="button" className="fd-secondary fd-search-action" disabled={friendBusyIds.has(friend.id)} onClick={() => act(friend)}>{actionText(relationshipFor(friend))}</button>
-            </div>)}</div>
+            <ContactSearchResults results={contactSearchResults}
+              loading={friendSearching} error={friendSearchError} busyIds={friendBusyIds}
+              relationshipFor={friendRelationship} onAction={act} onProfile={setFriendPreview}
+              onRetry={() => setFriendSearchRetry(value => value + 1)} />
           </> : <>
             <div className="fd-list-header"><h2>{embeddedInCalls ? 'Bạn bè' : 'Tất cả bạn bè'}</h2>
               <div className="fd-list-actions">

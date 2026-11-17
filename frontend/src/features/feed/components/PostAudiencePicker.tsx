@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type KeyboardEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { Check, ChevronDown, Globe2, LockKeyhole, UsersRound } from 'lucide-react'
 
@@ -33,8 +33,46 @@ export default function PostAudiencePicker({ value, disabled = false, onChange }
     return () => document.removeEventListener('pointerdown', dismiss, true)
   }, [open, setOpen])
 
-  useEffect(() => {
-    if (open) menuRef.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus()
+  useLayoutEffect(() => {
+    const menu = menuRef.current
+    const trigger = triggerRef.current
+    if (!open || !menu || !trigger) return
+
+    const position = (event?: Event) => {
+      if (event?.target instanceof Node && menu.contains(event.target)) return
+      const margin = 12
+      const gap = 6
+      const anchor = trigger.getBoundingClientRect()
+      const above = Math.max(0, anchor.top - margin - gap)
+      const below = Math.max(0, window.innerHeight - anchor.bottom - margin - gap)
+      const naturalHeight = menu.scrollHeight + menu.offsetHeight - menu.clientHeight
+      const placeAbove = naturalHeight > below && above > below
+      // On short viewports overlap the anchor instead of clipping the last choice.
+      const height = Math.min(naturalHeight, window.innerHeight - margin * 2)
+      const preferredTop = placeAbove ? anchor.top - gap - height : anchor.bottom + gap
+      const top = Math.max(margin, Math.min(preferredTop, window.innerHeight - margin - height))
+      const left = Math.max(margin, Math.min(anchor.left, window.innerWidth - menu.offsetWidth - margin))
+      menu.style.top = `${top}px`
+      menu.style.left = `${left}px`
+      menu.style.maxHeight = `${height}px`
+    }
+
+    // A popover in the same dialog can escape its scroll container without losing modal focus.
+    const selected = menu.querySelector<HTMLButtonElement>('[aria-checked="true"]')
+    if (typeof menu.showPopover !== 'function') {
+      selected?.focus({ preventScroll: true })
+      return
+    }
+    menu.showPopover()
+    position()
+    selected?.focus({ preventScroll: true })
+    window.addEventListener('resize', position)
+    document.addEventListener('scroll', position, true)
+    return () => {
+      window.removeEventListener('resize', position)
+      document.removeEventListener('scroll', position, true)
+      if (menu.matches(':popover-open')) menu.hidePopover()
+    }
   }, [open])
 
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -83,7 +121,7 @@ export default function PostAudiencePicker({ value, disabled = false, onChange }
         <ChevronDown size={13} className={open ? 'smart-audience-chevron is-open' : 'smart-audience-chevron'} aria-hidden="true" />
       </button>
       {open && <div className="smart-audience-menu" id={menuId}
-        role="menu" aria-label="Ai có thể xem bài viết"
+        role="menu" aria-label="Ai có thể xem bài viết" popover="manual"
         ref={menuRef} onKeyDown={onMenuKeyDown}>
         <div className="smart-audience-menu-heading">
           <strong>Ai có thể xem bài viết?</strong>

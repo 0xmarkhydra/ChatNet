@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
+import { feedPostPath } from '../../../shared/utils/feedPostPath'
 import { Bookmark, Copy, Ellipsis, Flag, Pencil, Share2, Trash2, X } from 'lucide-react'
 import '../styles/feed-actions.css'
 
@@ -25,10 +27,9 @@ type Props<P extends FeedActionPost> = {
 const reasons = ['Nội dung spam', 'Quấy rối hoặc xúc phạm', 'Lừa đảo hoặc giả mạo', 'Thông tin gây hiểu lầm', 'Nội dung không phù hợp']
 
 function postUrl(id: number) {
-  const url = new URL(window.location.href)
-  url.searchParams.set('tab', 'feed')
-  url.searchParams.set('post', String(id))
-  return url.toString()
+  const { origin, protocol } = window.location
+  const webOrigin = protocol === 'https:' || protocol === 'http:' ? origin : 'https://chat.codelocal.cloud'
+  return new URL(feedPostPath(id), webOrigin).href
 }
 
 async function sharePost(id: number, feedback: Feedback, copyOnly = false) {
@@ -86,6 +87,7 @@ export function FeedShareAction({ postId, onFeedback }: { postId: number; onFeed
 }
 
 export default function FeedPostActions<P extends FeedActionPost>({ post, mine, request, onUpdated, onDeleted, onFeedback, onEdit }: Props<P>) {
+  const portalContainer = useContext(ModalPortalContext)
   const trigger = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
   const [screenPosition, setScreenPosition] = useState({ top: 0, left: 0 })
@@ -96,7 +98,12 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busy) setOpen(false)
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      if (!busy) {
+        setOpen(false)
+        trigger.current?.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -231,7 +238,7 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
             )}
           </section>
         </div>,
-        document.body,
+        portalContainer ?? document.body,
       )}
     </div>
   )

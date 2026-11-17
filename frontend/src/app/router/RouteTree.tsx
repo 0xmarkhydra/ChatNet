@@ -90,7 +90,12 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
         </Route>
         <Route path={TAB_PATH.contacts.slice(1)} element={<FeatureRouteLayout />}>
           <Route index element={<CurrentPage />} />
+          <Route path="directory" element={<CurrentPage />} />
+          <Route path="overview" element={<CurrentPage />} />
+          <Route path="groups" element={<CurrentPage />} />
           <Route path="requests" element={<CurrentPage />} />
+          <Route path="calls" element={<CurrentPage />} />
+          <Route path="translation" element={<CurrentPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={TAB_PATH.feed.slice(1)} element={<FeatureRouteLayout />}>
@@ -108,10 +113,10 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={ROUTE.calls.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
-          <Route path="history" element={<CurrentPage />} />
-          <Route path="directory" element={<CurrentPage />} />
-          <Route path="translation" element={<CurrentPage />} />
+          <Route index element={<Navigate to="/contacts/calls" replace />} />
+          <Route path="history" element={<Navigate to="/contacts/calls" replace />} />
+          <Route path="directory" element={<Navigate to="/contacts" replace />} />
+          <Route path="translation" element={<Navigate to="/contacts/translation" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path="users" element={<FeatureRouteLayout />}>
@@ -119,6 +124,7 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
           <Route path=":username" element={<VisitorProfilePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
+        <Route path={ROUTE.search.slice(1)} element={<CurrentPage />} />
         {[TAB_PATH.discover, TAB_PATH.market, TAB_PATH.notifications].map((path) => (
           <Route key={path} path={path.slice(1)} element={<CurrentPage />} />
         ))}

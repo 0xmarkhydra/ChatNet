@@ -23,7 +23,6 @@ export type UseGroupChannelsDeps = {
   setHasMoreMessages: Dispatch<SetStateAction<boolean>>;
   setMessageActionId: Dispatch<SetStateAction<number | null>>;
   setMessageSearchOpen: Dispatch<SetStateAction<boolean>>;
-  setMessages: Dispatch<SetStateAction<Message[]>>;
   setReplyingTo: Dispatch<SetStateAction<Message | null>>;
 };
 
@@ -43,7 +42,6 @@ export function useGroupChannels({
   setHasMoreMessages,
   setMessageActionId,
   setMessageSearchOpen,
-  setMessages,
   setReplyingTo,
 }: UseGroupChannelsDeps) {
   const { apiFetch } = useApi();
@@ -54,7 +52,6 @@ export function useGroupChannels({
     if (activeConversation?.type !== 'group' || !groupChannels.some(channel => channel.id === channelId)) return;
     activeChannelIdRef.current = channelId;
     setChannelSelection({ conversationId: activeConversation.id, channelId });
-    setMessages([]);
     setHasMoreMessages(false);
     setChatSearchJump(null);
     setReplyingTo(null);
@@ -82,7 +79,6 @@ export function useGroupChannels({
       }));
       activeChannelIdRef.current = data.id;
       setChannelSelection({ conversationId: groupId, channelId: data.id });
-      setMessages([]);
       setHasMoreMessages(false);
       setReplyingTo(null);
       setChatSearchJump(null);

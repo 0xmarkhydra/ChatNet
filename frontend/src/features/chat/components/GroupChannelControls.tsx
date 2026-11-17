@@ -121,14 +121,14 @@ export default function GroupChannelControls({
 
   function toggleGroupNotifications() {
     if (groupNotifications === null) return
-    const mute = groupNotifications.messageNotifications || groupNotifications.mentionNotifications
+    const mute = groupNotifications.messageNotifications
     void perform(async () => {
       const result = await readResponse(await request('/api/conversations/' + groupId + '/notification-settings', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageNotifications: !mute, mentionNotifications: !mute }),
+        body: JSON.stringify({ messageNotifications: !mute, mentionNotifications: groupNotifications.mentionNotifications }),
       }), 'Không cập nhật được thông báo nhóm.') as GroupNotifications
       setGroupNotifications(result)
-      onGroupNotificationChanged?.(!result.messageNotifications && !result.mentionNotifications)
+      onGroupNotificationChanged?.(!result.messageNotifications)
       notify(mute ? 'Đã tắt thông báo nhóm.' : 'Đã bật thông báo nhóm.', 'success')
     })
   }
@@ -169,7 +169,7 @@ export default function GroupChannelControls({
     })
   }
 
-  const groupMuted = groupNotifications !== null && !groupNotifications.messageNotifications && !groupNotifications.mentionNotifications
+  const groupMuted = groupNotifications !== null && !groupNotifications.messageNotifications
 
   return <>
     {error && <p role="alert" className="group-channel-controls-error">{error}</p>}

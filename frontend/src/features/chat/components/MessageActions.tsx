@@ -1,9 +1,11 @@
+import { useState } from 'react'
+import ChatEmojiPicker from './ChatEmojiPicker'
 import { userLabel } from '../../../shared/utils/userLabel'
 import type { Message } from '../types'
 import { messageReactions } from '../utils/messageReactions'
 import { attachmentLabel, formatTime } from '../../../shared/utils/format'
 import type { MessageCopyTarget } from '../utils/messageCopyTarget'
-import { Copy, Forward, Languages, Pin, Reply } from 'lucide-react'
+import { Copy, Forward, Languages, Pin, Reply, SmilePlus } from 'lucide-react'
 
 type Props = {
   mode?: 'reactions' | 'actions'
@@ -40,6 +42,12 @@ export default function MessageActions({
 }: Props) {
   const mine = activeMessageAction.senderId === userId
   const preview = activeMessageAction.text.trim() || attachmentLabel(activeMessageAction.attachments)
+  const [showAllEmojis, setShowAllEmojis] = useState(false)
+  const selectedEmoji = activeMessageAction.reactions?.find(reaction => reaction.mine)?.emoji
+  const selectReaction = (emoji: string) => {
+    setMessageActionId(null)
+    void toggleReaction(activeMessageAction, emoji)
+  }
   return (
     <div
       className={mode === 'reactions' ? 'message-context-backdrop reaction-only' : 'message-context-backdrop'}
@@ -69,16 +77,27 @@ export default function MessageActions({
               aria-pressed={(activeMessageAction.reactions || []).some((reaction) => reaction.emoji === emoji && reaction.mine)}
               aria-label={`${label} ${emoji}`}
               title={label}
-              onClick={() => {
-                setMessageActionId(null)
-                void toggleReaction(activeMessageAction, emoji)
-              }}
+              onClick={() => selectReaction(emoji)}
             >
               {emoji}
               <small>{label}</small>
             </button>
           ))}
+          <button
+            type="button"
+            className="chat-reaction-more"
+            aria-label="Thêm emoji khác"
+            aria-expanded={showAllEmojis}
+            title="Thêm emoji"
+            onClick={() => setShowAllEmojis(open => !open)}
+          >
+            <SmilePlus size={25} aria-hidden="true" />
+            <small>Thêm</small>
+          </button>
         </div>}
+        {mode === 'reactions' && showAllEmojis && (
+          <ChatEmojiPicker label="Chọn emoji để thả cảm xúc" selectedEmoji={selectedEmoji} onSelect={selectReaction} />
+        )}
 
         {mode === 'actions' && <div className="message-context-actions">
           {!activeMessageAction.deleted && (
