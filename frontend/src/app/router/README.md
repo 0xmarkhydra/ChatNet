@@ -6,7 +6,7 @@
 
 - The signed-in shell and session/realtime providers stay mounted while navigating across supported feature routes.
 - `AppLayout` owns the shared Header, Sidebar, notices and one `<Outlet context={outletContext} />`; it imports the pure `routePageContext.ts` contract, never the `PageRoute` renderer.
-- `AuthedApp` remains the session-scoped feature-state controller. It supplies typed route-owned React nodes for Chat, Feed, Profile/Settings/visitors, Contacts/Calls, Search, Discover, Marketplace and Notifications.
+- `AuthedApp` remains the session-scoped feature-state controller. It supplies typed route-owned React nodes for Chat, Feed and Profile/Settings/visitors. `createSecondaryPageSlots.tsx` composes the typed React elements for Contacts/Calls, Search, Discover, Marketplace and Notifications without transferring state or mounting inactive features.
 - `PageRoute` requires a `RoutePageKey` (no implicit legacy fallback), owns `modern-frame` and a page Error Boundary, and adds no new CSS or structural DOM wrappers.
 - `FeatureRouteLayout` in `FeatureRoutePages.tsx` forwards the same context through nested `<Outlet />` without adding DOM or business state. The module also validates Chat conversation IDs, Feed post IDs, visitor usernames and Settings sections.
 - `beforeFeed` and `afterFeed` retain the existing shared dialogs/overlays in their original DOM positions for Chat, Feed and Profile; they own no business state.
