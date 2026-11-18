@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import type { Tab } from '../../shared/types/navigation'
-import type { UI_MESSAGES } from '../../features/i18n/lib/i18n'
+import { formatUnreadMessageDescription, type UI_MESSAGES } from '../../features/i18n/lib/i18n'
 import UiIcon from '../../shared/ui/UiIcon'
 
 type Props = {
@@ -19,6 +19,7 @@ export default function BottomNavigation({
   pushEnabled,
 }: Props) {
   const activeKey = tab
+  const unreadDescriptionId = useId()
   const navRef = useRef<HTMLElement>(null)
   const activeButtonRef = useRef<HTMLButtonElement>(null)
   const pillRef = useRef<HTMLSpanElement>(null)
@@ -89,13 +90,13 @@ export default function BottomNavigation({
       <button
         type="button"
         aria-label={t('nav.chat')}
-        title={t('nav.chat')}
+        aria-describedby={unreadTotal > 0 ? unreadDescriptionId : undefined}
         className={tab === 'chat' ? 'active' : ''}
         aria-current={tab === 'chat' ? 'page' : undefined}
         ref={tab === 'chat' ? activeButtonRef : undefined}
         onClick={() => switchTab('chat')}
       >
-        <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b>{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
+        <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b aria-hidden="true">{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
         <span className="nav-label">{t('nav.chat')}</span>
       </button>
       <button
@@ -146,6 +147,9 @@ export default function BottomNavigation({
         <span className="nav-icon"><UiIcon name="profile" size={25} />{!pushEnabled && <b>!</b>}</span>
         <span className="nav-label">{t('nav.profile')}</span>
       </button>
+      {unreadTotal > 0 && (
+        <span id={unreadDescriptionId} hidden>{formatUnreadMessageDescription(unreadTotal, t('nav.chatUnread'))}</span>
+      )}
     </nav>
   )
 }
