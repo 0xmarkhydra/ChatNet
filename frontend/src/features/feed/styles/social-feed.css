@@ -623,9 +623,6 @@
   .modern-shell.app-layout .social-feed-suggestions {
     min-height: 300px;
   }
-  .modern-shell.app-layout .social-feed-trending {
-    min-height: 262px;
-  }
   .social-feed-suggestion-list {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -730,103 +727,6 @@
     font-size: 12px;
     line-height: 1.5;
   }
-  .social-feed-trending header > svg {
-    color: #9eacca;
-  }
-  .social-feed-trend-list {
-    display: grid;
-    gap: 11px;
-    margin-top: 22px;
-  }
-  .social-feed-trend {
-    display: flex;
-    align-items: flex-start;
-    flex-direction: column;
-    justify-content: center;
-    gap: 4px;
-    min-height: 46px;
-    padding: 0 14px;
-    border: none;
-    border-radius: 10px;
-    background: #f8fafe;
-    color: #33507d;
-    text-align: left;
-    font: inherit;
-    cursor: pointer;
-  }
-  .social-feed-trend:hover {
-    background: #edf3ff;
-  }
-  .social-feed-trend strong {
-    color: #345184;
-    font-size: 13px;
-    font-weight: 730;
-  }
-  .social-feed-trend span {
-    color: #9ca9bc;
-    font-size: 11px;
-  }
-  .social-feed-topic-empty {
-    min-height: 172px;
-  }
-  .modern-shell.app-layout .social-feed-translation {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    height: 250px;
-    padding: 25px 23px 28px;
-    border-radius: 17px;
-    background: linear-gradient(125deg, #315dca 0%, #5652d1 48%, #8955df 100%);
-    color: #fff;
-    overflow: hidden;
-  }
-  .social-feed-translation-icon {
-    display: grid;
-    place-items: center;
-    width: 47px;
-    height: 47px;
-    border-radius: 13px;
-    color: #4f62d7;
-    background: #fff;
-    flex: 0 0 47px;
-  }
-  .social-feed-translation-copy {
-    margin-top: 13px;
-  }
-  .social-feed-translation h2 {
-    margin: 0;
-    color: #fff;
-    font-size: 20px;
-    line-height: 1.35;
-    font-weight: 760;
-  }
-  .social-feed-translation p {
-    margin: 10px 0 0;
-    font-size: 12px;
-    color: #e5eaff;
-    line-height: 1.45;
-  }
-  .social-feed-translation > button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 11px;
-    min-height: 40px;
-    margin-top: auto;
-    padding: 0 14px;
-    border: 0;
-    border-radius: 10px;
-    color: #315ec4;
-    background: #eff3ff;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  .social-feed-translation > button:hover {
-    background: #fff;
-  }
-
   /* Header geometry is owned by the application layout. */
   .modern-shell.app-layout .social-feed-header-community {
     background: #eff3ff;
@@ -876,27 +776,14 @@
   }
   .modern-shell.app-layout .social-feed-side {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
-  }
-  .modern-shell.app-layout .social-feed-translation {
-    grid-column: 1 / -1;
-    height: 200px;
-  }
-  .social-feed-translation > button {
-    margin-top: 18px;
   }
   .social-feed-story-strip {
     overflow-x: auto;
   }
 }
 @media (min-width: 761px) and (max-width: 930px) {
-  .modern-shell.app-layout .social-feed-side {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .modern-shell.app-layout .social-feed-translation {
-    grid-column: 1;
-  }
   .social-feed-launcher-shortcuts {
     gap: 8px;
   }
@@ -1029,8 +916,7 @@
   }
 }
 
-/* Retain a real side rail on compact laptop screens instead of pushing
- * the three menus underneath the entire feed, where they cannot be seen. */
+/* Keep connection suggestions beside the feed on compact laptop screens. */
 @media (min-width: 1121px) and (max-width: 1330px) {
   .modern-shell.app-layout .social-feed-grid {
     grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
@@ -1041,24 +927,15 @@
   .modern-shell.app-layout .social-feed-grid > .social-feed-side {
     grid-template-columns: none;
   }
-  .modern-shell.app-layout .social-feed-translation {
-    grid-column: auto;
-    height: 250px;
-  }
 }
 
-/* Short desktop viewports: tighter cards first, then independent rail scroll
- * when all three still cannot fit. */
+/* Use denser connection suggestions on short desktop viewports. */
 @media (min-width: 1121px) and (max-height: 780px) {
   .modern-shell.app-layout .social-feed-grid > .social-feed-side { gap: 11px; }
   .modern-shell.app-layout .social-feed-side-card { padding: 13px 15px 15px; }
   .modern-shell.app-layout .social-feed-suggestions { min-height: 260px; }
-  .modern-shell.app-layout .social-feed-trending { min-height: 210px; }
-  .modern-shell.app-layout .social-feed-translation {
-    height: 205px;
-    padding: 17px 19px 19px;
-  }
-  .social-feed-translation h2 { font-size: 18px; }
-  .social-feed-translation-copy { margin-top: 9px; }
-  .social-feed-translation p { margin-top: 6px; }
+}
+
+.modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > .feed-repost-action[data-reposted='true'] {
+  color: var(--soco-blue);
 }

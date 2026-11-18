@@ -10,10 +10,17 @@ export type DesktopPlatformInfo = {
 export type DesktopScreenRequest = { requestId: string; sources: { index: number; name: string; thumbnail: string }[] }
 export type MediaPermissionStatus = 'not-determined' | 'granted' | 'denied' | 'restricted' | 'unknown'
 
+export type DesktopScreenshotMode = 'include' | 'exclude'
+export type DesktopScreenshotBridge = {
+  capture: (mode: DesktopScreenshotMode) => Promise<true | null>
+  onShortcut: (callback: (mode: DesktopScreenshotMode) => void) => () => void
+}
+
 export type DesktopBridge = {
   getPlatformInfo: () => Promise<DesktopPlatformInfo>
   openExternal: (url: string) => Promise<boolean>
   notifications: {
+    preview: (sessionId: string) => Promise<boolean>
     sync: (input: { sessionId: string; conversationId: number | null; unreadCount: number | null; enabled: boolean; sound: boolean }) => Promise<boolean>
     show: (input: { sessionId: string; conversationId: number; eventId: string; kind: 'message' | 'call'; senderId: number; createdAt: string }) => Promise<{ shown: boolean; reason?: string }>
     clear: (sessionId: string) => Promise<boolean>
@@ -28,6 +35,7 @@ export type DesktopBridge = {
     select: (requestId: string, index: number | null) => Promise<boolean>
     onPicker: (callback: (request: DesktopScreenRequest | null) => void) => () => void
   }
+  screenshot?: DesktopScreenshotBridge
   auth: {
     restore: () => Promise<Session | null>
     verifyEmail: (input: { token: string; code: string }) => Promise<Session>
@@ -51,6 +59,10 @@ export const isDesktopBuild = import.meta.env.MODE === 'desktop'
 export function desktopBridge(): DesktopBridge {
   if (!isDesktopBuild || !window.socoDesktop?.auth) throw new Error('DESKTOP_BRIDGE_UNAVAILABLE')
   return window.socoDesktop
+}
+
+export function getDesktopScreenshotBridge(): DesktopScreenshotBridge | undefined {
+  return isDesktopBuild ? window.socoDesktop?.screenshot : undefined
 }
 
 export async function initializeDesktopPlatform(): Promise<void> {

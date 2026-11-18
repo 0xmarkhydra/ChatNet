@@ -44,3 +44,14 @@ export function reportComment(request: ApiRequest, commentId: number, reason: st
     }),
   });
 }
+
+export function changeCommentLike(
+  request: ApiRequest,
+  postId: number,
+  commentId: number,
+  liked: boolean,
+) {
+  return request(`/api/posts/${postId}/comments/${commentId}/like`, {
+    method: liked ? "PUT" : "DELETE",
+  });
+}

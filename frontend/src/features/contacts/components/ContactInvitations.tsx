@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState, type KeyboardEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check, Clock3, QrCode, UserRoundPlus, X } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from '../types'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -21,6 +21,20 @@ const personName = (friend: FriendConnection) => friend.displayName || friend.us
 
 export default function ContactInvitations({ friendRequests, friendBusyIds, actOnFriend, declineFriendRequest, connectionUrl, onScanQr, onBack, onSearch }: Props) {
   const [invitationTab, setInvitationTab] = useState<InvitationTab>('incoming')
+  const instanceId = useId()
+  const tabId = (tab: InvitationTab) => instanceId + '-tab-' + tab
+  const panelId = instanceId + '-tabpanel'
+  const tabs: InvitationTab[] = ['incoming', 'sent', 'qr']
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: InvitationTab) => {
+    const current = tabs.indexOf(tab)
+    const next = event.key === 'ArrowRight' ? (current + 1) % tabs.length
+      : event.key === 'ArrowLeft' ? (current + tabs.length - 1) % tabs.length
+      : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1
+    if (next < 0) return
+    event.preventDefault()
+    setInvitationTab(tabs[next])
+    document.getElementById(tabId(tabs[next]))?.focus()
+  }
   const { hostRef, pillRef, activeRef } = useSlidingPill<HTMLDivElement>(invitationTab)
   const incoming = friendRequests.filter(friend => friend.direction === 'incoming')
   const outgoing = friendRequests.filter(friend => friend.direction === 'outgoing')
@@ -28,26 +42,28 @@ export default function ContactInvitations({ friendRequests, friendBusyIds, actO
     <UserAvatar username={friend.username} name={personName(friend)} className="avatar fd-avatar" online={friend.online} />
   )
   return <>
+    <div className="fd-invitation-layout">
+      <div className="fd-invitation-main">
       <div className="fd-invitation-tabs">
         <button type="button" className="fd-back" onClick={onBack} aria-label="Quay lại Danh bạ"><ArrowLeft size={17}/></button>
-        <div ref={hostRef} className="sliding-pill-host" role="tablist" aria-label="Lời mời kết bạn">
+        <div ref={hostRef} className="sliding-pill-host" role="tablist" aria-label="Lời mời kết bạn" aria-orientation="horizontal">
           <span ref={pillRef} className="sliding-pill invitation-active-pill" aria-hidden="true" />
           {([['incoming','Lời mời đến'],['sent','Đã gửi'],['qr','Quét QR']] as const).map(([id,label]) =>
             <button ref={invitationTab === id ? activeRef : undefined} role="tab" type="button" key={id} className={invitationTab === id ? 'active' : ''}
-              aria-selected={invitationTab === id} onClick={() => setInvitationTab(id)}>{label}</button>)}
+              id={tabId(id)} aria-controls={panelId} tabIndex={invitationTab === id ? 0 : -1}
+              aria-selected={invitationTab === id} onKeyDown={event => onTabKeyDown(event, id)} onClick={() => setInvitationTab(id)}>{label}</button>)}
         </div>
-        <small>{incoming.length + outgoing.length} đang chờ xử lý</small>
+        <small aria-live="polite">{incoming.length} lời mời đến · {outgoing.length} đã gửi</small>
       </div>
-      <div className="fd-invitation-layout">
-        <section className="fd-card fd-invitation-list" role="tabpanel">
+        <section className="fd-card fd-invitation-list" id={panelId} role="tabpanel" aria-labelledby={tabId(invitationTab)} tabIndex={0}>
           {invitationTab === 'incoming' ? <>
             <div className="fd-invitation-heading"><h2>Lời mời đến</h2><p>Lời mời sẽ không tự động được chấp nhận</p></div>
             {incoming.length === 0 && <p className="fd-empty">Chưa có lời mời kết bạn đến.</p>}
-            {incoming.map(friend => <div className="fd-request-row" key={friend.id}>
+            {incoming.map(friend => <div className="fd-request-row" key={friend.id} aria-busy={friendBusyIds.has(friend.id)} >
               {avatar(friend)}<div className="fd-request-copy"><strong>{personName(friend)}</strong>
-                <span>@{friend.username} · Đang chờ phản hồi</span></div>
-              <button type="button" className="fd-primary" disabled={friendBusyIds.has(friend.id)} onClick={() => void actOnFriend(friend)}><Check size={17}/>Chấp nhận</button>
-              <button type="button" className="fd-secondary" disabled={friendBusyIds.has(friend.id)} onClick={() => void declineFriendRequest(friend)}><X size={17}/>Từ chối</button>
+                <span>@{friend.username} · {friendBusyIds.has(friend.id) ? 'Đang xử lý...' : 'Đang chờ phản hồi'}</span></div>
+              <button type="button" className="fd-primary" disabled={friendBusyIds.has(friend.id)} aria-label={'Chấp nhận lời mời của ' + personName(friend)} onClick={() => void actOnFriend(friend)}><Check size={17}/>Chấp nhận</button>
+              <button type="button" className="fd-secondary" disabled={friendBusyIds.has(friend.id)} aria-label={'Từ chối lời mời của ' + personName(friend)} onClick={() => void declineFriendRequest(friend)}><X size={17}/>Từ chối</button>
             </div>)}
             <button type="button" className="fd-outgoing-summary" onClick={() => setInvitationTab('sent')}>
               <Clock3 size={18}/><span><strong>Đã gửi {outgoing.length} lời mời</strong><small>Bạn có thể hủy lời mời khi chưa được chấp nhận.</small></span><ArrowRight size={18}/>
@@ -55,10 +71,10 @@ export default function ContactInvitations({ friendRequests, friendBusyIds, actO
           </> : invitationTab === 'sent' ? <>
             <div className="fd-invitation-heading"><h2>Đã gửi</h2><p>Những lời mời đang chờ người nhận phản hồi</p></div>
             {outgoing.length === 0 && <p className="fd-empty">Bạn chưa có lời mời đang chờ.</p>}
-            {outgoing.map(friend => <div className="fd-request-row" key={friend.id}>
-              {avatar(friend)}<div className="fd-request-copy"><strong>{personName(friend)}</strong><span>@{friend.username} · Đang chờ</span></div>
+            {outgoing.map(friend => <div className="fd-request-row" key={friend.id} aria-busy={friendBusyIds.has(friend.id)} >
+              {avatar(friend)}<div className="fd-request-copy"><strong>{personName(friend)}</strong><span>@{friend.username} · {friendBusyIds.has(friend.id) ? 'Đang xử lý...' : 'Đang chờ'}</span></div>
               <button type="button" className="fd-secondary" disabled={friendBusyIds.has(friend.id)}
-                onClick={() => void actOnFriend(friend)}><X size={17}/>Hủy lời mời</button>
+                aria-label={'Hủy lời mời đã gửi cho ' + personName(friend)} onClick={() => void actOnFriend(friend)}><X size={17} aria-hidden="true"/>Hủy lời mời</button>
             </div>)}
             <button type="button" className="fd-outgoing-summary" onClick={onSearch}>
               <UserRoundPlus size={20}/><span><strong>Tìm bạn bè mới</strong><small>Quay về danh bạ để tìm và gửi lời mời.</small></span><ArrowRight size={18}/>
@@ -70,6 +86,7 @@ export default function ContactInvitations({ friendRequests, friendBusyIds, actO
               <button type="button" className="fd-primary" onClick={onScanQr}><QrCode size={19}/>Mở trình quét QR</button></div>
           </>}
         </section>
+      </div>
         <ContactQrPanel connectionUrl={connectionUrl} onScanQr={onScanQr} />
       </div>
 

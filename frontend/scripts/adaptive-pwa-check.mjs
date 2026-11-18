@@ -55,7 +55,9 @@ try {
   }
   assert.ok(ready, 'Vite did not start')
   browser = await chromium.launch({ headless: true })
-  for (const width of [320, 375, 390, 430, 768, 1440]) {
+  const widths = process.argv.includes('--nav-only') ? [320, 375, 390, 430] : [320, 375, 390, 430, 768, 1440]
+  const selectedWidth = process.argv.find(arg => arg.startsWith('--width='))
+  for (const width of (selectedWidth ? widths.filter(value => value === Number(selectedWidth.slice(8))) : widths)) {
     const phone = width <= 760
     const context = await browser.newContext({
       viewport: { width, height: phone ? 844 : 900 }, deviceScaleFactor: 1,
@@ -117,52 +119,166 @@ try {
       return json([])
     })
     await page.goto(origin)
-    const list = page.locator('.social-chat-layout .conversation-sidebar')
+    const list = page.locator(phone ? '.conversation-avatar-rail' : '.desktop-conversation-rail')
     await list.waitFor({ state: 'visible', timeout: 15000 })
-    await page.locator('.conversation-item').first().waitFor({ state: 'visible' })
+    await list.locator(phone ? '.conversation-avatar-rail-item' : '.desktop-conversation-rail-entry').first().waitFor({ state: 'visible' })
     const bottom = page.locator('.bottom-navigation')
     const rail = page.locator('.app-sidebar')
     const header = page.locator('.social-chat-list-header')
     if (phone) {
       assert.equal(await rail.isVisible(), false, width + ': desktop rail must be hidden')
       assert.equal(await bottom.isVisible(), true, width + ': bottom tabs must remain visible')
-      assert.equal(await bottom.locator('button').count(), 6, width + ': six original tabs')
-      assert.equal(await bottom.locator('.nav-label:visible').count(), 6, width + ': six visible labels')
-      assert.equal(await header.isVisible(), true, width + ': chat search/filters header must be visible')
-      assert.equal(await header.locator('.social-chat-list-search').count(), 0, width + ': redundant list search removed')
-      assert.equal(await page.locator('.mobile-chat-appbar .appbar-search-anchor').count(), 0, width + ': top search moved out of appbar')
-      assert.equal(await page.locator('.appbar-search-anchor input').count(), 1, width + ': exactly one quick-search input')
-      const quickSearch = header.locator('.appbar-search-anchor input')
-      assert.equal(await quickSearch.isVisible(), true, width + ': existing quick search relocated under conversation title')
-      assert.equal(await header.locator('.social-chat-list-filters').isVisible(), true, width + ': chat filters')
-      const compact = await page.evaluate(() => {
-        const heading = document.querySelector('.social-chat-list-title')
-        const search = document.querySelector('.social-chat-list-header .appbar-search')
-        const filters = [...document.querySelectorAll('.social-chat-list-filters button')]
-        const category = document.querySelector('.conversation-categories .category-filter-trigger')
-        const icon = category.querySelector('.category-filter-mobile-icon')
-        const list = document.querySelector('.zalo-conversation-list')
-        return { hiddenHeading: getComputedStyle(heading).display === 'none',
-          searchHeight: search.getBoundingClientRect().height,
-          filterTop: filters[0].getBoundingClientRect().top,
-          filterRight: filters.at(-1).getBoundingClientRect().right,
-          categoryTop: category.getBoundingClientRect().top,
-          categoryLeft: category.getBoundingClientRect().left,
-          visibleIcon: getComputedStyle(icon).display !== 'none',
-          listTop: list.getBoundingClientRect().top }
-      })
-      assert.ok(compact.hiddenHeading && compact.searchHeight <= 42 && compact.visibleIcon,
-        width + ': compact mobile heading, search and category icon: ' + JSON.stringify(compact))
-      assert.ok(Math.abs(compact.filterTop - compact.categoryTop) <= 3 && compact.filterRight < compact.categoryLeft,
-        width + ': all filters and the category icon share one row without overlap: ' + JSON.stringify(compact))
-      assert.ok(compact.listTop < 235, width + ': conversation list begins high enough to show more messages')
+      assert.equal(await bottom.locator('button').count(), 5, width + ': five primary navigation tabs')
+      assert.equal(await bottom.locator('.nav-label:visible').count(), 5, width + ': five visible labels')
+      if (process.argv.includes('--nav-only')) {
+        await bottom.locator('.nav-liquid-pill.is-ready').waitFor()
+        const inspect = async () => bottom.evaluate(nav => {
+          const items = [...nav.querySelectorAll(':scope > button')].map(button => {
+            const box = button.getBoundingClientRect()
+            const icon = button.querySelector('.nav-icon').getBoundingClientRect()
+            const label = button.querySelector('.nav-label')
+            const text = label.getBoundingClientRect()
+            return { left: box.left, right: box.right, width: box.width, height: box.height,
+              center: (box.left + box.right) / 2,
+              iconCenter: (icon.left + icon.right) / 2,
+              labelCenter: (text.left + text.right) / 2,
+              labelY: text.top, clipped: label.scrollWidth > label.clientWidth + 1 }
+          })
+          const activeTab = nav.querySelector('button.active').getBoundingClientRect()
+          const icon = nav.querySelector('button.active .nav-icon').getBoundingClientRect()
+          const label = nav.querySelector('button.active .nav-label').getBoundingClientRect()
+          const pill = nav.querySelector('.nav-liquid-pill').getBoundingClientRect()
+          return { items, iconCenter: (icon.left + icon.right) / 2,
+            pillCenter: (pill.left + pill.right) / 2, pillWidth: pill.width,
+            tabWidth: activeTab.width, pillTop: pill.top, pillBottom: pill.bottom,
+            iconTop: icon.top, labelBottom: label.bottom }
+        })
+        for (const index of [0, 1, 2, 3, 4, 0]) {
+          await bottom.locator('button').nth(index).click()
+          await page.waitForFunction(selected =>
+            document.querySelectorAll('.bottom-navigation > button')[selected]?.getAttribute('aria-current') === 'page',
+            index, { timeout: 5000 })
+          await page.waitForTimeout(580)
+          const layout = await inspect()
+          const widths = layout.items.map(item => item.width)
+          assert.ok(Math.max(...widths) - Math.min(...widths) < 1,
+            width + 'px: tab cells must be the same width: ' + JSON.stringify(layout))
+          assert.ok(layout.items.every((item, i) =>
+            item.height >= 44 && !item.clipped &&
+            Math.abs(item.center - item.iconCenter) <= 1 &&
+            Math.abs(item.labelCenter - item.iconCenter) <= 1 &&
+            Math.abs(item.labelY - layout.items[0].labelY) <= 1 &&
+            (i === 0 || Math.abs(item.left - layout.items[i - 1].right) <= 1)),
+            width + 'px: tab icon/label alignment is not consistent: ' + JSON.stringify(layout))
+          assert.ok(Math.abs(layout.iconCenter - layout.pillCenter) <= 2 &&
+            Math.abs(layout.pillWidth - (layout.tabWidth - 4)) <= 1 &&
+            layout.pillTop <= layout.iconTop && layout.pillBottom >= layout.labelBottom,
+            width + 'px: selected bubble must wrap the whole tab (icon and label): ' + JSON.stringify(layout))
+        }
+        if (width === 390) {
+          const indicator = bottom.locator('.nav-liquid-pill')
+          const startingPill = await indicator.boundingBox()
+          const destinationIcon = await bottom.locator('button').nth(4).locator('.nav-icon').boundingBox()
+          await bottom.locator('button').nth(4).click()
+          await page.waitForTimeout(135)
+          const slidingPill = await indicator.boundingBox()
+          const elasticScale = await indicator.evaluate(el => getComputedStyle(el).scale)
+          assert.ok(startingPill && destinationIcon && slidingPill &&
+            slidingPill.x > startingPill.x + 3 && slidingPill.x < destinationIcon.x - 3,
+            'The bubble should glide between the old and new tabs, not jump immediately')
+          assert.ok(Number.parseFloat(elasticScale) > 1.03,
+            'The whole bubble should stretch elastically during the slide: ' + elasticScale)
+          await page.waitForTimeout(500)
+          const settledScale = await indicator.evaluate(el => getComputedStyle(el).scale)
+          assert.ok(settledScale === '1' || settledScale === 'none',
+            'The bubble should return to its natural size after the spring: ' + settledScale)
+          await bottom.locator('button').first().click()
+          await page.waitForTimeout(580)
+          await page.emulateMedia({ reducedMotion: 'reduce' })
+          await bottom.locator('button').nth(4).click()
+          const reducedMotionLayout = await inspect()
+          assert.ok(Math.abs(reducedMotionLayout.iconCenter - reducedMotionLayout.pillCenter) <= 2,
+            'Reduced motion must keep the bubble centered on the selected tab')
+          await bottom.locator('button').first().click()
+          await page.emulateMedia({ reducedMotion: 'no-preference' })
+        }
+        await page.screenshot({ path: 'output/playwright/layout/mobile-bottom-nav-' + width + '.png' })
+        assert.deepEqual(errors, [], width + 'px: unexpected browser errors')
+        console.log('PASS: 5 evenly spaced mobile tabs, labels, indicator and navigation at ' + width + 'px')
+        // Selecting a group keeps activeConversation set while the joined
+        // channel picker is shown. The bottom tabs must still be available
+        // both before and after tapping the same avatar to retract it.
+        const groupAvatar = list.getByRole('button', { name: /Mở nhóm SocCo Design Team/ })
+        await groupAvatar.click()
+        await page.locator('.social-chat-layout.mobile-rail-picker-view').waitFor({ state: 'visible' })
+        await page.waitForTimeout(600)
+        const pickerBefore = await page.locator('.social-chat-layout').evaluate(layout => ({
+          expanded: layout.getAttribute('data-split-expanded'),
+          priming: layout.getAttribute('data-split-priming'),
+          railWidth: layout.querySelector('.conversation-avatar-rail')?.getBoundingClientRect().width,
+          classes: layout.className,
+        }))
+        assert.ok(pickerBefore.railWidth < width / 2,
+          width + 'px: selecting a group must show the compact avatar dock and channel picker')
+        assert.equal(await bottom.isVisible(), true, width + 'px: group channel picker must preserve bottom tabs')
+        await groupAvatar.click()
+        await page.waitForTimeout(500)
+        const pickerAfter = await page.locator('.social-chat-layout').evaluate(layout => ({
+          expanded: layout.getAttribute('data-split-expanded'),
+          railWidth: layout.querySelector('.conversation-avatar-rail')?.getBoundingClientRect().width,
+        }))
+        assert.ok(pickerAfter.railWidth > width * .9 && pickerAfter.expanded === 'true',
+          width + 'px: second group-avatar tap must expand the conversation rail again: ' + JSON.stringify(pickerAfter))
+        assert.equal(await bottom.isVisible(), true, width + 'px: collapsing the group picker must restore bottom tabs')
+        await page.screenshot({ path: 'output/playwright/layout/mobile-group-picker-collapsed-' + width + '.png' })
+        console.log('PASS: group avatar collapse preserves bottom navigation at ' + width + 'px')
+        if (width === 390) {
+          await page.goto(origin)
+          const avatarRail = page.locator('.conversation-avatar-rail')
+          await avatarRail.waitFor({ state: 'visible' })
+          await avatarRail.getByRole('button', { name: /Mở cuộc trò chuyện Linh Anh/ }).click()
+          const composer = page.locator('.social-chat-layout.mobile-rail-chat-view > .conversation-panel .media-composer')
+          await composer.waitFor({ state: 'visible' })
+          await composer.locator('.attach-button').waitFor({ state: 'visible' })
+          await composer.locator('.chat-composer-image').waitFor({ state: 'visible' })
+          await composer.locator('.voice-record-trigger').waitFor({ state: 'visible' })
+          assert.equal(await bottom.isVisible(), false,
+            'Opening a message thread must still hide the bottom navigation')
+          const actionButtons = await composer.evaluate(form =>
+            ['.attach-button', '.chat-composer-image', '.voice-record-trigger'].map(selector => {
+              const button = form.querySelector(selector)
+              const box = button.getBoundingClientRect()
+              const svg = button.querySelector('svg')
+              const icon = svg?.getBoundingClientRect()
+              return { width: box.width, height: box.height, bg: getComputedStyle(button).backgroundColor,
+                icons: button.querySelectorAll('svg').length,
+                iconWidth: icon?.width, iconHeight: icon?.height,
+                iconOffset: icon ? Math.abs((icon.left + icon.right - box.left - box.right) / 2) : 999 }
+            }))
+          assert.ok(actionButtons.every(button => button.icons === 1 &&
+            button.width === actionButtons[0].width &&
+            button.height === actionButtons[0].height &&
+            button.bg === 'rgba(0, 0, 0, 0)' &&
+            button.iconWidth === 20 && button.iconHeight === 20 && button.iconOffset <= 1),
+            'Mobile composer icons must match the desktop single-glyph styling: ' + JSON.stringify(actionButtons))
+          console.log('PASS: mobile chat attachment, image and mic are single unboxed web-style icons')
+        }
+        await context.close()
+        continue
+      }
+      assert.equal(await list.getAttribute('data-expanded'), 'true', width + ': mobile rail must start expanded')
+      assert.equal(await header.isVisible(), false, width + ': legacy sidebar header must remain hidden')
+      assert.equal(await list.locator('.conversation-avatar-rail-item').count(), conversations.length,
+        width + ': avatar rail must expose the available conversations')
+      const quickSearch = list.locator('input[type="search"]').first()
+      await quickSearch.waitFor({ state: 'visible' })
       await quickSearch.fill('Linh')
-      await header.locator('.chat-quick-search').waitFor({ state: 'visible' })
+      await page.locator('.conversation-rail-floating-filters').waitFor({ state: 'visible' })
       await quickSearch.fill('')
-      assert.equal(await page.locator('.social-chat-groups-link').count(), 0, width + ': standalone groups shortcut removed')
-      assert.equal(await header.locator('.social-chat-list-filters').getByRole('button', { name: 'Nhóm' }).isVisible(), true, width + ': groups are accessible in chat filters')
-      assert.equal(await page.locator('.social-chat-new').isVisible(), false, width + ': redundant lower new-chat button hidden')
-      assert.equal(await page.locator('.appbar-create-trigger').isVisible(), true, width + ': top create menu stays available')
+      await page.mouse.click(5, 500)
+      await page.locator('.conversation-rail-floating-filters').waitFor({ state: 'hidden' })
+      assert.equal(await list.getByRole('button', { name: 'Tạo cuộc trò chuyện mới' }).isVisible(), true,
+        width + ': expanded avatar rail must expose new-conversation action')
       const viewport = await page.evaluate(() => ({ width: innerWidth, pageWidth: document.documentElement.scrollWidth }))
       assert.ok(viewport.pageWidth <= viewport.width + 1, width + ': document has horizontal overflow: ' + JSON.stringify(viewport))
       const tabs = await bottom.locator('button').evaluateAll(nodes => nodes.map(node => {
@@ -170,10 +286,42 @@ try {
         return { x: box.x, right: box.right, height: box.height }
       }))
       assert.ok(tabs.every(tab => tab.x >= -1 && tab.right <= width + 1 && tab.height >= 44), width + ': tabs must fit the screen and remain touch-friendly')
+      const navLayout = await bottom.evaluate(nav => {
+        const items = [...nav.querySelectorAll(':scope > button')].map(button => {
+          const box = button.getBoundingClientRect()
+          const icon = button.querySelector('.nav-icon').getBoundingClientRect()
+          const label = button.querySelector('.nav-label')
+          const text = label.getBoundingClientRect()
+          return {
+            x: box.left, right: box.right, width: box.width, height: box.height,
+            iconCenter: (icon.left + icon.right) / 2,
+            textCenter: (text.left + text.right) / 2,
+            textY: text.top, clipped: label.scrollWidth > label.clientWidth + 1,
+          }
+        })
+        const activeIcon = nav.querySelector('button.active .nav-icon').getBoundingClientRect()
+        const highlight = nav.querySelector('.nav-liquid-pill').getBoundingClientRect()
+        return { items, activeIconCenter: (activeIcon.left + activeIcon.right) / 2,
+          highlightCenter: (highlight.left + highlight.right) / 2, highlightWidth: highlight.width }
+      })
+      const tabWidths = navLayout.items.map(item => item.width)
+      assert.ok(Math.max(...tabWidths) - Math.min(...tabWidths) <= 1,
+        width + 'px: five tabs must share the width equally: ' + JSON.stringify(navLayout))
+      assert.ok(navLayout.items.every((item, i) =>
+        Math.abs(item.iconCenter - (item.x + item.right) / 2) <= 1 &&
+        Math.abs(item.textCenter - item.iconCenter) <= 1 &&
+        Math.abs(item.textY - navLayout.items[0].textY) <= 1 &&
+        !item.clipped &&
+        (i === 0 || Math.abs(navLayout.items[i - 1].right - item.x) <= 1)),
+        width + 'px: icons and labels must stay centered, aligned and legible')
+      assert.ok(Math.abs(navLayout.highlightCenter - navLayout.activeIconCenter) <= 2 &&
+        navLayout.highlightWidth < navLayout.items[0].width,
+        width + 'px: the active indicator must hug its icon, not the full tab')
+      console.log('PASS: evenly spaced, compact mobile navigation at ' + width + 'px')
       assert.equal(await page.locator('.conversation-pin-menu-trigger').count(), 0,
         width + 'px: no ellipsis beside conversations')
       if (width === 390) {
-        const entry = page.locator('.conversation-pin-entry').first()
+        const entry = page.locator('.conversation-avatar-rail-item').first()
         const bounds = await entry.boundingBox()
         const pointer = { pointerType: 'touch', clientX: bounds.x + 20, clientY: bounds.y + 20, button: 0 }
         await entry.dispatchEvent('pointerdown', pointer)
@@ -182,14 +330,18 @@ try {
         await entry.dispatchEvent('pointerup', pointer)
         await page.locator('.message-context-cancel').click()
         // Long-press must not also activate the conversation when the finger is lifted.
-        await entry.locator('.conversation-item').click()
         assert.equal(await page.locator('.social-chat-layout.has-active').count(), 0)
       }
       await page.screenshot({ path: 'output/playwright/layout/adaptive-chat-list-' + width + '.png' })
-      await page.locator('.conversation-item').first().click()
+      if (width === 390) {
+        await list.locator('.conversation-avatar-rail-item').first().click()
+        assert.equal(await page.locator('.social-chat-layout.has-active').count(), 0,
+          'First synthetic click after long-press must not accidentally open the conversation')
+      }
+      await list.locator('.conversation-avatar-rail-item').first().click()
       await page.locator('.social-chat-layout .conversation-panel').waitFor({ state: 'visible' })
       assert.equal(await bottom.isVisible(), false, width + ': tabs hidden in conversation detail')
-      assert.equal(await page.locator('.chatnet-appbar').isVisible(), false, width + ': compact header hidden in detail')
+      assert.equal(await page.locator('.chatnet-appbar').isVisible(), true, width + ': chat Header remains visible in detail')
       const imageButton = page.getByRole('button', { name: 'Đính kèm ảnh hoặc video' })
       assert.equal(await imageButton.isVisible(), true, width + ': photo picker must remain visible')
       const imageIcon = await imageButton.evaluate(button => {
@@ -278,15 +430,28 @@ try {
       await page.screenshot({ path: 'output/playwright/layout/adaptive-chat-detail-' + width + '.png' })
       await page.getByRole('button', { name: 'Quay lại danh sách' }).click()
       assert.equal(await bottom.isVisible(), true, width + ': bottom tabs restored on back')
-      assert.equal(await header.isVisible(), true, width + ': list restored on back')
+      assert.equal(await list.isVisible(), true, width + ': avatar rail restored on back')
     } else {
       assert.equal(await rail.isVisible(), true, width + ': desktop sidebar visible')
       assert.equal(await bottom.isVisible(), false, width + ': no duplicate desktop tabs')
-      assert.equal(await header.isVisible(), true, width + ': conversation filters')
-      await page.locator('.conversation-item').first().click()
+      assert.equal(await list.isVisible(), true, width + ': desktop rail visible')
+      await list.locator('.desktop-conversation-rail-entry').first().click()
+      await page.waitForURL(url => /^\/chat\/\d+$/.test(url.pathname))
       await page.locator('.conversation-panel').waitFor({ state: 'visible' })
-      const split = await page.locator('.social-chat-layout').evaluate(el => getComputedStyle(el).gridTemplateColumns)
-      assert.ok(split.split(' ').length >= 2, width + ': desktop must have split columns: ' + split)
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.social-chat-layout')
+        return el && getComputedStyle(el).display !== '' && el.getBoundingClientRect().width > 0
+      })
+      const split = await page.locator('.social-chat-layout').evaluate(el => {
+        const rail = el.querySelector('.desktop-conversation-rail')?.getBoundingClientRect()
+        const panel = el.querySelector('.conversation-panel')?.getBoundingClientRect()
+        return { layout: getComputedStyle(el).display, grid: getComputedStyle(el).gridTemplateColumns,
+          rail: rail && { left: rail.left, right: rail.right, width: rail.width },
+          panel: panel && { left: panel.left, right: panel.right, width: panel.width } }
+      })
+      assert.ok(split.rail && split.panel && split.rail.width > 0 && split.panel.width > 0 &&
+        split.rail.right <= split.panel.left + 2,
+        width + ': desktop rail and conversation must not overlap: ' + JSON.stringify(split))
       if (width === 1440) {
         const message = page.locator('[data-message-id="203"]')
         const bubble = message.locator('.bubble')
@@ -381,25 +546,33 @@ try {
     }
     if (phone) await bottom.locator('button').nth(2).click()
     else await rail.getByRole('button', { name: 'Bạn bè' }).click()
+    await page.locator('.contacts-overview').waitFor({ state: 'visible' })
+    await page.goto(origin + '/contacts/directory')
     await page.locator('.friends-design-v2 .fd-searchbar').waitFor({ state: 'visible' })
     await page.locator('.fd-person-row').first().waitFor({ state: 'visible', timeout: 8000 })
     if (width === 320) assert.equal(optionalContactsFinished, false,
       'Mobile friends must render before slow optional contact metadata finishes')
     if (phone) {
-      assert.equal(await page.locator('.fd-inline-profile').count(), 0, 'no friend details should open by default on mobile')
+      assert.equal(await page.getByRole('dialog', { name: 'Thông tin bạn bè' }).count(), 0,
+        'no friend modal should be open by default on mobile')
+      assert.equal(await page.locator('.fd-inline-profile').count(), 0,
+        'mobile friend details must use a dialog, not desktop inline panel')
       const firstFriend = page.locator('.fd-person-row .fd-person-identity').first()
       await firstFriend.click()
-      assert.equal(await page.locator('.fd-inline-profile').count(), 1, 'only the tapped friend should expand')
-      assert.equal(await page.locator('.fd-profile-panel').isVisible(), false, 'mobile must not show the separate profile panel')
-      assert.equal(await page.locator('.friends-design-v2:not(.is-call-directory) .fd-person-row .fd-icon-btn').count(), 0, 'adjacent call and message buttons must not exist in friends list')
-      assert.ok(await page.locator('.fd-inline-profile').evaluate(el => el.previousElementSibling?.classList.contains('fd-person-row')),
-        'friend details must appear immediately after the tapped user')
-      await firstFriend.click()
-      assert.equal(await page.locator('.fd-inline-profile').count(), 0, 'tapping an expanded friend should collapse details')
+      const friendDialog = page.getByRole('dialog', { name: 'Thông tin bạn bè' })
+      await friendDialog.waitFor({ state: 'visible' })
+      assert.equal(await friendDialog.count(), 1, 'only one mobile friend dialog should open')
+      assert.equal(await page.locator('.fd-profile-panel').isVisible(), false,
+        'mobile must not display desktop profile panel')
+      assert.equal(await page.locator('.friends-design-v2:not(.is-call-directory) .fd-person-row .fd-icon-btn').count(), 0,
+        'friend list should not expose separate call/video buttons')
+      await page.keyboard.press('Escape')
+      await friendDialog.waitFor({ state: 'hidden' })
       await page.locator('.fd-person-row .fd-person-identity').nth(1).click()
-      assert.equal(await page.locator('.fd-inline-profile').count(), 1)
-      assert.ok(await page.locator('.fd-inline-profile').evaluate(el => el.previousElementSibling?.textContent?.includes('Linh Anh') || el.previousElementSibling?.classList.contains('expanded')),
-        'the expanded details belong to the selected row')
+      await friendDialog.waitFor({ state: 'visible' })
+      assert.equal(await friendDialog.count(), 1, 'second selection should open a single friend dialog')
+      await friendDialog.getByRole('button', { name: 'Đóng thông tin bạn bè' }).click()
+      await friendDialog.waitFor({ state: 'hidden' })
     }
     const audit = await page.evaluate(() => {
       const selectors = ['.modern-frame','.friends-design-v2','.fd-searchbar','.fd-searchbar label','.fd-add-new','.fd-directory-layout','.fd-list-card','.fd-list-header','.fd-filters','.fd-person-list','.fd-person-row','.fd-profile-panel','.bottom-navigation','.chatnet-appbar']
@@ -424,15 +597,15 @@ try {
         width + 'px: search bar overlaps directory list')
       assert.ok(bounds['.friends-design-v2'].bottom <= bounds['.bottom-navigation'].y + 1,
         width + 'px: contact scrolling must stop above the fixed bottom tabs')
-      const navTop = bounds['.bottom-navigation'].y
-      const scroller = page.locator('.friends-design-v2')
-      await scroller.evaluate(el => { el.scrollTop = el.scrollHeight })
-      await page.locator('.fd-inline-profile').evaluate(el => el.scrollIntoView({ block: 'end' }))
-      const scrolledProfile = await page.locator('.fd-inline-profile').boundingBox()
-      assert.ok(scrolledProfile && scrolledProfile.y + scrolledProfile.height <= navTop - 5,
-        width + 'px: inline friend details must be fully reachable without bottom tabs covering them: ' +
-        JSON.stringify(scrolledProfile))
-      await scroller.evaluate(el => { el.scrollTop = 0 })
+      await page.locator('.fd-person-row .fd-person-identity').first().click()
+      const mobileProfile = page.getByRole('dialog', { name: 'Thông tin bạn bè' })
+      await mobileProfile.waitFor({ state: 'visible' })
+      const dialogRect = await mobileProfile.boundingBox()
+      assert.ok(dialogRect && dialogRect.x >= 0 && dialogRect.width <= width + 1 &&
+        dialogRect.y >= 0 && dialogRect.y + dialogRect.height <= 844 + 1,
+        width + 'px: mobile friend dialog must fit inside the viewport: ' + JSON.stringify(dialogRect))
+      await mobileProfile.getByRole('button', { name: 'Đóng thông tin bạn bè' }).click()
+      await mobileProfile.waitFor({ state: 'hidden' })
       await page.getByRole('button', { name: 'Đang online' }).click()
       assert.equal(await page.locator('.fd-person-row').count(), 2,
         width + 'px: contacts filter must work after responsive layout changes')
@@ -451,6 +624,7 @@ try {
       }
       await page.screenshot({ path: 'output/playwright/layout/adaptive-contacts-' + width + '.png' })
       await page.getByRole('button', { name: 'Kết bạn mới' }).click()
+      await page.locator('.fd-qr-panel').waitFor({ state: 'attached' })
       const invite = await page.evaluate(() => {
         const names = ['.fd-invitation-tabs','.fd-invitation-tabs > div','.fd-invitation-layout','.fd-invitation-list','.fd-request-row','.fd-qr-panel','.bottom-navigation']
         return Object.fromEntries(names.map(n => { const el=document.querySelector(n),r=el?.getBoundingClientRect();return [n,r?{x:r.x,y:r.y,right:r.right,bottom:r.bottom,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight}:null] }))

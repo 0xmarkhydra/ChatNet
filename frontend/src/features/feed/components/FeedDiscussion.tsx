@@ -1,5 +1,7 @@
 import { userLabel } from '../../../shared/utils/userLabel'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
+import { CommentComposerTarget } from './commentComposerTarget'
 import { createPortal } from 'react-dom'
 import { Ellipsis, Heart, SendHorizontal } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -7,6 +9,7 @@ import UserAvatar from '../../../shared/ui/UserAvatar'
 export type FeedComment = {
   id: number
   parentId?: number | null
+  liked?: boolean
   author: string
   authorDisplayName?: string
   content: string
@@ -125,7 +128,7 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
   )
 }
 
-export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, variant = 'default', sortOrder = 'oldest', ...translation }: TranslationProps & {
+export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, onLike, onAuthorOpen, variant = 'default', sortOrder = 'oldest', ...translation }: TranslationProps & {
   comments: FeedComment[]
   pending?: FeedComment
   submit: (content: string, parentId?: number) => Promise<void>
@@ -135,13 +138,15 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   onEdit: (id: number, content: string) => Promise<void>
   onDelete: (id: number) => Promise<void>
   onReport: (id: number, reason: string) => Promise<void>
+  onLike?: (id: number, liked: boolean) => Promise<void>
+  onAuthorOpen: (username: string) => void
   variant?: 'default' | 'post-page'
   sortOrder?: 'oldest' | 'newest'
 }) {
+  const composerTarget = useContext(CommentComposerTarget)
+  const modalContainer = useContext(ModalPortalContext)
   const { replyTo, drafts } = editor
   const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
-  // Comment likes are a visual preview until the feed service exposes a persisted like API.
-  const [previewLikes, setPreviewLikes] = useState<Set<number>>(new Set())
   const [editingComment, setEditingComment] = useState<number | null>(null)
   const [commentOptionsId, setCommentOptionsId] = useState<number | null>(null)
   const optionsTrigger = useRef<HTMLButtonElement | null>(null)
@@ -165,7 +170,11 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
       if (!optionsPanel.current?.contains(event.target as Node) && !optionsTrigger.current?.contains(event.target as Node)) setCommentOptionsId(null)
     }
     function onEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setCommentOptionsId(null)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setCommentOptionsId(null)
+        optionsTrigger.current?.focus()
+      }
     }
     const onMove = () => setCommentOptionsId(null)
     window.addEventListener('resize', onMove)
@@ -238,14 +247,19 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
 
   function renderComment(comment: FeedComment) {
     const parent = comment.parentId ? byID.get(comment.parentId) : undefined
+    const authorName = userLabel(comment.authorDisplayName, comment.author)
     return (
       <div className="feed-comment-row">
         {variant === 'post-page'
-          ? <UserAvatar username={comment.author} name={userLabel(comment.authorDisplayName, comment.author)} className="feed-comment-avatar" />
-          : <span className="feed-comment-avatar" aria-hidden="true">{userLabel(comment.authorDisplayName, comment.author).slice(0, 2).toUpperCase()}</span>}
+          ? <UserAvatar username={comment.author} name={authorName} className="feed-comment-avatar" />
+          : <span className="feed-comment-avatar" aria-hidden="true">{authorName.slice(0, 2).toUpperCase()}</span>}
         <div className="feed-comment-body">
           <div className="feed-comment-bubble">
-            <strong>{userLabel(comment.authorDisplayName, comment.author)}</strong>
+            <strong>
+              {comment.author ? (
+                <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(comment.author)}>{authorName}</button>
+              ) : authorName}
+            </strong>
             {parent && <small className="feed-reply-to">Trả lời {userLabel(parent.authorDisplayName, parent.author)}</small>}
             {editingComment === comment.id ? (
               <div className="feed-comment-edit">
@@ -261,16 +275,16 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
           </div>
           <div className="feed-comment-actions">
             {variant === 'default' && <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}
-            {variant === 'post-page' && <>
-              <button type="button" className={previewLikes.has(comment.id) ? 'feed-comment-liked' : ''}
-                aria-pressed={previewLikes.has(comment.id)} title="Lượt thích bình luận chưa được đồng bộ lên máy chủ"
-                onClick={() => setPreviewLikes(current => { const next = new Set(current); if (next.has(comment.id)) next.delete(comment.id); else next.add(comment.id); return next })}>
-                <Heart size={14} fill={previewLikes.has(comment.id) ? 'currentColor' : 'none'} aria-hidden="true" />
-                {previewLikes.has(comment.id) ? 'Đã thích' : 'Thích'}
+            {variant === 'post-page' && onLike && comment.id > 0 && <>
+              <button type="button" className={comment.liked ? 'feed-comment-liked' : ''}
+                aria-pressed={Boolean(comment.liked)} disabled={commentActionBusy}
+                onClick={() => void runAction(() => onLike(comment.id, !comment.liked))}>
+                <Heart size={14} fill={comment.liked ? 'currentColor' : 'none'} aria-hidden="true" />
+                {comment.liked ? 'Đã thích' : 'Thích'}
               </button>
               <span aria-hidden="true">·</span>
             </>}
-            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời ${userLabel(comment.authorDisplayName, comment.author)}`}>Trả lời</button>
+            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời ${authorName}`}>Trả lời</button>
             {variant === 'post-page' && <span aria-hidden="true">·</span>}
             {variant === 'post-page' && <time dateTime={comment.createdAt}>{commentRelativeTime(comment.createdAt)}</time>}
             <div className="feed-comment-menu">
@@ -293,7 +307,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
                   ) : <button type="button" onClick={() => {
                     setReportingComment(comment.id); setEditingComment(null); setCommentOptionsId(null)
                   }}>Báo cáo bình luận</button>}
-                </div>, document.body
+                </div>, modalContainer ?? document.body
               )}
             </div>
           </div>
@@ -310,6 +324,34 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
       </div>
     )
   }
+
+  const composer = (
+      <form className="feed-comment-form" onSubmit={(event) => { event.preventDefault(); void send() }}>
+        {replyTo && (
+          <div className="feed-reply-target">
+            <span>Đang trả lời {userLabel(replyTo.authorDisplayName, replyTo.author)}</span>
+            <button type="button" disabled={sending} onClick={() => updateEditor({ drafts, replyTo: null })}>Hủy</button>
+          </div>
+        )}
+        <div className="feed-comment-compose">
+          {variant === 'post-page' && <UserAvatar username={currentUser} name={currentUser} className="feed-comment-composer-avatar" />}
+          <textarea ref={input} rows={variant === 'post-page' ? 1 : 2} maxLength={1000} disabled={sending}
+            aria-label={replyTo ? `Phản hồi ${userLabel(replyTo.authorDisplayName, replyTo.author)}` : 'Viết bình luận'}
+            placeholder={replyTo ? `Trả lời ${userLabel(replyTo.authorDisplayName, replyTo.author)}...` : 'Viết bình luận...'}
+            value={draft} onChange={(event) => updateEditor({ replyTo, drafts: { ...drafts, [draftKey]: event.target.value } })}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                void send()
+              }
+            }} />
+          <button type="submit" disabled={sending || !draft.trim()} aria-label="Gửi bình luận">
+            {variant === 'post-page' ? <SendHorizontal size={21} aria-hidden="true" /> : 'Gửi'}
+          </button>
+        </div>
+        {error && <p role="alert" className="feed-comment-error">{error}</p>}
+      </form>
+  )
 
   return (
     <section className="feed-discussion" aria-label="Bình luận">
@@ -354,31 +396,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
           </div>
         </div>
       )}
-      <form className="feed-comment-form" onSubmit={(event) => { event.preventDefault(); void send() }}>
-        {replyTo && (
-          <div className="feed-reply-target">
-            <span>Đang trả lời {userLabel(replyTo.authorDisplayName, replyTo.author)}</span>
-            <button type="button" disabled={sending} onClick={() => updateEditor({ drafts, replyTo: null })}>Hủy</button>
-          </div>
-        )}
-        <div className="feed-comment-compose">
-          {variant === 'post-page' && <UserAvatar username={currentUser} name={currentUser} className="feed-comment-composer-avatar" />}
-          <textarea ref={input} rows={variant === 'post-page' ? 1 : 2} maxLength={1000} disabled={sending}
-            aria-label={replyTo ? `Phản hồi ${userLabel(replyTo.authorDisplayName, replyTo.author)}` : 'Viết bình luận'}
-            placeholder={replyTo ? `Trả lời ${userLabel(replyTo.authorDisplayName, replyTo.author)}...` : 'Viết bình luận...'}
-            value={draft} onChange={(event) => updateEditor({ replyTo, drafts: { ...drafts, [draftKey]: event.target.value } })}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault()
-                void send()
-              }
-            }} />
-          <button type="submit" disabled={sending || !draft.trim()} aria-label="Gửi bình luận">
-            {variant === 'post-page' ? <SendHorizontal size={21} aria-hidden="true" /> : 'Gửi'}
-          </button>
-        </div>
-        {error && <p role="alert" className="feed-comment-error">{error}</p>}
-      </form>
+      {composerTarget ? createPortal(composer, composerTarget) : composer}
     </section>
   )
 }

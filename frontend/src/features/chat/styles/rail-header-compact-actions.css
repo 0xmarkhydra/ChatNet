@@ -1,0 +1,132 @@
+/* Avatar header: conversation-name search takes all spare space.
+   Only the category-tag action and new-conversation (+) remain on the right.
+   The search never opens All/Unread/Groups filters or their popover. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .desktop-conversation-rail-top-actions:has(> .desktop-conversation-rail-search-area) {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-top-actions:has(> .desktop-conversation-rail-search-area)
+  > .desktop-conversation-rail-search-area {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-top-actions:has(> .desktop-conversation-rail-search-area)
+  > .desktop-conversation-rail-top-category {
+    display: flex !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-top-category .category-toolbar {
+    width: 32px !important;
+    min-width: 32px !important;
+    gap: 0 !important;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-top-category .category-filter-trigger {
+    display: inline-flex !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    gap: 0 !important;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-top-category .category-filter-trigger > span,
+  .modern-shell.app-layout .desktop-conversation-rail-top-category .category-filter-trigger > svg:last-child,
+  .modern-shell.app-layout .desktop-conversation-rail-top-category .category-clear {
+    display: none !important;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-top-actions:has(> .desktop-conversation-rail-search-area)
+  > .desktop-conversation-rail-plus {
+    display: inline-flex !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+  }
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout .conversation-avatar-rail-top-actions:has(> .conversation-avatar-rail-search-area) {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-top-actions:has(> .conversation-avatar-rail-search-area)
+  > .conversation-avatar-rail-search-area {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-top-actions:has(> .conversation-avatar-rail-search-area)
+  > .conversation-avatar-rail-top-category {
+    display: flex !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-top-category .category-toolbar {
+    width: 32px !important;
+    min-width: 32px !important;
+    gap: 0 !important;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-top-category .category-filter-trigger {
+    display: inline-flex !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    gap: 0 !important;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-top-category .category-filter-trigger > span,
+  .modern-shell.app-layout .conversation-avatar-rail-top-category .category-filter-trigger > svg:last-child,
+  .modern-shell.app-layout .conversation-avatar-rail-top-category .category-clear {
+    display: none !important;
+  }
+  .modern-shell.app-layout .conversation-avatar-rail-top-actions:has(> .conversation-avatar-rail-search-area)
+  > .conversation-avatar-rail-create {
+    display: inline-flex !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+  }
+}
+/* The group-picker reveal previously restored the category label and
+   chevron with more specific CSS. Keep the header icon-only while sliding. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.desktop-channel-panel-open
+  > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-top-category
+  .category-filter-trigger > span,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.desktop-channel-panel-open
+  > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-top-category
+  .category-filter-trigger > svg:last-child {
+    display: none !important;
+  }
+}
+@media (max-width: 350px) {
+  .modern-shell.app-layout .conversation-avatar-rail-top-actions:has(> .conversation-avatar-rail-search-area) {
+    gap: 3px !important;
+  }
+}

@@ -31,7 +31,7 @@ import ConversationDetailsPanel from "./ConversationDetailsPanel";
 import GroupSettingsPanel, { type GroupManagementSection } from "./GroupSettingsPanel";
 import type { GroupPhotoTarget } from "./GroupAvatarEditor";
 import { type ChatTranslationSettings } from "../lib/conversationTranslationSettings";
-import { type GroupMember, type Message, type Conversation, type NewChatMode, type MessageReaction } from "../types";
+import { type ConversationEncryptionMode, type GroupMember, type Message, type Conversation, type NewChatMode, type MessageReaction } from "../types";
 import type { FriendSearchResult, FriendConnection } from "../../contacts";
 import { type QueuedChatMessage } from "../lib/chatOutbox";
 import { type GroupChannel } from "../utils/groupChannels";
@@ -55,6 +55,7 @@ import ConversationHeader from "./ConversationHeader";
 import MessageTimeline from "./MessageTimeline";
 import PinnedItemsPanel from "./PinnedItemsPanel";
 import type { ChatSectionProps } from "./ChatSectionProps";
+import { useConversationNotificationToggle } from "../hooks/useConversationNotificationToggle";
 
 export type { ChatSectionProps } from "./ChatSectionProps";
 
@@ -154,6 +155,9 @@ export default function ChatSection({
   messageSearchOpen,
   messageSending,
   messagesLoadingMore,
+  messageHistoryLoading,
+  messageHistoryError,
+  retryMessageHistory,
   messagesScrollRef,
   messageText,
   moveConversationLongPress,
@@ -241,7 +245,10 @@ export default function ChatSection({
 }: ChatSectionProps) {
   const readersScope = `${session.sessionId}:${activeConversationId ?? ''}`;
   const [readersTarget, setReadersTarget] = useScopedState<{ message: Message; readerIds: number[]; sessionId: string } | null>(readersScope, null);
-  const [mlsPilotMode, setMlsPilotMode] = useState<'unknown' | 'legacy' | 'pending' | 'e2ee'>('unknown');
+  const encryptionScope = activeConversation?.type === 'direct' && activeConversation.otherUserId && !conversationBlocked
+    ? `${session.sessionId}:${session.user.id}:${activeConversation.id}:${activeConversation.otherUserId}`
+    : null;
+  const [mlsPilotMode, setMlsPilotMode] = useScopedState<ConversationEncryptionMode | 'unknown'>(encryptionScope, 'unknown');
   const readersMessage = readersTarget?.sessionId === session.sessionId ? readersTarget.message : null;
   const messageReaderMembers = useMemo(() => {
     if (!activeConversation) return [];
@@ -257,37 +264,22 @@ export default function ChatSection({
         }]
       : [];
   }, [activeConversation, friends, groupMembers]);
-  // Keep rail item positions stable even when new messages reorder the full chat list.
-  // Append newly discovered conversations, and remove only conversations that no longer exist.
-  const [railOrderIds, setRailOrderIds] = useState<number[]>([]);
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      setRailOrderIds(previous => {
-        const ids = new Set(allChatConversations.map(conversation => conversation.id));
-        const kept = previous.filter(id => ids.has(id));
-        const seen = new Set(kept);
-        const added = allChatConversations
-          .map(conversation => conversation.id)
-          .filter(id => !seen.has(id));
-        return [...kept, ...added];
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [allChatConversations]);
-  const stableRailConversations = useMemo(() => {
-    const byId = new Map(allChatConversations.map(conversation => [conversation.id, conversation]));
-    const knownIds = new Set(railOrderIds);
-    return [...railOrderIds, ...allChatConversations.map(item => item.id).filter(id => !knownIds.has(id))]
-      .flatMap(id => {
-        const conversation = byId.get(id);
-        return conversation ? [conversation] : [];
-      });
-  }, [allChatConversations, railOrderIds]);
+  // Reorder the avatar dock as soon as a message arrives (including group
+  // channels). Keeping a separate stable ID list prevented realtime changes
+  // to lastMessageAt from moving conversations up in the compact rail.
+  // Include historical groups and any additional search results without
+  // duplicating entries; pinned conversations retain their priority.
   const railConversations = useMemo(() => {
-    const ids = new Set(stableRailConversations.map(conversation => conversation.id));
-    return [...stableRailConversations,
-      ...sortedChatListConversations.filter(conversation => !ids.has(conversation.id))];
-  }, [stableRailConversations, sortedChatListConversations]);
+    const knownIds = new Set(allChatConversations.map(conversation => conversation.id));
+    return [
+      ...allChatConversations,
+      ...sortedChatListConversations.filter(conversation => !knownIds.has(conversation.id)),
+    ].sort((a, b) =>
+      Number(Boolean(b.pinnedAt)) - Number(Boolean(a.pinnedAt)) ||
+      (b.pinnedAt || '').localeCompare(a.pinnedAt || '') ||
+      (b.lastMessageAt || b.createdAt).localeCompare(a.lastMessageAt || a.createdAt),
+    );
+  }, [allChatConversations, sortedChatListConversations]);
   const railVisibleConversationIds = useMemo(
     () => sortedChatListConversations.map(conversation => conversation.id),
     [sortedChatListConversations],
@@ -298,45 +290,141 @@ export default function ChatSection({
     : conversationCategories.selected === null ? conversationLoadingMore : conversationCategories.loading;
   const railLoadMore = () => conversationListSearch.active ? conversationListSearch.loadMore()
     : conversationCategories.selected === null ? loadMoreConversations() : conversationCategories.load(true);
-  const railControls = <ConversationRailControls
-    filter={chatListFilter} onFilterChange={setChatListFilter}
-    categories={conversationCategories} search={conversationListSearch} mode="filters" />;
   const railCategoryControls = <ConversationRailControls
     filter={chatListFilter} onFilterChange={setChatListFilter}
     categories={conversationCategories} search={conversationListSearch} mode="category" />;
   const [groupPhotoBusy, setGroupPhotoBusy] = useState(false);
   const [railListOpen, setRailListOpen] = useState(false);
-  const [notificationBusyId, setNotificationBusyId] = useState<number | null>(null);
-  async function toggleConversationNotifications(conversation: Conversation) {
-    if (notificationBusyId !== null) return;
-    setNotificationBusyId(conversation.id);
-    try {
-      const muted = !conversation.muted;
-      const response = await apiFetch('/api/conversations/' + conversation.id + '/notification-settings', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageNotifications: !muted, mentionNotifications: !muted }),
-      });
-      const result = await response.json().catch(() => null) as
-        { messageNotifications?: boolean; mentionNotifications?: boolean; error?: string } | null;
-      if (!response.ok || typeof result?.messageNotifications !== 'boolean') {
-        throw new Error(result?.error || 'Không cập nhật được thông báo. Backend cần hỗ trợ thiết lập theo hội thoại.');
-      }
-      const nextMuted = !result.messageNotifications && !result.mentionNotifications;
-      setConversations(current => current.map(item =>
-        item.id === conversation.id ? { ...item, muted: nextMuted } : item));
-      setNotice(nextMuted ? 'Đã tắt thông báo hội thoại.' : 'Đã bật thông báo hội thoại.', 'success');
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Không cập nhật được thông báo.', 'error');
-    } finally {
-      setNotificationBusyId(null);
+  const railSelectedLocally = useRef<number | null>(null);
+  const splitLayoutRef = useRef<HTMLDivElement>(null);
+  const splitExpandedRef = useRef(false);
+  const splitTransitionFrames = useRef<number[]>([]);
+  const queuedRailNavigationRef = useRef<Conversation | null>(null);
+  const railNavigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function cancelQueuedRailNavigation() {
+    if (railNavigationTimerRef.current !== null) {
+      clearTimeout(railNavigationTimerRef.current);
+      railNavigationTimerRef.current = null;
     }
+    queuedRailNavigationRef.current = null;
   }
+  function cancelSplitTransitionFrames() {
+    splitTransitionFrames.current.forEach(cancelAnimationFrame);
+    splitTransitionFrames.current = [];
+    splitLayoutRef.current?.removeAttribute('data-split-priming');
+  }
+  /** Purely visual panel switch. Do not update ChatSection state: both rails,
+   * their search inputs, channel data and chat stay mounted throughout. */
+  function setSplitExpanded(expanded: boolean) {
+    splitExpandedRef.current = expanded;
+    const layout = splitLayoutRef.current;
+    if (!layout) return;
+    layout.dataset.splitExpanded = String(expanded);
+    const ariaLabel = expanded ? 'Thu gọn cột avatar' : 'Mở rộng cột avatar';
+    layout.querySelectorAll<HTMLButtonElement>(
+      '.desktop-conversation-rail-expand-toggle, .conversation-avatar-rail-expand-toggle',
+    ).forEach(button => {
+      button.setAttribute('aria-expanded', String(expanded));
+      button.setAttribute('aria-label', ariaLabel);
+      button.title = ariaLabel;
+    });
+  }
+  function toggleGroupSplit() {
+    cancelSplitTransitionFrames();
+    setSplitExpanded(!splitExpandedRef.current);
+  }
+  function openPickerFromExpandedRail() {
+    // Keep the shared divider at the far RIGHT until the new group and its
+    // channel picker have actually rendered. Two immediate animation frames
+    // can finish before an async conversation lookup supplies the group, which
+    // makes direct-chat → group appear to jump with no sliding transition.
+    cancelSplitTransitionFrames();
+    if (splitLayoutRef.current) splitLayoutRef.current.dataset.splitPriming = 'true';
+    setSplitExpanded(true);
+    setRailListOpen(false);
+    const startedAt = performance.now();
+    const waitForPicker = () => {
+      const layout = splitLayoutRef.current;
+      const isDesktop = window.matchMedia('(min-width: 761px)').matches;
+      const pickerReady = layout?.classList.contains('group-channel-workspace') &&
+        layout.classList.contains(isDesktop ? 'desktop-channel-panel-open' : 'mobile-rail-picker-view') &&
+        Boolean(layout.querySelector('.group-channel-sidebar'));
+      if (!pickerReady) {
+        if (performance.now() - startedAt < 3000) {
+          splitTransitionFrames.current = [requestAnimationFrame(waitForPicker)];
+        } else {
+          splitTransitionFrames.current = [];
+          splitLayoutRef.current?.removeAttribute('data-split-priming');
+          setSplitExpanded(false);
+        }
+        return;
+      }
+      // Commit the fully-expanded geometry before starting the 500ms
+      // reciprocal reveal. Once the panes are mounted, only a DOM attribute
+      // changes; no React state update or data request drives the animation.
+      splitTransitionFrames.current = [requestAnimationFrame(() => {
+        splitTransitionFrames.current = [requestAnimationFrame(() => {
+          // Initial group geometry is now committed at full avatar width.
+          // Turn transitions on first, then change the single split variable
+          // on the next frame so the browser animates FROM full width.
+          splitLayoutRef.current?.removeAttribute('data-split-priming');
+          splitTransitionFrames.current = [requestAnimationFrame(() => {
+            splitTransitionFrames.current = [];
+            setSplitExpanded(false);
+          })];
+        })];
+      })];
+    };
+    splitTransitionFrames.current = [requestAnimationFrame(waitForPicker)];
+  }
+  useEffect(() => () => {
+    cancelSplitTransitionFrames();
+    cancelQueuedRailNavigation();
+  }, []);
+  const { notificationBusyId, toggleConversationNotifications } = useConversationNotificationToggle({
+    apiFetch, setConversations, setNotice,
+  });
   const [desktopChannelPanelOpen, setDesktopChannelPanelOpen] = useState(false);
   const [channelSidebarOpen, setChannelSidebarOpen] = useState(false);
   const [mobileChannelSelected, setMobileChannelSelected] = useState(false);
+  function returnFromChannelPicker() {
+    if (activeConversation?.type === 'group' && !mobileChannelSelected) {
+      toggleGroupSplit();
+      return;
+    }
+    setRailListOpen(true);
+    setChannelSidebarOpen(false);
+    setMobileChannelSelected(false);
+    setActiveConversationId(null);
+  }
+  function returnFromDesktopChannelPicker() {
+    if (activeConversation?.type === 'group' && desktopChannelPanelOpen) {
+      toggleGroupSplit();
+      return;
+    }
+    setRailListOpen(true);
+    setDesktopChannelPanelOpen(false);
+    setChannelSidebarOpen(false);
+    setActiveConversationId(null);
+  }
+  function collapseDesktopChannelPicker() {
+    if (activeConversation?.type === 'group' && desktopChannelPanelOpen) {
+      toggleGroupSplit();
+      return;
+    }
+    setRailListOpen(false);
+  }
   const conversationType = activeConversation?.type;
   useLayoutEffect(() => {
-    // Reset and animate the drawer at the next paint when the selected room changes.
+    // Selection via the avatar rail already staged the full-width first
+    // frame. Do not override it with a second, out-of-phase rAF reset.
+    if (activeConversationId && railSelectedLocally.current === activeConversationId) {
+      // Real network data can resolve the conversation type one render later.
+      // Consume the local-navigation marker only after that data is present.
+      if (conversationType) railSelectedLocally.current = null;
+      return;
+    }
+    // External/deep-link selections still initialize the appropriate view.
     const isDesktop = window.matchMedia('(min-width: 761px)').matches;
     let secondFrame = 0;
     const firstFrame = requestAnimationFrame(() => {
@@ -353,38 +441,73 @@ export default function ChatSection({
       cancelAnimationFrame(secondFrame);
     };
   }, [activeConversationId, conversationType]);
-  function openConversationFromRail(conversation: Conversation) {
-    if (suppressConversationClickRef.current === conversation.id) {
-      suppressConversationClickRef.current = null;
-      return;
-    }
-    if (conversationListSearch.active) {
-      setConversations(current => current.some(item => item.id === conversation.id)
-        ? current : [...current, conversation]);
-    }
-    // The active group avatar doubles as a back action. Tapping it while
-    // the channel picker is shown returns to the expanded conversation rail.
-    if (conversation.id === activeConversationId && conversation.type === 'group' && !railListOpen) {
-      setDesktopChannelPanelOpen(false);
-      setChannelSidebarOpen(false);
-      setMobileChannelSelected(false);
-      setConversationDetailsOpen(false);
-      setGroupSettingsOpen(false);
-      setRailListOpen(true);
-      setActiveConversationId(null);
-      return;
-    }
+  function activateConversationFromRail(conversation: Conversation) {
+    // The avatar rail also contains historical/membership-recovered chats
+    // that may not be in the first active-conversations API page. Hydrate
+    // only after the outgoing group's panel has finished retracting.
+    setConversations(current => current.some(item => item.id === conversation.id)
+      ? current : [...current, conversation]);
     setChatSearchJump(null);
     setQuickSearchOpen(false);
+    railSelectedLocally.current = conversation.id;
     setActiveConversationId(conversation.id);
     setDesktopChannelPanelOpen(conversation.type === 'group');
-    // Expanded direct chat occupies its own desktop grid column, never overlays messages.
-    setRailListOpen(conversation.type === 'direct' && window.matchMedia('(min-width: 761px)').matches);
+    setChannelSidebarOpen(conversation.type === 'group');
+    if (conversation.type === 'group') {
+      setMobileChannelSelected(false);
+      openPickerFromExpandedRail();
+    } else {
+      cancelSplitTransitionFrames();
+      // Expanded direct chat occupies its own desktop grid column.
+      setRailListOpen(window.matchMedia('(min-width: 761px)').matches);
+    }
     setConversationDetailsOpen(false);
     setGroupSettingsOpen(false);
     setTranslations({});
     setTranslationOriginals({});
     setTranslationMenuOpen(false);
+  }
+  function openConversationFromRail(conversation: Conversation) {
+    if (suppressConversationClickRef.current === conversation.id) {
+      suppressConversationClickRef.current = null;
+      return;
+    }
+    // Switching away from a group, whether to a different group or to a
+    // private chat, retracts the existing channel pane before navigation.
+    // This preserves the original mutually exclusive sliding transition.
+    if (queuedRailNavigationRef.current) {
+      if (conversation.id === activeConversationId) {
+        cancelQueuedRailNavigation();
+        setSplitExpanded(false);
+      } else {
+        queuedRailNavigationRef.current = conversation;
+      }
+      return;
+    }
+    if (conversation.id === activeConversationId && conversation.type === 'group' &&
+        !mobileChannelSelected) {
+      toggleGroupSplit();
+      return;
+    }
+    if (activeConversation?.type === 'group' &&
+        conversation.id !== activeConversationId && !mobileChannelSelected &&
+        !splitExpandedRef.current && splitLayoutRef.current) {
+      cancelSplitTransitionFrames();
+      queuedRailNavigationRef.current = conversation;
+      setSplitExpanded(true);
+      const commit = () => {
+        railNavigationTimerRef.current = null;
+        const next = queuedRailNavigationRef.current;
+        queuedRailNavigationRef.current = null;
+        if (next) activateConversationFromRail(next);
+      };
+      // Let the channel pane finish its 380ms retraction before switching
+      // the active conversation. Both destinations use the same behavior.
+      railNavigationTimerRef.current = setTimeout(commit,
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 410);
+      return;
+    }
+    activateConversationFromRail(conversation);
   }
   const selectedGroupChannel = activeConversation?.type === 'group'
     ? groupChannels.find(channel => channel.id === selectedChannelId)
@@ -451,7 +574,7 @@ export default function ChatSection({
   }
 
   return (
-      <div className={`messenger-layout modern-messenger social-chat-layout avatar-rail-layout ${activeConversation ? 'has-active' : ''}${railListOpen ? ' avatar-rail-expanded' : ''}${newChatMode !== 'none' ? ' avatar-rail-creation-open' : ''}${activeConversation?.type === 'group' && desktopChannelPanelOpen ? ' desktop-channel-panel-open' : ''}${activeConversation?.type === 'group' ? ' group-channel-workspace' : ''}${activeConversation?.type === 'group' && channelSidebarOpen ? ' mobile-channel-picker-open' : ''} mobile-conversation-rail-visible${!activeConversation ? ' mobile-rail-list-view' : activeConversation.type === 'group' && !mobileChannelSelected ? ' mobile-rail-picker-view' : ' mobile-rail-chat-view'}${activeConversation?.type === 'group' && !channelSidebarOpen && !mobileChannelSelected ? ' mobile-channel-awaiting-choice' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
+      <div ref={splitLayoutRef} className={`messenger-layout modern-messenger social-chat-layout avatar-rail-layout ${activeConversation ? 'has-active' : ''}${railListOpen ? ' avatar-rail-expanded' : ''}${newChatMode !== 'none' ? ' avatar-rail-creation-open' : ''}${activeConversation?.type === 'group' && desktopChannelPanelOpen ? ' desktop-channel-panel-open' : ''}${activeConversation?.type === 'group' ? ' group-channel-workspace' : ''}${activeConversation?.type === 'group' && channelSidebarOpen ? ' mobile-channel-picker-open' : ''} mobile-conversation-rail-visible${!activeConversation ? ' mobile-rail-list-view' : activeConversation.type === 'group' && !mobileChannelSelected ? ' mobile-rail-picker-view' : ' mobile-rail-chat-view'}${activeConversation?.type === 'group' && !channelSidebarOpen && !mobileChannelSelected ? ' mobile-channel-awaiting-choice' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
             {activeConversation?.type === 'group' && (
               <>
                 <GroupChannelSidebar
@@ -529,7 +652,6 @@ export default function ChatSection({
               onRetry={refreshConversations}
               searchValue={chatListQuery}
               onSearchChange={setChatListQuery}
-              controls={railControls}
               categoryControls={railCategoryControls}
               categories={conversationCategories.categories}
               onEntryContextMenu={(conversation, event) => {
@@ -547,15 +669,11 @@ export default function ChatSection({
               onEntryPointerEnd={cancelConversationLongPress}
               selectedId={activeConversationId}
               expanded={railListOpen}
+              keepDetailsMounted={activeConversation?.type === 'group' && desktopChannelPanelOpen}
               onSelect={openConversationFromRail}
               onCreate={() => { setChatCreateError(''); setNewChatMode('direct') }}
-              onSearchCompact={() => {
-                setRailListOpen(true);
-                setDesktopChannelPanelOpen(false);
-                setChannelSidebarOpen(false);
-                setActiveConversationId(null);
-              }}
-              onCollapse={() => setRailListOpen(false)}
+              onSearchCompact={returnFromDesktopChannelPicker}
+              onCollapse={collapseDesktopChannelPicker}
               hasMore={railHasMore}
               loadingMore={railLoadingMore}
               onLoadMore={railLoadMore}
@@ -567,9 +685,7 @@ export default function ChatSection({
               loadError={conversationListError}
               onRetry={refreshConversations}
                 searchValue={chatListQuery}
-                searchControl={searchInConversationList ? quickSearchControl : undefined}
                 onSearchChange={setChatListQuery}
-                controls={railControls}
                 categoryControls={railCategoryControls}
                 categories={conversationCategories.categories}
                 onEntryContextMenu={(conversation, event) => {
@@ -587,6 +703,7 @@ export default function ChatSection({
                 onEntryPointerEnd={cancelConversationLongPress}
                 selectedId={activeConversationId}
                 expanded={railListOpen}
+                keepDetailsMounted={activeConversation?.type === 'group' && !mobileChannelSelected}
                 hasMore={railHasMore}
                 loadingMore={railLoadingMore}
                 onLoadMore={railLoadMore}
@@ -595,13 +712,14 @@ export default function ChatSection({
                   setChatCreateError('');
                   setNewChatMode('direct');
                 }}
-                onSearchCompact={() => {
-                  setRailListOpen(true);
-                  setChannelSidebarOpen(false);
-                  setMobileChannelSelected(false);
-                  setActiveConversationId(null);
+                onSearchCompact={returnFromChannelPicker}
+                onCollapse={() => {
+                  if (activeConversation?.type === 'group' && !mobileChannelSelected) {
+                    toggleGroupSplit();
+                  } else {
+                    setRailListOpen(false);
+                  }
                 }}
-                onCollapse={() => setRailListOpen(false)}
               />
             <ConversationList
                 activeConversationId={activeConversationId}
@@ -852,6 +970,9 @@ export default function ChatSection({
                     messageInputRef={messageInputRef}
                     setMessageScrollAtBottom={setMessageScrollAtBottom}
                     messagesLoadingMore={messagesLoadingMore}
+                    messageHistoryLoading={messageHistoryLoading}
+                    messageHistoryError={messageHistoryError}
+                    retryMessageHistory={retryMessageHistory}
                     messagesScrollRef={messagesScrollRef}
                     moveMessageLongPress={moveMessageLongPress}
                     openMessageActions={openMessageActions}
@@ -877,12 +998,14 @@ export default function ChatSection({
                     updateChatOutbox={updateChatOutbox}
                     visibleMessages={visibleMessages}
                     messageReaderMembers={messageReaderMembers}
+                    groupMembers={groupMembers}
+                    onProfile={openVisitor}
                     setReadersTarget={setReadersTarget}
                   />
 
                   {activeConversation.type === 'direct' && activeConversation.otherUserId && !conversationBlocked && (
                     <E2EEPilotGate
-                      key={session.sessionId + ':' + activeConversation.id}
+                      key={encryptionScope}
                       conversationId={activeConversation.id}
                       userId={session.user.id}
                       otherUserId={activeConversation.otherUserId}
@@ -906,12 +1029,14 @@ export default function ChatSection({
                     </div>
                   ) : (mlsPilotMode === 'e2ee' || mlsPilotMode === 'pending') ? null : (
                   <MessageComposer
+                key={`${activeConversationId}:${selectedChannelId}`}
                 activeConversation={activeConversation}
                 activeConversationId={activeConversationId}
                 addChatFiles={addChatFiles}
                 canSend={canSend}
                 chatFileInputRef={chatFileInputRef}
                 groupChannels={groupChannels}
+                groupMembers={groupMembers}
                 isProfileDesktop={isProfileDesktop}
                 mediaUploading={mediaUploading}
                 messageAttachments={messageAttachments}

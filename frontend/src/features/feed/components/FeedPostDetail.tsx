@@ -14,8 +14,11 @@ export type FeedPostDetailProps = {
   friendTaggedNames: { [k: string]: string; };
   like: (post: Post, emoji?: string) => Promise<void>;
   likePreviews: Record<number, boolean>;
-  onReactionUsers: (post: Post) => void;
+  onReactionUsers: (post: Post, portalContainer?: HTMLElement) => void;
   name: string;
+  onShareToChat?: (url: string) => void;
+  onRepostChanged?: () => void;
+  onOpenOriginal?: (id: number) => void;
   openEditPost: (post: Post) => void;
   openVisitor: (username: string) => void;
   postDiscussion: ReactNode | null;
@@ -40,6 +43,9 @@ export default function FeedPostDetail({
   onReactionUsers,
   name,
   openEditPost,
+  onRepostChanged,
+  onShareToChat,
+  onOpenOriginal,
   openVisitor,
   postDiscussion,
   profileMedia,
@@ -55,6 +61,7 @@ export default function FeedPostDetail({
       <PostCommentsPage
             key={activePost.id}
             post={activePost}
+            onClose={closeFeedPostDetails}
             username={name}
             ownDisplayName={profileMedia?.displayName || session.user.displayName || name}
             token={session.token}
@@ -62,12 +69,16 @@ export default function FeedPostDetail({
             request={apiFetch}
             sortOrder={commentSortOrder}
             onSortChange={setCommentSortOrder}
-            onDeleted={(id) => { removeFeedPost(id); closeFeedPostDetails(); }}
+            onDeleted={(id) => { removeFeedPost(id); closeFeedPostDetails(); if (activePost.repostKind) onRepostChanged?.(); }}
             onAuthorOpen={openVisitor}
             likeBusy={likePreviews[activePost.id] !== undefined}
             onLike={(post, emoji) => like(post, emoji)}
             onReactionUsers={onReactionUsers}
             onUpdated={syncFeedPost}
+            onRepostChanged={onRepostChanged}
+            onShareToChat={onShareToChat}
+            onOpenOriginal={onOpenOriginal}
+            onRepostRemoved={removeFeedPost}
             onEditPost={openEditPost}
             taggedNames={friendTaggedNames}
             onFeedback={(message, kind) => setNotice(message, kind)}

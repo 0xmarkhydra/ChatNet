@@ -3,12 +3,33 @@
    (2) compact avatar dock + joined group-channel picker,
    (3) full-width conversation chat (direct or selected channel).
    Desktop remains unchanged. */
+
+/* One animated dimension drives BOTH sides of the avatar/channel seam.
+   This avoids two independently timed animations when React remounts the
+   avatar rail and group picker during navigation. */
+@property --chatnet-picker-rail-width {
+  syntax: '<length-percentage>';
+  inherits: true;
+  initial-value: 56px;
+}
 @media (max-width: 760px) {
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible {
     position: relative;
     width: 100%;
     min-width: 0;
     overflow: hidden;
+    --chatnet-picker-rail-width: 56px;
+    --chatnet-picker-compact-width: 56px;
+    /* No start delay: a reverse tap continues from the current frame without
+       a brief pause at the divider. */
+    transition: --chatnet-picker-rail-width 380ms cubic-bezier(.4, 0, .2, 1);
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible.mobile-rail-list-view,
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible.mobile-rail-picker-view.avatar-rail-expanded {
+    --chatnet-picker-rail-width: 100%;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible.mobile-rail-picker-view[data-split-priming="true"] {
+    transition: none !important;
   }
 
   /* 1: The conversation list is the original avatar rail, not a new list. */
@@ -47,8 +68,8 @@
     visibility: visible !important;
     pointer-events: auto;
     box-sizing: border-box;
-    width: 56px !important;
-    max-width: 56px !important;
+    width: var(--chatnet-picker-rail-width) !important;
+    max-width: var(--chatnet-picker-rail-width) !important;
     border-right: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -60,9 +81,9 @@
   }
   .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .group-channel-sidebar {
     box-sizing: border-box;
-    left: 56px !important;
-    width: calc(100% - 56px) !important;
-    max-width: calc(100% - 56px) !important;
+    left: var(--chatnet-picker-rail-width) !important;
+    width: calc(100% - var(--chatnet-picker-rail-width)) !important;
+    max-width: calc(100% - var(--chatnet-picker-rail-width)) !important;
     border-left: 1px solid #e4ebf6 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -72,9 +93,31 @@
     visibility: visible !important;
     pointer-events: auto;
   }
+  /* Closing uses the exact same dimension in reverse: the avatar rail
+     grows over the channels before React unmounts the picker. */
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible.mobile-rail-picker-view.mobile-rail-picker-closing {
+    --chatnet-picker-rail-width: 100%;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-closing > .group-channel-sidebar,
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-closing .conversation-avatar-rail-scroll {
+    pointer-events: none !important;
+  }
+  /* The arrow itself remains clickable throughout the reverse motion. */
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-closing
+  > .conversation-avatar-rail .conversation-avatar-rail-expand-toggle {
+    pointer-events: auto !important;
+  }
   .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-panel,
   .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .group-channel-sidebar-overlay {
     display: none !important;
+  }
+
+  /* Both search fields align to the arrow's top row. Keep an equal offset
+     from its fixed X position while the avatar rail expands/contracts. */
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-rail-picker-view.mobile-channel-picker-open
+  > .group-channel-sidebar > .group-channel-sidebar-topbar {
+    align-items: center;
+    padding: 9px 10px 8px 18px !important;
   }
 
   /* 3: Direct and channel chats both reuse the exact same full-width panel. */
@@ -106,13 +149,145 @@
 }
 
 @media (max-width: 350px) {
-  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail {
-    width: 52px !important;
-    max-width: 52px !important;
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible.mobile-rail-picker-view {
+    --chatnet-picker-rail-width: 52px;
+    --chatnet-picker-compact-width: 52px;
   }
-  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .group-channel-sidebar {
-    left: 52px !important;
-    width: calc(100% - 52px) !important;
-    max-width: calc(100% - 52px) !important;
+}
+
+/* The avatar's RIGHT edge and channel picker's LEFT edge use the exact
+   same animated CSS variable, so they cannot get out of sync even if one
+   React subtree mounts later than the other. The arrow stays fixed. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail {
+    transform-origin: left center;
+    transition: background-color 240ms ease, box-shadow 240ms ease !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view.mobile-channel-picker-open > .group-channel-sidebar {
+    transform: translate3d(0, 0, 0) !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+/* The group picker first mounts with an already-compact target. Supply its
+   expanded starting track only on that initial appearance; subsequent taps
+   continue from the live shared divider position. */
+@media (max-width: 760px) and (prefers-reduced-motion: no-preference) {
+  @starting-style {
+    .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible.mobile-rail-picker-view {
+      --chatnet-picker-rail-width: 100%;
+    }
+  }
+}
+/* Mutually exclusive collapse/expand: one moving vertical boundary.
+   Avatar width + channel width always equals the available viewport. The
+   boundary itself moves; the two sets of content never resize/reflow during
+   the slide, but are progressively revealed by their clipped viewports. */
+@media (max-width: 760px) {
+  /* A SINGLE grid owns both halves. The two children are genuine adjacent
+     columns, not independent absolutely-positioned sliding panels. */
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view {
+    display: grid !important;
+    grid-template-columns: minmax(0, var(--chatnet-picker-rail-width)) minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    column-gap: 0 !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view > .conversation-avatar-rail {
+    position: relative !important;
+    inset: auto !important;
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    justify-self: stretch;
+    align-self: stretch;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view > .group-channel-sidebar {
+    position: relative !important;
+    inset: auto !important;
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    justify-self: stretch;
+    align-self: stretch;
+    transform: none !important;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-rail-picker-view::after {
+    content: "";
+    position: absolute;
+    z-index: 48;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--chatnet-picker-rail-width) - 1px);
+    width: 1px;
+    background: #e4ebf6;
+    pointer-events: none;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail {
+    overflow: hidden !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail .conversation-avatar-rail-scroll {
+    align-items: flex-start;
+    overflow-x: hidden;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail .conversation-avatar-rail-item {
+    /* Stable row geometry; the rail's moving edge reveals the name and preview. */
+    flex: 0 0 46px;
+    box-sizing: border-box;
+    width: calc(100vw - 8px) !important;
+    max-width: none !important;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail .conversation-avatar-rail-meta {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transition: none !important;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view > .group-channel-sidebar {
+    overflow: hidden !important;
+    border-left: 0 !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .group-channel-sidebar
+  > :is(.group-channel-sidebar-topbar, .group-channel-sidebar-list, .group-channel-unread-unavailable) {
+    /* Hold text and search at their final width while the seam moves. */
+    box-sizing: border-box;
+    flex-shrink: 0;
+    width: calc(100vw - var(--chatnet-picker-compact-width)) !important;
+    min-width: calc(100vw - var(--chatnet-picker-compact-width)) !important;
+    max-width: none !important;
+    opacity: 1 !important;
+    transition: none !important;
+  }
+}
+/* A group keeps the avatar list AND channel list mounted throughout.
+   Toggling data-split-expanded changes only this CSS variable—no React state,
+   data refresh, or component remount is involved in opening/closing the panes. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible.mobile-rail-picker-view[data-split-expanded="true"] {
+    /* Enter group picker from direct chat with channel width = 0 on first
+       paint; the same track animates back to compact after mount. */
+    --chatnet-picker-rail-width: 100% !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view[data-split-expanded="true"]
+  > .conversation-avatar-rail .conversation-avatar-rail-expand-toggle svg {
+    transform: rotate(180deg);
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view[data-split-expanded="false"]
+  > .conversation-avatar-rail .conversation-avatar-rail-expand-toggle svg {
+    transform: rotate(0deg);
+  }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible,
+  .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail {
+    transition: none !important;
   }
 }

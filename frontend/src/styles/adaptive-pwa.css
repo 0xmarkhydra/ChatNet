@@ -446,41 +446,41 @@
     padding: 8px 10px;
   }
 
-  /* Stable, labelled six-slot bottom tab bar. The chat detail already hides it. */
+  /* Five equal destinations, aligned icons and labels, with the system safe-area. */
   .modern-shell.app-layout .bottom-navigation {
     position: relative;
     z-index: 15;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0;
     flex: 0 0 auto;
     width: 100%;
-    min-height: calc(64px + env(safe-area-inset-bottom));
+    min-height: calc(60px + env(safe-area-inset-bottom));
     margin: 0;
-    padding: 4px max(5px, env(safe-area-inset-right))
-      max(5px, env(safe-area-inset-bottom))
-      max(5px, env(safe-area-inset-left));
+    padding: 3px max(8px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
     border: 0;
     border-top: 1px solid #e8edf6;
     border-radius: 0;
     background: rgba(255,255,255,.97);
-    box-shadow: 0 -3px 16px rgba(31,52,92,.04);
+    box-shadow: 0 -3px 14px rgba(31,52,92,.045);
   }
   .modern-shell.app-layout .bottom-navigation > button {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     width: 100%;
     min-width: 0;
-    min-height: 56px;
+    min-height: 52px;
     margin: 0;
-    padding: 3px 1px;
+    padding: 3px 2px;
     border: 0;
     border-radius: 11px;
     background: transparent;
-    color: #8390a7;
+    color: #67768b;
   }
   .modern-shell.app-layout .bottom-navigation > button.active {
     color: #2563eb;
@@ -490,10 +490,10 @@
   .modern-shell.app-layout .bottom-navigation .nav-icon {
     display: grid;
     place-items: center;
-    width: 34px;
-    min-width: 34px;
-    height: 29px;
-    min-height: 29px;
+    width: 40px;
+    min-width: 40px;
+    height: 31px;
+    min-height: 31px;
     color: inherit;
   }
   .modern-shell.app-layout .bottom-navigation .nav-label {
@@ -502,16 +502,30 @@
     min-width: 0;
     padding: 0;
     color: inherit;
-    font-size: clamp(9px, 2.7vw, 11px);
-    font-weight: 620;
-    line-height: 1.25;
+    font-size: clamp(10px, 2.6vw, 11px);
+    font-weight: 600;
+    line-height: 1.2;
     text-align: center;
     overflow: hidden;
     white-space: nowrap;
-    text-overflow: ellipsis;
+    text-overflow: clip;
   }
   .modern-shell.app-layout .bottom-navigation > button.active .nav-label {
-    font-weight: 800;
+    font-weight: 750;
+  }
+  .modern-shell.app-layout .bottom-navigation .nav-icon b {
+    top: -4px;
+    right: -9px;
+    height: 18px;
+    min-width: 18px;
+    padding-inline: 4px;
+    font-size: 9px;
+  }
+  .modern-shell.app-layout .bottom-navigation .nav-liquid-pill {
+    border: 1px solid rgba(37,99,235,.16);
+    border-radius: 15px;
+    background: rgba(37,99,235,.11);
+    box-shadow: 0 2px 9px rgba(37,99,235,.08);
   }
   .modern-shell.app-layout .bottom-navigation > button:focus-visible,
   .modern-shell.app-layout .social-chat-list-header button:focus-visible {
@@ -522,6 +536,14 @@
   .modern-shell.app-layout.conversation-open > .chatnet-appbar,
   .modern-shell.app-layout.conversation-open > .bottom-navigation {
     display: none;
+  }
+  /* A group with its channel picker open is still on the conversation-list
+     screen, not inside a message thread. The group remains selected while
+     the avatar rail expands, so conversation-open alone is insufficient. */
+  .modern-shell.app-layout.conversation-open:has(
+    .social-chat-layout.mobile-rail-picker-view
+  ) > .bottom-navigation {
+    display: grid;
   }
   .modern-shell.app-layout.conversation-open > .modern-frame {
     flex: 1 1 auto;

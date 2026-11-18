@@ -58,6 +58,10 @@ jobs:
       - run: npm run check:chat
       - run: npm run check:outbox
       - run: npm run check:offline-browser
+      - name: Verify responsive chat rails and route return
+        run: npm run check:chat-rail-responsive
+      - name: Protect approved unified Contacts and Calls layout
+        run: npm run check:unified-contacts-layout
       - run: npm run check:call-translation
       - run: npm run check:call-live
 

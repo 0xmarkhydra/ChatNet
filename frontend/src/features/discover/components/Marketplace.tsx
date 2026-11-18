@@ -16,14 +16,18 @@ type Order = {
 }
 type Props = {
   userId: number
+  searchQuery: string
   request: (path: string, init?: RequestInit) => Promise<Response>
   onBack: () => void
 }
 const showMoney = (n: number, unit: string) => n.toLocaleString('vi-VN') + ' ' + unit
 
-export default function Marketplace({ userId, request, onBack }: Props) {
+export default function Marketplace({ userId, searchQuery = '', request, onBack }: Props) {
   const apiRef = useLatest(request)
   const revision = useRef(0)
+  const readRevision = useRef(0)
+  const mutationFlight = useRef<{ version: number } | null>(null)
+  const retryFlight = useRef<{ version: number } | null>(null)
   const [view, setView] = useState<'products' | 'cart' | 'orders' | 'sell'>('products')
   const { hostRef: tabsPillSetHost, activeRef: tabsPillSetActive, pillRef: tabsPillSetPill } = useSlidingPill<HTMLElement>(view)
   const [products, setProducts] = useState<Product[]>([])
@@ -31,6 +35,8 @@ export default function Marketplace({ userId, request, onBack }: Props) {
   const [orders, setOrders] = useState<Order[]>([])
   const [mine, setMine] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -50,6 +56,8 @@ export default function Marketplace({ userId, request, onBack }: Props) {
     return response.json() as Promise<T>
   }
   async function refresh(version = revision.current) {
+    const read = ++readRevision.current
+    const isCurrent = () => version === revision.current && read === readRevision.current
     try {
       const [catalog, basket, history, owned] = await Promise.all([
         api<{ products: Product[] }>('/api/marketplace/products'),
@@ -57,36 +65,77 @@ export default function Marketplace({ userId, request, onBack }: Props) {
         api<{ orders: Order[] }>('/api/marketplace/orders'),
         api<{ products: Product[] }>('/api/marketplace/products/mine'),
       ])
-      if (version !== revision.current) return
+      if (!isCurrent()) return
       setProducts(catalog.products)
       setCart(basket.items)
       setOrders(history.orders)
       setMine(owned.products)
+      setLoaded(true)
       setError('')
     } catch (e) {
-      if (version === revision.current) setError(e instanceof Error ? e.message : 'Không tải được sàn')
+      if (isCurrent()) setError(e instanceof Error ? e.message : 'Không tải được sàn')
     } finally {
-      if (version === revision.current) setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }
   useEffect(() => {
-    const version = ++revision.current
+    const requestRevision = revision
+    const version = ++requestRevision.current
     setProducts([]); setCart([]); setOrders([]); setMine([])
-    setError(''); setMessage(''); setLoading(true); setBusy(false)
+    mutationFlight.current = null
+    retryFlight.current = null
+    setView('products')
+    setTitle(''); setDescription(''); setPrice(''); setUnit(''); setStock('1')
+    setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false); setRefreshing(false)
     void refresh(version)
+    return () => { ++requestRevision.current }
   }, [userId])
 
+  function retryRead() {
+    if (retryFlight.current) return
+    const flight = { version: revision.current }
+    retryFlight.current = flight
+    if (!loaded) setLoading(true)
+    else setRefreshing(true)
+    setError('')
+    void refresh(flight.version).finally(() => {
+      if (retryFlight.current === flight) {
+        retryFlight.current = null
+        setRefreshing(false)
+      }
+    })
+  }
+
   async function execute(fn: (isCurrent: () => boolean) => Promise<void>) {
-    if (busy) return
+    if (busy || mutationFlight.current) return
     const version = revision.current
+    const flight = { version }
+    mutationFlight.current = flight
     const isCurrent = () => version === revision.current
     setBusy(true)
     setMessage('')
     setError('')
-    try { await fn(isCurrent); if (isCurrent()) await refresh(version) }
+    try {
+      await fn(isCurrent)
+      if (isCurrent()) {
+        // A completed write supersedes any older read retry and its spinner.
+        retryFlight.current = null
+        setRefreshing(false)
+        await refresh(version)
+      }
+    }
     catch (e) { if (version === revision.current) setError(e instanceof Error ? e.message : 'Không thể thực hiện') }
-    finally { if (version === revision.current) setBusy(false) }
+    finally {
+      if (mutationFlight.current === flight) {
+        mutationFlight.current = null
+        if (isCurrent()) setBusy(false)
+      }
+    }
   }
+  const searchTerm = searchQuery.trim().toLocaleLowerCase("vi-VN")
+  const visibleProducts = searchTerm
+    ? products.filter(product => `${product.title} ${product.description}`.toLocaleLowerCase("vi-VN").includes(searchTerm))
+    : products
   const basketSellers = Array.from(new Set(cart.map(item => item.sellerId)))
   function updateCart(productId: number, quantity: number) {
     void execute(async (isCurrent) => {
@@ -133,7 +182,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
       if (isCurrent()) setMessage('Đã đăng sản phẩm.')
     })
   }
-  return (
+    return (
     <section className="marketplace-view">
       <header className="marketplace-header">
         <button type="button" aria-label="Quay lại Khám phá" onClick={onBack}><ArrowLeft size={20}/></button>
@@ -142,20 +191,23 @@ export default function Marketplace({ userId, request, onBack }: Props) {
       </header>
       <nav ref={tabsPillSetHost} className="marketplace-tabs sliding-pill-host" aria-label="Sàn mua bán">
         <span ref={tabsPillSetPill} className="sliding-pill marketplace-active-pill" aria-hidden="true" />
-        <button ref={view === 'products' ? tabsPillSetActive : undefined} type="button" className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><ShoppingBag size={17}/> Sản phẩm</button>
-        <button ref={view === 'cart' ? tabsPillSetActive : undefined} type="button" className={view === 'cart' ? 'active' : ''} onClick={() => setView('cart')}><ShoppingCart size={17}/> Giỏ ({cart.length})</button>
-        <button ref={view === 'orders' ? tabsPillSetActive : undefined} type="button" className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ClipboardList size={17}/> Đơn hàng</button>
-        <button ref={view === 'sell' ? tabsPillSetActive : undefined} type="button" className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}>+ Bán hàng</button>
+        <button ref={view === 'products' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'products'} className={view === 'products' ? 'active' : ''} onClick={() => setView('products')}><ShoppingBag size={17}/> Sản phẩm</button>
+        <button ref={view === 'cart' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'cart'} className={view === 'cart' ? 'active' : ''} onClick={() => setView('cart')}><ShoppingCart size={17}/> Giỏ ({cart.length})</button>
+        <button ref={view === 'orders' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'orders'} className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ClipboardList size={17}/> Đơn hàng</button>
+        <button ref={view === 'sell' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'sell'} className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}>+ Bán hàng</button>
       </nav>
       <div className="marketplace-body">
         <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>
 
-        {error && <p role="alert" className="marketplace-error">{error} <button onClick={() => void refresh()} type="button">Thử lại</button></p>}
+        {loading && <p role="status" aria-busy="true">Đang tải dữ liệu chợ…</p>}
+        {refreshing && <p role="status" aria-live="polite" aria-busy="true">Đang cập nhật dữ liệu chợ…</p>}
+        {busy && <p role="status" aria-live="polite" aria-busy="true">Đang xử lý yêu cầu…</p>}
+        {error && <p role="alert" className="marketplace-error">{error} <button onClick={retryRead} type="button" disabled={busy}>Thử tải dữ liệu</button></p>}
         {message && <p role="status" className="marketplace-message">{message}</p>}
 
-        {!loading && view === 'products' && <div className="marketplace-grid">
-          {products.length === 0 && <p>Chưa có sản phẩm được đăng.</p>}
-          {products.map(p => <article className="marketplace-card" key={p.id}>
+        {!loading && loaded && view === 'products' && <div className="marketplace-grid">
+          {visibleProducts.length === 0 && <p>{searchTerm ? 'Không tìm thấy sản phẩm phù hợp.' : 'Chưa có sản phẩm được đăng.'}</p>}
+          {visibleProducts.map(p => <article className="marketplace-card" key={p.id}>
             <div className="marketplace-image"><ShoppingBag size={36}/></div>
             <strong>{p.title}</strong>
             <p>{p.description || 'Chưa có mô tả'}</p>
@@ -168,7 +220,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
           </article>)}
         </div>}
 
-        {!loading && view === 'cart' && <div className="marketplace-list">
+        {!loading && loaded && view === 'cart' && <div className="marketplace-list">
           {basketSellers.length === 0 && <p>Giỏ hàng đang trống.</p>}
           {basketSellers.map(sellerId => {
             const items = cart.filter(item => item.sellerId === sellerId)
@@ -193,7 +245,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
           })}
         </div>}
 
-        {!loading && view === 'orders' && <div className="marketplace-list">
+        {!loading && loaded && view === 'orders' && <div className="marketplace-list">
           {orders.length === 0 && <p>Bạn chưa tạo yêu cầu đơn hàng.</p>}
           {orders.map(order => <article className="marketplace-basket" key={order.id}>
             <strong>Yêu cầu #{order.id}</strong>
@@ -203,7 +255,7 @@ export default function Marketplace({ userId, request, onBack }: Props) {
           </article>)}
         </div>}
 
-        {!loading && view === 'sell' && <section className="marketplace-sell">
+        {!loading && loaded && view === 'sell' && <section className="marketplace-sell">
           <p><strong>Trợ lý AI đăng bán sẽ được tích hợp ở bước tiếp theo.</strong> Đây là biểu mẫu dự phòng để tạo bản nháp, chưa phải AI.</p>
           <form onSubmit={createDraft}>
             <label>Tên sản phẩm<input required minLength={2} maxLength={160} value={title} onChange={event => setTitle(event.target.value)}/></label>

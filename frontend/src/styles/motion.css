@@ -136,15 +136,13 @@
   z-index: 0;
   opacity: 0;
   transform-origin: center center;
+  will-change: transform;
 }
 .modern-shell .bottom-navigation .nav-liquid-pill.is-ready {
-  transition: transform 0.42s cubic-bezier(.34, 1.4, .5, 1),
-              width 0.35s cubic-bezier(.34, 1.4, .5, 1),
-              height 0.35s cubic-bezier(.34, 1.4, .5, 1),
+  transition: transform 0.42s cubic-bezier(.22, 1, .36, 1),
+              width 0.35s cubic-bezier(.22, 1, .36, 1),
+              height 0.35s cubic-bezier(.22, 1, .36, 1),
               opacity 0.2s ease;
-}
-.modern-shell .bottom-navigation .nav-liquid-pill.is-sliding {
-  transform: translate3d(var(--pill-x, 0), var(--pill-y, 0), 0) scaleX(1.18) scaleY(0.9);
 }
 .modern-shell .bottom-navigation .nav-liquid-pill::after {
   content: "";
@@ -153,6 +151,32 @@
   border-radius: inherit;
   background: radial-gradient(circle at 50% 50%, rgba(37, 99, 235, .18) 0%, transparent 75%);
   pointer-events: none;
+}
+.modern-shell .bottom-navigation .nav-liquid-pill.is-sliding::after {
+  animation: soco-nav-pill-pulse 0.42s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes soco-nav-pill-pulse {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.18, .9); }
+}
+
+/* Stretch the whole mobile bubble separately from its sliding transform. */
+@media (max-width: 760px) and (prefers-reduced-motion: no-preference) {
+  .modern-shell.app-layout .bottom-navigation .nav-liquid-pill.is-ready {
+    transition: transform .52s cubic-bezier(.22, 1.28, .36, 1),
+                width .4s cubic-bezier(.22, 1.28, .36, 1),
+                height .4s cubic-bezier(.22, 1.28, .36, 1),
+                opacity .2s ease;
+  }
+  .modern-shell.app-layout .bottom-navigation .nav-liquid-pill.is-sliding {
+    animation: soco-nav-pill-elastic .52s ease-out both;
+  }
+}
+@keyframes soco-nav-pill-elastic {
+  0%, 100% { scale: 1; }
+  35% { scale: 1.12 .92; }
+  65% { scale: .97 1.04; }
+  85% { scale: 1.02 .99; }
 }
 
 /* Page-level motion: fluid liquid dissolve and subtle glide on tab switch */
@@ -209,6 +233,60 @@
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
+/* Radix owns mounting, keyboard behavior and focus. Distinct exit keyframes
+ * let Presence keep the portal around just long enough to paint the exit. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-slot="dialog-overlay"][data-state="open"] {
+    animation: soco-dim-in var(--soco-motion-quick) var(--soco-motion-ease) both;
+  }
+  [data-slot="dialog-overlay"][data-state="closed"] {
+    animation: soco-overlay-out var(--soco-motion-touch) ease-in both;
+  }
+  [data-slot="dialog-content"][data-state="open"] {
+    animation: soco-dialog-in var(--soco-motion-standard) var(--soco-motion-ease) both;
+  }
+  [data-slot="dialog-content"][data-state="closed"] {
+    animation: soco-dialog-out var(--soco-motion-touch) ease-in both;
+  }
+  [data-slot="dropdown-menu-content"] {
+    transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  }
+  [data-slot="dropdown-menu-content"][data-state="open"] {
+    animation: soco-dialog-in var(--soco-motion-quick) var(--soco-motion-ease) both;
+  }
+  [data-slot="dropdown-menu-content"][data-state="closed"] {
+    animation: soco-dialog-out var(--soco-motion-touch) ease-in both;
+  }
+  .reaction-motion-glyph {
+    display: inline-block;
+    animation: soco-reaction-pop var(--soco-motion-standard) var(--soco-motion-ease) both;
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+  .app-sidebar .app-sidebar-link:is(:hover, :focus-visible) > svg {
+    animation: soco-nav-icon-pop var(--soco-motion-standard) var(--soco-motion-ease);
+  }
+}
+@keyframes soco-overlay-out {
+  to { opacity: 0; }
+}
+@keyframes soco-dialog-in {
+  from { opacity: 0; scale: .98; }
+  to { opacity: 1; scale: 1; }
+}
+@keyframes soco-dialog-out {
+  from { opacity: 1; scale: 1; }
+  to { opacity: 0; scale: .98; }
+}
+@keyframes soco-reaction-pop {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.24) rotate(-7deg); }
+}
+@keyframes soco-nav-icon-pop {
+  0%, 100% { transform: none; }
+  45% { transform: translateY(-1px) scale(1.13); }
+}
+
 /* Respect accessibility preference; also avoid animating during automation. */
 @media (prefers-reduced-motion: reduce) {
   .modern-shell :is(
@@ -235,8 +313,8 @@
   .modern-shell .nav-liquid-pill {
     transition: none !important;
   }
-  .modern-shell .nav-liquid-pill.is-sliding {
-    transform: none !important;
+  .modern-shell .nav-liquid-pill.is-sliding::after {
+    animation: none !important;
   }
   .modern-shell button:active,
   .locale-picker-sheet button:active,

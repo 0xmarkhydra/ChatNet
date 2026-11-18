@@ -4,13 +4,14 @@ import type { DesktopSection } from "./headerContext";
 
 export type HeaderTitleProps = {
   tab: Tab;
+  searchResults?: boolean;
   desktopSection: DesktopSection;
   translationSettingsOpen: boolean;
   groupWorkspaceMode: GroupWorkspaceMode;
   groupCreateStep: number;
   activeConversationName?: string;
   contactsDirectory: boolean;
-  feedPostOpenOnDesktop: boolean;
+  contactsOverview?: boolean;
   profileSettings: boolean;
   profileDesktop: boolean;
   profileEditing: boolean;
@@ -35,27 +36,27 @@ function groupSubtitle(p: HeaderTitleProps) {
 export default function HeaderTitle(p: HeaderTitleProps) {
   const title: Record<Tab, string> = {
     chat: "Tin nhắn",
-    contacts: p.contactsDirectory ? "Bạn bè" : "Lời mời kết bạn",
+    contacts: "Danh bạ",
     notifications: "Thông báo",
     discover: "Khám phá",
     market: "Marketplace",
-    feed: p.feedPostOpenOnDesktop ? "Bình luận" : "Bảng tin",
+    feed: "Bảng tin",
     profile: p.profileSettings && p.profileDesktop ? "Cài đặt" : p.profileEditing ? "Chỉnh sửa hồ sơ" : "Hồ sơ cá nhân",
   };
   const subtitle: Record<Tab, string> = {
     chat: p.translationSettingsOpen
       ? "Chọn ngôn ngữ và quyền dịch của cuộc trò chuyện"
-      : p.desktopSection === "groups" ? groupSubtitle(p) : "Trò chuyện gần đây và kết nối bạn bè",
-    contacts: p.contactsDirectory ? "Tìm kiếm và kết nối với bạn bè" : "Gửi, nhận và quản lý yêu cầu kết nối",
+      : p.desktopSection === "groups" ? groupSubtitle(p) : "Trò chuyện gần đây và kết nối realtime",
+    contacts: "Bạn bè, nhóm, lời mời và lịch sử cuộc gọi",
     notifications: "Cập nhật những hoạt động quan trọng",
-    discover: "Khám phá và kết nối cộng đồng",
-    market: "Khám phá sản phẩm và cửa hàng",
-    feed: p.feedPostOpenOnDesktop ? "Tương tác với mọi người trong cộng đồng" : "Khoảnh khắc và cộng đồng dành cho bạn",
+    discover: "Tìm người, nhóm và những nội dung thú vị",
+    market: "Mua sắm, đăng bán và quản lý đơn hàng",
+    feed: "Khoảnh khắc và cộng đồng dành cho bạn",
     profile: p.profileSettings
       ? "Cài đặt tài khoản và quyền riêng tư"
       : p.profileEditing ? "Thông tin cá nhân và quyền hiển thị" : "Trang cá nhân, bài viết và thông tin của bạn",
   };
-  const heading = p.tab === "chat" && p.translationSettingsOpen
+  const heading = p.searchResults ? "Kết quả tìm kiếm" : p.tab === "chat" && p.translationSettingsOpen
     ? "Ngôn ngữ & dịch AI"
     : p.tab === "chat" && p.desktopSection === "groups"
       ? groupTitle(p)
@@ -65,7 +66,7 @@ export default function HeaderTitle(p: HeaderTitleProps) {
   return (
     <div className="app-page-heading">
       <strong>{heading}</strong>
-      <small>{subtitle[p.tab]}</small>
+      <small>{p.searchResults ? "Tìm người, bài viết, cộng đồng và sản phẩm" : subtitle[p.tab]}</small>
     </div>
   );
 }

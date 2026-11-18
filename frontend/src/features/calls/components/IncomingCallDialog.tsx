@@ -45,14 +45,14 @@ export default function IncomingCallDialog({ incoming, incomingName, otherUserna
             <div className="incoming-call-information">
               <section className="incoming-call-info-box">
                 <strong>ⓘ &nbsp; Quyền truy cập thiết bị</strong>
-                <p>Khi trả lời, SocCo cần quyền truy cập camera và microphone trên thiết bị của bạn.</p>
+                <p>Khi trả lời, SocCo cần quyền truy cập {incoming.mediaType === 'video' ? 'camera và microphone' : 'microphone'} trên thiết bị của bạn.</p>
                 {incoming.mediaType === 'video' && <button type="button" disabled={busy} onClick={() => void checkIncomingPermission('camera')}><Video size={15} /> Camera · Kiểm tra quyền</button>}
                 <button type="button" disabled={busy} onClick={() => void checkIncomingPermission('microphone')}><Mic size={15} /> Microphone · Kiểm tra quyền</button>
                 {incomingPermission && <small role="status">{incomingPermission}</small>}
               </section>
               <section className="incoming-call-info-box">
                 <strong>Bạn có quyền lựa chọn</strong>
-                <p>Bạn có thể chỉ trả lời bằng thoại hoặc tắt camera ngay khi kết nối.</p>
+                <p>{incoming.mediaType === 'video' ? 'Bạn có thể chỉ trả lời bằng thoại hoặc tắt camera ngay khi kết nối.' : 'Bạn có thể trả lời bằng thoại.'}</p>
               </section>
             </div>
           </div>

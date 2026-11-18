@@ -1,0 +1,217 @@
+/* A direct chat uses the selected channel's compact PWA header as its
+   visual baseline. Keep the existing call/search/translation/details actions
+   and their event handlers; only share the mobile measurements. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) > .chat-head > .room-info {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    min-height: 34px;
+    gap: 4px;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .chat-head .room-info > .mobile-back {
+    box-sizing: border-box;
+    display: grid;
+    place-items: center;
+    flex: 0 0 24px;
+    width: 24px;
+    min-width: 24px;
+    max-width: 24px;
+    height: 34px;
+    min-height: 34px;
+    margin: 0;
+    padding: 0;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .chat-head .room-avatar {
+    display: grid;
+    box-sizing: border-box;
+    flex: 0 0 29px;
+    width: 29px;
+    min-width: 29px;
+    max-width: 29px;
+    height: 29px;
+    min-height: 29px;
+    border-radius: 9px;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .chat-head .room-info > div {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .chat-head .room-info strong {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .chat-head .visitor-name-link {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: inherit;
+    text-align: left;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .chat-head .room-subtitle {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 10px;
+    line-height: 16px;
+  }
+
+  /* Same five 29 x 30 controls as the channel toolbar. */
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) > .chat-head > .translate-controls {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 3px;
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .translate-controls
+  :is(.call-header-actions, .translation-hub) {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 3px;
+    width: auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .translate-controls
+  :is(.call-header-actions > button, .group-settings-toggle) {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    flex: 0 0 29px;
+    width: 29px;
+    min-width: 29px;
+    max-width: 29px;
+    height: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #dfe6f5;
+    border-radius: 9px;
+    background: #f1f5ff;
+    color: #3265d7;
+    box-shadow: none;
+    line-height: 1;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .translate-controls
+  .call-header-actions > button:nth-child(2) {
+    display: grid;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .translate-controls svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .translate-controls
+  :is(.call-header-actions > button, .group-settings-toggle):is(:hover, :focus-visible, .active, [aria-expanded="true"]) {
+    background: #e3ebff;
+  }
+
+  /* Group-only activity is part of the same composer action family. */
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel.group-chat-panel > .media-composer
+  > .group-activity-composer-trigger {
+    flex: 0 0 36px;
+    box-sizing: border-box;
+    width: 36px;
+    min-width: 36px;
+    height: 43px;
+    min-height: 43px;
+    padding: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: #6684b6;
+  }
+}
+
+/* Use the same unboxed attachment, photo and microphone glyphs as web.
+   Preserve the mobile tap area without adding three large coloured tiles. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+    .media-composer > button:is(.attach-button, .chat-composer-image, .voice-record-trigger, .group-activity-composer-trigger) {
+    display: grid;
+    flex: 0 0 36px;
+    box-sizing: border-box;
+    place-items: center;
+    width: 36px;
+    min-width: 36px;
+    height: 43px;
+    min-height: 43px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #6684b6;
+    box-shadow: none;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+    .media-composer > button:is(.attach-button, .chat-composer-image, .voice-record-trigger, .group-activity-composer-trigger):is(:hover, :focus-visible, [aria-expanded="true"]) {
+    background: #edf3ff;
+    color: #3265d7;
+  }
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+    .media-composer > button:is(.attach-button, .chat-composer-image, .voice-record-trigger, .group-activity-composer-trigger) svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2;
+  }
+}
+
+@media (max-width: 360px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel:not(.group-chat-panel) .translate-controls
+  :is(.call-header-actions > button, .group-settings-toggle) {
+    flex-basis: 27px;
+    width: 27px;
+    min-width: 27px;
+    max-width: 27px;
+    height: 29px;
+    min-height: 29px;
+    max-height: 29px;
+  }
+}

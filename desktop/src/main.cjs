@@ -1,11 +1,13 @@
 'use strict'
 
-const { app, BrowserWindow, ipcMain, protocol, net, session, shell, safeStorage, systemPreferences, dialog, desktopCapturer } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, session, shell, safeStorage, systemPreferences, dialog, desktopCapturer, screen, clipboard, nativeImage } = require('electron')
 const { createCredentialVault } = require('./auth-vault.cjs')
 const { createAuthBroker } = require('./auth-broker.cjs')
 const { registerAuthIPC } = require('./auth-ipc.cjs')
 const { createMediaPermissions, registerMediaIPC, kindForMediaType } = require('./media-permissions.cjs')
 const { registerScreenCapture } = require('./screen-capture.cjs')
+const { registerScreenshotCapture } = require('./screenshot.cjs')
+const { createWindowsScreenReader } = require('./screenshot-windows.cjs')
 const { Notification } = require('electron')
 const { createNativeNotifications, registerNotificationIPC } = require('./notifications.cjs')
 const { createWindowLifecycle } = require('./window-lifecycle.cjs')
@@ -33,7 +35,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
 ])
 
-let mainWindow, windowLifecycle, authBroker, mediaPermissions, screenCapture, nativeNotifications
+let mainWindow, windowLifecycle, authBroker, mediaPermissions, screenCapture, nativeNotifications, screenshots
 const hasLock = app.requestSingleInstanceLock()
 if (!hasLock) app.quit()
 const trustedURL = (url) => trustedRendererURL(url, dev)
@@ -49,7 +51,7 @@ function isTrustedFrame(event) {
   return Boolean(mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents &&
     event.senderFrame && event.senderFrame === mainWindow.webContents.mainFrame && trustedURL(event.senderFrame.url))
 }
-function resetNativeGrants() { mediaPermissions?.reset(); screenCapture?.reset(); nativeNotifications?.reset() }
+function resetNativeGrants() { mediaPermissions?.reset(); screenCapture?.reset(); nativeNotifications?.reset(); screenshots?.reset() }
 
 function attachHandlers() {
   const vault = createCredentialVault(join(app.getPath('userData'), 'credentials'), safeStorage)
@@ -66,9 +68,14 @@ function attachHandlers() {
   registerMediaIPC(ipcMain, mediaPermissions, isTrustedFrame)
   screenCapture = registerScreenCapture({ ses: session.defaultSession, ipcMain, desktopCapturer,
     getScope, getWindow: () => mainWindow, trusted: isTrustedFrame, trustedURL })
+  screenshots = registerScreenshotCapture({ app, BrowserWindow, ipcMain, desktopCapturer, screen, clipboard, platform: process.platform,
+    getScope, getWindow: () => mainWindow, trusted: isTrustedFrame, trustedURL,
+    readScreen: process.platform === 'win32' ? createWindowsScreenReader({ app, nativeImage, screen }) : undefined })
   if (process.platform === 'win32') app.setAppUserModelId('asia.soco.desktop')
   nativeNotifications = createNativeNotifications({ Notification, getScope, getWindow: () => mainWindow,
-    showWindow: showMainWindow, setBadge: (count) => windowLifecycle?.setUnread(count) })
+    showWindow: showMainWindow, setBadge: (count, enabled) => windowLifecycle?.setUnread(count, enabled),
+    requestAttention: () => windowLifecycle?.requestAttention(),
+    playSound: () => shell.beep() })
   registerNotificationIPC(ipcMain, nativeNotifications, isTrustedFrame)
   ipcMain.handle('soco:platform-info', (event) => {
     if (!isTrustedFrame(event)) throw new Error('Forbidden IPC origin')
@@ -152,6 +159,7 @@ function createMainWindow() {
   mainWindow.webContents.on('will-redirect', (event) => event.preventDefault())
   mainWindow.webContents.on('render-process-gone', resetNativeGrants)
   mainWindow.webContents.on('did-start-navigation', resetNativeGrants)
+  screenshots.attach(mainWindow)
   windowLifecycle.attach(mainWindow)
   mainWindow.on('closed', () => { resetNativeGrants(); mainWindow = undefined })
   void mainWindow.loadURL(dev ? DEV_URL : APP_URL)

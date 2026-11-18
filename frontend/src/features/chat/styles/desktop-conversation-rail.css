@@ -764,3 +764,26 @@
     padding: 0;
   }
 }
+
+/* Animate the right edge of the avatar rail toward the left while keeping its
+   left edge (and all avatar positions) fixed. Both grid states must use the
+   same track shape or the browser will snap rather than interpolate. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout:not(.desktop-channel-panel-open) {
+    grid-template-columns: minmax(0, var(--avatar-rail-w)) minmax(0, 1fr) !important;
+    transition: grid-template-columns 420ms cubic-bezier(.22, 1, .36, 1);
+  }
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.avatar-rail-expanded:not(.desktop-channel-panel-open) {
+    grid-template-columns: minmax(0, var(--avatar-rail-expanded-w)) minmax(0, 1fr) !important;
+  }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout > .desktop-conversation-rail {
+    width: 100%;
+    transition: box-shadow 420ms cubic-bezier(.22, 1, .36, 1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout:not(.desktop-channel-panel-open),
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout > .desktop-conversation-rail {
+    transition: none !important;
+  }
+}

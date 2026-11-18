@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"io"
@@ -20,11 +21,13 @@ import (
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
 	"chatnet/internal/searchx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
 type comment struct {
+	Liked             bool       `json:"liked"`
 	UpdatedAt         *time.Time `json:"updatedAt,omitempty"`
 	ID                int64      `json:"id"`
 	ParentID          *int64     `json:"parentId"`
@@ -50,16 +53,24 @@ type post struct {
 	Comments          []comment           `json:"comments"`
 	Attachments       []mediax.Attachment `json:"attachments,omitempty"`
 	CreatedAt         time.Time           `json:"createdAt"`
+	RepostKind        string              `json:"repostKind,omitempty"`
+	OriginalPost     *repostPreview      `json:"originalPost,omitempty"`
+	RepostCount       int                 `json:"repostCount"`
+	MyRepostID        int64               `json:"myRepostId,omitempty"`
 }
 
 type story struct {
-	ID                int64             `json:"id"`
-	Author            string            `json:"author"`
-	AuthorDisplayName string            `json:"authorDisplayName,omitempty"`
-	Attachment        mediax.Attachment `json:"attachment"`
-	CreatedAt         time.Time         `json:"createdAt"`
-	ExpiresAt         time.Time         `json:"expiresAt"`
+	ID                int64              `json:"id"`
+	Author            string             `json:"author"`
+	AuthorDisplayName string             `json:"authorDisplayName,omitempty"`
+	Attachment        *mediax.Attachment `json:"attachment,omitempty"`
+	Text              string             `json:"text,omitempty"`
+	Background        string             `json:"background,omitempty"`
+	CreatedAt         time.Time          `json:"createdAt"`
+	ExpiresAt         time.Time          `json:"expiresAt"`
 }
+
+const storyTextLimit = 200
 
 type server struct {
 	db        *pgxpool.Pool
@@ -107,6 +118,8 @@ func main() {
 	mux.Handle("GET /api/feed/moderation/me", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getModerationMe)))
 	mux.Handle("GET /api/feed/moderation/reports", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listModerationReports)))
 	mux.Handle("PATCH /api/feed/moderation/reports/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reviewModerationReport)))
+	mux.Handle("POST /api/posts/{id}/repost", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createRepost)))
+	mux.Handle("DELETE /api/posts/{id}/repost", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.removeRepost)))
 	mux.Handle("POST /api/posts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.create)))
 	mux.Handle("GET /api/feed/mentions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPostMentions)))
 	mux.Handle("POST /api/feed/mentions/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.readPostMention)))
@@ -114,6 +127,8 @@ func main() {
 	mux.Handle("POST /api/posts/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.react)))
 	mux.Handle("GET /api/posts/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPostReactionUsers)))
 	mux.Handle("POST /api/posts/{id}/comments", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.addComment)))
+	mux.Handle("PUT /api/posts/{id}/comments/{commentId}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeCommentLike)))
+	mux.Handle("DELETE /api/posts/{id}/comments/{commentId}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeCommentLike)))
 	mux.Handle("GET /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStories)))
 	mux.Handle("POST /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createStory)))
 	mux.Handle("DELETE /api/stories/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteStory)))
@@ -168,7 +183,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := s.db.Query(r.Context(), `
 		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
-		       p.visibility,p.background,p.updated_at,
+		       p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0),
 		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND `+feedAccessSQL+`
@@ -188,18 +203,40 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	posts := []post{}
+	type feedRow struct {
+		post
+		originalID int64
+	}
+	var entries []feedRow
 	for rows.Next() {
 		var p post
-		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.Saved) != nil {
+		var originalID int64
+		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.Saved) != nil {
 			continue
 		}
+		entries = append(entries, feedRow{post: p, originalID: originalID})
+	}
+	if rows.Err() != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")
+		return
+	}
+	rows.Close()
+	posts := make([]post, 0, len(entries))
+	for _, entry := range entries {
+		p, originalID := entry.post, entry.originalID
 		if err := s.attachPostReactions(r.Context(), &p, claims.UserID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot load post reactions")
 			return
 		}
 		p.Comments = s.comments(r, p.ID, claims.UserID)
 		p.Attachments = s.postAttachments(r.Context(), p.ID)
+		if err := s.attachRepost(r.Context(), &p, originalID, claims.UserID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			httpx.Error(w, http.StatusInternalServerError, "cannot load repost")
+			return
+		}
 		posts = append(posts, p)
 	}
 	httpx.JSON(w, http.StatusOK, posts)
@@ -207,7 +244,8 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) comments(r *http.Request, postID, viewerID int64) []comment {
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id,c.parent_id,u.username,u.display_name,c.content,c.created_at,c.updated_at
+		SELECT c.id,c.parent_id,u.username,u.display_name,c.content,c.created_at,c.updated_at,
+		       EXISTS(SELECT 1 FROM comment_likes l WHERE l.comment_id=c.id AND l.user_id=$2)
 		FROM comments c JOIN users u ON u.id=c.user_id
 		WHERE c.post_id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		  (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))
@@ -220,7 +258,7 @@ func (s *server) comments(r *http.Request, postID, viewerID int64) []comment {
 	items := []comment{}
 	for rows.Next() {
 		var c comment
-		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.AuthorDisplayName, &c.Content, &c.CreatedAt, &c.UpdatedAt) == nil {
+		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.AuthorDisplayName, &c.Content, &c.CreatedAt, &c.UpdatedAt, &c.Liked) == nil {
 			items = append(items, c)
 		}
 	}
@@ -364,13 +402,16 @@ func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 	// ponytail: rows expire eagerly on reads; add object-store lifecycle cleanup when orphan cleanup ships.
 	_, _ = s.db.Exec(r.Context(), `DELETE FROM stories WHERE expires_at <= NOW()`)
 	rows, err := s.db.Query(r.Context(), `
-		SELECT s.id,u.username,u.display_name,s.storage_ref,s.original_name,s.content_type,s.size_bytes,s.kind,s.created_at,s.expires_at
+		SELECT s.id,u.username,u.display_name,COALESCE(s.storage_ref,''),COALESCE(s.original_name,''),
+		       COALESCE(s.content_type,''),COALESCE(s.size_bytes,0),s.kind,
+		       COALESCE(s.text_content,''),COALESCE(s.text_background,''),s.created_at,s.expires_at
 		FROM stories s JOIN users u ON u.id=s.user_id
 		WHERE s.expires_at > NOW()
+		  AND ($2 OR s.kind <> 'text')
 		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		    (b.blocker_id=$1 AND b.blocked_id=s.user_id) OR (b.blocked_id=$1 AND b.blocker_id=s.user_id))
 		ORDER BY (s.user_id=$1) DESC,s.created_at DESC
-		LIMIT 100`, claims.UserID)
+		LIMIT 100`, claims.UserID, r.URL.Query().Get("includeText") == "true")
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load stories")
 		return
@@ -380,21 +421,33 @@ func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 	items := []story{}
 	for rows.Next() {
 		var item story
-		if rows.Scan(
+		var attachment mediax.Attachment
+		if err := rows.Scan(
 			&item.ID,
 			&item.Author,
 			&item.AuthorDisplayName,
-			&item.Attachment.StorageRef,
-			&item.Attachment.Name,
-			&item.Attachment.ContentType,
-			&item.Attachment.SizeBytes,
-			&item.Attachment.Kind,
+			&attachment.StorageRef,
+			&attachment.Name,
+			&attachment.ContentType,
+			&attachment.SizeBytes,
+			&attachment.Kind,
+			&item.Text,
+			&item.Background,
 			&item.CreatedAt,
 			&item.ExpiresAt,
-		) == nil {
-			mediax.SignAttachment(s.storage, &item.Attachment)
-			items = append(items, item)
+		); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot load stories")
+			return
 		}
+		if attachment.Kind != "text" {
+			mediax.SignAttachment(s.storage, &attachment)
+			item.Attachment = &attachment
+		}
+		items = append(items, item)
+	}
+	if rows.Err() != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load stories")
+		return
 	}
 	httpx.JSON(w, http.StatusOK, items)
 }
@@ -405,11 +458,13 @@ func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
 	// from the upload response. Accept only these known legacy response fields,
 	// but NEVER trust them: ownership and storage metadata are verified below.
 	var body struct {
-		Attachment struct {
+		Attachment *struct {
 			mediax.AttachmentInput
 			URL string `json:"url"`
 			ID  int64  `json:"id"`
 		} `json:"attachment"`
+		Text       *string `json:"text"`
+		Background *string `json:"background"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8*1024))
 	decoder.DisallowUnknownFields()
@@ -417,39 +472,62 @@ func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	attachments, err := mediax.ValidateAttachments(
-		r.Context(),
-		s.storage,
-		"story",
-		claims.UserID,
-		[]mediax.AttachmentInput{body.Attachment.AttachmentInput},
-		1,
-	)
-	if err != nil || len(attachments) != 1 {
-		message := "Story requires one image or video"
-		if err != nil {
-			message = err.Error()
+	var item story
+	if body.Text != nil && body.Attachment == nil {
+		item.Text = strings.TrimSpace(*body.Text)
+		if item.Text == "" || utf8.RuneCountInString(item.Text) > storyTextLimit || strings.ContainsRune(item.Text, 0) {
+			httpx.Error(w, http.StatusBadRequest, "Story text must contain 1 to 200 characters")
+			return
 		}
-		httpx.Error(w, http.StatusBadRequest, message)
+		item.Background = "berry"
+		if body.Background != nil {
+			item.Background = *body.Background
+		}
+		switch item.Background {
+		case "berry", "indigo", "teal", "sunset":
+		default:
+			httpx.Error(w, http.StatusBadRequest, "invalid Story background")
+			return
+		}
+	} else if body.Attachment != nil && body.Text == nil && body.Background == nil {
+		attachments, err := mediax.ValidateAttachments(
+			r.Context(), s.storage, "story", claims.UserID,
+			[]mediax.AttachmentInput{body.Attachment.AttachmentInput}, 1,
+		)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if len(attachments) != 1 {
+			httpx.Error(w, http.StatusBadRequest, "Story requires one image or video")
+			return
+		}
+		item.Attachment = &attachments[0]
+	} else {
+		httpx.Error(w, http.StatusBadRequest, "Story requires either text or one image or video")
 		return
 	}
 
-	item := story{Attachment: attachments[0]}
 	if err := s.db.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&item.Author, &item.AuthorDisplayName); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load story author")
 		return
 	}
-	err = s.db.QueryRow(r.Context(), `
-		INSERT INTO stories(user_id,storage_ref,original_name,content_type,size_bytes,kind)
-		VALUES($1,$2,$3,$4,$5,$6)
-		RETURNING id,created_at,expires_at`,
-		claims.UserID,
-		item.Attachment.StorageRef,
-		item.Attachment.Name,
-		item.Attachment.ContentType,
-		item.Attachment.SizeBytes,
-		item.Attachment.Kind,
-	).Scan(&item.ID, &item.CreatedAt, &item.ExpiresAt)
+	var err error
+	if a := item.Attachment; a != nil {
+		err = s.db.QueryRow(r.Context(), `
+			INSERT INTO stories(user_id,storage_ref,original_name,content_type,size_bytes,kind)
+			VALUES($1,$2,$3,$4,$5,$6)
+			RETURNING id,created_at,expires_at`,
+			claims.UserID, a.StorageRef, a.Name, a.ContentType, a.SizeBytes, a.Kind,
+		).Scan(&item.ID, &item.CreatedAt, &item.ExpiresAt)
+	} else {
+		err = s.db.QueryRow(r.Context(), `
+			INSERT INTO stories(user_id,kind,text_content,text_background)
+			VALUES($1,'text',$2,$3)
+			RETURNING id,created_at,expires_at`,
+			claims.UserID, item.Text, item.Background,
+		).Scan(&item.ID, &item.CreatedAt, &item.ExpiresAt)
+	}
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create story")
 		return
@@ -515,6 +593,7 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 		SELECT p.id,$2,$3,$4::bigint
 		FROM posts p
 		WHERE p.id=$1 AND `+feedAccessSQL+`
+		  AND p.repost_kind IS DISTINCT FROM 'quick'
 		  AND ($4::bigint IS NULL OR EXISTS (
 		    SELECT 1 FROM comments c WHERE c.id=$4 AND c.post_id=p.id
 		    AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE

@@ -2,7 +2,7 @@ import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useApi } from "../../../shared/context/ApiContext";
 import { useNotice } from "../../../shared/context/NoticeContext";
 import { useSession } from "../../../shared/context/SessionContext";
-import { changeComment, reportComment, submitComment } from "../api/comments";
+import { changeComment, changeCommentLike, reportComment, submitComment } from "../api/comments";
 import type { FeedComment } from "../components/FeedDiscussion";
 import type { Post } from "../types";
 
@@ -124,8 +124,34 @@ export function usePostComments({
       }
     }
 
+  async function setCommentLike(post: Post, commentId: number, liked: boolean) {
+    const sessionId = session?.sessionId;
+    if (!sessionId || sessionRef.current?.sessionId !== sessionId) return;
+    const key = `feed:comment:${post.id}`;
+    if (actionLocks.current.has(key))
+      throw new Error("Bình luận đang được cập nhật.");
+
+    actionLocks.current.add(key);
+    ++feedRevisionRef.current;
+    try {
+      const response = await changeCommentLike(apiFetch, post.id, commentId, liked);
+      if (sessionRef.current?.sessionId !== sessionId) return;
+      if (!response.ok) throw new Error("Không cập nhật được lượt thích. Hãy thử lại.");
+      const updated = (await response.json()) as Post;
+      if (sessionRef.current?.sessionId !== sessionId) return;
+      if (updated?.id !== post.id || !Array.isArray(updated.comments) ||
+          updated.comments.find((comment) => comment.id === commentId)?.liked !== liked)
+        throw new Error("Chưa xác nhận được lượt thích. Hãy thử lại.");
+      syncFeedPost(updated);
+    } finally {
+      actionLocks.current.delete(key);
+      if (sessionRef.current?.sessionId === sessionId) ++feedRevisionRef.current;
+    }
+  }
+
   return {
     addComment,
+    setCommentLike,
     manageFeedComment,
     reportFeedComment,
   };

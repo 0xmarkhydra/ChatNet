@@ -8,6 +8,10 @@ Ship correct Web/PWA and Desktop-compatible React 19 + strict TypeScript code **
 
 Do not treat existing legacy patterns as permission to repeat them. Legacy violations in `frontend/lint-baseline.json` and `frontend/scripts/architecture-baseline.json` are **debt ceilings, not design examples**.
 
+## Concurrent-agent ownership
+
+Follow `docs/engineering/AGENT_FILE_OWNERSHIP.md` before changing files while other agents work. Agree on an exclusive writer for each modified file, especially `app/AuthedApp.tsx`, router/navigation, `shared/` and contract files. A worktree isolates local edits but does not reserve files; if ownership is unclear or overlaps, stop that edit and coordinate a handoff. Review the final diff against the agreed scope before PR.
+
 ## File ownership and dependency direction
 
 - `app/`: application composition, top-level providers, layouts and navigation. Domain behavior belongs to its feature. `platform/`: environment adapters, receiving domain dependencies through explicit interfaces.
@@ -36,6 +40,12 @@ Do not treat existing legacy patterns as permission to repeat them. Legacy viola
 - Prefer lazy-loading genuinely heavy routes or features only after identifying a measured bundle or UX problem. No automatic dependency additions (router, query/cache, state manager, form library) just to follow trends.
 - Keep render and API responsibilities separate but avoid unnecessary `useMemo`, `useCallback`, providers and abstractions.
 
+## UI design skills and conflict precedence
+
+For UI design, UI implementation, responsive fixes and visual review, follow [UI skill orchestration](UI_SKILL_ORCHESTRATION.md) in addition to this standard. The vendored `ui-ux-pro-max` skill is a **read-only design/UX advisory**, not an alternative design authority or automatic theme generator. Approved SocCo tokens, existing shadcn/Tailwind source, Penpot references and `ios-inspired-ui-design` keep precedence. Never apply externally generated colors/fonts, install packages, or rewrite CSS resets without explicit review.
+
+When present and approved, `socco-ui-fidelity` and `docs/DESIGN.md` add screen-specific visual checks. These currently may be pending integration in another agent's worktree; do not overwrite that uncommitted work. Review responsive and accessibility evidence, and report when Python-based UI UX Pro Max search is unavailable rather than claiming it ran.
+
 ## Shared UI and design system
 
 - New reusable controls belong in `frontend/src/shared/ui/`, with feature logic staying in the owning feature. Check for an existing shared control before adding another variant.
@@ -44,6 +54,16 @@ Do not treat existing legacy patterns as permission to repeat them. Legacy viola
 - Tailwind Preflight is deliberately **disabled** while legacy CSS remains. Do not switch to `@import "tailwindcss"`, regenerate global resets, or replace existing feature styles as part of unrelated work. Any migration requires screen-by-screen visual QA and an explicit PR.
 - Use `cn()` from `shared/lib/utils.ts` to combine Tailwind classes. Do not copy a new button/dialog/input implementation into each feature or introduce competing icon/UI libraries.
 - Existing feature CSS remains supported until its owner migrates it; do not mix mass CSS rewrites with behavior changes or blindly add `!important` to win selector conflicts.
+
+## Page and asynchronous UX contract (new or changed screens)
+
+- A page must declare who owns vertical scrolling: the app shell or the page body, never both by accident. Make the content region flex/grid-safe with `min-width: 0` and `min-height: 0` where needed. Do not add arbitrary `100vh`/fixed heights to a feature page or shift the shared header/sidebar when switching routes.
+- Preserve the same shell, header, navigation, page width and primary scroll owner while loading, empty, error and populated states change. Check short desktop height, mobile keyboard/safe area, narrow viewports and browser Back/Forward.
+- Every remote read must distinguish **initial loading**, **refreshing existing data**, **empty success**, **recoverable error** and **permission/session failure**. Use the existing `AsyncSectionFallback` or feature-owned state UI; give retry only when safe, and do not erase usable cached content just to show a full-page spinner.
+- Loading placeholders should resemble the content being loaded, be `aria-hidden` so assistive technology hears a single status message, and disable animation for reduced-motion users. No silent `Suspense fallback={null}` for a user-visible page where loading blocks interaction.
+- For new interactive UI, reuse `shared/ui` shadcn/Radix primitives first; retain feature-owned styles where necessary. Keep visible focus, Escape/keyboard semantics, accessible labels and minimum 44px touch targets for primary mobile actions.
+- Prefer existing semantic SocCO tokens and Tailwind utilities for new styles; do not introduce global selector overrides, feature-wide `!important`, or another independent button/menu/dialog design. Do not migrate unrelated legacy CSS without before/after visual proof.
+- Screen changes need component behavior tests for loading/empty/error/retry and appropriate browser layout smoke tests. A stale browser test must be updated to the current intentional route/responsive DOM; do not make the production layout regress merely to satisfy old selectors.
 
 ## Required workflow for AI-generated and human code
 

@@ -16,3 +16,14 @@ export function isCurrentFeedRefresh(request: FeedRequestState, current: FeedReq
     request.revision === current.revision &&
     request.sequence === current.sequence
 }
+
+/** A quick repost occupies the same feed slot as its original. Quotes are distinct posts. */
+export function collapseQuickReposts(items: Post[]): Post[] {
+  const seen = new Set<number>()
+  return items.filter(item => {
+    const key = item.repostKind === 'quick' ? item.originalPost?.id ?? item.id : item.id
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}

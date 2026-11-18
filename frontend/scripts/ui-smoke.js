@@ -417,15 +417,19 @@ async (page) => {
   check(!(await page.locator('.story-screen-people').isVisible()), 'Mobile Story user list should collapse')
   await page.screenshot({ path: 'output/playwright/story-mobile.png' })
   await page.getByRole('button', { name: 'Đóng', exact: true }).click()
-  await page.getByLabel('Chọn ảnh hoặc video cho Story', { exact: true }).setInputFiles({
+  await page.getByRole('button', { name: 'Tạo Story mới', exact: true }).click()
+  const storyComposer = page.getByRole('dialog', { name: 'Tạo Story' })
+  await storyComposer.getByLabel('Chọn ảnh hoặc video cho Story', { exact: true }).setInputFiles({
     name: 'new-story.jpg',
     mimeType: 'image/jpeg',
     buffer: Buffer.from('story-image'),
   })
+  await storyComposer.getByRole('button', { name: 'Đăng Story', exact: true }).click()
+  await storyComposer.waitFor({ state: 'hidden' })
   await page.getByRole('button', { name: `Xem Story của @${session.user.username}`, exact: true }).waitFor()
   check(presignRequests.some((item) => item.scope === 'story' && item.name === 'new-story.jpg'), 'Story upload used wrong scope')
   check(storyRequests.length === 1 && storyRequests[0].attachment.storageRef === 's3://mock/story/upload.jpg', 'Story create payload is wrong')
-  await page.getByRole('button', { name: `Xem Story của @${session.user.username}`, exact: true }).click()
+  await page.getByRole('dialog', { name: `Khoảnh khắc của @${session.user.username}`, exact: true }).waitFor()
   await page.evaluate(() => { window.confirm = () => true })
   await page.getByRole('button', { name: 'Tùy chọn Story', exact: true }).click()
   await page.getByRole('button', { name: 'Xóa Story', exact: true }).click()

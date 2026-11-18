@@ -65,6 +65,21 @@
   filter: blur(40px);
 }
 
+/* Login only: one ambient pass over the existing indigo/violet layers. */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-layout--login .auth-orb--blue {
+    animation: soco-aurora-drift 4s var(--soco-motion-ease, ease-out) both;
+  }
+  .auth-layout--login .auth-orb--purple {
+    animation: soco-aurora-drift 4s var(--soco-motion-ease, ease-out) reverse both;
+  }
+}
+@keyframes soco-aurora-drift {
+  0% { transform: translate3d(0, 0, 0); opacity: .8; }
+  45% { transform: translate3d(18px, -12px, 0); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0); opacity: .8; }
+}
+
 /* Left Column: Branding, Value Prop & Golden Ratio Visual */
 .auth-hero {
   position: relative;

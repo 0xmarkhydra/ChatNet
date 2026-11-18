@@ -27,12 +27,14 @@ export default function ReactionParticipantsDialog({
   initialEmoji = '',
   reactions = [],
   request,
+  portalContainer,
   onClose,
 }: {
   kind: 'message' | 'post'
   id: number
   initialEmoji?: string
   reactions?: ReactionOption[]
+  portalContainer?: HTMLElement
   request: (path: string, init?: RequestInit) => Promise<Response>
   onClose: () => void
 }) {
@@ -87,9 +89,12 @@ export default function ReactionParticipantsDialog({
 
   useEffect(() => {
     const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     closeRef.current?.focus()
     return () => {
       pending.current?.abort()
+      document.body.style.overflow = previousOverflow
       if (previousFocus instanceof HTMLElement) previousFocus.focus()
     }
   }, [])
@@ -115,7 +120,7 @@ export default function ReactionParticipantsDialog({
         aria-modal="true"
         aria-labelledby="reaction-users-title"
         onKeyDown={event => {
-          if (event.key === 'Escape') { event.stopPropagation(); onClose() }
+          if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose() }
           if (event.key !== 'Tab') return
           const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
           if (buttons.length === 0) return
@@ -154,7 +159,7 @@ export default function ReactionParticipantsDialog({
             ))}
           </div>
         )}
-        <div className="reaction-users-list" aria-live="polite">
+        <div className="reaction-users-list" aria-live="polite" aria-busy={loading}>
           {users.map((user, index) => (
             <div className="reaction-users-person" key={`${user.userId}-${index}`}>
               <UserAvatar username={user.username} name={userLabel(user.displayName, user.username)} className="reaction-users-avatar" />
@@ -178,6 +183,6 @@ export default function ReactionParticipantsDialog({
         </div>
       </section>
     </div>,
-    document.body,
+    portalContainer ?? document.body,
   )
 }

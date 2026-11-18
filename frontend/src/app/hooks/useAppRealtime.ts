@@ -1,5 +1,5 @@
 import type { SessionResponseCache } from '../../shared/lib/sessionCache'
-import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { API } from '../../shared/lib/config'
 import { useLatest } from '../../shared/hooks/useLatest'
 import { isDesktopBuild } from '../../platform/desktop'
@@ -91,6 +91,7 @@ export function useAppRealtime({
   setConversations,
   onMessageConfirmed,
 }: Options) {
+  const replayWindow = useRef<{ sessionId: string; ids: Set<number> } | null>(null)
   // Long-lived SSE/timer listeners need current callbacks without re-subscribing.
   const handlers = useLatest({
     onCategoryAssignmentChanged,
@@ -123,6 +124,18 @@ export function useAppRealtime({
     let hasOpened = false
     let hadConnectionError = false
     let lastSSECheckAt = 0
+    // EventSource can replay the last delivery after reconnecting. Keep a bounded
+    // per-session window so one message ID can never increment unread twice.
+    if (replayWindow.current?.sessionId !== session.sessionId)
+      replayWindow.current = { sessionId: session.sessionId, ids: new Set() }
+    const seenMessageIds = replayWindow.current.ids
+    let lastFriendPollAt = 0
+    const pollFriendsIfStale = () => {
+      const now = Date.now()
+      if (now - lastFriendPollAt < 60_000) return
+      lastFriendPollAt = now
+      void handlers.current.refreshFriendConnections()
+    }
     const events = new EventSource(
       `${API}/api/events?token=${encodeURIComponent(session.token)}`,
     )
@@ -138,6 +151,7 @@ export function useAppRealtime({
       if (reconnected) window.dispatchEvent(new CustomEvent('chatnet:sse-reconnected', {
         detail: { sessionId: session.sessionId },
       }))
+      lastFriendPollAt = Date.now()
       void handlers.current.refreshFriendConnections()
       void handlers.current.reconcileConversationMemberships()
     }
@@ -158,6 +172,15 @@ export function useAppRealtime({
       if (!active || sessionRef.current?.sessionId !== session.sessionId) return
       const update = parseRealtimeEvent((event as MessageEvent).data)
       if (!update) return
+      if (update.type === 'message' && update.message) {
+        const id = update.message.id
+        if (seenMessageIds.has(id)) return
+        if (seenMessageIds.size >= 4096) {
+          const oldest = seenMessageIds.values().next().value
+          if (oldest !== undefined) seenMessageIds.delete(oldest)
+        }
+        seenMessageIds.add(id)
+      }
       if (['message', 'conversation.read', 'conversation.created', 'conversation.removed', 'privacy.updated'].includes(update.type)) refreshDesktopUnread()
       if (update.type === 'privacy.updated' || update.type === 'conversation.removed') clearDesktopNotifications(session.sessionId)
       if (update.type === 'privacy.updated') {
@@ -281,25 +304,21 @@ export function useAppRealtime({
         const incoming = update.message
         if (activeConversationTypeRef.current === 'group' && activeConversationIdRef.current === incoming.conversationId)
           window.dispatchEvent(new CustomEvent('chatnet:group-channel-event',{detail:{type:'message',message:incoming}}))
-        // SSE delivers live events only. Message timestamps can be skewed
-        // relative to the device clock, so do not use createdAt to gate sound.
-        // Loading history, reaction updates and our own sends stay silent.
-        // Background browser tabs may alert after Web Audio is unlocked.
-        // Desktop uses native sound in the background, avoiding a double chime.
-        const localSoundAllowed = !isDesktopBuild ||
-          (document.visibilityState === 'visible' && document.hasFocus())
-        const sound = messageSound.current
-        sound?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current && localSoundAllowed)
-        // Local-only diagnostics distinguish muted/own/duplicate messages
-        // and unavailable AudioContext without logging private data.
-        if (import.meta.env.DEV) {
-          const diagnostic = sound?.getDiagnostic()
-          console.info('[ChatNet incoming sound]', {
-            result: diagnostic?.result ?? 'audio-not-initialized',
-            audioState: diagnostic?.audioState ?? 'not-initialized',
-            enabled: messageSoundEnabledRef.current,
-            fromAnotherAccount: incoming.senderId !== session.user.id,
-          })
+        // SSE messages are live; neither renderer nor Desktop Main compares
+        // createdAt against the local clock. Desktop Main plays the alert even
+        // in the background, independent of Windows toast delivery.
+        if (!isDesktopBuild) {
+          const sound = messageSound.current
+          sound?.onIncoming(incoming, session.user.id, messageSoundEnabledRef.current)
+          if (import.meta.env.DEV) {
+            const diagnostic = sound?.getDiagnostic()
+            console.info('[ChatNet incoming sound]', {
+              result: diagnostic?.result ?? 'audio-not-initialized',
+              audioState: diagnostic?.audioState ?? 'not-initialized',
+              enabled: messageSoundEnabledRef.current,
+              fromAnotherAccount: incoming.senderId !== session.user.id,
+            })
+          }
         }
         notifyDesktopMessage(session, incoming)
         messageChanges.current.add(incoming.id)
@@ -335,12 +354,18 @@ export function useAppRealtime({
         setConversations((current) => {
           const existing = current.find((item) => item.id === update.conversationId)
           if (!existing) return current
+          const incomingTime = Date.parse(incoming.createdAt)
+          const previewTime = Date.parse(existing.lastMessageAt || '')
+          const advancePreview = Number.isFinite(incomingTime) &&
+            (!Number.isFinite(previewTime) || incomingTime > previewTime)
           const next = current.map((item) =>
             item.id === update.conversationId
               ? {
                   ...item,
-                  lastMessage: incoming.text || attachmentLabel(incoming.attachments),
-                  lastMessageAt: incoming.createdAt,
+                  ...(advancePreview ? {
+                    lastMessage: incoming.text || attachmentLabel(incoming.attachments),
+                    lastMessageAt: incoming.createdAt,
+                  } : {}),
                   unreadCount:
                     incoming.senderId !== session.user.id &&
                       (!canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus()) ||
@@ -362,7 +387,7 @@ export function useAppRealtime({
           setMessages((current) =>
             current.some((item) => item.id === incoming.id)
               ? current
-              : [...current, incoming],
+              : [...current, incoming].sort((a, b) => a.id - b.id),
           )
           if (incoming.senderId !== session.user.id &&
               canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) {
@@ -390,7 +415,7 @@ export function useAppRealtime({
     const refreshTimer = window.setInterval(() => {
       if (!active || sessionRef.current?.sessionId !== session.sessionId || document.visibilityState !== 'visible') return
       void handlers.current.refreshConversations()
-      void handlers.current.refreshFriendConnections()
+      pollFriendsIfStale()
       handlers.current.refreshCategoryConversations()
     }, 20000)
     const membershipTimer = window.setInterval(() => {
@@ -405,7 +430,7 @@ export function useAppRealtime({
         checkMembership()
         void handlers.current.refreshConversations()
         handlers.current.refreshCategoryConversations()
-        void handlers.current.refreshFriendConnections()
+        pollFriendsIfStale()
       }
     }
     window.addEventListener('online', checkMembership)

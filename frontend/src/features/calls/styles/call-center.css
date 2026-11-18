@@ -65,6 +65,43 @@
   border: 0; border-radius: 50%; background: #eff3ff; color: #2d62e9;
 }
 .call-center-content { flex: 1; min-height: 0; overflow: auto; padding: 20px 26px 32px; }
+/* History list and call details own their scroll positions, not the page. */
+.call-center-history {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.call-center-history .call-center-stats,
+.call-center-history .call-center-filters { flex-shrink: 0; }
+/* Keep the statistics and recent calls exactly as wide as the left column. */
+.call-center-history .call-history-main-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.call-center-history .call-history-main-column .call-history-list {
+  flex: 1;
+  min-height: 0;
+}
+.call-center-history .call-history-main-column .call-center-stats {
+  width: 100%;
+  box-sizing: border-box;
+}
+.call-center-history .call-history-layout {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.call-center-history .call-history-list,
+.call-center-history .call-history-details {
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
 .call-center-stats {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px;
   background: #fff; border-radius: 18px; padding: 21px 25px; margin-bottom: 17px;
@@ -214,6 +251,7 @@
   .call-center-header { padding: 15px 18px; }
   .call-center-content { padding: 16px; }
   .call-history-layout, .call-settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .call-center-history .call-history-layout { grid-template-rows: repeat(2, minmax(0, 1fr)); }
   .call-history-details { min-height: 0; }
 }
 @media (max-width: 680px) {
@@ -312,17 +350,19 @@
   .call-center-tabs button { gap:3px; font-size:10px; }
 }
 @media(min-width:761px) {
-  .modern-shell.app-layout:has(.call-center.is-embedded) > .chatnet-appbar {display:none;}
+  .modern-shell.app-layout:has(.call-center.is-embedded:not(.is-contact-panel)) > .chatnet-appbar {display:none;}
 }
 @media(max-width:760px) {
-  .app-shell:has(.call-center.is-embedded) > .chatnet-appbar {display:none;}
+  .app-shell:has(.call-center.is-embedded:not(.is-contact-panel)) > .chatnet-appbar {display:none;}
 }
-@media(max-width:760px) { .modern-shell .bottom-navigation { grid-template-columns: repeat(6,minmax(0,1fr)); } }
+@media(max-width:760px) { .modern-shell .bottom-navigation { grid-template-columns: repeat(5,minmax(0,1fr)); } }
 
 /* On PWA phones the call details open above history, not beneath the list. */
 @media (max-width: 760px) {
+  .call-center-history { display: block; overflow-y: auto; }
+  .call-center-history .call-history-layout { min-height: auto; }
   .call-history-layout { display: block; }
-  .call-history-list { min-height: 0; }
+  .call-center-history .call-history-list { min-height: 0; max-height: none; overflow: visible; }
   .call-history-details { display: none; }
   .call-detail-scrim {
     display: block; position: fixed; inset: 0; z-index: 10010;

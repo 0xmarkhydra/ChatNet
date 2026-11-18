@@ -682,7 +682,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
                ORDER BY CASE WHEN avatar_member.user_id=$1 THEN 1 ELSE 0 END, avatar_member.user_id
                LIMIT 3
              ) ELSE ARRAY[]::text[] END,
-             COALESCE((SELECT NOT p.message_notifications AND NOT p.mention_notifications
+             COALESCE((SELECT NOT p.message_notifications
                FROM group_notification_preferences p
                WHERE p.conversation_id=c.id AND p.user_id=$1),FALSE)
 
@@ -1613,11 +1613,7 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	allowed := map[string]bool{
-		"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "😡": true,
-		"🙏": true, // Legacy reaction remains removable on existing messages.
-	}
-	if !allowed[body.Emoji] {
+	if !validChatReactionEmoji(body.Emoji) {
 		httpx.Error(w, http.StatusBadRequest, "unsupported reaction")
 		return
 	}

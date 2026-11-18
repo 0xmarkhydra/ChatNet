@@ -1,1 +1,5 @@
 /frontend-nginx-security-headers.conf text eol=lf
+
+# Preserve audited third-party UI UX Pro Max source byte-for-byte (upstream contains trailing whitespace).
+.agents/skills/ui-ux-pro-max/** whitespace=-blank-at-eol,-blank-at-eof
+.claude/skills/ui-ux-pro-max/** whitespace=-blank-at-eol,-blank-at-eof

@@ -2,13 +2,14 @@
 import { act, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Link, MemoryRouter, Outlet, useLocation } from "react-router-dom";
+import { Link, MemoryRouter, Outlet, parsePath, useLocation, useNavigate } from "react-router-dom";
 import { AppRouteTree } from "./RouteTree";
+import { ROUTE, TAB_PATH } from "./routes";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 const cleanup: Array<() => void> = [];
 
-function renderAt(path: string) {
+function renderAt(path: string, initialState?: unknown) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -16,19 +17,45 @@ function renderAt(path: string) {
 
   function Shell() {
     const location = useLocation();
+    const navigate = useNavigate();
     useEffect(() => { onMount(); }, []);
     return (
       <div>
         <output data-testid="location">{location.pathname + location.search}</output>
+        <output data-testid="hash">{location.hash}</output>
+        <output data-testid="state">{JSON.stringify(location.state)}</output>
         <Link to="/feed">Bảng tin</Link>
+        <Link to="/feed/posts/42">Bài viết 42</Link>
+        <Link to="/chat/123">Hội thoại 123</Link>
+        <Link to="/settings/devices">Thiết bị</Link>
+        <Link to="/calls/translation">Dịch AI</Link>
+        <Link to="/users/alice">Hồ sơ Alice</Link>
         <Link to="/somewhere-unknown">Invalid</Link>
-        <Outlet context={<p data-testid="page">Current screen</p>} />
+        <button type="button" data-testid="navigate-route" onClick={(event) => navigate(event.currentTarget.getAttribute("data-target") || "/feed")}>Navigate route</button>
+        <button type="button" onClick={() => navigate(-1)}>History Back</button>
+        <button type="button" onClick={() => navigate(1)}>History Forward</button>
+        <Outlet context={{
+          beforeFeed: ["/profile", "/settings", "/users", "/feed", "/chat"].some(prefix =>
+            location.pathname === prefix || location.pathname.startsWith(prefix + "/")
+          ) ? <span data-testid="shared-page-overlay">Overlay retained</span>
+            : <p data-testid="page" data-page="legacy">Current screen</p>,
+          frameClassName: "",
+          afterFeed: <span data-testid="shared-after-feed-overlay">Secondary overlay</span>,
+          feed: <p data-testid="page" data-page="feed">Current screen</p>,
+          chat: <p data-testid="page" data-page="chat">Current screen</p>,
+          contacts: <p data-testid="page" data-page="contacts">Current screen</p>,
+          search: <p data-testid="page" data-page="search">Current screen</p>,
+          discover: <p data-testid="page" data-page="discover">Current screen</p>,
+          market: <p data-testid="page" data-page="market">Current screen</p>,
+          notifications: <p data-testid="page" data-page="notifications">Current screen</p>,
+          profile: <p data-testid="page" data-page="profile">Current screen</p>,
+        }} />
       </div>
     );
   }
 
   act(() => root.render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={[{ ...parsePath(path), state: initialState }]}>
       <AppRouteTree><Shell /></AppRouteTree>
     </MemoryRouter>,
   ));
@@ -42,8 +69,15 @@ function renderAt(path: string) {
     return el;
   };
   const location = () => container.querySelector('[data-testid="location"]')?.textContent;
+  const history = (direction: "Back" | "Forward") => {
+    const button = Array.from(container.querySelectorAll("button")).find((item) => item.textContent === `History ${direction}`);
+    if (!button) throw new Error(`Missing History ${direction}`);
+    act(() => button.click());
+  };
   const page = () => container.querySelector('[data-testid="page"]');
-  return { container, onMount, link, location, page };
+  const hash = () => container.querySelector('[data-testid="hash"]')?.textContent;
+  const state = () => container.querySelector('[data-testid="state"]')?.textContent;
+  return { container, onMount, link, location, page, hash, state, history };
 }
 
 afterEach(() => {
@@ -51,6 +85,106 @@ afterEach(() => {
 });
 
 describe("app route tree", () => {
+  it("provides a working index route for every registered app tab and workspace", () => {
+    for (const path of [...Object.values(TAB_PATH), ...Object.values(ROUTE)]) {
+      const app = renderAt(path);
+      expect(app.page()?.textContent, `Missing route content: ${path}`).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("selects feature content from route ownership without remounting the shell", () => {
+    for (const [path, feature] of [
+      ["/contacts", "contacts"],
+      ["/contacts/calls", "contacts"],
+      ["/contacts/groups", "contacts"],
+      ["/search?q=user", "search"],
+      ["/discover", "discover"],
+      ["/marketplace", "market"],
+      ["/notifications", "notifications"],
+      ["/feed", "feed"],
+      ["/chat", "chat"],
+      ["/feed/posts/42", "feed"],
+      ["/chat/123", "chat"],
+      ["/profile", "profile"],
+      ["/settings/devices", "profile"],
+      ["/users/alice", "profile"],
+    ]) {
+      const app = renderAt(path);
+      expect(app.page()?.getAttribute("data-page")).toBe(feature);
+      expect(app.container.querySelector(".modern-frame")?.getAttribute("data-route-page")).toBe(feature);
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("navigates across route-owned pages without remounting the app shell", () => {
+    const app = renderAt("/feed");
+    for (const [path, expected] of [
+      ["/contacts", "contacts"],
+      ["/discover", "discover"],
+      ["/marketplace", "market"],
+      ["/notifications", "notifications"],
+      ["/search?q=alice", "search"],
+      ["/chat", "chat"],
+      ["/feed", "feed"],
+      ["/feed/posts/42", "feed"],
+      ["/profile", "profile"],
+      ["/settings/privacy", "profile"],
+      ["/users/alice", "profile"],
+    ]) {
+      // Navigate via the same router instance rather than mounting a new shell.
+      const destination = app.container.querySelector<HTMLButtonElement>('[data-testid="navigate-route"]');
+      expect(destination).not.toBeNull();
+      act(() => {
+        destination!.setAttribute("data-target", path);
+        destination!.click();
+      });
+      expect(app.location()).toBe(path);
+      expect(app.page()?.getAttribute("data-page")).toBe(expected);
+      expect(app.container.querySelector(".modern-frame")?.getAttribute("data-route-page")).toBe(expected);
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("keeps Chat and its shared overlays in original DOM order", () => {
+    for (const path of ["/chat", "/chat/123"]) {
+      const app = renderAt(path);
+      const chat = app.page();
+      const shared = app.container.querySelector('[data-testid="shared-page-overlay"]');
+      const after = app.container.querySelector('[data-testid="shared-after-feed-overlay"]');
+      expect(chat?.getAttribute("data-page")).toBe("chat");
+      expect(shared).not.toBeNull();
+      expect(after).not.toBeNull();
+      expect(Boolean(chat!.compareDocumentPosition(shared!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+      expect(Boolean(shared!.compareDocumentPosition(after!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("preserves shared dialogs before and after Feed when routing to posts", () => {
+    for (const path of ["/feed", "/feed/posts/42"]) {
+      const app = renderAt(path);
+      const before = app.container.querySelector('[data-testid="shared-page-overlay"]');
+      const feed = app.page();
+      const after = app.container.querySelector('[data-testid="shared-after-feed-overlay"]');
+      expect(before).not.toBeNull();
+      expect(feed?.getAttribute("data-page")).toBe("feed");
+      expect(after).not.toBeNull();
+      expect(Boolean(before!.compareDocumentPosition(feed!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+      expect(Boolean(feed!.compareDocumentPosition(after!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("keeps shared page overlays when Profile, Settings or visitors are route-owned", () => {
+    for (const path of ["/profile", "/settings/privacy", "/users/alice"]) {
+      const app = renderAt(path);
+      expect(app.page()?.getAttribute("data-page")).toBe("profile");
+      expect(app.container.querySelector('[data-testid="shared-page-overlay"]')?.textContent).toBe("Overlay retained");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("keeps the authenticated shell mounted when switching tabs", () => {
     const { onMount, link, location, page } = renderAt("/chat");
     expect(page()?.textContent).toBe("Current screen");
@@ -60,10 +194,72 @@ describe("app route tree", () => {
     expect(onMount).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the signed-in shell and outlet context across nested feature routes", () => {
+    const app = renderAt("/feed");
+    for (const [label, path] of [
+      ["Bài viết 42", "/feed/posts/42"],
+      ["Hội thoại 123", "/chat/123"],
+      ["Thiết bị", "/settings/devices"],
+      ["Dịch AI", "/contacts/translation"],
+      ["Hồ sơ Alice", "/users/alice"],
+      ["Bảng tin", "/feed"],
+    ]) {
+      act(() => app.link(label).click());
+      expect(app.location()).toBe(path);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("preserves nested page context across back/forward history", () => {
+    const app = renderAt("/chat");
+    act(() => app.link("Bài viết 42").click());
+    act(() => app.link("Thiết bị").click());
+    expect(app.location()).toBe("/settings/devices");
+    app.history("Back");
+    expect(app.location()).toBe("/feed/posts/42");
+    expect(app.page()?.textContent).toBe("Current screen");
+    app.history("Back");
+    expect(app.location()).toBe("/chat");
+    app.history("Forward");
+    expect(app.location()).toBe("/feed/posts/42");
+    app.history("Forward");
+    expect(app.location()).toBe("/settings/devices");
+    expect(app.page()?.textContent).toBe("Current screen");
+    expect(app.onMount).toHaveBeenCalledTimes(1);
+  });
+
   it("redirects legacy home links without discarding the post deep link", () => {
     const { location, page } = renderAt("/?tab=feed&post=42");
-    expect(location()).toBe("/feed?tab=feed&post=42");
+    expect(location()).toBe("/feed?post=42");
     expect(page()).not.toBeNull();
+  });
+
+  it("rejects prototype-named legacy tabs while preserving non-tab query and redirect context", () => {
+    for (const name of ["__proto__", "constructor", "toString", "hasOwnProperty"]) {
+      const app = renderAt(`/?tab=${name}&post=42#comments`, { context: "legacy" });
+      expect(app.location()).toBe("/chat?post=42");
+      expect(app.hash()).toBe("#comments");
+      expect(app.state()).toBe(JSON.stringify({ context: "legacy" }));
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("preserves legacy deep-link fragment and navigation state through a canonical home redirect", () => {
+    const payload = { postId: 42, visitorReturnTo: "/contacts/requests" };
+    const app = renderAt("/?tab=feed&post=42#comments", payload);
+    expect(app.location()).toBe("/feed?post=42");
+    expect(app.hash()).toBe("#comments");
+    expect(app.state()).toBe(JSON.stringify(payload));
+    expect(app.page()?.textContent).toBe("Current screen");
+    expect(app.onMount).toHaveBeenCalledTimes(1);
+  });
+
+  it("canonicalizes legacy tab links while keeping unrelated search parameters", () => {
+    expect(renderAt("/?tab=contacts&invite=alice").location()).toBe("/contacts?invite=alice");
+    expect(renderAt("/?tab=unknown&message=12").location()).toBe("/chat?message=12");
+    expect(renderAt("/?tab=feed").location()).toBe("/feed");
   });
 
   it("renders Not Found for unknown paths without replacing the shell", () => {
@@ -106,6 +302,70 @@ describe("app route tree", () => {
     expect(invalid.container.textContent).toContain("Không tìm thấy trang");
   });
 
+  it("supports Settings subpages while keeping invalid sections out of the shell", () => {
+    for (const section of [
+      "account", "privacy", "security", "notifications", "language",
+      "messages", "appearance", "storage", "devices",
+    ]) {
+      const app = renderAt(`/settings/${section}`);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    for (const path of ["/settings/not-a-section", "/settings/privacy/nested"]) {
+      const invalid = renderAt(path);
+      expect(invalid.page()).toBeNull();
+      expect(invalid.container.textContent).toContain("Không tìm thấy trang");
+    }
+  });
+
+  it("recovers from rejected nested routes through browser history without remounting the shell", () => {
+    const app = renderAt("/settings/privacy");
+    const navigation = app.container.querySelector<HTMLButtonElement>('[data-testid="navigate-route"]');
+    expect(navigation).not.toBeNull();
+    for (const [invalid, valid] of [
+      ["/settings/not-a-section", "/settings/privacy"],
+      ["/feed/posts/0", "/settings/privacy"],
+      ["/chat/9007199254740992", "/settings/privacy"],
+      ["/users/%2F", "/settings/privacy"],
+    ]) {
+      act(() => {
+        navigation!.setAttribute("data-target", invalid);
+        navigation!.click();
+      });
+      expect(app.location()).toBe(invalid);
+      expect(app.page()).toBeNull();
+      expect(app.container.textContent).toContain("Không tìm thấy trang");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+      app.history("Back");
+      expect(app.location()).toBe(valid);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("redirects legacy calls into unified Contacts and preserves the shell", () => {
+    for (const [legacy, canonical] of [
+      ["/calls", "/contacts/calls"],
+      ["/calls/history", "/contacts/calls"],
+      ["/calls/directory", "/contacts"],
+      ["/calls/translation", "/contacts/translation"],
+    ]) {
+      const app = renderAt(legacy);
+      expect(app.location()).toBe(canonical);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    for (const path of ["/contacts/calls", "/contacts/translation"]) {
+      const app = renderAt(path);
+      expect(app.location()).toBe(path);
+      expect(app.page()?.getAttribute("data-page")).toBe("contacts");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    const invalid = renderAt("/calls/unknown");
+    expect(invalid.page()).toBeNull();
+    expect(invalid.container.textContent).toContain("Không tìm thấy trang");
+  });
+
   it("supports direct feed post URLs and rejects malformed post IDs", () => {
     const { location, page } = renderAt("/feed/posts/42");
     expect(location()).toBe("/feed/posts/42");
@@ -114,6 +374,40 @@ describe("app route tree", () => {
       const invalid = renderAt(path);
       expect(invalid.page()).toBeNull();
       expect(invalid.container.textContent).toContain("Không tìm thấy trang");
+    }
+  });
+
+  it("rejects unknown profile and feed subpaths instead of rendering an unrelated page", () => {
+    for (const path of ["/profile/unknown", "/profile/edit/unknown", "/feed/unknown", "/feed/posts/42/extra"]) {
+      const app = renderAt(path);
+      expect(app.location()).toBe(path);
+      expect(app.page()).toBeNull();
+      expect(app.container.textContent).toContain("Không tìm thấy trang");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    for (const path of ["/profile", "/feed", "/feed/posts/42"]) {
+      expect(renderAt(path).page()?.textContent).toBe("Current screen");
+    }
+  });
+
+  it("offers a parent destination from unsupported deep links", () => {
+    const examples: Array<[string, string, string]> = [
+      ["/feed/broken", "Về Bảng tin", "/feed"],
+      ["/profile/broken", "Về Hồ sơ", "/profile"],
+      ["/users/alice/more", "Về Hồ sơ", "/profile"],
+      ["/settings/broken", "Về Cài đặt", "/settings"],
+      ["/calls/broken", "Về Cuộc gọi", "/contacts/calls"],
+      ["/contacts/broken", "Về Danh bạ", "/contacts"],
+      ["/unknown", "Về Tin nhắn", "/chat"],
+    ];
+    for (const [path, label, destination] of examples) {
+      const app = renderAt(path);
+      expect(app.page()).toBeNull();
+      expect(app.container.textContent).toContain("Không tìm thấy trang");
+      act(() => app.link(label).click());
+      expect(app.location()).toBe(destination);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
     }
   });
 

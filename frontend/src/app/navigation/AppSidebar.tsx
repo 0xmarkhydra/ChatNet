@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef } from 'react'
-import { Bell, Bookmark, Compass, MessageCircle, Newspaper, Phone, Settings, ShoppingBag, UserRoundCheck } from 'lucide-react'
+import { useId, useLayoutEffect, useRef } from 'react'
+import { Bell, Bookmark, BookUser, Compass, MessageCircle, Newspaper, Scan, Settings, ShoppingBag } from 'lucide-react'
+import { formatUnreadMessageDescription } from '../../features/i18n/lib/i18n'
 import type { Tab } from '../../shared/types/navigation'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import { Button } from '../../shared/ui/button'
@@ -15,16 +16,18 @@ type Props = {
   feedSaved: boolean
   settingsActive: boolean
   onNavigate: (tab: Tab) => void
-  onCalls: () => void
   onSaved: () => void
   onSettings: () => void
+  onScreenshot?: () => void
+  screenshotBusy?: boolean
 }
 
 export default function AppSidebar({
   tab, section, username, displayName, unreadTotal, notificationCount, feedSaved, settingsActive,
-  onNavigate, onCalls, onSaved, onSettings,
+  onNavigate, onSaved, onSettings, onScreenshot, screenshotBusy,
 }: Props) {
   const activeKey = `${tab}:${section ?? ''}:${feedSaved}:${settingsActive}`
+  const unreadDescriptionId = useId()
   const navRef = useRef<HTMLElement>(null)
   const activeButtonRef = useRef<HTMLButtonElement>(null)
   const pillRef = useRef<HTMLSpanElement>(null)
@@ -92,8 +95,7 @@ export default function AppSidebar({
     { label: 'Bảng tin', Icon: Newspaper, active: tab === 'feed' && !feedSaved, action: () => onNavigate('feed') },
     { label: 'Tin nhắn', Icon: MessageCircle, active: tab === 'chat' && section === null, action: () => onNavigate('chat'), count: unreadTotal },
     { label: 'Khám phá', Icon: Compass, active: tab === 'discover', action: () => onNavigate('discover') },
-    { label: 'Bạn bè', Icon: UserRoundCheck, active: tab === 'contacts', action: () => onNavigate('contacts') },
-    { label: 'Cuộc gọi', Icon: Phone, active: section === 'calls', action: onCalls },
+    { label: 'Danh bạ', Icon: BookUser, active: tab === 'contacts', action: () => onNavigate('contacts') },
     { label: 'Marketplace', Icon: ShoppingBag, active: tab === 'market', action: () => onNavigate('market') },
   ]
 
@@ -110,6 +112,7 @@ export default function AppSidebar({
             variant="ghost"
             key={label}
             aria-label={label}
+            aria-describedby={count ? unreadDescriptionId : undefined}
             className={cn('app-sidebar-link justify-start', active && 'is-active')}
             aria-current={active ? 'page' : undefined}
             ref={active ? activeButtonRef : undefined}
@@ -117,11 +120,27 @@ export default function AppSidebar({
           >
             <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
             <span>{label}</span>
-            {count ? <b className="app-sidebar-count">{count > 99 ? '99+' : count}</b> : null}
+            {count ? <b className="app-sidebar-count" aria-hidden="true">{count > 99 ? '99+' : count}</b> : null}
           </Button>
         ))}
+        {unreadTotal > 0 && <span id={unreadDescriptionId} hidden>{formatUnreadMessageDescription(unreadTotal)}</span>}
       </nav>
-      <div className="app-sidebar-secondary">
+      <div className="app-sidebar-secondary" role="group" aria-label="Tiện ích">
+      {onScreenshot && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="app-sidebar-link justify-start"
+          aria-label="Chụp màn hình không kèm cửa sổ SocCO"
+          aria-keyshortcuts="Control+Alt+A"
+          title="Chụp màn hình không kèm cửa sổ SocCO (Ctrl+Alt+A)"
+          disabled={screenshotBusy}
+          onClick={onScreenshot}
+        >
+          <Scan size={22} strokeWidth={1.8} aria-hidden="true" />
+          <span>Chụp màn hình</span>
+        </Button>
+      )}
         <Button variant="ghost" className={cn('app-sidebar-link justify-start', tab === 'notifications' && 'is-active')} aria-label="Thông báo" aria-current={tab === 'notifications' ? 'page' : undefined} onClick={() => onNavigate('notifications')}>
           <Bell size={22} strokeWidth={1.8} aria-hidden="true" /><span>Thông báo</span>
           {notificationCount > 0 && <b className="app-sidebar-count">{notificationCount > 99 ? '99+' : notificationCount}</b>}

@@ -1,3 +1,4 @@
+import { collapseQuickReposts } from "../utils/feedRequestState";
 import FeedModeration from "./FeedModeration";
 import SocialFeedStories from "./SocialFeedStories";
 import { userLabel } from "../../../shared/utils/userLabel";
@@ -11,7 +12,7 @@ import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import type { FriendSearchResult, FriendConnection } from "../../contacts";
 import { type Conversation } from "../../chat";
-import { type Post, type Story } from "../types";
+import { type Post, type Story, type StoryDraft } from "../types";
 import type { ProfileMediaState } from "../../profile";
 import { type Session } from "../../../shared/types/session";
 import { type SetStateAction } from "react";
@@ -66,15 +67,13 @@ export type FeedSectionProps = {
   setFeedCommunitiesOpen: Dispatch<SetStateAction<boolean>>;
   setFeedComposerOpen: Dispatch<SetStateAction<boolean>>;
   setFeedFilter: Dispatch<SetStateAction<"all" | "following" | "latest" | "saved">>;
-  setGlobalSearch: Dispatch<SetStateAction<string>>;
   setPosts: Dispatch<SetStateAction<Post[]>>;
   setSavedPosts: Dispatch<SetStateAction<Post[]>>;
   setSearchHasScrolled: Dispatch<SetStateAction<boolean>>;
   setStories: Dispatch<SetStateAction<Story[]>>;
-  setStoryDraftFile: Dispatch<SetStateAction<File | null>>;
+  setStoryDraft: Dispatch<SetStateAction<StoryDraft | null>>;
   stories: Story[];
   storyBusy: boolean;
-  storyFileInputRef: RefObject<HTMLInputElement | null>;
   switchTab: (nextTab: Tab) => void;
 };
 
@@ -126,15 +125,13 @@ export default function FeedSection({
   setFeedCommunitiesOpen,
   setFeedComposerOpen,
   setFeedFilter,
-  setGlobalSearch,
   setPosts,
   setSavedPosts,
   setSearchHasScrolled,
   setStories,
-  setStoryDraftFile,
+  setStoryDraft,
   stories,
   storyBusy,
-  storyFileInputRef,
   switchTab,
 }: FeedSectionProps) {
   return (
@@ -168,18 +165,6 @@ export default function FeedSection({
                 }
               }}
             />
-            <input
-              ref={storyFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*,video/*"
-              aria-label="Chọn ảnh hoặc video cho Story"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                if (file) setStoryDraftFile(file);
-              }}
-            />
             <div className="social-feed-grid">
               <div className="social-feed-center">
                 {!feedCommunitiesOpen && (<>
@@ -192,7 +177,7 @@ export default function FeedSection({
                     )}
                     stories={stories}
                     busy={storyBusy || mediaUploading === "story"}
-                    onCreate={() => storyFileInputRef.current?.click()}
+                    onCreate={() => setStoryDraft({ kind: "choose" })}
                     onOpen={setActiveStoryId}
                   />
                 ) : (
@@ -200,7 +185,7 @@ export default function FeedSection({
                     username={name}
                     stories={stories}
                     busy={storyBusy || mediaUploading === "story"}
-                    onCreate={() => storyFileInputRef.current?.click()}
+                    onCreate={() => setStoryDraft({ kind: "choose" })}
                     onOpen={setActiveStoryId}
                   />
                 )}
@@ -221,7 +206,7 @@ export default function FeedSection({
                       setFeedComposerOpen(true);
                       void addFeedFiles(files);
                     }}
-                    onCreateStory={() => storyFileInputRef.current?.click()}
+                    onCreateStory={() => setStoryDraft({ kind: "choose" })}
                     onCheckIn={() => {
                       setFeedCheckInOpen(true);
                       setFeedComposerOpen(true);
@@ -259,7 +244,7 @@ export default function FeedSection({
                   {pendingPost && <FeedPendingPost post={pendingPost} />}
 
 
-                  {renderPosts(searchedPosts, isProfileDesktop)}
+                  {renderPosts(collapseQuickReposts(searchedPosts), isProfileDesktop)}
 
                   {feedPagingError && (
                     <div role="alert" className="soco-feed-load-more">
@@ -340,7 +325,6 @@ export default function FeedSection({
                 <SocialFeedSidebar
                   username={name}
                   sessionId={session.sessionId}
-                  posts={posts}
                   friends={friends}
                   friendRequests={friendRequests}
                   friendBusyIds={friendBusyIds}
@@ -350,11 +334,6 @@ export default function FeedSection({
                   }}
                   onViewUser={openVisitor}
                   onViewContacts={() => switchTab("contacts")}
-                  onSearchTag={(tag) => {
-                    setFeedFilter("all");
-                    setGlobalSearch(tag);
-                  }}
-                  onOpenChat={() => switchTab("chat")}
                 />
               )}
             </div>

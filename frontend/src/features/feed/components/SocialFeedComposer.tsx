@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Clapperboard, Image as ImageIcon, MapPin } from 'lucide-react'
+import FeedComposerIconButton from './FeedComposerIconButton'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 
 type Props = {
@@ -34,17 +34,12 @@ export default function SocialFeedComposer({
               event.currentTarget.value = ''
               if (files.length) onCreateMediaPost(files)
             }} />
-          <button type="button" aria-label="Ảnh / Video" data-tooltip="Thêm ảnh hoặc video"
-            onClick={() => quickMediaInput.current?.click()} disabled={pending}>
-            <ImageIcon size={21} aria-hidden="true" />
-          </button>
-          <button type="button" aria-label="Story" data-tooltip="Tạo Story" onClick={onCreateStory}
-            disabled={storyBusy || pending}>
-            <Clapperboard size={21} aria-hidden="true" />
-          </button>
-          <button type="button" aria-label="Check-in" data-tooltip="Thêm địa điểm check-in" onClick={onCheckIn} disabled={pending}>
-            <MapPin size={21} aria-hidden="true" />
-          </button>
+          <FeedComposerIconButton icon="photo" aria-label="Ảnh / Video" data-tooltip="Thêm ảnh hoặc video"
+            onClick={() => quickMediaInput.current?.click()} disabled={pending} />
+          <FeedComposerIconButton icon="story" aria-label="Story" data-tooltip="Tạo Story"
+            onClick={onCreateStory} disabled={storyBusy || pending} />
+          <FeedComposerIconButton icon="location" aria-label="Check-in" data-tooltip="Thêm địa điểm check-in"
+            onClick={onCheckIn} disabled={pending} />
         </div>
       </div>
     </section>

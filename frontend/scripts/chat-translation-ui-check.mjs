@@ -107,15 +107,20 @@ try {
         const bubble = message.querySelector('.bubble')?.getBoundingClientRect()
         const reactions = message.querySelector('.message-reactions')?.getBoundingClientRect()
         if (!bubble || !reactions) return null
+        const hasReactions = Boolean(message.querySelector('.reaction-chip'))
         return {
           bottomGap: reactions.bottom - bubble.bottom,
+          expectedGap: hasReactions ? 24 : 10,
+          paddingBottom: parseFloat(getComputedStyle(message.querySelector('.bubble')).paddingBottom),
+          hasReactions,
           sideGap: message.classList.contains('mine')
             ? reactions.right - bubble.right : reactions.left - bubble.left,
         }
       })
-      assert.ok(bounds && Math.abs(bounds.bottomGap - 10) <= 2 &&
+      assert.ok(bounds && Math.abs(bounds.bottomGap - bounds.expectedGap) <= 2 &&
+        (!bounds.hasReactions || bounds.paddingBottom <= 10) &&
         Math.abs(bounds.sideGap) <= 2,
-      `Reaction must follow its bubble (${state}, message ${id}): ${JSON.stringify(bounds)}`)
+      `Reaction must follow its bubble without extra background padding (${state}, message ${id}): ${JSON.stringify(bounds)}`)
     }
     await row(11).locator('.bubble').waitFor({state:'visible'})
     if (autoTranslate) {
