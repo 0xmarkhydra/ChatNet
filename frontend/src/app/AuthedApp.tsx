@@ -2499,7 +2499,12 @@ export default function AuthedApp({
     />
   );
 
-  const renderPostDiscussion = (discussionPost: Post) => (
+  function openPostDetailProfile(username: string) {
+    const returnTo = closeFeedPostDetails();
+    openVisitor(username, returnTo);
+  }
+
+  const renderPostDiscussion = (discussionPost: Post, onAuthorOpen: (username: string) => void) => (
     <FeedDiscussion
       key={discussionPost.id}
       variant="post-page"
@@ -2543,6 +2548,7 @@ export default function AuthedApp({
         manageFeedComment(discussionPost, commentId, "DELETE")
       }
       onReport={reportFeedComment}
+      onAuthorOpen={onAuthorOpen}
     />
   );
 
@@ -2565,7 +2571,7 @@ export default function AuthedApp({
         targetLanguage={targetLanguage}
         setActivePostId={openFeedPostDetails}
         onToggleComments={() => setInlineCommentsId((current) => current === post.id ? null : post.id)}
-        discussion={inlineCommentsId === post.id ? renderPostDiscussion(post) : null}
+        discussion={inlineCommentsId === post.id ? renderPostDiscussion(post, openVisitor) : null}
         showSave={showSave}
         likePreviews={likePreviews}
         like={like}
@@ -3277,8 +3283,8 @@ export default function AuthedApp({
           onReactionUsers={(post, portalContainer) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions, portalContainer})}
           name={name}
           openEditPost={openEditPost}
-          openVisitor={openVisitor}
-          postDiscussion={renderPostDiscussion(activePost)}
+          openVisitor={openPostDetailProfile}
+          postDiscussion={renderPostDiscussion(activePost, openPostDetailProfile)}
           profileMedia={profileMedia}
           removeFeedPost={removeFeedPost}
           session={session}
