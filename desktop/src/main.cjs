@@ -73,7 +73,8 @@ function attachHandlers() {
     readScreen: process.platform === 'win32' ? createWindowsScreenReader({ app, nativeImage, screen }) : undefined })
   if (process.platform === 'win32') app.setAppUserModelId('asia.soco.desktop')
   nativeNotifications = createNativeNotifications({ Notification, getScope, getWindow: () => mainWindow,
-    showWindow: showMainWindow, setBadge: (count) => windowLifecycle?.setUnread(count),
+    showWindow: showMainWindow, setBadge: (count, enabled) => windowLifecycle?.setUnread(count, enabled),
+    requestAttention: () => windowLifecycle?.requestAttention(),
     playSound: () => shell.beep() })
   registerNotificationIPC(ipcMain, nativeNotifications, isTrustedFrame)
   ipcMain.handle('soco:platform-info', (event) => {
