@@ -93,6 +93,7 @@ import NearbyRadar from "../features/discover/components/NearbyRadar";
 import PostComposer from "../features/feed/components/PostComposer";
 import FeedPostCard from "../features/feed/components/FeedPostCard";
 import ReactionParticipantsDialog from "../shared/ui/ReactionParticipantsDialog";
+import SharedPostLinkPicker from "../features/chat/components/SharedPostLinkPicker";
 import MessageForwardPicker from "../features/chat/components/MessageForwardPicker";
 import FeedReactionControl from "../features/feed/components/FeedReactionControl";
 import StoryViewer from "../features/feed/components/StoryViewer";
@@ -460,6 +461,7 @@ export default function AuthedApp({
   const [reactionPreviews, setReactionPreviews] = useState<
     Record<number, MessageReaction[]>
   >({});
+  const [postLinkToSend, setPostLinkToSend] = useScopedState<string | null>(session?.sessionId ?? null, null);
   const [forwardSource, setForwardSource] = useScopedState<Message | null>(session?.sessionId ?? null, null);
   const [reactionTarget, setReactionTarget] = useScopedState<{
     kind: "message" | "post"; id: number; initialEmoji?: string;
@@ -2253,10 +2255,7 @@ export default function AuthedApp({
   }, [messages, session?.sessionId]);
 
 
-  const unreadTotal = conversations.reduce(
-    (sum, conversation) => sum + conversation.unreadCount,
-    0,
-  );
+  const unreadTotal = nativeNotifications.unreadCount ?? 0;
   const notificationItemCount = countNotificationItems(friendRequests, conversations)
     + postMentions.filter(mention => !mention.readAt).length;
   const notificationBadgeText = formatNotificationBadge(notificationItemCount);
@@ -2499,7 +2498,12 @@ export default function AuthedApp({
     />
   );
 
-  const renderPostDiscussion = (discussionPost: Post) => (
+  function openPostDetailProfile(username: string) {
+    const returnTo = closeFeedPostDetails();
+    openVisitor(username, returnTo);
+  }
+
+  const renderPostDiscussion = (discussionPost: Post, onAuthorOpen: (username: string) => void) => (
     <FeedDiscussion
       key={discussionPost.id}
       variant="post-page"
@@ -2543,8 +2547,16 @@ export default function AuthedApp({
         manageFeedComment(discussionPost, commentId, "DELETE")
       }
       onReport={reportFeedComment}
+      onAuthorOpen={onAuthorOpen}
     />
   );
+
+  function refreshAfterRepost() {
+    void refreshPosts();
+    if (feedFilter === 'following') followingFeed.refresh();
+    if (feedSearchActive) postSearch.retry();
+    if (tab === 'profile') void loadProfilePosts(false, true);
+  }
 
   const renderPosts = (items: Post[], showSave = false) =>
     items.map((post) => (
@@ -2565,12 +2577,14 @@ export default function AuthedApp({
         targetLanguage={targetLanguage}
         setActivePostId={openFeedPostDetails}
         onToggleComments={() => setInlineCommentsId((current) => current === post.id ? null : post.id)}
-        discussion={inlineCommentsId === post.id ? renderPostDiscussion(post) : null}
+        discussion={inlineCommentsId === post.id ? renderPostDiscussion(post, openVisitor) : null}
         showSave={showSave}
         likePreviews={likePreviews}
         like={like}
         onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
         onEditPost={openEditPost}
+        onRepostChanged={refreshAfterRepost}
+        onShareToChat={setPostLinkToSend}
         taggedNames={friendTaggedNames}
       />
     ));
@@ -2770,6 +2784,9 @@ export default function AuthedApp({
           }}
           onClose={closeVisitor}
           onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
+          onOpenOriginal={openFeedPostDetails}
+          onRepostChanged={refreshAfterRepost}
+          onShareToChat={setPostLinkToSend}
           onPostOpen={(post) => {
             setPosts((current) => [
               post,
@@ -3265,6 +3282,9 @@ export default function AuthedApp({
         {activePost && (
           <FeedPostDetail
           activePost={activePost}
+          onRepostChanged={refreshAfterRepost}
+          onShareToChat={setPostLinkToSend}
+          onOpenOriginal={openFeedPostDetails}
           apiFetch={apiFetch}
           closeFeedPostDetails={closeFeedPostDetails}
           commentSortOrder={commentSortOrder}
@@ -3274,8 +3294,8 @@ export default function AuthedApp({
           onReactionUsers={(post, portalContainer) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions, portalContainer})}
           name={name}
           openEditPost={openEditPost}
-          openVisitor={openVisitor}
-          postDiscussion={renderPostDiscussion(activePost)}
+          openVisitor={openPostDetailProfile}
+          postDiscussion={renderPostDiscussion(activePost, openPostDetailProfile)}
           profileMedia={profileMedia}
           removeFeedPost={removeFeedPost}
           session={session}
@@ -3594,6 +3614,20 @@ export default function AuthedApp({
           </ProfileOverlay>
         )}
 
+      {postLinkToSend && (
+        <SharedPostLinkPicker
+          key={session.sessionId + ":" + postLinkToSend}
+          url={postLinkToSend}
+          conversations={conversations}
+          hasMore={hasMoreConversations}
+          loadingMore={conversationLoadingMore}
+          onLoadMore={() => void loadMoreConversations()}
+          request={apiFetch}
+          onClose={() => setPostLinkToSend(null)}
+          onOpenChat={(id) => { setPostLinkToSend(null); switchTab("chat"); selectRoutedConversation(id); }}
+          onSent={(destinationName) => setNotice(`Đã gửi bài viết đến ${destinationName}.`, "success")}
+        />
+      )}
       {forwardSource && (
         <MessageForwardPicker
           message={forwardSource}

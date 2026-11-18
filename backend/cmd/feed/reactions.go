@@ -84,7 +84,7 @@ func (s *server) changePostReaction(w http.ResponseWriter, r *http.Request, emoj
 	}
 	defer tx.Rollback(r.Context())
 	var lockedID int64
-	if err := tx.QueryRow(r.Context(), `SELECT id FROM posts WHERE id=$1 FOR UPDATE`, id).Scan(&lockedID); err != nil {
+	if err := tx.QueryRow(r.Context(), `SELECT p.id FROM posts p WHERE p.id=$1 AND p.repost_kind IS DISTINCT FROM 'quick' AND `+feedAccessSQL+` FOR UPDATE OF p`, id, claims.UserID).Scan(&lockedID); err != nil {
 		httpx.Error(w, 404, "post not found")
 		return
 	}

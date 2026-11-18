@@ -90,3 +90,15 @@ export function reactToPost(request: ApiRequest, id: number, emoji: string) {
       : {}),
   });
 }
+
+export function publishRepost(request: ApiRequest, id: number, kind: "quick" | "quote", content: string) {
+  return request(`/api/posts/${id}/repost`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind, content }),
+  });
+}
+
+export function undoRepost(request: ApiRequest, id: number) {
+  return request(`/api/posts/${id}/repost`, { method: "DELETE" });
+}

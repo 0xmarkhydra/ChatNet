@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"io"
@@ -20,6 +21,7 @@ import (
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
 	"chatnet/internal/searchx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -50,6 +52,10 @@ type post struct {
 	Comments          []comment           `json:"comments"`
 	Attachments       []mediax.Attachment `json:"attachments,omitempty"`
 	CreatedAt         time.Time           `json:"createdAt"`
+	RepostKind        string              `json:"repostKind,omitempty"`
+	OriginalPost     *repostPreview      `json:"originalPost,omitempty"`
+	RepostCount       int                 `json:"repostCount"`
+	MyRepostID        int64               `json:"myRepostId,omitempty"`
 }
 
 type story struct {
@@ -111,6 +117,8 @@ func main() {
 	mux.Handle("GET /api/feed/moderation/me", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getModerationMe)))
 	mux.Handle("GET /api/feed/moderation/reports", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listModerationReports)))
 	mux.Handle("PATCH /api/feed/moderation/reports/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reviewModerationReport)))
+	mux.Handle("POST /api/posts/{id}/repost", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createRepost)))
+	mux.Handle("DELETE /api/posts/{id}/repost", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.removeRepost)))
 	mux.Handle("POST /api/posts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.create)))
 	mux.Handle("GET /api/feed/mentions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPostMentions)))
 	mux.Handle("POST /api/feed/mentions/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.readPostMention)))
@@ -172,7 +180,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := s.db.Query(r.Context(), `
 		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
-		       p.visibility,p.background,p.updated_at,
+		       p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0),
 		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND `+feedAccessSQL+`
@@ -192,18 +200,40 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	posts := []post{}
+	type feedRow struct {
+		post
+		originalID int64
+	}
+	var entries []feedRow
 	for rows.Next() {
 		var p post
-		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.Saved) != nil {
+		var originalID int64
+		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.Saved) != nil {
 			continue
 		}
+		entries = append(entries, feedRow{post: p, originalID: originalID})
+	}
+	if rows.Err() != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")
+		return
+	}
+	rows.Close()
+	posts := make([]post, 0, len(entries))
+	for _, entry := range entries {
+		p, originalID := entry.post, entry.originalID
 		if err := s.attachPostReactions(r.Context(), &p, claims.UserID); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot load post reactions")
 			return
 		}
 		p.Comments = s.comments(r, p.ID, claims.UserID)
 		p.Attachments = s.postAttachments(r.Context(), p.ID)
+		if err := s.attachRepost(r.Context(), &p, originalID, claims.UserID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			httpx.Error(w, http.StatusInternalServerError, "cannot load repost")
+			return
+		}
 		posts = append(posts, p)
 	}
 	httpx.JSON(w, http.StatusOK, posts)
@@ -559,6 +589,7 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 		SELECT p.id,$2,$3,$4::bigint
 		FROM posts p
 		WHERE p.id=$1 AND `+feedAccessSQL+`
+		  AND p.repost_kind IS DISTINCT FROM 'quick'
 		  AND ($4::bigint IS NULL OR EXISTS (
 		    SELECT 1 FROM comments c WHERE c.id=$4 AND c.post_id=p.id
 		    AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE

@@ -1,6 +1,6 @@
 /* Hallmark · shape: app screen · genre: modern-minimal · theme: SocCO · v2.0.0 */
-/* The post and its conversation are one reading surface, separated by a rule. */
-/* Keep the discussion composer in view while the post and comments scroll. */
+/* A compact split view on desktop, with one reading column on smaller screens. */
+/* Scroll desktop content in each column, leaving both sets of controls visible. */
 .post-detail-backdrop.post-comments-page {
   --detail-secondary: color-mix(in srgb, var(--soco-text) 62%, var(--soco-muted));
   --detail-like: #ee416a;
@@ -93,7 +93,7 @@
   display: block; width: 100%; max-width: none; height: auto;
   max-height: min(540px, 65dvh); min-height: 0; object-fit: contain; border-radius: 14px;
 }
-.post-comments-post-footer { flex: 0 0 auto; margin-top: 12px; }
+.post-comments-post-footer { min-width: 0; padding: 12px 20px; }
 .post-comments-stats {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
   min-height: 44px; flex-wrap: wrap; color: var(--detail-secondary); font-size: 13px;
@@ -271,14 +271,65 @@
 .post-comments-thread .feed-comment-error { margin: 8px 0 0; }
 .post-comments-page button:focus-visible,
 .post-comments-page select:focus-visible { outline: 2px solid var(--chatnet-accent-ink); outline-offset: 2px; }
+@media (min-width: 900px) {
+  .post-detail-backdrop.post-comments-page[open] {
+    display: grid;
+    justify-items: stretch;
+    grid-template-columns: minmax(0, 1fr) 40%;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "heading heading"
+      "post thread"
+      "actions composer";
+    width: min(1060px, calc(100% - 48px));
+  }
+  .post-comments-scroll { display: contents; }
+  .post-comments-modal-heading { grid-area: heading; }
+  .post-comments-original { grid-area: post; padding-block-end: 12px; }
+  .post-comments-thread { grid-area: thread; min-width: 0; }
+  .post-comments-original,
+  .post-comments-thread {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--soco-muted) 60%, transparent) transparent;
+  }
+  .post-comments-thread-heading {
+    flex: none;
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    background: var(--soco-surface);
+  }
+  .post-comments-post-footer {
+    grid-area: actions;
+    padding-block: 0 6px;
+    border-top: 1px solid var(--detail-rule);
+  }
+  .post-comments-composer {
+    grid-area: composer;
+    display: grid;
+    align-items: center;
+    min-width: 0;
+  }
+  .post-comments-thread,
+  .post-comments-composer { border-inline-start: 1px solid var(--detail-rule); }
+  .post-comments-portals { position: absolute; inset: 0 auto auto 0; }
+}
 @media (max-width: 480px) {
   :is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions {
     padding-inline-start: 8px;
   }
   :is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions > span[aria-hidden="true"] { display: none; }
-  .post-comments-original { padding-inline: 12px; }
+  .post-comments-original,
+  .post-comments-post-footer { padding-inline: 12px; }
   .post-comments-post-actions.post-toolbar-compact > button { gap: 4px; }
   .post-comments-post-actions.post-toolbar-compact > button span { font-size: 11px; }
   .post-comments-composer .feed-comment-form { padding: 8px 12px; }
   .post-comments-composer .feed-comment-compose textarea { font-size: 16px; }
+}
+
+.post-comments-post-actions.post-toolbar-compact > .feed-repost-action[data-reposted='true'] {
+  color: var(--soco-blue);
 }

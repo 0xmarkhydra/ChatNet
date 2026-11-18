@@ -90,7 +90,7 @@ func (s *server) syncPostMentions(ctx context.Context, tx pgx.Tx, postID, author
 		rows.Close()
 	}
 	if _, err := tx.Exec(ctx,
-		`DELETE FROM post_mentions WHERE post_id=$1 AND NOT (user_id = ANY($2::bigint[]))`,
+		`DELETE FROM post_mentions WHERE post_id=$1 AND kind='mention' AND NOT (user_id = ANY($2::bigint[]))`,
 		postID, recipients); err != nil {
 		return nil, err
 	}
@@ -125,6 +125,7 @@ func (s *server) syncPostMentions(ctx context.Context, tx pgx.Tx, postID, author
 }
 
 type postMention struct {
+	Kind              string     `json:"kind"`
 	ID                int64      `json:"id"`
 	PostID            int64      `json:"postId"`
 	Author            string     `json:"author"`
@@ -136,7 +137,7 @@ type postMention struct {
 func (s *server) listPostMentions(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	rows, err := s.db.Query(r.Context(), `
-        SELECT m.id, m.post_id, u.username, u.display_name, m.created_at, m.read_at
+        SELECT m.id, m.post_id, u.username, u.display_name, m.created_at, m.read_at, m.kind
         FROM post_mentions m
         JOIN posts p ON p.id=m.post_id
         JOIN users u ON u.id=p.user_id
@@ -152,7 +153,7 @@ func (s *server) listPostMentions(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item postMention
 		if err := rows.Scan(&item.ID, &item.PostID, &item.Author,
-			&item.AuthorDisplayName, &item.CreatedAt, &item.ReadAt); err != nil {
+			&item.AuthorDisplayName, &item.CreatedAt, &item.ReadAt, &item.Kind); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "cannot read post mention")
 			return
 		}

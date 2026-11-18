@@ -1,7 +1,8 @@
-export const UI_BUNDLE_VERSION = '2026-10-15.2'
+export const UI_BUNDLE_VERSION = '2026-11-18.1'
 
 export const UI_MESSAGES = {
   'nav.chat': 'Tin nhắn',
+  'nav.chatUnread': '{count} tin nhắn chưa đọc',
   'nav.contacts': 'Bạn bè',
   'nav.discover': 'Quanh đây',
   'nav.feed': 'Bảng tin',
@@ -129,4 +130,9 @@ export function saveCachedBundle(locale: string, bundle: UIBundle) {
 
 export function translateUI(bundle: UIBundle, key: UIMessageKey) {
   return bundle[key] || UI_MESSAGES[key]
+}
+
+export function formatUnreadMessageDescription(count: number, template: string = UI_MESSAGES['nav.chatUnread']) {
+  const message = template.includes('{count}') ? template : UI_MESSAGES['nav.chatUnread']
+  return message.replace('{count}', String(count))
 }

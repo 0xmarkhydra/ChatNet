@@ -261,16 +261,22 @@ describe("app route tree", () => {
     }
   });
 
-  it("redirects legacy call routes into Contacts without remounting the shell", () => {
-    for (const [path, target] of [
+  it("redirects legacy calls into unified Contacts and preserves the shell", () => {
+    for (const [legacy, canonical] of [
       ["/calls", "/contacts/calls"],
       ["/calls/history", "/contacts/calls"],
       ["/calls/directory", "/contacts"],
       ["/calls/translation", "/contacts/translation"],
     ]) {
-      const app = renderAt(path);
-      expect(app.location()).toBe(target);
+      const app = renderAt(legacy);
+      expect(app.location()).toBe(canonical);
       expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+    for (const path of ["/contacts/calls", "/contacts/translation"]) {
+      const app = renderAt(path);
+      expect(app.location()).toBe(path);
+      expect(app.page()?.getAttribute("data-page")).toBe("contacts");
       expect(app.onMount).toHaveBeenCalledTimes(1);
     }
     const invalid = renderAt("/calls/unknown");

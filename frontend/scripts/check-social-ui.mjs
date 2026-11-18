@@ -63,9 +63,12 @@ let presignedUploads = 0
 let friendRequestsSent = 0
 let rejectStoryDirect = false
 const storyReplyRequests = []
+const repostOnly = process.argv.includes('--repost-only')
+const postShareMessages = []
 const mediaOnly = process.argv.includes('--media-only')
 const headerOnly = process.argv.includes('--header-only')
 const postPreviewOnly = process.argv.includes('--post-preview-only')
+const postProfileOnly = process.argv.includes('--socco-67-only')
 let genericPreviewRequests = 0
 
 
@@ -125,6 +128,11 @@ try {
       })
       return json(conversations[0])
     }
+    if (repostOnly && path.endsWith('/e2ee/status')) return json({ mode: 'legacy' })
+    if (repostOnly && /^\/api\/conversations\/(1|3)\/messages$/.test(path) && req.method() === 'POST') {
+      postShareMessages.push({ path, ...req.postDataJSON() })
+      return json({ id: 804, text: req.postDataJSON().text })
+    }
     if (path === '/api/conversations/1/messages' && req.method() === 'POST') {
       const body = req.postDataJSON()
       storyReplyRequests.push(body)
@@ -175,6 +183,9 @@ try {
       avatarSet: false, coverSet: false, allowFriendRequests: true,
       updatedAt: '2026-11-05T00:00:00Z',
     })
+    if (postProfileOnly && path === '/api/users/phuonglinh/profile') return json({
+      ...suggestions[0], avatarSet: false, coverSet: false,
+    })
     if (path === '/api/users/suggestions') return json(suggestions)
     if (path === '/api/users/search') return json([])
     if (path === '/api/friends/4' && req.method() === 'POST') { friendRequestsSent++; return json({ ...suggestions[0], status:'pending', direction:'outgoing', updatedAt:new Date().toISOString() }) }
@@ -183,6 +194,27 @@ try {
       mentionReadCalls++
       incomingMention = { ...incomingMention, readAt: new Date().toISOString() }
       return route.fulfill({ status: 204, headers: cors })
+    }
+    if (repostOnly && path === '/api/posts/88/repost') {
+      if (req.method() === 'DELETE') {
+        const at = feedPosts.findIndex(post => post.id === fixturePost.myRepostId)
+        if (at >= 0) feedPosts.splice(at, 1)
+        delete fixturePost.myRepostId
+        fixturePost.repostCount = Math.max(0, fixturePost.repostCount - 1)
+        return route.fulfill({ status: 204, headers: cors })
+      }
+      if (req.method() === 'POST') {
+        const { kind, content } = req.postDataJSON()
+        const id = kind === 'quick' ? 89 : 90
+        const originalPost = { ...fixturePost }
+        feedPosts.unshift({
+          id, author: 'soco_user', authorDisplayName: 'SocCO Tester', content, likes: 0, liked: false,
+          comments: [], visibility: 'public', createdAt: new Date().toISOString(), repostKind: kind, originalPost,
+        })
+        if (kind === 'quick') fixturePost.myRepostId = id
+        fixturePost.repostCount = (fixturePost.repostCount || 0) + 1
+        return json({ ...fixturePost })
+      }
     }
     if (path === '/api/posts/88' && req.method() === 'GET') return json({ ...fixturePost })
     if (path === '/api/posts/88/reactions' && req.method() === 'POST') {
@@ -288,6 +320,157 @@ try {
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     return json({})
   })
+  if (repostOnly) {
+    await page.goto(origin + '/feed', { waitUntil: 'domcontentloaded', timeout: 90000 })
+    const toolbar = page.locator('.feed-post-card .feed-post-toolbar').first()
+    await toolbar.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Đăng lại ngay' }).click()
+    const sourceLink = page.getByRole('button', { name: 'Mở bài viết gốc của Minh Anh' })
+    await sourceLink.waitFor()
+    assert(await page.locator('.feed-post-card').count() === 1, 'Quick repost must not duplicate its original in the feed')
+    await sourceLink.click()
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    await details.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Bỏ đăng lại', exact: true }).click()
+    await details.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Gửi qua chat' }).click()
+    const receiver = page.getByRole('dialog', { name: 'Gửi bài viết qua chat' })
+    await receiver.getByRole('button', { name: 'Minh Anh' }).click()
+    assert(postShareMessages.length === 0, 'Selecting a chat must not send a message')
+    await receiver.getByRole('button', { name: 'Gửi', exact: true }).click()
+    await receiver.waitFor({ state: 'detached' })
+    assert(postShareMessages[0]?.path === '/api/conversations/1/messages' &&
+      postShareMessages[0]?.text === origin + '/feed/posts/88?ref=share' &&
+      postShareMessages[0]?.attachments?.length === 0, 'Direct chat receives only the original link')
+    await details.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
+    await page.setViewportSize({ width: 390, height: 720 })
+    await toolbar.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Đăng lại kèm lời', exact: true }).click()
+    const quote = page.getByRole('dialog', { name: 'Đăng lại kèm lời' })
+    const bounds = await quote.boundingBox()
+    assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 390, 'Quote composer must fit mobile viewport')
+    await quote.getByLabel('Ý kiến của bạn').fill('Góc nhìn của tôi về bài viết')
+    await quote.getByRole('button', { name: 'Đăng bài trích dẫn' }).click()
+    const quoteCard = page.locator('.feed-post-card').filter({ hasText: 'Góc nhìn của tôi về bài viết' })
+    await quoteCard.getByRole('button', { name: 'Mở bài viết gốc của Minh Anh' }).waitFor()
+    await quoteCard.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Gửi qua chat' }).click()
+    const pickerBounds = await receiver.boundingBox()
+    assert(pickerBounds && pickerBounds.x >= 0 && pickerBounds.x + pickerBounds.width <= 390, 'Chat picker fits mobile viewport')
+    await receiver.getByRole('button', { name: 'Nhóm SocCO' }).click()
+    await receiver.getByRole('button', { name: 'Gửi', exact: true }).click()
+    await receiver.waitFor({ state: 'detached' })
+    assert(postShareMessages[1]?.path === '/api/conversations/3/messages' &&
+      postShareMessages[1]?.text === origin + '/feed/posts/90?ref=share', 'Group chat receives the quote permalink')
+    assert(errors.length === 0, 'Unexpected browser errors: ' + errors.join(', '))
+    console.log('PASS: unified share menu, desktop repost and undo, mobile quotes, and direct/group chat link delivery')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
+  if (postProfileOnly) {
+    fixturePost.comments = [
+      { id: 501, author: 'phuonglinh', authorDisplayName: 'Phương Linh', content: 'Bình luận thử', createdAt: fixturePost.createdAt },
+      { id: 502, parentId: 501, author: 'soco_user', authorDisplayName: 'SocCO Tester', content: 'Phản hồi thử', createdAt: fixturePost.createdAt },
+    ]
+    const feedURL = origin + '/feed?sort=latest'
+    const card = page.locator('.feed-post-card').first()
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    const profile = page.getByRole('dialog', { name: 'Trang cá nhân người dùng' })
+    async function expectVisitor(username, displayName) {
+      await page.waitForURL(origin + '/users/' + username)
+      await details.waitFor({ state: 'detached' })
+      await profile.getByText(displayName, { exact: true }).first().waitFor()
+    }
+
+    await page.goto(feedURL)
+    await card.getByRole('button', { name: 'Mở bài viết' }).press('Enter')
+    await details.getByRole('button', { name: 'Minh Anh', exact: true }).click()
+    await expectVisitor('minhanh', 'Minh Anh')
+    await page.goBack()
+    await page.waitForURL(feedURL)
+    assert(await details.count() === 0, 'Browser Back should not reopen dismissed post details')
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(origin + '/feed/posts/88?ref=share&sort=latest')
+    await details.getByRole('button', { name: 'Phương Linh', exact: true }).click()
+    await expectVisitor('phuonglinh', 'Phương Linh')
+    await profile.getByRole('button', { name: 'Quay lại' }).click()
+    await page.waitForURL(feedURL)
+    assert(await details.count() === 0, 'Returning from profile should remove the shared post route')
+
+    await page.goto(origin + '/feed?tab=feed&post=88&sort=latest')
+    await details.getByRole('button', { name: 'Xem 1 phản hồi' }).click()
+    await details.getByRole('button', { name: 'SocCO Tester', exact: true }).press('Enter')
+    await page.waitForURL(origin + '/profile')
+    await details.waitFor({ state: 'detached' })
+    await page.goBack()
+    await page.waitForURL(feedURL)
+    assert(await details.count() === 0, 'Browser Back should not reopen a legacy post link')
+
+    await card.getByRole('button', { name: 'Bình luận', exact: true }).click()
+    const inline = card.getByRole('region', { name: 'Bình luận về bài viết' })
+    await inline.getByRole('button', { name: 'Phương Linh', exact: true }).click()
+    await expectVisitor('phuonglinh', 'Phương Linh')
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('SOCCO-67 PASS: author and commenter profiles, inline comments, own profile, browser Back, and shared links')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
+  if (process.argv.includes('--post-detail-dock-only')) {
+    await page.goto(origin + '/feed', { waitUntil: 'domcontentloaded', timeout: 90000 })
+    const post = page.locator('.feed-post-card').first()
+    await post.getByRole('button', { name: 'Mở bài viết' }).press('Enter')
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    await details.getByRole('textbox', { name: 'Viết bình luận' }).waitFor()
+    for (const viewport of [{ width: 1352, height: 977 }, { width: 1000, height: 460 }]) {
+      await page.setViewportSize(viewport)
+      const dock = await details.evaluate(modal => {
+        const actions = modal.querySelector('.post-comments-post-footer').getBoundingClientRect()
+        const composer = modal.querySelector('.post-comments-composer').getBoundingClientRect()
+        const dialog = modal.getBoundingClientRect()
+        const controls = [...modal.querySelectorAll('.post-comments-post-actions > button, .feed-comment-compose textarea')]
+        return {
+          aligned: Math.abs(actions.top - composer.top) < 1 && Math.abs(actions.right - composer.left) < 1,
+          bounded: actions.bottom <= dialog.bottom && composer.bottom <= dialog.bottom,
+          hitTargets: controls.length === 4 && controls.every(control => {
+            const rect = control.getBoundingClientRect()
+            const center = rect.left + rect.width / 2
+            return [rect.top + 4, rect.bottom - 4].every(y => control.contains(document.elementFromPoint(center, y)))
+          }),
+        }
+      })
+      assert(Object.values(dock).every(Boolean),
+        'Desktop details must show every control in the aligned bottom row at ' + viewport.width + '×' + viewport.height + ': ' + JSON.stringify(dock))
+    }
+    await page.setViewportSize({ width: 390, height: 700 })
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 700 })
+      const mobile = await details.evaluate(node => {
+        const bounds = selector => node.querySelector(selector).getBoundingClientRect()
+        const post = bounds('.post-comments-original')
+        const actions = bounds('.post-comments-post-footer')
+        const thread = bounds('.post-comments-thread')
+        const composer = bounds('.post-comments-composer')
+        return {
+          stacked: post.bottom <= actions.top && actions.bottom <= thread.top,
+          composerVisible: composer.bottom <= innerHeight && composer.width <= innerWidth,
+          noHorizontalScroll: node.scrollWidth <= node.clientWidth,
+        }
+      })
+      assert(Object.values(mobile).every(Boolean),
+        'Mobile details should preserve post, actions, and comments reading order: ' + JSON.stringify(mobile))
+      await details.getByRole('button', { name: 'Bình luận', exact: true }).click()
+      assert(await details.getByRole('textbox', { name: 'Viết bình luận' })
+        .evaluate(input => input === document.activeElement), 'The post action should focus the commentary input')
+    }
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('Post detail dock PASS: footer hit targets and aligned columns on desktop, stacked layout and composer focus on mobile')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
   if (process.argv.includes('--socco-feed-layout-only')) {
     await page.goto(origin + '/feed')
     const headerAccount = page.locator('header.chatnet-appbar').getByRole('button', { name: 'Mở trang cá nhân' })
@@ -335,6 +518,8 @@ try {
           })
       })
       assert(fits, 'All audience options should fit and be clickable before scrolling at ' + viewport.width + '×' + viewport.height)
+      const bounds = await menu.boundingBox()
+      assert(bounds && bounds.width <= 336, 'The audience picker should stay compact: ' + JSON.stringify(bounds))
       if (viewport.width === 1440) assert(await dialog.evaluate(node => node.clientWidth >= 650),
         'Desktop composer should use the widened dialog')
       await publicOption.press('End')
@@ -432,6 +617,8 @@ try {
       const form = rect('.feed-comment-form')
       const header = rect('.post-comments-modal-heading')
       return { stacked: thread.top >= post.bottom && Math.abs(thread.left - post.left) < 2,
+        split: Math.abs(thread.top - post.top) < 2 && thread.left >= post.right - 1 && post.width > thread.width,
+        composerOnRight: form.left >= post.right - 16,
         composerInViewport: form.bottom <= innerHeight && form.top > header.bottom,
         overflow: node.scrollWidth - node.clientWidth }
     })
@@ -439,8 +626,9 @@ try {
       await page.setViewportSize(viewport)
       await checkCommentTools(details)
       const layout = await measure()
-      assert(layout.stacked && layout.composerInViewport && layout.overflow <= 1,
-        'The dialog should stack the thread and keep the composer visible: ' + JSON.stringify(layout))
+      const expected = viewport.width >= 900 ? layout.split && layout.composerOnRight : layout.stacked
+      assert(expected && layout.composerInViewport && layout.overflow <= 1,
+        'The dialog should split on desktop, stack on mobile and keep the composer visible: ' + JSON.stringify(layout))
     }
     await details.getByRole('button', { name: 'Bình luận', exact: true }).click()
     assert(await details.getByRole('textbox', { name: 'Viết bình luận' }).evaluate(input => input === document.activeElement),
@@ -522,11 +710,13 @@ try {
     await page.getByRole('button', { name: 'Sao chép liên kết' }).click()
     await page.getByText('Đã sao chép liên kết bài viết.', { exact: true }).waitFor()
     const copied = await page.evaluate(() => navigator.clipboard.readText())
-    assert(copied === origin + '/feed/posts/88', 'Copied permalink should omit the current query and fragment: ' + copied)
+    assert(copied === origin + '/feed/posts/88?ref=share', 'Copied permalink should include only the share source: ' + copied)
     const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
-    for (const link of [copied, origin + '/?tab=feed&post=88']) {
+    for (const link of [copied, origin + '/feed/posts/88', origin + '/?tab=feed&post=88']) {
       await page.goto(link)
       await details.getByText(fixturePost.content, { exact: true }).waitFor()
+      await details.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
+      await page.waitForURL(origin + '/feed')
     }
     assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
     console.log('SOCCO-61/65 PASS: responsive suggestions, hidden sidebar cards, clipboard, direct and legacy post links')
@@ -1856,7 +2046,7 @@ try {
   assert(commentRequests === 2 && lastCommentPayload?.parentId === 501,
     'Replies from post comments must preserve the parent comment ID')
   await page.screenshot({ path: 'output/playwright/layout/social-post-comments-desktop-1586.png' })
-  await page.setViewportSize({ width: 1000, height: 820 })
+  await page.setViewportSize({ width: 768, height: 820 })
   const commentsCompact = await page.evaluate(() => {
     const post = document.querySelector('.post-comments-original')?.getBoundingClientRect()
     const thread = document.querySelector('.post-comments-thread')?.getBoundingClientRect()

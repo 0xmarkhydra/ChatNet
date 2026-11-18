@@ -55,6 +55,16 @@ When present and approved, `socco-ui-fidelity` and `docs/DESIGN.md` add screen-s
 - Use `cn()` from `shared/lib/utils.ts` to combine Tailwind classes. Do not copy a new button/dialog/input implementation into each feature or introduce competing icon/UI libraries.
 - Existing feature CSS remains supported until its owner migrates it; do not mix mass CSS rewrites with behavior changes or blindly add `!important` to win selector conflicts.
 
+## Page and asynchronous UX contract (new or changed screens)
+
+- A page must declare who owns vertical scrolling: the app shell or the page body, never both by accident. Make the content region flex/grid-safe with `min-width: 0` and `min-height: 0` where needed. Do not add arbitrary `100vh`/fixed heights to a feature page or shift the shared header/sidebar when switching routes.
+- Preserve the same shell, header, navigation, page width and primary scroll owner while loading, empty, error and populated states change. Check short desktop height, mobile keyboard/safe area, narrow viewports and browser Back/Forward.
+- Every remote read must distinguish **initial loading**, **refreshing existing data**, **empty success**, **recoverable error** and **permission/session failure**. Use the existing `AsyncSectionFallback` or feature-owned state UI; give retry only when safe, and do not erase usable cached content just to show a full-page spinner.
+- Loading placeholders should resemble the content being loaded, be `aria-hidden` so assistive technology hears a single status message, and disable animation for reduced-motion users. No silent `Suspense fallback={null}` for a user-visible page where loading blocks interaction.
+- For new interactive UI, reuse `shared/ui` shadcn/Radix primitives first; retain feature-owned styles where necessary. Keep visible focus, Escape/keyboard semantics, accessible labels and minimum 44px touch targets for primary mobile actions.
+- Prefer existing semantic SocCO tokens and Tailwind utilities for new styles; do not introduce global selector overrides, feature-wide `!important`, or another independent button/menu/dialog design. Do not migrate unrelated legacy CSS without before/after visual proof.
+- Screen changes need component behavior tests for loading/empty/error/retry and appropriate browser layout smoke tests. A stale browser test must be updated to the current intentional route/responsive DOM; do not make the production layout regress merely to satisfy old selectors.
+
 ## Required workflow for AI-generated and human code
 
 1. **Inspect:** read the relevant code, contracts, existing tests and ownership; check current Git state and instructions. Start from freshly fetched `origin/main` in an isolated branch/worktree. Never change someone else's dirty files or worktree.

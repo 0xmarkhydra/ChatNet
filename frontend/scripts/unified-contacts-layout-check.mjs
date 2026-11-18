@@ -47,7 +47,8 @@ const overviewHtml = `<!doctype html><html><head><meta name="viewport" content="
   <aside class="co-side"><section class="co-qr-wrap" style="min-height:230px">Kết nối bằng QR</section><section class="co-privacy">Quyền riêng tư</section></aside>
 </div></div></body></html>`
 
-const browser = await chromium.launch({ headless: true })
+// Match the Chrome channel already used by the Web/PWA browser gates in CI.
+const browser = await chromium.launch({ headless: true, channel: 'chrome' })
 try {
   for (const width of [390, 768, 980, 1180, 1440]) {
     const page = await browser.newPage({viewport:{width,height:900}})

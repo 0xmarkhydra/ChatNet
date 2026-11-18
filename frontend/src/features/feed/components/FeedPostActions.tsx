@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
-import { feedPostPath } from '../../../shared/utils/feedPostPath'
+import { postShareUrl } from '../utils/postSharing'
 import { Bookmark, Copy, Ellipsis, Flag, Pencil, Share2, Trash2, X } from 'lucide-react'
 import '../styles/feed-actions.css'
 
@@ -12,6 +12,7 @@ export type FeedActionPost = {
   visibility?: 'public' | 'friends' | 'private'
   background?: string
   saved?: boolean
+  repostKind?: 'quick' | 'quote'
   attachments?: unknown[]
 }
 type Feedback = (message: string, kind?: 'success' | 'error') => void
@@ -26,15 +27,9 @@ type Props<P extends FeedActionPost> = {
 }
 const reasons = ['Nội dung spam', 'Quấy rối hoặc xúc phạm', 'Lừa đảo hoặc giả mạo', 'Thông tin gây hiểu lầm', 'Nội dung không phù hợp']
 
-function postUrl(id: number) {
-  const { origin, protocol } = window.location
-  const webOrigin = protocol === 'https:' || protocol === 'http:' ? origin : 'https://chat.codelocal.cloud'
-  return new URL(feedPostPath(id), webOrigin).href
-}
-
 async function sharePost(id: number, feedback: Feedback, copyOnly = false) {
   try {
-    const url = postUrl(id)
+    const url = postShareUrl(id)
     if (!copyOnly && navigator.share) {
       await navigator.share({ title: 'Bài viết ChatNet', url })
     } else {
@@ -76,17 +71,9 @@ export function FeedSaveAction<P extends FeedActionPost>({
   </button>
 }
 
-/** Only engagement actions live in the public post footer. */
-export function FeedShareAction({ postId, onFeedback }: { postId: number; onFeedback: Feedback }) {
-  return (
-    <button type="button" className="post-stat feed-share-action"
-      aria-label="Chia sẻ bài viết" onClick={() => void sharePost(postId, onFeedback)}>
-      <Share2 size={20} aria-hidden="true" /><span>Chia sẻ</span>
-    </button>
-  )
-}
-
 export default function FeedPostActions<P extends FeedActionPost>({ post, mine, request, onUpdated, onDeleted, onFeedback, onEdit }: Props<P>) {
+  const quickRepost = post.repostKind === 'quick'
+  const deleteLabel = quickRepost ? 'Bỏ đăng lại' : 'Xóa bài viết'
   const portalContainer = useContext(ModalPortalContext)
   const trigger = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -148,7 +135,7 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
       await send('/api/posts/' + post.id, { method: 'DELETE' })
       close()
       onDeleted(post.id)
-      onFeedback('Đã xóa bài viết.', 'success')
+      onFeedback(quickRepost ? 'Đã bỏ đăng lại.' : 'Đã xóa bài viết.', 'success')
     })
   }
   async function savePost() {
@@ -185,16 +172,16 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
             style={{ top: screenPosition.top, left: screenPosition.left }}>
             <div className="feed-actions-grabber" aria-hidden="true" />
             <div className="feed-actions-header">
-              <strong>{screen === 'report' ? 'Báo cáo bài viết' : screen === 'delete' ? 'Xác nhận xóa' : 'Tùy chọn bài viết'}</strong>
+              <strong>{screen === 'report' ? 'Báo cáo bài viết' : screen === 'delete' ? quickRepost ? 'Xác nhận bỏ đăng lại' : 'Xác nhận xóa' : 'Tùy chọn bài viết'}</strong>
               <button type="button" onClick={close} aria-label="Đóng"><X size={19} /></button>
             </div>
             {screen === 'delete' ? (
               <div className="feed-actions-editor">
-                <p className="feed-delete-warning">Bài viết và các bình luận sẽ bị xóa vĩnh viễn. Bạn có chắc muốn xóa?</p>
+                <p className="feed-delete-warning">{quickRepost ? 'Bài viết gốc sẽ không bị xóa.' : 'Bài viết và các bình luận sẽ bị xóa vĩnh viễn. Bạn có chắc muốn xóa?'}</p>
                 <div className="feed-actions-footer">
                   <button type="button" onClick={() => setScreen('options')}>Hủy</button>
                   <button type="button" className="feed-confirm-delete" disabled={busy}
-                    onClick={() => void deletePost()}>Xóa bài viết</button>
+                    onClick={() => void deletePost()}>{deleteLabel}</button>
                 </div>
               </div>
             ) : screen === 'report' ? (
@@ -225,7 +212,7 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
                     <div className="feed-actions-separator" />
                     {onEdit && <button type="button" onClick={startEdit}><Pencil size={19} />Chỉnh sửa bài viết</button>}
                     <button type="button" className="danger" onClick={() => setScreen('delete')}>
-                      <Trash2 size={19} />Xóa bài viết
+                      <Trash2 size={19} />{deleteLabel}
                     </button>
                   </>
                 ) : (
