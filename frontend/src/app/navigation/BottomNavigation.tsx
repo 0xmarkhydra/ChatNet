@@ -41,17 +41,13 @@ export default function BottomNavigation({
     const measure = (animate = false) => {
       const navRect = nav.getBoundingClientRect()
       const buttonRect = activeButton.getBoundingClientRect()
-      // On phones the highlight should sit behind the icon, not fill the tab.
-      // Keep the original full-button highlight on wider screens.
-      const icon = activeButton.querySelector<HTMLElement>('.nav-icon')
-      const targetRect = window.matchMedia('(max-width: 760px)').matches && icon
-        ? icon.getBoundingClientRect()
-        : buttonRect
-      const left = targetRect.left - navRect.left - nav.clientLeft
+      // Wrap the entire active tab (icon and label) with a small inset on phones.
+      const inset = window.matchMedia('(max-width: 760px)').matches ? 2 : 0
+      const left = buttonRect.left - navRect.left - nav.clientLeft + inset
       pill.style.setProperty('--pill-x', `${left}px`)
-      pill.style.setProperty('--pill-y', `${targetRect.top - navRect.top - nav.clientTop}px`)
-      pill.style.setProperty('--pill-w', `${targetRect.width}px`)
-      pill.style.setProperty('--pill-h', `${targetRect.height}px`)
+      pill.style.setProperty('--pill-y', `${buttonRect.top - navRect.top - nav.clientTop + inset / 2}px`)
+      pill.style.setProperty('--pill-w', `${buttonRect.width - inset * 2}px`)
+      pill.style.setProperty('--pill-h', `${buttonRect.height - inset}px`)
 
       if (!pill.classList.contains('is-ready')) {
         void pill.offsetWidth
@@ -59,9 +55,14 @@ export default function BottomNavigation({
       }
       pill.style.opacity = '1'
       if (animate) {
+        // Restart the liquid pulse on rapid tab changes without interrupting the slide.
+        if (pill.classList.contains('is-sliding')) {
+          pill.classList.remove('is-sliding')
+          void pill.offsetWidth
+        }
         pill.classList.add('is-sliding')
         if (slideTimerRef.current) clearTimeout(slideTimerRef.current)
-        slideTimerRef.current = setTimeout(() => pill.classList.remove('is-sliding'), 420)
+        slideTimerRef.current = setTimeout(() => pill.classList.remove('is-sliding'), 520)
       }
     }
 
