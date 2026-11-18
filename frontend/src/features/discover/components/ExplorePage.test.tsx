@@ -38,12 +38,7 @@ function mount(request: DiscoverSectionProps['request'], route = '/discover') {
   const render = async () => {
     await act(async () => root.render(<Test />))
   }
-  const rerender = async () => {
-    // Preserve the router and component identity while changing session props.
-    await act(async () => root.render(<MemoryRouter initialEntries={[route]}>
-      <ExplorePage {...props} /><RouteLocation />
-    </MemoryRouter>))
-  }
+  const rerender = render
   return { host, props, render, rerender,
     route: () => host.querySelector('[data-testid="route"]')?.textContent,
     button: (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === label),
