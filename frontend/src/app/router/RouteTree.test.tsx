@@ -262,6 +262,20 @@ describe("app route tree", () => {
     expect(renderAt("/?tab=feed").location()).toBe("/feed");
   });
 
+  it("returns invalid deep links to their feature owner with the correct label", () => {
+    for (const [path, label, destination] of [
+      ["/chat/invalid", "Về Tin nhắn", "/chat"],
+      ["/contacts/invalid", "Về Danh bạ", "/contacts"],
+      ["/calls/invalid", "Về Cuộc gọi", "/contacts/calls"],
+      ["/settings/invalid", "Về Cài đặt", "/settings"],
+      ["/marketplace/invalid", "Về Marketplace", "/marketplace"],
+    ]) {
+      const app = renderAt(path);
+      expect(app.link(label).getAttribute("href")).toBe(destination);
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("renders Not Found for unknown paths without replacing the shell", () => {
     const { link, location, container, onMount, page } = renderAt("/chat");
     act(() => link("Invalid").click());

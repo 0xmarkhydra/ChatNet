@@ -8,16 +8,12 @@ import type { RoutePageKey, AppPageContext } from "./routePageContext";
  */
 export default function PageRoute({ page }: { page: RoutePageKey }) {
   const context = useOutletContext<AppPageContext>();
-  const { beforeFeed, frameClassName } = context;
-  // Shared dialogs remain in their original DOM order as feature-owned pages
-  // are progressively routed. No new CSS or mounting boundary is introduced.
-  const pageContent = page === "chat"
-    ? <>{context.chat}{beforeFeed}{context.afterFeed}</>
-    : page === "feed"
-      ? <>{beforeFeed}{context.feed}{context.afterFeed}</>
-      : page === "profile"
-        ? <>{beforeFeed}{context.afterFeed}{context.profile}</>
-        : context[page];
+  const { beforeFeed, afterFeed, frameClassName } = context;
+  // Preserve each page's original shared-dialog order without mounting inactive pages.
+  let pageContent = context[page];
+  if (page === "chat") pageContent = <>{context.chat}{beforeFeed}{afterFeed}</>;
+  else if (page === "feed") pageContent = <>{beforeFeed}{context.feed}{afterFeed}</>;
+  else if (page === "profile") pageContent = <>{beforeFeed}{afterFeed}{context.profile}</>;
   return (
     <section className={`phone-frame modern-frame ${frameClassName}`.trim()} data-route-page={page}>
       <AppPageErrorBoundary>{pageContent}</AppPageErrorBoundary>

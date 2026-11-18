@@ -2,18 +2,23 @@ import { Link, useLocation } from "react-router-dom";
 import AppPageErrorBoundary from "../layouts/AppPageErrorBoundary";
 import { ROUTE, TAB_PATH, fallbackPathForRoute } from "./routes";
 
+const FALLBACK_LABELS: Record<string, string> = {
+  [TAB_PATH.chat]: "Tin nhắn",
+  [TAB_PATH.feed]: "Bảng tin",
+  [TAB_PATH.profile]: "Hồ sơ",
+  [ROUTE.settings]: "Cài đặt",
+  "/contacts/calls": "Cuộc gọi",
+  [TAB_PATH.contacts]: "Danh bạ",
+  [TAB_PATH.discover]: "Khám phá",
+  [TAB_PATH.market]: "Marketplace",
+  [TAB_PATH.notifications]: "Thông báo",
+};
+
 /** Standalone invalid-route page that preserves the existing shell and CSS. */
 export default function NotFoundPage() {
   const { pathname } = useLocation();
   const fallbackPath = fallbackPathForRoute(pathname);
-  const fallbackLabel = fallbackPath === TAB_PATH.chat ? "Tin nhắn"
-    : fallbackPath === TAB_PATH.feed ? "Bảng tin"
-    : fallbackPath === TAB_PATH.profile ? "Hồ sơ"
-    : fallbackPath === ROUTE.settings ? "Cài đặt"
-    : (fallbackPath === ROUTE.calls || fallbackPath === "/contacts/calls") ? "Cuộc gọi"
-    : fallbackPath === TAB_PATH.contacts ? "Danh bạ"
-    : fallbackPath === TAB_PATH.discover ? "Khám phá"
-    : fallbackPath === TAB_PATH.market ? "Marketplace" : "Thông báo";
+  const fallbackLabel = FALLBACK_LABELS[fallbackPath] ?? "Tin nhắn";
   return (
     <AppPageErrorBoundary>
       <section className="phone-frame modern-frame" aria-labelledby="route-not-found-title">
