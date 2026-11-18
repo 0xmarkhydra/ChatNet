@@ -31,12 +31,16 @@ it("renders header and sidebar around the outlet without extra DOM wrappers", ()
         beforePage={<output data-testid="notice">Notice</output>}
         outletContext={{
           frameClassName: "",
-          content: <p data-testid="page">Stable page content</p>,
+          beforeFeed: null,
           contacts: <p data-testid="page">Stable page content</p>,
           search: null,
           discover: null,
           market: null,
           notifications: null,
+          profile: null,
+          afterFeed: null,
+          feed: <p data-testid="page">Stable page content</p>,
+          chat: null,
         }}
       >
         <div data-testid="after-page">Dialogs</div>
@@ -48,8 +52,8 @@ it("renders header and sidebar around the outlet without extra DOM wrappers", ()
     <MemoryRouter initialEntries={["/feed"]}>
       <Routes>
         <Route element={<Shell />}>
-          <Route path="feed" element={<PageRoute />} />
-          <Route path="contacts" element={<PageRoute />} />
+          <Route path="feed" element={<PageRoute page="feed" />} />
+          <Route path="contacts" element={<PageRoute page="contacts" />} />
         </Route>
       </Routes>
       <Link to="/contacts" data-testid="navigate">Contacts</Link>
