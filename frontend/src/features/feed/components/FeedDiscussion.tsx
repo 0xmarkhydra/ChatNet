@@ -9,6 +9,7 @@ import UserAvatar from '../../../shared/ui/UserAvatar'
 export type FeedComment = {
   id: number
   parentId?: number | null
+  liked?: boolean
   author: string
   authorDisplayName?: string
   content: string
@@ -127,7 +128,7 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
   )
 }
 
-export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, onAuthorOpen, variant = 'default', sortOrder = 'oldest', ...translation }: TranslationProps & {
+export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, onLike, onAuthorOpen, variant = 'default', sortOrder = 'oldest', ...translation }: TranslationProps & {
   comments: FeedComment[]
   pending?: FeedComment
   submit: (content: string, parentId?: number) => Promise<void>
@@ -137,6 +138,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   onEdit: (id: number, content: string) => Promise<void>
   onDelete: (id: number) => Promise<void>
   onReport: (id: number, reason: string) => Promise<void>
+  onLike?: (id: number, liked: boolean) => Promise<void>
   onAuthorOpen: (username: string) => void
   variant?: 'default' | 'post-page'
   sortOrder?: 'oldest' | 'newest'
@@ -145,8 +147,6 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   const modalContainer = useContext(ModalPortalContext)
   const { replyTo, drafts } = editor
   const [expandedThreads, setExpandedThreads] = useState<Set<number>>(new Set())
-  // Comment likes are a visual preview until the feed service exposes a persisted like API.
-  const [previewLikes, setPreviewLikes] = useState<Set<number>>(new Set())
   const [editingComment, setEditingComment] = useState<number | null>(null)
   const [commentOptionsId, setCommentOptionsId] = useState<number | null>(null)
   const optionsTrigger = useRef<HTMLButtonElement | null>(null)
@@ -275,12 +275,12 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
           </div>
           <div className="feed-comment-actions">
             {variant === 'default' && <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}
-            {variant === 'post-page' && <>
-              <button type="button" className={previewLikes.has(comment.id) ? 'feed-comment-liked' : ''}
-                aria-pressed={previewLikes.has(comment.id)} title="Lượt thích bình luận chưa được đồng bộ lên máy chủ"
-                onClick={() => setPreviewLikes(current => { const next = new Set(current); if (next.has(comment.id)) next.delete(comment.id); else next.add(comment.id); return next })}>
-                <Heart size={14} fill={previewLikes.has(comment.id) ? 'currentColor' : 'none'} aria-hidden="true" />
-                {previewLikes.has(comment.id) ? 'Đã thích' : 'Thích'}
+            {variant === 'post-page' && onLike && comment.id > 0 && <>
+              <button type="button" className={comment.liked ? 'feed-comment-liked' : ''}
+                aria-pressed={Boolean(comment.liked)} disabled={commentActionBusy}
+                onClick={() => void runAction(() => onLike(comment.id, !comment.liked))}>
+                <Heart size={14} fill={comment.liked ? 'currentColor' : 'none'} aria-hidden="true" />
+                {comment.liked ? 'Đã thích' : 'Thích'}
               </button>
               <span aria-hidden="true">·</span>
             </>}

@@ -7,6 +7,17 @@ type AuthMode = 'login' | 'register'
 type LoginMethod = 'password' | 'otp'
 type RegisterStep = 'details' | 'otp' | 'setup'
 
+type OtpPayload = { verificationToken: string; emailMasked: string; expiresInSeconds: number }
+
+function readOtpPayload(value: unknown): OtpPayload | null {
+  if (!value || typeof value !== 'object') return null
+  const { verificationToken, emailMasked, expiresInSeconds } = value as Partial<OtpPayload>
+  if (typeof verificationToken !== 'string' || !verificationToken.trim() ||
+      typeof emailMasked !== 'string' || !emailMasked.trim() ||
+      typeof expiresInSeconds !== 'number' || !Number.isFinite(expiresInSeconds) || expiresInSeconds <= 0) return null
+  return { verificationToken, emailMasked, expiresInSeconds }
+}
+
 function describeOtpSendError(error: unknown, fallback: string): string {
   if (typeof error !== 'string' || !error.trim()) return fallback
   if (error === 'we could not send the verification email' || error === 'we could not resend the verification email') {
@@ -88,8 +99,8 @@ export function useAuthFlow(saveSession: (next: Session) => void) {
         setAuthError(describeOtpSendError(result.error, 'Không thể gửi mã xác minh.'))
         return
       }
-      const payload = result as { verificationToken: string; emailMasked: string; expiresInSeconds: number }
-      if (!payload.verificationToken || !Number.isFinite(payload.expiresInSeconds)) throw new Error('invalid OTP response')
+      const payload = readOtpPayload(result)
+      if (!payload) throw new Error('invalid OTP response')
       setVerificationToken(payload.verificationToken)
       setVerificationEmail(payload.emailMasked)
       setOtpCode('')
@@ -163,7 +174,11 @@ export function useAuthFlow(saveSession: (next: Session) => void) {
         setAuthError(response.status === 410 ? 'Phiên xác minh đã hết hạn. Hãy dùng email để bắt đầu lại.' : describeOtpSendError(result.error, 'Không thể gửi lại mã.'))
         return
       }
-      const payload = result as { verificationToken: string; emailMasked: string; expiresInSeconds: number }
+      const payload = readOtpPayload(result)
+      if (!payload) {
+        setAuthError('Máy chủ trả về mã xác minh không hợp lệ. Hãy thử gửi lại.')
+        return
+      }
       setVerificationToken(payload.verificationToken)
       setVerificationEmail(payload.emailMasked)
       setOtpCode('')

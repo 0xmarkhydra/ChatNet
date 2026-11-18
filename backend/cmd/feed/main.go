@@ -27,6 +27,7 @@ import (
 )
 
 type comment struct {
+	Liked             bool       `json:"liked"`
 	UpdatedAt         *time.Time `json:"updatedAt,omitempty"`
 	ID                int64      `json:"id"`
 	ParentID          *int64     `json:"parentId"`
@@ -126,6 +127,8 @@ func main() {
 	mux.Handle("POST /api/posts/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.react)))
 	mux.Handle("GET /api/posts/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listPostReactionUsers)))
 	mux.Handle("POST /api/posts/{id}/comments", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.addComment)))
+	mux.Handle("PUT /api/posts/{id}/comments/{commentId}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeCommentLike)))
+	mux.Handle("DELETE /api/posts/{id}/comments/{commentId}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeCommentLike)))
 	mux.Handle("GET /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStories)))
 	mux.Handle("POST /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createStory)))
 	mux.Handle("DELETE /api/stories/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteStory)))
@@ -241,7 +244,8 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) comments(r *http.Request, postID, viewerID int64) []comment {
 	rows, err := s.db.Query(r.Context(), `
-		SELECT c.id,c.parent_id,u.username,u.display_name,c.content,c.created_at,c.updated_at
+		SELECT c.id,c.parent_id,u.username,u.display_name,c.content,c.created_at,c.updated_at,
+		       EXISTS(SELECT 1 FROM comment_likes l WHERE l.comment_id=c.id AND l.user_id=$2)
 		FROM comments c JOIN users u ON u.id=c.user_id
 		WHERE c.post_id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		  (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))
@@ -254,7 +258,7 @@ func (s *server) comments(r *http.Request, postID, viewerID int64) []comment {
 	items := []comment{}
 	for rows.Next() {
 		var c comment
-		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.AuthorDisplayName, &c.Content, &c.CreatedAt, &c.UpdatedAt) == nil {
+		if rows.Scan(&c.ID, &c.ParentID, &c.Author, &c.AuthorDisplayName, &c.Content, &c.CreatedAt, &c.UpdatedAt, &c.Liked) == nil {
 			items = append(items, c)
 		}
 	}
