@@ -1,5 +1,5 @@
 import type { SessionResponseCache } from '../../shared/lib/sessionCache'
-import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { API } from '../../shared/lib/config'
 import { useLatest } from '../../shared/hooks/useLatest'
 import { isDesktopBuild } from '../../platform/desktop'
@@ -91,6 +91,7 @@ export function useAppRealtime({
   setConversations,
   onMessageConfirmed,
 }: Options) {
+  const replayWindow = useRef<{ sessionId: string; ids: Set<number> } | null>(null)
   // Long-lived SSE/timer listeners need current callbacks without re-subscribing.
   const handlers = useLatest({
     onCategoryAssignmentChanged,
@@ -123,6 +124,11 @@ export function useAppRealtime({
     let hasOpened = false
     let hadConnectionError = false
     let lastSSECheckAt = 0
+    // EventSource can replay the last delivery after reconnecting. Keep a bounded
+    // per-session window so one message ID can never increment unread twice.
+    if (replayWindow.current?.sessionId !== session.sessionId)
+      replayWindow.current = { sessionId: session.sessionId, ids: new Set() }
+    const seenMessageIds = replayWindow.current.ids
     let lastFriendPollAt = 0
     const pollFriendsIfStale = () => {
       const now = Date.now()
@@ -166,6 +172,15 @@ export function useAppRealtime({
       if (!active || sessionRef.current?.sessionId !== session.sessionId) return
       const update = parseRealtimeEvent((event as MessageEvent).data)
       if (!update) return
+      if (update.type === 'message' && update.message) {
+        const id = update.message.id
+        if (seenMessageIds.has(id)) return
+        if (seenMessageIds.size >= 4096) {
+          const oldest = seenMessageIds.values().next().value
+          if (oldest !== undefined) seenMessageIds.delete(oldest)
+        }
+        seenMessageIds.add(id)
+      }
       if (['message', 'conversation.read', 'conversation.created', 'conversation.removed', 'privacy.updated'].includes(update.type)) refreshDesktopUnread()
       if (update.type === 'privacy.updated' || update.type === 'conversation.removed') clearDesktopNotifications(session.sessionId)
       if (update.type === 'privacy.updated') {
@@ -339,12 +354,18 @@ export function useAppRealtime({
         setConversations((current) => {
           const existing = current.find((item) => item.id === update.conversationId)
           if (!existing) return current
+          const incomingTime = Date.parse(incoming.createdAt)
+          const previewTime = Date.parse(existing.lastMessageAt || '')
+          const advancePreview = Number.isFinite(incomingTime) &&
+            (!Number.isFinite(previewTime) || incomingTime > previewTime)
           const next = current.map((item) =>
             item.id === update.conversationId
               ? {
                   ...item,
-                  lastMessage: incoming.text || attachmentLabel(incoming.attachments),
-                  lastMessageAt: incoming.createdAt,
+                  ...(advancePreview ? {
+                    lastMessage: incoming.text || attachmentLabel(incoming.attachments),
+                    lastMessageAt: incoming.createdAt,
+                  } : {}),
                   unreadCount:
                     incoming.senderId !== session.user.id &&
                       (!canMarkConversationRead(currentId, item.id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus()) ||
@@ -366,7 +387,7 @@ export function useAppRealtime({
           setMessages((current) =>
             current.some((item) => item.id === incoming.id)
               ? current
-              : [...current, incoming],
+              : [...current, incoming].sort((a, b) => a.id - b.id),
           )
           if (incoming.senderId !== session.user.id &&
               canMarkConversationRead(currentId, update.conversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) {

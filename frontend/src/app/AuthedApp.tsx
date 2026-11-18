@@ -1253,7 +1253,7 @@ export default function AuthedApp({
   const { loadProfilePosts } = useProfilePosts({ feedRevisionRef: feedRevision, profileLoadSequenceRef: profileLoadSequence, profilePagingBusyRef: profilePagingBusy, profilePosts, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError });
   const { createPost, draftBeforeEdit, editingPost, openEditPost, postAttachments, postBackground, postEditBusy, postFeelingId, postTaggedFriends, postText, postVisibility, restoreDraftAfterEdit, setEditingPost, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostTaggedFriends, setPostText, setPostVisibility, setShowPostBackgrounds, showPostBackgrounds } = usePostComposer({ actionLocks, feedCheckInLocation, feedCheckInOpen, feedRevisionRef: feedRevision, friends, mediaUploading, name, pendingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setPendingPost, setPosts, setPostSubmitError, setProfileComposerOpen, setProfilePosts, syncFeedPost, tab });
   const { like } = usePostReactions({ actionLocks, feedRevisionRef: feedRevision, followingFeed, postSearch, refreshPosts, setLikePreviews, setPosts, setProfilePosts, setSavedPosts });
-  const { addComment, manageFeedComment, reportFeedComment } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
+  const { addComment, manageFeedComment, reportFeedComment, setCommentLike } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
   const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ setActivePostId });
 
   const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
@@ -2470,6 +2470,7 @@ export default function AuthedApp({
         manageFeedComment(discussionPost, commentId, "DELETE")
       }
       onReport={reportFeedComment}
+      onLike={(commentId, liked) => setCommentLike(discussionPost, commentId, liked)}
       onAuthorOpen={onAuthorOpen}
     />
   );

@@ -92,16 +92,29 @@ export function useCallMediaControls({ room, mediaType, ending, permissionRetryi
   }
 
   async function toggleSound() {
-    if (!room) return
+    if (!room || ending) return
     const next = !soundOn
-    for (const participant of room.remoteParticipants.values()) {
-      for (const publication of participant.audioTrackPublications.values()) {
-        const element = publication.track?.attachedElements?.[0] as HTMLMediaElement | undefined
-        if (element) element.muted = !next
+    const setRemoteAudioMuted = (muted: boolean) => {
+      for (const participant of room.remoteParticipants.values()) {
+        for (const publication of participant.audioTrackPublications.values()) {
+          for (const element of publication.track?.attachedElements ?? []) element.muted = muted
+        }
       }
     }
+
+    setRemoteAudioMuted(!next)
     if (next) {
-      try { await room.startAudio() } catch { onError('Trình duyệt đang chặn phát âm thanh. Hãy chạm lại nút loa.') }
+      try {
+        await room.startAudio()
+      } catch {
+        setRemoteAudioMuted(true)
+        onError('Trình duyệt đang chặn phát âm thanh. Hãy chạm lại nút loa.')
+        return
+      }
+      if (room.state !== 'connected') {
+        setRemoteAudioMuted(true)
+        return
+      }
     }
     setSoundOn(next)
   }

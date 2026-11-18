@@ -204,6 +204,45 @@ func (s *server) toggleSave(w http.ResponseWriter, r *http.Request) {
 	}
 	s.respondPost(w, r, id, c.UserID, 200)
 }
+func (s *server) changeCommentLike(w http.ResponseWriter, r *http.Request) {
+	postID, ok := feedID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	commentID, ok := feedID(w, r.PathValue("commentId"))
+	if !ok {
+		return
+	}
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	var visible bool
+	err := s.db.QueryRow(r.Context(), `
+		WITH visible_comment AS MATERIALIZED (
+			SELECT c.id FROM comments c JOIN posts p ON p.id=c.post_id
+			WHERE p.id=$1 AND c.id=$3 AND `+feedAccessSQL+`
+			AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+				(b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))
+		), added AS (
+			INSERT INTO comment_likes (comment_id, user_id)
+			SELECT id,$2 FROM visible_comment WHERE $4::boolean
+			ON CONFLICT (comment_id, user_id) DO NOTHING
+			RETURNING 1
+		), removed AS (
+			DELETE FROM comment_likes l USING visible_comment c
+			WHERE l.comment_id=c.id AND l.user_id=$2 AND NOT $4::boolean
+			RETURNING 1
+		)
+		SELECT EXISTS (SELECT 1 FROM visible_comment)`, postID, claims.UserID, commentID, r.Method == http.MethodPut).Scan(&visible)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot update comment like")
+		return
+	}
+	if !visible {
+		httpx.Error(w, http.StatusNotFound, "comment not found")
+		return
+	}
+	s.respondPost(w, r, postID, claims.UserID, http.StatusOK)
+}
+
 func (s *server) editComment(w http.ResponseWriter, r *http.Request) {
 	id, ok := feedID(w, r.PathValue("id"))
 	if !ok {

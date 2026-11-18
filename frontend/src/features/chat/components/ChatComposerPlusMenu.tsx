@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, FileText, Images, Smile } from 'lucide-react'
-import UiIcon from '../../../shared/ui/UiIcon'
+import { ArrowLeft, FileText, Images, Plus, Smile } from 'lucide-react'
 import ChatEmojiPicker from './ChatEmojiPicker'
 import { positionChatComposerMenu, type ChatComposerMenuPosition } from '../utils/positionChatComposerMenu'
 import './ChatEmojiPicker.css'
@@ -98,7 +97,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
         title="Thêm tệp, ảnh hoặc emoji"
         onClick={() => mode === 'closed' ? show('actions') : setMode('closed')}
       >
-        <UiIcon name="attach" size={22} />
+        <Plus className="chat-composer-plus" size={22} aria-hidden="true" />
       </button>
       {mode !== 'closed' && position && createPortal(
         <div
