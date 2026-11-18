@@ -2255,10 +2255,7 @@ export default function AuthedApp({
   }, [messages, session?.sessionId]);
 
 
-  const unreadTotal = conversations.reduce(
-    (sum, conversation) => sum + conversation.unreadCount,
-    0,
-  );
+  const unreadTotal = nativeNotifications.unreadCount ?? 0;
   const notificationItemCount = countNotificationItems(friendRequests, conversations)
     + postMentions.filter(mention => !mention.readAt).length;
   const notificationBadgeText = formatNotificationBadge(notificationItemCount);
