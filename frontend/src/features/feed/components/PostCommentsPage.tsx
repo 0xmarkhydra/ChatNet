@@ -6,7 +6,7 @@ import FeedLikeButton from './FeedLikeButton'
 import type { Post } from '../types'
 import { FeedText } from './FeedDiscussion'
 import { CommentComposerTarget } from './commentComposerTarget'
-import FeedPostActions, { FeedShareAction } from './FeedPostActions'
+import FeedPostActions from './FeedPostActions'
 import PostExtrasView from './PostExtrasView'
 import { parsePostExtras } from '../utils/postExtras'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -29,6 +29,7 @@ type Props = {
   request: (path: string, init?: RequestInit) => Promise<Response>
   onLike: (post: Post, emoji?: string) => Promise<void>
   onReactionUsers: (post: Post, portalContainer?: HTMLElement) => void
+  onShareToChat?: (url: string) => void
   onRepostChanged?: () => void
   onRepostRemoved?: (id: number) => void
   onOpenOriginal?: (id: number) => void
@@ -56,7 +57,7 @@ function relativeDate(value: string): string {
 export default function PostCommentsPage({
   post, onClose, username, ownDisplayName, token, targetLanguage, likeBusy,
   request, onLike, onReactionUsers, onUpdated, onDeleted, onFeedback, onAuthorOpen, onEditPost, taggedNames,
-  sortOrder, onSortChange, children, onRepostChanged, onRepostRemoved, onOpenOriginal,
+  sortOrder, onSortChange, children, onRepostChanged, onRepostRemoved, onOpenOriginal, onShareToChat,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -118,6 +119,10 @@ export default function PostCommentsPage({
             {onOpenOriginal && <FeedRepostPreview post={post} onOpen={onOpenOriginal} />}
           </article>
 
+          {post.repostKind === 'quick' && <div className="post-comments-post-actions post-toolbar post-toolbar-compact">
+            <FeedRepostAction post={post} request={request} onUpdated={onUpdated}
+              onShareToChat={onShareToChat} onFeedback={onFeedback} />
+          </div>}
           {post.repostKind !== 'quick' && <>
           <div className="post-comments-post-footer">
             <div className="post-comments-stats">
@@ -134,9 +139,8 @@ export default function PostCommentsPage({
                 onClick={() => composerTarget?.querySelector<HTMLTextAreaElement>('textarea')?.focus()}>
                 <MessageCircle size={21} aria-hidden="true" /><span>Bình luận</span>
               </button>
-              <FeedShareAction postId={post.id} onFeedback={onFeedback} />
-              {onRepostRemoved && <FeedRepostAction post={post} request={request} onUpdated={onUpdated}
-                onRemoved={onRepostRemoved} onChanged={onRepostChanged} onFeedback={onFeedback} />}
+              <FeedRepostAction post={post} request={request} onUpdated={onUpdated}
+                onRemoved={onRepostRemoved} onChanged={onRepostChanged} onShareToChat={onShareToChat} onFeedback={onFeedback} />
             </div>
           </div>
 

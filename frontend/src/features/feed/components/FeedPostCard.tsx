@@ -8,7 +8,7 @@ import type { Post } from '../types'
 import type { ToastKind } from '../../../shared/utils/toast'
 import { API } from '../../../shared/lib/config'
 import { FeedText } from './FeedDiscussion'
-import FeedPostActions, { FeedSaveAction, FeedShareAction } from './FeedPostActions'
+import FeedPostActions, { FeedSaveAction } from './FeedPostActions'
 import PostExtrasView from './PostExtrasView'
 import { parsePostExtras } from '../utils/postExtras'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -35,6 +35,7 @@ type Props = {
   onReactionUsers: (post: Post) => void;
   showSave?: boolean;
   onEditPost?: (post: Post) => void;
+  onShareToChat?: (url: string) => void;
   onRepostChanged?: () => void;
   taggedNames?: Record<string, string>;
 };
@@ -75,6 +76,7 @@ export default function FeedPostCard({
   onReactionUsers,
   onEditPost,
   onRepostChanged,
+  onShareToChat,
   taggedNames,
 }: Props) {
   const authorLabel = userLabel(post.author === name ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
@@ -123,6 +125,10 @@ export default function FeedPostCard({
           </div>
         )}
         <FeedRepostPreview post={post} onOpen={setActivePostId} />
+        {post.repostKind === 'quick' && <div className="post-toolbar">
+          <FeedRepostAction post={post} request={apiFetch} onUpdated={syncFeedPost}
+            onShareToChat={onShareToChat} onFeedback={setNotice} />
+        </div>}
         {post.repostKind !== 'quick' && <>
         <div className="post-engagement-summary feed-post-engagement">
           <button type="button" className="feed-post-likes feed-reaction-users-trigger"
@@ -143,10 +149,8 @@ export default function FeedPostCard({
             onClick={onToggleComments ?? openPost}>
             <UiIcon name="comment" size={22} /><span>Bình luận</span>
           </button>
-          <FeedShareAction postId={post.id}
-            onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
           <FeedRepostAction post={post} request={apiFetch} onUpdated={syncFeedPost} onRemoved={removeFeedPost}
-            onChanged={onRepostChanged} onFeedback={setNotice} />
+            onChanged={onRepostChanged} onShareToChat={onShareToChat} onFeedback={setNotice} />
           <FeedSaveAction post={post} request={apiFetch} onUpdated={syncFeedPost}
             onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
         </div>

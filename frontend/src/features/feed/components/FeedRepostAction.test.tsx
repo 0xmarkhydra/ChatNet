@@ -43,18 +43,18 @@ async function click(label: string) {
   await act(async () => node.click())
 }
 
-async function setup(post: Post, response: Response) {
+async function setup(post: Post, response: Response, onShareToChat?: (url: string) => void) {
   const request = vi.fn().mockResolvedValue(response)
   const onUpdated = vi.fn()
   const onRemoved = vi.fn()
-  await act(async () => root.render(<FeedRepostAction post={post} request={request} onUpdated={onUpdated} onRemoved={onRemoved} onFeedback={vi.fn()} />))
+  await act(async () => root.render(<FeedRepostAction post={post} request={request} onUpdated={onUpdated} onRemoved={onRemoved} onFeedback={vi.fn()} onShareToChat={onShareToChat} />))
   return { request, onUpdated, onRemoved }
 }
 describe('Repost controls', () => {
   it('offers a quick repost and updates the original with the server response', async () => {
     const result = { ...source, myRepostId: 60, repostCount: 1 }
     const { request, onUpdated } = await setup(source, new Response(JSON.stringify(result), { status: 201 }))
-    await click('Đăng lại')
+    await click('Chia sẻ bài viết')
     await click('Đăng lại ngay')
     expect(onUpdated).toHaveBeenCalledWith(result)
     expect(request).toHaveBeenCalledWith('/api/posts/12/repost', expect.objectContaining({
@@ -64,8 +64,8 @@ describe('Repost controls', () => {
 
   it('keeps a failed quote draft and shows an error if the source disappears', async () => {
     const { request, onUpdated } = await setup(source, new Response(null, { status: 404 }))
-    await click('Đăng lại')
-    await click('Trích dẫn bài viết')
+    await click('Chia sẻ bài viết')
+    await click('Đăng lại kèm lời')
     const textarea = host.querySelector('textarea')!
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(textarea, '  Ý kiến  ')
@@ -82,15 +82,27 @@ describe('Repost controls', () => {
 
   it('removes the quick repost by source id', async () => {
     const { request, onRemoved } = await setup({ ...source, myRepostId: 60, repostCount: 1 }, new Response(null, { status: 204 }))
-    await click('Đã đăng lại')
+    await click('Chia sẻ bài viết')
     await click('Bỏ đăng lại')
     expect(onRemoved).toHaveBeenCalledWith(60)
     expect(request).toHaveBeenCalledWith('/api/posts/12/repost', { method: 'DELETE' })
   })
 
-  it('does not offer reposting for private posts', async () => {
-    await setup({ ...source, visibility: 'private' }, new Response())
-    expect(button('Đăng lại')).toBeUndefined()
+  it('offers sending only the original permalink for quick reposts', async () => {
+    const onShare = vi.fn()
+    await setup({ ...source, id: 60, repostKind: 'quick', originalPost: source }, new Response(), onShare)
+    await click('Chia sẻ bài viết')
+    await click('Gửi qua chat')
+    expect(onShare).toHaveBeenCalledOnce()
+    expect(new URL(onShare.mock.calls[0][0]).pathname).toBe('/feed/posts/12')
+  })
+
+  it('does not offer reposting or sending for private posts', async () => {
+    await setup({ ...source, visibility: 'private' }, new Response(), vi.fn())
+    await click('Chia sẻ bài viết')
+    expect(button('Đăng lại ngay')).toBeUndefined()
+    expect(button('Đăng lại kèm lời')).toBeUndefined()
+    expect(button('Gửi qua chat')).toBeUndefined()
   })
 })
 

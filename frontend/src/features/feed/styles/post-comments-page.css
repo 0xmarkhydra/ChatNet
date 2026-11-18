@@ -330,9 +330,6 @@
   .post-comments-composer .feed-comment-compose textarea { font-size: 16px; }
 }
 
-.post-comments-post-actions.post-toolbar-compact:has(> .feed-repost-action) {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
 .post-comments-post-actions.post-toolbar-compact > .feed-repost-action[data-reposted='true'] {
   color: var(--soco-blue);
 }

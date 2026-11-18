@@ -16,6 +16,7 @@ export type FeedPostDetailProps = {
   likePreviews: Record<number, boolean>;
   onReactionUsers: (post: Post, portalContainer?: HTMLElement) => void;
   name: string;
+  onShareToChat?: (url: string) => void;
   onRepostChanged?: () => void;
   onOpenOriginal?: (id: number) => void;
   openEditPost: (post: Post) => void;
@@ -43,6 +44,7 @@ export default function FeedPostDetail({
   name,
   openEditPost,
   onRepostChanged,
+  onShareToChat,
   onOpenOriginal,
   openVisitor,
   postDiscussion,
@@ -74,6 +76,7 @@ export default function FeedPostDetail({
             onReactionUsers={onReactionUsers}
             onUpdated={syncFeedPost}
             onRepostChanged={onRepostChanged}
+            onShareToChat={onShareToChat}
             onOpenOriginal={onOpenOriginal}
             onRepostRemoved={removeFeedPost}
             onEditPost={openEditPost}

@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
-import { feedPostPath } from '../../../shared/utils/feedPostPath'
+import { postShareUrl } from '../utils/postSharing'
 import { Bookmark, Copy, Ellipsis, Flag, Pencil, Share2, Trash2, X } from 'lucide-react'
 import '../styles/feed-actions.css'
 
@@ -27,17 +27,9 @@ type Props<P extends FeedActionPost> = {
 }
 const reasons = ['Nội dung spam', 'Quấy rối hoặc xúc phạm', 'Lừa đảo hoặc giả mạo', 'Thông tin gây hiểu lầm', 'Nội dung không phù hợp']
 
-function postUrl(id: number) {
-  const { origin, protocol } = window.location
-  const webOrigin = protocol === 'https:' || protocol === 'http:' ? origin : 'https://chat.codelocal.cloud'
-  const url = new URL(feedPostPath(id), webOrigin)
-  url.searchParams.set('ref', 'share')
-  return url.href
-}
-
 async function sharePost(id: number, feedback: Feedback, copyOnly = false) {
   try {
-    const url = postUrl(id)
+    const url = postShareUrl(id)
     if (!copyOnly && navigator.share) {
       await navigator.share({ title: 'Bài viết ChatNet', url })
     } else {
@@ -77,16 +69,6 @@ export function FeedSaveAction<P extends FeedActionPost>({
     <Bookmark size={20} fill={post.saved ? 'currentColor' : 'none'} aria-hidden="true" />
     <span>{post.saved ? 'Đã lưu' : 'Lưu'}</span>
   </button>
-}
-
-/** Only engagement actions live in the public post footer. */
-export function FeedShareAction({ postId, onFeedback }: { postId: number; onFeedback: Feedback }) {
-  return (
-    <button type="button" className="post-stat feed-share-action"
-      aria-label="Chia sẻ bài viết" onClick={() => void sharePost(postId, onFeedback)}>
-      <Share2 size={20} aria-hidden="true" /><span>Chia sẻ</span>
-    </button>
-  )
 }
 
 export default function FeedPostActions<P extends FeedActionPost>({ post, mine, request, onUpdated, onDeleted, onFeedback, onEdit }: Props<P>) {
