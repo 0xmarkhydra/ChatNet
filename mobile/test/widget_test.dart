@@ -8,9 +8,26 @@ import 'package:soco/call_surface.dart';
 import 'package:soco/api.dart';
 
 void main() {
-  testWidgets('real mobile calls do not show a simulated connection', (tester) async {
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: Builder(builder: (context) =>
-      TextButton(onPressed: () => showCallSurface(context, api: Api(), conversation: const {}, video: true), child: const Text('Call'))))));
+  testWidgets('real mobile calls do not show a simulated connection', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showCallSurface(
+                context,
+                api: Api(),
+                conversation: const {},
+                video: true,
+              ),
+              child: const Text('Call'),
+            ),
+          ),
+        ),
+      ),
+    );
     await tester.tap(find.text('Call'));
     await tester.pump();
     expect(find.textContaining('chưa được hỗ trợ'), findsOneWidget);
@@ -25,10 +42,8 @@ void main() {
     await tester.pumpWidget(SocoApp(api: DemoApi()));
     await tester.pumpAndSettle();
 
-    expect(find.text('SocCO'), findsWidgets);
-    expect(find.text('Trò chuyện'), findsOneWidget);
-    expect(find.text('Kết nối'), findsOneWidget);
-    expect(find.text('14:00'), findsNWidgets(3));
+    expect(find.byKey(const ValueKey('mobile-avatar-rail')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile-chat-search')), findsOneWidget);
     expect(find.byKey(const ValueKey('web-appbar')), findsOneWidget);
     expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
     expect(find.byKey(const ValueKey('nav-chat')), findsOneWidget);
@@ -48,8 +63,8 @@ void main() {
 
     expect(find.byKey(const ValueKey('web-appbar')), findsOneWidget);
     expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
-    expect(find.text('SocCO'), findsWidgets);
-    expect(find.text('Kết nối'), findsOneWidget);
+    expect(find.byKey(const ValueKey('web-appbar')), findsOneWidget);
+    expect(find.byKey(const ValueKey('connect-action')), findsOneWidget);
   });
 
   testWidgets('web parity controls stay visible across primary tabs', (
@@ -64,15 +79,20 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('nav-contacts')));
     await tester.pumpAndSettle();
+    expect(find.text('Danh sách bạn bè'), findsWidgets);
+    expect(find.text('Danh sách nhóm'), findsWidgets);
     expect(find.text('Lời mời kết bạn'), findsWidgets);
-    expect(find.text('Nhóm và cộng đồng'), findsOneWidget);
+    expect(find.byKey(const ValueKey('friends-local-search')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('nav-feed')));
     await tester.pumpAndSettle();
-    expect(find.text('Ảnh'), findsOneWidget);
-    expect(find.text('Video'), findsOneWidget);
-    expect(find.text('Album'), findsOneWidget);
-    expect(find.text('Nền chữ'), findsOneWidget);
+    expect(find.byKey(const ValueKey('feed-composer-open')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('feed-composer-open')));
+    await tester.pumpAndSettle();
+    expect(find.text('Gắn thẻ'), findsOneWidget);
+    expect(find.text('Check-in'), findsOneWidget);
+    await tester.tap(find.byTooltip('Đóng').last);
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('nav-discover')));
     await tester.pumpAndSettle();
@@ -90,8 +110,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('SocCO Design Team').first);
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('mobile-channel-picker')), findsOneWidget);
+    await tester.tap(find.text('Thảo luận chung'));
+    await tester.pumpAndSettle();
     expect(find.textContaining('Sẵn sàng!'), findsOneWidget);
-    expect(find.byKey(const ValueKey('web-appbar')), findsOneWidget);
+    expect(find.byKey(const ValueKey('web-appbar')), findsNothing);
     expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
     tester.view.physicalSize = const Size(900, 1100);
     await tester.pumpAndSettle();
@@ -109,7 +132,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('nav-contacts')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Nhắn tin').first);
+    await tester.tap(find.text('Linh Nguyễn').first);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('friend-profile-content')), findsOneWidget);
+    await tester.tap(find.byTooltip('Nhắn tin'));
     await tester.pumpAndSettle();
 
     expect(find.text('Linh Nguyễn'), findsWidgets);
@@ -132,7 +158,7 @@ void main() {
     await tester.tap(find.text('Linh Nguyễn').first);
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Nội dung đã chia sẻ'), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-more-actions')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('chat-translation-action')),
       findsOneWidget,
@@ -149,6 +175,11 @@ void main() {
       find.byKey(const ValueKey('chat-translation-language')),
       findsOneWidget,
     );
+    await tester.tapAt(const Offset(16, 180));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('chat-more-actions')));
+    await tester.pumpAndSettle();
+    expect(find.text('File phương tiện'), findsOneWidget);
   });
 
   testWidgets('message long press supports copy', (tester) async {
@@ -179,20 +210,19 @@ void main() {
     expect(find.text('Đã sao chép tin nhắn.'), findsOneWidget);
   });
 
-  testWidgets('quick create opens direct and group chat actions', (
-    tester,
-  ) async {
+  testWidgets('mobile inbox offers conversation filters', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(SocoApp(api: DemoApi()));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('quick-create')));
+    expect(find.byKey(const ValueKey('mobile-avatar-rail')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('mobile-chat-menu')));
     await tester.pumpAndSettle();
-
-    expect(find.text('Chat riêng'), findsOneWidget);
-    expect(find.text('Tạo nhóm'), findsOneWidget);
+    expect(find.text('Tất cả'), findsOneWidget);
+    expect(find.text('Chưa đọc'), findsOneWidget);
+    expect(find.text('Nhóm'), findsOneWidget);
   });
 
   testWidgets('nearby places has offline demo results', (tester) async {
@@ -224,7 +254,7 @@ void main() {
     await tester.tap(find.text('Linh Nguyễn').first);
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Gọi video'));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.text('SocCO SECURE CALL'), findsOneWidget);
     expect(find.text('Tắt mic'), findsOneWidget);
@@ -309,7 +339,7 @@ void main() {
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Profile'), findsNothing);
+    expect(find.text('Profile'), findsOneWidget);
     expect(find.text('App language'), findsOneWidget);
     expect(find.text('Log out'), findsOneWidget);
   });

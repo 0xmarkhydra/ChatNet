@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'state/app_providers.dart';
 
 import 'api.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-class AuthScreen extends StatefulWidget {
+class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({
     super.key,
     required this.api,
@@ -19,10 +22,10 @@ class AuthScreen extends StatefulWidget {
   final VoidCallback onDemo;
 
   @override
-  State<AuthScreen> createState() => _AuthScreenState();
+  ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends ConsumerState<AuthScreen> {
   final emailController = TextEditingController();
   final otpController = TextEditingController();
   String? verificationToken;
@@ -64,14 +67,12 @@ class _AuthScreenState extends State<AuthScreen> {
       error = '';
     });
     try {
-      final result = object(
-        await widget.api.request('POST', '/api/auth/email/start', {
-          'email': emailController.text.trim(),
-        }),
-      );
-      verificationToken = result['verificationToken']?.toString();
-      maskedEmail = result['emailMasked']?.toString() ?? emailController.text;
-      _startTimer((result['expiresInSeconds'] as num?)?.toInt() ?? 600);
+      final challenge = await ref
+          .read(emailAuthProvider.notifier)
+          .start(emailController.text.trim());
+      verificationToken = challenge.verificationToken;
+      maskedEmail = challenge.emailMasked;
+      _startTimer(challenge.expiresInSeconds);
     } catch (value) {
       error = value.toString();
     } finally {
@@ -87,13 +88,7 @@ class _AuthScreenState extends State<AuthScreen> {
       error = '';
     });
     try {
-      final result = object(
-        await widget.api.request('POST', '/api/auth/email/verify', {
-          'token': verificationToken,
-          'code': code,
-        }),
-      );
-      await widget.api.authenticate(result);
+      await ref.read(emailAuthProvider.notifier).verify(code);
       widget.onAuthenticated();
     } catch (value) {
       error = value.toString();
@@ -108,15 +103,11 @@ class _AuthScreenState extends State<AuthScreen> {
       error = '';
     });
     try {
-      final result = object(
-        await widget.api.request('POST', '/api/auth/email/resend', {
-          'token': verificationToken,
-        }),
-      );
-      verificationToken = result['verificationToken']?.toString();
-      maskedEmail = result['emailMasked']?.toString() ?? maskedEmail;
+      final challenge = await ref.read(emailAuthProvider.notifier).resend();
+      verificationToken = challenge.verificationToken;
+      maskedEmail = challenge.emailMasked;
       otpController.clear();
-      _startTimer((result['expiresInSeconds'] as num?)?.toInt() ?? 600);
+      _startTimer(challenge.expiresInSeconds);
     } catch (value) {
       error = value.toString();
     } finally {
@@ -295,6 +286,9 @@ class _AuthScreenState extends State<AuthScreen> {
                                     : () {
                                         timer?.cancel();
                                         otpController.clear();
+                                        ref
+                                            .read(emailAuthProvider.notifier)
+                                            .reset();
                                         setState(() {
                                           verificationToken = null;
                                           error = '';

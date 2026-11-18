@@ -333,33 +333,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                               ? const _ProgressIcon(color: socoBlue)
                               : const Icon(Icons.refresh_rounded, size: 21),
                         );
-                        if (!compact) {
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: SizedBox(height: 46, child: search),
-                              ),
-                              const SizedBox(width: 8),
-                              radius,
-                              const SizedBox(width: 8),
-                              refresh,
-                            ],
-                          );
-                        }
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        return Row(
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: SizedBox(height: 46, child: search),
-                                ),
-                                const SizedBox(width: 8),
-                                radius,
-                              ],
+                            Expanded(
+                              child: SizedBox(height: 46, child: search),
                             ),
-                            const SizedBox(height: 8),
-                            refresh,
+                            const SizedBox(width: 6),
+                            radius,
+                            const SizedBox(width: 6),
+                            SizedBox(width: compact ? 44 : 48, child: refresh),
                           ],
                         );
                       },
@@ -684,7 +666,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         border: Border.all(color: socoLine),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(children: children),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(children: children),
+      ),
     );
   }
 
