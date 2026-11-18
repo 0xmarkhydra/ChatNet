@@ -1,8 +1,8 @@
 import { UsersRound } from 'lucide-react'
-import type { ReturnTypeOfCommunities } from '../types'
+import type { ExploreCommunitiesState } from '../types'
 import type { PublicCommunity } from '../api/explore'
 
-export default function CommunitySuggestions({ communities }: { communities: ReturnTypeOfCommunities }) {
+export default function CommunitySuggestions({ communities }: { communities: ExploreCommunitiesState }) {
   return <section className="explore-communities" aria-labelledby="explore-communities-title">
     <div className="explore-section-heading"><h2 id="explore-communities-title">Cộng đồng nên khám phá</h2></div>
     {communities.joinMessage && <p className="explore-note" role="status">{communities.joinMessage}</p>}

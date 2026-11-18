@@ -3,7 +3,7 @@ import type { FriendSearchResult, FriendConnection } from '../contacts'
 import type { ApiRequest } from '../../shared/types/api'
 import type { useExploreCommunities } from './hooks/useExploreCommunities'
 
-export type ReturnTypeOfCommunities = ReturnType<typeof useExploreCommunities>
+export type ExploreCommunitiesState = ReturnType<typeof useExploreCommunities>
 export type DiscoverSectionProps = {
   request: ApiRequest
   sessionId: string

@@ -9,6 +9,10 @@ import CommunitySuggestions from './CommunitySuggestions'
 import '../styles/explore-page.css'
 
 const NearbyExplorer = lazy(() => import('./NearbyExplorer'))
+
+export default function ExplorePage(props: DiscoverSectionProps) {
+  return <ExplorePageContent key={props.sessionId} {...props} />
+}
 type ExploreTab = 'all' | 'people' | 'posts' | 'communities' | 'recent'
 const tabs: { id: ExploreTab; title: string }[] = [
   { id: 'all', title: 'Tất cả' }, { id: 'people', title: 'Mọi người' },
@@ -24,7 +28,7 @@ function friendLabel(relationship: ReturnType<DiscoverSectionProps['friendRelati
     relationship === 'outgoing' ? 'Hủy lời mời' : 'Kết bạn'
 }
 
-export default function ExplorePage(props: DiscoverSectionProps) {
+function ExplorePageContent(props: DiscoverSectionProps) {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const tab = parseTab(params.get('tab'))
@@ -75,7 +79,7 @@ export default function ExplorePage(props: DiscoverSectionProps) {
       {tab === 'all' && <div className="explore-feature-layout">
         <section className="explore-feature" aria-labelledby="explore-feature-title">
           <span className="explore-feature-chip"><Sparkles size={15} /> NỔI BẬT</span>
-          <div><h2 id="explore-feature-title">Những chuyến đi đáng nhớ</h2>
+          <div><h2 id="explore-feature-title">Nội dung nổi bật</h2>
             <p>Nội dung nổi bật sẽ xuất hiện khi hệ thống hỗ trợ tuyển chọn bài viết.</p>
             <button type="button" onClick={() => setTab('posts')}>Khám phá bài viết <ArrowRight size={17} /></button>
           </div>
