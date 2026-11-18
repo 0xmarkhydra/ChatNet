@@ -54,7 +54,7 @@ it('renders truthful empty states and changes tabs without fabricated hashtags',
   expect(view.host.textContent).toContain('Chưa có dữ liệu hashtag thịnh hành')
   expect(view.host.textContent).toContain('Hiện chưa có cộng đồng công khai phù hợp')
   await act(async () => view.button('Mọi người')?.click())
-  expect(view.host.textContent).toContain('Chưa có gợi ý từ người ở gần')
+  expect(view.host.textContent).toContain('Chưa có gợi ý kết nối')
   expect(view.host.textContent).not.toContain('Đang được quan tâm')
 })
 

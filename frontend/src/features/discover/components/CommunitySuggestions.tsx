@@ -13,7 +13,7 @@ export default function CommunitySuggestions({ communities }: { communities: Exp
     {communities.status === 'error' && <div className="explore-state" role="alert">
       <p>{communities.error}</p><button type="button" onClick={communities.retry}>Thử lại</button>
     </div>}
-    {communities.status === 'ready' && communities.items.length === 0 && <p className="explore-state">Hiện chưa có cộng đồng công khai phù hợp.</p>}
+    {communities.status === 'ready' && communities.items.length === 0 && <div className="explore-state"><span className="explore-empty-icon" aria-hidden="true"><UsersRound size={22} /></span><div className="explore-empty-copy"><strong>Chưa có cộng đồng gợi ý</strong><p>Hiện chưa có cộng đồng công khai phù hợp.</p></div></div>}
     {communities.items.length > 0 && <div className="explore-community-grid">
       {communities.items.map((community: PublicCommunity) => <article key={community.id} className="explore-community-card">
         <div className="explore-community-icon" aria-hidden="true"><UsersRound size={23} /></div>

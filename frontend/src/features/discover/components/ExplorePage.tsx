@@ -55,7 +55,7 @@ function ExplorePageContent(props: DiscoverSectionProps) {
         <p>Chủ đề dành riêng cho bạn, cộng đồng cùng sở thích và nhiều điều mới.</p>
         <form role="search" onSubmit={submit} className="explore-search">
           <Search size={20} aria-hidden="true" />
-          <input aria-label="Tìm kiếm người, bài viết, hashtag, cộng đồng" placeholder="Tìm người, bài viết, hashtag, cộng đồng…" value={search} maxLength={120} onChange={event => setSearch(event.target.value)} />
+          <input aria-label="Tìm kiếm người, bài viết, hashtag, cộng đồng" placeholder="Tìm người, bài viết, cộng đồng…" value={search} maxLength={120} onChange={event => setSearch(event.target.value)} />
           <button type="submit" disabled={!search.trim()}><Search size={18} aria-hidden="true" /> Tìm kiếm</button>
         </form>
       </div>
@@ -79,23 +79,23 @@ function ExplorePageContent(props: DiscoverSectionProps) {
       {tab === 'all' && <div className="explore-feature-layout">
         <section className="explore-feature" aria-labelledby="explore-feature-title">
           <span className="explore-feature-chip"><Sparkles size={15} /> NỔI BẬT</span>
-          <div><h2 id="explore-feature-title">Nội dung nổi bật</h2>
+          <div className="explore-feature-content"><h2 id="explore-feature-title">Nội dung nổi bật</h2>
             <p>Nội dung nổi bật sẽ xuất hiện khi hệ thống hỗ trợ tuyển chọn bài viết.</p>
             <button type="button" onClick={() => setTab('posts')}>Khám phá bài viết <ArrowRight size={17} /></button>
           </div>
         </section>
         <aside className="explore-trending" aria-labelledby="explore-trending-title">
           <h2 id="explore-trending-title">Đang được quan tâm</h2>
-          <div className="explore-trending-empty"><Sparkles size={26} aria-hidden="true" />
-            <p>Chưa có dữ liệu hashtag thịnh hành.</p><small>Tính năng sẽ được cập nhật khi có dữ liệu thực.</small>
+          <div className="explore-state-content explore-trending-empty"><span className="explore-empty-icon" aria-hidden="true"><Sparkles size={22} /></span>
+            <strong>Chưa có xu hướng mới</strong><p>Chưa có dữ liệu hashtag thịnh hành.</p>
           </div>
         </aside>
       </div>}
       {showCommunities && <CommunitySuggestions communities={communities} />}
       {showPeople && <section aria-labelledby="explore-people-title" className="explore-people">
         <div className="explore-section-heading"><h2 id="explore-people-title">Mọi người nên kết nối</h2></div>
-        {props.nearbyUsers.length === 0 ? <div className="explore-state"><Users size={24} aria-hidden="true" />
-          <p>Chưa có gợi ý từ người ở gần. Bạn có thể tìm người quanh đây hoặc tìm theo tên.</p>
+        {props.nearbyUsers.length === 0 ? <div className="explore-state"><span className="explore-empty-icon" aria-hidden="true"><Users size={22} /></span>
+          <div className="explore-empty-copy"><strong>Chưa có gợi ý kết nối</strong><p>Thử khám phá người ở gần để tìm thêm bạn bè.</p></div>
           <button type="button" onClick={() => setTab('recent')}><MapPin size={17} /> Khám phá gần đây</button>
         </div> : <div className="explore-people-grid">
           {props.nearbyUsers.map(user => <article key={user.id} className="explore-person">
