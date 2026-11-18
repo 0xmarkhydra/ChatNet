@@ -93,6 +93,7 @@ import NearbyRadar from "../features/discover/components/NearbyRadar";
 import PostComposer from "../features/feed/components/PostComposer";
 import FeedPostCard from "../features/feed/components/FeedPostCard";
 import ReactionParticipantsDialog from "../shared/ui/ReactionParticipantsDialog";
+import SharedPostLinkPicker from "../features/chat/components/SharedPostLinkPicker";
 import MessageForwardPicker from "../features/chat/components/MessageForwardPicker";
 import FeedReactionControl from "../features/feed/components/FeedReactionControl";
 import StoryViewer from "../features/feed/components/StoryViewer";
@@ -460,6 +461,7 @@ export default function AuthedApp({
   const [reactionPreviews, setReactionPreviews] = useState<
     Record<number, MessageReaction[]>
   >({});
+  const [postLinkToSend, setPostLinkToSend] = useScopedState<string | null>(session?.sessionId ?? null, null);
   const [forwardSource, setForwardSource] = useScopedState<Message | null>(session?.sessionId ?? null, null);
   const [reactionTarget, setReactionTarget] = useScopedState<{
     kind: "message" | "post"; id: number; initialEmoji?: string;
@@ -2552,6 +2554,13 @@ export default function AuthedApp({
     />
   );
 
+  function refreshAfterRepost() {
+    void refreshPosts();
+    if (feedFilter === 'following') followingFeed.refresh();
+    if (feedSearchActive) postSearch.retry();
+    if (tab === 'profile') void loadProfilePosts(false, true);
+  }
+
   const renderPosts = (items: Post[], showSave = false) =>
     items.map((post) => (
       <FeedPostCard
@@ -2577,6 +2586,8 @@ export default function AuthedApp({
         like={like}
         onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
         onEditPost={openEditPost}
+        onRepostChanged={refreshAfterRepost}
+        onShareToChat={setPostLinkToSend}
         taggedNames={friendTaggedNames}
       />
     ));
@@ -2776,6 +2787,9 @@ export default function AuthedApp({
           }}
           onClose={closeVisitor}
           onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
+          onOpenOriginal={openFeedPostDetails}
+          onRepostChanged={refreshAfterRepost}
+          onShareToChat={setPostLinkToSend}
           onPostOpen={(post) => {
             setPosts((current) => [
               post,
@@ -3274,6 +3288,9 @@ export default function AuthedApp({
         {activePost && (
           <FeedPostDetail
           activePost={activePost}
+          onRepostChanged={refreshAfterRepost}
+          onShareToChat={setPostLinkToSend}
+          onOpenOriginal={openFeedPostDetails}
           apiFetch={apiFetch}
           closeFeedPostDetails={closeFeedPostDetails}
           commentSortOrder={commentSortOrder}
@@ -3603,6 +3620,20 @@ export default function AuthedApp({
           </ProfileOverlay>
         )}
 
+      {postLinkToSend && (
+        <SharedPostLinkPicker
+          key={session.sessionId + ":" + postLinkToSend}
+          url={postLinkToSend}
+          conversations={conversations}
+          hasMore={hasMoreConversations}
+          loadingMore={conversationLoadingMore}
+          onLoadMore={() => void loadMoreConversations()}
+          request={apiFetch}
+          onClose={() => setPostLinkToSend(null)}
+          onOpenChat={(id) => { setPostLinkToSend(null); switchTab("chat"); selectRoutedConversation(id); }}
+          onSent={(destinationName) => setNotice(`Đã gửi bài viết đến ${destinationName}.`, "success")}
+        />
+      )}
       {forwardSource && (
         <MessageForwardPicker
           message={forwardSource}

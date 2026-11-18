@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import FeedPostActions, { FeedShareAction } from './FeedPostActions'
+import FeedPostActions from './FeedPostActions'
 
 const post = { id: 42, author: 'alice', content: 'Bài viết', visibility: 'friends' } as const
 
@@ -38,9 +38,15 @@ describe('feed post sharing', () => {
     await act(async () => { button.click() })
   }
 
+  function renderPostMenu() {
+    act(() => root.render(<FeedPostActions post={post} mine={false} request={vi.fn()}
+      onUpdated={vi.fn()} onDeleted={vi.fn()} onFeedback={onFeedback} />))
+  }
+
   it('shares the exact selected post without copying unrelated query or fragment state', async () => {
-    act(() => root.render(<FeedShareAction postId={post.id} onFeedback={onFeedback} />))
-    await click('Chia sẻ bài viết')
+    renderPostMenu()
+    await click('Tùy chọn bài viết')
+    await click('Chia sẻ bài viết', true)
     expect(share).toHaveBeenCalledWith({
       title: 'Bài viết ChatNet',
       url: `${window.location.origin}/feed/posts/42?ref=share`,
@@ -60,10 +66,11 @@ describe('feed post sharing', () => {
     expect(onFeedback).toHaveBeenCalledWith('Đã sao chép liên kết bài viết.', 'success')
   })
 
-  it('copies the permalink from the share button when native share is unavailable', async () => {
+  it('copies the permalink from the external share action when native share is unavailable', async () => {
     vi.stubGlobal('navigator', { clipboard: { writeText } })
-    act(() => root.render(<FeedShareAction postId={post.id} onFeedback={onFeedback} />))
-    await click('Chia sẻ bài viết')
+    renderPostMenu()
+    await click('Tùy chọn bài viết')
+    await click('Chia sẻ bài viết', true)
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/feed/posts/42?ref=share`)
   })
 })

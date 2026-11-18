@@ -63,6 +63,8 @@ let presignedUploads = 0
 let friendRequestsSent = 0
 let rejectStoryDirect = false
 const storyReplyRequests = []
+const repostOnly = process.argv.includes('--repost-only')
+const postShareMessages = []
 const mediaOnly = process.argv.includes('--media-only')
 const headerOnly = process.argv.includes('--header-only')
 const postPreviewOnly = process.argv.includes('--post-preview-only')
@@ -126,6 +128,11 @@ try {
       })
       return json(conversations[0])
     }
+    if (repostOnly && path.endsWith('/e2ee/status')) return json({ mode: 'legacy' })
+    if (repostOnly && /^\/api\/conversations\/(1|3)\/messages$/.test(path) && req.method() === 'POST') {
+      postShareMessages.push({ path, ...req.postDataJSON() })
+      return json({ id: 804, text: req.postDataJSON().text })
+    }
     if (path === '/api/conversations/1/messages' && req.method() === 'POST') {
       const body = req.postDataJSON()
       storyReplyRequests.push(body)
@@ -187,6 +194,27 @@ try {
       mentionReadCalls++
       incomingMention = { ...incomingMention, readAt: new Date().toISOString() }
       return route.fulfill({ status: 204, headers: cors })
+    }
+    if (repostOnly && path === '/api/posts/88/repost') {
+      if (req.method() === 'DELETE') {
+        const at = feedPosts.findIndex(post => post.id === fixturePost.myRepostId)
+        if (at >= 0) feedPosts.splice(at, 1)
+        delete fixturePost.myRepostId
+        fixturePost.repostCount = Math.max(0, fixturePost.repostCount - 1)
+        return route.fulfill({ status: 204, headers: cors })
+      }
+      if (req.method() === 'POST') {
+        const { kind, content } = req.postDataJSON()
+        const id = kind === 'quick' ? 89 : 90
+        const originalPost = { ...fixturePost }
+        feedPosts.unshift({
+          id, author: 'soco_user', authorDisplayName: 'SocCO Tester', content, likes: 0, liked: false,
+          comments: [], visibility: 'public', createdAt: new Date().toISOString(), repostKind: kind, originalPost,
+        })
+        if (kind === 'quick') fixturePost.myRepostId = id
+        fixturePost.repostCount = (fixturePost.repostCount || 0) + 1
+        return json({ ...fixturePost })
+      }
     }
     if (path === '/api/posts/88' && req.method() === 'GET') return json({ ...fixturePost })
     if (path === '/api/posts/88/reactions' && req.method() === 'POST') {
@@ -292,6 +320,54 @@ try {
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     return json({})
   })
+  if (repostOnly) {
+    await page.goto(origin + '/feed', { waitUntil: 'domcontentloaded', timeout: 90000 })
+    const toolbar = page.locator('.feed-post-card .feed-post-toolbar').first()
+    await toolbar.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Đăng lại ngay' }).click()
+    const sourceLink = page.getByRole('button', { name: 'Mở bài viết gốc của Minh Anh' })
+    await sourceLink.waitFor()
+    assert(await page.locator('.feed-post-card').count() === 1, 'Quick repost must not duplicate its original in the feed')
+    await sourceLink.click()
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    await details.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Bỏ đăng lại', exact: true }).click()
+    await details.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Gửi qua chat' }).click()
+    const receiver = page.getByRole('dialog', { name: 'Gửi bài viết qua chat' })
+    await receiver.getByRole('button', { name: 'Minh Anh' }).click()
+    assert(postShareMessages.length === 0, 'Selecting a chat must not send a message')
+    await receiver.getByRole('button', { name: 'Gửi', exact: true }).click()
+    await receiver.waitFor({ state: 'detached' })
+    assert(postShareMessages[0]?.path === '/api/conversations/1/messages' &&
+      postShareMessages[0]?.text === origin + '/feed/posts/88?ref=share' &&
+      postShareMessages[0]?.attachments?.length === 0, 'Direct chat receives only the original link')
+    await details.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
+    await page.setViewportSize({ width: 390, height: 720 })
+    await toolbar.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Đăng lại kèm lời', exact: true }).click()
+    const quote = page.getByRole('dialog', { name: 'Đăng lại kèm lời' })
+    const bounds = await quote.boundingBox()
+    assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 390, 'Quote composer must fit mobile viewport')
+    await quote.getByLabel('Ý kiến của bạn').fill('Góc nhìn của tôi về bài viết')
+    await quote.getByRole('button', { name: 'Đăng bài trích dẫn' }).click()
+    const quoteCard = page.locator('.feed-post-card').filter({ hasText: 'Góc nhìn của tôi về bài viết' })
+    await quoteCard.getByRole('button', { name: 'Mở bài viết gốc của Minh Anh' }).waitFor()
+    await quoteCard.getByRole('button', { name: 'Chia sẻ bài viết' }).click()
+    await page.getByRole('button', { name: 'Gửi qua chat' }).click()
+    const pickerBounds = await receiver.boundingBox()
+    assert(pickerBounds && pickerBounds.x >= 0 && pickerBounds.x + pickerBounds.width <= 390, 'Chat picker fits mobile viewport')
+    await receiver.getByRole('button', { name: 'Nhóm SocCO' }).click()
+    await receiver.getByRole('button', { name: 'Gửi', exact: true }).click()
+    await receiver.waitFor({ state: 'detached' })
+    assert(postShareMessages[1]?.path === '/api/conversations/3/messages' &&
+      postShareMessages[1]?.text === origin + '/feed/posts/90?ref=share', 'Group chat receives the quote permalink')
+    assert(errors.length === 0, 'Unexpected browser errors: ' + errors.join(', '))
+    console.log('PASS: unified share menu, desktop repost and undo, mobile quotes, and direct/group chat link delivery')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
   if (postProfileOnly) {
     fixturePost.comments = [
       { id: 501, author: 'phuonglinh', authorDisplayName: 'Phương Linh', content: 'Bình luận thử', createdAt: fixturePost.createdAt },
