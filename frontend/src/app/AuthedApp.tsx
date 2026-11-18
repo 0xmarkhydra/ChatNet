@@ -145,7 +145,6 @@ import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
 import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
 import ContactsView from "../features/contacts/components/ContactsView";
-import UnifiedContactsPage from "../features/contacts/components/UnifiedContactsPage";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
@@ -268,6 +267,7 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
+import { createSecondaryPageSlots } from "./router/createSecondaryPageSlots";
 import AppShellNotices from "./layouts/AppShellNotices";
 import AppShellUploadProgress from "./layouts/AppShellUploadProgress";
 import AppShellCallManager from "./layouts/AppShellCallManager";
@@ -279,10 +279,6 @@ import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
 import HeaderTitle from "./header/HeaderTitle";
 import { searchLabels } from "./header/headerContext";
-import NotificationsSection from "../features/notifications/components/NotificationsSection";
-import DiscoverSection from "../features/discover/components/DiscoverSection";
-import SearchResultsPage from "../features/search/SearchResultsPage";
-import MarketSection from "../features/discover/components/MarketSection";
 import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
 import FeedPostDetail from "../features/feed/components/FeedPostDetail";
@@ -2913,65 +2909,67 @@ export default function AuthedApp({
       />}
       outletContext={{
         frameClassName: tab === "chat" && activeConversation ? "mobile-conversation-open" : "",
-        notifications: (<NotificationsSection
-          actOnFriend={actOnFriend}
-          conversations={conversations}
-          declineFriendRequest={declineFriendRequest}
-          friendBusyIds={friendBusyIds}
-          friendRequests={friendRequests}
-          globalSearch={globalSearch}
-          openMentionPost={openMentionPost}
-          openVisitor={openVisitor}
-          postMentions={postMentions}
-          readPostMention={readPostMention}
-          setActiveConversationId={selectRoutedConversation}
-          setContactsScreen={setContactsScreen}
-          setDesktopProfileSettings={setDesktopProfileSettings}
-          setProfileTimelineOpen={setProfileTimelineOpen}
-          switchTab={switchTab}
-        />),
-        contacts: (<UnifiedContactsPage
-          contactsContent={contactsContent}
-          conversations={displayConversations}
-          friends={friends}
-          incomingRequests={friendRequests.filter(friend => friend.direction === "incoming").length}
-          request={apiFetch}
-          userId={session.user.id}
-          token={session.token}
-          targetLanguage={targetLanguage}
-          friendQuery={friendQuery}
-          setFriendQuery={setFriendQuery}
-          onOpenChat={(id) => { switchTab("chat"); selectRoutedConversation(id); }}
-          onNavigate={switchTab}
-        />),
-        search: (<SearchResultsPage
-            request={apiFetch}
-            sessionId={session.sessionId}
-            onOpenProfile={username => openVisitorProfile(username)}
-            onOpenPost={postId => navigate(feedPostPath(postId))}
-          />),
-        discover: (<DiscoverSection
-          actOnFriend={actOnFriend}
-          findNearby={findNearby}
-          friendActionBusy={friendActionBusy}
-          friendRelationship={friendRelationship}
-          globalSearch={globalSearch}
-          nearbyBusy={nearbyBusy}
-          nearbyRadiusKm={nearbyRadiusKm}
-          nearbyResultRadiusKm={nearbyResultRadiusKm}
-          nearbyScanning={nearbyScanning}
-          nearbyUntil={nearbyUntil}
-          nearbyUsers={nearbyUsers}
-          setGlobalSearch={setGlobalSearch}
-          setNearbyRadiusKm={setNearbyRadiusKm}
-          stopNearby={stopNearby}
-        />),
-        market: (<MarketSection
-            searchQuery={globalSearch}
-          apiFetch={apiFetch}
-          session={session}
-          switchTab={switchTab}
-        />),
+        ...createSecondaryPageSlots({
+          notifications: {
+            actOnFriend,
+            conversations,
+            declineFriendRequest,
+            friendBusyIds,
+            friendRequests,
+            globalSearch,
+            openMentionPost,
+            openVisitor,
+            postMentions,
+            readPostMention,
+            setActiveConversationId: selectRoutedConversation,
+            setContactsScreen,
+            setDesktopProfileSettings,
+            setProfileTimelineOpen,
+            switchTab,
+          },
+          contacts: {
+            contactsContent,
+            conversations: displayConversations,
+            friends,
+            incomingRequests: friendRequests.filter(friend => friend.direction === "incoming").length,
+            request: apiFetch,
+            userId: session.user.id,
+            token: session.token,
+            targetLanguage,
+            friendQuery,
+            setFriendQuery,
+            onOpenChat: (id) => { switchTab("chat"); selectRoutedConversation(id); },
+            onNavigate: switchTab,
+          },
+          search: {
+            request: apiFetch,
+            sessionId: session.sessionId,
+            onOpenProfile: username => openVisitorProfile(username),
+            onOpenPost: postId => navigate(feedPostPath(postId)),
+          },
+          discover: {
+            actOnFriend,
+            findNearby,
+            friendActionBusy,
+            friendRelationship,
+            globalSearch,
+            nearbyBusy,
+            nearbyRadiusKm,
+            nearbyResultRadiusKm,
+            nearbyScanning,
+            nearbyUntil,
+            nearbyUsers,
+            setGlobalSearch,
+            setNearbyRadiusKm,
+            stopNearby,
+          },
+          market: {
+            searchQuery: globalSearch,
+            apiFetch,
+            session,
+            switchTab,
+          },
+        }),
         profile: <>
         {desktopProfileOverview && (
           <ProfileOverviewSection
