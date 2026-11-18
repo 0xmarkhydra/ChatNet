@@ -11,6 +11,10 @@ afterEach(() => vi.unstubAllGlobals());
 describe("Message navigation unread accessibility", () => {
   it("describes the exact total once and clears it on the same button when the total falls to zero", () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+      matches: query === "(max-width: 760px)",
+      media: query,
+    })));
     vi.stubGlobal("ResizeObserver", class {
       observe() {}
       disconnect() {}
