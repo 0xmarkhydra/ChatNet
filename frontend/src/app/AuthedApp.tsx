@@ -229,7 +229,7 @@ import {
 } from "../features/chat/utils/chatFileTransfer";
 import { canMarkConversationRead } from "../features/chat/utils/conversationRead";
 import { mergeById, toggleMessageReactionCount } from "../shared/utils/optimistic";
-import CallManager, { CallHeaderActions } from "../features/calls/components/CallManager";
+import { CallHeaderActions } from "../features/calls/components/CallManager";
 import SharedContent from "../features/chat/components/SharedContent";
 import VoiceRecorder from "../features/chat/components/VoiceRecorder";
 import { SocoEmptyState, SocoTextAction } from "../shared/ui/SocoUI";
@@ -270,6 +270,7 @@ import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
 import AppShellNotices from "./layouts/AppShellNotices";
 import AppShellUploadProgress from "./layouts/AppShellUploadProgress";
+import AppShellCallManager from "./layouts/AppShellCallManager";
 
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { inviteRouteTarget } from "./navigation/inviteDeepLink";
@@ -3584,7 +3585,7 @@ export default function AuthedApp({
         }}
       />
 
-      <CallManager
+      <AppShellCallManager
         request={apiFetch}
         apiBase={API}
         token={session.token}
@@ -3592,13 +3593,7 @@ export default function AuthedApp({
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}
-        conversations={displayConversations.map(({ id, name, type, otherUsername, blockedByMe, blockedByOther }) => ({
-          id,
-          name,
-          type,
-          otherUsername,
-          blocked: Boolean(blockedByMe || blockedByOther),
-        }))}
+        conversations={displayConversations}
       />
 
       <BottomNavigation
