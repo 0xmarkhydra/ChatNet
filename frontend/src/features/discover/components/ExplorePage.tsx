@@ -1,6 +1,6 @@
 import { useState, lazy, Suspense, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Compass, Search, Sparkles, Users, FileText, MapPin, ArrowRight } from 'lucide-react'
+import { Search, Sparkles, Users, FileText, MapPin, ArrowRight } from 'lucide-react'
 import { ErrorBoundary } from '../../../shared/ui/ErrorBoundary'
 import { AsyncSectionFallback } from '../../../shared/ui/AsyncSectionFallback'
 import type { DiscoverSectionProps } from '../types'
@@ -48,6 +48,28 @@ function ExplorePageContent(props: DiscoverSectionProps) {
   const showPeople = tab === 'all' || tab === 'people'
   const showCommunities = tab === 'all' || tab === 'communities'
 
+  const people = <section aria-labelledby="explore-people-title" className="explore-people">
+    <div className="explore-section-heading"><h2 id="explore-people-title">Mọi người nên kết nối</h2></div>
+    {props.nearbyUsers.length === 0 ? <div className="explore-state"><span className="explore-empty-icon" aria-hidden="true"><Users size={22} /></span>
+      <div className="explore-empty-copy"><strong>Chưa có gợi ý kết nối</strong><p>Thử khám phá người ở gần để tìm thêm bạn bè.</p></div>
+      <button type="button" onClick={() => setTab('recent')}><MapPin size={17} /> Khám phá gần đây</button>
+    </div> : <div className="explore-people-grid">
+      {props.nearbyUsers.map(user => <article key={user.id} className="explore-person">
+        <span className="explore-person-avatar" aria-hidden="true">{(user.displayName || user.username).slice(0, 1).toUpperCase()}</span>
+        <div><h3>{user.displayName || user.username}</h3><p>@{user.username}</p></div>
+        <button type="button" disabled={props.friendActionBusy === user.id}
+          onClick={() => void props.actOnFriend(user)}>{props.friendActionBusy === user.id ? 'Đang xử lý…' : friendLabel(props.friendRelationship(user.id))}</button>
+      </article>)}
+    </div>}
+  </section>
+  const trending = <section className="explore-trending" aria-labelledby="explore-trending-title">
+    <h2 id="explore-trending-title">Đang được quan tâm</h2>
+    <div className="explore-state-content explore-trending-empty">
+      <span className="explore-empty-icon" aria-hidden="true"><Sparkles size={22} /></span>
+      <strong>Chưa có xu hướng mới</strong><p>Chưa có dữ liệu hashtag thịnh hành.</p>
+    </div>
+  </section>
+
   return <main className="explore-page">
     <section className="explore-hero" aria-labelledby="explore-heading">
       <div className="explore-hero-text">
@@ -59,7 +81,6 @@ function ExplorePageContent(props: DiscoverSectionProps) {
           <button type="submit" disabled={!search.trim()}><Search size={18} aria-hidden="true" /> Tìm kiếm</button>
         </form>
       </div>
-      <span className="explore-hero-art" aria-hidden="true"><Compass size={30} /></span>
     </section>
     <nav className="explore-tabs" aria-label="Danh mục khám phá">
       {tabs.map(item => <button key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined}
@@ -75,42 +96,28 @@ function ExplorePageContent(props: DiscoverSectionProps) {
           friendActionBusy={props.friendActionBusy} onFriendAction={props.actOnFriend}
           getFriendActionLabel={user => friendLabel(props.friendRelationship(user.id))} />
       </Suspense>
-    </ErrorBoundary> : <>
-      {tab === 'all' && <div className="explore-feature-layout">
-        <section className="explore-feature" aria-labelledby="explore-feature-title">
+    </ErrorBoundary> : <div className="explore-content-layout">
+      <div className="explore-main-column">
+        {tab === 'all' && <section className="explore-feature" aria-labelledby="explore-feature-title">
           <span className="explore-feature-chip"><Sparkles size={15} /> NỔI BẬT</span>
           <div className="explore-feature-content"><h2 id="explore-feature-title">Nội dung nổi bật</h2>
             <p>Nội dung nổi bật sẽ xuất hiện khi hệ thống hỗ trợ tuyển chọn bài viết.</p>
             <button type="button" onClick={() => setTab('posts')}>Khám phá bài viết <ArrowRight size={17} /></button>
           </div>
-        </section>
-        <aside className="explore-trending" aria-labelledby="explore-trending-title">
-          <h2 id="explore-trending-title">Đang được quan tâm</h2>
-          <div className="explore-state-content explore-trending-empty"><span className="explore-empty-icon" aria-hidden="true"><Sparkles size={22} /></span>
-            <strong>Chưa có xu hướng mới</strong><p>Chưa có dữ liệu hashtag thịnh hành.</p>
-          </div>
-        </aside>
-      </div>}
-      {showCommunities && <CommunitySuggestions communities={communities} />}
-      {showPeople && <section aria-labelledby="explore-people-title" className="explore-people">
-        <div className="explore-section-heading"><h2 id="explore-people-title">Mọi người nên kết nối</h2></div>
-        {props.nearbyUsers.length === 0 ? <div className="explore-state"><span className="explore-empty-icon" aria-hidden="true"><Users size={22} /></span>
-          <div className="explore-empty-copy"><strong>Chưa có gợi ý kết nối</strong><p>Thử khám phá người ở gần để tìm thêm bạn bè.</p></div>
-          <button type="button" onClick={() => setTab('recent')}><MapPin size={17} /> Khám phá gần đây</button>
-        </div> : <div className="explore-people-grid">
-          {props.nearbyUsers.map(user => <article key={user.id} className="explore-person">
-            <span className="explore-person-avatar" aria-hidden="true">{(user.displayName || user.username).slice(0, 1).toUpperCase()}</span>
-            <div><h3>{user.displayName || user.username}</h3><p>@{user.username}</p></div>
-            <button type="button" disabled={props.friendActionBusy === user.id}
-              onClick={() => void props.actOnFriend(user)}>{props.friendActionBusy === user.id ? 'Đang xử lý…' : friendLabel(props.friendRelationship(user.id))}</button>
-          </article>)}
-        </div>}
-      </section>}
-      {tab === 'posts' && <section className="explore-state explore-posts" aria-labelledby="explore-posts-title">
-        <FileText size={34} aria-hidden="true" /><h2 id="explore-posts-title">Khám phá bài viết</h2>
-        <p>Chưa có nguồn bài viết nổi bật riêng cho Khám phá. Hãy sử dụng tìm kiếm để xem bài viết công khai.</p>
-        <button type="button" onClick={() => navigate('/search?type=posts')}>Đến trang tìm kiếm <ArrowRight size={17} /></button>
-      </section>}
-    </>}
+        </section>}
+        {tab === 'communities' && <CommunitySuggestions communities={communities} />}
+        {tab === 'people' && people}
+        {tab === 'posts' && <section className="explore-state explore-posts" aria-labelledby="explore-posts-title">
+          <FileText size={34} aria-hidden="true" /><h2 id="explore-posts-title">Khám phá bài viết</h2>
+          <p>Chưa có nguồn bài viết nổi bật riêng cho Khám phá. Hãy sử dụng tìm kiếm để xem bài viết công khai.</p>
+          <button type="button" onClick={() => navigate('/search?type=posts')}>Đến trang tìm kiếm <ArrowRight size={17} /></button>
+        </section>}
+      </div>
+      <aside className="explore-rail" aria-label="Gợi ý khám phá">
+        {trending}
+        {tab === 'all' && <CommunitySuggestions communities={communities} />}
+        {tab === 'all' && people}
+      </aside>
+    </div>}
   </main>
 }

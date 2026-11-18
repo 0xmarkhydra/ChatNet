@@ -55,7 +55,25 @@ it('renders truthful empty states and changes tabs without fabricated hashtags',
   expect(view.host.textContent).toContain('Hiện chưa có cộng đồng công khai phù hợp')
   await act(async () => view.button('Mọi người')?.click())
   expect(view.host.textContent).toContain('Chưa có gợi ý kết nối')
-  expect(view.host.textContent).not.toContain('Đang được quan tâm')
+  expect(view.host.querySelector('.explore-rail')?.textContent).toContain('Đang được quan tâm')
+})
+
+it('places discovery suggestions in the rail and moves selected lists to the main column', async () => {
+  const view = mount(vi.fn(async () => ok([
+    { id: 4, name: 'Cộng đồng công khai', visibility: 'public', memberCount: 12 },
+  ])))
+  await view.render()
+  expect(view.host.querySelector('.explore-rail .explore-communities')).not.toBeNull()
+  expect(view.host.querySelector('.explore-rail .explore-people')).not.toBeNull()
+  expect(view.host.querySelector('.explore-main-column .explore-feature')).not.toBeNull()
+  await act(async () => view.button('Cộng đồng')?.click())
+  expect(view.host.querySelector('.explore-main-column .explore-communities')).not.toBeNull()
+  expect(view.host.querySelector('.explore-rail .explore-communities')).toBeNull()
+  expect(view.host.querySelector('.explore-rail .explore-trending')).not.toBeNull()
+  await act(async () => view.button('Mọi người')?.click())
+  expect(view.host.querySelector('.explore-main-column .explore-people')).not.toBeNull()
+  await act(async () => view.button('Gần đây')?.click())
+  expect(view.host.querySelector('.explore-content-layout')).toBeNull()
 })
 
 it('updates tab URL and removes tab param when selecting all', async () => {
