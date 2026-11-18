@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Outlet } from "react-router-dom";
-import type { AppPageContext } from "../router/PageRoute";
+import type { AppPageContext } from "../router/routePageContext";
 
 type AppLayoutProps = {
   className: string;

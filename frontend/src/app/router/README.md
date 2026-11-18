@@ -1,16 +1,17 @@
 # ChatNet frontend routing contract
 
-`AppRouter.tsx` selects `BrowserRouter` on web and `HashRouter` in the packaged desktop app. `RouteTree.tsx` owns the authenticated route hierarchy; `routes.ts` owns URL helpers and top-level tab paths.
+`AppRouter.tsx` selects `BrowserRouter` on web and `HashRouter` in the packaged desktop app. `RouteTree.tsx` owns the declarative authenticated route hierarchy; `FeatureRoutePages.tsx` owns the nested context-only layout and URL parameter guards; `routes.ts` owns URL helpers and top-level tab paths.
 
 ## Nested routes and shell ownership
 
 - The signed-in shell and session/realtime providers stay mounted while navigating across supported feature routes.
 - `AppLayout` renders the shared Header, Sidebar, notices and a single direct `<Outlet context={outletContext} />`. `PageRoute` owns `modern-frame` and page-specific Error Boundary without adding new CSS or DOM wrappers.
-- `AuthedApp` remains the session-scoped feature-state controller. It supplies `AppPageContext` with independent route-owned React nodes for Contacts, Search, Discover, Marketplace, and Notifications. `PageRoute page="..."` selects the correct node according to the URL.
+- `AuthedApp` remains the session-scoped feature-state controller. It supplies the contract in `routePageContext.ts` (`AppPageContext`) with independent route-owned React nodes for Contacts, Search, Discover, Marketplace, and Notifications. `PageRoute page="..."` selects the correct node according to the URL.
 - `FeatureRouteLayout` forwards that same context through its nested `<Outlet />` and intentionally adds **no DOM wrapper** or business state. Chat, Feed, Profile, Settings and detail routes retain the legacy `content` slot during migration.
 - Parent index routes display the existing page for Chat, Contacts, Feed, Profile, Calls and Settings. Subroutes reuse the same page slot until feature-specific page ownership can move independently.
 - Invalid child paths render standalone `NotFoundPage` inside the shell, with its existing CSS structure, contextual parent link, and page Error Boundary. Unknown `/users` without a username is invalid.
-- The route tree currently validates post IDs, conversation IDs, usernames and Settings section names before rendering. Do not replace validated routes with broad wildcard `CurrentPage` matches.
+- `FeatureRoutePages.tsx` validates post IDs, conversation IDs, usernames and Settings section names before rendering. Do not replace validated routes with broad wildcard `CurrentPage` matches.
+- `AppLayout` depends only on the typed `routePageContext.ts` contract, not on the `PageRoute` rendering component. Keep app-shell component composition separate from route-specific business validation.
 
 ## Navigation and deep-link compatibility
 

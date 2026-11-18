@@ -1,14 +1,6 @@
-import type { ReactNode } from "react";
 import { useOutletContext } from "react-router-dom";
 import AppPageErrorBoundary from "../layouts/AppPageErrorBoundary";
-
-/** Data supplied by the persistent authenticated shell to route pages. */
-export type RoutePageKey = "contacts" | "search" | "discover" | "market" | "notifications";
-
-export type AppPageContext = {
-  content: ReactNode;
-  frameClassName: string;
-} & Record<RoutePageKey, ReactNode>;
+import type { RoutePageKey, AppPageContext } from "./routePageContext";
 
 /**
  * Route-owned page surface. Keep the existing DOM and CSS class contracts:
