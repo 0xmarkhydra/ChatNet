@@ -27,7 +27,8 @@ export function useFeedRefreshInterval({
     let refreshAfterCurrent = false;
     const isOnline = () => navigator.onLine !== false;
     const refresh = (onDemand = false) => {
-      if (!active || !isOnline()) return;
+      // Do not start new network reads for a background tab.
+      if (!active || !isOnline() || document.visibilityState !== "visible") return;
       if (refreshing) {
         // Visibility/online events should not be lost behind a slow request.
         if (onDemand) refreshAfterCurrent = true;

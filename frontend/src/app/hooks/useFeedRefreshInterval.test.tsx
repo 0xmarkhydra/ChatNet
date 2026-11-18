@@ -76,24 +76,24 @@ describe("useFeedRefreshInterval", () => {
 
     try {
       act(() => root.render(<Probe enabled sessionId="A" sessionToken="t-A" />));
-      expect(posts).toHaveBeenCalledTimes(1);
+      expect(posts).toHaveBeenCalledTimes(0);
       await act(async () => { await Promise.resolve(); });
       act(() => vi.advanceTimersByTime(12_000));
-      expect(posts).toHaveBeenCalledTimes(1);
+      expect(posts).toHaveBeenCalledTimes(0);
       visible = true;
       act(() => document.dispatchEvent(new Event("visibilitychange")));
-      expect(posts).toHaveBeenCalledTimes(2);
+      expect(posts).toHaveBeenCalledTimes(1);
       await act(async () => { await Promise.resolve(); });
       act(() => vi.advanceTimersByTime(12_000));
-      expect(posts).toHaveBeenCalledTimes(3);
+      expect(posts).toHaveBeenCalledTimes(2);
       await act(async () => { await Promise.resolve(); });
       act(() => root.render(<Probe enabled sessionId="B" sessionToken="t-B" />));
-      expect(posts).toHaveBeenCalledTimes(4);
+      expect(posts).toHaveBeenCalledTimes(3);
       act(() => root.render(<Probe enabled={false} sessionId="B" sessionToken="t-B" />));
       act(() => vi.advanceTimersByTime(24_000));
       act(() => document.dispatchEvent(new Event("visibilitychange")));
-      expect(posts).toHaveBeenCalledTimes(4);
-      expect(stories).toHaveBeenCalledTimes(4);
+      expect(posts).toHaveBeenCalledTimes(3);
+      expect(stories).toHaveBeenCalledTimes(3);
     } finally {
       act(() => root.unmount());
       host.remove();
@@ -241,8 +241,8 @@ describe("useFeedRefreshInterval", () => {
       act(() => root.render(<Probe />));
       await act(async () => { await Promise.resolve(); });
       act(() => window.dispatchEvent(new Event("online")));
-      expect(posts).toHaveBeenCalledTimes(1);
-      expect(stories).toHaveBeenCalledTimes(1);
+      expect(posts).toHaveBeenCalledTimes(0);
+      expect(stories).toHaveBeenCalledTimes(0);
     } finally {
       act(() => root.unmount());
       host.remove();
@@ -329,4 +329,46 @@ describe("useFeedRefreshInterval", () => {
       host.remove();
     }
   });
+  it("does not start an initial Feed refresh from an online but hidden tab", async () => {
+    vi.useFakeTimers();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const onlineDescriptor = Object.getOwnPropertyDescriptor(navigator, "onLine");
+    let visible = false;
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => visible ? "visible" : "hidden",
+    });
+    const posts = vi.fn(async () => undefined);
+    const stories = vi.fn(async () => undefined);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    function Probe() {
+      useFeedRefreshInterval({
+        enabled: true,
+        sessionId: "A",
+        sessionToken: "token",
+        refreshPosts: posts,
+        refreshStories: stories,
+      });
+      return null;
+    }
+    try {
+      act(() => root.render(<Probe />));
+      await act(async () => vi.advanceTimersByTime(24_000));
+      expect(posts).not.toHaveBeenCalled();
+      expect(stories).not.toHaveBeenCalled();
+      visible = true;
+      act(() => document.dispatchEvent(new Event("visibilitychange")));
+      expect(posts).toHaveBeenCalledTimes(1);
+      expect(stories).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      if (onlineDescriptor) Object.defineProperty(navigator, "onLine", onlineDescriptor);
+      else Reflect.deleteProperty(navigator, "onLine");
+    }
+  });
+
 });
