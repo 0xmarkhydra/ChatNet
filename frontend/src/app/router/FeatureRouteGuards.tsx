@@ -21,26 +21,26 @@ const settingsSections = new Set([
 
 export function SettingsSectionPage() {
   const { section } = useParams();
-  return section && settingsSections.has(section) ? <PageRoute /> : <NotFoundPage />;
+  return section && settingsSections.has(section) ? <PageRoute page="profile" /> : <NotFoundPage />;
 }
 
 export function FeedPostPage() {
   const { postId } = useParams();
   return postId && feedPostIdFromPath(`/feed/posts/${postId}`) !== null
-    ? <PageRoute />
+    ? <PageRoute page="feed" />
     : <NotFoundPage />;
 }
 
 export function VisitorProfilePage() {
   const { username } = useParams();
   return username && visitorUsernameFromPath(`/users/${encodeURIComponent(username)}`) !== null
-    ? <PageRoute />
+    ? <PageRoute page="profile" />
     : <NotFoundPage />;
 }
 
 export function ChatConversationPage() {
   const { conversationId } = useParams();
   return conversationId && chatConversationIdFromPath(`/chat/${conversationId}`) !== null
-    ? <PageRoute />
+    ? <PageRoute page="chat" />
     : <NotFoundPage />;
 }

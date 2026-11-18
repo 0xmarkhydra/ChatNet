@@ -3048,7 +3048,142 @@ export default function AuthedApp({
           session={session}
           switchTab={switchTab}
         />),
-        content: <>
+        profile: <>
+        {desktopProfileOverview && (
+          <ProfileOverviewSection
+          apiFetch={apiFetch}
+          avatarFileInputRef={avatarFileInputRef}
+          changePrivacy={changePrivacy}
+          coverFileInputRef={coverFileInputRef}
+          discardDesktopProfileEdits={discardDesktopProfileEdits}
+          friends={friends}
+          loadProfilePosts={loadProfilePosts}
+          mediaUploading={mediaUploading}
+          name={name}
+          openVisitor={openVisitor}
+          pendingPost={pendingPost}
+          privacy={privacy}
+          privacyBusy={privacyBusy}
+          privacyError={privacyError}
+          privacyLoading={privacyLoading}
+          profileBioDraft={profileBioDraft}
+          profileBusy={profileBusy}
+          profileCityDraft={profileCityDraft}
+          profileDisplayNameDraft={profileDisplayNameDraft}
+          profileEditorOpen={profileEditorOpen}
+          profileHasMore={profileHasMore}
+          profileMedia={profileMedia}
+          profilePosts={profilePosts}
+          profilePostsBusy={profilePostsBusy}
+          profilePostsError={profilePostsError}
+          profileSaving={profileSaving}
+          profileUsernameDraft={profileUsernameDraft}
+          renderPosts={renderPosts}
+          saveProfileIdentity={saveProfileIdentity}
+          session={session}
+          setActivePostId={setActivePostId}
+          setPrivacyRetry={setPrivacyRetry}
+          setProfileBioDraft={setProfileBioDraft}
+          setProfileCityDraft={setProfileCityDraft}
+          setProfileComposerOpen={setProfileComposerOpen}
+          setProfileDisplayNameDraft={setProfileDisplayNameDraft}
+          setProfileEditorOpen={setProfileEditorOpen}
+          setProfileUsernameDraft={setProfileUsernameDraft}
+          switchTab={switchTab}
+          updateProfileImage={updateProfileImage}
+          visibleProfilePosts={visibleProfilePosts}
+        />
+        )}
+
+        {!desktopProfileOverview && (
+          <ProfileSection
+          apiFetch={apiFetch}
+          appLocale={appLocale}
+          autoTranslate={autoTranslate}
+          avatarFileInputRef={avatarFileInputRef}
+          blockedBusy={blockedBusy}
+          blockedError={blockedError}
+          blockedOpen={blockedOpen}
+          blockedUsers={blockedUsers}
+          changeAppLocale={changeAppLocale}
+          changeAutoTranslate={changeAutoTranslate}
+          changeTargetLanguage={changeTargetLanguage}
+          closeProfileTimeline={closeProfileTimeline}
+          coverFileInputRef={coverFileInputRef}
+          desktopProfileSettings={desktopProfileSettings}
+          fetchAccountSessions={fetchAccountSessions}
+          installApp={installApp}
+          isProfileDesktop={isProfileDesktop}
+          isStandalone={isStandalone}
+          loadBlockedUsers={loadBlockedUsers}
+          loadProfilePosts={loadProfilePosts}
+          localePickerOpen={localePickerOpen}
+          localeSearch={localeSearch}
+          logout={logout}
+          managedSessions={managedSessions}
+          mediaUploading={mediaUploading}
+          messageSoundEnabled={messageSoundEnabled}
+          name={name}
+          nativeNotifications={nativeNotifications}
+          pendingPost={pendingPost}
+          postText={postText}
+          previewMessageSound={previewMessageSound}
+          privacy={privacy}
+          privacyBusy={privacyBusy}
+          privacyError={privacyError}
+          privacyLoading={privacyLoading}
+          profileBusy={profileBusy}
+          profileHasMore={profileHasMore}
+          profileHeadingRef={profileHeadingRef}
+          profileIdentityForm={profileIdentityForm}
+          profileIdentityRef={profileIdentityRef}
+          profileMedia={profileMedia}
+          profilePosts={profilePosts}
+          profilePostsBusy={profilePostsBusy}
+          profilePostsError={profilePostsError}
+          profilePrivacyControls={profilePrivacyControls}
+          profileTimelineOpen={profileTimelineOpen}
+          pushBusy={pushBusy}
+          pushEnabled={pushEnabled}
+          renderPosts={renderPosts}
+          revokeAccountSessions={revokeAccountSessions}
+          savePrivacy={savePrivacy}
+          selectedAppLanguage={selectedAppLanguage}
+          selectedLanguage={selectedLanguage}
+          sendTestPush={sendTestPush}
+          session={session}
+          sessionsBusy={sessionsBusy}
+          sessionsError={sessionsError}
+          sessionsOpen={sessionsOpen}
+          setBlockedOpen={setBlockedOpen}
+          setDesktopProfileSettings={setDesktopProfileSettings}
+          setGlobalSearch={setGlobalSearch}
+          setLocalePickerOpen={setLocalePickerOpen}
+          setLocaleSearch={setLocaleSearch}
+          setPrivacyRetry={setPrivacyRetry}
+          setProfileComposerOpen={setProfileComposerOpen}
+          setProfileEditorOpen={setProfileEditorOpen}
+          setProfileTimelineOpen={setProfileTimelineOpen}
+          setSessionsOpen={setSessionsOpen}
+          setTranslationPickerOpen={setTranslationPickerOpen}
+          setTranslationSettingsSearch={setTranslationSettingsSearch}
+          switchTab={switchTab}
+          t={t}
+          targetLanguage={targetLanguage}
+          toggleMessageSound={toggleMessageSound}
+          togglePush={togglePush}
+          translationPickerOpen={translationPickerOpen}
+          translationSettingsSearch={translationSettingsSearch}
+          uiLocaleLoading={uiLocaleLoading}
+          unblockContact={unblockContact}
+          updateProfileImage={updateProfileImage}
+          visibleLocaleOptions={visibleLocaleOptions}
+          visibleProfilePosts={visibleProfilePosts}
+          visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
+        />
+        )}
+        </>,
+        chat: <>
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
           activeChatTranslationSettings={activeChatTranslationSettings}
@@ -3279,6 +3414,8 @@ export default function AuthedApp({
 
 
 
+        </>,
+        beforeFeed: <>
         {activePost && (
           <FeedPostDetail
           activePost={activePost}
@@ -3307,8 +3444,8 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "feed" && (
-          <FeedSection
+        </>,
+        feed: (<FeedSection
           activePostId={activePostId}
           activeStoryId={activeStoryId}
           actOnFriend={actOnFriend}
@@ -3364,8 +3501,9 @@ export default function AuthedApp({
           stories={stories}
           storyBusy={storyBusy}
           switchTab={switchTab}
-        />
-        )}
+        />),
+        afterFeed: <>
+
 
         {activeConversationAction && (
           <ConversationActionDialog
@@ -3422,139 +3560,6 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "profile" && desktopProfileOverview && (
-          <ProfileOverviewSection
-          apiFetch={apiFetch}
-          avatarFileInputRef={avatarFileInputRef}
-          changePrivacy={changePrivacy}
-          coverFileInputRef={coverFileInputRef}
-          discardDesktopProfileEdits={discardDesktopProfileEdits}
-          friends={friends}
-          loadProfilePosts={loadProfilePosts}
-          mediaUploading={mediaUploading}
-          name={name}
-          openVisitor={openVisitor}
-          pendingPost={pendingPost}
-          privacy={privacy}
-          privacyBusy={privacyBusy}
-          privacyError={privacyError}
-          privacyLoading={privacyLoading}
-          profileBioDraft={profileBioDraft}
-          profileBusy={profileBusy}
-          profileCityDraft={profileCityDraft}
-          profileDisplayNameDraft={profileDisplayNameDraft}
-          profileEditorOpen={profileEditorOpen}
-          profileHasMore={profileHasMore}
-          profileMedia={profileMedia}
-          profilePosts={profilePosts}
-          profilePostsBusy={profilePostsBusy}
-          profilePostsError={profilePostsError}
-          profileSaving={profileSaving}
-          profileUsernameDraft={profileUsernameDraft}
-          renderPosts={renderPosts}
-          saveProfileIdentity={saveProfileIdentity}
-          session={session}
-          setActivePostId={setActivePostId}
-          setPrivacyRetry={setPrivacyRetry}
-          setProfileBioDraft={setProfileBioDraft}
-          setProfileCityDraft={setProfileCityDraft}
-          setProfileComposerOpen={setProfileComposerOpen}
-          setProfileDisplayNameDraft={setProfileDisplayNameDraft}
-          setProfileEditorOpen={setProfileEditorOpen}
-          setProfileUsernameDraft={setProfileUsernameDraft}
-          switchTab={switchTab}
-          updateProfileImage={updateProfileImage}
-          visibleProfilePosts={visibleProfilePosts}
-        />
-        )}
-
-        {tab === "profile" && !desktopProfileOverview && (
-          <ProfileSection
-          apiFetch={apiFetch}
-          appLocale={appLocale}
-          autoTranslate={autoTranslate}
-          avatarFileInputRef={avatarFileInputRef}
-          blockedBusy={blockedBusy}
-          blockedError={blockedError}
-          blockedOpen={blockedOpen}
-          blockedUsers={blockedUsers}
-          changeAppLocale={changeAppLocale}
-          changeAutoTranslate={changeAutoTranslate}
-          changeTargetLanguage={changeTargetLanguage}
-          closeProfileTimeline={closeProfileTimeline}
-          coverFileInputRef={coverFileInputRef}
-          desktopProfileSettings={desktopProfileSettings}
-          fetchAccountSessions={fetchAccountSessions}
-          installApp={installApp}
-          isProfileDesktop={isProfileDesktop}
-          isStandalone={isStandalone}
-          loadBlockedUsers={loadBlockedUsers}
-          loadProfilePosts={loadProfilePosts}
-          localePickerOpen={localePickerOpen}
-          localeSearch={localeSearch}
-          logout={logout}
-          managedSessions={managedSessions}
-          mediaUploading={mediaUploading}
-          messageSoundEnabled={messageSoundEnabled}
-          name={name}
-          nativeNotifications={nativeNotifications}
-          pendingPost={pendingPost}
-          postText={postText}
-          previewMessageSound={previewMessageSound}
-          privacy={privacy}
-          privacyBusy={privacyBusy}
-          privacyError={privacyError}
-          privacyLoading={privacyLoading}
-          profileBusy={profileBusy}
-          profileHasMore={profileHasMore}
-          profileHeadingRef={profileHeadingRef}
-          profileIdentityForm={profileIdentityForm}
-          profileIdentityRef={profileIdentityRef}
-          profileMedia={profileMedia}
-          profilePosts={profilePosts}
-          profilePostsBusy={profilePostsBusy}
-          profilePostsError={profilePostsError}
-          profilePrivacyControls={profilePrivacyControls}
-          profileTimelineOpen={profileTimelineOpen}
-          pushBusy={pushBusy}
-          pushEnabled={pushEnabled}
-          renderPosts={renderPosts}
-          revokeAccountSessions={revokeAccountSessions}
-          savePrivacy={savePrivacy}
-          selectedAppLanguage={selectedAppLanguage}
-          selectedLanguage={selectedLanguage}
-          sendTestPush={sendTestPush}
-          session={session}
-          sessionsBusy={sessionsBusy}
-          sessionsError={sessionsError}
-          sessionsOpen={sessionsOpen}
-          setBlockedOpen={setBlockedOpen}
-          setDesktopProfileSettings={setDesktopProfileSettings}
-          setGlobalSearch={setGlobalSearch}
-          setLocalePickerOpen={setLocalePickerOpen}
-          setLocaleSearch={setLocaleSearch}
-          setPrivacyRetry={setPrivacyRetry}
-          setProfileComposerOpen={setProfileComposerOpen}
-          setProfileEditorOpen={setProfileEditorOpen}
-          setProfileTimelineOpen={setProfileTimelineOpen}
-          setSessionsOpen={setSessionsOpen}
-          setTranslationPickerOpen={setTranslationPickerOpen}
-          setTranslationSettingsSearch={setTranslationSettingsSearch}
-          switchTab={switchTab}
-          t={t}
-          targetLanguage={targetLanguage}
-          toggleMessageSound={toggleMessageSound}
-          togglePush={togglePush}
-          translationPickerOpen={translationPickerOpen}
-          translationSettingsSearch={translationSettingsSearch}
-          uiLocaleLoading={uiLocaleLoading}
-          unblockContact={unblockContact}
-          updateProfileImage={updateProfileImage}
-          visibleLocaleOptions={visibleLocaleOptions}
-          visibleProfilePosts={visibleProfilePosts}
-          visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
-        />
-        )}
         </>,
       }}
     >

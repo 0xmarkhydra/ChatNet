@@ -5,13 +5,20 @@
 ## Nested routes and shell ownership
 
 - The signed-in shell and session/realtime providers stay mounted while navigating across supported feature routes.
-- `AppLayout` renders the shared Header, Sidebar, notices and a single direct `<Outlet context={outletContext} />`. `PageRoute` owns `modern-frame` and page-specific Error Boundary without adding new CSS or DOM wrappers.
-- `AuthedApp` remains the session-scoped feature-state controller. It supplies `AppPageContext` with independent route-owned React nodes for Contacts, Search, Discover, Marketplace, and Notifications. `PageRoute page="..."` selects the correct node according to the URL.
-- `FeatureRouteLayout` forwards that same context through its nested `<Outlet />` and intentionally adds **no DOM wrapper** or business state. Chat, Feed, Profile, Settings and detail routes retain the legacy `content` slot during migration.
-- Parent index routes display the existing page for Chat, Contacts, Feed, Profile, Calls and Settings. Subroutes reuse the same page slot until feature-specific page ownership can move independently.
+- `AppLayout` renders the shared Header, Sidebar, notices and a single direct `<Outlet context={outletContext} />`. `PageRoute` owns `modern-frame` and page-specific Error Boundary without adding new CSS or structural DOM wrappers.
+- `AuthedApp` remains the session-scoped feature-state controller. It supplies `AppPageContext` with route-owned React nodes for Chat, Feed, Profile/Settings/visitors, Contacts/Calls, Search, Discover, Marketplace, and Notifications. Every `PageRoute` requires a typed `page` key selected by the URL.
+- `FeatureRouteLayout` forwards that same context through its nested `<Outlet />` and intentionally adds **no DOM wrapper** or business state. The `beforeFeed` and `afterFeed` slots retain existing shared dialogs and overlays in their original DOM order for Chat, Feed and Profile; they do not own feature business state.
+- Parent and validated detail routes select the same feature page key (e.g. `/feed` and `/feed/posts/:postId` both select `feed`; `/settings` and `/users/:username` select `profile`). Legacy `/calls/*` redirects to the unified Contacts/Calls workspace.
 - Invalid child paths render standalone `NotFoundPage` inside the shell, with its existing CSS structure, contextual parent link, and page Error Boundary. Unknown `/users` without a username is invalid.
 - `FeatureRouteGuards.tsx` owns nested context forwarding and validation for Chat conversation IDs, Feed post IDs, visitor usernames and Settings sections. `RouteTree.tsx` stays declarative; keep invalid paths directed to `NotFoundPage` rather than broad wildcard matches.
 - Navigation regressions must cover invalid nested routes followed by Back/Forward without remounting the app shell.
+
+## Migration boundary
+
+- Routing composition is now declarative, but many props and business controllers are still built in `AuthedApp`. Moving them into feature hooks/controllers must happen separately with session/outbox/realtime/call lifecycle coverage.
+- `LegacyHomeRedirect.tsx` preserves the `/?tab=...` compatibility entry point, search, hash and navigation state.
+- `FeatureRouteGuards.tsx` owns nested URL validation, not feature state.
+- Route content for Chat, Feed and Profile deliberately retains shared overlays in their previous relative order; test this before changing their ownership. UI/CSS (including Feed and Contacts) must stay unchanged in this refactor.
 
 ## Navigation and deep-link compatibility
 

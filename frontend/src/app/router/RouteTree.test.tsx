@@ -35,13 +35,20 @@ function renderAt(path: string, initialState?: unknown) {
         <button type="button" onClick={() => navigate(-1)}>History Back</button>
         <button type="button" onClick={() => navigate(1)}>History Forward</button>
         <Outlet context={{
-          content: <p data-testid="page" data-page="legacy">Current screen</p>,
+          beforeFeed: ["/profile", "/settings", "/users", "/feed", "/chat"].some(prefix =>
+            location.pathname === prefix || location.pathname.startsWith(prefix + "/")
+          ) ? <span data-testid="shared-page-overlay">Overlay retained</span>
+            : <p data-testid="page" data-page="legacy">Current screen</p>,
           frameClassName: "",
+          afterFeed: <span data-testid="shared-after-feed-overlay">Secondary overlay</span>,
+          feed: <p data-testid="page" data-page="feed">Current screen</p>,
+          chat: <p data-testid="page" data-page="chat">Current screen</p>,
           contacts: <p data-testid="page" data-page="contacts">Current screen</p>,
           search: <p data-testid="page" data-page="search">Current screen</p>,
           discover: <p data-testid="page" data-page="discover">Current screen</p>,
           market: <p data-testid="page" data-page="market">Current screen</p>,
           notifications: <p data-testid="page" data-page="notifications">Current screen</p>,
+          profile: <p data-testid="page" data-page="profile">Current screen</p>,
         }} />
       </div>
     );
@@ -95,8 +102,13 @@ describe("app route tree", () => {
       ["/discover", "discover"],
       ["/marketplace", "market"],
       ["/notifications", "notifications"],
-      ["/feed", "legacy"],
-      ["/chat", "legacy"],
+      ["/feed", "feed"],
+      ["/chat", "chat"],
+      ["/feed/posts/42", "feed"],
+      ["/chat/123", "chat"],
+      ["/profile", "profile"],
+      ["/settings/devices", "profile"],
+      ["/users/alice", "profile"],
     ]) {
       const app = renderAt(path);
       expect(app.page()?.getAttribute("data-page")).toBe(feature);
@@ -112,8 +124,12 @@ describe("app route tree", () => {
       ["/marketplace", "market"],
       ["/notifications", "notifications"],
       ["/search?q=alice", "search"],
-      ["/chat", "legacy"],
-      ["/feed", "legacy"],
+      ["/chat", "chat"],
+      ["/feed", "feed"],
+      ["/feed/posts/42", "feed"],
+      ["/profile", "profile"],
+      ["/settings/privacy", "profile"],
+      ["/users/alice", "profile"],
     ]) {
       // Navigate via the same router instance rather than mounting a new shell.
       const destination = app.container.querySelector<HTMLButtonElement>('[data-testid="navigate-route"]');
@@ -124,6 +140,45 @@ describe("app route tree", () => {
       });
       expect(app.location()).toBe(path);
       expect(app.page()?.getAttribute("data-page")).toBe(expected);
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("keeps Chat and its shared overlays in original DOM order", () => {
+    for (const path of ["/chat", "/chat/123"]) {
+      const app = renderAt(path);
+      const chat = app.page();
+      const shared = app.container.querySelector('[data-testid="shared-page-overlay"]');
+      const after = app.container.querySelector('[data-testid="shared-after-feed-overlay"]');
+      expect(chat?.getAttribute("data-page")).toBe("chat");
+      expect(shared).not.toBeNull();
+      expect(after).not.toBeNull();
+      expect(Boolean(chat!.compareDocumentPosition(shared!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+      expect(Boolean(shared!.compareDocumentPosition(after!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("preserves shared dialogs before and after Feed when routing to posts", () => {
+    for (const path of ["/feed", "/feed/posts/42"]) {
+      const app = renderAt(path);
+      const before = app.container.querySelector('[data-testid="shared-page-overlay"]');
+      const feed = app.page();
+      const after = app.container.querySelector('[data-testid="shared-after-feed-overlay"]');
+      expect(before).not.toBeNull();
+      expect(feed?.getAttribute("data-page")).toBe("feed");
+      expect(after).not.toBeNull();
+      expect(Boolean(before!.compareDocumentPosition(feed!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+      expect(Boolean(feed!.compareDocumentPosition(after!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("keeps shared page overlays when Profile, Settings or visitors are route-owned", () => {
+    for (const path of ["/profile", "/settings/privacy", "/users/alice"]) {
+      const app = renderAt(path);
+      expect(app.page()?.getAttribute("data-page")).toBe("profile");
+      expect(app.container.querySelector('[data-testid="shared-page-overlay"]')?.textContent).toBe("Overlay retained");
       expect(app.onMount).toHaveBeenCalledTimes(1);
     }
   });
