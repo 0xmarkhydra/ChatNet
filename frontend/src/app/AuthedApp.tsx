@@ -176,7 +176,6 @@ import ProfileOverlay from "../features/profile/components/ProfileOverlay";
 import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
-  Bell,
   Check,
   Images,
   Languages,
@@ -269,6 +268,8 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
+import AppShellNotices from "./layouts/AppShellNotices";
+import AppShellUploadProgress from "./layouts/AppShellUploadProgress";
 
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { inviteRouteTarget } from "./navigation/inviteDeepLink";
@@ -2743,30 +2744,10 @@ export default function AuthedApp({
           />
         </Suspense>
       )}
-          {mediaUploading && mediaUploadProgress && (
-        <div className="media-upload-progress" role="status" aria-live="polite">
-          <span>
-            Đang tải tệp:{" "}
-            {Math.round(
-              (mediaUploadProgress.loaded /
-                Math.max(1, mediaUploadProgress.total)) *
-                100,
-            )}
-            %
-          </span>
-          <progress
-            value={mediaUploadProgress.loaded}
-            max={mediaUploadProgress.total}
-            aria-label="Tiến độ tải tệp"
+          <AppShellUploadProgress
+            progress={mediaUploading ? mediaUploadProgress : null}
+            onCancel={() => mediaUploadAbort.current?.abort()}
           />
-          <button
-            type="button"
-            onClick={() => mediaUploadAbort.current?.abort()}
-          >
-            Hủy tải
-          </button>
-        </div>
-      )}
           {visitorUsername && (
         <VisitorProfile
           key={session.sessionId + ":" + visitorUsername}
@@ -2921,72 +2902,14 @@ export default function AuthedApp({
           </AppHeaderActions>
         </AppHeader>
       }
-      beforePage={<>
-{pushPrompt && !pushPromptDismissed && !pushEnabled && (
-        <section
-          className="push-onboarding"
-          aria-label="Thông báo tin nhắn"
-          aria-live="polite"
-        >
-          <Bell size={22} aria-hidden="true" />
-          <strong>Nhận thông báo tin nhắn mới?</strong>
-          <div className="push-onboarding-actions">
-            <button
-              type="button"
-              onClick={() => setPushPromptDismissed(true)}
-              disabled={pushBusy}
-            >
-              Để sau
-            </button>
-            <button
-              className="push-onboarding-enable"
-              type="button"
-              onClick={() => void togglePush()}
-              disabled={pushBusy}
-            >
-              Bật thông báo
-            </button>
-          </div>
-        </section>
-      )}
-
-      {notice && (
-        <div
-          className={`notice toast toast-${notice.kind}`}
-          role={notice.kind === "error" ? "alert" : "status"}
-          aria-live={notice.kind === "error" ? "assertive" : "polite"}
-        >
-          <span className="toast-icon" aria-hidden="true">
-            {notice.kind === "success"
-              ? "✓"
-              : notice.kind === "error"
-                ? "!"
-                : notice.kind === "warning"
-                  ? "!"
-                  : "i"}
-          </span>
-          <div className="toast-copy">
-            <strong>
-              {notice.kind === "success"
-                ? "Thành công"
-                : notice.kind === "error"
-                  ? "Có lỗi"
-                  : notice.kind === "warning"
-                    ? "Lưu ý"
-                    : "Thông báo"}
-            </strong>
-            <span>{notice.message}</span>
-          </div>
-          <button
-            type="button"
-            aria-label="Đóng thông báo"
-            onClick={dismissNotice}
-          >
-            ×
-          </button>
-        </div>
-      )}
-      </>}
+      beforePage={<AppShellNotices
+        showPushPrompt={pushPrompt && !pushPromptDismissed && !pushEnabled}
+        pushBusy={pushBusy}
+        notice={notice}
+        onDismissPushPrompt={() => setPushPromptDismissed(true)}
+        onEnablePush={() => void togglePush()}
+        onDismissNotice={dismissNotice}
+      />}
       outletContext={{
         frameClassName: tab === "chat" && activeConversation ? "mobile-conversation-open" : "",
         notifications: (<NotificationsSection
