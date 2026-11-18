@@ -6,7 +6,7 @@
 
 - The signed-in shell and session/realtime providers stay mounted while navigating across supported feature routes.
 - `AppLayout` renders the shared Header, Sidebar, notices and a single direct `<Outlet context={outletContext} />`. `PageRoute` owns `modern-frame` and page-specific Error Boundary without adding new CSS or DOM wrappers.
-- `AuthedApp` remains the session-scoped feature-state controller. It supplies the contract in `routePageContext.ts` (`AppPageContext`) with independent route-owned React nodes for Contacts, Search, Discover, Marketplace, and Notifications. `PageRoute page="..."` selects the correct node according to the URL.
+- `AuthedApp` remains the session-scoped feature-state controller. `createFeaturePageSlots.tsx` composes the route-owned React nodes for Contacts, Search, Discover, Marketplace, and Notifications with strongly typed feature props, without owning their state or mounting inactive pages. It supplies those nodes through `routePageContext.ts` (`AppPageContext`); `PageRoute page="..."` selects the node according to the URL.
 - `FeatureRouteLayout` forwards that same context through its nested `<Outlet />` and intentionally adds **no DOM wrapper** or business state. Chat, Feed, Profile, Settings and detail routes retain the legacy `content` slot during migration.
 - Parent index routes display the existing page for Chat, Contacts, Feed, Profile, Calls and Settings. Subroutes reuse the same page slot until feature-specific page ownership can move independently.
 - Invalid child paths render standalone `NotFoundPage` inside the shell, with its existing CSS structure, contextual parent link, and page Error Boundary. Unknown `/users` without a username is invalid.
