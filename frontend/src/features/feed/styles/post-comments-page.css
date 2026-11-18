@@ -329,3 +329,7 @@
   .post-comments-composer .feed-comment-form { padding: 8px 12px; }
   .post-comments-composer .feed-comment-compose textarea { font-size: 16px; }
 }
+
+.post-comments-post-actions.post-toolbar-compact > .feed-repost-action[data-reposted='true'] {
+  color: var(--soco-blue);
+}

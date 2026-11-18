@@ -50,7 +50,8 @@ export function buildNotificationItems(
   const taggedPosts: NotificationItem[] = mentions.map(mention => ({
     key: 'mention:' + mention.id, kind: 'mention',
     name: mention.authorDisplayName || mention.author,
-    subtitle: 'đã gắn thẻ bạn trong một bài viết',
+    subtitle: mention.kind === 'repost' ? 'đã đăng lại bài viết của bạn' :
+      mention.kind === 'quote' ? 'đã trích dẫn bài viết của bạn' : 'đã gắn thẻ bạn trong một bài viết',
     date: mention.createdAt, username: mention.author, mention,
   }))
   return [...pending, ...unreadChats, ...taggedPosts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
