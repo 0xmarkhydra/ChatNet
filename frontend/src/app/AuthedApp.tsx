@@ -67,7 +67,7 @@ import {
 } from "../features/chat/types";
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
 import { useAppRouteNavigation } from "./router/useAppRouteNavigation";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
@@ -269,7 +269,7 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
-import AppPageErrorBoundary from "./layouts/AppPageErrorBoundary";
+
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { inviteRouteTarget } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
@@ -2921,7 +2921,8 @@ export default function AuthedApp({
           </AppHeaderActions>
         </AppHeader>
       }
-    >{pushPrompt && !pushPromptDismissed && !pushEnabled && (
+      beforePage={<>
+{pushPrompt && !pushPromptDismissed && !pushEnabled && (
         <section
           className="push-onboarding"
           aria-label="Thông báo tin nhắn"
@@ -2985,11 +2986,69 @@ export default function AuthedApp({
           </button>
         </div>
       )}
-      <Outlet context={
-        <section
-          className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
-        >
-          <AppPageErrorBoundary>
+      </>}
+      outletContext={{
+        frameClassName: tab === "chat" && activeConversation ? "mobile-conversation-open" : "",
+        notifications: (<NotificationsSection
+          actOnFriend={actOnFriend}
+          conversations={conversations}
+          declineFriendRequest={declineFriendRequest}
+          friendBusyIds={friendBusyIds}
+          friendRequests={friendRequests}
+          globalSearch={globalSearch}
+          openMentionPost={openMentionPost}
+          openVisitor={openVisitor}
+          postMentions={postMentions}
+          readPostMention={readPostMention}
+          setActiveConversationId={selectRoutedConversation}
+          setContactsScreen={setContactsScreen}
+          setDesktopProfileSettings={setDesktopProfileSettings}
+          setProfileTimelineOpen={setProfileTimelineOpen}
+          switchTab={switchTab}
+        />),
+        contacts: (<UnifiedContactsPage
+          contactsContent={contactsContent}
+          conversations={displayConversations}
+          friends={friends}
+          incomingRequests={friendRequests.filter(friend => friend.direction === "incoming").length}
+          request={apiFetch}
+          userId={session.user.id}
+          token={session.token}
+          targetLanguage={targetLanguage}
+          friendQuery={friendQuery}
+          setFriendQuery={setFriendQuery}
+          onOpenChat={(id) => { switchTab("chat"); selectRoutedConversation(id); }}
+          onNavigate={switchTab}
+        />),
+        search: (<SearchResultsPage
+            request={apiFetch}
+            sessionId={session.sessionId}
+            onOpenProfile={username => openVisitorProfile(username)}
+            onOpenPost={postId => navigate(feedPostPath(postId))}
+          />),
+        discover: (<DiscoverSection
+          actOnFriend={actOnFriend}
+          findNearby={findNearby}
+          friendActionBusy={friendActionBusy}
+          friendRelationship={friendRelationship}
+          globalSearch={globalSearch}
+          nearbyBusy={nearbyBusy}
+          nearbyRadiusKm={nearbyRadiusKm}
+          nearbyResultRadiusKm={nearbyResultRadiusKm}
+          nearbyScanning={nearbyScanning}
+          nearbyUntil={nearbyUntil}
+          nearbyUsers={nearbyUsers}
+          setGlobalSearch={setGlobalSearch}
+          setNearbyRadiusKm={setNearbyRadiusKm}
+          stopNearby={stopNearby}
+        />),
+        market: (<MarketSection
+            searchQuery={globalSearch}
+          apiFetch={apiFetch}
+          session={session}
+          switchTab={switchTab}
+        />),
+        content: <>
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
           activeChatTranslationSettings={activeChatTranslationSettings}
@@ -3210,77 +3269,15 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "notifications" && (
-          <NotificationsSection
-          actOnFriend={actOnFriend}
-          conversations={conversations}
-          declineFriendRequest={declineFriendRequest}
-          friendBusyIds={friendBusyIds}
-          friendRequests={friendRequests}
-          globalSearch={globalSearch}
-          openMentionPost={openMentionPost}
-          openVisitor={openVisitor}
-          postMentions={postMentions}
-          readPostMention={readPostMention}
-          setActiveConversationId={selectRoutedConversation}
-          setContactsScreen={setContactsScreen}
-          setDesktopProfileSettings={setDesktopProfileSettings}
-          setProfileTimelineOpen={setProfileTimelineOpen}
-          switchTab={switchTab}
-        />
-        )}
 
-        {tab === "contacts" && <UnifiedContactsPage
-          contactsContent={contactsContent}
-          conversations={displayConversations}
-          friends={friends}
-          incomingRequests={friendRequests.filter(friend => friend.direction === "incoming").length}
-          request={apiFetch}
-          userId={session.user.id}
-          token={session.token}
-          targetLanguage={targetLanguage}
-          friendQuery={friendQuery}
-          setFriendQuery={setFriendQuery}
-          onOpenChat={(id) => { switchTab("chat"); selectRoutedConversation(id); }}
-          onNavigate={switchTab}
-        />}
 
-        {isSearchResultsRoute && (
-          <SearchResultsPage
-            request={apiFetch}
-            sessionId={session.sessionId}
-            onOpenProfile={username => openVisitorProfile(username)}
-            onOpenPost={postId => navigate(feedPostPath(postId))}
-          />
-        )}
 
-        {tab === "discover" && !isSearchResultsRoute && (
-          <DiscoverSection
-          actOnFriend={actOnFriend}
-          findNearby={findNearby}
-          friendActionBusy={friendActionBusy}
-          friendRelationship={friendRelationship}
-          globalSearch={globalSearch}
-          nearbyBusy={nearbyBusy}
-          nearbyRadiusKm={nearbyRadiusKm}
-          nearbyResultRadiusKm={nearbyResultRadiusKm}
-          nearbyScanning={nearbyScanning}
-          nearbyUntil={nearbyUntil}
-          nearbyUsers={nearbyUsers}
-          setGlobalSearch={setGlobalSearch}
-          setNearbyRadiusKm={setNearbyRadiusKm}
-          stopNearby={stopNearby}
-        />
-        )}
 
-        {tab === "market" && (
-          <MarketSection
-            searchQuery={globalSearch}
-          apiFetch={apiFetch}
-          session={session}
-          switchTab={switchTab}
-        />
-        )}
+
+
+
+
+
 
         {activePost && (
           <FeedPostDetail
@@ -3558,9 +3555,9 @@ export default function AuthedApp({
           visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
         />
         )}
-          </AppPageErrorBoundary>
-        </section>
-      } />
+        </>,
+      }}
+    >
 
       {storyDraft && tab === "feed" && (
           <StoryDraftOverlay

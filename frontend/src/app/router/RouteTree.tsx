@@ -1,6 +1,8 @@
+import NotFoundPage from "./NotFoundPage";
 import type { ReactNode } from "react";
-import { Link, Navigate, Outlet, Route, Routes, useLocation, useOutletContext, useParams } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, fallbackPathForRoute, feedPostIdFromPath, tabFromPath, visitorUsernameFromPath } from "./routes";
+import PageRoute, { type AppPageContext } from "./PageRoute";
+import { Navigate, Outlet, Route, Routes, useLocation, useOutletContext, useParams } from "react-router-dom";
+import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, tabFromPath, visitorUsernameFromPath } from "./routes";
 
 function LegacyHomeRedirect() {
   const { search, hash, state } = useLocation();
@@ -13,7 +15,7 @@ function LegacyHomeRedirect() {
 
 // The signed-in app owns live feature state; changing routes only replaces its page slot.
 function CurrentPage() {
-  return useOutletContext<ReactNode>() ?? null;
+  return <PageRoute />;
 }
 
 /**
@@ -21,31 +23,10 @@ function CurrentPage() {
  * feature children without adding DOM or remounting auth/realtime providers.
  */
 function FeatureRouteLayout() {
-  const page = useOutletContext<ReactNode>();
+  const page = useOutletContext<AppPageContext>();
   return <Outlet context={page} />;
 }
 
-function NotFoundPage() {
-  const { pathname } = useLocation();
-  const fallbackPath = fallbackPathForRoute(pathname);
-  const fallbackLabel = fallbackPath === TAB_PATH.chat ? "Tin nhắn"
-    : fallbackPath === TAB_PATH.feed ? "Bảng tin"
-    : fallbackPath === TAB_PATH.profile ? "Hồ sơ"
-    : fallbackPath === ROUTE.settings ? "Cài đặt"
-    : fallbackPath === "/contacts/calls" ? "Cuộc gọi"
-    : fallbackPath === TAB_PATH.contacts ? "Danh bạ"
-    : fallbackPath === TAB_PATH.discover ? "Khám phá"
-    : fallbackPath === TAB_PATH.market ? "Marketplace" : "Thông báo";
-  return (
-    <section className="phone-frame modern-frame" aria-labelledby="route-not-found-title">
-      <div className="soco-empty-state">
-        <h1 id="route-not-found-title">Không tìm thấy trang</h1>
-        <p>Đường dẫn này không tồn tại hoặc chưa được hỗ trợ.</p>
-        <Link to={fallbackPath}>Về {fallbackLabel}</Link>
-      </div>
-    </section>
-  );
-}
 
 const settingsSections = new Set([
   "account", "privacy", "security", "notifications", "language",
@@ -89,13 +70,13 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={TAB_PATH.contacts.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
-          <Route path="directory" element={<CurrentPage />} />
-          <Route path="overview" element={<CurrentPage />} />
-          <Route path="groups" element={<CurrentPage />} />
-          <Route path="requests" element={<CurrentPage />} />
-          <Route path="calls" element={<CurrentPage />} />
-          <Route path="translation" element={<CurrentPage />} />
+          <Route index element={<PageRoute page="contacts" />} />
+          <Route path="directory" element={<PageRoute page="contacts" />} />
+          <Route path="overview" element={<PageRoute page="contacts" />} />
+          <Route path="groups" element={<PageRoute page="contacts" />} />
+          <Route path="requests" element={<PageRoute page="contacts" />} />
+          <Route path="calls" element={<PageRoute page="contacts" />} />
+          <Route path="translation" element={<PageRoute page="contacts" />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={TAB_PATH.feed.slice(1)} element={<FeatureRouteLayout />}>
@@ -124,10 +105,10 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
           <Route path=":username" element={<VisitorProfilePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
-        <Route path={ROUTE.search.slice(1)} element={<CurrentPage />} />
-        {[TAB_PATH.discover, TAB_PATH.market, TAB_PATH.notifications].map((path) => (
-          <Route key={path} path={path.slice(1)} element={<CurrentPage />} />
-        ))}
+        <Route path={ROUTE.search.slice(1)} element={<PageRoute page="search" />} />
+        <Route path={TAB_PATH.discover.slice(1)} element={<PageRoute page="discover" />} />
+        <Route path={TAB_PATH.market.slice(1)} element={<PageRoute page="market" />} />
+        <Route path={TAB_PATH.notifications.slice(1)} element={<PageRoute page="notifications" />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

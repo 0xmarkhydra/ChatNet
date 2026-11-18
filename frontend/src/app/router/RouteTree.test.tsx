@@ -31,9 +31,18 @@ function renderAt(path: string, initialState?: unknown) {
         <Link to="/calls/translation">Dịch AI</Link>
         <Link to="/users/alice">Hồ sơ Alice</Link>
         <Link to="/somewhere-unknown">Invalid</Link>
+        <button type="button" data-testid="navigate-route" onClick={(event) => navigate(event.currentTarget.getAttribute("data-target") || "/feed")}>Navigate route</button>
         <button type="button" onClick={() => navigate(-1)}>History Back</button>
         <button type="button" onClick={() => navigate(1)}>History Forward</button>
-        <Outlet context={<p data-testid="page">Current screen</p>} />
+        <Outlet context={{
+          content: <p data-testid="page" data-page="legacy">Current screen</p>,
+          frameClassName: "",
+          contacts: <p data-testid="page" data-page="contacts">Current screen</p>,
+          search: <p data-testid="page" data-page="search">Current screen</p>,
+          discover: <p data-testid="page" data-page="discover">Current screen</p>,
+          market: <p data-testid="page" data-page="market">Current screen</p>,
+          notifications: <p data-testid="page" data-page="notifications">Current screen</p>,
+        }} />
       </div>
     );
   }
@@ -72,7 +81,49 @@ describe("app route tree", () => {
   it("provides a working index route for every registered app tab and workspace", () => {
     for (const path of [...Object.values(TAB_PATH), ...Object.values(ROUTE)]) {
       const app = renderAt(path);
-      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.page()?.textContent, `Missing route content: ${path}`).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("selects feature content from route ownership without remounting the shell", () => {
+    for (const [path, feature] of [
+      ["/contacts", "contacts"],
+      ["/contacts/calls", "contacts"],
+      ["/contacts/groups", "contacts"],
+      ["/search?q=user", "search"],
+      ["/discover", "discover"],
+      ["/marketplace", "market"],
+      ["/notifications", "notifications"],
+      ["/feed", "legacy"],
+      ["/chat", "legacy"],
+    ]) {
+      const app = renderAt(path);
+      expect(app.page()?.getAttribute("data-page")).toBe(feature);
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("navigates across route-owned pages without remounting the app shell", () => {
+    const app = renderAt("/feed");
+    for (const [path, expected] of [
+      ["/contacts", "contacts"],
+      ["/discover", "discover"],
+      ["/marketplace", "market"],
+      ["/notifications", "notifications"],
+      ["/search?q=alice", "search"],
+      ["/chat", "legacy"],
+      ["/feed", "legacy"],
+    ]) {
+      // Navigate via the same router instance rather than mounting a new shell.
+      const destination = app.container.querySelector<HTMLButtonElement>('[data-testid="navigate-route"]');
+      expect(destination).not.toBeNull();
+      act(() => {
+        destination!.setAttribute("data-target", path);
+        destination!.click();
+      });
+      expect(app.location()).toBe(path);
+      expect(app.page()?.getAttribute("data-page")).toBe(expected);
       expect(app.onMount).toHaveBeenCalledTimes(1);
     }
   });
