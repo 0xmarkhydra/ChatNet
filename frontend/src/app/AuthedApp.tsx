@@ -267,6 +267,8 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
+import { withContactNicknames, mergeContactSearchResults, selectChatListConversations, sortChatListConversations } from "./selectors/appListSelectors";
+import { selectDisplayedFeedPosts } from "./selectors/feedListSelector";
 import { createSecondaryPageSlots } from "./router/createSecondaryPageSlots";
 import AppShellNotices from "./layouts/AppShellNotices";
 import AppShellUploadProgress from "./layouts/AppShellUploadProgress";
@@ -1049,15 +1051,7 @@ export default function AuthedApp({
   }, [messages, activeConversationId, chatSearchJump]);
   const name = session?.user.username || "";
   const displayConversations = useMemo(
-    () =>
-      conversations.map((conversation) => ({
-        ...conversation,
-        name:
-          conversation.type === "direct" && conversation.otherUserId
-            ? contactMetadata[conversation.otherUserId]?.nickname ||
-              conversation.name
-            : conversation.name,
-      })),
+    () => withContactNicknames(conversations, contactMetadata),
     [conversations, contactMetadata],
   );
   const activeConversation =
@@ -1778,22 +1772,7 @@ export default function AuthedApp({
     }
   }
 
-  const contactQuery = friendQuery
-    .trim()
-    .replace(/^@/, "")
-    .toLocaleLowerCase("vi-VN");
-  const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
-    `${friend.displayName} ${friend.username}`
-      .toLocaleLowerCase("vi-VN")
-      .includes(contactQuery),
-  );
-  const localContactIds = new Set(
-    localContactMatches.map((friend) => friend.id),
-  );
-  const contactSearchResults = [
-    ...localContactMatches,
-    ...friendResults.filter((friend) => !localContactIds.has(friend.id)),
-  ];
+  const contactSearchResults = mergeContactSearchResults(friendQuery, friends, friendRequests, friendResults);
 
   function friendRelationship(userId: number) {
     if (friends.some((item) => item.id === userId)) return "accepted" as const;
@@ -2273,80 +2252,26 @@ export default function AuthedApp({
               (!membershipSnapshot.current ||
                 membershipSnapshot.current.has(item.id)),
           );
-  // Avatar-rail search matches conversation NAMES only (including custom
-  // contact nicknames). The server's q query may also return message-body
-  // matches, so explicitly discard those rather than showing unrelated chats.
-  // Normalize Vietnamese accents so "Linh" can match "Lĩnh", etc.
-  const normalizeChatName = (value: string) => value
-    .toLocaleLowerCase('vi-VN').normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
-  const chatNameKeyword = normalizeChatName(chatListQuery.trim())
-  const chatListConversations = conversationListSearch.active
-    ? conversationListSearch.items
-        .filter((conversation) => !revokedConversationIds.current.has(conversation.id))
-        .map((conversation) => ({
-          ...conversation,
-          name: conversation.type === 'direct' && conversation.otherUserId
-            ? contactMetadata[conversation.otherUserId]?.nickname || conversation.name
-            : conversation.name,
-        }))
-        .filter(conversation => normalizeChatName(conversation.name).includes(chatNameKeyword))
-    : visibleConversations.filter((conversation) => {
-        if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
-        if (chatListFilter === 'groups' && conversation.type !== 'group') return false
-        return true
-      })
+  const chatListConversations = selectChatListConversations({
+    visibleConversations,
+    searchActive: conversationListSearch.active,
+    searchItems: conversationListSearch.items,
+    searchQuery: chatListQuery,
+    filter: chatListFilter,
+    revokedIds: revokedConversationIds.current,
+    contactMetadata,
+  });
 
-  const searchedPosts = feedSearchActive
-    ? postSearch.posts.map((post) =>
-        likePreviews[post.id] === undefined
-          ? post
-          : {
-              ...post,
-              liked: likePreviews[post.id],
-              likes: Math.max(
-                0,
-                post.likes +
-                  (likePreviews[post.id] === post.liked
-                    ? 0
-                    : likePreviews[post.id]
-                      ? 1
-                      : -1),
-              ),
-            },
-      )
-    : feedFilter === "saved"
-      ? savedPosts
-      : feedFilter === "following"
-        ? followingFeed.posts.map((post) =>
-            likePreviews[post.id] === undefined
-              ? post
-              : {
-                  ...post,
-                  liked: likePreviews[post.id],
-                  likes: Math.max(
-                    0,
-                    post.likes +
-                      (likePreviews[post.id] === post.liked
-                        ? 0
-                        : likePreviews[post.id]
-                          ? 1
-                          : -1),
-                  ),
-                },
-          )
-        : feedFilter === "latest"
-          ? [...visiblePosts].sort(
-              (a, b) =>
-                Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
-                b.id - a.id,
-            )
-          : visiblePosts;
-  const sortedChatListConversations = [...chatListConversations].sort((a, b) =>
-    Number(Boolean(b.pinnedAt)) - Number(Boolean(a.pinnedAt)) ||
-    (b.pinnedAt || '').localeCompare(a.pinnedAt || '') ||
-    (b.lastMessageAt || b.createdAt).localeCompare(a.lastMessageAt || a.createdAt)
-  );
+  const searchedPosts = selectDisplayedFeedPosts({
+    searchActive: feedSearchActive,
+    searchPosts: postSearch.posts,
+    savedPosts,
+    followingPosts: followingFeed.posts,
+    visiblePosts,
+    filter: feedFilter,
+    likePreviews,
+  });
+  const sortedChatListConversations = sortChatListConversations(chatListConversations);
   const openChatQuickContact = (contact: ChatQuickContact) => {
     setQuickSearchOpen(false);
     setGlobalSearch("");
