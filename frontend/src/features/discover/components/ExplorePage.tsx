@@ -1,6 +1,6 @@
-import { useState, lazy, Suspense, type FormEvent } from 'react'
+import { lazy, Suspense } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Sparkles, Users, FileText, MapPin, ArrowRight } from 'lucide-react'
+import { Users, FileText, MapPin, ArrowRight } from 'lucide-react'
 import { ErrorBoundary } from '../../../shared/ui/ErrorBoundary'
 import { AsyncSectionFallback } from '../../../shared/ui/AsyncSectionFallback'
 import type { DiscoverSectionProps } from '../types'
@@ -32,7 +32,6 @@ function ExplorePageContent(props: DiscoverSectionProps) {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const tab = parseTab(params.get('tab'))
-  const [search, setSearch] = useState('')
   const communities = useExploreCommunities(props.request, props.sessionId, tab === 'all' || tab === 'communities')
   function setTab(value: ExploreTab) {
     const next = new URLSearchParams(params)
@@ -40,14 +39,6 @@ function ExplorePageContent(props: DiscoverSectionProps) {
     else next.set('tab', value)
     setParams(next)
   }
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const query = search.trim()
-    if (query) navigate('/search?q=' + encodeURIComponent(query.slice(0, 120)))
-  }
-  const showPeople = tab === 'all' || tab === 'people'
-  const showCommunities = tab === 'all' || tab === 'communities'
-
   const people = <section aria-labelledby="explore-people-title" className="explore-people">
     <div className="explore-section-heading"><h2 id="explore-people-title">Mọi người nên kết nối</h2></div>
     {props.nearbyUsers.length === 0 ? <div className="explore-state"><span className="explore-empty-icon" aria-hidden="true"><Users size={22} /></span>
@@ -62,26 +53,15 @@ function ExplorePageContent(props: DiscoverSectionProps) {
       </article>)}
     </div>}
   </section>
-  const trending = <section className="explore-trending" aria-labelledby="explore-trending-title">
-    <h2 id="explore-trending-title">Đang được quan tâm</h2>
-    <div className="explore-state-content explore-trending-empty">
-      <span className="explore-empty-icon" aria-hidden="true"><Sparkles size={22} /></span>
-      <strong>Chưa có xu hướng mới</strong><p>Chưa có dữ liệu hashtag thịnh hành.</p>
-    </div>
+  const nearby = <section className="explore-near" aria-labelledby="explore-near-title">
+    <h2 id="explore-near-title">Gần bạn</h2>
+    <p>Bật quét để thấy người đang ở trong bán kính bạn chọn.</p>
+    <div className="explore-near-radar" aria-hidden="true" />
+    <button type="button" onClick={() => setTab('recent')}><MapPin size={17} aria-hidden="true" /> Quét người gần đây</button>
   </section>
 
   return <main className="explore-page">
-    <section className="explore-hero" aria-labelledby="explore-heading">
-      <div className="explore-hero-text">
-        <h1 id="explore-heading">Khám phá thế giới SocCo</h1>
-        <p>Chủ đề dành riêng cho bạn, cộng đồng cùng sở thích và nhiều điều mới.</p>
-        <form role="search" onSubmit={submit} className="explore-search">
-          <Search size={20} aria-hidden="true" />
-          <input aria-label="Tìm kiếm người, bài viết, hashtag, cộng đồng" placeholder="Tìm người, bài viết, cộng đồng…" value={search} maxLength={120} onChange={event => setSearch(event.target.value)} />
-          <button type="submit" disabled={!search.trim()}><Search size={18} aria-hidden="true" /> Tìm kiếm</button>
-        </form>
-      </div>
-    </section>
+    <h1 className="explore-visually-hidden">Khám phá</h1>
     <nav className="explore-tabs" aria-label="Danh mục khám phá">
       {tabs.map(item => <button key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined}
         className={tab === item.id ? 'active' : ''} onClick={() => setTab(item.id)}>{item.title}</button>)}
@@ -96,16 +76,9 @@ function ExplorePageContent(props: DiscoverSectionProps) {
           friendActionBusy={props.friendActionBusy} onFriendAction={props.actOnFriend}
           getFriendActionLabel={user => friendLabel(props.friendRelationship(user.id))} />
       </Suspense>
-    </ErrorBoundary> : <div className="explore-content-layout">
+    </ErrorBoundary> : <div className={tab === 'all' ? 'explore-content-layout' : 'explore-content-layout explore-content-layout-single'}>
       <div className="explore-main-column">
-        {tab === 'all' && <section className="explore-feature" aria-labelledby="explore-feature-title">
-          <span className="explore-feature-chip"><Sparkles size={15} /> NỔI BẬT</span>
-          <div className="explore-feature-content"><h2 id="explore-feature-title">Nội dung nổi bật</h2>
-            <p>Nội dung nổi bật sẽ xuất hiện khi hệ thống hỗ trợ tuyển chọn bài viết.</p>
-            <button type="button" onClick={() => setTab('posts')}>Khám phá bài viết <ArrowRight size={17} /></button>
-          </div>
-        </section>}
-        {tab === 'communities' && <CommunitySuggestions communities={communities} />}
+        {(tab === 'all' || tab === 'communities') && <CommunitySuggestions communities={communities} />}
         {tab === 'people' && people}
         {tab === 'posts' && <section className="explore-state explore-posts" aria-labelledby="explore-posts-title">
           <FileText size={34} aria-hidden="true" /><h2 id="explore-posts-title">Khám phá bài viết</h2>
@@ -113,11 +86,10 @@ function ExplorePageContent(props: DiscoverSectionProps) {
           <button type="button" onClick={() => navigate('/search?type=posts')}>Đến trang tìm kiếm <ArrowRight size={17} /></button>
         </section>}
       </div>
-      <aside className="explore-rail" aria-label="Gợi ý khám phá">
-        {trending}
-        {tab === 'all' && <CommunitySuggestions communities={communities} />}
-        {tab === 'all' && people}
-      </aside>
+      {tab === 'all' && <aside className="explore-rail" aria-label="Gợi ý khám phá">
+        {props.nearbyUsers.length > 0 && people}
+        {nearby}
+      </aside>}
     </div>}
   </main>
 }

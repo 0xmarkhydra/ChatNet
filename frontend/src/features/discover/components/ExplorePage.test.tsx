@@ -47,33 +47,44 @@ function mount(request: DiscoverSectionProps['request'], route = '/discover') {
 
 const ok = (items: unknown[]) => ({ ok: true, json: async () => items }) as Response
 
-it('renders truthful empty states and changes tabs without fabricated hashtags', async () => {
+it('renders truthful empty states and never fabricates featured content or hashtags', async () => {
   const view = mount(vi.fn(async () => ok([])))
   await view.render()
-  expect(view.host.textContent).toContain('Nội dung nổi bật')
-  expect(view.host.textContent).toContain('Chưa có dữ liệu hashtag thịnh hành')
   expect(view.host.textContent).toContain('Hiện chưa có cộng đồng công khai phù hợp')
+  expect(view.host.textContent).not.toContain('Nội dung nổi bật')
+  expect(view.host.textContent).not.toContain('hashtag')
+  expect(view.host.textContent).not.toContain('Đang được quan tâm')
+  expect(view.host.querySelector('.explore-rail .explore-people')).toBeNull()
+  expect(view.host.querySelector('.explore-rail .explore-near')).not.toBeNull()
   await act(async () => view.button('Mọi người')?.click())
   expect(view.host.textContent).toContain('Chưa có gợi ý kết nối')
-  expect(view.host.querySelector('.explore-rail')?.textContent).toContain('Đang được quan tâm')
 })
 
-it('places discovery suggestions in the rail and moves selected lists to the main column', async () => {
+it('puts communities in the main column and people plus nearby card in the rail', async () => {
+  const view = mount(vi.fn(async () => ok([
+    { id: 4, name: 'Cộng đồng công khai', visibility: 'public', memberCount: 12 },
+  ])))
+  view.props.nearbyUsers = [{ id: 23, username: 'an123', displayName: 'Bạn An', online: true }]
+  await view.render()
+  expect(view.host.querySelector('.explore-main-column .explore-communities')).not.toBeNull()
+  expect(view.host.querySelector('.explore-rail .explore-people')).not.toBeNull()
+  expect(view.host.querySelector('.explore-rail .explore-near')).not.toBeNull()
+  await act(async () => view.button('Quét người gần đây')?.click())
+  expect(view.route()).toBe('/discover?tab=recent')
+  expect(view.host.querySelector('.explore-content-layout')).toBeNull()
+})
+
+it('uses a single column without the rail on dedicated tabs', async () => {
   const view = mount(vi.fn(async () => ok([
     { id: 4, name: 'Cộng đồng công khai', visibility: 'public', memberCount: 12 },
   ])))
   await view.render()
-  expect(view.host.querySelector('.explore-rail .explore-communities')).not.toBeNull()
-  expect(view.host.querySelector('.explore-rail .explore-people')).not.toBeNull()
-  expect(view.host.querySelector('.explore-main-column .explore-feature')).not.toBeNull()
   await act(async () => view.button('Cộng đồng')?.click())
-  expect(view.host.querySelector('.explore-main-column .explore-communities')).not.toBeNull()
-  expect(view.host.querySelector('.explore-rail .explore-communities')).toBeNull()
-  expect(view.host.querySelector('.explore-rail .explore-trending')).not.toBeNull()
+  expect(view.host.querySelector('.explore-content-layout-single .explore-communities')).not.toBeNull()
+  expect(view.host.querySelector('.explore-rail')).toBeNull()
   await act(async () => view.button('Mọi người')?.click())
   expect(view.host.querySelector('.explore-main-column .explore-people')).not.toBeNull()
-  await act(async () => view.button('Gần đây')?.click())
-  expect(view.host.querySelector('.explore-content-layout')).toBeNull()
+  expect(view.host.querySelector('.explore-rail')).toBeNull()
 })
 
 it('updates tab URL and removes tab param when selecting all', async () => {
@@ -85,30 +96,6 @@ it('updates tab URL and removes tab param when selecting all', async () => {
   expect(view.route()).toBe('/discover?source=menu')
 })
 
-it('submits trimmed search text using URL encoding but cannot submit blank text', async () => {
-  const view = mount(vi.fn(async () => ok([])))
-  await view.render()
-  const input = view.host.querySelector<HTMLInputElement>('.explore-search input')!
-  const submit = view.host.querySelector<HTMLButtonElement>('.explore-search button')!
-  expect(submit.disabled).toBe(true)
-  expect(view.route()).toBe('/discover')
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-    setter.call(input, '   ')
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  expect(submit.disabled).toBe(true)
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-    setter.call(input, '  Việt Nam & AI  ')
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  expect(submit.disabled).toBe(false)
-  await act(async () => view.host.querySelector<HTMLFormElement>('.explore-search')!.dispatchEvent(
-    new Event('submit', { bubbles: true, cancelable: true }),
-  ))
-  expect(view.route()).toBe('/search?q=Vi%E1%BB%87t%20Nam%20%26%20AI')
-})
 
 it('shows nearby users and dispatches existing friend action', async () => {
   const view = mount(vi.fn(async () => ok([])), '/discover?tab=people')
