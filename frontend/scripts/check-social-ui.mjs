@@ -66,6 +66,7 @@ const storyReplyRequests = []
 const mediaOnly = process.argv.includes('--media-only')
 const headerOnly = process.argv.includes('--header-only')
 const postPreviewOnly = process.argv.includes('--post-preview-only')
+const postProfileOnly = process.argv.includes('--socco-67-only')
 let genericPreviewRequests = 0
 
 
@@ -174,6 +175,9 @@ try {
       id: 2, username: 'minhanh', displayName: 'Minh Anh',
       avatarSet: false, coverSet: false, allowFriendRequests: true,
       updatedAt: '2026-11-05T00:00:00Z',
+    })
+    if (postProfileOnly && path === '/api/users/phuonglinh/profile') return json({
+      ...suggestions[0], avatarSet: false, coverSet: false,
     })
     if (path === '/api/users/suggestions') return json(suggestions)
     if (path === '/api/users/search') return json([])
@@ -288,6 +292,56 @@ try {
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     return json({})
   })
+  if (postProfileOnly) {
+    fixturePost.comments = [
+      { id: 501, author: 'phuonglinh', authorDisplayName: 'Phương Linh', content: 'Bình luận thử', createdAt: fixturePost.createdAt },
+      { id: 502, parentId: 501, author: 'soco_user', authorDisplayName: 'SocCO Tester', content: 'Phản hồi thử', createdAt: fixturePost.createdAt },
+    ]
+    const feedURL = origin + '/feed?sort=latest'
+    const card = page.locator('.feed-post-card').first()
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    const profile = page.getByRole('dialog', { name: 'Trang cá nhân người dùng' })
+    async function expectVisitor(username, displayName) {
+      await page.waitForURL(origin + '/users/' + username)
+      await details.waitFor({ state: 'detached' })
+      await profile.getByText(displayName, { exact: true }).first().waitFor()
+    }
+
+    await page.goto(feedURL)
+    await card.getByRole('button', { name: 'Mở bài viết' }).press('Enter')
+    await details.getByRole('button', { name: 'Minh Anh', exact: true }).click()
+    await expectVisitor('minhanh', 'Minh Anh')
+    await page.goBack()
+    await page.waitForURL(feedURL)
+    assert(await details.count() === 0, 'Browser Back should not reopen dismissed post details')
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(origin + '/feed/posts/88?ref=share&sort=latest')
+    await details.getByRole('button', { name: 'Phương Linh', exact: true }).click()
+    await expectVisitor('phuonglinh', 'Phương Linh')
+    await profile.getByRole('button', { name: 'Quay lại' }).click()
+    await page.waitForURL(feedURL)
+    assert(await details.count() === 0, 'Returning from profile should remove the shared post route')
+
+    await page.goto(origin + '/feed?tab=feed&post=88&sort=latest')
+    await details.getByRole('button', { name: 'Xem 1 phản hồi' }).click()
+    await details.getByRole('button', { name: 'SocCO Tester', exact: true }).press('Enter')
+    await page.waitForURL(origin + '/profile')
+    await details.waitFor({ state: 'detached' })
+    await page.goBack()
+    await page.waitForURL(feedURL)
+    assert(await details.count() === 0, 'Browser Back should not reopen a legacy post link')
+
+    await card.getByRole('button', { name: 'Bình luận', exact: true }).click()
+    const inline = card.getByRole('region', { name: 'Bình luận về bài viết' })
+    await inline.getByRole('button', { name: 'Phương Linh', exact: true }).click()
+    await expectVisitor('phuonglinh', 'Phương Linh')
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('SOCCO-67 PASS: author and commenter profiles, inline comments, own profile, browser Back, and shared links')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
   if (process.argv.includes('--post-detail-dock-only')) {
     await page.goto(origin + '/feed', { waitUntil: 'domcontentloaded', timeout: 90000 })
     const post = page.locator('.feed-post-card').first()

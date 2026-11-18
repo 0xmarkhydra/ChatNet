@@ -2,7 +2,7 @@
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HashRouter, MemoryRouter, useLocation } from "react-router-dom";
+import { HashRouter, MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { usePostDetailNavigation } from "./usePostDetailNavigation";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -15,6 +15,7 @@ function mount(router: "memory" | "hash", url = "/feed?sort=latest") {
 
   function Probe() {
     const location = useLocation();
+    const navigate = useNavigate();
     const [active, setActive] = useState<number | null>(null);
     const { openFeedPostDetails, closeFeedPostDetails } = usePostDetailNavigation({ setActivePostId: setActive });
     return (
@@ -24,6 +25,12 @@ function mount(router: "memory" | "hash", url = "/feed?sort=latest") {
         <button onClick={() => openFeedPostDetails(42)}>Open</button>
         <button onClick={() => openFeedPostDetails(0)}>Invalid</button>
         <button onClick={closeFeedPostDetails}>Close</button>
+        <button onClick={() => {
+          const returnTo = closeFeedPostDetails();
+          navigate("/users/alice", { state: { returnTo } });
+        }}>Open profile</button>
+        <button onClick={() => navigate(-1)}>Back</button>
+        <output data-testid="returnTo">{location.state?.returnTo}</output>
       </div>
     );
   }
@@ -69,6 +76,18 @@ describe("post details stay over the feed", () => {
     const app = mount("memory", "/feed/posts/42?sort=latest");
     app.click("Open");
     app.click("Close");
+    expect(app.text("url")).toBe("/feed?sort=latest");
+    expect(app.text("active")).toBe("none");
+  });
+
+  it("replaces a shared post entry before opening a profile, so Back cannot reopen it", () => {
+    const app = mount("memory", "/feed/posts/42?ref=share&sort=latest#today");
+    app.click("Open");
+    app.click("Open profile");
+    expect(app.text("url")).toBe("/users/alice");
+    expect(app.text("active")).toBe("none");
+    expect(app.text("returnTo")).toBe("/feed?sort=latest#today");
+    app.click("Back");
     expect(app.text("url")).toBe("/feed?sort=latest");
     expect(app.text("active")).toBe("none");
   });
