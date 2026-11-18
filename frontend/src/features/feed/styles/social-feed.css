@@ -935,3 +935,23 @@
   .modern-shell.app-layout .social-feed-side-card { padding: 13px 15px 15px; }
   .modern-shell.app-layout .social-feed-suggestions { min-height: 260px; }
 }
+
+/* Preserve one row when the repost action joins the existing four controls. */
+.modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar:has(> .feed-repost-action) {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > .feed-repost-action[data-reposted='true'] {
+  color: var(--soco-blue);
+}
+@media (max-width: 600px) {
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar:has(> .feed-repost-action) > button {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar:has(> .feed-repost-action) > button span {
+    white-space: normal;
+    font-size: 11px;
+    line-height: 1.15;
+    text-align: center;
+  }
+}

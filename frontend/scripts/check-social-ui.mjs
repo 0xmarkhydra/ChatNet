@@ -63,6 +63,7 @@ let presignedUploads = 0
 let friendRequestsSent = 0
 let rejectStoryDirect = false
 const storyReplyRequests = []
+const repostOnly = process.argv.includes('--repost-only')
 const mediaOnly = process.argv.includes('--media-only')
 const headerOnly = process.argv.includes('--header-only')
 const postPreviewOnly = process.argv.includes('--post-preview-only')
@@ -188,6 +189,27 @@ try {
       incomingMention = { ...incomingMention, readAt: new Date().toISOString() }
       return route.fulfill({ status: 204, headers: cors })
     }
+    if (repostOnly && path === '/api/posts/88/repost') {
+      if (req.method() === 'DELETE') {
+        const at = feedPosts.findIndex(post => post.id === fixturePost.myRepostId)
+        if (at >= 0) feedPosts.splice(at, 1)
+        delete fixturePost.myRepostId
+        fixturePost.repostCount = Math.max(0, fixturePost.repostCount - 1)
+        return route.fulfill({ status: 204, headers: cors })
+      }
+      if (req.method() === 'POST') {
+        const { kind, content } = req.postDataJSON()
+        const id = kind === 'quick' ? 89 : 90
+        const originalPost = { ...fixturePost }
+        feedPosts.unshift({
+          id, author: 'soco_user', authorDisplayName: 'SocCO Tester', content, likes: 0, liked: false,
+          comments: [], visibility: 'public', createdAt: new Date().toISOString(), repostKind: kind, originalPost,
+        })
+        if (kind === 'quick') fixturePost.myRepostId = id
+        fixturePost.repostCount = (fixturePost.repostCount || 0) + 1
+        return json({ ...fixturePost })
+      }
+    }
     if (path === '/api/posts/88' && req.method() === 'GET') return json({ ...fixturePost })
     if (path === '/api/posts/88/reactions' && req.method() === 'POST') {
       const selected = req.postDataJSON().emoji
@@ -292,6 +314,36 @@ try {
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     return json({})
   })
+  if (repostOnly) {
+    await page.goto(origin + '/feed', { waitUntil: 'domcontentloaded' })
+    const toolbar = page.locator('.feed-post-card .feed-post-toolbar').first()
+    await toolbar.getByRole('button', { name: 'Đăng lại', exact: true }).click()
+    await page.getByRole('button', { name: 'Đăng lại ngay' }).click()
+    const sourceLink = page.getByRole('button', { name: 'Mở bài viết gốc của Minh Anh' })
+    await sourceLink.waitFor()
+    assert(await page.locator('.feed-post-card').count() === 1, 'Quick repost must not duplicate its original in the feed')
+    await sourceLink.click()
+    const details = page.getByRole('dialog', { name: 'Bài viết của Minh Anh' })
+    await details.getByRole('button', { name: 'Đã đăng lại' }).click()
+    await page.getByRole('button', { name: 'Bỏ đăng lại', exact: true }).click()
+    await details.getByRole('button', { name: 'Đăng lại', exact: true }).waitFor()
+    await details.getByRole('button', { name: 'Đóng chi tiết bài viết' }).click()
+    await page.setViewportSize({ width: 390, height: 720 })
+    await toolbar.getByRole('button', { name: 'Đăng lại', exact: true }).click()
+    await page.getByRole('button', { name: 'Trích dẫn bài viết', exact: true }).click()
+    const quote = page.getByRole('dialog', { name: 'Trích dẫn bài viết' })
+    const bounds = await quote.boundingBox()
+    assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 390, 'Quote composer must fit mobile viewport')
+    await quote.getByLabel('Ý kiến của bạn').fill('Góc nhìn của tôi về bài viết')
+    await quote.getByRole('button', { name: 'Đăng bài trích dẫn' }).click()
+    const quoteCard = page.locator('.feed-post-card').filter({ hasText: 'Góc nhìn của tôi về bài viết' })
+    await quoteCard.getByRole('button', { name: 'Mở bài viết gốc của Minh Anh' }).waitFor()
+    assert(errors.length === 0, 'Unexpected browser errors: ' + errors.join(', '))
+    console.log('PASS: repost, undo and feed deduplication on desktop; quote composer and embedded original on mobile')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
   if (postProfileOnly) {
     fixturePost.comments = [
       { id: 501, author: 'phuonglinh', authorDisplayName: 'Phương Linh', content: 'Bình luận thử', createdAt: fixturePost.createdAt },

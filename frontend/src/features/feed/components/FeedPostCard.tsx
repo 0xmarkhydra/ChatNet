@@ -1,5 +1,7 @@
 import { useId, type ReactNode } from 'react'
 import { Heart } from 'lucide-react'
+import FeedRepostAction from './FeedRepostAction'
+import FeedRepostPreview from './FeedRepostPreview'
 import FeedLikeButton from './FeedLikeButton'
 import { userLabel } from '../../../shared/utils/userLabel'
 import type { Post } from '../types'
@@ -33,6 +35,7 @@ type Props = {
   onReactionUsers: (post: Post) => void;
   showSave?: boolean;
   onEditPost?: (post: Post) => void;
+  onRepostChanged?: () => void;
   taggedNames?: Record<string, string>;
 };
 
@@ -71,6 +74,7 @@ export default function FeedPostCard({
   like,
   onReactionUsers,
   onEditPost,
+  onRepostChanged,
   taggedNames,
 }: Props) {
   const authorLabel = userLabel(post.author === name ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
@@ -87,17 +91,18 @@ export default function FeedPostCard({
         <div className="post-author">
           <div>
             <strong>{onAuthorOpen ? <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(post.author)}>{authorLabel}</button> : authorLabel}</strong>
+            {post.repostKind && <span className="block text-sm text-muted-foreground">{post.repostKind === 'quick' ? 'Đã đăng lại' : 'Đã trích dẫn'}</span>}
             <small><button type="button" className="feed-post-open-date" aria-label="Mở bài viết" onClick={openPost}>
               {relativeDate(post.createdAt)}
             </button> · {post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}</small>
           </div>
           <FeedPostActions
-            onEdit={onEditPost}
+            onEdit={post.repostKind === 'quick' ? undefined : onEditPost}
             post={post}
             mine={post.author === name}
             request={apiFetch}
             onUpdated={syncFeedPost}
-            onDeleted={removeFeedPost}
+            onDeleted={(id) => { removeFeedPost(id); if (post.repostKind) onRepostChanged?.() }}
             onFeedback={(text, kind) => setNotice(text, kind || "success")}
           />
         </div>
@@ -117,6 +122,8 @@ export default function FeedPostCard({
             <MediaAttachmentsView items={post.attachments} onImageClick={openPost} />
           </div>
         )}
+        <FeedRepostPreview post={post} onOpen={setActivePostId} />
+        {post.repostKind !== 'quick' && <>
         <div className="post-engagement-summary feed-post-engagement">
           <button type="button" className="feed-post-likes feed-reaction-users-trigger"
             disabled={post.likes === 0} aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`}
@@ -125,7 +132,7 @@ export default function FeedPostCard({
             <span>{formatCount(post.likes)} lượt thích</span>
           </button>
           <span className="feed-post-conversation-stats">
-            {commentsCount.toLocaleString('vi-VN')} bình luận · Chia sẻ
+            {commentsCount.toLocaleString('vi-VN')} bình luận{Boolean(post.repostCount) && ` · ${formatCount(post.repostCount ?? 0)} lượt đăng lại`}
           </span>
         </div>
         <div className="post-toolbar feed-post-toolbar">
@@ -138,6 +145,8 @@ export default function FeedPostCard({
           </button>
           <FeedShareAction postId={post.id}
             onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
+          <FeedRepostAction post={post} request={apiFetch} onUpdated={syncFeedPost} onRemoved={removeFeedPost}
+            onChanged={onRepostChanged} onFeedback={setNotice} />
           <FeedSaveAction post={post} request={apiFetch} onUpdated={syncFeedPost}
             onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
         </div>
@@ -147,6 +156,7 @@ export default function FeedPostCard({
             {discussion}
           </section>
         )}
+        </>}
       </div>
     </article>
   )

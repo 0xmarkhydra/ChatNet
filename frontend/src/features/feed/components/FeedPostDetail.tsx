@@ -16,6 +16,8 @@ export type FeedPostDetailProps = {
   likePreviews: Record<number, boolean>;
   onReactionUsers: (post: Post, portalContainer?: HTMLElement) => void;
   name: string;
+  onRepostChanged?: () => void;
+  onOpenOriginal?: (id: number) => void;
   openEditPost: (post: Post) => void;
   openVisitor: (username: string) => void;
   postDiscussion: ReactNode | null;
@@ -40,6 +42,8 @@ export default function FeedPostDetail({
   onReactionUsers,
   name,
   openEditPost,
+  onRepostChanged,
+  onOpenOriginal,
   openVisitor,
   postDiscussion,
   profileMedia,
@@ -63,12 +67,15 @@ export default function FeedPostDetail({
             request={apiFetch}
             sortOrder={commentSortOrder}
             onSortChange={setCommentSortOrder}
-            onDeleted={(id) => { removeFeedPost(id); closeFeedPostDetails(); }}
+            onDeleted={(id) => { removeFeedPost(id); closeFeedPostDetails(); if (activePost.repostKind) onRepostChanged?.(); }}
             onAuthorOpen={openVisitor}
             likeBusy={likePreviews[activePost.id] !== undefined}
             onLike={(post, emoji) => like(post, emoji)}
             onReactionUsers={onReactionUsers}
             onUpdated={syncFeedPost}
+            onRepostChanged={onRepostChanged}
+            onOpenOriginal={onOpenOriginal}
+            onRepostRemoved={removeFeedPost}
             onEditPost={openEditPost}
             taggedNames={friendTaggedNames}
             onFeedback={(message, kind) => setNotice(message, kind)}

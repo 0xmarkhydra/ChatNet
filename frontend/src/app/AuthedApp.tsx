@@ -2552,6 +2552,13 @@ export default function AuthedApp({
     />
   );
 
+  function refreshAfterRepost() {
+    void refreshPosts();
+    if (feedFilter === 'following') followingFeed.refresh();
+    if (feedSearchActive) postSearch.retry();
+    if (tab === 'profile') void loadProfilePosts(false, true);
+  }
+
   const renderPosts = (items: Post[], showSave = false) =>
     items.map((post) => (
       <FeedPostCard
@@ -2577,6 +2584,7 @@ export default function AuthedApp({
         like={like}
         onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
         onEditPost={openEditPost}
+        onRepostChanged={refreshAfterRepost}
         taggedNames={friendTaggedNames}
       />
     ));
@@ -2776,6 +2784,8 @@ export default function AuthedApp({
           }}
           onClose={closeVisitor}
           onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
+          onOpenOriginal={openFeedPostDetails}
+          onRepostChanged={refreshAfterRepost}
           onPostOpen={(post) => {
             setPosts((current) => [
               post,
@@ -3274,6 +3284,8 @@ export default function AuthedApp({
         {activePost && (
           <FeedPostDetail
           activePost={activePost}
+          onRepostChanged={refreshAfterRepost}
+          onOpenOriginal={openFeedPostDetails}
           apiFetch={apiFetch}
           closeFeedPostDetails={closeFeedPostDetails}
           commentSortOrder={commentSortOrder}

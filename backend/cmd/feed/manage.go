@@ -5,20 +5,32 @@ import (
 	"chatnet/internal/httpx"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // A block in either direction overrides post visibility.
-const feedAccessSQL = `NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+const directPostAccessSQL = `NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
  (b.blocker_id=$2 AND b.blocked_id=p.user_id) OR (b.blocker_id=p.user_id AND b.blocked_id=$2)) AND (p.user_id=$2 OR p.visibility='public' OR
  (p.visibility='friends' AND EXISTS(SELECT 1 FROM friend_connections fc
  WHERE fc.user_low=LEAST(p.user_id,$2) AND fc.user_high=GREATEST(p.user_id,$2)
  AND fc.status='accepted')))`
+
+const originalPostAccessSQL = `NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+ (b.blocker_id=$2 AND b.blocked_id=original.user_id) OR (b.blocker_id=original.user_id AND b.blocked_id=$2)) AND (original.user_id=$2 OR original.visibility='public' OR
+ (original.visibility='friends' AND EXISTS(SELECT 1 FROM friend_connections fc
+ WHERE fc.user_low=LEAST(original.user_id,$2) AND fc.user_high=GREATEST(original.user_id,$2)
+ AND fc.status='accepted')))`
+
+const feedAccessSQL = directPostAccessSQL + ` AND (p.repost_of IS NULL OR EXISTS (
+ SELECT 1 FROM posts original WHERE original.id=p.repost_of AND original.visibility<>'private' AND ` + originalPostAccessSQL + `))`
 
 func validVisibility(s string) bool { return s == "public" || s == "friends" || s == "private" }
 func validBackground(s string) bool {
@@ -43,20 +55,29 @@ func (s *server) canReadPost(ctx context.Context, id, uid int64) bool {
 }
 func (s *server) respondPost(w http.ResponseWriter, r *http.Request, id, uid int64, status int) {
 	var p post
+	var originalID int64
 	err := s.db.QueryRow(r.Context(), `SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
- p.visibility,p.background,p.updated_at,
+ p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0),
  EXISTS(SELECT 1 FROM post_likes WHERE post_id=p.id AND user_id=$2),
  EXISTS(SELECT 1 FROM saved_posts WHERE post_id=p.id AND user_id=$2)
  FROM posts p JOIN users u ON u.id=p.user_id
  WHERE p.id=$1 AND `+feedAccessSQL, id, uid).Scan(
 		&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt,
-		&p.Visibility, &p.Background, &p.UpdatedAt, &p.Liked, &p.Saved)
+		&p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.Liked, &p.Saved)
 	if err != nil {
 		httpx.Error(w, 404, "post not found")
 		return
 	}
 	if err := s.attachPostReactions(r.Context(), &p, uid); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load post reactions")
+		return
+	}
+	if err := s.attachRepost(r.Context(), &p, originalID, uid); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpx.Error(w, http.StatusNotFound, "post not found")
+		} else {
+			httpx.Error(w, http.StatusInternalServerError, "cannot load repost")
+		}
 		return
 	}
 	p.Comments = s.comments(r, p.ID, uid)
@@ -107,7 +128,7 @@ func (s *server) editPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	tag, err := tx.Exec(r.Context(), `UPDATE posts SET content=$1,visibility=$2,background=$3,updated_at=NOW() WHERE id=$4 AND user_id=$5`, b.Content, b.Visibility, b.Background, id, c.UserID)
+	tag, err := tx.Exec(r.Context(), `UPDATE posts SET content=$1,visibility=$2,background=$3,updated_at=NOW() WHERE id=$4 AND user_id=$5 AND repost_kind IS DISTINCT FROM 'quick'`, b.Content, b.Visibility, b.Background, id, c.UserID)
 	if err != nil {
 		httpx.Error(w, 500, "cannot update post")
 		return
