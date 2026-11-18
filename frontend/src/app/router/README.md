@@ -10,7 +10,8 @@
 - `FeatureRouteLayout` forwards that same context through its nested `<Outlet />` and intentionally adds **no DOM wrapper** or business state. Chat, Feed, Profile, Settings and detail routes retain the legacy `content` slot during migration.
 - Parent index routes display the existing page for Chat, Contacts, Feed, Profile, Calls and Settings. Subroutes reuse the same page slot until feature-specific page ownership can move independently.
 - Invalid child paths render standalone `NotFoundPage` inside the shell, with its existing CSS structure, contextual parent link, and page Error Boundary. Unknown `/users` without a username is invalid.
-- The route tree currently validates post IDs, conversation IDs, usernames and Settings section names before rendering. Do not replace validated routes with broad wildcard `CurrentPage` matches.
+- `FeatureRouteGuards.tsx` owns nested context forwarding and validation for Chat conversation IDs, Feed post IDs, visitor usernames and Settings sections. `RouteTree.tsx` stays declarative; keep invalid paths directed to `NotFoundPage` rather than broad wildcard matches.
+- Navigation regressions must cover invalid nested routes followed by Back/Forward without remounting the app shell.
 
 ## Navigation and deep-link compatibility
 

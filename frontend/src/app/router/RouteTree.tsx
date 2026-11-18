@@ -1,8 +1,9 @@
 import NotFoundPage from "./NotFoundPage";
 import type { ReactNode } from "react";
-import PageRoute, { type AppPageContext } from "./PageRoute";
-import { Navigate, Outlet, Route, Routes, useLocation, useOutletContext, useParams } from "react-router-dom";
-import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, tabFromPath, visitorUsernameFromPath } from "./routes";
+import PageRoute from "./PageRoute";
+import { FeatureRouteLayout, SettingsSectionPage, FeedPostPage, VisitorProfilePage, ChatConversationPage } from "./FeatureRouteGuards";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { ROUTE, TAB_PATH, tabFromPath } from "./routes";
 
 function LegacyHomeRedirect() {
   const { search, hash, state } = useLocation();
@@ -13,58 +14,13 @@ function LegacyHomeRedirect() {
   return <Navigate to={{ pathname: TAB_PATH[tab], search: remaining ? `?${remaining}` : "", hash }} state={state} replace />;
 }
 
-// The signed-in app owns live feature state; changing routes only replaces its page slot.
-function CurrentPage() {
-  return <PageRoute />;
-}
-
-/**
- * Route-only nested layout: forward the shell's existing page outlet context to
- * feature children without adding DOM or remounting auth/realtime providers.
- */
-function FeatureRouteLayout() {
-  const page = useOutletContext<AppPageContext>();
-  return <Outlet context={page} />;
-}
-
-const settingsSections = new Set([
-  "account", "privacy", "security", "notifications", "language",
-  "messages", "appearance", "storage", "devices",
-]);
-
-function SettingsSectionPage() {
-  const { section } = useParams();
-  return section && settingsSections.has(section) ? <CurrentPage /> : <NotFoundPage />;
-}
-
-function FeedPostPage() {
-  const { postId } = useParams();
-  return postId && feedPostIdFromPath(`/feed/posts/${postId}`) !== null
-    ? <CurrentPage />
-    : <NotFoundPage />;
-}
-
-function VisitorProfilePage() {
-  const { username } = useParams();
-  return username && visitorUsernameFromPath(`/users/${encodeURIComponent(username)}`) !== null
-    ? <CurrentPage />
-    : <NotFoundPage />;
-}
-
-function ChatConversationPage() {
-  const { conversationId } = useParams();
-  return conversationId && chatConversationIdFromPath(`/chat/${conversationId}`) !== null
-    ? <CurrentPage />
-    : <NotFoundPage />;
-}
-
 export function AppRouteTree({ children }: { children: ReactNode }) {
   return (
     <Routes>
       <Route path="/" element={<>{children}</>}>
         <Route index element={<LegacyHomeRedirect />} />
         <Route path={TAB_PATH.chat.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
+          <Route index element={<PageRoute />} />
           <Route path=":conversationId" element={<ChatConversationPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
@@ -79,16 +35,16 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={TAB_PATH.feed.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
+          <Route index element={<PageRoute />} />
           <Route path="posts/:postId" element={<FeedPostPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={TAB_PATH.profile.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
+          <Route index element={<PageRoute />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={ROUTE.settings.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
+          <Route index element={<PageRoute />} />
           <Route path=":section" element={<SettingsSectionPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

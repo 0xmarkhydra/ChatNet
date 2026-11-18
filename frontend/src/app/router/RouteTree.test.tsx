@@ -261,6 +261,31 @@ describe("app route tree", () => {
     }
   });
 
+  it("recovers from rejected nested routes through browser history without remounting the shell", () => {
+    const app = renderAt("/settings/privacy");
+    const navigation = app.container.querySelector<HTMLButtonElement>('[data-testid="navigate-route"]');
+    expect(navigation).not.toBeNull();
+    for (const [invalid, valid] of [
+      ["/settings/not-a-section", "/settings/privacy"],
+      ["/feed/posts/0", "/settings/privacy"],
+      ["/chat/9007199254740992", "/settings/privacy"],
+      ["/users/%2F", "/settings/privacy"],
+    ]) {
+      act(() => {
+        navigation!.setAttribute("data-target", invalid);
+        navigation!.click();
+      });
+      expect(app.location()).toBe(invalid);
+      expect(app.page()).toBeNull();
+      expect(app.container.textContent).toContain("Không tìm thấy trang");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+      app.history("Back");
+      expect(app.location()).toBe(valid);
+      expect(app.page()?.textContent).toBe("Current screen");
+      expect(app.onMount).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("redirects legacy calls into unified Contacts and preserves the shell", () => {
     for (const [legacy, canonical] of [
       ["/calls", "/contacts/calls"],
