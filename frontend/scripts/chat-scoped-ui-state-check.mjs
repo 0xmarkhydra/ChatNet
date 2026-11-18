@@ -80,6 +80,7 @@ try {
       return route.abort() // unmocked writes must never leave the browser
     }
     if (path === '/api/conversations') return reply([conversation(1, 'Bạn A', 'a'), conversation(2, 'Bạn B', 'b')])
+    if (/^\/api\/conversations\/\d+\/e2ee\/status$/.test(path)) return reply({ mode: 'legacy', autoEnabled: false })
     const list = path.match(/^\/api\/conversations\/(\d+)\/messages$/)
     if (list) return reply(history[Number(list[1])] ?? [])
     if (path === '/api/preferences') return reply({ autoTranslate: false, targetLanguage: 'vi' })
@@ -89,14 +90,21 @@ try {
   })
 
   const openConversation = async name => {
-    await page.locator('.conversation-item', { hasText: name }).first().click()
+    // The current avatar-first layout keeps the old list mounted but hidden.
+
+    const entry = page.locator('.desktop-conversation-rail-row button:visible, .conversation-avatar-rail-item:visible')
+      .filter({ hasText: name }).first()
+    if (await entry.count()) return entry.click()
+    const expanded = page.locator('.zalo-conversation-list .conversation-item:visible', { hasText: name }).first()
+    if (await expanded.count()) return expanded.click()
+    throw new Error(`No visible conversation entry for ${name}`)
   }
   const composer = page.getByPlaceholder(/Nhập tin nhắn|Nhắn /)
   const detailsOpen = () => page.locator('#conversation-details-panel').count()
   const replyBar = () => page.locator('.composer-reply-preview').count()
 
   await page.goto(origin)
-  await page.locator('.conversation-item').first().waitFor()
+  await page.locator('.desktop-conversation-rail-row button:visible, .conversation-avatar-rail-item:visible').first().waitFor()
 
   // Conversation A: open details, start a reply, type a draft.
   await openConversation('Bạn A')
@@ -137,7 +145,6 @@ try {
   const queued = writes.filter(w => w.body.text === 'gửi sau cho A')
   assert.equal(queued.length, 1, 'queued message is delivered exactly once')
   assert.equal(queued[0].conversationId, 1, 'queued message stays with the conversation it was written in')
-
   assert.deepEqual(errors.filter(e => !/Failed to load resource|net::ERR/.test(e)), [], 'no page or console errors')
   console.log('PASS: scoped chat UI state resets per conversation; drafts, outbox and history are kept (mocked network)')
 } finally {
