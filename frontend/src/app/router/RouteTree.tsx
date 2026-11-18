@@ -6,6 +6,10 @@ import { ChatConversationPage, FeatureRouteLayout, FeedPostPage, SettingsSection
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ROUTE, TAB_PATH } from "./routes";
 
+const CONTACTS_SUBROUTES = [
+  "directory", "overview", "groups", "requests", "calls", "translation",
+] as const;
+
 export function AppRouteTree({ children }: { children: ReactNode }) {
   return (
     <Routes>
@@ -18,12 +22,9 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
         </Route>
         <Route path={TAB_PATH.contacts.slice(1)} element={<FeatureRouteLayout />}>
           <Route index element={<PageRoute page="contacts" />} />
-          <Route path="directory" element={<PageRoute page="contacts" />} />
-          <Route path="overview" element={<PageRoute page="contacts" />} />
-          <Route path="groups" element={<PageRoute page="contacts" />} />
-          <Route path="requests" element={<PageRoute page="contacts" />} />
-          <Route path="calls" element={<PageRoute page="contacts" />} />
-          <Route path="translation" element={<PageRoute page="contacts" />} />
+          {CONTACTS_SUBROUTES.map((path) => (
+            <Route key={path} path={path} element={<PageRoute page="contacts" />} />
+          ))}
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={TAB_PATH.feed.slice(1)} element={<FeatureRouteLayout />}>
