@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'state/app_providers.dart';
 
 import 'api.dart';
 import 'auth_screen.dart';
@@ -96,23 +99,27 @@ class _SocoAppState extends State<SocoApp> {
 
   @override
   Widget build(BuildContext context) {
-    return UiTranslations(
-      messages: messages,
-      child: MaterialApp(
-        title: 'SocCO',
-        debugShowCheckedModeBanner: false,
-        theme: buildSocoTheme(),
-        home: api.session == null
-            ? AuthScreen(
-                api: api,
-                onAuthenticated: () => _authenticated(api),
-                onDemo: () => _authenticated(DemoApi()),
-              )
-            : HomeShell(
-                api: api,
-                onLogout: _logout,
-                onLocaleChanged: _loadLocale,
-              ),
+    return ProviderScope(
+      key: ValueKey(api),
+      overrides: [apiProvider.overrideWithValue(api)],
+      child: UiTranslations(
+        messages: messages,
+        child: MaterialApp(
+          title: 'SocCO',
+          debugShowCheckedModeBanner: false,
+          theme: buildSocoTheme(),
+          home: api.session == null
+              ? AuthScreen(
+                  api: api,
+                  onAuthenticated: () => _authenticated(api),
+                  onDemo: () => _authenticated(DemoApi()),
+                )
+              : HomeShell(
+                  api: api,
+                  onLogout: _logout,
+                  onLocaleChanged: _loadLocale,
+                ),
+        ),
       ),
     );
   }

@@ -82,6 +82,24 @@ class DemoApi extends Api {
       'lastMessageAt': '2026-10-15T14:00:00+07:00',
     },
   ];
+  final Map<int, Json> contactMetadata = {
+    2: {'id': 2, 'nickname': '', 'note': '', 'favorite': false},
+    3: {'id': 3, 'nickname': '', 'note': '', 'favorite': false},
+  };
+  final List<Json> userReports = [];
+  final Map<int, Json> notificationSettings = {};
+  final Set<int> pinnedMessageIds = {};
+  final List<String> messageSearchRequests = [];
+  final Map<int, List<Json>> channels = {
+    1: [
+      {
+        'id': 0,
+        'name': 'Thảo luận chung',
+        'description': 'Kênh chính của nhóm',
+      },
+      {'id': 5, 'name': 'Thiết kế UI', 'description': 'Cập nhật giao diện'},
+    ],
+  };
   late final Map<int, List<Json>> groupMembers = {
     1: [
       {
@@ -161,6 +179,9 @@ class DemoApi extends Api {
           'author': 'Alex Chen',
           'content': 'Looking forward to it!',
           'parentId': null,
+          'createdAt': DateTime.now()
+              .subtract(const Duration(minutes: 24))
+              .toIso8601String(),
         },
       ],
       'attachments': [
@@ -199,11 +220,21 @@ class DemoApi extends Api {
         'url':
             'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=900&q=85',
       },
+      'createdAt': DateTime.now()
+          .subtract(const Duration(hours: 4))
+          .toIso8601String(),
       'expiresAt': DateTime.now()
           .add(const Duration(hours: 20))
           .toIso8601String(),
     },
   ];
+  Json privacy = {
+    'searchableByUsername': true,
+    'searchableByName': true,
+    'searchableByEmail': false,
+    'allowFriendRequests': true,
+    'showOnlineStatus': true,
+  };
   Json profile = {
     'username': 'minhanh',
     'displayName': 'Minh Anh',
@@ -273,14 +304,52 @@ class DemoApi extends Api {
             'Bản dịch minh họa. Đăng nhập để dịch AI thật: ${body?['text']}',
       };
     }
-    await Future<void>.delayed(const Duration(milliseconds: 160));
+    // Membership/group prefetch is instantaneous in demo mode so that
+    // unawaited refreshes cannot leave fake timers after a widget is removed.
+    if (!path.startsWith('/api/conversations?type=group&') &&
+        path != '/api/conversations?limit=100') {
+      await Future<void>.delayed(const Duration(milliseconds: 160));
+    }
     final uri = Uri.parse(path);
     final parts = uri.path.split('/').where((s) => s.isNotEmpty).toList();
     final data = body ?? {};
     if (path == '/api/auth/me') return user;
+    if (path == '/api/calls/translation/languages') {
+      return {
+        'languages': ['vi', 'en', 'ja', 'ko', 'zh'],
+      };
+    }
+    if (parts.length >= 2 && parts[1] == 'contacts') {
+      if (method == 'GET' && parts.length == 2) {
+        return contactMetadata.values.toList();
+      }
+      if (method == 'PUT' && parts.length == 3) {
+        final id = int.parse(parts[2]);
+        return contactMetadata[id] = {'id': id, ...data};
+      }
+    }
+    if (parts.length == 4 && parts[1] == 'users' && parts[3] == 'block') {
+      final id = int.parse(parts[2]);
+      final blocked = method == 'POST';
+      for (final friend in friends) {
+        if (friend['id'] == id) friend['blockedByMe'] = blocked;
+      }
+      return {'blocked': blocked};
+    }
+    if (parts.length == 4 &&
+        parts[1] == 'users' &&
+        parts[3] == 'report' &&
+        method == 'POST') {
+      userReports.add({'id': int.parse(parts[2]), ...data});
+      return {'ok': true};
+    }
     if (path == '/api/preferences') {
       if (method == 'PUT') preferences.addAll(data);
       return {...preferences};
+    }
+    if (path == '/api/privacy') {
+      if (method == 'PUT') privacy.addAll(data);
+      return {...privacy};
     }
     if (path == '/api/profile') {
       if (method == 'PUT') profile.addAll(data);
@@ -292,7 +361,16 @@ class DemoApi extends Api {
       return {...profile};
     }
     if (parts[1] == 'conversations') {
-      if (parts.length == 2) return rooms;
+      if (parts.length == 2) {
+        final type = uri.queryParameters['type'];
+        final matching = type == null
+            ? rooms
+            : rooms.where((room) => room['type'] == type).toList();
+        final offset = int.tryParse(uri.queryParameters['offset'] ?? '0') ?? 0;
+        final limit =
+            int.tryParse(uri.queryParameters['limit'] ?? '') ?? matching.length;
+        return matching.skip(offset).take(limit).toList();
+      }
       if (parts[2] == 'groups' || parts[2] == 'direct') {
         final group = parts[2] == 'groups';
         if (!group) {
@@ -358,6 +436,50 @@ class DemoApi extends Api {
       if (parts.length == 3 && method == 'PATCH') {
         room.addAll(data);
         return room;
+      }
+      if (parts[3] == 'notification-settings') {
+        final settings = notificationSettings.putIfAbsent(
+          id,
+          () => {
+            'messageNotifications': room['muted'] != true,
+            'mentionNotifications': true,
+          },
+        );
+        if (method == 'PUT') {
+          settings.addAll(data);
+          room['muted'] = room['type'] == 'group'
+              ? settings['messageNotifications'] != true
+              : settings['messageNotifications'] != true &&
+                    settings['mentionNotifications'] != true;
+        }
+        return {...settings};
+      }
+      if (parts[3] == 'channels') {
+        return channels.putIfAbsent(
+          id,
+          () => [
+            {
+              'id': 0,
+              'name': 'Thảo luận chung',
+              'description': 'Kênh chính của nhóm',
+            },
+          ],
+        );
+      }
+      if (parts[3] == 'pins') {
+        return [
+          for (final item in messages[id] ?? <Json>[])
+            if (pinnedMessageIds.contains(item['id']))
+              {'message': item, 'pinnedAt': DateTime.now().toIso8601String()},
+        ];
+      }
+      if (parts[3] == 'pin') {
+        if (method == 'PUT') {
+          room['pinnedAt'] = DateTime.now().toIso8601String();
+        } else if (method == 'DELETE') {
+          room.remove('pinnedAt');
+        }
+        return {...room};
       }
       if (parts[3] == 'read') {
         room['unreadCount'] = 0;
@@ -438,13 +560,96 @@ class DemoApi extends Api {
           room['lastMessage'] = data['text'];
           return m;
         }
-        return messages[id] ?? [];
+        final channelId =
+            int.tryParse(uri.queryParameters['channelId'] ?? '0') ?? 0;
+        final keyword =
+            uri.queryParameters['search']?.trim().toLowerCase() ?? '';
+        final sender =
+            uri.queryParameters['sender']?.trim().toLowerCase() ?? '';
+        final from = uri.queryParameters['from'] ?? '';
+        final to = uri.queryParameters['to'] ?? '';
+        final before = int.tryParse(uri.queryParameters['before'] ?? '');
+        final limit = int.tryParse(uri.queryParameters['limit'] ?? '');
+        if (uri.queryParameters.containsKey('limit')) {
+          messageSearchRequests.add(path);
+        }
+        final filtered = (messages[id] ?? <Json>[]).where((item) {
+          if (((item['channelId'] as num?)?.toInt() ?? 0) != channelId) {
+            return false;
+          }
+          if (keyword.isNotEmpty &&
+              !(item['text']?.toString() ?? '').toLowerCase().contains(
+                keyword,
+              )) {
+            return false;
+          }
+          if (sender.isNotEmpty) {
+            final authorId = item['senderId'];
+            final username = authorId == user['id']
+                ? user['username']?.toString().toLowerCase() ?? ''
+                : people
+                          .where((person) => person['id'] == authorId)
+                          .map(
+                            (person) =>
+                                person['username']?.toString().toLowerCase() ??
+                                '',
+                          )
+                          .firstOrNull ??
+                      '';
+            if (username != sender &&
+                (item['sender']?.toString().toLowerCase() ?? '') != sender) {
+              return false;
+            }
+          }
+          final date = DateTime.tryParse(item['createdAt']?.toString() ?? '');
+          if (date == null) return from.isEmpty && to.isEmpty;
+          final day =
+              '${date.year.toString().padLeft(4, '0')}-'
+              '${date.month.toString().padLeft(2, '0')}-'
+              '${date.day.toString().padLeft(2, '0')}';
+          if (from.isNotEmpty && day.compareTo(from) < 0) return false;
+          if (to.isNotEmpty && day.compareTo(to) > 0) return false;
+          if (before != null &&
+              ((item['id'] as num?)?.toInt() ?? 0) >= before) {
+            return false;
+          }
+          return true;
+        }).toList();
+        if (limit == null) return filtered;
+        filtered.sort(
+          (a, b) => ((b['id'] as num?)?.toInt() ?? 0).compareTo(
+            (a['id'] as num?)?.toInt() ?? 0,
+          ),
+        );
+        return filtered.take(limit).toList();
       }
     }
     if (parts[1] == 'messages') {
       final m = messages.values
           .expand((v) => v)
           .firstWhere((m) => '${m['id']}' == parts[2]);
+      if (parts.length > 3 && parts[3] == 'pin') {
+        if (method == 'PUT') pinnedMessageIds.add(m['id'] as int);
+        if (method == 'DELETE') pinnedMessageIds.remove(m['id']);
+        return {...m};
+      }
+      if (parts.length > 3 && parts[3] == 'reactions' && method == 'GET') {
+        final emoji = uri.queryParameters['emoji'] ?? '';
+        final reactions = objects(m['reactions']);
+        return {
+          'items': [
+            for (final reaction in reactions)
+              if (emoji.isEmpty || reaction['emoji'] == emoji)
+                {
+                  'userId': 1,
+                  'username': 'minhanh',
+                  'displayName': 'Minh Anh',
+                  'emoji': reaction['emoji'],
+                },
+          ],
+          'hasMore': false,
+        };
+      }
       if (method == 'DELETE') {
         m.addAll({
           'deleted': true,
@@ -494,6 +699,28 @@ class DemoApi extends Api {
       return {};
     }
     if (parts[1] == 'users') {
+      if (parts.length >= 4 && parts[3] == 'profile') {
+        final username = Uri.decodeComponent(parts[2]);
+        final person = people.firstWhere(
+          (item) =>
+              item['username'] == username || item['displayName'] == username,
+          orElse: () => {
+            'id': ++serial,
+            'username': username,
+            'displayName': username,
+            'online': false,
+          },
+        );
+        return {
+          ...person,
+          'avatarSet': false,
+          'coverSet': false,
+          'bio': 'Kết nối với bạn bè trên SocCO',
+          'city': 'Việt Nam',
+          'allowFriendRequests': true,
+          'updatedAt': DateTime.now().toIso8601String(),
+        };
+      }
       if (parts[2] == 'nearby') {
         return {
           'users': people.map((p) => {...p, 'distanceKm': 0.8}).toList(),
@@ -501,6 +728,29 @@ class DemoApi extends Api {
       }
       final query = uri.queryParameters['q'] ?? '';
       return people.where((p) => '${p['username']}'.contains(query)).toList();
+    }
+    if (parts[1] == 'calls' && parts.length > 2 && parts[2] == 'history') {
+      return [
+        {
+          'id': 'demo-call-1',
+          'conversationId': 2,
+          'createdBy': 1,
+          'mediaType': 'audio',
+          'status': 'ended',
+          'joined': true,
+          'declined': false,
+          'isGroup': false,
+          'createdAt': DateTime.now()
+              .subtract(const Duration(hours: 2))
+              .toIso8601String(),
+          'startedAt': DateTime.now()
+              .subtract(const Duration(hours: 2))
+              .toIso8601String(),
+          'endedAt': DateTime.now()
+              .subtract(const Duration(minutes: 119))
+              .toIso8601String(),
+        },
+      ];
     }
     if (parts[1] == 'posts') {
       if (parts.length == 2) {
@@ -517,13 +767,57 @@ class DemoApi extends Api {
           posts.insert(0, p);
           return p;
         }
+        final author = uri.queryParameters['author'];
+        if (author != null) {
+          final peopleMatches = people.where(
+            (person) =>
+                person['username'] == author || person['displayName'] == author,
+          );
+          final alias = peopleMatches.isNotEmpty
+              ? peopleMatches.first['displayName']?.toString()
+              : null;
+          return posts
+              .where(
+                (p) =>
+                    p['author'] == author ||
+                    p['authorDisplayName'] == author ||
+                    (alias != null && p['author'] == alias),
+              )
+              .toList();
+        }
         return posts;
       }
       final p = posts.firstWhere((p) => '${p['id']}' == parts[2]);
+      if (parts[3] == 'reactions' && method == 'GET') {
+        return {
+          'items': [
+            if ((p['likes'] as num?)?.toInt() != 0)
+              {
+                'userId': 2,
+                'username': 'linhnguyen',
+                'displayName': 'Linh Nguyễn',
+                'emoji': '👍',
+              },
+          ],
+          'hasMore': false,
+        };
+      }
       if (parts[3] == 'like') {
         p['liked'] = p['liked'] != true;
         p['likes'] += p['liked'] == true ? 1 : -1;
         return p;
+      }
+      if (parts[3] == 'save') {
+        p['saved'] = p['saved'] != true;
+        return {...p};
+      }
+      if (parts.length == 3 && method == 'DELETE') {
+        posts.removeWhere((item) => item['id'] == p['id']);
+        return {};
+      }
+      if (parts.length == 3 && method == 'PATCH') {
+        p.addAll(data);
+        return {...p};
       }
       final comment = {
         'id': ++serial,

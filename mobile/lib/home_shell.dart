@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'presentation/mobile_shell_state.dart';
+import 'presentation/soco_bottom_navigation.dart';
 
 import 'api.dart';
 import 'chat_screen.dart';
 import 'contacts_screen.dart';
 import 'discover_screen.dart';
 import 'feed_screen.dart';
-import 'localization.dart';
 import 'notification_sheet.dart';
 import 'profile_qr.dart';
 import 'profile_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-enum SocoTab { chat, contacts, discover, feed, profile }
-
-class HomeShell extends StatefulWidget {
+class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({
     super.key,
     required this.api,
@@ -27,54 +28,51 @@ class HomeShell extends StatefulWidget {
   final ValueChanged<String> onLocaleChanged;
 
   @override
-  State<HomeShell> createState() => _HomeShellState();
+  ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
-  SocoTab tab = SocoTab.chat;
+class _HomeShellState extends ConsumerState<HomeShell> {
+  SocoTab get tab => ref.read(mobileShellProvider).tab;
+  bool get conversationOpen => ref.read(mobileShellProvider).conversationOpen;
+  int get unreadTotal => ref.read(mobileShellProvider).unreadTotal;
   String search = '';
-  bool conversationOpen = false;
   Json? requestedConversation;
   int createChatRequest = 0;
+  int chatHomeRequest = 0;
+  int createPostRequest = 0;
+  int newFriendRequest = 0;
   final contentKey = GlobalKey();
   late final TextEditingController searchController = TextEditingController();
 
-  List<NavigationDestination> destinations(BuildContext context) => [
-    NavigationDestination(
-      icon: const SocoIcon(SocoIconType.chat),
-      label: tr(context, 'nav.chat'),
-    ),
-    NavigationDestination(
-      icon: const SocoIcon(SocoIconType.contacts),
-      label: tr(context, 'nav.contacts'),
-    ),
-    NavigationDestination(
-      icon: const SocoIcon(SocoIconType.discover),
-      label: tr(context, 'nav.discover'),
-    ),
-    NavigationDestination(
-      icon: const SocoIcon(SocoIconType.feed),
-      label: tr(context, 'nav.feed'),
-    ),
-    NavigationDestination(
-      icon: const SocoIcon(SocoIconType.profile),
-      label: tr(context, 'nav.profile'),
-    ),
-  ];
-
   void _select(int index) {
+    final destination = SocoTab.values[index];
+    ref.read(mobileShellProvider.notifier).select(destination);
     setState(() {
-      tab = SocoTab.values[index];
       search = '';
       searchController.clear();
-      if (tab != SocoTab.chat) conversationOpen = false;
+      if (destination == SocoTab.chat) chatHomeRequest++;
     });
   }
 
+  void _openChat(Json room) {
+    if (!mounted) return;
+    ref.read(mobileShellProvider.notifier).openConversation();
+    setState(() {
+      requestedConversation = room;
+      search = '';
+      searchController.clear();
+    });
+  }
+
+  void _createChat() {
+    ref.read(mobileShellProvider.notifier).select(SocoTab.chat);
+    setState(() => createChatRequest++);
+  }
+
   String get hint => switch (tab) {
-    SocoTab.chat => 'Tìm cuộc trò chuyện',
+    SocoTab.chat => '',
     SocoTab.contacts => 'Tên, @username hoặc email',
-    SocoTab.feed => 'Tìm tác giả hoặc nội dung',
+    SocoTab.feed => 'Tìm tác giả hoặc nội dung bài viết',
     SocoTab.discover => 'Tìm địa điểm quanh đây',
     SocoTab.profile => '',
   };
@@ -89,9 +87,15 @@ class _HomeShellState extends State<HomeShell> {
           query: tab == SocoTab.chat ? search : '',
           requestedConversation: requestedConversation,
           createRequest: createChatRequest,
+          resetRequest: chatHomeRequest,
+          onUnreadChanged: (count) {
+            if (mounted) {
+              ref.read(mobileShellProvider.notifier).setUnreadTotal(count);
+            }
+          },
           onConversationChanged: (value) {
-            if (conversationOpen != value && mounted) {
-              setState(() => conversationOpen = value);
+            if (mounted) {
+              ref.read(mobileShellProvider.notifier).setConversationOpen(value);
             }
           },
         ),
@@ -99,26 +103,12 @@ class _HomeShellState extends State<HomeShell> {
           key: const ValueKey('contacts'),
           api: widget.api,
           query: tab == SocoTab.contacts ? search : '',
-          onOpenConversation: (room) {
-            setState(() {
-              requestedConversation = room;
-              tab = SocoTab.chat;
-              search = '';
-              searchController.clear();
-            });
-          },
-          onAddFriend: () {
-            setState(() {
-              tab = SocoTab.chat;
-              createChatRequest++;
-            });
-          },
-          onCreateGroup: () {
-            setState(() {
-              tab = SocoTab.chat;
-              createChatRequest++;
-            });
-          },
+          onOpenConversation: _openChat,
+          onAddFriend: _createChat,
+          onCreateGroup: _createChat,
+          newFriendRequest: newFriendRequest,
+          onScanQr: () => _showQr(initialScan: true),
+          onShowQr: () => _showQr(),
         ),
         DiscoverScreen(
           key: const ValueKey('discover'),
@@ -129,6 +119,9 @@ class _HomeShellState extends State<HomeShell> {
           key: const ValueKey('feed'),
           api: widget.api,
           query: tab == SocoTab.feed ? search : '',
+          createRequest: createPostRequest,
+          onOpenOwnProfile: () => _select(SocoTab.profile.index),
+          onOpenConversation: _openChat,
         ),
         ProfileScreen(
           key: const ValueKey('profile'),
@@ -136,6 +129,10 @@ class _HomeShellState extends State<HomeShell> {
           onLogout: widget.onLogout,
           onConnect: _connectProfile,
           onLocaleChanged: widget.onLocaleChanged,
+          onCreatePost: () {
+            ref.read(mobileShellProvider.notifier).select(SocoTab.feed);
+            setState(() => createPostRequest++);
+          },
         ),
       ],
     );
@@ -147,7 +144,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget _header(bool compact) {
     return Container(
       key: const ValueKey('web-appbar'),
-      height: compact ? 112 : 76,
+      height: compact ? (hint.isEmpty ? 70 : 112) : 76,
       padding: EdgeInsets.fromLTRB(
         compact ? 14 : 20,
         compact ? 10 : 12,
@@ -207,19 +204,34 @@ class _HomeShellState extends State<HomeShell> {
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
+    final bell = IconButton(
+      tooltip: 'Thông báo',
+      style: style,
+      onPressed: () => showNotificationSheet(context, widget.api),
+      icon: const SocoIcon(SocoIconType.bell, size: 26),
+    );
     if (tab == SocoTab.feed) {
       return [
         IconButton(
-          tooltip: 'Tạo bài viết',
+          tooltip: 'Bạn bè',
           style: style,
-          onPressed: () {},
-          icon: const SocoIcon(SocoIconType.compose, size: 27),
+          onPressed: () => _select(SocoTab.contacts.index),
+          icon: const Icon(Icons.people_outline_rounded, size: 27),
         ),
-        IconButton(
-          tooltip: 'Thông báo',
-          style: style,
-          onPressed: () => showNotificationSheet(context, widget.api),
-          icon: const SocoIcon(SocoIconType.bell, size: 27),
+        bell,
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: InkWell(
+            key: const ValueKey('header-my-avatar'),
+            onTap: () => _select(SocoTab.profile.index),
+            borderRadius: BorderRadius.circular(50),
+            child: UserAvatar(
+              name: widget.api.user['displayName']?.toString() ?? '',
+              username: widget.api.user['username']?.toString(),
+              size: 35,
+              fetchProfileImage: !widget.api.isDemo,
+            ),
+          ),
         ),
       ];
     }
@@ -228,14 +240,10 @@ class _HomeShellState extends State<HomeShell> {
         IconButton(
           tooltip: 'Thêm bạn',
           style: style,
-          onPressed: () {
-            setState(() {
-              tab = SocoTab.chat;
-              createChatRequest++;
-            });
-          },
+          onPressed: () => setState(() => newFriendRequest++),
           icon: const SocoIcon(SocoIconType.plus, size: 31),
         ),
+        bell,
       ];
     }
     return [
@@ -243,20 +251,16 @@ class _HomeShellState extends State<HomeShell> {
         tooltip: 'Quét QR',
         style: style,
         onPressed: () => _showQr(initialScan: true),
-        icon: const SocoIcon(SocoIconType.qr, size: 28),
+        icon: const SocoIcon(SocoIconType.qr, size: 27),
       ),
       IconButton(
         key: const ValueKey('quick-create'),
         tooltip: 'Tạo mới',
         style: style,
-        onPressed: () {
-          setState(() {
-            tab = SocoTab.chat;
-            createChatRequest++;
-          });
-        },
+        onPressed: _createChat,
         icon: const SocoIcon(SocoIconType.plus, size: 31),
       ),
+      bell,
     ];
   }
 
@@ -298,11 +302,10 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _connectProfile(String username) {
+    ref.read(mobileShellProvider.notifier).select(SocoTab.contacts);
     setState(() {
-      tab = SocoTab.contacts;
       search = username;
       searchController.text = username;
-      conversationOpen = false;
     });
   }
 
@@ -326,6 +329,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(mobileShellProvider);
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth <= 760;
@@ -358,7 +362,9 @@ class _HomeShellState extends State<HomeShell> {
                   ),
                   child: Column(
                     children: [
-                      if (_showsHeader) _header(compact),
+                      if (_showsHeader &&
+                          !(compact && tab == SocoTab.chat && conversationOpen))
+                        _header(compact),
                       Expanded(
                         child: KeyedSubtree(key: contentKey, child: _screens()),
                       ),
@@ -375,81 +381,11 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Widget _bottomNavigation(bool compact) {
-    final items = destinations(context);
-    return Container(
-      key: const ValueKey('bottom-navigation'),
-      height: compact ? 58 : 66,
-      decoration: const BoxDecoration(
-        color: Color(0xFFFEFEFF),
-        border: Border(top: BorderSide(color: socoLine)),
-      ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: Row(
-            children: [
-              for (var index = 0; index < items.length; index++)
-                Expanded(
-                  child: Semantics(
-                    button: true,
-                    selected: tab.index == index,
-                    label: items[index].label,
-                    child: InkWell(
-                      key: ValueKey('nav-${SocoTab.values[index].name}'),
-                      onTap: () => _select(index),
-                      child: Center(
-                        child: Container(
-                          height: compact ? 48 : 52,
-                          margin: EdgeInsets.symmetric(
-                            horizontal: compact ? 3 : 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: tab.index == index
-                                ? const Color(0xFFE5EDFF)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              if (tab.index == index)
-                                const Positioned(
-                                  top: 0,
-                                  child: SizedBox(
-                                    width: 28,
-                                    child: Divider(
-                                      height: 3,
-                                      thickness: 3,
-                                      color: socoBlue,
-                                    ),
-                                  ),
-                                ),
-                              Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  IconTheme(
-                                    data: IconThemeData(
-                                      color: tab.index == index
-                                          ? socoBlue
-                                          : const Color(0xFF8792A8),
-                                      size: compact ? 25 : 26,
-                                    ),
-                                    child: items[index].icon,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+    return SocoBottomNavigationBar(
+      compact: compact,
+      selected: tab,
+      unreadTotal: unreadTotal,
+      onSelected: (destination) => _select(destination.index),
     );
   }
 }
