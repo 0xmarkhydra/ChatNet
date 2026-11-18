@@ -6,7 +6,7 @@ const validID = (value) => Number.isSafeInteger(value) && value > 0
 const validSession = (value) => typeof value === 'string' && /^[a-f0-9-]{36}$/i.test(value)
 
 // No message text, names, avatars, credentials or external URLs enter the OS notification store.
-function createNativeNotifications({ Notification, getScope, getWindow, showWindow, setBadge, playSound, now = () => performance.now() }) {
+function createNativeNotifications({ Notification, getScope, getWindow, showWindow, setBadge, playSound, requestAttention = () => {}, now = () => performance.now() }) {
   let context = null
   let lastShown = -Infinity
   let lastSound = -Infinity
@@ -27,7 +27,7 @@ function createNativeNotifications({ Notification, getScope, getWindow, showWind
     if (context?.sessionId !== input.sessionId) reset()
     context = { ...input }
     if (!context.enabled) closeAll()
-    setBadge(input.unreadCount)
+    setBadge(input.unreadCount, input.enabled)
     return true
   }
   function clear(sessionId) {
@@ -76,6 +76,7 @@ function createNativeNotifications({ Notification, getScope, getWindow, showWind
     if (window && !window.isDestroyed() && window.isVisible() && window.isFocused() &&
         (input.kind === 'call' || context.conversationId === input.conversationId))
       return { shown: false, reason: soundFailed ? 'unavailable' : 'focused' }
+    if (input.kind === 'message') requestAttention()
     if (input.kind === 'message' && now() - lastShown < 900) return { shown: false, reason: soundFailed ? 'unavailable' : 'rate-limited' }
     if (!Notification.isSupported()) return { shown: false, reason: 'unavailable' }
     if (active.size >= 8) {

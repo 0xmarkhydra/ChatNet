@@ -1,13 +1,12 @@
 import { Outlet, useOutletContext, useParams } from "react-router-dom";
-import type { AppPageContext } from "./PageRoute";
-import PageRoute from "./PageRoute";
 import NotFoundPage from "./NotFoundPage";
+import PageRoute from "./PageRoute";
+import type { AppPageContext } from "./routePageContext";
 import { chatConversationIdFromPath, feedPostIdFromPath, visitorUsernameFromPath } from "./routes";
 
 /**
- * Nested URL handling lives outside the route configuration.
- * Guards validate deep links without remounting the authenticated App Shell,
- * chat/outbox state, call manager or providers.
+ * Forward the existing page context; no extra DOM wrapper and no new state.
+ * Keeping these URL guards outside RouteTree makes its responsibility declarative.
  */
 export function FeatureRouteLayout() {
   const page = useOutletContext<AppPageContext>();
@@ -27,20 +26,17 @@ export function SettingsSectionPage() {
 export function FeedPostPage() {
   const { postId } = useParams();
   return postId && feedPostIdFromPath(`/feed/posts/${postId}`) !== null
-    ? <PageRoute page="feed" />
-    : <NotFoundPage />;
+    ? <PageRoute page="feed" /> : <NotFoundPage />;
 }
 
 export function VisitorProfilePage() {
   const { username } = useParams();
   return username && visitorUsernameFromPath(`/users/${encodeURIComponent(username)}`) !== null
-    ? <PageRoute page="profile" />
-    : <NotFoundPage />;
+    ? <PageRoute page="profile" /> : <NotFoundPage />;
 }
 
 export function ChatConversationPage() {
   const { conversationId } = useParams();
   return conversationId && chatConversationIdFromPath(`/chat/${conversationId}`) !== null
-    ? <PageRoute page="chat" />
-    : <NotFoundPage />;
+    ? <PageRoute page="chat" /> : <NotFoundPage />;
 }

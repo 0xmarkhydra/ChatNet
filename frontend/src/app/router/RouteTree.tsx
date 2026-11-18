@@ -2,7 +2,7 @@ import LegacyHomeRedirect from "./LegacyHomeRedirect";
 import NotFoundPage from "./NotFoundPage";
 import type { ReactNode } from "react";
 import PageRoute from "./PageRoute";
-import { FeatureRouteLayout, SettingsSectionPage, FeedPostPage, VisitorProfilePage, ChatConversationPage } from "./FeatureRouteGuards";
+import { ChatConversationPage, FeatureRouteLayout, FeedPostPage, SettingsSectionPage, VisitorProfilePage } from "./FeatureRoutePages";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ROUTE, TAB_PATH } from "./routes";
 

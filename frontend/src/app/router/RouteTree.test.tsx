@@ -112,6 +112,7 @@ describe("app route tree", () => {
     ]) {
       const app = renderAt(path);
       expect(app.page()?.getAttribute("data-page")).toBe(feature);
+      expect(app.container.querySelector(".modern-frame")?.getAttribute("data-route-page")).toBe(feature);
       expect(app.onMount).toHaveBeenCalledTimes(1);
     }
   });
@@ -140,6 +141,7 @@ describe("app route tree", () => {
       });
       expect(app.location()).toBe(path);
       expect(app.page()?.getAttribute("data-page")).toBe(expected);
+      expect(app.container.querySelector(".modern-frame")?.getAttribute("data-route-page")).toBe(expected);
       expect(app.onMount).toHaveBeenCalledTimes(1);
     }
   });
