@@ -13,22 +13,21 @@ export function useChatConversationRoute(
   const previousRouteIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const applyRoute = () => {
-      const previousId = previousRouteIdRef.current;
-      previousRouteIdRef.current = routeId;
-      if (routeId !== null) {
-        setActiveConversationId((current) => current === routeId ? current : routeId);
-      } else if (previousId !== null && location.pathname === TAB_PATH.chat) {
-        setActiveConversationId(null);
-      }
-    };
-    applyRoute();
+    const previousId = previousRouteIdRef.current;
+    previousRouteIdRef.current = routeId;
+    if (routeId !== null) {
+      setActiveConversationId((current) => current === routeId ? current : routeId);
+    } else if (previousId !== null && location.pathname === TAB_PATH.chat) {
+      setActiveConversationId(null);
+    }
   }, [routeId, location.pathname, setActiveConversationId]);
 
   const selectConversation: Dispatch<SetStateAction<number | null>> = useCallback((next) => {
     const nextId = typeof next === "function" ? next(activeConversationId) : next;
+    // Reject invalid IDs before they reach chat state or navigation.
+    if (nextId !== null && (!Number.isSafeInteger(nextId) || nextId <= 0)) return;
     setActiveConversationId(nextId);
-    if (nextId !== null && Number.isSafeInteger(nextId) && nextId > 0) {
+    if (nextId !== null) {
       const path = chatConversationPath(nextId);
       if (location.pathname !== path) navigate(path);
     } else if (location.pathname.startsWith(`${TAB_PATH.chat}/`)) {

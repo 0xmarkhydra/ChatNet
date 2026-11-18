@@ -5,6 +5,12 @@ import { ROUTE, TAB_PATH, tabFromPath, visitorProfilePath, visitorUsernameFromPa
 
 type ContactsScreen = "overview" | "directory" | "invitations";
 
+const CONTACTS_SCREEN_PATH: Record<ContactsScreen, string> = {
+  overview: "/contacts/overview",
+  directory: TAB_PATH.contacts,
+  invitations: "/contacts/requests",
+};
+
 /** Resolve return locations without leaving the app or accepting malformed paths. */
 export function visitorReturnPath(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")
@@ -23,12 +29,11 @@ export function useAppRouteNavigation() {
   }, [tab, location.pathname, navigate]);
 
   const contactsScreen: ContactsScreen =
-    location.pathname === "/contacts/requests" ? "invitations"
-      : location.pathname === "/contacts/overview" ? "overview" : "directory";
+    location.pathname === CONTACTS_SCREEN_PATH.invitations ? "invitations"
+      : location.pathname === CONTACTS_SCREEN_PATH.overview ? "overview" : "directory";
   const setContactsScreen: Dispatch<SetStateAction<ContactsScreen>> = useCallback((next) => {
     const screen = typeof next === "function" ? next(contactsScreen) : next;
-    const path = screen === "invitations" ? "/contacts/requests"
-      : screen === "overview" ? "/contacts/overview" : TAB_PATH.contacts;
+    const path = CONTACTS_SCREEN_PATH[screen];
     if (location.pathname !== path) navigate(path);
   }, [contactsScreen, location.pathname, navigate]);
 

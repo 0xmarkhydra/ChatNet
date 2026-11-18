@@ -25,6 +25,9 @@ function mountAt(path: string) {
         <output data-testid="selected">{selectedId ?? "none"}</output>
         <button onClick={() => selectConversation(42)}>Open 42</button>
         <button onClick={() => selectConversation(43)}>Open 43</button>
+        <button onClick={() => selectConversation(0)}>Invalid zero</button>
+        <button onClick={() => selectConversation(Number.MAX_SAFE_INTEGER + 1)}>Invalid overflow</button>
+        <button onClick={() => selectConversation(-1)}>Invalid negative</button>
         <button onClick={() => selectConversation(null)}>Close</button>
         <button onClick={() => navigate(-1)}>Back</button>
         <button onClick={() => navigate("/feed")}>Feed</button>
@@ -75,6 +78,20 @@ describe("chat conversation routes", () => {
     app.click("Back");
     expect(app.text("path")).toBe("/chat");
     expect(app.text("selected")).toBe("none");
+  });
+
+  it("does not mutate selected chat or URL when an invalid conversation ID is requested", () => {
+    const app = mountAt("/chat/42");
+    for (const label of ["Invalid zero", "Invalid overflow", "Invalid negative"]) {
+      app.click(label);
+      expect(app.text("path")).toBe("/chat/42");
+      expect(app.text("selected")).toBe("42");
+    }
+    app.click("Close");
+    expect(app.text("path")).toBe("/chat");
+    app.click("Invalid overflow");
+    expect(app.text("selected")).toBe("none");
+    expect(app.text("path")).toBe("/chat");
   });
 
   it("opens a shareable chat route when a call or contact selects a conversation", () => {

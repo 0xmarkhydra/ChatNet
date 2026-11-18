@@ -1,4 +1,4 @@
-import { Outlet, useOutletContext, useParams } from "react-router-dom";
+import { Outlet, useLocation, useOutletContext, useParams } from "react-router-dom";
 import NotFoundPage from "./NotFoundPage";
 import PageRoute from "./PageRoute";
 import type { AppPageContext } from "./routePageContext";
@@ -24,19 +24,19 @@ export function SettingsSectionPage() {
 }
 
 export function FeedPostPage() {
-  const { postId } = useParams();
-  return postId && feedPostIdFromPath(`/feed/posts/${postId}`) !== null
+  const { pathname } = useLocation();
+  return feedPostIdFromPath(pathname) !== null
     ? <PageRoute page="feed" /> : <NotFoundPage />;
 }
 
 export function VisitorProfilePage() {
-  const { username } = useParams();
-  return username && visitorUsernameFromPath(`/users/${encodeURIComponent(username)}`) !== null
+  const { pathname } = useLocation();
+  return visitorUsernameFromPath(pathname) !== null
     ? <PageRoute page="profile" /> : <NotFoundPage />;
 }
 
 export function ChatConversationPage() {
-  const { conversationId } = useParams();
-  return conversationId && chatConversationIdFromPath(`/chat/${conversationId}`) !== null
+  const { pathname } = useLocation();
+  return chatConversationIdFromPath(pathname) !== null
     ? <PageRoute page="chat" /> : <NotFoundPage />;
 }
