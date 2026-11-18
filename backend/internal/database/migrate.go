@@ -74,6 +74,9 @@ var e2eePilotConsentsSQL string
 //go:embed migrations/016_text_stories.sql
 var textStoriesSQL string
 
+//go:embed migrations/017_feed_reposts.sql
+var feedRepostsSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -153,6 +156,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, textStoriesSQL); err != nil {
 		return fmt.Errorf("apply text stories migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, feedRepostsSQL); err != nil {
+		return fmt.Errorf("apply feed reposts migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)

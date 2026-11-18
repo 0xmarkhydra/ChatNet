@@ -18,6 +18,10 @@ export type Post = {
   background?: string
   updatedAt?: string
   saved?: boolean
+  repostKind?: 'quick' | 'quote'
+  originalPost?: Pick<Post, 'id' | 'author' | 'authorDisplayName' | 'content' | 'attachments'>
+  repostCount?: number
+  myRepostId?: number
   createdAt: string
 }
 

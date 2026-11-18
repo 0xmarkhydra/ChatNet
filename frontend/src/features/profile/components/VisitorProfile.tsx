@@ -21,6 +21,9 @@ type Props = {
  onRemoveFriend: (user: FriendSearchResult) => Promise<void>
  onMessage: (username: string) => Promise<void>
  onClose: () => void
+ onOpenOriginal?: (id: number) => void
+ onShareToChat?: (url: string) => void
+ onRepostChanged?: () => void
  onPostOpen: (post: Post) => void
  onReactionUsers: (post: Post) => void
  onUserOpen?: (username: string) => void
@@ -31,7 +34,7 @@ type Props = {
  onDeleted: (id: number) => void
  feedback: (message: string, kind?: 'success' | 'error' | 'warning' | 'info') => void
 }
-export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onClose, onPostOpen, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
+export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onClose, onPostOpen, onOpenOriginal, onRepostChanged, onShareToChat, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
  const scope=JSON.stringify([username,token])
  const [profile,setProfile]=useScopedState<VisitorProfileData|null>(scope,null)
  const [posts,setPosts]=useScopedState<Post[]>(scope,[])
@@ -53,7 +56,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   alive.current=true
   const previous=document.activeElement instanceof HTMLElement?document.activeElement:null
   back.current?.focus()
-  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape' && !document.querySelector('.post-detail-backdrop') && !document.querySelector('.profile-note-dialog[open]'))latestClose.current()}
+  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape' && !document.querySelector('dialog[open]'))latestClose.current()}
   document.addEventListener('keydown',escape)
   return ()=>{alive.current=false;sequence.current++;document.removeEventListener('keydown',escape);previous?.focus()}
  },[])
@@ -134,7 +137,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
  },[relation,profile?.username])
  const action=relation==='accepted'?'Bạn bè':relation==='incoming'?'Chấp nhận kết bạn':relation==='outgoing'?'Hủy lời mời':'Kết bạn'
  return <section ref={surface} onKeyDown={event=>{
-  if(event.key!=='Tab'||document.querySelector('.post-detail-backdrop')||document.querySelector('.profile-note-dialog[open]'))return
+  if(event.key!=='Tab'||document.querySelector('dialog[open]'))return
   const controls=Array.from(surface.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')||[])
   const first=controls[0],last=controls[controls.length-1]
   if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
@@ -168,7 +171,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
       }}
     />
     <div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
-    <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={()=>onPostOpen(post)} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
+    <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={(id)=>{if(id===post.id)onPostOpen(post);else onOpenOriginal?.(id)}} onRepostChanged={onRepostChanged} onShareToChat={onShareToChat} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
     {more&&<button type="button" className="soco-load-more" disabled={loading} onClick={()=>void loadMore()}>Xem bài viết cũ hơn</button>}
    </>}

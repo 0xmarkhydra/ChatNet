@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import { Bell, Bookmark, BookUser, Compass, MessageCircle, Newspaper, Scan, Settings, ShoppingBag } from 'lucide-react'
+import { formatUnreadMessageDescription } from '../../features/i18n/lib/i18n'
 import type { Tab } from '../../shared/types/navigation'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import { Button } from '../../shared/ui/button'
@@ -26,6 +27,7 @@ export default function AppSidebar({
   onNavigate, onSaved, onSettings, onScreenshot, screenshotBusy,
 }: Props) {
   const activeKey = `${tab}:${section ?? ''}:${feedSaved}:${settingsActive}`
+  const unreadDescriptionId = useId()
   const navRef = useRef<HTMLElement>(null)
   const activeButtonRef = useRef<HTMLButtonElement>(null)
   const pillRef = useRef<HTMLSpanElement>(null)
@@ -110,6 +112,7 @@ export default function AppSidebar({
             variant="ghost"
             key={label}
             aria-label={label}
+            aria-describedby={count ? unreadDescriptionId : undefined}
             className={cn('app-sidebar-link justify-start', active && 'is-active')}
             aria-current={active ? 'page' : undefined}
             ref={active ? activeButtonRef : undefined}
@@ -117,9 +120,10 @@ export default function AppSidebar({
           >
             <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
             <span>{label}</span>
-            {count ? <b className="app-sidebar-count">{count > 99 ? '99+' : count}</b> : null}
+            {count ? <b className="app-sidebar-count" aria-hidden="true">{count > 99 ? '99+' : count}</b> : null}
           </Button>
         ))}
+        {unreadTotal > 0 && <span id={unreadDescriptionId} hidden>{formatUnreadMessageDescription(unreadTotal)}</span>}
       </nav>
       <div className="app-sidebar-secondary" role="group" aria-label="Tiện ích">
       {onScreenshot && (

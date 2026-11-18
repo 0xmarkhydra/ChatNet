@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import type { Tab } from '../../shared/types/navigation'
-import type { UI_MESSAGES } from '../../features/i18n/lib/i18n'
+import { formatUnreadMessageDescription, type UI_MESSAGES } from '../../features/i18n/lib/i18n'
 import UiIcon from '../../shared/ui/UiIcon'
 
 type Props = {
@@ -19,6 +19,7 @@ export default function BottomNavigation({
   pushEnabled,
 }: Props) {
   const activeKey = tab
+  const unreadDescriptionId = useId()
   const navRef = useRef<HTMLElement>(null)
   const activeButtonRef = useRef<HTMLButtonElement>(null)
   const pillRef = useRef<HTMLSpanElement>(null)
@@ -41,17 +42,13 @@ export default function BottomNavigation({
     const measure = (animate = false) => {
       const navRect = nav.getBoundingClientRect()
       const buttonRect = activeButton.getBoundingClientRect()
-      // On phones the highlight should sit behind the icon, not fill the tab.
-      // Keep the original full-button highlight on wider screens.
-      const icon = activeButton.querySelector<HTMLElement>('.nav-icon')
-      const targetRect = window.matchMedia('(max-width: 760px)').matches && icon
-        ? icon.getBoundingClientRect()
-        : buttonRect
-      const left = targetRect.left - navRect.left - nav.clientLeft
+      // Wrap the entire active tab (icon and label) with a small inset on phones.
+      const inset = window.matchMedia('(max-width: 760px)').matches ? 2 : 0
+      const left = buttonRect.left - navRect.left - nav.clientLeft + inset
       pill.style.setProperty('--pill-x', `${left}px`)
-      pill.style.setProperty('--pill-y', `${targetRect.top - navRect.top - nav.clientTop}px`)
-      pill.style.setProperty('--pill-w', `${targetRect.width}px`)
-      pill.style.setProperty('--pill-h', `${targetRect.height}px`)
+      pill.style.setProperty('--pill-y', `${buttonRect.top - navRect.top - nav.clientTop + inset / 2}px`)
+      pill.style.setProperty('--pill-w', `${buttonRect.width - inset * 2}px`)
+      pill.style.setProperty('--pill-h', `${buttonRect.height - inset}px`)
 
       if (!pill.classList.contains('is-ready')) {
         void pill.offsetWidth
@@ -59,9 +56,14 @@ export default function BottomNavigation({
       }
       pill.style.opacity = '1'
       if (animate) {
+        // Restart the liquid pulse on rapid tab changes without interrupting the slide.
+        if (pill.classList.contains('is-sliding')) {
+          pill.classList.remove('is-sliding')
+          void pill.offsetWidth
+        }
         pill.classList.add('is-sliding')
         if (slideTimerRef.current) clearTimeout(slideTimerRef.current)
-        slideTimerRef.current = setTimeout(() => pill.classList.remove('is-sliding'), 420)
+        slideTimerRef.current = setTimeout(() => pill.classList.remove('is-sliding'), 520)
       }
     }
 
@@ -89,13 +91,13 @@ export default function BottomNavigation({
       <button
         type="button"
         aria-label={t('nav.chat')}
-        title={t('nav.chat')}
+        aria-describedby={unreadTotal > 0 ? unreadDescriptionId : undefined}
         className={tab === 'chat' ? 'active' : ''}
         aria-current={tab === 'chat' ? 'page' : undefined}
         ref={tab === 'chat' ? activeButtonRef : undefined}
         onClick={() => switchTab('chat')}
       >
-        <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b>{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
+        <span className="nav-icon"><UiIcon name="chat" size={25} />{unreadTotal > 0 && <b aria-hidden="true">{unreadTotal > 99 ? '99+' : unreadTotal}</b>}</span>
         <span className="nav-label">{t('nav.chat')}</span>
       </button>
       <button
@@ -146,6 +148,9 @@ export default function BottomNavigation({
         <span className="nav-icon"><UiIcon name="profile" size={25} />{!pushEnabled && <b>!</b>}</span>
         <span className="nav-label">{t('nav.profile')}</span>
       </button>
+      {unreadTotal > 0 && (
+        <span id={unreadDescriptionId} hidden>{formatUnreadMessageDescription(unreadTotal, t('nav.chatUnread'))}</span>
+      )}
     </nav>
   )
 }

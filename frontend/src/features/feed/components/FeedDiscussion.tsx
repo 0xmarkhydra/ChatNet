@@ -127,7 +127,7 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
   )
 }
 
-export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, variant = 'default', sortOrder = 'oldest', ...translation }: TranslationProps & {
+export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, onAuthorOpen, variant = 'default', sortOrder = 'oldest', ...translation }: TranslationProps & {
   comments: FeedComment[]
   pending?: FeedComment
   submit: (content: string, parentId?: number) => Promise<void>
@@ -137,6 +137,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   onEdit: (id: number, content: string) => Promise<void>
   onDelete: (id: number) => Promise<void>
   onReport: (id: number, reason: string) => Promise<void>
+  onAuthorOpen: (username: string) => void
   variant?: 'default' | 'post-page'
   sortOrder?: 'oldest' | 'newest'
 }) {
@@ -246,14 +247,19 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
 
   function renderComment(comment: FeedComment) {
     const parent = comment.parentId ? byID.get(comment.parentId) : undefined
+    const authorName = userLabel(comment.authorDisplayName, comment.author)
     return (
       <div className="feed-comment-row">
         {variant === 'post-page'
-          ? <UserAvatar username={comment.author} name={userLabel(comment.authorDisplayName, comment.author)} className="feed-comment-avatar" />
-          : <span className="feed-comment-avatar" aria-hidden="true">{userLabel(comment.authorDisplayName, comment.author).slice(0, 2).toUpperCase()}</span>}
+          ? <UserAvatar username={comment.author} name={authorName} className="feed-comment-avatar" />
+          : <span className="feed-comment-avatar" aria-hidden="true">{authorName.slice(0, 2).toUpperCase()}</span>}
         <div className="feed-comment-body">
           <div className="feed-comment-bubble">
-            <strong>{userLabel(comment.authorDisplayName, comment.author)}</strong>
+            <strong>
+              {comment.author ? (
+                <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(comment.author)}>{authorName}</button>
+              ) : authorName}
+            </strong>
             {parent && <small className="feed-reply-to">Trả lời {userLabel(parent.authorDisplayName, parent.author)}</small>}
             {editingComment === comment.id ? (
               <div className="feed-comment-edit">
@@ -278,7 +284,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
               </button>
               <span aria-hidden="true">·</span>
             </>}
-            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời ${userLabel(comment.authorDisplayName, comment.author)}`}>Trả lời</button>
+            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời ${authorName}`}>Trả lời</button>
             {variant === 'post-page' && <span aria-hidden="true">·</span>}
             {variant === 'post-page' && <time dateTime={comment.createdAt}>{commentRelativeTime(comment.createdAt)}</time>}
             <div className="feed-comment-menu">

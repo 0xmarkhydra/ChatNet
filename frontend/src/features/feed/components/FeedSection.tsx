@@ -1,3 +1,4 @@
+import { collapseQuickReposts } from "../utils/feedRequestState";
 import FeedModeration from "./FeedModeration";
 import SocialFeedStories from "./SocialFeedStories";
 import { userLabel } from "../../../shared/utils/userLabel";
@@ -243,7 +244,7 @@ export default function FeedSection({
                   {pendingPost && <FeedPendingPost post={pendingPost} />}
 
 
-                  {renderPosts(searchedPosts, isProfileDesktop)}
+                  {renderPosts(collapseQuickReposts(searchedPosts), isProfileDesktop)}
 
                   {feedPagingError && (
                     <div role="alert" className="soco-feed-load-more">

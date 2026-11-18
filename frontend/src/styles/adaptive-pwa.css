@@ -522,10 +522,10 @@
     font-size: 9px;
   }
   .modern-shell.app-layout .bottom-navigation .nav-liquid-pill {
-    border: 0;
-    border-radius: 12px;
-    background: rgba(37,99,235,.10);
-    box-shadow: none;
+    border: 1px solid rgba(37,99,235,.16);
+    border-radius: 15px;
+    background: rgba(37,99,235,.11);
+    box-shadow: 0 2px 9px rgba(37,99,235,.08);
   }
   .modern-shell.app-layout .bottom-navigation > button:focus-visible,
   .modern-shell.app-layout .social-chat-list-header button:focus-visible {

@@ -9,7 +9,7 @@ const sessionId = 'a7ce5309-8fb5-4f57-861c-ef54c75db291'
 function fixture(t) {
   const state = { scope: { sessionId, userId: 7 }, now: 1000, wallTime: Date.parse('2026-10-31T00:00:00Z'),
     focused: false, visible: true, supported: true, fail: false, soundFail: false,
-    shown: [], badges: [], events: [], opens: 0, sounds: 0 }
+    shown: [], badges: [], events: [], opens: 0, sounds: 0, attention: 0 }
   class Notification extends EventEmitter {
     static isSupported() { return state.supported }
     constructor(options) { super(); this.options = options; state.shown.push(this) }
@@ -20,7 +20,7 @@ function fixture(t) {
     webContents: { send: (_channel, value) => state.events.push(value) } }
   const notifications = createNativeNotifications({ Notification, getScope: () => state.scope,
     getWindow: () => window, now: () => state.now, showWindow: () => { state.opens++ },
-    setBadge: count => state.badges.push(count),
+    setBadge: count => state.badges.push(count), requestAttention: () => { state.attention++ },
     playSound: () => { if (state.soundFail) throw new Error('audio unavailable'); state.sounds++ } })
   t.after(() => notifications.reset())
   const sync = overrides => notifications.sync({ sessionId, conversationId: 3, unreadCount: 5, enabled: true, sound: true, ...overrides })
@@ -180,4 +180,22 @@ test('all notification IPC handlers reject foreign frames and extra arguments', 
     await assert.rejects(handler({}, {}), /Forbidden IPC origin/)
     await assert.rejects(handler({ trusted: true }, {}, {}), /NOTIFICATION_INVALID_INPUT/)
   }
+})
+
+test('only validated new message notifications request taskbar attention, even when toasts are unavailable', async t => {
+  const f = fixture(t)
+  f.sync({ unreadCount: 45 })
+  assert.equal(f.state.attention, 0, 'an existing unread snapshot does not flash')
+  f.state.supported = false
+  await f.notifications.show(f.message())
+  await f.notifications.show(f.message())
+  assert.equal(f.state.attention, 1, 'duplicate events do not flash twice')
+  await f.notifications.show(f.message({ eventId: 'call-attention', kind: 'call' }))
+  await f.notifications.show(f.message({ eventId: 'own-attention', senderId: 7 }))
+  f.state.focused = true
+  await f.notifications.show(f.message({ eventId: 'focused-attention', conversationId: 3 }))
+  f.state.focused = false
+  f.sync({ enabled: false })
+  await f.notifications.show(f.message({ eventId: 'disabled-attention' }))
+  assert.equal(f.state.attention, 1)
 })

@@ -67,7 +67,7 @@ import {
 } from "../features/chat/types";
 import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
 import { useAppRouteNavigation } from "./router/useAppRouteNavigation";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
@@ -93,6 +93,7 @@ import NearbyRadar from "../features/discover/components/NearbyRadar";
 import PostComposer from "../features/feed/components/PostComposer";
 import FeedPostCard from "../features/feed/components/FeedPostCard";
 import ReactionParticipantsDialog from "../shared/ui/ReactionParticipantsDialog";
+import SharedPostLinkPicker from "../features/chat/components/SharedPostLinkPicker";
 import MessageForwardPicker from "../features/chat/components/MessageForwardPicker";
 import FeedReactionControl from "../features/feed/components/FeedReactionControl";
 import StoryViewer from "../features/feed/components/StoryViewer";
@@ -144,7 +145,6 @@ import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
 import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
 import ContactsView from "../features/contacts/components/ContactsView";
-import UnifiedContactsPage from "../features/contacts/components/UnifiedContactsPage";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
@@ -175,7 +175,6 @@ import ProfileOverlay from "../features/profile/components/ProfileOverlay";
 import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
-  Bell,
   Check,
   Images,
   Languages,
@@ -229,7 +228,7 @@ import {
 } from "../features/chat/utils/chatFileTransfer";
 import { canMarkConversationRead } from "../features/chat/utils/conversationRead";
 import { mergeById, toggleMessageReactionCount } from "../shared/utils/optimistic";
-import CallManager, { CallHeaderActions } from "../features/calls/components/CallManager";
+import { CallHeaderActions } from "../features/calls/components/CallManager";
 import SharedContent from "../features/chat/components/SharedContent";
 import VoiceRecorder from "../features/chat/components/VoiceRecorder";
 import { SocoEmptyState, SocoTextAction } from "../shared/ui/SocoUI";
@@ -268,7 +267,13 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
-import AppPageErrorBoundary from "./layouts/AppPageErrorBoundary";
+import { withContactNicknames, mergeContactSearchResults, selectChatListConversations, sortChatListConversations } from "./selectors/appListSelectors";
+import { selectDisplayedFeedPosts } from "./selectors/feedListSelector";
+import { createSecondaryPageSlots } from "./router/createSecondaryPageSlots";
+import AppShellNotices from "./layouts/AppShellNotices";
+import AppShellUploadProgress from "./layouts/AppShellUploadProgress";
+import AppShellCallManager from "./layouts/AppShellCallManager";
+
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { inviteRouteTarget } from "./navigation/inviteDeepLink";
 import HeaderSearch from "./header/HeaderSearch";
@@ -276,10 +281,6 @@ import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
 import HeaderTitle from "./header/HeaderTitle";
 import { searchLabels } from "./header/headerContext";
-import NotificationsSection from "../features/notifications/components/NotificationsSection";
-import DiscoverSection from "../features/discover/components/DiscoverSection";
-import SearchResultsPage from "../features/search/SearchResultsPage";
-import MarketSection from "../features/discover/components/MarketSection";
 import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
 import FeedPostDetail from "../features/feed/components/FeedPostDetail";
@@ -460,6 +461,7 @@ export default function AuthedApp({
   const [reactionPreviews, setReactionPreviews] = useState<
     Record<number, MessageReaction[]>
   >({});
+  const [postLinkToSend, setPostLinkToSend] = useScopedState<string | null>(session?.sessionId ?? null, null);
   const [forwardSource, setForwardSource] = useScopedState<Message | null>(session?.sessionId ?? null, null);
   const [reactionTarget, setReactionTarget] = useScopedState<{
     kind: "message" | "post"; id: number; initialEmoji?: string;
@@ -1049,15 +1051,7 @@ export default function AuthedApp({
   }, [messages, activeConversationId, chatSearchJump]);
   const name = session?.user.username || "";
   const displayConversations = useMemo(
-    () =>
-      conversations.map((conversation) => ({
-        ...conversation,
-        name:
-          conversation.type === "direct" && conversation.otherUserId
-            ? contactMetadata[conversation.otherUserId]?.nickname ||
-              conversation.name
-            : conversation.name,
-      })),
+    () => withContactNicknames(conversations, contactMetadata),
     [conversations, contactMetadata],
   );
   const activeConversation =
@@ -1778,22 +1772,7 @@ export default function AuthedApp({
     }
   }
 
-  const contactQuery = friendQuery
-    .trim()
-    .replace(/^@/, "")
-    .toLocaleLowerCase("vi-VN");
-  const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
-    `${friend.displayName} ${friend.username}`
-      .toLocaleLowerCase("vi-VN")
-      .includes(contactQuery),
-  );
-  const localContactIds = new Set(
-    localContactMatches.map((friend) => friend.id),
-  );
-  const contactSearchResults = [
-    ...localContactMatches,
-    ...friendResults.filter((friend) => !localContactIds.has(friend.id)),
-  ];
+  const contactSearchResults = mergeContactSearchResults(friendQuery, friends, friendRequests, friendResults);
 
   function friendRelationship(userId: number) {
     if (friends.some((item) => item.id === userId)) return "accepted" as const;
@@ -2253,10 +2232,7 @@ export default function AuthedApp({
   }, [messages, session?.sessionId]);
 
 
-  const unreadTotal = conversations.reduce(
-    (sum, conversation) => sum + conversation.unreadCount,
-    0,
-  );
+  const unreadTotal = nativeNotifications.unreadCount ?? 0;
   const notificationItemCount = countNotificationItems(friendRequests, conversations)
     + postMentions.filter(mention => !mention.readAt).length;
   const notificationBadgeText = formatNotificationBadge(notificationItemCount);
@@ -2276,80 +2252,26 @@ export default function AuthedApp({
               (!membershipSnapshot.current ||
                 membershipSnapshot.current.has(item.id)),
           );
-  // Avatar-rail search matches conversation NAMES only (including custom
-  // contact nicknames). The server's q query may also return message-body
-  // matches, so explicitly discard those rather than showing unrelated chats.
-  // Normalize Vietnamese accents so "Linh" can match "Lĩnh", etc.
-  const normalizeChatName = (value: string) => value
-    .toLocaleLowerCase('vi-VN').normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
-  const chatNameKeyword = normalizeChatName(chatListQuery.trim())
-  const chatListConversations = conversationListSearch.active
-    ? conversationListSearch.items
-        .filter((conversation) => !revokedConversationIds.current.has(conversation.id))
-        .map((conversation) => ({
-          ...conversation,
-          name: conversation.type === 'direct' && conversation.otherUserId
-            ? contactMetadata[conversation.otherUserId]?.nickname || conversation.name
-            : conversation.name,
-        }))
-        .filter(conversation => normalizeChatName(conversation.name).includes(chatNameKeyword))
-    : visibleConversations.filter((conversation) => {
-        if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
-        if (chatListFilter === 'groups' && conversation.type !== 'group') return false
-        return true
-      })
+  const chatListConversations = selectChatListConversations({
+    visibleConversations,
+    searchActive: conversationListSearch.active,
+    searchItems: conversationListSearch.items,
+    searchQuery: chatListQuery,
+    filter: chatListFilter,
+    revokedIds: revokedConversationIds.current,
+    contactMetadata,
+  });
 
-  const searchedPosts = feedSearchActive
-    ? postSearch.posts.map((post) =>
-        likePreviews[post.id] === undefined
-          ? post
-          : {
-              ...post,
-              liked: likePreviews[post.id],
-              likes: Math.max(
-                0,
-                post.likes +
-                  (likePreviews[post.id] === post.liked
-                    ? 0
-                    : likePreviews[post.id]
-                      ? 1
-                      : -1),
-              ),
-            },
-      )
-    : feedFilter === "saved"
-      ? savedPosts
-      : feedFilter === "following"
-        ? followingFeed.posts.map((post) =>
-            likePreviews[post.id] === undefined
-              ? post
-              : {
-                  ...post,
-                  liked: likePreviews[post.id],
-                  likes: Math.max(
-                    0,
-                    post.likes +
-                      (likePreviews[post.id] === post.liked
-                        ? 0
-                        : likePreviews[post.id]
-                          ? 1
-                          : -1),
-                  ),
-                },
-          )
-        : feedFilter === "latest"
-          ? [...visiblePosts].sort(
-              (a, b) =>
-                Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
-                b.id - a.id,
-            )
-          : visiblePosts;
-  const sortedChatListConversations = [...chatListConversations].sort((a, b) =>
-    Number(Boolean(b.pinnedAt)) - Number(Boolean(a.pinnedAt)) ||
-    (b.pinnedAt || '').localeCompare(a.pinnedAt || '') ||
-    (b.lastMessageAt || b.createdAt).localeCompare(a.lastMessageAt || a.createdAt)
-  );
+  const searchedPosts = selectDisplayedFeedPosts({
+    searchActive: feedSearchActive,
+    searchPosts: postSearch.posts,
+    savedPosts,
+    followingPosts: followingFeed.posts,
+    visiblePosts,
+    filter: feedFilter,
+    likePreviews,
+  });
+  const sortedChatListConversations = sortChatListConversations(chatListConversations);
   const openChatQuickContact = (contact: ChatQuickContact) => {
     setQuickSearchOpen(false);
     setGlobalSearch("");
@@ -2499,7 +2421,12 @@ export default function AuthedApp({
     />
   );
 
-  const renderPostDiscussion = (discussionPost: Post) => (
+  function openPostDetailProfile(username: string) {
+    const returnTo = closeFeedPostDetails();
+    openVisitor(username, returnTo);
+  }
+
+  const renderPostDiscussion = (discussionPost: Post, onAuthorOpen: (username: string) => void) => (
     <FeedDiscussion
       key={discussionPost.id}
       variant="post-page"
@@ -2543,8 +2470,16 @@ export default function AuthedApp({
         manageFeedComment(discussionPost, commentId, "DELETE")
       }
       onReport={reportFeedComment}
+      onAuthorOpen={onAuthorOpen}
     />
   );
+
+  function refreshAfterRepost() {
+    void refreshPosts();
+    if (feedFilter === 'following') followingFeed.refresh();
+    if (feedSearchActive) postSearch.retry();
+    if (tab === 'profile') void loadProfilePosts(false, true);
+  }
 
   const renderPosts = (items: Post[], showSave = false) =>
     items.map((post) => (
@@ -2565,12 +2500,14 @@ export default function AuthedApp({
         targetLanguage={targetLanguage}
         setActivePostId={openFeedPostDetails}
         onToggleComments={() => setInlineCommentsId((current) => current === post.id ? null : post.id)}
-        discussion={inlineCommentsId === post.id ? renderPostDiscussion(post) : null}
+        discussion={inlineCommentsId === post.id ? renderPostDiscussion(post, openVisitor) : null}
         showSave={showSave}
         likePreviews={likePreviews}
         like={like}
         onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
         onEditPost={openEditPost}
+        onRepostChanged={refreshAfterRepost}
+        onShareToChat={setPostLinkToSend}
         taggedNames={friendTaggedNames}
       />
     ));
@@ -2729,30 +2666,10 @@ export default function AuthedApp({
           />
         </Suspense>
       )}
-          {mediaUploading && mediaUploadProgress && (
-        <div className="media-upload-progress" role="status" aria-live="polite">
-          <span>
-            Đang tải tệp:{" "}
-            {Math.round(
-              (mediaUploadProgress.loaded /
-                Math.max(1, mediaUploadProgress.total)) *
-                100,
-            )}
-            %
-          </span>
-          <progress
-            value={mediaUploadProgress.loaded}
-            max={mediaUploadProgress.total}
-            aria-label="Tiến độ tải tệp"
+          <AppShellUploadProgress
+            progress={mediaUploading ? mediaUploadProgress : null}
+            onCancel={() => mediaUploadAbort.current?.abort()}
           />
-          <button
-            type="button"
-            onClick={() => mediaUploadAbort.current?.abort()}
-          >
-            Hủy tải
-          </button>
-        </div>
-      )}
           {visitorUsername && (
         <VisitorProfile
           key={session.sessionId + ":" + visitorUsername}
@@ -2770,6 +2687,9 @@ export default function AuthedApp({
           }}
           onClose={closeVisitor}
           onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
+          onOpenOriginal={openFeedPostDetails}
+          onRepostChanged={refreshAfterRepost}
+          onShareToChat={setPostLinkToSend}
           onPostOpen={(post) => {
             setPosts((current) => [
               post,
@@ -2904,75 +2824,213 @@ export default function AuthedApp({
           </AppHeaderActions>
         </AppHeader>
       }
-    >{pushPrompt && !pushPromptDismissed && !pushEnabled && (
-        <section
-          className="push-onboarding"
-          aria-label="Thông báo tin nhắn"
-          aria-live="polite"
-        >
-          <Bell size={22} aria-hidden="true" />
-          <strong>Nhận thông báo tin nhắn mới?</strong>
-          <div className="push-onboarding-actions">
-            <button
-              type="button"
-              onClick={() => setPushPromptDismissed(true)}
-              disabled={pushBusy}
-            >
-              Để sau
-            </button>
-            <button
-              className="push-onboarding-enable"
-              type="button"
-              onClick={() => void togglePush()}
-              disabled={pushBusy}
-            >
-              Bật thông báo
-            </button>
-          </div>
-        </section>
-      )}
+      beforePage={<AppShellNotices
+        showPushPrompt={pushPrompt && !pushPromptDismissed && !pushEnabled}
+        pushBusy={pushBusy}
+        notice={notice}
+        onDismissPushPrompt={() => setPushPromptDismissed(true)}
+        onEnablePush={() => void togglePush()}
+        onDismissNotice={dismissNotice}
+      />}
+      outletContext={{
+        frameClassName: tab === "chat" && activeConversation ? "mobile-conversation-open" : "",
+        ...createSecondaryPageSlots({
+          notifications: {
+            actOnFriend,
+            conversations,
+            declineFriendRequest,
+            friendBusyIds,
+            friendRequests,
+            globalSearch,
+            openMentionPost,
+            openVisitor,
+            postMentions,
+            readPostMention,
+            setActiveConversationId: selectRoutedConversation,
+            setContactsScreen,
+            setDesktopProfileSettings,
+            setProfileTimelineOpen,
+            switchTab,
+          },
+          contacts: {
+            contactsContent,
+            conversations: displayConversations,
+            friends,
+            incomingRequests: friendRequests.filter(friend => friend.direction === "incoming").length,
+            request: apiFetch,
+            userId: session.user.id,
+            token: session.token,
+            targetLanguage,
+            friendQuery,
+            setFriendQuery,
+            onOpenChat: (id) => { switchTab("chat"); selectRoutedConversation(id); },
+            onNavigate: switchTab,
+          },
+          search: {
+            request: apiFetch,
+            sessionId: session.sessionId,
+            onOpenProfile: username => openVisitorProfile(username),
+            onOpenPost: postId => navigate(feedPostPath(postId)),
+          },
+          discover: {
+            actOnFriend,
+            findNearby,
+            friendActionBusy,
+            friendRelationship,
+            globalSearch,
+            nearbyBusy,
+            nearbyRadiusKm,
+            nearbyResultRadiusKm,
+            nearbyScanning,
+            nearbyUntil,
+            nearbyUsers,
+            setGlobalSearch,
+            setNearbyRadiusKm,
+            stopNearby,
+          },
+          market: {
+            searchQuery: globalSearch,
+            apiFetch,
+            session,
+            switchTab,
+          },
+        }),
+        profile: <>
+        {desktopProfileOverview && (
+          <ProfileOverviewSection
+          apiFetch={apiFetch}
+          avatarFileInputRef={avatarFileInputRef}
+          changePrivacy={changePrivacy}
+          coverFileInputRef={coverFileInputRef}
+          discardDesktopProfileEdits={discardDesktopProfileEdits}
+          friends={friends}
+          loadProfilePosts={loadProfilePosts}
+          mediaUploading={mediaUploading}
+          name={name}
+          openVisitor={openVisitor}
+          pendingPost={pendingPost}
+          privacy={privacy}
+          privacyBusy={privacyBusy}
+          privacyError={privacyError}
+          privacyLoading={privacyLoading}
+          profileBioDraft={profileBioDraft}
+          profileBusy={profileBusy}
+          profileCityDraft={profileCityDraft}
+          profileDisplayNameDraft={profileDisplayNameDraft}
+          profileEditorOpen={profileEditorOpen}
+          profileHasMore={profileHasMore}
+          profileMedia={profileMedia}
+          profilePosts={profilePosts}
+          profilePostsBusy={profilePostsBusy}
+          profilePostsError={profilePostsError}
+          profileSaving={profileSaving}
+          profileUsernameDraft={profileUsernameDraft}
+          renderPosts={renderPosts}
+          saveProfileIdentity={saveProfileIdentity}
+          session={session}
+          setActivePostId={setActivePostId}
+          setPrivacyRetry={setPrivacyRetry}
+          setProfileBioDraft={setProfileBioDraft}
+          setProfileCityDraft={setProfileCityDraft}
+          setProfileComposerOpen={setProfileComposerOpen}
+          setProfileDisplayNameDraft={setProfileDisplayNameDraft}
+          setProfileEditorOpen={setProfileEditorOpen}
+          setProfileUsernameDraft={setProfileUsernameDraft}
+          switchTab={switchTab}
+          updateProfileImage={updateProfileImage}
+          visibleProfilePosts={visibleProfilePosts}
+        />
+        )}
 
-      {notice && (
-        <div
-          className={`notice toast toast-${notice.kind}`}
-          role={notice.kind === "error" ? "alert" : "status"}
-          aria-live={notice.kind === "error" ? "assertive" : "polite"}
-        >
-          <span className="toast-icon" aria-hidden="true">
-            {notice.kind === "success"
-              ? "✓"
-              : notice.kind === "error"
-                ? "!"
-                : notice.kind === "warning"
-                  ? "!"
-                  : "i"}
-          </span>
-          <div className="toast-copy">
-            <strong>
-              {notice.kind === "success"
-                ? "Thành công"
-                : notice.kind === "error"
-                  ? "Có lỗi"
-                  : notice.kind === "warning"
-                    ? "Lưu ý"
-                    : "Thông báo"}
-            </strong>
-            <span>{notice.message}</span>
-          </div>
-          <button
-            type="button"
-            aria-label="Đóng thông báo"
-            onClick={dismissNotice}
-          >
-            ×
-          </button>
-        </div>
-      )}
-      <Outlet context={
-        <section
-          className={`phone-frame modern-frame ${tab === "chat" && activeConversation ? "mobile-conversation-open" : ""}`}
-        >
-          <AppPageErrorBoundary>
+        {!desktopProfileOverview && (
+          <ProfileSection
+          apiFetch={apiFetch}
+          appLocale={appLocale}
+          autoTranslate={autoTranslate}
+          avatarFileInputRef={avatarFileInputRef}
+          blockedBusy={blockedBusy}
+          blockedError={blockedError}
+          blockedOpen={blockedOpen}
+          blockedUsers={blockedUsers}
+          changeAppLocale={changeAppLocale}
+          changeAutoTranslate={changeAutoTranslate}
+          changeTargetLanguage={changeTargetLanguage}
+          closeProfileTimeline={closeProfileTimeline}
+          coverFileInputRef={coverFileInputRef}
+          desktopProfileSettings={desktopProfileSettings}
+          fetchAccountSessions={fetchAccountSessions}
+          installApp={installApp}
+          isProfileDesktop={isProfileDesktop}
+          isStandalone={isStandalone}
+          loadBlockedUsers={loadBlockedUsers}
+          loadProfilePosts={loadProfilePosts}
+          localePickerOpen={localePickerOpen}
+          localeSearch={localeSearch}
+          logout={logout}
+          managedSessions={managedSessions}
+          mediaUploading={mediaUploading}
+          messageSoundEnabled={messageSoundEnabled}
+          name={name}
+          nativeNotifications={nativeNotifications}
+          pendingPost={pendingPost}
+          postText={postText}
+          previewMessageSound={previewMessageSound}
+          privacy={privacy}
+          privacyBusy={privacyBusy}
+          privacyError={privacyError}
+          privacyLoading={privacyLoading}
+          profileBusy={profileBusy}
+          profileHasMore={profileHasMore}
+          profileHeadingRef={profileHeadingRef}
+          profileIdentityForm={profileIdentityForm}
+          profileIdentityRef={profileIdentityRef}
+          profileMedia={profileMedia}
+          profilePosts={profilePosts}
+          profilePostsBusy={profilePostsBusy}
+          profilePostsError={profilePostsError}
+          profilePrivacyControls={profilePrivacyControls}
+          profileTimelineOpen={profileTimelineOpen}
+          pushBusy={pushBusy}
+          pushEnabled={pushEnabled}
+          renderPosts={renderPosts}
+          revokeAccountSessions={revokeAccountSessions}
+          savePrivacy={savePrivacy}
+          selectedAppLanguage={selectedAppLanguage}
+          selectedLanguage={selectedLanguage}
+          sendTestPush={sendTestPush}
+          session={session}
+          sessionsBusy={sessionsBusy}
+          sessionsError={sessionsError}
+          sessionsOpen={sessionsOpen}
+          setBlockedOpen={setBlockedOpen}
+          setDesktopProfileSettings={setDesktopProfileSettings}
+          setGlobalSearch={setGlobalSearch}
+          setLocalePickerOpen={setLocalePickerOpen}
+          setLocaleSearch={setLocaleSearch}
+          setPrivacyRetry={setPrivacyRetry}
+          setProfileComposerOpen={setProfileComposerOpen}
+          setProfileEditorOpen={setProfileEditorOpen}
+          setProfileTimelineOpen={setProfileTimelineOpen}
+          setSessionsOpen={setSessionsOpen}
+          setTranslationPickerOpen={setTranslationPickerOpen}
+          setTranslationSettingsSearch={setTranslationSettingsSearch}
+          switchTab={switchTab}
+          t={t}
+          targetLanguage={targetLanguage}
+          toggleMessageSound={toggleMessageSound}
+          togglePush={togglePush}
+          translationPickerOpen={translationPickerOpen}
+          translationSettingsSearch={translationSettingsSearch}
+          uiLocaleLoading={uiLocaleLoading}
+          unblockContact={unblockContact}
+          updateProfileImage={updateProfileImage}
+          visibleLocaleOptions={visibleLocaleOptions}
+          visibleProfilePosts={visibleProfilePosts}
+          visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
+        />
+        )}
+        </>,
+        chat: <>
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
           activeChatTranslationSettings={activeChatTranslationSettings}
@@ -3193,81 +3251,24 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "notifications" && (
-          <NotificationsSection
-          actOnFriend={actOnFriend}
-          conversations={conversations}
-          declineFriendRequest={declineFriendRequest}
-          friendBusyIds={friendBusyIds}
-          friendRequests={friendRequests}
-          globalSearch={globalSearch}
-          openMentionPost={openMentionPost}
-          openVisitor={openVisitor}
-          postMentions={postMentions}
-          readPostMention={readPostMention}
-          setActiveConversationId={selectRoutedConversation}
-          setContactsScreen={setContactsScreen}
-          setDesktopProfileSettings={setDesktopProfileSettings}
-          setProfileTimelineOpen={setProfileTimelineOpen}
-          switchTab={switchTab}
-        />
-        )}
 
-        {tab === "contacts" && <UnifiedContactsPage
-          contactsContent={contactsContent}
-          conversations={displayConversations}
-          friends={friends}
-          incomingRequests={friendRequests.filter(friend => friend.direction === "incoming").length}
-          request={apiFetch}
-          userId={session.user.id}
-          token={session.token}
-          targetLanguage={targetLanguage}
-          friendQuery={friendQuery}
-          setFriendQuery={setFriendQuery}
-          onOpenChat={(id) => { switchTab("chat"); selectRoutedConversation(id); }}
-          onNavigate={switchTab}
-        />}
 
-        {isSearchResultsRoute && (
-          <SearchResultsPage
-            request={apiFetch}
-            sessionId={session.sessionId}
-            onOpenProfile={username => openVisitorProfile(username)}
-            onOpenPost={postId => navigate(feedPostPath(postId))}
-          />
-        )}
 
-        {tab === "discover" && !isSearchResultsRoute && (
-          <DiscoverSection
-          actOnFriend={actOnFriend}
-          findNearby={findNearby}
-          friendActionBusy={friendActionBusy}
-          friendRelationship={friendRelationship}
-          globalSearch={globalSearch}
-          nearbyBusy={nearbyBusy}
-          nearbyRadiusKm={nearbyRadiusKm}
-          nearbyResultRadiusKm={nearbyResultRadiusKm}
-          nearbyScanning={nearbyScanning}
-          nearbyUntil={nearbyUntil}
-          nearbyUsers={nearbyUsers}
-          setGlobalSearch={setGlobalSearch}
-          setNearbyRadiusKm={setNearbyRadiusKm}
-          stopNearby={stopNearby}
-        />
-        )}
 
-        {tab === "market" && (
-          <MarketSection
-            searchQuery={globalSearch}
-          apiFetch={apiFetch}
-          session={session}
-          switchTab={switchTab}
-        />
-        )}
 
+
+
+
+
+
+        </>,
+        beforeFeed: <>
         {activePost && (
           <FeedPostDetail
           activePost={activePost}
+          onRepostChanged={refreshAfterRepost}
+          onShareToChat={setPostLinkToSend}
+          onOpenOriginal={openFeedPostDetails}
           apiFetch={apiFetch}
           closeFeedPostDetails={closeFeedPostDetails}
           commentSortOrder={commentSortOrder}
@@ -3277,8 +3278,8 @@ export default function AuthedApp({
           onReactionUsers={(post, portalContainer) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions, portalContainer})}
           name={name}
           openEditPost={openEditPost}
-          openVisitor={openVisitor}
-          postDiscussion={renderPostDiscussion(activePost)}
+          openVisitor={openPostDetailProfile}
+          postDiscussion={renderPostDiscussion(activePost, openPostDetailProfile)}
           profileMedia={profileMedia}
           removeFeedPost={removeFeedPost}
           session={session}
@@ -3290,8 +3291,8 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "feed" && (
-          <FeedSection
+        </>,
+        feed: (<FeedSection
           activePostId={activePostId}
           activeStoryId={activeStoryId}
           actOnFriend={actOnFriend}
@@ -3347,8 +3348,9 @@ export default function AuthedApp({
           stories={stories}
           storyBusy={storyBusy}
           switchTab={switchTab}
-        />
-        )}
+        />),
+        afterFeed: <>
+
 
         {activeConversationAction && (
           <ConversationActionDialog
@@ -3405,142 +3407,9 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "profile" && desktopProfileOverview && (
-          <ProfileOverviewSection
-          apiFetch={apiFetch}
-          avatarFileInputRef={avatarFileInputRef}
-          changePrivacy={changePrivacy}
-          coverFileInputRef={coverFileInputRef}
-          discardDesktopProfileEdits={discardDesktopProfileEdits}
-          friends={friends}
-          loadProfilePosts={loadProfilePosts}
-          mediaUploading={mediaUploading}
-          name={name}
-          openVisitor={openVisitor}
-          pendingPost={pendingPost}
-          privacy={privacy}
-          privacyBusy={privacyBusy}
-          privacyError={privacyError}
-          privacyLoading={privacyLoading}
-          profileBioDraft={profileBioDraft}
-          profileBusy={profileBusy}
-          profileCityDraft={profileCityDraft}
-          profileDisplayNameDraft={profileDisplayNameDraft}
-          profileEditorOpen={profileEditorOpen}
-          profileHasMore={profileHasMore}
-          profileMedia={profileMedia}
-          profilePosts={profilePosts}
-          profilePostsBusy={profilePostsBusy}
-          profilePostsError={profilePostsError}
-          profileSaving={profileSaving}
-          profileUsernameDraft={profileUsernameDraft}
-          renderPosts={renderPosts}
-          saveProfileIdentity={saveProfileIdentity}
-          session={session}
-          setActivePostId={setActivePostId}
-          setPrivacyRetry={setPrivacyRetry}
-          setProfileBioDraft={setProfileBioDraft}
-          setProfileCityDraft={setProfileCityDraft}
-          setProfileComposerOpen={setProfileComposerOpen}
-          setProfileDisplayNameDraft={setProfileDisplayNameDraft}
-          setProfileEditorOpen={setProfileEditorOpen}
-          setProfileUsernameDraft={setProfileUsernameDraft}
-          switchTab={switchTab}
-          updateProfileImage={updateProfileImage}
-          visibleProfilePosts={visibleProfilePosts}
-        />
-        )}
-
-        {tab === "profile" && !desktopProfileOverview && (
-          <ProfileSection
-          apiFetch={apiFetch}
-          appLocale={appLocale}
-          autoTranslate={autoTranslate}
-          avatarFileInputRef={avatarFileInputRef}
-          blockedBusy={blockedBusy}
-          blockedError={blockedError}
-          blockedOpen={blockedOpen}
-          blockedUsers={blockedUsers}
-          changeAppLocale={changeAppLocale}
-          changeAutoTranslate={changeAutoTranslate}
-          changeTargetLanguage={changeTargetLanguage}
-          closeProfileTimeline={closeProfileTimeline}
-          coverFileInputRef={coverFileInputRef}
-          desktopProfileSettings={desktopProfileSettings}
-          fetchAccountSessions={fetchAccountSessions}
-          installApp={installApp}
-          isProfileDesktop={isProfileDesktop}
-          isStandalone={isStandalone}
-          loadBlockedUsers={loadBlockedUsers}
-          loadProfilePosts={loadProfilePosts}
-          localePickerOpen={localePickerOpen}
-          localeSearch={localeSearch}
-          logout={logout}
-          managedSessions={managedSessions}
-          mediaUploading={mediaUploading}
-          messageSoundEnabled={messageSoundEnabled}
-          name={name}
-          nativeNotifications={nativeNotifications}
-          pendingPost={pendingPost}
-          postText={postText}
-          previewMessageSound={previewMessageSound}
-          privacy={privacy}
-          privacyBusy={privacyBusy}
-          privacyError={privacyError}
-          privacyLoading={privacyLoading}
-          profileBusy={profileBusy}
-          profileHasMore={profileHasMore}
-          profileHeadingRef={profileHeadingRef}
-          profileIdentityForm={profileIdentityForm}
-          profileIdentityRef={profileIdentityRef}
-          profileMedia={profileMedia}
-          profilePosts={profilePosts}
-          profilePostsBusy={profilePostsBusy}
-          profilePostsError={profilePostsError}
-          profilePrivacyControls={profilePrivacyControls}
-          profileTimelineOpen={profileTimelineOpen}
-          pushBusy={pushBusy}
-          pushEnabled={pushEnabled}
-          renderPosts={renderPosts}
-          revokeAccountSessions={revokeAccountSessions}
-          savePrivacy={savePrivacy}
-          selectedAppLanguage={selectedAppLanguage}
-          selectedLanguage={selectedLanguage}
-          sendTestPush={sendTestPush}
-          session={session}
-          sessionsBusy={sessionsBusy}
-          sessionsError={sessionsError}
-          sessionsOpen={sessionsOpen}
-          setBlockedOpen={setBlockedOpen}
-          setDesktopProfileSettings={setDesktopProfileSettings}
-          setGlobalSearch={setGlobalSearch}
-          setLocalePickerOpen={setLocalePickerOpen}
-          setLocaleSearch={setLocaleSearch}
-          setPrivacyRetry={setPrivacyRetry}
-          setProfileComposerOpen={setProfileComposerOpen}
-          setProfileEditorOpen={setProfileEditorOpen}
-          setProfileTimelineOpen={setProfileTimelineOpen}
-          setSessionsOpen={setSessionsOpen}
-          setTranslationPickerOpen={setTranslationPickerOpen}
-          setTranslationSettingsSearch={setTranslationSettingsSearch}
-          switchTab={switchTab}
-          t={t}
-          targetLanguage={targetLanguage}
-          toggleMessageSound={toggleMessageSound}
-          togglePush={togglePush}
-          translationPickerOpen={translationPickerOpen}
-          translationSettingsSearch={translationSettingsSearch}
-          uiLocaleLoading={uiLocaleLoading}
-          unblockContact={unblockContact}
-          updateProfileImage={updateProfileImage}
-          visibleLocaleOptions={visibleLocaleOptions}
-          visibleProfilePosts={visibleProfilePosts}
-          visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
-        />
-        )}
-          </AppPageErrorBoundary>
-        </section>
-      } />
+        </>,
+      }}
+    >
 
       {storyDraft && tab === "feed" && (
           <StoryDraftOverlay
@@ -3597,6 +3466,20 @@ export default function AuthedApp({
           </ProfileOverlay>
         )}
 
+      {postLinkToSend && (
+        <SharedPostLinkPicker
+          key={session.sessionId + ":" + postLinkToSend}
+          url={postLinkToSend}
+          conversations={conversations}
+          hasMore={hasMoreConversations}
+          loadingMore={conversationLoadingMore}
+          onLoadMore={() => void loadMoreConversations()}
+          request={apiFetch}
+          onClose={() => setPostLinkToSend(null)}
+          onOpenChat={(id) => { setPostLinkToSend(null); switchTab("chat"); selectRoutedConversation(id); }}
+          onSent={(destinationName) => setNotice(`Đã gửi bài viết đến ${destinationName}.`, "success")}
+        />
+      )}
       {forwardSource && (
         <MessageForwardPicker
           message={forwardSource}
@@ -3630,7 +3513,7 @@ export default function AuthedApp({
         }}
       />
 
-      <CallManager
+      <AppShellCallManager
         request={apiFetch}
         apiBase={API}
         token={session.token}
@@ -3638,13 +3521,7 @@ export default function AuthedApp({
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}
-        conversations={displayConversations.map(({ id, name, type, otherUsername, blockedByMe, blockedByOther }) => ({
-          id,
-          name,
-          type,
-          otherUsername,
-          blocked: Boolean(blockedByMe || blockedByOther),
-        }))}
+        conversations={displayConversations}
       />
 
       <BottomNavigation

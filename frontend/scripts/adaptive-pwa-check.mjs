@@ -144,17 +144,21 @@ try {
               labelCenter: (text.left + text.right) / 2,
               labelY: text.top, clipped: label.scrollWidth > label.clientWidth + 1 }
           })
+          const activeTab = nav.querySelector('button.active').getBoundingClientRect()
           const icon = nav.querySelector('button.active .nav-icon').getBoundingClientRect()
+          const label = nav.querySelector('button.active .nav-label').getBoundingClientRect()
           const pill = nav.querySelector('.nav-liquid-pill').getBoundingClientRect()
           return { items, iconCenter: (icon.left + icon.right) / 2,
-            pillCenter: (pill.left + pill.right) / 2, pillWidth: pill.width }
+            pillCenter: (pill.left + pill.right) / 2, pillWidth: pill.width,
+            tabWidth: activeTab.width, pillTop: pill.top, pillBottom: pill.bottom,
+            iconTop: icon.top, labelBottom: label.bottom }
         })
         for (const index of [0, 1, 2, 3, 4, 0]) {
           await bottom.locator('button').nth(index).click()
           await page.waitForFunction(selected =>
             document.querySelectorAll('.bottom-navigation > button')[selected]?.getAttribute('aria-current') === 'page',
             index, { timeout: 5000 })
-          await page.waitForTimeout(450)
+          await page.waitForTimeout(580)
           const layout = await inspect()
           const widths = layout.items.map(item => item.width)
           assert.ok(Math.max(...widths) - Math.min(...widths) < 1,
@@ -167,8 +171,36 @@ try {
             (i === 0 || Math.abs(item.left - layout.items[i - 1].right) <= 1)),
             width + 'px: tab icon/label alignment is not consistent: ' + JSON.stringify(layout))
           assert.ok(Math.abs(layout.iconCenter - layout.pillCenter) <= 2 &&
-            layout.pillWidth < layout.items[0].width,
-            width + 'px: selected indicator must be centered behind the icon: ' + JSON.stringify(layout))
+            Math.abs(layout.pillWidth - (layout.tabWidth - 4)) <= 1 &&
+            layout.pillTop <= layout.iconTop && layout.pillBottom >= layout.labelBottom,
+            width + 'px: selected bubble must wrap the whole tab (icon and label): ' + JSON.stringify(layout))
+        }
+        if (width === 390) {
+          const indicator = bottom.locator('.nav-liquid-pill')
+          const startingPill = await indicator.boundingBox()
+          const destinationIcon = await bottom.locator('button').nth(4).locator('.nav-icon').boundingBox()
+          await bottom.locator('button').nth(4).click()
+          await page.waitForTimeout(135)
+          const slidingPill = await indicator.boundingBox()
+          const elasticScale = await indicator.evaluate(el => getComputedStyle(el).scale)
+          assert.ok(startingPill && destinationIcon && slidingPill &&
+            slidingPill.x > startingPill.x + 3 && slidingPill.x < destinationIcon.x - 3,
+            'The bubble should glide between the old and new tabs, not jump immediately')
+          assert.ok(Number.parseFloat(elasticScale) > 1.03,
+            'The whole bubble should stretch elastically during the slide: ' + elasticScale)
+          await page.waitForTimeout(500)
+          const settledScale = await indicator.evaluate(el => getComputedStyle(el).scale)
+          assert.ok(settledScale === '1' || settledScale === 'none',
+            'The bubble should return to its natural size after the spring: ' + settledScale)
+          await bottom.locator('button').first().click()
+          await page.waitForTimeout(580)
+          await page.emulateMedia({ reducedMotion: 'reduce' })
+          await bottom.locator('button').nth(4).click()
+          const reducedMotionLayout = await inspect()
+          assert.ok(Math.abs(reducedMotionLayout.iconCenter - reducedMotionLayout.pillCenter) <= 2,
+            'Reduced motion must keep the bubble centered on the selected tab')
+          await bottom.locator('button').first().click()
+          await page.emulateMedia({ reducedMotion: 'no-preference' })
         }
         await page.screenshot({ path: 'output/playwright/layout/mobile-bottom-nav-' + width + '.png' })
         assert.deepEqual(errors, [], width + 'px: unexpected browser errors')
