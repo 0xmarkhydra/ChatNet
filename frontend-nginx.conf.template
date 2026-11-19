@@ -1,3 +1,15 @@
+# Upgrade is hop-by-hop and must be forwarded explicitly for WebSockets.
+map $http_upgrade $chatnet_connection_upgrade {
+    default upgrade;
+    "" close;
+}
+
+# Preserve a stricter policy set by an upstream (e.g. signed media).
+map $upstream_http_referrer_policy $chatnet_referrer_policy {
+    default $upstream_http_referrer_policy;
+    "" strict-origin-when-cross-origin;
+}
+
 server {
     listen ${PORT};
     server_name _;
@@ -5,9 +17,15 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    proxy_hide_header Referrer-Policy;
+    proxy_hide_header X-Content-Type-Options;
+    include /etc/nginx/chatnet-security-headers.conf;
+
     location /api/ {
         proxy_pass ${BACKEND_URL};
         proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $chatnet_connection_upgrade;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -28,21 +46,29 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache off;
+        # A location with its own hide list does not inherit the server list.
+        proxy_hide_header Referrer-Policy;
+        proxy_hide_header X-Content-Type-Options;
+        proxy_hide_header Cache-Control;
         add_header Cache-Control "private, no-store" always;
+        include /etc/nginx/chatnet-security-headers.conf;
     }
 
     location = /sw.js {
         add_header Cache-Control "no-cache, no-store, must-revalidate";
+        include /etc/nginx/chatnet-security-headers.conf;
         try_files $uri =404;
     }
 
     location = / {
         add_header Cache-Control "no-cache, no-store, must-revalidate";
+        include /etc/nginx/chatnet-security-headers.conf;
         try_files /index.html =404;
     }
 
     location = /index.html {
         add_header Cache-Control "no-cache, no-store, must-revalidate";
+        include /etc/nginx/chatnet-security-headers.conf;
         try_files $uri =404;
     }
 
