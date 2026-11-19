@@ -42,6 +42,8 @@
     position: relative;
     box-sizing: border-box;
     width: 100%;
+    max-width: 1060px;
+    margin: 0 auto;
     padding: 0;
     border: 1px solid #e8ecf5;
     border-radius: 0 0 16px 16px;
