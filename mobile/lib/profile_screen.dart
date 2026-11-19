@@ -648,7 +648,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Row(
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             UserAvatar(
                               name: displayName,
@@ -657,7 +660,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               imageUrl: avatarUrl,
                               fetchProfileImage: !widget.api.isDemo,
                             ),
-                            const SizedBox(width: 10),
                             OutlinedButton.icon(
                               onPressed: saving ? null : () => _updateImage('avatar'),
                               icon: const Icon(Icons.camera_alt_outlined, size: 17),
