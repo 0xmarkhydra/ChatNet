@@ -255,15 +255,16 @@ void main() {
     expect(find.text('Bật thông báo hội thoại'), findsOneWidget);
   });
 
-  testWidgets('friends plus opens native friend discovery', (tester) async {
+  testWidgets('friends plus opens incoming friend invitations', (tester) async {
     final api = DemoApi();
     await openMobile(tester, api);
     await tester.tap(find.byKey(const ValueKey('nav-contacts')));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Thêm bạn'));
     await tester.pumpAndSettle();
-    expect(find.text('Khám phá bạn bè'), findsWidgets);
-    expect(find.byKey(const ValueKey('contacts-discovery-stats')), findsOneWidget);
+    expect(find.byKey(const ValueKey('friend-invitation-screen')), findsOneWidget);
+    expect(find.byKey(const ValueKey('invitation-incoming')), findsOneWidget);
+    expect(find.text('Chấp nhận'), findsWidgets);
   });
 
   testWidgets(
@@ -299,6 +300,8 @@ void main() {
     await openMobile(tester, api);
     await tester.tap(find.byKey(const ValueKey('nav-profile')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('profile-settings-open')));
+    await tester.pumpAndSettle();
     final privacyToggle = find.byKey(
       const ValueKey('privacy-searchableByUsername'),
     );
@@ -308,6 +311,16 @@ void main() {
     await tester.tap(privacyToggle);
     await tester.pumpAndSettle();
     expect(api.privacy['searchableByUsername'], false);
+    final back = find.byKey(const ValueKey('profile-back'));
+    await tester.ensureVisible(back);
+    await tester.pumpAndSettle();
+    await tester.tap(back.hitTestable());
+    await tester.pumpAndSettle();
+    final edit = find.byKey(const ValueKey('profile-edit-open'));
+    await tester.ensureVisible(edit);
+    await tester.pumpAndSettle();
+    await tester.tap(edit.hitTestable());
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const ValueKey('profile-bio')));
     await tester.enterText(
       find.byKey(const ValueKey('profile-bio')),
@@ -318,9 +331,10 @@ void main() {
       'Hà Nội',
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Save changes'));
+    final save = find.widgetWithText(FilledButton, 'Lưu hồ sơ');
+    await tester.ensureVisible(save);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Save changes'));
+    await tester.tap(save);
     await tester.pumpAndSettle();
     expect(api.profile['bio'], 'Flutter và PWA đồng bộ');
     expect(api.profile['city'], 'Hà Nội');
