@@ -285,10 +285,8 @@ export default function AuthScreen({
               <button
                 type="button"
                 className="auth-action-btn auth-google-btn"
-                onClick={() => {
-                  /* Google OAuth integration placeholder */
-                  submitAuth(new Event('submit') as unknown as React.FormEvent)
-                }}
+                disabled
+                title="Đăng nhập bằng Google chưa được hỗ trợ"
               >
                 <svg className="auth-google-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -330,13 +328,6 @@ export default function AuthScreen({
           </select>
         </label>
         <span className="auth-footer-brand-mobile">SocCo từ ChatNet Ecosystem</span>
-        <div className="auth-footer-links">
-          <a href="#privacy">Quyền riêng tư</a>
-          <span aria-hidden="true">•</span>
-          <a href="#terms">Điều khoản</a>
-          <span aria-hidden="true">•</span>
-          <a href="#support">Hỗ trợ</a>
-        </div>
       </footer>
     </main>
   )

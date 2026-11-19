@@ -145,7 +145,6 @@ import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
 import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
 import ContactsView from "../features/contacts/components/ContactsView";
-import UnifiedContactsPage from "../features/contacts/components/UnifiedContactsPage";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
@@ -176,7 +175,6 @@ import ProfileOverlay from "../features/profile/components/ProfileOverlay";
 import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
-  Bell,
   Check,
   Images,
   Languages,
@@ -230,7 +228,7 @@ import {
 } from "../features/chat/utils/chatFileTransfer";
 import { canMarkConversationRead } from "../features/chat/utils/conversationRead";
 import { mergeById, toggleMessageReactionCount } from "../shared/utils/optimistic";
-import CallManager, { CallHeaderActions } from "../features/calls/components/CallManager";
+import { CallHeaderActions } from "../features/calls/components/CallManager";
 import SharedContent from "../features/chat/components/SharedContent";
 import VoiceRecorder from "../features/chat/components/VoiceRecorder";
 import { SocoEmptyState, SocoTextAction } from "../shared/ui/SocoUI";
@@ -269,6 +267,12 @@ import {
 import { isDesktopBuild } from "../platform/desktop";
 import AppHeader, { AppHeaderActions } from "./header/AppHeader";
 import AppLayout from "./layouts/AppLayout";
+import { withContactNicknames, mergeContactSearchResults, selectChatListConversations, sortChatListConversations } from "./selectors/appListSelectors";
+import { selectDisplayedFeedPosts } from "./selectors/feedListSelector";
+import { createSecondaryPageSlots } from "./router/createSecondaryPageSlots";
+import AppShellNotices from "./layouts/AppShellNotices";
+import AppShellUploadProgress from "./layouts/AppShellUploadProgress";
+import AppShellCallManager from "./layouts/AppShellCallManager";
 
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { inviteRouteTarget } from "./navigation/inviteDeepLink";
@@ -277,10 +281,6 @@ import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
 import HeaderTitle from "./header/HeaderTitle";
 import { searchLabels } from "./header/headerContext";
-import NotificationsSection from "../features/notifications/components/NotificationsSection";
-import DiscoverSection from "../features/discover/components/DiscoverSection";
-import SearchResultsPage from "../features/search/SearchResultsPage";
-import MarketSection from "../features/discover/components/MarketSection";
 import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
 import FeedPostDetail from "../features/feed/components/FeedPostDetail";
@@ -1051,15 +1051,7 @@ export default function AuthedApp({
   }, [messages, activeConversationId, chatSearchJump]);
   const name = session?.user.username || "";
   const displayConversations = useMemo(
-    () =>
-      conversations.map((conversation) => ({
-        ...conversation,
-        name:
-          conversation.type === "direct" && conversation.otherUserId
-            ? contactMetadata[conversation.otherUserId]?.nickname ||
-              conversation.name
-            : conversation.name,
-      })),
+    () => withContactNicknames(conversations, contactMetadata),
     [conversations, contactMetadata],
   );
   const activeConversation =
@@ -1261,7 +1253,7 @@ export default function AuthedApp({
   const { loadProfilePosts } = useProfilePosts({ feedRevisionRef: feedRevision, profileLoadSequenceRef: profileLoadSequence, profilePagingBusyRef: profilePagingBusy, profilePosts, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError });
   const { createPost, draftBeforeEdit, editingPost, openEditPost, postAttachments, postBackground, postEditBusy, postFeelingId, postTaggedFriends, postText, postVisibility, restoreDraftAfterEdit, setEditingPost, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostTaggedFriends, setPostText, setPostVisibility, setShowPostBackgrounds, showPostBackgrounds } = usePostComposer({ actionLocks, feedCheckInLocation, feedCheckInOpen, feedRevisionRef: feedRevision, friends, mediaUploading, name, pendingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setPendingPost, setPosts, setPostSubmitError, setProfileComposerOpen, setProfilePosts, syncFeedPost, tab });
   const { like } = usePostReactions({ actionLocks, feedRevisionRef: feedRevision, followingFeed, postSearch, refreshPosts, setLikePreviews, setPosts, setProfilePosts, setSavedPosts });
-  const { addComment, manageFeedComment, reportFeedComment } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
+  const { addComment, manageFeedComment, reportFeedComment, setCommentLike } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
   const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ setActivePostId });
 
   const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
@@ -1780,22 +1772,7 @@ export default function AuthedApp({
     }
   }
 
-  const contactQuery = friendQuery
-    .trim()
-    .replace(/^@/, "")
-    .toLocaleLowerCase("vi-VN");
-  const localContactMatches = [...friends, ...friendRequests].filter((friend) =>
-    `${friend.displayName} ${friend.username}`
-      .toLocaleLowerCase("vi-VN")
-      .includes(contactQuery),
-  );
-  const localContactIds = new Set(
-    localContactMatches.map((friend) => friend.id),
-  );
-  const contactSearchResults = [
-    ...localContactMatches,
-    ...friendResults.filter((friend) => !localContactIds.has(friend.id)),
-  ];
+  const contactSearchResults = mergeContactSearchResults(friendQuery, friends, friendRequests, friendResults);
 
   function friendRelationship(userId: number) {
     if (friends.some((item) => item.id === userId)) return "accepted" as const;
@@ -2275,80 +2252,26 @@ export default function AuthedApp({
               (!membershipSnapshot.current ||
                 membershipSnapshot.current.has(item.id)),
           );
-  // Avatar-rail search matches conversation NAMES only (including custom
-  // contact nicknames). The server's q query may also return message-body
-  // matches, so explicitly discard those rather than showing unrelated chats.
-  // Normalize Vietnamese accents so "Linh" can match "Lĩnh", etc.
-  const normalizeChatName = (value: string) => value
-    .toLocaleLowerCase('vi-VN').normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
-  const chatNameKeyword = normalizeChatName(chatListQuery.trim())
-  const chatListConversations = conversationListSearch.active
-    ? conversationListSearch.items
-        .filter((conversation) => !revokedConversationIds.current.has(conversation.id))
-        .map((conversation) => ({
-          ...conversation,
-          name: conversation.type === 'direct' && conversation.otherUserId
-            ? contactMetadata[conversation.otherUserId]?.nickname || conversation.name
-            : conversation.name,
-        }))
-        .filter(conversation => normalizeChatName(conversation.name).includes(chatNameKeyword))
-    : visibleConversations.filter((conversation) => {
-        if (chatListFilter === 'unread' && conversation.unreadCount <= 0) return false
-        if (chatListFilter === 'groups' && conversation.type !== 'group') return false
-        return true
-      })
+  const chatListConversations = selectChatListConversations({
+    visibleConversations,
+    searchActive: conversationListSearch.active,
+    searchItems: conversationListSearch.items,
+    searchQuery: chatListQuery,
+    filter: chatListFilter,
+    revokedIds: revokedConversationIds.current,
+    contactMetadata,
+  });
 
-  const searchedPosts = feedSearchActive
-    ? postSearch.posts.map((post) =>
-        likePreviews[post.id] === undefined
-          ? post
-          : {
-              ...post,
-              liked: likePreviews[post.id],
-              likes: Math.max(
-                0,
-                post.likes +
-                  (likePreviews[post.id] === post.liked
-                    ? 0
-                    : likePreviews[post.id]
-                      ? 1
-                      : -1),
-              ),
-            },
-      )
-    : feedFilter === "saved"
-      ? savedPosts
-      : feedFilter === "following"
-        ? followingFeed.posts.map((post) =>
-            likePreviews[post.id] === undefined
-              ? post
-              : {
-                  ...post,
-                  liked: likePreviews[post.id],
-                  likes: Math.max(
-                    0,
-                    post.likes +
-                      (likePreviews[post.id] === post.liked
-                        ? 0
-                        : likePreviews[post.id]
-                          ? 1
-                          : -1),
-                  ),
-                },
-          )
-        : feedFilter === "latest"
-          ? [...visiblePosts].sort(
-              (a, b) =>
-                Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
-                b.id - a.id,
-            )
-          : visiblePosts;
-  const sortedChatListConversations = [...chatListConversations].sort((a, b) =>
-    Number(Boolean(b.pinnedAt)) - Number(Boolean(a.pinnedAt)) ||
-    (b.pinnedAt || '').localeCompare(a.pinnedAt || '') ||
-    (b.lastMessageAt || b.createdAt).localeCompare(a.lastMessageAt || a.createdAt)
-  );
+  const searchedPosts = selectDisplayedFeedPosts({
+    searchActive: feedSearchActive,
+    searchPosts: postSearch.posts,
+    savedPosts,
+    followingPosts: followingFeed.posts,
+    visiblePosts,
+    filter: feedFilter,
+    likePreviews,
+  });
+  const sortedChatListConversations = sortChatListConversations(chatListConversations);
   const openChatQuickContact = (contact: ChatQuickContact) => {
     setQuickSearchOpen(false);
     setGlobalSearch("");
@@ -2547,6 +2470,7 @@ export default function AuthedApp({
         manageFeedComment(discussionPost, commentId, "DELETE")
       }
       onReport={reportFeedComment}
+      onLike={(commentId, liked) => setCommentLike(discussionPost, commentId, liked)}
       onAuthorOpen={onAuthorOpen}
     />
   );
@@ -2743,30 +2667,10 @@ export default function AuthedApp({
           />
         </Suspense>
       )}
-          {mediaUploading && mediaUploadProgress && (
-        <div className="media-upload-progress" role="status" aria-live="polite">
-          <span>
-            Đang tải tệp:{" "}
-            {Math.round(
-              (mediaUploadProgress.loaded /
-                Math.max(1, mediaUploadProgress.total)) *
-                100,
-            )}
-            %
-          </span>
-          <progress
-            value={mediaUploadProgress.loaded}
-            max={mediaUploadProgress.total}
-            aria-label="Tiến độ tải tệp"
+          <AppShellUploadProgress
+            progress={mediaUploading ? mediaUploadProgress : null}
+            onCancel={() => mediaUploadAbort.current?.abort()}
           />
-          <button
-            type="button"
-            onClick={() => mediaUploadAbort.current?.abort()}
-          >
-            Hủy tải
-          </button>
-        </div>
-      )}
           {visitorUsername && (
         <VisitorProfile
           key={session.sessionId + ":" + visitorUsername}
@@ -2921,136 +2825,215 @@ export default function AuthedApp({
           </AppHeaderActions>
         </AppHeader>
       }
-      beforePage={<>
-{pushPrompt && !pushPromptDismissed && !pushEnabled && (
-        <section
-          className="push-onboarding"
-          aria-label="Thông báo tin nhắn"
-          aria-live="polite"
-        >
-          <Bell size={22} aria-hidden="true" />
-          <strong>Nhận thông báo tin nhắn mới?</strong>
-          <div className="push-onboarding-actions">
-            <button
-              type="button"
-              onClick={() => setPushPromptDismissed(true)}
-              disabled={pushBusy}
-            >
-              Để sau
-            </button>
-            <button
-              className="push-onboarding-enable"
-              type="button"
-              onClick={() => void togglePush()}
-              disabled={pushBusy}
-            >
-              Bật thông báo
-            </button>
-          </div>
-        </section>
-      )}
-
-      {notice && (
-        <div
-          className={`notice toast toast-${notice.kind}`}
-          role={notice.kind === "error" ? "alert" : "status"}
-          aria-live={notice.kind === "error" ? "assertive" : "polite"}
-        >
-          <span className="toast-icon" aria-hidden="true">
-            {notice.kind === "success"
-              ? "✓"
-              : notice.kind === "error"
-                ? "!"
-                : notice.kind === "warning"
-                  ? "!"
-                  : "i"}
-          </span>
-          <div className="toast-copy">
-            <strong>
-              {notice.kind === "success"
-                ? "Thành công"
-                : notice.kind === "error"
-                  ? "Có lỗi"
-                  : notice.kind === "warning"
-                    ? "Lưu ý"
-                    : "Thông báo"}
-            </strong>
-            <span>{notice.message}</span>
-          </div>
-          <button
-            type="button"
-            aria-label="Đóng thông báo"
-            onClick={dismissNotice}
-          >
-            ×
-          </button>
-        </div>
-      )}
-      </>}
+      beforePage={<AppShellNotices
+        showPushPrompt={pushPrompt && !pushPromptDismissed && !pushEnabled}
+        pushBusy={pushBusy}
+        notice={notice}
+        onDismissPushPrompt={() => setPushPromptDismissed(true)}
+        onEnablePush={() => void togglePush()}
+        onDismissNotice={dismissNotice}
+      />}
       outletContext={{
         frameClassName: tab === "chat" && activeConversation ? "mobile-conversation-open" : "",
-        notifications: (<NotificationsSection
-          actOnFriend={actOnFriend}
-          conversations={conversations}
-          declineFriendRequest={declineFriendRequest}
-          friendBusyIds={friendBusyIds}
-          friendRequests={friendRequests}
-          globalSearch={globalSearch}
-          openMentionPost={openMentionPost}
-          openVisitor={openVisitor}
-          postMentions={postMentions}
-          readPostMention={readPostMention}
-          setActiveConversationId={selectRoutedConversation}
-          setContactsScreen={setContactsScreen}
-          setDesktopProfileSettings={setDesktopProfileSettings}
-          setProfileTimelineOpen={setProfileTimelineOpen}
-          switchTab={switchTab}
-        />),
-        contacts: (<UnifiedContactsPage
-          contactsContent={contactsContent}
-          conversations={displayConversations}
-          friends={friends}
-          incomingRequests={friendRequests.filter(friend => friend.direction === "incoming").length}
-          request={apiFetch}
-          userId={session.user.id}
-          token={session.token}
-          targetLanguage={targetLanguage}
-          friendQuery={friendQuery}
-          setFriendQuery={setFriendQuery}
-          onOpenChat={(id) => { switchTab("chat"); selectRoutedConversation(id); }}
-          onNavigate={switchTab}
-        />),
-        search: (<SearchResultsPage
-            request={apiFetch}
-            sessionId={session.sessionId}
-            onOpenProfile={username => openVisitorProfile(username)}
-            onOpenPost={postId => navigate(feedPostPath(postId))}
-          />),
-        discover: (<DiscoverSection
-          request={apiFetch}
-          sessionId={session.sessionId}
-          actOnFriend={actOnFriend}
-          findNearby={findNearby}
-          friendActionBusy={friendActionBusy}
-          friendRelationship={friendRelationship}
-          globalSearch={globalSearch}
-          nearbyBusy={nearbyBusy}
-          nearbyRadiusKm={nearbyRadiusKm}
-          nearbyResultRadiusKm={nearbyResultRadiusKm}
-          nearbyScanning={nearbyScanning}
-          nearbyUntil={nearbyUntil}
-          nearbyUsers={nearbyUsers}
-          setGlobalSearch={setGlobalSearch}
-          setNearbyRadiusKm={setNearbyRadiusKm}
-          stopNearby={stopNearby}
-        />),
-        market: (<MarketSection
-            searchQuery={globalSearch}
+        ...createSecondaryPageSlots({
+          notifications: {
+            actOnFriend,
+            conversations,
+            declineFriendRequest,
+            friendBusyIds,
+            friendRequests,
+            globalSearch,
+            openMentionPost,
+            openVisitor,
+            postMentions,
+            readPostMention,
+            setActiveConversationId: selectRoutedConversation,
+            setContactsScreen,
+            setDesktopProfileSettings,
+            setProfileTimelineOpen,
+            switchTab,
+          },
+          contacts: {
+            contactsContent,
+            conversations: displayConversations,
+            friends,
+            incomingRequests: friendRequests.filter(friend => friend.direction === "incoming").length,
+            request: apiFetch,
+            userId: session.user.id,
+            token: session.token,
+            targetLanguage,
+            friendQuery,
+            setFriendQuery,
+            onOpenChat: (id) => { switchTab("chat"); selectRoutedConversation(id); },
+            onNavigate: switchTab,
+          },
+          search: {
+            request: apiFetch,
+            sessionId: session.sessionId,
+            onOpenProfile: username => openVisitorProfile(username),
+            onOpenPost: postId => navigate(feedPostPath(postId)),
+          },
+          discover: {
+            request: apiFetch,
+            sessionId: session.sessionId,
+            actOnFriend,
+            findNearby,
+            friendActionBusy,
+            friendRelationship,
+            globalSearch,
+            nearbyBusy,
+            nearbyRadiusKm,
+            nearbyResultRadiusKm,
+            nearbyScanning,
+            nearbyUntil,
+            nearbyUsers,
+            setGlobalSearch,
+            setNearbyRadiusKm,
+            stopNearby,
+          },
+          market: {
+            searchQuery: globalSearch,
+            apiFetch,
+            session,
+            switchTab,
+          },
+        }),
+        profile: <>
+        {desktopProfileOverview && (
+          <ProfileOverviewSection
           apiFetch={apiFetch}
+          avatarFileInputRef={avatarFileInputRef}
+          changePrivacy={changePrivacy}
+          coverFileInputRef={coverFileInputRef}
+          discardDesktopProfileEdits={discardDesktopProfileEdits}
+          friends={friends}
+          loadProfilePosts={loadProfilePosts}
+          mediaUploading={mediaUploading}
+          name={name}
+          openVisitor={openVisitor}
+          pendingPost={pendingPost}
+          privacy={privacy}
+          privacyBusy={privacyBusy}
+          privacyError={privacyError}
+          privacyLoading={privacyLoading}
+          profileBioDraft={profileBioDraft}
+          profileBusy={profileBusy}
+          profileCityDraft={profileCityDraft}
+          profileDisplayNameDraft={profileDisplayNameDraft}
+          profileEditorOpen={profileEditorOpen}
+          profileHasMore={profileHasMore}
+          profileMedia={profileMedia}
+          profilePosts={profilePosts}
+          profilePostsBusy={profilePostsBusy}
+          profilePostsError={profilePostsError}
+          profileSaving={profileSaving}
+          profileUsernameDraft={profileUsernameDraft}
+          renderPosts={renderPosts}
+          saveProfileIdentity={saveProfileIdentity}
           session={session}
+          setActivePostId={setActivePostId}
+          setPrivacyRetry={setPrivacyRetry}
+          setProfileBioDraft={setProfileBioDraft}
+          setProfileCityDraft={setProfileCityDraft}
+          setProfileComposerOpen={setProfileComposerOpen}
+          setProfileDisplayNameDraft={setProfileDisplayNameDraft}
+          setProfileEditorOpen={setProfileEditorOpen}
+          setProfileUsernameDraft={setProfileUsernameDraft}
           switchTab={switchTab}
-        />),
-        content: <>
+          updateProfileImage={updateProfileImage}
+          visibleProfilePosts={visibleProfilePosts}
+        />
+        )}
+
+        {!desktopProfileOverview && (
+          <ProfileSection
+          apiFetch={apiFetch}
+          appLocale={appLocale}
+          autoTranslate={autoTranslate}
+          avatarFileInputRef={avatarFileInputRef}
+          blockedBusy={blockedBusy}
+          blockedError={blockedError}
+          blockedOpen={blockedOpen}
+          blockedUsers={blockedUsers}
+          changeAppLocale={changeAppLocale}
+          changeAutoTranslate={changeAutoTranslate}
+          changeTargetLanguage={changeTargetLanguage}
+          closeProfileTimeline={closeProfileTimeline}
+          coverFileInputRef={coverFileInputRef}
+          desktopProfileSettings={desktopProfileSettings}
+          fetchAccountSessions={fetchAccountSessions}
+          installApp={installApp}
+          isProfileDesktop={isProfileDesktop}
+          isStandalone={isStandalone}
+          loadBlockedUsers={loadBlockedUsers}
+          loadProfilePosts={loadProfilePosts}
+          localePickerOpen={localePickerOpen}
+          localeSearch={localeSearch}
+          logout={logout}
+          managedSessions={managedSessions}
+          mediaUploading={mediaUploading}
+          messageSoundEnabled={messageSoundEnabled}
+          name={name}
+          nativeNotifications={nativeNotifications}
+          pendingPost={pendingPost}
+          postText={postText}
+          previewMessageSound={previewMessageSound}
+          privacy={privacy}
+          privacyBusy={privacyBusy}
+          privacyError={privacyError}
+          privacyLoading={privacyLoading}
+          profileBusy={profileBusy}
+          profileHasMore={profileHasMore}
+          profileHeadingRef={profileHeadingRef}
+          profileIdentityForm={profileIdentityForm}
+          profileIdentityRef={profileIdentityRef}
+          profileMedia={profileMedia}
+          profilePosts={profilePosts}
+          profilePostsBusy={profilePostsBusy}
+          profilePostsError={profilePostsError}
+          profilePrivacyControls={profilePrivacyControls}
+          profileTimelineOpen={profileTimelineOpen}
+          pushBusy={pushBusy}
+          pushEnabled={pushEnabled}
+          renderPosts={renderPosts}
+          revokeAccountSessions={revokeAccountSessions}
+          savePrivacy={savePrivacy}
+          selectedAppLanguage={selectedAppLanguage}
+          selectedLanguage={selectedLanguage}
+          sendTestPush={sendTestPush}
+          session={session}
+          sessionsBusy={sessionsBusy}
+          sessionsError={sessionsError}
+          sessionsOpen={sessionsOpen}
+          setBlockedOpen={setBlockedOpen}
+          setDesktopProfileSettings={setDesktopProfileSettings}
+          setGlobalSearch={setGlobalSearch}
+          setLocalePickerOpen={setLocalePickerOpen}
+          setLocaleSearch={setLocaleSearch}
+          setPrivacyRetry={setPrivacyRetry}
+          setProfileComposerOpen={setProfileComposerOpen}
+          setProfileEditorOpen={setProfileEditorOpen}
+          setProfileTimelineOpen={setProfileTimelineOpen}
+          setSessionsOpen={setSessionsOpen}
+          setTranslationPickerOpen={setTranslationPickerOpen}
+          setTranslationSettingsSearch={setTranslationSettingsSearch}
+          switchTab={switchTab}
+          t={t}
+          targetLanguage={targetLanguage}
+          toggleMessageSound={toggleMessageSound}
+          togglePush={togglePush}
+          translationPickerOpen={translationPickerOpen}
+          translationSettingsSearch={translationSettingsSearch}
+          uiLocaleLoading={uiLocaleLoading}
+          unblockContact={unblockContact}
+          updateProfileImage={updateProfileImage}
+          visibleLocaleOptions={visibleLocaleOptions}
+          visibleProfilePosts={visibleProfilePosts}
+          visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
+        />
+        )}
+        </>,
+        chat: <>
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
           activeChatTranslationSettings={activeChatTranslationSettings}
@@ -3281,6 +3264,8 @@ export default function AuthedApp({
 
 
 
+        </>,
+        beforeFeed: <>
         {activePost && (
           <FeedPostDetail
           activePost={activePost}
@@ -3309,8 +3294,8 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "feed" && (
-          <FeedSection
+        </>,
+        feed: (<FeedSection
           activePostId={activePostId}
           activeStoryId={activeStoryId}
           actOnFriend={actOnFriend}
@@ -3366,8 +3351,9 @@ export default function AuthedApp({
           stories={stories}
           storyBusy={storyBusy}
           switchTab={switchTab}
-        />
-        )}
+        />),
+        afterFeed: <>
+
 
         {activeConversationAction && (
           <ConversationActionDialog
@@ -3424,139 +3410,6 @@ export default function AuthedApp({
         />
         )}
 
-        {tab === "profile" && desktopProfileOverview && (
-          <ProfileOverviewSection
-          apiFetch={apiFetch}
-          avatarFileInputRef={avatarFileInputRef}
-          changePrivacy={changePrivacy}
-          coverFileInputRef={coverFileInputRef}
-          discardDesktopProfileEdits={discardDesktopProfileEdits}
-          friends={friends}
-          loadProfilePosts={loadProfilePosts}
-          mediaUploading={mediaUploading}
-          name={name}
-          openVisitor={openVisitor}
-          pendingPost={pendingPost}
-          privacy={privacy}
-          privacyBusy={privacyBusy}
-          privacyError={privacyError}
-          privacyLoading={privacyLoading}
-          profileBioDraft={profileBioDraft}
-          profileBusy={profileBusy}
-          profileCityDraft={profileCityDraft}
-          profileDisplayNameDraft={profileDisplayNameDraft}
-          profileEditorOpen={profileEditorOpen}
-          profileHasMore={profileHasMore}
-          profileMedia={profileMedia}
-          profilePosts={profilePosts}
-          profilePostsBusy={profilePostsBusy}
-          profilePostsError={profilePostsError}
-          profileSaving={profileSaving}
-          profileUsernameDraft={profileUsernameDraft}
-          renderPosts={renderPosts}
-          saveProfileIdentity={saveProfileIdentity}
-          session={session}
-          setActivePostId={setActivePostId}
-          setPrivacyRetry={setPrivacyRetry}
-          setProfileBioDraft={setProfileBioDraft}
-          setProfileCityDraft={setProfileCityDraft}
-          setProfileComposerOpen={setProfileComposerOpen}
-          setProfileDisplayNameDraft={setProfileDisplayNameDraft}
-          setProfileEditorOpen={setProfileEditorOpen}
-          setProfileUsernameDraft={setProfileUsernameDraft}
-          switchTab={switchTab}
-          updateProfileImage={updateProfileImage}
-          visibleProfilePosts={visibleProfilePosts}
-        />
-        )}
-
-        {tab === "profile" && !desktopProfileOverview && (
-          <ProfileSection
-          apiFetch={apiFetch}
-          appLocale={appLocale}
-          autoTranslate={autoTranslate}
-          avatarFileInputRef={avatarFileInputRef}
-          blockedBusy={blockedBusy}
-          blockedError={blockedError}
-          blockedOpen={blockedOpen}
-          blockedUsers={blockedUsers}
-          changeAppLocale={changeAppLocale}
-          changeAutoTranslate={changeAutoTranslate}
-          changeTargetLanguage={changeTargetLanguage}
-          closeProfileTimeline={closeProfileTimeline}
-          coverFileInputRef={coverFileInputRef}
-          desktopProfileSettings={desktopProfileSettings}
-          fetchAccountSessions={fetchAccountSessions}
-          installApp={installApp}
-          isProfileDesktop={isProfileDesktop}
-          isStandalone={isStandalone}
-          loadBlockedUsers={loadBlockedUsers}
-          loadProfilePosts={loadProfilePosts}
-          localePickerOpen={localePickerOpen}
-          localeSearch={localeSearch}
-          logout={logout}
-          managedSessions={managedSessions}
-          mediaUploading={mediaUploading}
-          messageSoundEnabled={messageSoundEnabled}
-          name={name}
-          nativeNotifications={nativeNotifications}
-          pendingPost={pendingPost}
-          postText={postText}
-          previewMessageSound={previewMessageSound}
-          privacy={privacy}
-          privacyBusy={privacyBusy}
-          privacyError={privacyError}
-          privacyLoading={privacyLoading}
-          profileBusy={profileBusy}
-          profileHasMore={profileHasMore}
-          profileHeadingRef={profileHeadingRef}
-          profileIdentityForm={profileIdentityForm}
-          profileIdentityRef={profileIdentityRef}
-          profileMedia={profileMedia}
-          profilePosts={profilePosts}
-          profilePostsBusy={profilePostsBusy}
-          profilePostsError={profilePostsError}
-          profilePrivacyControls={profilePrivacyControls}
-          profileTimelineOpen={profileTimelineOpen}
-          pushBusy={pushBusy}
-          pushEnabled={pushEnabled}
-          renderPosts={renderPosts}
-          revokeAccountSessions={revokeAccountSessions}
-          savePrivacy={savePrivacy}
-          selectedAppLanguage={selectedAppLanguage}
-          selectedLanguage={selectedLanguage}
-          sendTestPush={sendTestPush}
-          session={session}
-          sessionsBusy={sessionsBusy}
-          sessionsError={sessionsError}
-          sessionsOpen={sessionsOpen}
-          setBlockedOpen={setBlockedOpen}
-          setDesktopProfileSettings={setDesktopProfileSettings}
-          setGlobalSearch={setGlobalSearch}
-          setLocalePickerOpen={setLocalePickerOpen}
-          setLocaleSearch={setLocaleSearch}
-          setPrivacyRetry={setPrivacyRetry}
-          setProfileComposerOpen={setProfileComposerOpen}
-          setProfileEditorOpen={setProfileEditorOpen}
-          setProfileTimelineOpen={setProfileTimelineOpen}
-          setSessionsOpen={setSessionsOpen}
-          setTranslationPickerOpen={setTranslationPickerOpen}
-          setTranslationSettingsSearch={setTranslationSettingsSearch}
-          switchTab={switchTab}
-          t={t}
-          targetLanguage={targetLanguage}
-          toggleMessageSound={toggleMessageSound}
-          togglePush={togglePush}
-          translationPickerOpen={translationPickerOpen}
-          translationSettingsSearch={translationSettingsSearch}
-          uiLocaleLoading={uiLocaleLoading}
-          unblockContact={unblockContact}
-          updateProfileImage={updateProfileImage}
-          visibleLocaleOptions={visibleLocaleOptions}
-          visibleProfilePosts={visibleProfilePosts}
-          visibleTranslationSettingsOptions={visibleTranslationSettingsOptions}
-        />
-        )}
         </>,
       }}
     >
@@ -3663,7 +3516,7 @@ export default function AuthedApp({
         }}
       />
 
-      <CallManager
+      <AppShellCallManager
         request={apiFetch}
         apiBase={API}
         token={session.token}
@@ -3671,13 +3524,7 @@ export default function AuthedApp({
         userId={session.user.id}
         sourceLanguage={effectiveAppLocale}
         targetLanguage={targetLanguage}
-        conversations={displayConversations.map(({ id, name, type, otherUsername, blockedByMe, blockedByOther }) => ({
-          id,
-          name,
-          type,
-          otherUsername,
-          blocked: Boolean(blockedByMe || blockedByOther),
-        }))}
+        conversations={displayConversations}
       />
 
       <BottomNavigation

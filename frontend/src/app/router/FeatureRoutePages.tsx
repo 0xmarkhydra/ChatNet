@@ -13,10 +13,6 @@ export function FeatureRouteLayout() {
   return <Outlet context={page} />;
 }
 
-export function CurrentPage() {
-  return <PageRoute />;
-}
-
 const settingsSections = new Set([
   "account", "privacy", "security", "notifications", "language",
   "messages", "appearance", "storage", "devices",
@@ -24,23 +20,23 @@ const settingsSections = new Set([
 
 export function SettingsSectionPage() {
   const { section } = useParams();
-  return section && settingsSections.has(section) ? <CurrentPage /> : <NotFoundPage />;
+  return section && settingsSections.has(section) ? <PageRoute page="profile" /> : <NotFoundPage />;
 }
 
 export function FeedPostPage() {
   const { postId } = useParams();
   return postId && feedPostIdFromPath(`/feed/posts/${postId}`) !== null
-    ? <CurrentPage /> : <NotFoundPage />;
+    ? <PageRoute page="feed" /> : <NotFoundPage />;
 }
 
 export function VisitorProfilePage() {
   const { username } = useParams();
   return username && visitorUsernameFromPath(`/users/${encodeURIComponent(username)}`) !== null
-    ? <CurrentPage /> : <NotFoundPage />;
+    ? <PageRoute page="profile" /> : <NotFoundPage />;
 }
 
 export function ChatConversationPage() {
   const { conversationId } = useParams();
   return conversationId && chatConversationIdFromPath(`/chat/${conversationId}`) !== null
-    ? <CurrentPage /> : <NotFoundPage />;
+    ? <PageRoute page="chat" /> : <NotFoundPage />;
 }

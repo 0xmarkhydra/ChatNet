@@ -76,6 +76,7 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
   const deleteLabel = quickRepost ? 'Bỏ đăng lại' : 'Xóa bài viết'
   const portalContainer = useContext(ModalPortalContext)
   const trigger = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLElement>(null)
   const [open, setOpen] = useState(false)
   const [screenPosition, setScreenPosition] = useState({ top: 0, left: 0 })
   const [screen, setScreen] = useState<'options' | 'report' | 'delete'>('options')
@@ -84,17 +85,37 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
 
   useEffect(() => {
     if (!open) return
+    const element = panel.current
+    if (!element) return
+    const focusable = () => Array.from(
+      element.querySelectorAll<HTMLElement>('button:not(:disabled), select:not(:disabled)'),
+    ).filter(control => control.tabIndex >= 0)
+    if (!element.contains(document.activeElement)) (focusable()[0] ?? element).focus()
+
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      if (!busy) {
-        setOpen(false)
-        trigger.current?.focus()
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        if (!busy) {
+          setOpen(false)
+          trigger.current?.focus()
+        }
+        return
+      }
+      if (event.key !== 'Tab') return
+      const controls = focusable()
+      const first = controls[0]
+      const last = controls[controls.length - 1]
+      const active = document.activeElement
+      if (!controls.some(control => control === active) || active === (event.shiftKey ? first : last)) {
+        event.preventDefault()
+        const target = (event.shiftKey ? last : first) ?? element
+        target.focus()
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, busy])
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [open, screen, busy])
 
   function close() {
     setOpen(false)
@@ -168,7 +189,7 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
         <div className="feed-actions-overlay" data-feed-options={post.id}>
           <button type="button" className="feed-actions-backdrop" tabIndex={-1}
             aria-label="Đóng tùy chọn" onClick={close} />
-          <section className="feed-actions-panel" role="dialog" aria-modal="true" aria-label="Tùy chọn bài viết"
+          <section ref={panel} tabIndex={-1} className="feed-actions-panel" role="dialog" aria-modal="true" aria-label="Tùy chọn bài viết"
             style={{ top: screenPosition.top, left: screenPosition.left }}>
             <div className="feed-actions-grabber" aria-hidden="true" />
             <div className="feed-actions-header">

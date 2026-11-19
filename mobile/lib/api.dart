@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -36,8 +37,20 @@ class ApiError implements Exception {
 }
 
 class Api {
-  Api({http.Client? client, this.storage = const FlutterSecureStorage()})
-    : client = client ?? http.Client();
+  Api({
+    http.Client? client,
+    Dio? dio,
+    this.storage = const FlutterSecureStorage(),
+  }) : client = client ?? http.Client(),
+       dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               connectTimeout: const Duration(seconds: 30),
+               receiveTimeout: const Duration(seconds: 30),
+               sendTimeout: const Duration(seconds: 30),
+             ),
+           );
 
   static const baseUrl = String.fromEnvironment(
     'API_URL',
@@ -47,7 +60,9 @@ class Api {
     'WEB_URL',
     defaultValue: 'https://chat.codelocal.cloud',
   );
-  final http.Client client;
+  final http.Client
+  client; // Only for Server-Sent Events; Dio handles REST and media.
+  final Dio dio;
   final FlutterSecureStorage storage;
   Json? session;
   int generation = 0;
@@ -157,43 +172,119 @@ class Api {
   }
 
   Future<dynamic> _send(String method, String path, Json? body) async {
-    final req = http.Request(method, uri(path));
-    req.headers['Accept'] = 'application/json';
-    if (session != null) {
-      req.headers['Authorization'] = 'Bearer ${session!['token']}';
-    }
-    if (body != null) {
-      req.headers['Content-Type'] = 'application/json';
-      req.body = jsonEncode(body);
-    }
+    // Parsing error payloads ourselves keeps status codes available to the
+    // 401 refresh flow. Never auto-retry ambiguous network writes.
     try {
-      final res = await http.Response.fromStream(
-        await client.send(req).timeout(const Duration(seconds: 30)),
-      ).timeout(const Duration(seconds: 30));
+      final response = await dio.requestUri<String>(
+        uri(path),
+        data: body == null ? null : jsonEncode(body),
+        options: Options(
+          method: method,
+          responseType: ResponseType.plain,
+          validateStatus: (_) => true,
+          headers: {
+            'Accept': 'application/json',
+            if (session != null) 'Authorization': 'Bearer ${session!['token']}',
+            if (body != null) 'Content-Type': 'application/json',
+          },
+        ),
+      );
+      final status = response.statusCode ?? 0;
       dynamic data;
       try {
-        data = res.body.isEmpty ? null : jsonDecode(res.body);
+        final raw = response.data ?? '';
+        data = raw.isEmpty ? null : jsonDecode(raw);
       } on FormatException {
-        throw ApiError('Máy chủ trả dữ liệu không hợp lệ (${res.statusCode}).');
+        throw ApiError('Máy chủ trả dữ liệu không hợp lệ ($status).', status);
       }
-      if (res.statusCode < 200 || res.statusCode >= 300) {
+      if (status < 200 || status >= 300) {
         throw ApiError(
           data is Map && data['error'] is String
               ? data['error'] as String
-              : 'Yêu cầu thất bại (${res.statusCode}).',
-          res.statusCode,
+              : 'Yêu cầu thất bại ($status).',
+          status,
         );
       }
       return data;
-    } on TimeoutException {
-      throw const ApiError(
-        'Mạng quá chậm. Kiểm tra dữ liệu trước khi thử gửi lại.',
-      );
-    } on http.ClientException {
+    } on DioException catch (error) {
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.type == DioExceptionType.receiveTimeout) {
+        throw const ApiError(
+          'Mạng quá chậm. Kiểm tra dữ liệu trước khi thử gửi lại.',
+        );
+      }
       throw const ApiError(
         'Không kết nối được máy chủ. Bản nháp vẫn được giữ.',
       );
     }
+  }
+
+  /// Download a forwarded attachment using the current user's permission,
+  /// then re-upload it as the sender rather than copying another user's storageRef.
+  Future<Uint8List> downloadForForward(Json attachment) async {
+    final raw = attachment['url']?.toString() ?? '';
+    final parsed = Uri.tryParse(raw);
+    if (parsed == null || raw.isEmpty || parsed.userInfo.isNotEmpty) {
+      throw const ApiError('Tệp không có đường dẫn tải hợp lệ.');
+    }
+    final target = parsed.hasScheme ? parsed : uri(raw);
+    final localHttp =
+        target.scheme == 'http' &&
+        ['localhost', '127.0.0.1', '10.0.2.2'].contains(target.host);
+    if (target.userInfo.isNotEmpty ||
+        (target.scheme != 'https' && !localHttp)) {
+      throw const ApiError('Địa chỉ tải tệp không an toàn.');
+    }
+
+    final kind = (attachment['contentType']?.toString() ?? '').split('/').first;
+    final limitMb = switch (kind) {
+      'image' => 20,
+      'video' => 150,
+      'audio' => 40,
+      _ => 50,
+    };
+    final limit = limitMb * 1024 * 1024;
+    final origin = Uri.parse(baseUrl);
+    final sameOrigin =
+        target.scheme == origin.scheme &&
+        target.host == origin.host &&
+        target.port == origin.port;
+    // Signed external URLs must never receive the user's bearer token.
+    final response = await dio.getUri<ResponseBody>(
+      target,
+      options: Options(
+        responseType: ResponseType.stream,
+        validateStatus: (_) => true,
+        headers: {
+          if (session != null && sameOrigin)
+            'Authorization': 'Bearer ${session!['token']}',
+        },
+      ),
+    );
+    final status = response.statusCode ?? 0;
+    if (status < 200 || status >= 300) {
+      throw ApiError('Không thể tải tệp để chuyển tiếp ($status).', status);
+    }
+    final contentLength = int.tryParse(
+      response.headers.value('content-length') ?? '',
+    );
+    if (contentLength != null && contentLength > limit) {
+      throw ApiError('Tệp chuyển tiếp vượt quá $limitMb MB.');
+    }
+    final bytes = BytesBuilder(copy: false);
+    final body = response.data;
+    if (body == null) throw const ApiError('Tệp đính kèm trống.');
+    await for (final part in body.stream.timeout(
+      const Duration(seconds: 120),
+    )) {
+      if (bytes.length + part.length > limit) {
+        throw ApiError('Tệp chuyển tiếp vượt quá $limitMb MB.');
+      }
+      bytes.add(part);
+    }
+    if (bytes.isEmpty) throw const ApiError('Tệp đính kèm trống.');
+    return bytes.takeBytes();
   }
 
   Future<Json> upload(
@@ -227,10 +318,20 @@ class Api {
     if (url == null || url.scheme != 'https' || url.userInfo.isNotEmpty) {
       throw const ApiError('Địa chỉ tải tệp không an toàn.');
     }
-    final response = await client
-        .put(url, headers: {'Content-Type': contentType}, body: bytes)
-        .timeout(const Duration(seconds: 120));
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+    final response = await dio.putUri<void>(
+      url,
+      data: bytes,
+      options: Options(
+        contentType: contentType,
+        responseType: ResponseType.plain,
+        validateStatus: (_) => true,
+        sendTimeout: const Duration(seconds: 120),
+        receiveTimeout: const Duration(seconds: 120),
+        // Presigned upload requests must not inherit the session token.
+        headers: {'Content-Type': contentType},
+      ),
+    );
+    if ((response.statusCode ?? 0) < 200 || (response.statusCode ?? 0) >= 300) {
       throw const ApiError('Tải tệp thất bại. Chưa gửi nội dung.');
     }
     return {
@@ -278,5 +379,6 @@ class Api {
     generation++;
     session = null;
     client.close();
+    dio.close(force: true);
   }
 }

@@ -5,13 +5,19 @@
 ## Nested routes and shell ownership
 
 - The signed-in shell and session/realtime providers stay mounted while navigating across supported feature routes.
-- `AppLayout` renders the shared Header, Sidebar, notices and a single direct `<Outlet context={outletContext} />`. `PageRoute` owns `modern-frame` and page-specific Error Boundary without adding new CSS or DOM wrappers.
-- `AuthedApp` remains the session-scoped feature-state controller. It supplies the contract in `routePageContext.ts` (`AppPageContext`) with independent route-owned React nodes for Contacts, Search, Discover, Marketplace, and Notifications. `PageRoute page="..."` selects the correct node according to the URL.
-- `FeatureRouteLayout` forwards that same context through its nested `<Outlet />` and intentionally adds **no DOM wrapper** or business state. Chat, Feed, Profile, Settings and detail routes retain the legacy `content` slot during migration.
-- Parent index routes display the existing page for Chat, Contacts, Feed, Profile, Calls and Settings. Subroutes reuse the same page slot until feature-specific page ownership can move independently.
-- Invalid child paths render standalone `NotFoundPage` inside the shell, with its existing CSS structure, contextual parent link, and page Error Boundary. Unknown `/users` without a username is invalid.
-- `FeatureRoutePages.tsx` validates post IDs, conversation IDs, usernames and Settings section names before rendering. Do not replace validated routes with broad wildcard `CurrentPage` matches.
-- `AppLayout` depends only on the typed `routePageContext.ts` contract, not on the `PageRoute` rendering component. Keep app-shell component composition separate from route-specific business validation.
+- `AppLayout` owns the shared Header, Sidebar, notices and one `<Outlet context={outletContext} />`; it imports the pure `routePageContext.ts` contract, never the `PageRoute` renderer.
+- `AuthedApp` remains the session-scoped feature-state controller. It supplies typed route-owned React nodes for Chat, Feed and Profile/Settings/visitors. `createSecondaryPageSlots.tsx` composes the typed React elements for Contacts/Calls, Search, Discover, Marketplace and Notifications without transferring state or mounting inactive features.
+- `PageRoute` requires a `RoutePageKey` (no implicit legacy fallback), owns `modern-frame` and a page Error Boundary, and adds no new CSS or structural DOM wrappers.
+- `FeatureRouteLayout` in `FeatureRoutePages.tsx` forwards the same context through nested `<Outlet />` without adding DOM or business state. The module also validates Chat conversation IDs, Feed post IDs, visitor usernames and Settings sections.
+- `beforeFeed` and `afterFeed` retain the existing shared dialogs/overlays in their original DOM positions for Chat, Feed and Profile; they own no business state.
+- Validated detail routes select the same page key as their parent, e.g. `/feed/posts/:postId` selects `feed` and `/users/:username` selects `profile`. Legacy `/calls/*` redirects to unified Contacts/Calls.
+- Invalid child paths render `NotFoundPage` within the shell, retaining existing CSS, contextual parent links and an Error Boundary. A new route must have direct URL, unknown path and Back/Forward tests.
+
+## Migration boundary
+
+- Routing composition is now declarative, but business controllers and many props still live in `AuthedApp`; do not move their session/outbox/realtime/call lifecycle without separate behavioral tests.
+- `LegacyHomeRedirect.tsx` preserves `/?tab=...` compatibility, search, URL fragment and navigation state.
+- UI/CSS, including the approved Feed and Contacts design, is unchanged in this refactor.
 
 ## Navigation and deep-link compatibility
 

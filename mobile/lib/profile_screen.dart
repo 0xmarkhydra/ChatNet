@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'state/app_providers.dart';
 import 'package:mime/mime.dart';
 
 import 'api.dart';
@@ -9,28 +14,36 @@ import 'profile_qr.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({
     super.key,
     required this.api,
     required this.onLogout,
     required this.onConnect,
     required this.onLocaleChanged,
+    this.onCreatePost,
   });
 
   final Api api;
   final Future<void> Function() onLogout;
   final ValueChanged<String> onConnect;
   final ValueChanged<String> onLocaleChanged;
+  final VoidCallback? onCreatePost;
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final displayNameController = TextEditingController();
   final usernameController = TextEditingController();
+  final bioController = TextEditingController();
+  final cityController = TextEditingController();
   Json? profile;
+  Json? privacy;
+  bool privacyLoading = true;
+  bool privacyBusy = false;
+  String privacyError = '';
   Json preferences = {
     'targetLanguage': 'vi',
     'autoTranslate': true,
@@ -45,19 +58,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _load();
+    unawaited(_loadPrivacy());
+  }
+
+  Future<void> _loadPrivacy() async {
+    setState(() {
+      privacyLoading = true;
+      privacyError = '';
+    });
+    try {
+      ref.invalidate(privacyProvider);
+      final values = (await ref.read(privacyProvider.future)).toJson();
+      if (!mounted) return;
+      setState(() {
+        privacy = values;
+        privacyLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        privacyLoading = false;
+        privacyError = 'Không thể tải cài đặt riêng tư: $error';
+      });
+    }
+  }
+
+  Future<void> _changePrivacy(String key) async {
+    if (privacy == null || privacyBusy || privacy![key] is! bool) return;
+    final next = {...privacy!, key: privacy![key] != true};
+    setState(() => privacyBusy = true);
+    try {
+      final updated = object(
+        await widget.api.request('PUT', '/api/privacy', next),
+      );
+      if (!mounted) return;
+      ref.invalidate(privacyProvider);
+      setState(() => privacy = updated);
+    } catch (error) {
+      _show('Không lưu được quyền riêng tư: $error');
+    } finally {
+      if (mounted) setState(() => privacyBusy = false);
+    }
   }
 
   Future<void> _load() async {
     try {
-      final values = await Future.wait([
-        widget.api.request('GET', '/api/profile'),
-        widget.api.request('GET', '/api/preferences'),
-      ]);
+      final profileRequest = ref.read(profileProvider.future);
+      final preferencesRequest = ref.read(preferencesProvider.future);
+      final loadedProfile = await profileRequest;
+      final loadedPreferences = await preferencesRequest;
       if (!mounted) return;
-      profile = object(values[0]);
-      preferences = object(values[1]);
+      profile = loadedProfile.toJson();
+      preferences = loadedPreferences.toJson();
       displayNameController.text = profile!['displayName']?.toString() ?? '';
       usernameController.text = profile!['username']?.toString() ?? '';
+      bioController.text = profile!['bio']?.toString() ?? '';
+      cityController.text = profile!['city']?.toString() ?? '';
       setState(() {
         loading = false;
         error = '';
@@ -89,10 +145,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await widget.api.request('PUT', '/api/profile', {
           'username': username,
           'displayName': displayName,
+          'bio': bioController.text.trim(),
+          'city': cityController.text.trim(),
         }),
       );
       await widget.api.updateUser(updated);
       if (mounted) {
+        ref.invalidate(profileProvider);
         setState(() => profile = updated);
         _show('Đã cập nhật hồ sơ.');
       }
@@ -142,6 +201,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final updated = object(
         await widget.api.request('PUT', '/api/preferences', next),
       );
+      ref.invalidate(preferencesProvider);
       if (mounted) setState(() => preferences = updated);
       if (appLocale != null) {
         widget.onLocaleChanged(updated['appLocale']?.toString() ?? appLocale);
@@ -176,6 +236,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     displayNameController.dispose();
     usernameController.dispose();
+    bioController.dispose();
+    cityController.dispose();
     super.dispose();
   }
 
@@ -205,17 +267,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             : null);
     final profileChanged =
         displayNameController.text.trim() != displayName ||
-        usernameController.text.trim().toLowerCase() != username;
+        usernameController.text.trim().toLowerCase() != username ||
+        bioController.text.trim() != (profile?['bio']?.toString() ?? '') ||
+        cityController.text.trim() != (profile?['city']?.toString() ?? '');
     return ColoredBox(
       color: socoCanvas,
       child: ListView(
         padding: const EdgeInsets.only(bottom: 34),
         children: [
-          SectionHeading(
-            eyebrow: tr(context, 'profile.eyebrow').toUpperCase(),
-            title: tr(context, 'nav.profile'),
-            description: tr(context, 'profile.description'),
-          ),
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
@@ -223,7 +282,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    margin: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+                    margin: const EdgeInsets.fromLTRB(0, 0, 0, 9),
                     clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -235,16 +294,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Stack(
                           children: [
                             Container(
-                              height: 150,
+                              height: 112,
                               width: double.infinity,
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: [
-                                    Color(0xFF1769F8),
-                                    Color(0xFF8B5CF6),
-                                    Color(0xFFFF9F0E),
+                                    Color(0xFF2563EB),
+                                    Color(0xFF7754EE),
                                   ],
                                 ),
                                 image: coverUrl == null
@@ -258,9 +316,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: coverUrl == null
                                   ? Padding(
                                       padding: const EdgeInsets.fromLTRB(
-                                        22,
-                                        24,
-                                        22,
+                                        11,
+                                        13,
+                                        11,
                                         0,
                                       ),
                                       child: Column(
@@ -272,7 +330,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             'SocCO',
                                             style: TextStyle(
                                               color: Colors.white,
-                                              fontSize: 27,
+                                              fontSize: 23,
                                               fontWeight: FontWeight.w900,
                                             ),
                                           ),
@@ -288,13 +346,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   : null,
                             ),
                             Positioned(
-                              right: 12,
-                              bottom: 12,
+                              left: 11,
+                              bottom: 11,
+                              child: OutlinedButton.icon(
+                                onPressed: widget.onCreatePost,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF78859A),
+                                  backgroundColor: Colors.white,
+                                  minimumSize: const Size(0, 40),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.add_rounded, size: 20),
+                                label: const Text(
+                                  'Chia sẻ suy nghĩ...',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              right: 10,
+                              bottom: 11,
                               child: FilledButton.tonalIcon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: const Color(0xFF293449),
+                                  minimumSize: const Size(0, 39),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                ),
                                 onPressed: saving
                                     ? null
                                     : () => _updateImage('cover'),
-                                icon: const Icon(Icons.photo_camera_outlined),
+                                icon: const Icon(
+                                  Icons.image_outlined,
+                                  size: 18,
+                                ),
                                 label: Text(
                                   profile?['coverSet'] == true
                                       ? tr(context, 'profile.changeCover')
@@ -307,7 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 2),
                           child: Transform.translate(
-                            offset: const Offset(0, -40),
+                            offset: const Offset(0, -23),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
@@ -316,8 +411,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     UserAvatar(
                                       name: displayName,
                                       username: username,
-                                      size: 92,
-                                      online: true,
+                                      size: 67,
+                                      online: false,
                                       circular: true,
                                       imageUrl: avatarUrl,
                                       fetchProfileImage: !widget.api.isDemo,
@@ -333,15 +428,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         onPressed: saving
                                             ? null
                                             : () => _updateImage('avatar'),
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFFF0F3E8,
+                                          ),
+                                          minimumSize: const Size.square(32),
+                                          maximumSize: const Size.square(32),
+                                        ),
                                         icon: const Icon(
-                                          Icons.photo_camera_rounded,
-                                          size: 18,
+                                          Icons.image_outlined,
+                                          size: 17,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(width: 16),
+                                const SizedBox(width: 9),
                                 Expanded(
                                   child: Padding(
                                     padding: const EdgeInsets.only(bottom: 7),
@@ -385,13 +487,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
-                  _label(tr(context, 'profile.personalInfo').toUpperCase()),
                   _card(
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          tr(context, 'profile.personalInfo'),
+                          'Personal info',
                           style: const TextStyle(
                             color: socoNavy,
                             fontSize: 18,
@@ -400,21 +501,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: 2),
                         const Text(
-                          'Đổi tên hiển thị và username của bạn',
+                          'Change display name, username',
                           style: TextStyle(color: socoMuted, fontSize: 12),
                         ),
                         const SizedBox(height: 14),
+                        const Text(
+                          'Display name',
+                          style: TextStyle(
+                            color: Color(0xFF465676),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
                         TextField(
                           controller: displayNameController,
                           enabled: !saving,
                           maxLength: 100,
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            labelText: tr(context, 'profile.displayName'),
+                            hintText: 'Display name',
                             counterText: '',
                           ),
                         ),
                         const SizedBox(height: 12),
+                        const Text(
+                          'Username',
+                          style: TextStyle(
+                            color: Color(0xFF465676),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
                         TextField(
                           controller: usernameController,
                           enabled: !saving,
@@ -422,7 +541,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           autocorrect: false,
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            labelText: tr(context, 'profile.username'),
+                            hintText: 'Username',
                             prefixText: '@',
                             counterText: '',
                           ),
@@ -432,6 +551,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           '3–32 ký tự: chữ thường, số, dấu chấm, _, hoặc -',
                           style: TextStyle(color: socoMuted, fontSize: 11),
                         ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Tiểu sử',
+                          style: TextStyle(
+                            color: Color(0xFF465676),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        TextField(
+                          key: const ValueKey('profile-bio'),
+                          controller: bioController,
+                          enabled: !saving,
+                          maxLength: 160,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            hintText: 'Một chút giới thiệu về bạn',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Thành phố',
+                          style: TextStyle(
+                            color: Color(0xFF465676),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        TextField(
+                          key: const ValueKey('profile-city'),
+                          controller: cityController,
+                          enabled: !saving,
+                          maxLength: 100,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            hintText: 'Thành phố bạn muốn chia sẻ',
+                          ),
+                        ),
                         const SizedBox(height: 14),
                         FilledButton(
                           onPressed: saving || !profileChanged
@@ -440,13 +599,108 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Text(
                             saving
                                 ? tr(context, 'common.saving')
-                                : tr(context, 'common.save'),
+                                : 'Save changes',
                           ),
                         ),
                       ],
                     ),
                   ),
-                  _label(tr(context, 'profile.settings').toUpperCase()),
+                  _label('TÙY CHỌN & CÀI ĐẶT'),
+                  _card(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Quyền riêng tư tài khoản',
+                          style: TextStyle(
+                            color: socoNavy,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. '
+                          'Thiết lập lưu trên máy chủ.',
+                          style: TextStyle(
+                            color: Color(0xFF758274),
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (privacyLoading)
+                          const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                        if (privacyError.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            privacyError,
+                            style: const TextStyle(
+                              color: Color(0xFFBE123C),
+                              fontSize: 12,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _loadPrivacy,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Thử lại'),
+                          ),
+                        ],
+                        if (privacy != null)
+                          for (final setting in const [
+                            (
+                              'searchableByUsername',
+                              'Cho phép tìm bằng username',
+                              'Người khác có thể tìm @username của bạn.',
+                            ),
+                            (
+                              'searchableByName',
+                              'Cho phép tìm bằng tên',
+                              'Tên hiển thị có thể xuất hiện trong kết quả.',
+                            ),
+                            (
+                              'searchableByEmail',
+                              'Cho phép tìm bằng email',
+                              'Chỉ tìm bằng email khớp chính xác.',
+                            ),
+                            (
+                              'allowFriendRequests',
+                              'Cho phép lời mời mới',
+                              'Tắt để ngăn yêu cầu kết bạn mới.',
+                            ),
+                            (
+                              'showOnlineStatus',
+                              'Hiển thị trạng thái online',
+                              'Ẩn sự hiện diện của bạn trong danh sách.',
+                            ),
+                          ])
+                            if (privacy![setting.$1] is bool)
+                              SwitchListTile.adaptive(
+                                key: ValueKey('privacy-${setting.$1}'),
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  setting.$2,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  setting.$3,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: socoMuted,
+                                  ),
+                                ),
+                                value: privacy![setting.$1] == true,
+                                onChanged: privacyBusy
+                                    ? null
+                                    : (_) => _changePrivacy(setting.$1),
+                              ),
+                      ],
+                    ),
+                  ),
                   _card(
                     Column(
                       children: [
@@ -569,7 +823,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         border: Border.all(color: socoLine),
         borderRadius: BorderRadius.circular(18),
       ),
-      child: child,
+      child: Material(type: MaterialType.transparency, child: child),
     );
   }
 }

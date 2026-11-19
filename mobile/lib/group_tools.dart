@@ -522,21 +522,30 @@ class _GroupSettingsSheetState extends State<_GroupSettingsSheet> {
 Future<void> showSharedContent(
   BuildContext context,
   Api api,
-  Json conversation,
-) {
+  Json conversation, {
+  int channelId = 0,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (context) =>
-        _SharedContentSheet(api: api, conversation: conversation),
+    builder: (context) => _SharedContentSheet(
+      api: api,
+      conversation: conversation,
+      channelId: channelId,
+    ),
   );
 }
 
 class _SharedContentSheet extends StatefulWidget {
-  const _SharedContentSheet({required this.api, required this.conversation});
+  const _SharedContentSheet({
+    required this.api,
+    required this.conversation,
+    required this.channelId,
+  });
 
   final Api api;
   final Json conversation;
+  final int channelId;
 
   @override
   State<_SharedContentSheet> createState() => _SharedContentSheetState();
@@ -570,7 +579,7 @@ class _SharedContentSheetState extends State<_SharedContentSheet>
       final result = object(
         await widget.api.request(
           'GET',
-          '/api/conversations/${widget.conversation['id']}/shared?kind=$kind&limit=48',
+          '/api/conversations/${widget.conversation['id']}/shared?kind=$kind&limit=48&channelId=${widget.channelId}',
         ),
       );
       if (mounted) setState(() => values[kind] = objects(result['items']));

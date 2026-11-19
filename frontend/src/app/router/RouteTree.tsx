@@ -1,18 +1,10 @@
+import LegacyHomeRedirect from "./LegacyHomeRedirect";
 import NotFoundPage from "./NotFoundPage";
 import type { ReactNode } from "react";
 import PageRoute from "./PageRoute";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { ChatConversationPage, CurrentPage, FeatureRouteLayout, FeedPostPage, SettingsSectionPage, VisitorProfilePage } from "./FeatureRoutePages";
-import { ROUTE, TAB_PATH, tabFromPath } from "./routes";
-
-function LegacyHomeRedirect() {
-  const { search, hash, state } = useLocation();
-  const params = new URLSearchParams(search);
-  const tab = tabFromPath("/", params.get("tab"));
-  params.delete("tab");
-  const remaining = params.toString();
-  return <Navigate to={{ pathname: TAB_PATH[tab], search: remaining ? `?${remaining}` : "", hash }} state={state} replace />;
-}
+import { ChatConversationPage, FeatureRouteLayout, FeedPostPage, SettingsSectionPage, VisitorProfilePage } from "./FeatureRoutePages";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { ROUTE, TAB_PATH } from "./routes";
 
 export function AppRouteTree({ children }: { children: ReactNode }) {
   return (
@@ -20,7 +12,7 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
       <Route path="/" element={<>{children}</>}>
         <Route index element={<LegacyHomeRedirect />} />
         <Route path={TAB_PATH.chat.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
+          <Route index element={<PageRoute page="chat" />} />
           <Route path=":conversationId" element={<ChatConversationPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
@@ -35,16 +27,16 @@ export function AppRouteTree({ children }: { children: ReactNode }) {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={TAB_PATH.feed.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
+          <Route index element={<PageRoute page="feed" />} />
           <Route path="posts/:postId" element={<FeedPostPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={TAB_PATH.profile.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
+          <Route index element={<PageRoute page="profile" />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path={ROUTE.settings.slice(1)} element={<FeatureRouteLayout />}>
-          <Route index element={<CurrentPage />} />
+          <Route index element={<PageRoute page="profile" />} />
           <Route path=":section" element={<SettingsSectionPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

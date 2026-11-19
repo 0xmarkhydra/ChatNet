@@ -1,5 +1,4 @@
-import type { Conversation } from '../../chat'
-import UserAvatar from '../../../shared/ui/UserAvatar'
+import { ConversationAvatar, type Conversation } from '../../chat'
 import { CallHeaderActions } from '../../calls'
 
 type Props = {
@@ -15,8 +14,7 @@ export default function ContactCallConversationSection({ items, label, onOpenCal
       {items.map(conversation => <div key={conversation.id} className="fd-person-row fd-call-conversation-row">
         <button type="button" className="fd-person-identity" onClick={() => onOpenCallChat?.(conversation.id)}
           aria-label={'Mở cuộc trò chuyện với ' + conversation.name}>
-          <UserAvatar name={conversation.name} username={conversation.otherUsername} group={conversation.type === 'group'}
-            className="avatar fd-avatar" online={conversation.type === 'direct' && conversation.online}/>
+          <ConversationAvatar conversation={conversation} className="avatar fd-avatar" />
           <span><strong>{conversation.name}</strong><small>{conversation.type === 'group'
             ? conversation.memberCount + ' thành viên' : conversation.online ? 'Đang hoạt động' : 'Cuộc trò chuyện cá nhân'}</small></span>
         </button>

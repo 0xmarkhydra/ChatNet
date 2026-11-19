@@ -1,7 +1,7 @@
 import VisitorProfileHero, { type VisitorProfileData } from './VisitorProfileHero'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft, RefreshCw, MapPin } from 'lucide-react'
 import { FeedPostCard } from '../../feed'
 import type { Post } from '../../feed'
 import type { FriendSearchResult } from '../../contacts'
@@ -43,6 +43,10 @@ export default function VisitorProfile({ username, request, currentUser, token, 
  const [error,setError]=useScopedState(scope,'')
  const [retry,setRetry]=useScopedState(scope,0)
  const [likeBusy,setLikeBusy]=useScopedState<Record<number,boolean>>(scope,{})
+ const [activeTab,setActiveTab]=useScopedState(scope,'posts')
+ const [sidebarTop,setSidebarTop]=useState(16)
+ const sidebar=useRef<HTMLElement>(null)
+ const scroller=useRef<HTMLDivElement>(null)
  const alive=useRef(true)
  const latestToken=useLatest(token)
  const latestRequest=useLatest(request)
@@ -136,6 +140,20 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   return ()=>{cancelled=true}
  },[relation,profile?.username])
  const action=relation==='accepted'?'Bạn bè':relation==='incoming'?'Chấp nhận kết bạn':relation==='outgoing'?'Hủy lời mời':'Kết bạn'
+ const media=posts.flatMap(post=>(post.attachments||[]).filter(attachment=>(attachment.kind==='image'||attachment.kind==='video')&&Boolean(attachment.url)).map(attachment=>({...attachment,postId:post.id})))
+ const tabs=[{id:'posts',label:'Bài viết'},...(media.length?[{id:'media',label:'Ảnh & video'}]:[]),...(profile?.bio||profile?.city?[{id:'about',label:'Giới thiệu'}]:[])]
+ const visibleTab=tabs.some(tab=>tab.id===activeTab)?activeTab:'posts'
+ useEffect(()=>{
+  const element=sidebar.current
+  const viewport=scroller.current
+  if(!element||!viewport||typeof ResizeObserver==='undefined')return
+  const measure=()=>setSidebarTop(Math.min(16,viewport.clientHeight-element.getBoundingClientRect().height-16))
+  const observer=new ResizeObserver(measure)
+  observer.observe(element)
+  observer.observe(viewport)
+  measure()
+  return()=>observer.disconnect()
+ },[profile?.username,visibleTab])
  return <section ref={surface} onKeyDown={event=>{
   if(event.key!=='Tab'||document.querySelector('dialog[open]'))return
   const controls=Array.from(surface.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')||[])
@@ -144,7 +162,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}
  }} className="visitor-profile" role="dialog" aria-modal="true" aria-label="Trang cá nhân người dùng">
   <header className="visitor-toolbar"><button ref={back} type="button" onClick={onClose} aria-label="Quay lại"><ArrowLeft size={21}/></button><strong>Trang cá nhân</strong><button type="button" onClick={()=>setRetry(n=>n+1)} disabled={loading} aria-label="Tải lại hồ sơ"><RefreshCw size={19}/></button></header>
-  <div className="visitor-scroll"><div className="visitor-content">
+  <div className="visitor-scroll" ref={scroller}><div className="visitor-content">
    {profile&&<>
     <VisitorProfileHero
       profile={profile}
@@ -161,6 +179,9 @@ export default function VisitorProfile({ username, request, currentUser, token, 
             feedback(cause instanceof Error ? cause.message : 'Không cập nhật được kết bạn.', 'error')
         })
       }}
+      tabs={tabs}
+      activeTab={visibleTab}
+      onTabChange={setActiveTab}
       onRemoveFriendAction={() => {
         const id = sequence.current
         const sessionToken = token
@@ -170,10 +191,20 @@ export default function VisitorProfile({ username, request, currentUser, token, 
         })
       }}
     />
-    <div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
+    {visibleTab==='media' && <section className="visitor-media-panel" aria-label="Ảnh và video"><h2>Ảnh & video</h2><div className="visitor-media-grid">{media.map((item,index)=><button type="button" key={item.storageRef+'-'+index} onClick={()=>{const post=posts.find(post=>post.id===item.postId);if(post)onPostOpen(post)}} aria-label={'Mở bài viết chứa '+(item.kind==='video'?'video':'ảnh')}>
+      {item.kind==='image'?<img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/>:<video src={item.url} preload="metadata" aria-label={item.name||'Video bài viết'}/>}
+    </button>)}</div></section>}
+    {visibleTab==='about' && <section className="visitor-about-panel"><h2>Giới thiệu</h2>{profile.bio&&<p>{profile.bio}</p>}{profile.city&&<p><MapPin size={18} aria-hidden="true"/>Sống tại {profile.city}</p>}<small>Chỉ thông tin công khai được hiển thị.</small></section>}
+    {visibleTab==='posts' && <div className="visitor-cols">
+      {(profile.bio||profile.city||media.length>0)&&<aside ref={sidebar} className="visitor-sidebar" style={{'--visitor-sticky-top':sidebarTop+'px'} as CSSProperties}>
+        {(profile.bio||profile.city)&&<section className="visitor-side-section"><h2>Giới thiệu</h2>{profile.bio&&<p>{profile.bio}</p>}{profile.city&&<p className="visitor-side-detail"><span><MapPin size={19} aria-hidden="true"/></span>Sống tại {profile.city}</p>}</section>}
+        {media.some(item=>item.kind==='image')&&<section className="visitor-side-section visitor-side-photos"><div className="visitor-side-heading"><h2>Ảnh</h2><button type="button" onClick={()=>setActiveTab('media')}>Xem tất cả</button></div><div className="visitor-photo-mosaic">{media.filter(item=>item.kind==='image').slice(0,5).map((item,index)=><button type="button" key={item.storageRef+'-'+index} aria-label="Xem ảnh bài viết" onClick={()=>setActiveTab('media')}><img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/></button>)}</div></section>}
+      </aside>}
+      <main className="visitor-posts"><div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
     <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={(id)=>{if(id===post.id)onPostOpen(post);else onOpenOriginal?.(id)}} onRepostChanged={onRepostChanged} onShareToChat={onShareToChat} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
     {more&&<button type="button" className="soco-load-more" disabled={loading} onClick={()=>void loadMore()}>Xem bài viết cũ hơn</button>}
+    </main></div>}
    </>}
 
    {error&&<div role="alert" className="visitor-empty"><p>{error}</p><button type="button" disabled={loading} onClick={()=>more&&posts.length?void loadMore():setRetry(n=>n+1)}>Thử lại</button></div>}
