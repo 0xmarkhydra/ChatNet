@@ -329,6 +329,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('nav-profile')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('profile-settings-open')));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Ngôn ngữ ứng dụng'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ngôn ngữ ứng dụng'));
@@ -347,9 +349,12 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(SocoApp(api: DemoApi()));
+    final api = DemoApi();
+    await tester.pumpWidget(SocoApp(api: api));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('nav-profile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('profile-settings-open')));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Ngôn ngữ ứng dụng'));
     await tester.pumpAndSettle();
@@ -358,7 +363,8 @@ void main() {
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Profile'), findsOneWidget);
+    expect(api.preferences['appLocale'], 'en');
+    expect(find.byKey(const ValueKey('profile-back')), findsOneWidget);
     expect(find.text('App language'), findsOneWidget);
     expect(find.text('Log out'), findsOneWidget);
   });
