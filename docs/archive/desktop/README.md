@@ -1,4 +1,6 @@
-# ChatNet / SocCO Desktop — Tài liệu tổng (Source of Truth)
+# ChatNet / SocCO Desktop — Hồ sơ lịch sử
+
+> Mục lục này lưu bối cảnh và kết quả các đợt Desktop năm 2026. Để xem mô tả theo baseline hiện tại của bộ tài liệu, mở [Electron Desktop](../../05-clients/DESKTOP_ELECTRON.md), [cổng CI](../../07-quality/CI_QUALITY_GATES.md) và [quy trình phát hành](../../08-operations/RELEASE_MANAGEMENT.md). Các nhánh, phiên bản và trạng thái bên dưới là ghi nhận lịch sử.
 
 > **Trạng thái tại 30/10/2026: ĐÃ CÓ ELECTRON FOUNDATION TRÊN NHÁNH RIÊNG — CHƯA ĐỦ BETA.**
 > Những mục [CHỐT] là quyết định kỹ thuật/sản phẩm; [ĐỀ XUẤT] cần xác nhận hoặc spike; [CHƯA CHỐT] không được tự áp đặt thành chính sách phát hành.

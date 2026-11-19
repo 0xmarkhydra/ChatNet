@@ -7,9 +7,9 @@
 
 | Thứ tự | Tài liệu | Mục đích |
 | --- | --- | --- |
-| **01 — BA A–Z (đọc trước)** | [CHATNET_DISTRIBUTED_MEDIA_RECOVERY_BA_HANDOFF.md](./CHATNET_DISTRIBUTED_MEDIA_RECOVERY_BA_HANDOFF.md) | Bối cảnh, yêu cầu nghiệp vụ, luồng gửi/nhận, chat nhóm, đăng ký node, lưu mảnh, truy cập lại có phí, trường hợp lỗi, API/DB logic và backlog phân công |
-| **02 — RFC kiến trúc** | [CHATNET_DISTRIBUTED_MEDIA_RECOVERY_SPEC.md](./CHATNET_DISTRIBUTED_MEDIA_RECOVERY_SPEC.md) | Mô hình E2EE, erasure coding, storage node tự nguyện, audit/repair, nguyên tắc xóa bản relay và mô hình thưởng |
-| **03 — QA/UAT** | [CHATNET_DISTRIBUTED_MEDIA_RECOVERY_QA_MATRIX.md](./CHATNET_DISTRIBUTED_MEDIA_RECOVERY_QA_MATRIX.md) | Các case bắt buộc, điều kiện chặn release, biểu mẫu ghi nhận kết quả và bằng chứng nghiệm thu |
+| **01 — BA A–Z (đọc trước)** | [CHATNET_DISTRIBUTED_MEDIA_RECOVERY_BA_HANDOFF.md](CHATNET_DISTRIBUTED_MEDIA_RECOVERY_BA_HANDOFF.md) | Bối cảnh, yêu cầu nghiệp vụ, luồng gửi/nhận, chat nhóm, đăng ký node, lưu mảnh, truy cập lại có phí, trường hợp lỗi, API/DB logic và backlog phân công |
+| **02 — RFC kiến trúc** | [CHATNET_DISTRIBUTED_MEDIA_RECOVERY_SPEC.md](CHATNET_DISTRIBUTED_MEDIA_RECOVERY_SPEC.md) | Mô hình E2EE, erasure coding, storage node tự nguyện, audit/repair, nguyên tắc xóa bản relay và mô hình thưởng |
+| **03 — QA/UAT** | [CHATNET_DISTRIBUTED_MEDIA_RECOVERY_QA_MATRIX.md](CHATNET_DISTRIBUTED_MEDIA_RECOVERY_QA_MATRIX.md) | Các case bắt buộc, điều kiện chặn release, biểu mẫu ghi nhận kết quả và bằng chứng nghiệm thu |
 
 ## Ý tưởng cốt lõi
 
@@ -21,9 +21,9 @@
 
 ## Các phần phụ thuộc trong dự án
 
-- [E2EE Implementation Master Plan](../E2EE_IMPLEMENTATION_MASTER_PLAN.md) — trạng thái E2EE và điều kiện triển khai.
+- [E2EE Implementation Master Plan](../../archive/features/E2EE_IMPLEMENTATION_MASTER_PLAN.md) — trạng thái E2EE và điều kiện triển khai.
 - [Point/Coin Product Spec](../CHATNET_POINT_COIN_PRODUCT_SPEC.md) — nền tảng kinh tế nội bộ, chưa chốt dùng loại nào cho phí truy cập lại.
-- [Media Access Revocation](../MEDIA_ACCESS_REVOCATION.md) — nguyên tắc cấp, thu hồi quyền media.
+- [Media Access Revocation](../../archive/features/MEDIA_ACCESS_REVOCATION.md) — nguyên tắc cấp, thu hồi quyền media.
 
 ## Phạm vi bàn giao / hướng triển khai
 

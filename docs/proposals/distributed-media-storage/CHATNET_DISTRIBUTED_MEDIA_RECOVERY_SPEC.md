@@ -3,7 +3,7 @@
 **Ngày:** 16/11/2026  
 **Trạng thái:** PRODUCT DISCOVERY / ĐẶC TẢ ĐỊNH HƯỚNG — **chưa triển khai, chưa bật thu phí, chưa chứng minh độ bền**  
 **Phạm vi:** chat riêng tư 1-1 và nhóm; Web/PWA giai đoạn đầu; Storage Node tùy chọn trên desktop ở giai đoạn thử nghiệm sau.  
-**Liên quan:** [E2EE Master Plan](../E2EE_IMPLEMENTATION_MASTER_PLAN.md), [Point/Coin Product Spec](../CHATNET_POINT_COIN_PRODUCT_SPEC.md), [Media Access Revocation](../MEDIA_ACCESS_REVOCATION.md).
+**Liên quan:** [E2EE Master Plan](../../archive/features/E2EE_IMPLEMENTATION_MASTER_PLAN.md), [Point/Coin Product Spec](../CHATNET_POINT_COIN_PRODUCT_SPEC.md), [Media Access Revocation](../../archive/features/MEDIA_ACCESS_REVOCATION.md).
 
 > Ký hiệu: **[CHỐT]** = chủ sản phẩm đã xác nhận trong buổi trao đổi; **[ĐỀ XUẤT]** = hướng kỹ thuật/UX chưa được duyệt; **[CHƯA CHỐT]** = quyết định không được tự suy đoán khi code.
 

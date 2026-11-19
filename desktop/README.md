@@ -1,7 +1,7 @@
 # SocCO Desktop — native shell and shared React integration
 
 Branch `feat/chatnet-desktop-electron`. **Not approved for beta, dev/main integration or production release.**
-Read `docs/desktop/07_BATCH_02_STATUS.md` through `10_BATCH_05_STATUS.md` for actual tests, artifacts and remaining acceptance gates. B03/B04 implementation was pushed as `2330cc3` / `76b56f1`; the B05 report accompanies its packaging commit.
+Read `docs/archive/desktop/07_BATCH_02_STATUS.md` through `10_BATCH_05_STATUS.md` for actual tests, artifacts and remaining acceptance gates. B03/B04 implementation was pushed as `2330cc3` / `76b56f1`; the B05 report accompanies its packaging commit.
 
 ## Development
 
