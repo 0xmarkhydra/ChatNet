@@ -255,15 +255,16 @@ void main() {
     expect(find.text('Bật thông báo hội thoại'), findsOneWidget);
   });
 
-  testWidgets('friends plus opens native friend discovery', (tester) async {
+  testWidgets('friends plus opens incoming friend invitations', (tester) async {
     final api = DemoApi();
     await openMobile(tester, api);
     await tester.tap(find.byKey(const ValueKey('nav-contacts')));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Thêm bạn'));
     await tester.pumpAndSettle();
-    expect(find.text('Khám phá bạn bè'), findsWidgets);
-    expect(find.byKey(const ValueKey('contacts-discovery-stats')), findsOneWidget);
+    expect(find.byKey(const ValueKey('friend-invitation-screen')), findsOneWidget);
+    expect(find.byKey(const ValueKey('invitation-incoming')), findsOneWidget);
+    expect(find.text('Chấp nhận'), findsWidgets);
   });
 
   testWidgets(

@@ -37,7 +37,16 @@ async function withPage(browser, width, height, routePath, check, hasTouch = fal
   page.setDefaultTimeout(12000)
   try {
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await page.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
+    await page.addInitScript(value => {
+      localStorage.setItem('chatnet-session', JSON.stringify(value))
+      // A one-shot response would reconnect every few seconds during layout checks.
+      window.EventSource = class TestEventSource {
+        readyState = 1
+        constructor() { queueMicrotask(() => this.onopen?.({})) }
+        addEventListener() {}
+        close() {}
+      }
+    }, session)
     await page.route(url => url.pathname.startsWith('/api/'), async route => {
       const path = new URL(route.request().url()).pathname
       if (path === '/api/events') {
@@ -45,6 +54,7 @@ async function withPage(browser, width, height, routePath, check, hasTouch = fal
         return
       }
       const json = path === '/api/conversations' ? conversations
+        : path === '/api/conversations/memberships' ? { ids: conversations.map(conversation => conversation.id), nextAfter: null }
         : path === '/api/profile' ? { username: session.user.username, displayName: session.user.displayName, updatedAt: '2026-11-17T00:00:00Z' }
         : path === '/api/preferences' ? { autoTranslate: false, targetLanguage: 'vi', appLocale: 'vi' }
         : path === '/api/marketplace/cart' ? { items: [] }
@@ -69,13 +79,26 @@ async function withPage(browser, width, height, routePath, check, hasTouch = fal
   }
 }
 
-async function assertEntireControlFits(control, container) {
-  await container.waitFor({ state: 'visible' })
-  await control.waitFor({ state: 'visible' })
-  const button = await control.boundingBox()
-  const frame = await container.boundingBox()
-  assert.ok(button && frame && button.x >= Math.max(0, frame.x) - 1 &&
-    button.x + button.width <= Math.min(frame.x + frame.width, control.page().viewportSize().width) + 1,
+async function assertEntireControlFits(control, containerSelector) {
+  let geometry
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await control.waitFor({ state: 'visible' })
+    // Read both boxes together. A replaced DOM node is not a measurement.
+    geometry = await control.evaluateAll((elements, selector) => {
+      if (elements.length !== 1 || !elements[0].isConnected) return null
+      const element = elements[0]
+      const frame = element.closest(selector)?.getBoundingClientRect()
+      const button = element.getBoundingClientRect()
+      if (!frame || !button.width || !button.height || !frame.width) return null
+      return { button: { x: button.x, width: button.width },
+        frame: { x: frame.x, width: frame.width }, viewportWidth: innerWidth }
+    }, containerSelector)
+    if (geometry) break
+  }
+  assert.ok(geometry, 'The control and its enclosing frame must both render')
+  const { button, frame, viewportWidth } = geometry
+  assert.ok(button.x >= Math.max(0, frame.x) - 1 &&
+    button.x + button.width <= Math.min(frame.x + frame.width, viewportWidth) + 1,
     'Control clipped before any auto-scroll: ' + JSON.stringify({ button, frame }))
 }
 
@@ -131,13 +154,13 @@ try {
         await rail.getByRole('button', { name: /QA Beta/ }).first().click()
         await page.waitForURL('**/chat/1')
         await layout.locator('.desktop-conversation-rail.is-expanded').waitFor()
-        await assertEntireControlFits(translate, head)
-        await assertEntireControlFits(details, head)
+        await assertEntireControlFits(translate, '.chat-head')
+        await assertEntireControlFits(details, '.chat-head')
         await rail.getByRole('button', { name: 'Menu hội thoại' }).click()
         await rail.getByRole('button', { name: 'Thu gọn cột avatar' }).click()
         await layout.locator('.desktop-conversation-rail.is-expanded').waitFor({ state: 'hidden' })
-        await assertEntireControlFits(translate, head)
-        await assertEntireControlFits(details, head)
+        await assertEntireControlFits(translate, '.chat-head')
+        await assertEntireControlFits(details, '.chat-head')
         await head.getByRole('button', { name: 'Tìm tin nhắn trong cuộc trò chuyện' }).focus()
         await page.keyboard.press('Tab')
         assert.equal(await translate.evaluate(el => el === document.activeElement), true)
@@ -152,7 +175,7 @@ try {
       '87 sell control ' + width, () => withPage(browser, width, height, '/marketplace', async page => {
         const tabs = page.getByRole('navigation', { name: 'Sàn mua bán' })
         const sell = tabs.getByRole('button', { name: /Bán hàng/ })
-        await assertEntireControlFits(sell, tabs)
+        await assertEntireControlFits(sell, '.marketplace-tabs')
         assert.equal(await tabs.evaluate(el => el.scrollLeft), 0)
         await sell.tap()
         await page.getByRole('button', { name: 'Tạo bản nháp' }).waitFor()

@@ -56,7 +56,7 @@ class StubApi extends Api {
         },
       ];
     }
-    if (path == '/api/posts?limit=20') {
+    if (path == '/api/posts?limit=15') {
       return [
         {
           'id': 10,
@@ -69,7 +69,7 @@ class StubApi extends Api {
         },
       ];
     }
-    if (path == '/api/stories') return [];
+    if (path == '/api/stories?includeText=true') return [];
     if (path == '/api/friends') {
       return [
         {
