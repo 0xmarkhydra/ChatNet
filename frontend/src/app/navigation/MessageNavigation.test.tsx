@@ -34,8 +34,6 @@ describe("Message navigation unread accessibility", () => {
               unreadTotal={unreadTotal} notificationCount={0}
               feedSaved={false} settingsActive={false}
               onNavigate={onNavigate} onSaved={noop} onSettings={noop}
-              onNewPost={noop} onNewDirect={noop} onNewGroup={noop}
-              onAddFriend={noop} onSell={noop} onSearch={noop}
             />
             <BottomNavigation
               tab="feed" unreadTotal={unreadTotal} pushEnabled

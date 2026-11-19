@@ -2645,12 +2645,6 @@ export default function AuthedApp({
         feedSaved={feedFilter === "saved"}
         settingsActive={desktopProfileSettings}
         onNavigate={switchTab}
-        onNewPost={() => { switchTab('feed'); setFeedComposerOpen(true); }}
-        onNewDirect={() => { switchTab('chat'); setNewChatMode('direct'); }}
-        onNewGroup={() => { switchTab('chat'); setFriendQuery(''); setChatCreateError(''); setNewChatMode('group'); }}
-        onAddFriend={() => openConnectSurface()}
-        onSell={() => switchTab('market')}
-        onSearch={(query, scope) => navigate('/search?q=' + encodeURIComponent(query) + '&scope=' + encodeURIComponent(scope))}
         onScreenshot={screenshot.captureWithoutWindow}
         screenshotBusy={screenshot.busy}
         onSaved={() => {
