@@ -2618,6 +2618,15 @@ export default function AuthedApp({
     />
   );
 
+  const toggleFeedCommunities = () => {
+    if (!feedCommunitiesOpen) {
+      setActivePostId(null);
+      setFeedComposerOpen(false);
+      setFeedCheckInOpen(false);
+    }
+    setFeedCommunitiesOpen((current) => !current);
+  };
+
   return (
     <AppLayout
       className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""} ${tab === "chat" && !desktopSection && translationSettingsConversationId === null ? "chat-rail-screen" : ""}`}
@@ -2636,6 +2645,12 @@ export default function AuthedApp({
         feedSaved={feedFilter === "saved"}
         settingsActive={desktopProfileSettings}
         onNavigate={switchTab}
+        onNewPost={() => { switchTab('feed'); setFeedComposerOpen(true); }}
+        onNewDirect={() => { switchTab('chat'); setNewChatMode('direct'); }}
+        onNewGroup={() => { switchTab('chat'); setFriendQuery(''); setChatCreateError(''); setNewChatMode('group'); }}
+        onAddFriend={() => openConnectSurface()}
+        onSell={() => switchTab('market')}
+        onSearch={(query, scope) => navigate('/search?q=' + encodeURIComponent(query) + '&scope=' + encodeURIComponent(scope))}
         onScreenshot={screenshot.captureWithoutWindow}
         screenshotBusy={screenshot.busy}
         onSaved={() => {
@@ -2726,7 +2741,7 @@ export default function AuthedApp({
       }
       header={
         <AppHeader
-          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
+          className={`chatnet-appbar ${tab === 'feed' ? 'shell-v2-feed-header' : ''} ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
           title={
             <HeaderTitle
               tab={tab}
@@ -2794,14 +2809,7 @@ export default function AuthedApp({
               }}
               feed={{
                 communitiesOpen: feedCommunitiesOpen,
-                onToggleCommunities: () => {
-                  if (!feedCommunitiesOpen) {
-                    setActivePostId(null);
-                    setFeedComposerOpen(false);
-                    setFeedCheckInOpen(false);
-                  }
-                  setFeedCommunitiesOpen((current) => !current);
-                },
+                onToggleCommunities: toggleFeedCommunities,
               }}
               profile={{
                 onNewPost: () => {
@@ -3304,6 +3312,7 @@ export default function AuthedApp({
           conversationLoadingMore={conversationLoadingMore}
           conversations={conversations}
           feedCommunitiesOpen={feedCommunitiesOpen}
+          onToggleCommunities={toggleFeedCommunities}
           feedFilter={feedFilter}
           feedFiltersPill={feedFiltersPill}
           feedInfiniteScrollRef={feedInfiniteScrollRef}

@@ -6,6 +6,9 @@ import MobileFeedStories from "./MobileFeedStories";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import SocialFeedComposer from "./SocialFeedComposer";
 import FeedFilters from "./FeedFilters";
+import PageHeader from "../../../shared/ui/PageHeader";
+import { Button } from "../../../shared/ui/button";
+import { Users } from "lucide-react";
 import FeedCommunitiesList from "./FeedCommunitiesList";
 import FeedPendingPost from "./FeedPendingPost";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
@@ -28,6 +31,7 @@ export type FeedSectionProps = {
   conversationLoadingMore: boolean;
   conversations: Conversation[];
   feedCommunitiesOpen: boolean;
+  onToggleCommunities: () => void;
   feedFilter: "all" | "following" | "latest" | "saved";
   feedFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
   feedInfiniteScrollRef: RefObject<HTMLDivElement | null>;
@@ -86,6 +90,7 @@ export default function FeedSection({
   conversationLoadingMore,
   conversations,
   feedCommunitiesOpen,
+  onToggleCommunities,
   feedFilter,
   feedFiltersPill,
   feedInfiniteScrollRef,
@@ -143,6 +148,14 @@ export default function FeedSection({
                 setSearchHasScrolled(true);
             }}
           >
+            <PageHeader
+              className="shell-v2-feed-page-header"
+              title="Bảng tin"
+              tabs={[{ id: 'all', label: 'Dành cho bạn' }, { id: 'following', label: 'Đang theo dõi' }, { id: 'latest', label: 'Mới nhất' }, ...(feedFilter === 'saved' ? [{ id: 'saved', label: 'Đã lưu' }] : [])]}
+              activeTab={feedFilter}
+              onTabChange={(next) => { setFeedCommunitiesOpen(false); setFeedFilter(next as typeof feedFilter) }}
+              actions={<Button variant="outline" type="button" aria-pressed={feedCommunitiesOpen} onClick={onToggleCommunities}><Users size={18} aria-hidden="true" />Cộng đồng</Button>}
+            />
             <FeedModeration
               request={apiFetch}
               onRemoved={(type, id) => {
@@ -215,7 +228,7 @@ export default function FeedSection({
                 </>)}
 
                 {!feedCommunitiesOpen && (
-                  <FeedFilters
+                  <div className="shell-v2-feed-filter-legacy"><FeedFilters
                     isProfileDesktop={isProfileDesktop}
                     filter={feedFilter}
                     onHostMount={feedFiltersPill.hostRef}
@@ -229,7 +242,7 @@ export default function FeedSection({
                       else void refreshPosts();
                     }}
                     onLoadSaved={() => void loadSavedPosts()}
-                  />
+                  /></div>
                 )}
                 <div className="feed zalo-feed">
                   {feedCommunitiesOpen ? (

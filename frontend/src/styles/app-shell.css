@@ -866,3 +866,79 @@
     z-index: 180;
   }
 }
+
+/* Shell v2: expanded 248px sidebar, persistent icon rail, single page scroll owner. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout { padding-left: 248px; }
+  .modern-shell.app-layout:has(.app-sidebar.is-collapsed) { padding-left: 76px; }
+  .modern-shell.app-layout .app-sidebar,
+  .modern-shell.app-layout .app-sidebar:is(:hover, :has(:focus-visible)) {
+    width: 248px; padding: 16px 10px; overflow: visible;
+    background: var(--background, #fff); border-right: 1px solid var(--border, #e8ecf5);
+    transition: width .2s ease;
+  }
+  .modern-shell.app-layout .app-sidebar.is-collapsed,
+  .modern-shell.app-layout .app-sidebar.is-collapsed:is(:hover, :has(:focus-visible)) { width: 76px; }
+  .modern-shell.app-layout .app-sidebar::before { display: none; }
+  .modern-shell.app-layout .app-sidebar-brand {
+    width: 100%; min-height: 48px; margin-bottom: 12px; padding: 0 6px;
+    gap: 8px; pointer-events: auto;
+  }
+  .modern-shell.app-layout .app-sidebar-logo { width: 40px; height: 40px; border-radius: 12px; }
+  .modern-shell.app-layout .app-sidebar-logo img { width: 32px; height: 32px; }
+  .modern-shell.app-layout .app-sidebar-brand-copy { flex: 1 1 auto; }
+  .modern-shell.app-layout .app-sidebar-brand-copy strong { font-size: 17px; }
+  .modern-shell.app-layout .app-sidebar-collapse { margin-left: auto; flex-shrink: 0; width: 44px; height: 44px; }
+  .modern-shell.app-layout .app-sidebar-primary-actions { display: grid; gap: 8px; margin-bottom: 15px; }
+  .modern-shell.app-layout .app-sidebar-nav { width: 100%; pointer-events: auto; gap: 4px; }
+  .modern-shell.app-layout .app-sidebar-link,
+  .modern-shell.app-layout .app-sidebar:is(:hover, :has(:focus-visible)) .app-sidebar-link {
+    width: 100%; min-height: 44px; gap: 12px; padding: 0 13px;
+  }
+  .modern-shell.app-layout .app-sidebar-link > span,
+  .modern-shell.app-layout .app-sidebar:is(:hover, :has(:focus-visible)) .app-sidebar-link > span,
+  .modern-shell.app-layout .app-sidebar-brand-copy,
+  .modern-shell.app-layout .app-sidebar-account-copy {
+    position: static; display: inline-flex; align-items: center;
+    height: auto; opacity: 1; visibility: visible; transform: none;
+    transition: none; pointer-events: none;
+  }
+  .modern-shell.app-layout .app-sidebar-account-copy { align-items: flex-start; width: auto; }
+  .modern-shell.app-layout .app-sidebar-secondary,
+  .modern-shell.app-layout .app-sidebar:is(:hover, :has(:focus-visible)) .app-sidebar-secondary {
+    box-sizing: border-box; width: 100%; margin: 10px 0; padding-top: 12px; pointer-events: auto;
+  }
+  .modern-shell.app-layout .app-sidebar-account,
+  .modern-shell.app-layout .app-sidebar:is(:hover, :has(:focus-visible)) .app-sidebar-account {
+    width: 100%; min-height: 62px; padding: 6px; gap: 9px;
+  }
+  .modern-shell.app-layout .app-sidebar-avatar { flex-basis: 42px; width: 42px; height: 42px; }
+  .modern-shell.app-layout .app-sidebar-account-chevron { margin-left: auto; flex-shrink: 0; }
+  .modern-shell.app-layout .app-sidebar-shortcut { margin-left: auto; font-size: 10px; color: var(--muted-foreground); }
+  .modern-shell.app-layout .app-sidebar-search { background: var(--muted); border: 1px solid var(--border); }
+  .modern-shell.app-layout .app-sidebar-create { background: var(--primary); color: var(--primary-foreground); }
+  .modern-shell.app-layout .app-sidebar-create:hover { background: var(--primary); color: var(--primary-foreground); opacity: .9; }
+  .modern-shell.app-layout .app-sidebar-count { left: auto; right: 5px; top: 3px; }
+  .modern-shell.app-layout .app-sidebar-notification-count { background: #f97316; }
+  .modern-shell.app-layout .app-sidebar.is-collapsed .app-sidebar-brand-copy,
+  .modern-shell.app-layout .app-sidebar.is-collapsed .app-sidebar-account-copy,
+  .modern-shell.app-layout .app-sidebar.is-collapsed .app-sidebar-account-chevron,
+  .modern-shell.app-layout .app-sidebar.is-collapsed .app-sidebar-link > span,
+  .modern-shell.app-layout .app-sidebar.is-collapsed .app-sidebar-shortcut { display: none; }
+  .modern-shell.app-layout .app-sidebar.is-collapsed .app-sidebar-collapse {
+    position: absolute; top: 61px; left: 6px; width: 44px; height: 44px;
+  }
+  .modern-shell.app-layout .app-sidebar.is-collapsed .app-sidebar-brand { margin-bottom: 61px; }
+  .modern-shell.app-layout .app-sidebar.is-collapsed .app-sidebar-link { justify-content: center; padding: 0; }
+  .modern-shell.app-layout .app-sidebar.is-collapsed .app-sidebar-account { justify-content: center; }
+  .modern-shell.app-layout > .chatnet-appbar.shell-v2-feed-header { display: none; }
+  .modern-shell.app-layout .shell-v2-feed-page-header {
+    position: sticky; top: 0; z-index: 5; margin-bottom: 10px;
+  }
+  .modern-shell.app-layout .shell-v2-feed-filter-legacy { display: none; }
+}
+@media (max-width: 760px) { .shell-v2-feed-page-header { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .app-sidebar { transition: none; }
+  .modern-shell.app-layout .app-sidebar-nav .sidebar-liquid-pill { animation: none; transition: none; }
+}
