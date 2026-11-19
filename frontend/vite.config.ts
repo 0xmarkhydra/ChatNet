@@ -11,10 +11,6 @@ export default defineConfig({
   // Ignore nested frontend/output snapshots when discovering app dependencies.
   resolve: { dedupe: ['react', 'react-dom'], alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   optimizeDeps: { entries: ['index.html'] },
-  build: { rollupOptions: { input: {
-    app: fileURLToPath(new URL('./index.html', import.meta.url)),
-    preview: fileURLToPath(new URL('./discover-v2-preview.html', import.meta.url)),
-  } } },
   plugins: [
     react(),
     tailwindcss(),
