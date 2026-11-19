@@ -1,0 +1,4209 @@
+{
+  "openapi": "3.2.1",
+  "info": {
+    "title": "ChatNet — Hợp đồng HTTP đối chiếu từ source",
+    "version": "0.2.0",
+    "description": "Bản nháp. Ba thao tác health, SSE và tạo yêu cầu đơn Marketplace được đối chiếu tới handler. Các thao tác còn lại chỉ là kiểm kê route lấy từ danh mục API (x-chatnet-contract-status: route-inventory). Chúng không có schema, mã trạng thái hay yêu cầu xác thực đã xác minh. Không dùng để sinh mã, suy ra hợp đồng đầy đủ, thanh toán thật hay live deployment."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "x-source-baseline": "40c1f1b35958ee22c1278986bf82ff57520137a1",
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "getGatewayHealth",
+        "x-source": "backend/cmd/gateway/main.go",
+        "summary": "Kiểm tra health của năm dịch vụ upstream",
+        "responses": {
+          "200": {
+            "description": "Tất cả health upstream trả 2xx.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayHealth"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Có ít nhất một upstream health không đạt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayHealth"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "operationId": "subscribeChatEvents",
+        "x-source": "backend/cmd/chat/main.go",
+        "summary": "Mở stream SSE theo tài khoản",
+        "description": "SSE phát update hoặc session-revoked. Không có cursor hoặc cam kết replay. Web dùng EventSource với token trong query. Không ghi token hoặc URL chứa token vào log.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "eventSourceQuery": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream SSE. Nội dung data của từng event xem realtime.asyncapi.json.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Phiên không hợp lệ.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "HTTP writer không hỗ trợ stream.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Không kiểm tra được phiên.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketplace/orders": {
+      "post": {
+        "operationId": "createMarketplaceOrderRequest",
+        "x-source": "backend/cmd/feed/marketplace.go",
+        "summary": "Tạo yêu cầu đơn chờ cấu hình thanh toán",
+        "description": "Route xác thực JWT, không dùng middleware kiểm trạng thái phiên. Idempotency theo buyer và idempotencyKey, không so fingerprint giỏ. Chỉ dùng lại khóa để retry cùng thao tác. Không thu tiền, giữ tồn kho hoặc giao đơn cho người bán.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sellerId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 1
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{8,100}$"
+                  }
+                },
+                "required": [
+                  "sellerId",
+                  "idempotencyKey"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Yêu cầu đã tồn tại cùng khóa.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "awaiting_payment_configuration"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Đã lưu yêu cầu mới, chưa thanh toán.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 1
+                    },
+                    "amountTotal": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "priceUnit": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "awaiting_payment_configuration"
+                      ]
+                    },
+                    "notice": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "amountTotal",
+                    "priceUnit",
+                    "status",
+                    "notice"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body, sellerId hoặc idempotencyKey không hợp lệ.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer không hợp lệ.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Giỏ hàng/đơn vị giá không hợp lệ hoặc xung đột khóa.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Không tạo hoặc tải được yêu cầu đơn.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "feed_get_api_marketplace_orders",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/auth/register/start": {
+      "post": {
+        "operationId": "auth_post_api_auth_register_start",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start registration",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/register/verify": {
+      "post": {
+        "operationId": "auth_post_api_auth_register_verify",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Verify registration",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/register/resend": {
+      "post": {
+        "operationId": "auth_post_api_auth_register_resend",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Resend verification",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/email/start": {
+      "post": {
+        "operationId": "auth_post_api_auth_email_start",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Email registration alias",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/email/verify": {
+      "post": {
+        "operationId": "auth_post_api_auth_email_verify",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Email verification alias",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/email/resend": {
+      "post": {
+        "operationId": "auth_post_api_auth_email_resend",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Email resend alias",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "auth_post_api_auth_login",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "operationId": "auth_post_api_auth_refresh",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh session",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "auth_post_api_auth_logout",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/sessions/list": {
+      "post": {
+        "operationId": "auth_post_api_auth_sessions_list",
+        "tags": [
+          "auth"
+        ],
+        "summary": "List managed sessions",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/sessions/revoke": {
+      "post": {
+        "operationId": "auth_post_api_auth_sessions_revoke",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke a session",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/sessions/revoke-others": {
+      "post": {
+        "operationId": "auth_post_api_auth_sessions_revoke_others",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke other sessions",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "auth_get_api_auth_me",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Current user",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/session/status": {
+      "get": {
+        "operationId": "auth_get_api_auth_session_status",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Current session status",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/e2ee/challenge": {
+      "post": {
+        "operationId": "auth_post_api_auth_e2ee_challenge",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create E2EE challenge",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/e2ee/devices": {
+      "post": {
+        "operationId": "auth_post_api_auth_e2ee_devices",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register E2EE device",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      },
+      "get": {
+        "operationId": "auth_get_api_auth_e2ee_devices",
+        "tags": [
+          "auth"
+        ],
+        "summary": "List E2EE devices",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/e2ee/users/{userId}/devices": {
+      "get": {
+        "operationId": "auth_get_api_auth_e2ee_users_by_userId_devices",
+        "tags": [
+          "auth"
+        ],
+        "summary": "List a user's E2EE devices",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/e2ee/devices/{deviceId}/revoke": {
+      "post": {
+        "operationId": "auth_post_api_auth_e2ee_devices_by_deviceId_revoke",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke E2EE device",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/e2ee/key-packages": {
+      "post": {
+        "operationId": "auth_post_api_auth_e2ee_key_packages",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Publish key package",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/auth/e2ee/key-packages/claim": {
+      "post": {
+        "operationId": "auth_post_api_auth_e2ee_key_packages_claim",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Claim key package",
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/auth/main.go"
+      }
+    },
+    "/api/push/config": {
+      "get": {
+        "operationId": "chat_get_api_push_config",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/push/subscription": {
+      "post": {
+        "operationId": "chat_post_api_push_subscription",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_push_subscription",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/push/test": {
+      "post": {
+        "operationId": "chat_post_api_push_test",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/media/presign": {
+      "post": {
+        "operationId": "chat_post_api_media_presign",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/media/relay": {
+      "put": {
+        "operationId": "chat_put_api_media_relay",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/media/chat/{id}": {
+      "get": {
+        "operationId": "chat_get_api_media_chat_by_id",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/{username}/profile": {
+      "get": {
+        "operationId": "chat_get_api_users_by_username_profile",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/profile": {
+      "get": {
+        "operationId": "chat_get_api_profile",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "put": {
+        "operationId": "chat_put_api_profile",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/profile/media": {
+      "put": {
+        "operationId": "chat_put_api_profile_media",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/profile/note": {
+      "get": {
+        "operationId": "chat_get_api_profile_note",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "post": {
+        "operationId": "chat_post_api_profile_note",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_profile_note",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/{username}/note": {
+      "get": {
+        "operationId": "chat_get_api_users_by_username_note",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/{username}/avatar": {
+      "get": {
+        "operationId": "chat_get_api_users_by_username_avatar",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/{username}/cover": {
+      "get": {
+        "operationId": "chat_get_api_users_by_username_cover",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/search": {
+      "get": {
+        "operationId": "chat_get_api_users_search",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/suggestions": {
+      "get": {
+        "operationId": "chat_get_api_users_suggestions",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/nearby": {
+      "post": {
+        "operationId": "chat_post_api_users_nearby",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_users_nearby",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/friends": {
+      "get": {
+        "operationId": "chat_get_api_friends",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/friends/requests": {
+      "get": {
+        "operationId": "chat_get_api_friends_requests",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/friends/{id}": {
+      "post": {
+        "operationId": "chat_post_api_friends_by_id",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_friends_by_id",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/friends/{id}/accept": {
+      "post": {
+        "operationId": "chat_post_api_friends_by_id_accept",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/contacts": {
+      "get": {
+        "operationId": "chat_get_api_contacts",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/contacts/{id}": {
+      "put": {
+        "operationId": "chat_put_api_contacts_by_id",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/privacy": {
+      "get": {
+        "operationId": "chat_get_api_privacy",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "put": {
+        "operationId": "chat_put_api_privacy",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/blocked": {
+      "get": {
+        "operationId": "chat_get_api_users_blocked",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/{id}/block": {
+      "post": {
+        "operationId": "chat_post_api_users_by_id_block",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_users_by_id_block",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/users/{id}/report": {
+      "post": {
+        "operationId": "chat_post_api_users_by_id_report",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/preferences": {
+      "get": {
+        "operationId": "chat_get_api_preferences",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "put": {
+        "operationId": "chat_put_api_preferences",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/preferences/translation": {
+      "get": {
+        "operationId": "chat_get_api_preferences_translation",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "put": {
+        "operationId": "chat_put_api_preferences_translation",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversation-categories": {
+      "get": {
+        "operationId": "chat_get_api_conversation_categories",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "post": {
+        "operationId": "chat_post_api_conversation_categories",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversation-categories/{categoryId}": {
+      "put": {
+        "operationId": "chat_put_api_conversation_categories_by_categoryId",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "categoryId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_conversation_categories_by_categoryId",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "categoryId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/category": {
+      "put": {
+        "operationId": "chat_put_api_conversations_by_id_category",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/link-preview": {
+      "get": {
+        "operationId": "chat_get_api_link_preview",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations": {
+      "get": {
+        "operationId": "chat_get_api_conversations",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/direct": {
+      "post": {
+        "operationId": "chat_post_api_conversations_direct",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/groups": {
+      "post": {
+        "operationId": "chat_post_api_conversations_groups",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/memberships": {
+      "get": {
+        "operationId": "chat_get_api_conversations_memberships",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/unread": {
+      "get": {
+        "operationId": "chat_get_api_conversations_unread",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/messages": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_messages",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_messages",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/read": {
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_read",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/history": {
+      "delete": {
+        "operationId": "chat_delete_api_conversations_by_id_history",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/shared": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_shared",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/messages/{id}": {
+      "patch": {
+        "operationId": "chat_patch_api_messages_by_id",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_messages_by_id",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/messages/{id}/reactions": {
+      "post": {
+        "operationId": "chat_post_api_messages_by_id_reactions",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "get": {
+        "operationId": "chat_get_api_messages_by_id_reactions",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/messages/{id}/pin": {
+      "put": {
+        "operationId": "chat_put_api_messages_by_id_pin",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_messages_by_id_pin",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/pin": {
+      "put": {
+        "operationId": "chat_put_api_conversations_by_id_pin",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_conversations_by_id_pin",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/pins": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_pins",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/chat/search": {
+      "get": {
+        "operationId": "chat_get_api_chat_search",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/groups/public": {
+      "get": {
+        "operationId": "chat_get_api_groups_public",
+        "tags": [
+          "chat"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/groups/{id}/join": {
+      "post": {
+        "operationId": "chat_post_api_groups_by_id_join",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/community": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_community",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "patch": {
+        "operationId": "chat_patch_api_conversations_by_id_community",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}": {
+      "patch": {
+        "operationId": "chat_patch_api_conversations_by_id",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/members": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_members",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_members",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/members/{userId}": {
+      "patch": {
+        "operationId": "chat_patch_api_conversations_by_id_members_by_userId",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_conversations_by_id_members_by_userId",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/group-settings": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_group_settings",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "patch": {
+        "operationId": "chat_patch_api_conversations_by_id_group_settings",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/notification-settings": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_notification_settings",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "put": {
+        "operationId": "chat_put_api_conversations_by_id_notification_settings",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/avatar": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_avatar",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "put": {
+        "operationId": "chat_put_api_conversations_by_id_avatar",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/channels": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_channels",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_channels",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/channel-read": {
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_channel_read",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/channels/{channelId}": {
+      "patch": {
+        "operationId": "chat_patch_api_conversations_by_id_channels_by_channelId",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_conversations_by_id_channels_by_channelId",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/channels/{channelId}/notifications": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_channels_by_channelId_notifications",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "put": {
+        "operationId": "chat_put_api_conversations_by_id_channels_by_channelId_notifications",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/channels/{channelId}/avatar": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_channels_by_channelId_avatar",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "put": {
+        "operationId": "chat_put_api_conversations_by_id_channels_by_channelId_avatar",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/activities": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_activities",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_activities",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/activities/{activityId}/vote": {
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_activities_by_activityId_vote",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/activities/{activityId}/pin": {
+      "put": {
+        "operationId": "chat_put_api_conversations_by_id_activities_by_activityId_pin",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "delete": {
+        "operationId": "chat_delete_api_conversations_by_id_activities_by_activityId_pin",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/invites": {
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_invites",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_invites",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/invites/{inviteId}": {
+      "delete": {
+        "operationId": "chat_delete_api_conversations_by_id_invites_by_inviteId",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inviteId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/group-invites/{token}": {
+      "get": {
+        "operationId": "chat_get_api_group_invites_by_token",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/group-invites/{token}/join": {
+      "post": {
+        "operationId": "chat_post_api_group_invites_by_token_join",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/join-requests": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_join_requests",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/join-requests/{requestId}": {
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_join_requests_by_requestId",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/admin-audit": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_admin_audit",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/e2ee/status": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_e2ee_status",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/e2ee/events": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_e2ee_events",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_e2ee_events",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/e2ee/consents": {
+      "get": {
+        "operationId": "chat_get_api_conversations_by_id_e2ee_consents",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      },
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_e2ee_consents",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/conversations/{id}/e2ee/bootstrap": {
+      "post": {
+        "operationId": "chat_post_api_conversations_by_id_e2ee_bootstrap",
+        "tags": [
+          "chat"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/chat/"
+      }
+    },
+    "/api/calls": {
+      "post": {
+        "operationId": "call_post_api_calls",
+        "tags": [
+          "call"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/current": {
+      "get": {
+        "operationId": "call_get_api_calls_current",
+        "tags": [
+          "call"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/history": {
+      "get": {
+        "operationId": "call_get_api_calls_history",
+        "tags": [
+          "call"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}": {
+      "get": {
+        "operationId": "call_get_api_calls_by_id",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/participants": {
+      "get": {
+        "operationId": "call_get_api_calls_by_id_participants",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/join": {
+      "post": {
+        "operationId": "call_post_api_calls_by_id_join",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/decline": {
+      "post": {
+        "operationId": "call_post_api_calls_by_id_decline",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/leave": {
+      "post": {
+        "operationId": "call_post_api_calls_by_id_leave",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/end": {
+      "post": {
+        "operationId": "call_post_api_calls_by_id_end",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/translation/languages": {
+      "get": {
+        "operationId": "call_get_api_calls_translation_languages",
+        "tags": [
+          "call"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/translation-consent": {
+      "get": {
+        "operationId": "call_get_api_calls_by_id_translation_consent",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      },
+      "post": {
+        "operationId": "call_post_api_calls_by_id_translation_consent",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/translation-session": {
+      "post": {
+        "operationId": "call_post_api_calls_by_id_translation_session",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/translation-stream": {
+      "get": {
+        "operationId": "call_get_api_calls_by_id_translation_stream",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/e2ee/public-key": {
+      "post": {
+        "operationId": "call_post_api_calls_by_id_e2ee_public_key",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/e2ee/public-keys": {
+      "get": {
+        "operationId": "call_get_api_calls_by_id_e2ee_public_keys",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/e2ee/envelopes": {
+      "post": {
+        "operationId": "call_post_api_calls_by_id_e2ee_envelopes",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/calls/{id}/e2ee/envelope": {
+      "get": {
+        "operationId": "call_get_api_calls_by_id_e2ee_envelope",
+        "tags": [
+          "call"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/call/"
+      }
+    },
+    "/api/posts": {
+      "get": {
+        "operationId": "feed_get_api_posts",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "post": {
+        "operationId": "feed_post_api_posts",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/posts/{id}": {
+      "get": {
+        "operationId": "feed_get_api_posts_by_id",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "patch": {
+        "operationId": "feed_patch_api_posts_by_id",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "delete": {
+        "operationId": "feed_delete_api_posts_by_id",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/posts/{id}/save": {
+      "post": {
+        "operationId": "feed_post_api_posts_by_id_save",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/posts/{id}/like": {
+      "post": {
+        "operationId": "feed_post_api_posts_by_id_like",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/posts/{id}/reactions": {
+      "post": {
+        "operationId": "feed_post_api_posts_by_id_reactions",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "get": {
+        "operationId": "feed_get_api_posts_by_id_reactions",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/posts/{id}/comments": {
+      "post": {
+        "operationId": "feed_post_api_posts_by_id_comments",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/posts/{id}/comments/{commentId}": {
+      "patch": {
+        "operationId": "feed_patch_api_posts_by_id_comments_by_commentId",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "delete": {
+        "operationId": "feed_delete_api_posts_by_id_comments_by_commentId",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/feed/mentions": {
+      "get": {
+        "operationId": "feed_get_api_feed_mentions",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/feed/mentions/{id}/read": {
+      "post": {
+        "operationId": "feed_post_api_feed_mentions_by_id_read",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/feed/reports": {
+      "post": {
+        "operationId": "feed_post_api_feed_reports",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/feed/moderation/me": {
+      "get": {
+        "operationId": "feed_get_api_feed_moderation_me",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/feed/moderation/reports": {
+      "get": {
+        "operationId": "feed_get_api_feed_moderation_reports",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/feed/moderation/reports/{id}": {
+      "patch": {
+        "operationId": "feed_patch_api_feed_moderation_reports_by_id",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/stories": {
+      "get": {
+        "operationId": "feed_get_api_stories",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "post": {
+        "operationId": "feed_post_api_stories",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/stories/{id}": {
+      "delete": {
+        "operationId": "feed_delete_api_stories_by_id",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/marketplace/products": {
+      "get": {
+        "operationId": "feed_get_api_marketplace_products",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "post": {
+        "operationId": "feed_post_api_marketplace_products",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/marketplace/products/mine": {
+      "get": {
+        "operationId": "feed_get_api_marketplace_products_mine",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/marketplace/products/{id}/publish": {
+      "post": {
+        "operationId": "feed_post_api_marketplace_products_by_id_publish",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/marketplace/cart": {
+      "get": {
+        "operationId": "feed_get_api_marketplace_cart",
+        "tags": [
+          "feed"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/marketplace/cart/{id}": {
+      "put": {
+        "operationId": "feed_put_api_marketplace_cart_by_id",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "delete": {
+        "operationId": "feed_delete_api_marketplace_cart_by_id",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/translate": {
+      "post": {
+        "operationId": "translate_post_api_translate",
+        "tags": [
+          "translate"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/translate/"
+      }
+    },
+    "/api/i18n/bundle": {
+      "post": {
+        "operationId": "translate_post_api_i18n_bundle",
+        "tags": [
+          "translate"
+        ],
+        "responses": {
+          "default": {
+            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/translate/"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "eventSourceQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "token",
+        "description": "Chỉ cho GET /api/events khi không có bearer trong Authorization. Vẫn kiểm trạng thái phiên phía server."
+      }
+    },
+    "schemas": {
+      "HandlerError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "GatewayHealth": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "enum": [
+              "backend"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
+          "components": {
+            "type": "object",
+            "properties": {
+              "auth": {
+                "type": "boolean"
+              },
+              "chat": {
+                "type": "boolean"
+              },
+              "feed": {
+                "type": "boolean"
+              },
+              "translate": {
+                "type": "boolean"
+              },
+              "call": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "auth",
+              "chat",
+              "feed",
+              "translate",
+              "call"
+            ]
+          }
+        },
+        "required": [
+          "service",
+          "status",
+          "components"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Dịch vụ auth (kiểm kê route)"
+    },
+    {
+      "name": "chat",
+      "description": "Dịch vụ chat (kiểm kê route)"
+    },
+    {
+      "name": "call",
+      "description": "Dịch vụ call (kiểm kê route)"
+    },
+    {
+      "name": "feed",
+      "description": "Dịch vụ feed (kiểm kê route)"
+    },
+    {
+      "name": "translate",
+      "description": "Dịch vụ translate (kiểm kê route)"
+    }
+  ]
+}
