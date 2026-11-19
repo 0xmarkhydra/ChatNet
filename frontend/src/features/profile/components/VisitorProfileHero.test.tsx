@@ -1,0 +1,50 @@
+// @vitest-environment jsdom
+import { act } from 'react'
+import { createRoot } from 'react-dom/client'
+import { describe, expect, it, vi } from 'vitest'
+import VisitorProfileHero from './VisitorProfileHero'
+
+vi.mock('./ProfileNote', () => ({ default: () => null }))
+vi.mock('../../../shared/ui/UserAvatar', () => ({
+  default: ({ username }: { username: string }) => <span>{username}</span>,
+  profileAssetUrl: () => '/cover.jpg',
+}))
+
+describe('VisitorProfileHero actions', () => {
+  it('keeps the real unfriend action accessible, and closes on outside click or Escape', async () => {
+    const environment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    const previous = environment.IS_REACT_ACT_ENVIRONMENT
+    environment.IS_REACT_ACT_ENVIRONMENT = true
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    const onRemoveFriendAction = vi.fn()
+    try {
+      await act(async () => root.render(<VisitorProfileHero
+        profile={{ id: 5, username: 'alice', displayName: 'Alice', avatarSet: false,
+          coverSet: false, updatedAt: '2026-01-01', allowFriendRequests: true, online: false }}
+        relation="accepted" friendBusy={null} action="Bạn bè" request={async () => new Response()}
+        onMessage={async () => {}} onFriendAction={() => {}} onRemoveFriendAction={onRemoveFriendAction}
+        tabs={[{id:'posts',label:'Bài viết'}]} activeTab="posts" onTabChange={() => {}} />))
+      const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')
+      expect(trigger).not.toBeNull()
+      await act(async () => trigger?.click())
+      expect(host.querySelector('[role="menu"]')).not.toBeNull()
+      await act(async () => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })))
+      expect(host.querySelector('[role="menu"]')).toBeNull()
+      await act(async () => trigger?.click())
+      await act(async () => trigger?.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true})))
+      expect(host.querySelector('[role="menu"]')).toBeNull()
+      expect(document.activeElement).toBe(trigger)
+      await act(async () => trigger?.click())
+      const remove = host.querySelector<HTMLButtonElement>('[role="menuitem"]')
+      await act(async () => remove?.click())
+      expect(onRemoveFriendAction).toHaveBeenCalledOnce()
+      expect(host.querySelector('[aria-label="Tùy chọn trang cá nhân"]')).toBeNull()
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+      environment.IS_REACT_ACT_ENVIRONMENT = previous
+    }
+  })
+})
