@@ -313,9 +313,13 @@ void main() {
     expect(api.privacy['searchableByUsername'], false);
     final back = find.byKey(const ValueKey('profile-back'));
     await tester.ensureVisible(back);
-    await tester.tap(back);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('profile-edit-open')));
+    await tester.tap(back.hitTestable());
+    await tester.pumpAndSettle();
+    final edit = find.byKey(const ValueKey('profile-edit-open'));
+    await tester.ensureVisible(edit);
+    await tester.pumpAndSettle();
+    await tester.tap(edit.hitTestable());
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const ValueKey('profile-bio')));
     await tester.enterText(
