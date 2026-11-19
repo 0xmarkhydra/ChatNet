@@ -2874,6 +2874,8 @@ export default function AuthedApp({
             onOpenPost: postId => navigate(feedPostPath(postId)),
           },
           discover: {
+            request: apiFetch,
+            sessionId: session.sessionId,
             actOnFriend,
             findNearby,
             friendActionBusy,
