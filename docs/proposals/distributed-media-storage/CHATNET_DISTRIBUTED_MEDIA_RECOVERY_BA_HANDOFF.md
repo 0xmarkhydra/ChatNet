@@ -4,7 +4,7 @@
 **Phiên bản:** 1.0 — DRAFT FOR TEAM REVIEW  
 **Trạng thái:** ĐẶC TẢ / CHƯA TRIỂN KHAI / CHƯA BẬT THU PHÍ / KHÔNG ĐƯỢC XÓA FILE PRODUCTION THEO TÀI LIỆU NÀY  
 **Đầu vào:** trao đổi chủ sản phẩm về chat 1-1, nhóm, relay S3/R2, E2EE, Storage Node tự nguyện, trả thưởng và “Truy cập lại”; nghiên cứu local-first; tài liệu hiện hữu trong docs/.  
-**Tài liệu liên quan:** [RFC kiến trúc](./CHATNET_DISTRIBUTED_MEDIA_RECOVERY_SPEC.md), [E2EE Master Plan](../E2EE_IMPLEMENTATION_MASTER_PLAN.md), [Point/Coin Product Spec](../CHATNET_POINT_COIN_PRODUCT_SPEC.md), [Media Access Revocation](../MEDIA_ACCESS_REVOCATION.md), [QA/UAT Matrix](./CHATNET_DISTRIBUTED_MEDIA_RECOVERY_QA_MATRIX.md).
+**Tài liệu liên quan:** [RFC kiến trúc](CHATNET_DISTRIBUTED_MEDIA_RECOVERY_SPEC.md), [E2EE Master Plan](../../archive/features/E2EE_IMPLEMENTATION_MASTER_PLAN.md), [Point/Coin Product Spec](../CHATNET_POINT_COIN_PRODUCT_SPEC.md), [Media Access Revocation](../../archive/features/MEDIA_ACCESS_REVOCATION.md), [QA/UAT Matrix](CHATNET_DISTRIBUTED_MEDIA_RECOVERY_QA_MATRIX.md).
 
 > Nhãn quyết định: **[CHỐT]** là ý đồ nghiệp vụ đã được chủ sản phẩm xác nhận; **[ĐỀ XUẤT]** là thiết kế để team triển khai thử; **[CẦN DUYỆT]** là chỗ không được tự quyết và tuyệt đối không thu phí thật/xóa bản cloud trước khi có quyết định. Những giá trị 40 ngày, 4-of-6, mức độ an toàn, hiệu năng và độ bền đều là mục tiêu kiểm chứng, không phải cam kết đã đạt.
 

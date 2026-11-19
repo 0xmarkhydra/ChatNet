@@ -25,7 +25,7 @@ normative_basis: "ISO/IEC/IEEE 12207:2026, ISO/IEC/IEEE 15289:2019"
 3. Khi rollout lỗi, dừng mở rộng. Kiểm tương thích schema trước khi quay lại artifact cũ. Chỉ phục hồi từ backup theo quy trình đã xác minh.
 4. Phân biệt `Built`, `Verified`, `Approved`, `Published` và ghi kết quả thực tế.
 
-Xem [V&V](../07-quality/VERIFICATION_AND_VALIDATION_PLAN.md), [CI](../07-quality/CI_QUALITY_GATES.md) và [báo cáo Desktop B05](../desktop/10_BATCH_05_STATUS.md).
+Xem [V&V](../07-quality/VERIFICATION_AND_VALIDATION_PLAN.md), [CI](../07-quality/CI_QUALITY_GATES.md) và [báo cáo Desktop B05](../archive/desktop/10_BATCH_05_STATUS.md).
 
 ## Lịch sử thay đổi
 

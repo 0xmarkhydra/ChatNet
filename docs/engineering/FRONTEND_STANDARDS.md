@@ -1,6 +1,6 @@
 # Frontend engineering standards (mandatory)
 
-This is the single source of truth for **new and changed frontend code** in ChatNet. It applies equally to humans, ChatGPT, Claude and automated coding agents. Read `AGENTS.md` / `CLAUDE.md` and the relevant React and Ponytail skills first; use `docs/FRONTEND_STRUCTURE.md` for the directory map.
+This is the single source of truth for **new and changed frontend code** in ChatNet. It applies equally to humans, ChatGPT, Claude and automated coding agents. Read `AGENTS.md` / `CLAUDE.md` and the relevant React and Ponytail skills first; use `docs/engineering/FRONTEND_STRUCTURE.md` for the directory map.
 
 ## Goal and scope
 

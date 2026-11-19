@@ -2,7 +2,7 @@
 
 **Ngày:** 27/10/2026
 **Phạm vi:** Web/PWA giai đoạn 1. Đây là đặc tả và backlog để triển khai, **không phải tính năng đã chạy**.
-**Liên quan:** `docs/CHATNET_POINT_COIN_PRODUCT_SPEC.md`.
+**Liên quan:** `docs/proposals/CHATNET_POINT_COIN_PRODUCT_SPEC.md`.
 
 ## 0. Mục tiêu sản phẩm [CHỐT]
 

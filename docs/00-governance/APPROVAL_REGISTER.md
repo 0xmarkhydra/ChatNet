@@ -1,7 +1,7 @@
 ---
 document_id: GOV-APPR-001
 title: Sổ duyệt tài liệu ChatNet
-version: 1.0.0
+version: 1.0.1
 status: Draft
 owner: Engineering Governance
 baseline_commit: 40c1f1b35958ee22c1278986bf82ff57520137a1
@@ -36,13 +36,17 @@ Các mục dưới đây không được duyệt ngầm theo tài liệu chứa 
 
 ## 3. Bản ghi duyệt
 
+Bảng này là danh sách các tài liệu có metadata quản lý phiên bản. Dùng [cổng tài liệu](../README.md) để chọn tài liệu theo công việc.
+
 | ID | Tài liệu | Phiên bản | Owner | Người duyệt | Ngày | Quyết định / ghi chú |
 |---|---|---|---|---|---|---|
 | GOV-AGENT-001 | [Agent Workflow and File Ownership](../00-governance/AGENT_WORKFLOW.md) | 1.0.0 | Engineering Governance | | | |
 | GOV-BASE-001 | [Documentation Baseline and Change Control](../00-governance/BASELINE_AND_CHANGE_CONTROL.md) | 1.0.0 | Documentation Workstream | | | |
 | GOV-DOC-001 | [Documentation Control and Policy](../00-governance/DOCUMENT_CONTROL.md) | 1.0.0 | ChatNet Engineering | | | |
 | GOV-TPL-001 | [Mẫu tài liệu và biên bản kiểm tra](../00-governance/DOCUMENT_TEMPLATE.md) | 1.0.0 | Engineering Governance | | | |
-| GOV-LEG-001 | [Legacy Document Register](../00-governance/LEGACY_DOCUMENT_REGISTER.md) | 1.0.0 | Documentation Workstream | | | |
+| GOV-LEG-001 | [Legacy Document Register](../00-governance/LEGACY_DOCUMENT_REGISTER.md) | 1.0.1 | Documentation Workstream | | | |
+| GOV-ARC-LEG-001 | [Hồ sơ tài liệu lịch sử](../archive/README.md) | 1.0.1 | Engineering Governance | | | |
+| GOV-APPR-001 | [Sổ duyệt tài liệu ChatNet](APPROVAL_REGISTER.md) | 1.0.1 | Engineering Governance | | | |
 | GOV-STD-001 | [Standards Register and Tailoring Profile](../00-governance/STANDARDS_REGISTER.md) | 1.1.1 | Engineering Governance | | | |
 | GOV-TERM-001 | [ChatNet Terms and Glossary](../00-governance/TERMS_GLOSSARY.md) | 1.0.0 | Engineering Governance | | | |
 | PRD-STAT-001 | [ChatNet Feature Status Register](../01-product/FEATURE_STATUS_REGISTER.md) | 1.0.0 | Product and Engineering | | | |
@@ -101,6 +105,14 @@ Các mục dưới đây không được duyệt ngầm theo tài liệu chứa 
 | ADR-0006 | [Phân quyền do từng dịch vụ backend thực thi, Gateway chỉ định tuyến](../09-decisions/0006-per-service-authorization.md) | 1.0.0 | System Architecture | | | |
 | ADR-INDEX-001 | [Hồ sơ quyết định kiến trúc](../09-decisions/README.md) | 1.1.0 | System Architecture | | | |
 
+## 4. Phiên bản trước
+
+| ID | Tài liệu | Phiên bản | Owner | Người duyệt | Ngày | Quyết định / ghi chú |
+|---|---|---|---|---|---|---|
+| GOV-LEG-001 | [Legacy Document Register](../00-governance/LEGACY_DOCUMENT_REGISTER.md) | 1.0.0 | Documentation Workstream | | | |
+
 ## Lịch sử thay đổi
+
+- 1.0.1 (2026-11-19) — Bổ sung chỉ mục còn thiếu và theo dõi phiên bản mới mà không đổi trạng thái duyệt.
 
 - 1.0.0 (2026-11-19) — Bản nháp đầu tiên. Chưa có bản duyệt nào.

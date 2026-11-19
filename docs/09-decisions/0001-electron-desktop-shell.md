@@ -13,7 +13,7 @@ normative_basis: "ISO/IEC/IEEE 42010:2022"
 
 ## Quyết định ghi nhận
 
-[ADR gốc](../desktop/adr/0001-electron-vs-tauri.md) chọn Electron **cho spike ban đầu**. Baseline có shell trong [desktop](../../desktop/package.json), nhưng điều đó không mở rộng quyết định lịch sử thành phê duyệt phát hành.
+[ADR gốc](../archive/desktop/adr/0001-electron-vs-tauri.md) chọn Electron **cho spike ban đầu**. Baseline có shell trong [desktop](../../desktop/package.json), nhưng điều đó không mở rộng quyết định lịch sử thành phê duyệt phát hành.
 
 | Phương án | Đánh đổi |
 |---|---|

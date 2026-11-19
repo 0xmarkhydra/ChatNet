@@ -59,7 +59,7 @@ The retained feature specification states:
 - server-side filtering applies before pagination;
 - category updates are private to the owning user and synchronized through SSE.
 
-Recheck categories.go and its tests when changing these limits or semantics. See docs/CONVERSATION_CATEGORIES.md for the original feature note.
+Recheck categories.go and its tests when changing these limits or semantics. See docs/archive/features/CONVERSATION_CATEGORIES.md for the original feature note.
 
 ## 7. Realtime
 

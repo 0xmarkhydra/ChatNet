@@ -159,7 +159,7 @@ Mỗi kịch bản chỉ áp cho tác nhân có quyền và môi trường cấu
 **Actors:** Media owner, recipient, optional storage-node provider and recovery coordinator.\
 **Rule:** No production object deletion, storage-node enrollment, paid recovery or reward settlement is authorized by the proposal alone.
 
-**Source:** Restored distributed-media proposal under docs/distributed-media-storage/.
+**Source:** Restored distributed-media proposal under docs/proposals/distributed-media-storage/.
 
 ## Truy vết kịch bản
 
@@ -176,7 +176,7 @@ Các liên kết dưới đây dẫn đến yêu cầu đại diện và ca ki�
 | UC-07 | [REQ-CALL-003](SOFTWARE_REQUIREMENTS_SPECIFICATION.md#req-call-003), [REQ-CALL-004](SOFTWARE_REQUIREMENTS_SPECIFICATION.md#req-call-004) | [TC-CALL-001](../07-quality/ACCEPTANCE_CASES.md#tc-call-001) |
 | UC-08 | [NFR-PLAT-001](SOFTWARE_REQUIREMENTS_SPECIFICATION.md#nfr-plat-001) | [TC-DESK-001](../07-quality/ACCEPTANCE_CASES.md#tc-desk-001) |
 | UC-09 | [REQ-MKT-001](SOFTWARE_REQUIREMENTS_SPECIFICATION.md#req-mkt-001), [REQ-MKT-006](SOFTWARE_REQUIREMENTS_SPECIFICATION.md#req-mkt-006) | [TC-MKT-001](../07-quality/ACCEPTANCE_CASES.md#tc-mkt-001) |
-| UC-10 | Ngoài baseline sản phẩm. [Đặc tả và QA riêng](../distributed-media-storage/README.md). | Không có ca nghiệm thu sản phẩm ở baseline này. |
+| UC-10 | Ngoài baseline sản phẩm. [Đặc tả và QA riêng](../proposals/distributed-media-storage/README.md). | Không có ca nghiệm thu sản phẩm ở baseline này. |
 
 ## Lịch sử thay đổi
 

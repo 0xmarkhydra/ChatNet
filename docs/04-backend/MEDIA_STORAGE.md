@@ -62,14 +62,14 @@ The Chat service defines a seven-day orphan retention period and runs cleanup on
 
 ## 7. Distributed media recovery proposal
 
-The documents under docs/distributed-media-storage describe an opt-in storage-node network, erasure coding, shard auditing, recovery and paid re-access. This is a proposal, not an implemented subsystem in the current baseline.
+The documents under docs/proposals/distributed-media-storage describe an opt-in storage-node network, erasure coding, shard auditing, recovery and paid re-access. This is a proposal, not an implemented subsystem in the current baseline.
 
 The proposal explicitly prohibits production S3/R2 deletion based solely on elapsed retention or shard acknowledgements. A production deletion decision would require independently verified recovery drills, failure-domain diversity, current audits, rollback and owner go/no-go approval. It also does not authorize real payment or rewards.
 
 ## 8. Related documents
 
 - [Media access control](../06-security/MEDIA_ACCESS_CONTROL.md)
-- [Distributed media proposal](../distributed-media-storage/README.md)
+- [Distributed media proposal](../proposals/distributed-media-storage/README.md)
 - [Data architecture](../02-architecture/DATA_ARCHITECTURE.md)
 
 ## Lịch sử thay đổi

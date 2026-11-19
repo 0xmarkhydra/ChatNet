@@ -29,7 +29,7 @@ Client cần nhận cập nhật tin nhắn, đọc, hội thoại, quan hệ b�
 Chưa có tài liệu về phương án đã cân nhắc. Đã tra lịch sử Git và các handoff trong repo ngày 2026-11-19:
 
 - Handler `text/event-stream` của backend xuất hiện lần đầu ở commit `bb015c4` (2026-10-01, "feat: add ChatNet media uploads and polish mobile UI"). Thông điệp commit không nêu lý do chọn SSE.
-- [Handoff Agent 4](../agent-handoffs/agent-4/2026-10-19-phase3.md) ghi hành vi hiện tại: client đồng bộ lại khi SSE nối lại, khi trình duyệt online lại, khi tab hiện lại và mỗi 90 giây. Đây là hệ quả, không phải lý do chọn.
+- [Handoff Agent 4](../archive/agent-handoffs/agent-4/2026-10-19-phase3.md) ghi hành vi hiện tại: client đồng bộ lại khi SSE nối lại, khi trình duyệt online lại, khi tab hiện lại và mỗi 90 giây. Đây là hệ quả, không phải lý do chọn.
 
 Lý do gốc và các phương án như WebSocket hay long polling vẫn do architect xác nhận. Không điền thay.
 

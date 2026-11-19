@@ -11,7 +11,7 @@ normative_basis: "ISO/IEC/IEEE 42010:2022; IETF RFC 9420"
 
 # E2EE bằng MLS ở dạng pilot tự nguyện, không bật mặc định
 
-**Loại ghi nhận:** ghi nhận quyết định hiện có ở [trạng thái E2EE/MLS](../06-security/E2EE_MLS_STATUS.md) và [kế hoạch E2EE](../E2EE_IMPLEMENTATION_MASTER_PLAN.md). Lý do chọn MLS so với giao thức khác chưa được tài liệu hóa trong baseline.
+**Loại ghi nhận:** ghi nhận quyết định hiện có ở [trạng thái E2EE/MLS](../06-security/E2EE_MLS_STATUS.md) và [kế hoạch E2EE](../archive/features/E2EE_IMPLEMENTATION_MASTER_PLAN.md). Lý do chọn MLS so với giao thức khác chưa được tài liệu hóa trong baseline.
 
 ## Bối cảnh
 
@@ -39,7 +39,7 @@ Chưa có tài liệu về phương án đã cân nhắc. Mục này phải đư
 ## Bằng chứng
 
 - [Trạng thái E2EE/MLS](../06-security/E2EE_MLS_STATUS.md)
-- [Kế hoạch triển khai E2EE (lịch sử)](../E2EE_IMPLEMENTATION_MASTER_PLAN.md)
+- [Kế hoạch triển khai E2EE (lịch sử)](../archive/features/E2EE_IMPLEMENTATION_MASTER_PLAN.md)
 - Route thiết bị và KeyPackage ở [Auth](../../backend/cmd/auth/main.go)
 
 ## Điều kiện xem xét lại

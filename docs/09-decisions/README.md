@@ -13,7 +13,7 @@ normative_basis: "ISO/IEC/IEEE 42010:2022"
 
 | ADR | Quyết định | Loại ghi nhận | Mối quan tâm |
 |---|---|---|---|
-| [ADR-0001](0001-electron-desktop-shell.md) | Electron cho bản Desktop đầu tiên | Từ ADR gốc ở `docs/desktop/adr` | C-10 |
+| [ADR-0001](0001-electron-desktop-shell.md) | Electron cho bản Desktop đầu tiên | Từ ADR gốc ở `docs/archive/desktop/adr` | C-10 |
 | [ADR-0002](0002-sse-realtime-delivery.md) | SSE và Redis Pub/Sub cho realtime của chat | Hồi cứu | C-04 |
 | [ADR-0003](0003-server-side-ai-provider-secrets.md) | Khóa nhà cung cấp AI chỉ nằm phía server | Theo chính sách | C-05 |
 | [ADR-0004](0004-multi-process-backend-container.md) | Nhiều dịch vụ Go trong một container, qua Gateway | Hồi cứu | C-07, C-08 |
