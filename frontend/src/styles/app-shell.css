@@ -882,7 +882,7 @@
     min-height: 64px;
     margin-bottom: 8px;
     padding: 10px 20px;
-    background: color-mix(in srgb, var(--soco-blue) 8%, var(--soco-surface));
+    background: transparent;
     border-bottom: 1px solid var(--soco-line);
   }
   .modern-shell.app-layout .shell-v2-feed-page-header h1 {
