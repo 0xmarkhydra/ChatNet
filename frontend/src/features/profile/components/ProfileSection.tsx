@@ -1037,9 +1037,12 @@ export default function ProfileSection({
                         </span>
                         <span className="locale-option-copy">
                           <strong>{language.localizedLanguage}</strong>
-                          <small>{language.nativeLanguage}</small>
+                          {language.nativeLanguage !== language.localizedLanguage && (
+                            <small>{language.nativeLanguage}</small>
+                          )}
                           <em>
-                            {language.localizedRegion} · {language.nativeRegion}
+                            {language.localizedRegion}
+                            {language.nativeRegion !== language.localizedRegion && ` · ${language.nativeRegion}`}
                           </em>
                         </span>
                         <b>{language.code}</b>

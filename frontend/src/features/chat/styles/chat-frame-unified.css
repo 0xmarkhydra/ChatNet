@@ -65,6 +65,32 @@
 }
 
 @media (min-width: 761px) {
+  /* A long direct-chat name may shrink, but must not push actions offscreen. */
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) > .chat-head > .room-info {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) .chat-head .room-info > div:last-child {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) .chat-head .room-info :is(strong, .visitor-name-link) {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: start;
+  }
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) > .chat-head > .translate-controls {
+    flex: none;
+  }
+
+
   .modern-shell.app-layout .social-chat-layout > .conversation-panel > .chat-head,
   .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .conversation-panel.group-chat-panel > .chat-head {
     box-sizing: border-box;

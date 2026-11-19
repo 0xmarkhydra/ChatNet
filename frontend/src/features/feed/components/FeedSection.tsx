@@ -288,14 +288,18 @@ export default function FeedSection({
                               ? "Không tìm thấy bài viết"
                               : feedFilter === "following"
                                 ? "Chưa có bài viết từ bạn bè"
-                                : "Chưa có bài viết"
+                                : feedFilter === "saved"
+                                  ? "Chưa có bài viết đã lưu"
+                                  : "Chưa có bài viết"
                           }
                           description={
                             normalizedSearch
                               ? "Thử một từ khóa khác nhé."
                               : feedFilter === "following"
                                 ? "Kết bạn để xem các bài viết được chia sẻ với bạn."
-                                : "Hãy chia sẻ khoảnh khắc đầu tiên của bạn."
+                                : feedFilter === "saved"
+                                  ? "Mở menu của bài viết và chọn Lưu bài viết để xem lại ở đây."
+                                  : "Hãy chia sẻ khoảnh khắc đầu tiên của bạn."
                           }
                           action={
                             !normalizedSearch && (
@@ -303,15 +307,19 @@ export default function FeedSection({
                                 onClick={() =>
                                   feedFilter === "following"
                                     ? switchTab("contacts")
-                                    : isProfileDesktop
-                                      ? (setFeedCheckInOpen(false),
-                                        setFeedComposerOpen(true))
-                                      : postComposerRef.current?.focus()
+                                    : feedFilter === "saved"
+                                      ? setFeedFilter("all")
+                                      : isProfileDesktop
+                                        ? (setFeedCheckInOpen(false),
+                                          setFeedComposerOpen(true))
+                                        : postComposerRef.current?.focus()
                                 }
                               >
                                 {feedFilter === "following"
                                   ? "Tìm bạn bè"
-                                  : "Tạo bài viết"}
+                                  : feedFilter === "saved"
+                                    ? "Quay lại Bảng tin"
+                                    : "Tạo bài viết"}
                               </SocoTextAction>
                             )
                           }
