@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, FileText, MapPin, Search, UsersRound } from 'lucide-react'
+import { ArrowRight, FileText, Heart, Image as ImageIcon, MessageCircle, MapPin, UsersRound } from 'lucide-react'
 import { ErrorBoundary } from '../../../shared/ui/ErrorBoundary'
 import { AsyncSectionFallback } from '../../../shared/ui/AsyncSectionFallback'
 import type { DiscoverSectionProps } from '../types'
@@ -29,11 +29,17 @@ function friendLabel(relationship: ReturnType<DiscoverSectionProps['friendRelati
       : relationship === 'outgoing' ? 'Hủy lời mời' : 'Kết bạn'
 }
 
-export default function ExplorePage(props: DiscoverSectionProps) {
+type PreviewExtras = {
+  posts: { id: number; author: string; community: string; body: string; likes: number; comments: number; when: string; tag: string }[]
+  tags: { name: string; postCount: number }[]
+}
+type PreviewProps = DiscoverSectionProps & { previewExtras?: PreviewExtras; previewEmptyDesign?: boolean; onPreviewAction?: (action: string) => void }
+
+export default function ExplorePage(props: PreviewProps) {
   return <ExplorePageContent key={props.sessionId} {...props} />
 }
 
-function ExplorePageContent(props: DiscoverSectionProps) {
+function ExplorePageContent(props: PreviewProps) {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
@@ -72,12 +78,70 @@ function ExplorePageContent(props: DiscoverSectionProps) {
     </div>}
   </section>
 
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const posts = props.previewExtras?.posts ?? []
+  const tags = props.previewExtras?.tags ?? []
+  const previewPosts = posts.length > 0 && (tab === 'all' || tab === 'posts') && <section className="explore-preview-posts" aria-labelledby="explore-preview-posts-title">
+    <div className="explore-section-heading"><h2 id="explore-preview-posts-title">Bài viết nổi bật <span className="explore-preview-marker">Demo</span></h2></div>
+    <div className="explore-preview-post-list">{posts.map((post, index) => <article className="explore-preview-post" key={post.id}>
+      <div className={'explore-preview-post-media explore-preview-post-tone-' + (index % 3)} aria-hidden="true"><ImageIcon size={27} strokeWidth={1.8} /></div>
+      <div className="explore-preview-post-content">
+        <div className="explore-preview-post-author"><span className="explore-person-avatar" aria-hidden="true">{post.author.charAt(0)}</span><div className="explore-preview-byline"><strong>{post.author}</strong><span>trong {post.community} · {post.when}</span></div></div>
+        <p>{post.body}</p>
+        <div className="explore-preview-post-footer"><div className="explore-preview-engagement"><span><Heart size={16} aria-hidden="true" />{post.likes}</span><span><MessageCircle size={16} aria-hidden="true" />{post.comments}</span></div><span className="explore-preview-post-hashtag">#{post.tag}</span></div>
+      </div>
+    </article>)}</div>
+  </section>
+
   const nearby = <section className="explore-near" aria-labelledby="explore-near-title">
     <h2 id="explore-near-title">Gần bạn</h2>
     <p>Bật quét để thấy người đang ở trong bán kính bạn chọn.</p>
     <div className="explore-near-radar" aria-hidden="true" />
     <button type="button" onClick={() => setTab('recent')}><MapPin size={18} aria-hidden="true" /> Quét người gần đây</button>
   </section>
+
+  if (isEmptyAll && props.previewEmptyDesign) {
+    return <main className="explore-page explore-preview-empty-page">
+      <h1 className="explore-visually-hidden">Khám phá</h1>
+      <nav className="explore-tabs" aria-label="Danh mục khám phá">
+        {tabs.map(item => <button key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined}
+          className={tab === item.id ? 'active' : ''} onClick={() => setTab(item.id)}>{item.title}</button>)}
+      </nav>
+      <section className="explore-preview-empty-intro" aria-labelledby="explore-empty-intro-title">
+        <h2 id="explore-empty-intro-title">Bắt đầu khám phá ChatNet</h2>
+        <p>Chưa có nhiều nội dung ở đây. Ba bước dưới đây giúp bạn kết nối nhanh nhất.</p>
+        <div className="explore-preview-empty-steps">
+          <article className="explore-preview-empty-step"><div className="explore-preview-step-top"><span className="explore-step-number">1</span><small>Bước 1</small></div><h3>Tìm người gần bạn</h3><p>Bật quét vị trí để kết bạn với người ở quanh bạn.</p><button className="explore-preview-step-primary" type="button" onClick={() => setTab('recent')}>Quét người gần đây</button></article>
+          <article className="explore-preview-empty-step"><div className="explore-preview-step-top"><span className="explore-step-number">2</span><small>Bước 2</small></div><h3>Tham gia hoặc tạo cộng đồng</h3><p>Gặp những người cùng sở thích và trao đổi theo chủ đề.</p><button type="button" onClick={() => setTab('communities')}>Xem cộng đồng</button></article>
+          <article className="explore-preview-empty-step"><div className="explore-preview-step-top"><span className="explore-step-number">3</span><small>Bước 3</small></div><h3>Đăng bài đầu tiên</h3><p>Chia sẻ một khoảnh khắc để mọi người biết đến bạn.</p><button type="button" onClick={() => props.onPreviewAction?.('Viết bài')}>Viết bài</button></article>
+        </div>
+      </section>
+      <div className="explore-preview-empty-layout">
+        <div className="explore-preview-empty-main">
+          <section aria-labelledby="explore-empty-topics-title">
+            <h2 id="explore-empty-topics-title">Tìm theo chủ đề <span className="explore-preview-marker">Minh họa</span></h2>
+            <div className="explore-preview-empty-topics">{['Nhiếp ảnh','Lập trình','Du lịch','Âm nhạc','Ẩm thực','Thể thao','Game','Sách'].map((topic,index) => <button type="button" key={topic} onClick={() => props.onPreviewAction?.('Chủ đề ' + topic)}><span className={'explore-preview-topic-dot explore-preview-topic-dot-' + index % 4} />{topic}</button>)}</div>
+          </section>
+          <section aria-labelledby="explore-empty-community-title">
+            <h2 id="explore-empty-community-title">Cộng đồng</h2>
+            <div className="explore-preview-empty-community">
+              <span className="explore-empty-icon" aria-hidden="true"><UsersRound size={24} /></span>
+              <div><strong>Chưa có cộng đồng công khai nào</strong><p>Hãy là người đầu tiên mở một cộng đồng quanh chủ đề bạn thích, mọi người sẽ tìm thấy ở đây.</p></div>
+              <button type="button" onClick={() => props.onPreviewAction?.('Tạo cộng đồng')}>Tạo cộng đồng</button>
+            </div>
+          </section>
+        </div>
+        <aside className="explore-preview-empty-rail" aria-label="Kết nối và mời bạn bè">
+          {nearby}
+          <section className="explore-preview-invite">
+            <h2>Mời bạn bè cùng tham gia</h2>
+            <p>Càng nhiều người quen, trang Khám phá càng có nhiều gợi ý hợp với bạn.</p>
+            <button type="button" onClick={() => props.onPreviewAction?.('Sao chép liên kết mời')}>Sao chép liên kết mời</button>
+          </section>
+        </aside>
+      </div>
+    </main>
+  }
 
   return <main className="explore-page">
     <h1 className="explore-visually-hidden">Khám phá</h1>
@@ -147,7 +211,8 @@ function ExplorePageContent(props: DiscoverSectionProps) {
           title="Cộng đồng đang hoạt động"
           onViewAll={tab === 'all' && communities.items.length > 0 ? () => setTab('communities') : undefined} />}
         {tab === 'people' && people}
-        {tab === 'posts' && <section className="explore-state explore-posts" aria-labelledby="explore-posts-title">
+        {previewPosts}
+        {tab === 'posts' && posts.length === 0 && <section className="explore-state explore-posts" aria-labelledby="explore-posts-title">
           <FileText size={34} aria-hidden="true" /><h2 id="explore-posts-title">Khám phá bài viết</h2>
           <p>Chưa có danh sách bài viết nổi bật riêng cho Khám phá. Hãy tìm các bài viết công khai trên ChatNet.</p>
           <button type="button" onClick={() => navigate('/search?type=posts')}>Đến trang tìm kiếm <ArrowRight size={17} aria-hidden="true" /></button>
@@ -155,6 +220,15 @@ function ExplorePageContent(props: DiscoverSectionProps) {
       </div>
       {tab === 'all' && <aside className="explore-rail" aria-label="Gợi ý khám phá">
         {peopleCount > 0 && people}
+        {tags.length > 0 && <section className="explore-preview-trending" aria-labelledby="explore-preview-trending-title">
+          <h2 id="explore-preview-trending-title">Đang được quan tâm <span className="explore-preview-marker">Demo</span></h2>
+          <ol className="explore-preview-tag-list">{tags.map((tag, index) => <li key={tag.name}>
+            <button type="button" aria-pressed={selectedTag === tag.name} onClick={() => setSelectedTag(current => current === tag.name ? null : tag.name)}>
+              <span className="explore-preview-tag-rank" aria-hidden="true">{index + 1}</span>
+              <span className="explore-preview-tag-content"><strong>#{tag.name}</strong><small>{tag.postCount >= 1000 ? (tag.postCount / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' N' : tag.postCount.toLocaleString('vi-VN')} bài viết</small></span>
+            </button>
+          </li>)}</ol>
+        </section>}
         {nearby}
       </aside>}
     </div>}
