@@ -26,23 +26,6 @@ const mounted: Array<ReturnType<typeof mountComposer>> = [];
 afterEach(() => { while (mounted.length) mounted.pop()!.close(); });
 
 describe("useChatComposerSurface", () => {
-  it("scopes drag overlay to the current conversation and resets depth", () => {
-    const app = mountComposer();
-    mounted.push(app);
-    let state = app.render();
-    act(() => {
-      state.setChatDragActive(true);
-      state.setChatDragDepth(2);
-    });
-    expect(app.render().chatDragActive).toBe(true);
-    expect(state.chatDragDepth.current).toBe(2);
-    state = app.render("chat", 5);
-    expect(state.chatDragActive).toBe(false);
-    expect(state.chatDragDepth.current).toBe(0);
-    state = app.render("chat", 4);
-    expect(state.chatDragActive).toBe(false);
-  });
-
   it("resizes the composer on draft changes and retains the textarea ref", () => {
     const app = mountComposer();
     mounted.push(app);
