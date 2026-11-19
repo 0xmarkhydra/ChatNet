@@ -17,12 +17,11 @@ import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
 import { applyPostLikePreviews } from "./applyPostLikePreviews";
-import { usePhoneSearchLayout } from "./hooks/usePhoneSearchLayout";
+import { useAppChatSearchState } from "./hooks/useAppChatSearchState";
 import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
 import { useAppInstallState } from "./hooks/useAppInstallState";
 import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
-import { useQuickSearchDismiss } from "./hooks/useQuickSearchDismiss";
 import { useChatOutboxReconnect } from "./hooks/useChatOutboxReconnect";
 import { useUnreadDocumentTitle } from "./hooks/useUnreadDocumentTitle";
 import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
@@ -218,10 +217,7 @@ import {
   type QueuedChatMessage,
 } from "../features/chat/lib/chatOutbox";
 import { uploadPresignedFile } from "../features/chat/lib/mediaUpload";
-import {
-  chatFilesFromClipboard,
-  transferHasFiles,
-} from "../features/chat/utils/chatFileTransfer";
+import { chatFilesFromClipboard } from "../features/chat/utils/chatFileTransfer";
 import { canMarkConversationRead } from "../features/chat/utils/conversationRead";
 import { mergeById, toggleMessageReactionCount } from "../shared/utils/optimistic";
 import { CallHeaderActions } from "../features/calls/components/CallManager";
@@ -330,6 +326,7 @@ import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
 import { useChatDraftState } from "../features/chat/hooks/useChatDraftState";
 import { useChatOutboxState } from "../features/chat/hooks/useChatOutboxState";
+import { useChatComposerSurface } from "../features/chat/hooks/useChatComposerSurface";
 import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
 export type AuthedAppProps = {
@@ -386,22 +383,13 @@ export default function AuthedApp({
 
   const [inlineCommentsId, setInlineCommentsId] = useScopedState<number | null>(tab, null);
   const tabRef = useLatest(tab);
-  const [globalSearch, setGlobalSearch] = useState("");
-  const [chatListQuery, setChatListQuery] = useState('');
-  const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'groups'>('all');
-  const chatFiltersPill = useSlidingPill<HTMLDivElement>(chatListFilter);
-  const [quickSearchOpen, setQuickSearchOpen] = useState(false);
-  const phoneSearchLayout = usePhoneSearchLayout();
-  const quickSearchAnchorRef = useRef<HTMLDivElement>(null);
-  const [chatSearchJump, setChatSearchJump] = useState<{
-    conversationId: number;
-    messageId: number;
-    revision: number;
-  } | null>(null);
-  const chatSearchJumpRevision = useRef(0);
-  const nextChatSearchJumpRevision = useCallback(() => ++chatSearchJumpRevision.current, []);
-  const lastScrolledSearchJump = useRef(0);
-  useQuickSearchDismiss(quickSearchOpen, quickSearchAnchorRef, setQuickSearchOpen);
+  const {
+    globalSearch, setGlobalSearch, chatListQuery, setChatListQuery,
+    chatListFilter, setChatListFilter, chatFiltersPill,
+    quickSearchOpen, setQuickSearchOpen, phoneSearchLayout, quickSearchAnchorRef,
+    chatSearchJump, setChatSearchJump, chatSearchJumpRevision,
+    nextChatSearchJumpRevision, lastScrolledSearchJump,
+  } = useAppChatSearchState();
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
@@ -613,40 +601,16 @@ export default function AuthedApp({
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const postComposerRef = useRef<HTMLTextAreaElement>(null);
-  const messageInputRef = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const input = messageInputRef.current;
-    if (!input) return;
-    input.style.height = 'auto';
-    input.style.height = `${Math.min(input.scrollHeight, 154)}px`;
-  }, [messageText, activeConversationId, tab, desktopSection]);
-  const chatDragDepth = useRef(0);
-  const setChatDragDepth = useCallback((next: number) => { chatDragDepth.current = next; }, []);
-  const [chatDragActive, setChatDragActive] = useScopedState(
-    `${tab}:${activeConversationId ?? "none"}`, false,
-  );
-  useEffect(() => {
-    chatDragDepth.current = 0;
-  }, [activeConversationId, tab]);
+  const {
+    messageInputRef, chatFileInputRef,
+    chatDragDepth, setChatDragDepth, chatDragActive, setChatDragActive,
+  } = useChatComposerSurface({ tab, activeConversationId, desktopSection, messageText });
 
   useDesktopShortcuts({
     sessionRef,
     onOpenChat: () => setTab("chat"),
     messageInputRef,
   });
-  useEffect(() => {
-    const preventFileNavigation = (event: DragEvent) => {
-      // Never navigate away from the chat when a file is dropped outside it.
-      if (transferHasFiles(event.dataTransfer)) event.preventDefault();
-    };
-    document.addEventListener("dragover", preventFileNavigation);
-    document.addEventListener("drop", preventFileNavigation);
-    return () => {
-      document.removeEventListener("dragover", preventFileNavigation);
-      document.removeEventListener("drop", preventFileNavigation);
-    };
-  }, []);
-  const chatFileInputRef = useRef<HTMLInputElement>(null);
   const feedAlbumInputRef = useRef<HTMLInputElement>(null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
