@@ -87,6 +87,7 @@ class DemoApi extends Api {
     3: {'id': 3, 'nickname': '', 'note': '', 'favorite': false},
   };
   final List<Json> userReports = [];
+  bool nearbyEnabled = false;
   final Map<int, Json> notificationSettings = {};
   final Set<int> pinnedMessageIds = {};
   final List<String> messageSearchRequests = [];
@@ -165,6 +166,19 @@ class DemoApi extends Api {
       ),
     ],
   };
+  late final List<Json> postMentions = [
+    {
+      'id': 60,
+      'postId': 1,
+      'kind': 'mention',
+      'author': 'linhnguyen',
+      'authorDisplayName': 'Linh Nguyễn',
+      'createdAt': DateTime.now()
+          .subtract(const Duration(minutes: 18))
+          .toIso8601String(),
+      'readAt': null,
+    },
+  ];
   late final List<Json> posts = [
     {
       'id': 1,
@@ -722,8 +736,18 @@ class DemoApi extends Api {
         };
       }
       if (parts[2] == 'nearby') {
+        if (method == 'DELETE') {
+          nearbyEnabled = false;
+          return {};
+        }
+        nearbyEnabled = true;
         return {
           'users': people.map((p) => {...p, 'distanceKm': 0.8}).toList(),
+          'expiresAt': DateTime.now()
+              .add(const Duration(minutes: 10))
+              .toUtc()
+              .toIso8601String(),
+          'radiusKm': data['radiusKm'] ?? 5,
         };
       }
       final query = uri.queryParameters['q'] ?? '';
@@ -751,6 +775,16 @@ class DemoApi extends Api {
               .toIso8601String(),
         },
       ];
+    }
+    if (parts[1] == 'feed' && parts.length >= 3 && parts[2] == 'mentions') {
+      if (parts.length == 3 && method == 'GET') return postMentions;
+      if (parts.length == 5 && parts[4] == 'read' && method == 'POST') {
+        final mention = postMentions.firstWhere(
+          (item) => '${item['id']}' == parts[3],
+        );
+        mention['readAt'] = DateTime.now().toUtc().toIso8601String();
+        return {...mention};
+      }
     }
     if (parts[1] == 'posts') {
       if (parts.length == 2) {
@@ -785,10 +819,41 @@ class DemoApi extends Api {
               )
               .toList();
         }
+        if (uri.queryParameters['scope'] == 'saved') {
+          return posts.where((p) => p['saved'] == true).toList();
+        }
+        if (uri.queryParameters['scope'] == 'mine') {
+          return posts.where((p) => p['author'] == user['username'] ||
+              p['author'] == user['displayName']).toList();
+        }
         return posts;
       }
       final p = posts.firstWhere((p) => '${p['id']}' == parts[2]);
-      if (parts[3] == 'reactions' && method == 'GET') {
+      if (parts.length == 3) {
+        if (method == 'GET') return {...p};
+        if (method == 'DELETE') {
+          if (p['repostKind'] == 'quick' && p['originalPost'] is Map) {
+            final originalId = (p['originalPost'] as Map)['id'];
+            for (final source in posts.where(
+              (item) => item['id'] == originalId,
+            )) {
+              source['myRepostId'] = 0;
+              source['repostCount'] =
+                  (((source['repostCount'] as num?)?.toInt() ?? 1) - 1).clamp(
+                    0,
+                    999999,
+                  );
+            }
+          }
+          posts.removeWhere((item) => item['id'] == p['id']);
+          return {};
+        }
+        if (method == 'PATCH') {
+          p.addAll(data);
+          return {...p};
+        }
+      }
+      if (parts.length >= 4 && parts[3] == 'reactions' && method == 'GET') {
         return {
           'items': [
             if ((p['likes'] as num?)?.toInt() != 0)
@@ -802,22 +867,72 @@ class DemoApi extends Api {
           'hasMore': false,
         };
       }
-      if (parts[3] == 'like') {
+      if (parts.length >= 4 && parts[3] == 'like') {
         p['liked'] = p['liked'] != true;
         p['likes'] += p['liked'] == true ? 1 : -1;
         return p;
       }
-      if (parts[3] == 'save') {
+      if (parts.length >= 4 && parts[3] == 'save') {
         p['saved'] = p['saved'] != true;
         return {...p};
       }
-      if (parts.length == 3 && method == 'DELETE') {
-        posts.removeWhere((item) => item['id'] == p['id']);
-        return {};
-      }
-      if (parts.length == 3 && method == 'PATCH') {
-        p.addAll(data);
+      if (parts.length == 4 && parts[3] == 'repost') {
+        final existing = (p['myRepostId'] as num?)?.toInt() ?? 0;
+        if (method == 'DELETE') {
+          if (existing > 0) {
+            posts.removeWhere((item) => item['id'] == existing);
+            p['repostCount'] = ((p['repostCount'] as num?)?.toInt() ?? 1) - 1;
+            p['myRepostId'] = 0;
+          }
+          return {};
+        }
+        final kind = data['kind']?.toString() ?? '';
+        if (kind == 'quick' && existing > 0) return {...p};
+        if (kind != 'quick' && kind != 'quote') {
+          throw const ApiError('Loại đăng lại không hợp lệ.', 400);
+        }
+        final original = <String, dynamic>{
+          'id': p['id'],
+          'author': p['author'],
+          'authorDisplayName': p['authorDisplayName'],
+          'content': p['content'],
+          'attachments': p['attachments'] ?? [],
+        };
+        final repost = <String, dynamic>{
+          'id': ++serial,
+          'author': user['username'],
+          'authorDisplayName': user['displayName'],
+          'content': kind == 'quote' ? (data['content'] ?? '') : '',
+          'repostKind': kind,
+          'originalPost': original,
+          'visibility': 'public',
+          'likes': 0,
+          'liked': false,
+          'comments': <Json>[],
+          'createdAt': DateTime.now().toIso8601String(),
+        };
+        posts.insert(0, repost);
+        p['repostCount'] = ((p['repostCount'] as num?)?.toInt() ?? 0) + 1;
+        if (kind == 'quick') p['myRepostId'] = repost['id'];
         return {...p};
+      }
+      if (parts.length >= 5 && parts[3] == 'comments') {
+        final comments = (p['comments'] as List).cast<Json>();
+        final comment = comments.firstWhere(
+          (item) => '${item['id']}' == parts[4],
+        );
+        if (parts.length == 6 && parts[5] == 'like') {
+          comment['liked'] = method == 'PUT';
+          return {...p};
+        }
+        if (method == 'DELETE') {
+          comments.removeWhere((item) => item['id'] == comment['id']);
+          return {...p};
+        }
+        if (method == 'PATCH') {
+          comment['content'] = data['content'];
+          return {...p};
+        }
       }
       final comment = {
         'id': ++serial,
@@ -838,6 +953,7 @@ class DemoApi extends Api {
           'id': ++serial,
           'author': user['username'],
           ...data,
+          'createdAt': DateTime.now().toIso8601String(),
           'expiresAt': DateTime.now()
               .add(const Duration(hours: 24))
               .toIso8601String(),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -12,10 +14,16 @@ import 'widgets.dart';
 enum _NearbyMode { people, places }
 
 class DiscoverScreen extends StatefulWidget {
-  const DiscoverScreen({super.key, required this.api, required this.query});
+  const DiscoverScreen({
+    super.key,
+    required this.api,
+    required this.query,
+    this.onOpenConversation,
+  });
 
   final Api api;
   final String query;
+  final ValueChanged<Json>? onOpenConversation;
 
   @override
   State<DiscoverScreen> createState() => _DiscoverScreenState();
@@ -26,9 +34,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   final searchController = TextEditingController();
   List<Json> people = [];
   List<Json> places = [];
+  List<Json> friends = [];
+  List<Json> friendRequests = [];
+  int? friendBusyId;
+  double scannedPeopleRadius = 5;
+  DateTime? activeUntil;
+  Timer? nearbyLeaseTimer;
+  int _peopleRevision = 0;
+  int _placesRevision = 0;
   _NearbyMode mode = _NearbyMode.people;
   bool mapView = true;
-  bool scanning = false;
+  bool placesLocated = false;
+  bool scanningPeople = false;
+  bool loadingPlaces = false;
+  bool get scanning =>
+      mode == _NearbyMode.people ? scanningPeople : loadingPlaces;
   bool active = false;
   double peopleRadius = 5;
   double placeRadius = 1;
@@ -41,6 +61,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Future<({double latitude, double longitude})> _position() async {
     if (widget.api.isDemo) {
       return (latitude: 10.7769, longitude: 106.7009);
+    }
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw const ApiError(
+        'Dịch vụ vị trí đang tắt. Bật GPS để khám phá quanh đây.',
+      );
     }
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -56,93 +81,227 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         timeLimit: Duration(seconds: 15),
       ),
     );
+    if (!value.latitude.isFinite ||
+        !value.longitude.isFinite ||
+        value.latitude.abs() > 85.05112878 ||
+        value.longitude.abs() > 180) {
+      throw const ApiError(
+        'Tọa độ thiết bị không hợp lệ. Kiểm tra vị trí giả lập.',
+      );
+    }
     return (latitude: value.latitude, longitude: value.longitude);
   }
 
+  Future<void> _loadRelationships() async {
+    try {
+      final responses = await Future.wait([
+        widget.api.request('GET', '/api/friends'),
+        widget.api.request('GET', '/api/friends/requests'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        friends = objects(responses[0]);
+        friendRequests = objects(responses[1]);
+      });
+    } catch (_) {
+      // Relationship data is supplemental to nearby discovery.
+    }
+  }
+
+  String _relationship(Json person) {
+    final id = person['id'];
+    if (friends.any((item) => item['id'] == id)) return 'accepted';
+    for (final item in friendRequests) {
+      if (item['id'] == id) {
+        return item['direction'] == 'incoming' ? 'incoming' : 'outgoing';
+      }
+    }
+    return 'none';
+  }
+
+  String _friendLabel(Json person) => switch (_relationship(person)) {
+    'accepted' => 'Nhắn tin',
+    'incoming' => 'Chấp nhận',
+    'outgoing' => 'Hủy lời mời',
+    _ => 'Kết bạn',
+  };
+
   Future<void> _scanPeople() async {
+    if (scanningPeople) return;
+    final revision = ++_peopleRevision;
+    final radius = peopleRadius;
     setState(() {
-      scanning = true;
+      scanningPeople = true;
       error = '';
     });
     try {
       final position = await _position();
+      if (!mounted || revision != _peopleRevision) return;
       final result = object(
         await widget.api.request('POST', '/api/users/nearby', {
           'latitude': position.latitude,
           'longitude': position.longitude,
-          'radiusKm': peopleRadius,
+          'radiusKm': radius,
         }),
       );
-      if (!mounted) return;
+      if (!mounted || revision != _peopleRevision) return;
+      final expires = DateTime.tryParse(result['expiresAt']?.toString() ?? '');
+      nearbyLeaseTimer?.cancel();
+      final now = DateTime.now();
+      if (expires != null && expires.isAfter(now)) {
+        nearbyLeaseTimer = Timer(expires.difference(now), () {
+          if (mounted) setState(() => active = false);
+        });
+      }
       setState(() {
         latitude = position.latitude;
         longitude = position.longitude;
         people = objects(result['users']);
-        active = true;
+        scannedPeopleRadius = radius;
+        activeUntil = expires;
+        active = expires == null || expires.isAfter(now);
       });
-    } catch (value) {
-      if (mounted) setState(() => error = value.toString());
+      await _loadRelationships();
+    } on ApiError catch (cause) {
+      if (mounted && revision == _peopleRevision) {
+        setState(() {
+          error = cause.status == 429
+              ? 'Chờ 10 giây trước khi tìm lại.'
+              : cause.toString();
+        });
+      }
+    } catch (cause) {
+      if (mounted && revision == _peopleRevision) {
+        setState(() => error = cause.toString());
+      }
     } finally {
-      if (mounted) setState(() => scanning = false);
+      if (mounted && revision == _peopleRevision) {
+        setState(() => scanningPeople = false);
+      }
     }
   }
 
+  void _centerMap(LatLng position, {double zoom = 14}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || mode != _NearbyMode.places || !mapView) return;
+      try {
+        mapController.move(position, zoom);
+      } catch (_) {
+        // The map may have been disposed while switching tabs.
+      }
+    });
+  }
+
   Future<void> _loadPlaces({bool locate = false}) async {
+    final revision = ++_placesRevision;
+    final radius = placeRadius;
+    final requestedCategory = category;
     setState(() {
-      scanning = true;
+      loadingPlaces = true;
       error = '';
+      places = [];
+      selectedPlace = null;
     });
     try {
       if (locate || latitude == null || longitude == null) {
         final position = await _position();
+        if (!mounted || revision != _placesRevision) return;
         latitude = position.latitude;
         longitude = position.longitude;
       }
+      if (!mounted || revision != _placesRevision) return;
+      setState(() => placesLocated = true);
       final result = widget.api.isDemo
           ? demoNearbyPlaces(latitude!, longitude!)
           : await loadNearbyPlaces(
               latitude: latitude!,
               longitude: longitude!,
-              radiusKm: placeRadius,
-              category: category,
+              radiusKm: radius,
+              category: requestedCategory,
             );
-      if (!mounted) return;
-      setState(() {
-        places = result;
-        selectedPlace = null;
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          mapController.move(LatLng(latitude!, longitude!), 14);
-        }
-      });
-    } catch (value) {
-      if (mounted) setState(() => error = value.toString());
+      if (!mounted || revision != _placesRevision) return;
+      setState(() => places = result);
+      _centerMap(LatLng(latitude!, longitude!));
+    } catch (cause) {
+      if (mounted && revision == _placesRevision) {
+        setState(() => error = cause.toString());
+      }
     } finally {
-      if (mounted) setState(() => scanning = false);
+      if (mounted && revision == _placesRevision) {
+        setState(() => loadingPlaces = false);
+      }
     }
   }
 
   Future<void> _stop() async {
+    if (scanningPeople) return;
+    setState(() {
+      scanningPeople = true;
+      error = '';
+    });
     try {
       await widget.api.request('DELETE', '/api/users/nearby');
-    } catch (_) {
-      // Local privacy state still closes if server location already expired.
-    }
-    if (mounted) {
+      if (!mounted) return;
+      nearbyLeaseTimer?.cancel();
+      ++_peopleRevision;
       setState(() {
         active = false;
+        activeUntil = null;
         people = [];
       });
+      _show('Đã tắt Quanh đây và xóa vị trí đã chia sẻ.');
+    } catch (cause) {
+      if (mounted) {
+        setState(() {
+          error = 'Chưa xác nhận đã tắt Quanh đây: $cause';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => scanningPeople = false);
     }
   }
 
   Future<void> _friend(Json person) async {
+    final id = (person['id'] as num?)?.toInt();
+    if (id == null || friendBusyId != null) return;
+    final relationship = _relationship(person);
+    setState(() => friendBusyId = id);
     try {
-      await widget.api.request('POST', '/api/friends/${person['id']}');
-      _show('Đã gửi lời mời kết bạn tới @${person['username']}.');
-    } catch (value) {
-      _show(value.toString());
+      if (relationship == 'accepted') {
+        final room = object(
+          await widget.api.request('POST', '/api/conversations/direct', {
+            'username': person['username'],
+          }),
+        );
+        if (!mounted) return;
+        if (widget.onOpenConversation != null) {
+          widget.onOpenConversation!(room);
+        } else {
+          _show('Đã mở hội thoại với @${person['username']}.');
+        }
+      } else {
+        if (relationship == 'incoming') {
+          await widget.api.request('POST', '/api/friends/$id/accept');
+        } else if (relationship == 'outgoing') {
+          await widget.api.request(
+            'DELETE',
+            '/api/friends/$id?direction=outgoing',
+          );
+        } else {
+          await widget.api.request('POST', '/api/friends/$id');
+        }
+        await _loadRelationships();
+        if (!mounted) return;
+        _show(switch (relationship) {
+          'incoming' => 'Đã chấp nhận lời mời kết bạn.',
+          'outgoing' => 'Đã hủy lời mời kết bạn.',
+          _ => 'Đã gửi lời mời kết bạn.',
+        });
+      }
+    } catch (cause) {
+      _show('Không thể cập nhật kết bạn: $cause');
+    } finally {
+      if (mounted) setState(() => friendBusyId = null);
     }
   }
 
@@ -165,10 +324,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   List<Json> get _visiblePeople {
-    final query = searchController.text
-        .trim()
-        .replaceFirst('@', '')
-        .toLowerCase();
+    final query =
+        (searchController.text.trim().isEmpty
+                ? widget.query
+                : searchController.text)
+            .trim()
+            .replaceFirst('@', '')
+            .toLowerCase();
     return people.where((person) {
       return query.isEmpty ||
           '${person['displayName']} ${person['username']}'
@@ -181,7 +343,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   List<Json> get _visiblePlaces {
-    final query = searchController.text.trim().toLowerCase();
+    final query =
+        (searchController.text.trim().isEmpty
+                ? widget.query
+                : searchController.text)
+            .trim()
+            .toLowerCase();
     return places.where((place) {
       final categoryMatch = category == 'all' || place['category'] == category;
       final textMatch =
@@ -195,6 +362,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   void dispose() {
+    nearbyLeaseTimer?.cancel();
+    ++_peopleRevision;
+    ++_placesRevision;
     mapController.dispose();
     searchController.dispose();
     super.dispose();
@@ -230,13 +400,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             ),
                           ),
                         ),
-                        if (peopleMode)
+                        if (peopleMode) ...[
+                          const Text(
+                            'Hiển thị',
+                            style: TextStyle(fontSize: 12, color: socoMuted),
+                          ),
                           Switch(
+                            key: const ValueKey('nearby-visibility-switch'),
                             value: active,
                             onChanged: scanning
                                 ? null
                                 : (value) => value ? _scanPeople() : _stop(),
                           ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -271,6 +447,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       builder: (context, constraints) {
                         final compact = constraints.maxWidth < 520;
                         final search = TextField(
+                          key: const ValueKey('nearby-search'),
                           controller: searchController,
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
@@ -281,6 +458,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                               Icons.search_rounded,
                               size: 20,
                             ),
+                            suffixIcon: searchController.text.isEmpty
+                                ? null
+                                : IconButton(
+                                    key: const ValueKey('nearby-clear-query'),
+                                    tooltip: 'Xóa tìm kiếm',
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 18,
+                                    ),
+                                    onPressed: () =>
+                                        setState(searchController.clear),
+                                  ),
                             contentPadding: EdgeInsets.zero,
                             filled: true,
                             fillColor: Colors.white,
@@ -309,6 +498,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                       placeRadius = value;
                                     }
                                   });
+                                  if (!peopleMode && placesLocated) {
+                                    _loadPlaces();
+                                  }
                                 },
                         );
                         final refresh = IconButton(
@@ -400,7 +592,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget _people(List<Json> visible) {
     return Column(
       children: [
-        if (!active)
+        if (scanningPeople && visible.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 22),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (!active && visible.isEmpty)
           EmptyState(
             icon: Icons.people_outline_rounded,
             title: 'Tìm người ở gần bạn',
@@ -430,11 +627,28 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               ),
             ),
           )
-        else
+        else ...[
+          if (!active && activeUntil != null)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Phiên hiển thị đã hết hạn. Kết quả thuộc lần quét trước.',
+                style: TextStyle(color: socoMuted, fontSize: 12),
+              ),
+            ),
+          if (scannedPeopleRadius != peopleRadius)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Bán kính đã đổi. Kết quả vẫn thuộc lần quét trước ($scannedPeopleRadius km).',
+                style: const TextStyle(color: socoMuted, fontSize: 12),
+              ),
+            ),
           _resultPanel(
             children: [
               for (final person in visible)
                 ListTile(
+                  key: ValueKey('nearby-person-${person['id']}'),
                   leading: UserAvatar(
                     name:
                         person['displayName']?.toString() ??
@@ -455,12 +669,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     '${_distanceLabel((person['distanceKm'] as num?)?.toDouble())}',
                   ),
                   trailing: TextButton(
-                    onPressed: () => _friend(person),
-                    child: const Text('Kết bạn'),
+                    key: ValueKey('nearby-friend-action-${person['id']}'),
+                    onPressed: friendBusyId != null
+                        ? null
+                        : () => _friend(person),
+                    child: friendBusyId == person['id']
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_friendLabel(person)),
                   ),
                 ),
             ],
           ),
+        ],
       ],
     );
   }
@@ -482,7 +705,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                         ? null
                         : (_) {
                             setState(() => category = entry.key);
-                            if (latitude != null) _loadPlaces();
+                            if (placesLocated) _loadPlaces();
                           },
                   ),
                 ),
@@ -490,7 +713,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        if (latitude == null && !scanning)
+        if (!placesLocated && !scanning)
           EmptyState(
             icon: Icons.map_outlined,
             title: 'Tìm địa điểm gần bạn',
@@ -501,7 +724,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               label: const Text('Dùng vị trí hiện tại'),
             ),
           )
-        else if (latitude != null) ...[
+        else if (placesLocated && latitude != null) ...[
           Row(
             children: [
               Expanded(
@@ -574,8 +797,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             width: 42,
                             height: 42,
                             child: _PlaceMarker(
+                              key: ValueKey(
+                                'nearby-map-marker-${visible[index]['id']}',
+                              ),
                               index: index + 1,
-                              selected: selectedPlace == visible[index]['id'],
+                              selected:
+                                  selectedPlace ==
+                                  visible[index]['id']?.toString(),
                               onTap: () {
                                 setState(
                                   () => selectedPlace = visible[index]['id']
@@ -585,6 +813,51 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             ),
                           ),
                       ],
+                    ),
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Material(
+                          color: Colors.white,
+                          elevation: 2,
+                          borderRadius: BorderRadius.circular(11),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                key: const ValueKey('nearby-map-my-location'),
+                                tooltip: 'Về vị trí của tôi',
+                                onPressed: () =>
+                                    _centerMap(LatLng(latitude!, longitude!)),
+                                icon: const Icon(Icons.my_location_rounded),
+                              ),
+                              IconButton(
+                                key: const ValueKey('nearby-map-zoom-in'),
+                                tooltip: 'Phóng to',
+                                onPressed: () => _centerMap(
+                                  mapController.camera.center,
+                                  zoom: (mapController.camera.zoom + 1)
+                                      .clamp(3, 19)
+                                      .toDouble(),
+                                ),
+                                icon: const Icon(Icons.add_rounded),
+                              ),
+                              IconButton(
+                                key: const ValueKey('nearby-map-zoom-out'),
+                                tooltip: 'Thu nhỏ',
+                                onPressed: () => _centerMap(
+                                  mapController.camera.center,
+                                  zoom: (mapController.camera.zoom - 1)
+                                      .clamp(3, 19)
+                                      .toDouble(),
+                                ),
+                                icon: const Icon(Icons.remove_rounded),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                     const Align(
                       alignment: Alignment.bottomRight,
@@ -616,19 +889,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               children: [
                 for (var index = 0; index < visible.length; index++)
                   ListTile(
-                    selected: visible[index]['id'] == selectedPlace,
+                    key: ValueKey('nearby-place-${visible[index]['id']}'),
+                    selected: visible[index]['id']?.toString() == selectedPlace,
                     onTap: () {
                       final place = visible[index];
                       setState(() {
                         selectedPlace = place['id']?.toString();
                         mapView = true;
                       });
-                      mapController.move(
+                      _centerMap(
                         LatLng(
                           (place['latitude'] as num).toDouble(),
                           (place['longitude'] as num).toDouble(),
                         ),
-                        16,
+                        zoom: 16,
                       );
                     },
                     leading: CircleAvatar(
@@ -758,6 +1032,7 @@ class _RadiusDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      key: const ValueKey('nearby-radius'),
       width: 80,
       height: 46,
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -832,6 +1107,7 @@ class _CurrentLocationMarker extends StatelessWidget {
 
 class _PlaceMarker extends StatelessWidget {
   const _PlaceMarker({
+    super.key,
     required this.index,
     required this.selected,
     required this.onTap,

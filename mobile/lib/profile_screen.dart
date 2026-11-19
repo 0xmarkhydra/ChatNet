@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'state/app_providers.dart';
+import 'presentation/profile_timeline.dart';
+import 'feed_visitor_profile.dart';
 import 'package:mime/mime.dart';
 
 import 'api.dart';
@@ -18,17 +20,27 @@ class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({
     super.key,
     required this.api,
+    this.refreshRequest = 0,
     required this.onLogout,
     required this.onConnect,
     required this.onLocaleChanged,
     this.onCreatePost,
+    this.onNotifications,
+    this.onOpenPost,
+    this.onOpenContacts,
+    this.onOpenConversation,
   });
 
   final Api api;
+  final int refreshRequest;
   final Future<void> Function() onLogout;
   final ValueChanged<String> onConnect;
   final ValueChanged<String> onLocaleChanged;
   final VoidCallback? onCreatePost;
+  final VoidCallback? onNotifications;
+  final ValueChanged<int>? onOpenPost;
+  final VoidCallback? onOpenContacts;
+  final ValueChanged<Json>? onOpenConversation;
 
   @override
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
@@ -51,14 +63,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   };
   bool loading = true;
   bool saving = false;
-  bool notificationsEnabled = true;
   String error = '';
+  // Match the PWA: profile, identity editor and settings are distinct views.
+  String section = 'overview';
 
   @override
   void initState() {
     super.initState();
     _load();
     unawaited(_loadPrivacy());
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.refreshRequest != oldWidget.refreshRequest && section == 'overview') {
+      ref.invalidate(profileProvider);
+      unawaited(_load());
+    }
   }
 
   Future<void> _loadPrivacy() async {
@@ -128,9 +150,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  void _resetProfileDraft() {
+    final current = profile;
+    if (current == null) return;
+    displayNameController.text = current['displayName']?.toString() ?? '';
+    usernameController.text = current['username']?.toString() ?? '';
+    bioController.text = current['bio']?.toString() ?? '';
+    cityController.text = current['city']?.toString() ?? '';
+  }
+
   Future<void> _saveProfile() async {
     final username = usernameController.text.trim().toLowerCase();
     final displayName = displayNameController.text.trim();
+    if (displayName.isEmpty) {
+      _show('Vui lòng nhập tên hiển thị.');
+      return;
+    }
     if (!RegExp(
       r'^[a-zA-Z0-9][a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9]$',
     ).hasMatch(username)) {
@@ -152,7 +187,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       await widget.api.updateUser(updated);
       if (mounted) {
         ref.invalidate(profileProvider);
-        setState(() => profile = updated);
+        setState(() {
+          profile = updated;
+          section = 'overview';
+        });
         _show('Đã cập nhật hồ sơ.');
       }
     } catch (value) {
@@ -180,7 +218,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           'attachment': attachment,
         }),
       );
-      if (mounted) setState(() => profile = updated);
+      if (mounted) {
+        ref.invalidate(profileProvider);
+        setState(() => profile = updated);
+      }
     } catch (value) {
       _show(value.toString());
     } finally {
@@ -209,6 +250,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } catch (value) {
       _show(value.toString());
     }
+  }
+
+  Future<void> _openVisitor(String username) async {
+    if (username.trim().isEmpty || !mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => FeedVisitorProfile(
+          api: widget.api,
+          username: username,
+          onOpenConversation: (room) {
+            Navigator.of(context).pop();
+            widget.onOpenConversation?.call(room);
+          },
+          onOpenPost: (post) {
+            final id = (post['id'] as num?)?.toInt();
+            Navigator.of(context).pop();
+            if (id != null) widget.onOpenPost?.call(id);
+          },
+        ),
+      ),
+    );
   }
 
   void _showQr() {
@@ -281,7 +343,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
+                  if (section != 'overview')
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            key: const ValueKey('profile-back'),
+                            tooltip: 'Quay lại trang cá nhân',
+                            onPressed: saving ? null : () => setState(() {
+                              if (section == 'editor') _resetProfileDraft();
+                              section = 'overview';
+                            }),
+                            icon: const Icon(Icons.arrow_back_rounded),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              section == 'editor' ? 'Chỉnh sửa hồ sơ' : 'Cài đặt',
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: socoNavy),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (section == 'overview') Container(
                     margin: const EdgeInsets.fromLTRB(0, 0, 0, 9),
                     clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
@@ -487,12 +573,48 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                   ),
-                  _card(
+                  if (section == 'overview')
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              key: const ValueKey('profile-edit-open'),
+                              onPressed: () => setState(() => section = 'editor'),
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              label: const Text('Chỉnh sửa hồ sơ'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            key: const ValueKey('profile-settings-open'),
+                            onPressed: () => setState(() => section = 'settings'),
+                            icon: const Icon(Icons.settings_outlined, size: 18),
+                            label: const Text('Cài đặt'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (section == 'overview') ProfileTimeline(
+                    api: widget.api,
+                    refreshRequest: widget.refreshRequest,
+                    username: username,
+                    displayName: displayName,
+                    bio: profile?['bio']?.toString() ?? '',
+                    city: profile?['city']?.toString() ?? '',
+                    email: widget.api.user['email']?.toString() ?? '',
+                    onCreatePost: widget.onCreatePost,
+                    onOpenPost: widget.onOpenPost,
+                    onOpenContacts: widget.onOpenContacts,
+                    onViewFriend: _openVisitor,
+                  ),
+                  if (section == 'editor') _card(
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Personal info',
+                          'Thông tin cơ bản',
                           style: const TextStyle(
                             color: socoNavy,
                             fontSize: 18,
@@ -501,12 +623,51 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                         const SizedBox(height: 2),
                         const Text(
-                          'Change display name, username',
+                          'Chỉ thay đổi những thông tin bạn muốn người khác nhìn thấy.',
                           style: TextStyle(color: socoMuted, fontSize: 12),
                         ),
                         const SizedBox(height: 14),
+                        Container(
+                          height: 112,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            color: socoSoftBlue,
+                            borderRadius: BorderRadius.circular(14),
+                            image: coverUrl == null ? null : DecorationImage(
+                              image: NetworkImage(coverUrl), fit: BoxFit.cover,
+                            ),
+                          ),
+                          alignment: Alignment.bottomRight,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: FilledButton.tonalIcon(
+                              onPressed: saving ? null : () => _updateImage('cover'),
+                              icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                              label: const Text('Đổi ảnh bìa'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            UserAvatar(
+                              name: displayName,
+                              username: username,
+                              size: 64,
+                              imageUrl: avatarUrl,
+                              fetchProfileImage: !widget.api.isDemo,
+                            ),
+                            const SizedBox(width: 10),
+                            OutlinedButton.icon(
+                              onPressed: saving ? null : () => _updateImage('avatar'),
+                              icon: const Icon(Icons.camera_alt_outlined, size: 17),
+                              label: const Text('Đổi ảnh đại diện'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
                         const Text(
-                          'Display name',
+                          'Tên hiển thị',
                           style: TextStyle(
                             color: Color(0xFF465676),
                             fontSize: 13,
@@ -520,13 +681,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           maxLength: 100,
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            hintText: 'Display name',
+                            hintText: 'Nhập tên hiển thị',
                             counterText: '',
                           ),
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'Username',
+                          'Tên người dùng',
                           style: TextStyle(
                             color: Color(0xFF465676),
                             fontSize: 13,
@@ -541,7 +702,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           autocorrect: false,
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            hintText: 'Username',
+                            hintText: 'Tên người dùng duy nhất',
                             prefixText: '@',
                             counterText: '',
                           ),
@@ -592,21 +753,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 14),
+                        OutlinedButton.icon(
+                          onPressed: saving ? null : () => setState(() {
+                            _resetProfileDraft();
+                            section = 'overview';
+                          }),
+                          icon: const Icon(Icons.undo_rounded),
+                          label: const Text('Hủy thay đổi'),
+                        ),
+                        const SizedBox(height: 8),
                         FilledButton(
-                          onPressed: saving || !profileChanged
+                          onPressed: saving || !profileChanged || displayNameController.text.trim().isEmpty
                               ? null
                               : _saveProfile,
                           child: Text(
                             saving
                                 ? tr(context, 'common.saving')
-                                : 'Save changes',
+                                : 'Lưu hồ sơ',
                           ),
                         ),
                       ],
                     ),
                   ),
-                  _label('TÙY CHỌN & CÀI ĐẶT'),
-                  _card(
+                  if (section == 'settings') _label('TÙY CHỌN & CÀI ĐẶT'),
+                  if (section == 'editor' || section == 'settings') _card(
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -701,7 +871,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                   ),
-                  _card(
+                  if (section == 'settings') _card(
                     Column(
                       children: [
                         SwitchListTile(
@@ -764,23 +934,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           },
                         ),
                         const Divider(),
-                        SwitchListTile(
+                        ListTile(
+                          key: const ValueKey('profile-notifications'),
                           contentPadding: EdgeInsets.zero,
-                          secondary: const Icon(
-                            Icons.notifications_none_rounded,
-                          ),
+                          leading: const Icon(Icons.notifications_none_rounded),
                           title: Text(tr(context, 'profile.notifications')),
-                          subtitle: Text(
-                            tr(context, 'profile.notificationsHint'),
+                          subtitle: const Text(
+                            'Xem lời mời, tin nhắn và bài viết nhắc đến bạn',
                           ),
-                          value: notificationsEnabled,
-                          onChanged: (value) =>
-                              setState(() => notificationsEnabled = value),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: widget.onNotifications,
                         ),
                       ],
                     ),
                   ),
-                  Padding(
+                  if (section == 'settings') Padding(
                     padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
                     child: OutlinedButton.icon(
                       onPressed: saving ? null : widget.onLogout,

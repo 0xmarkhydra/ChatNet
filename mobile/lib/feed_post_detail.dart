@@ -38,6 +38,7 @@ class _FeedPostDetailState extends State<FeedPostDetail> {
   late Json post;
   bool submitting = false;
   bool liking = false;
+  bool likingComment = false;
   bool newestFirst = true;
   Json? replyingTo;
 
@@ -85,6 +86,33 @@ class _FeedPostDetailState extends State<FeedPostDetail> {
       _show('Không cập nhật được cảm xúc: $error');
     } finally {
       if (mounted) setState(() => liking = false);
+    }
+  }
+
+  Future<void> _toggleCommentLike(Json comment) async {
+    if (likingComment) return;
+    final id = (comment['id'] as num?)?.toInt();
+    if (id == null) return;
+    final desired = comment['liked'] != true;
+    setState(() => likingComment = true);
+    try {
+      final updated = object(
+        await widget.api.request(
+          desired ? 'PUT' : 'DELETE',
+          '/api/posts/$postId/comments/$id/like',
+        ),
+      );
+      final fresh = objects(
+        updated['comments'],
+      ).where((item) => item['id'] == id);
+      if (fresh.isEmpty || fresh.first['liked'] != desired) {
+        throw const ApiError('Chưa xác nhận cập nhật lượt thích.');
+      }
+      _update(updated);
+    } catch (error) {
+      _show('Không cập nhật được lượt thích bình luận: $error');
+    } finally {
+      if (mounted) setState(() => likingComment = false);
     }
   }
 
@@ -186,6 +214,25 @@ class _FeedPostDetailState extends State<FeedPostDetail> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    TextButton.icon(
+                      key: ValueKey('post-comment-like-${comment['id']}'),
+                      onPressed: likingComment
+                          ? null
+                          : () => _toggleCommentLike(comment),
+                      icon: Icon(
+                        comment['liked'] == true
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: comment['liked'] == true
+                            ? const Color(0xFFE11D48)
+                            : socoMuted,
+                        size: 15,
+                      ),
+                      label: Text(
+                        comment['liked'] == true ? 'Đã thích' : 'Thích',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    ),
                     TextButton(
                       onPressed: () {
                         setState(() => replyingTo = comment);
@@ -289,6 +336,24 @@ class _FeedPostDetailState extends State<FeedPostDetail> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (post['repostKind'] == 'quick')
+            const Padding(
+              padding: EdgeInsets.only(bottom: 9),
+              child: Row(
+                children: [
+                  Icon(Icons.repeat_rounded, size: 16, color: socoMuted),
+                  SizedBox(width: 5),
+                  Text(
+                    'Đã đăng lại',
+                    style: TextStyle(
+                      color: socoMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Row(
             children: [
               UserAvatar(
@@ -344,6 +409,37 @@ class _FeedPostDetailState extends State<FeedPostDetail> {
             const SizedBox(height: 12),
             for (final attachment in objects(post['attachments']))
               _media(attachment),
+          ],
+          if (post['originalPost'] is Map) ...[
+            const SizedBox(height: 12),
+            Container(
+              key: const ValueKey('post-detail-original-preview'),
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F7FB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: socoLine),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (post['originalPost'] as Map)['authorDisplayName']
+                            ?.toString() ??
+                        (post['originalPost'] as Map)['author']?.toString() ??
+                        '',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    (post['originalPost'] as Map)['content']?.toString() ?? '',
+                    maxLines: 8,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
       ),

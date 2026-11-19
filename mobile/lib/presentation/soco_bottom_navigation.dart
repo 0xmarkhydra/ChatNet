@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../localization.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'mobile_shell_state.dart';
@@ -22,11 +23,23 @@ class SocoBottomNavigationBar extends StatelessWidget {
 
   static const _destinations =
       <({SocoTab tab, String label, SocoIconType icon})>[
-        (tab: SocoTab.chat, label: 'Messages', icon: SocoIconType.chat),
-        (tab: SocoTab.contacts, label: 'Friends', icon: SocoIconType.contacts),
-        (tab: SocoTab.discover, label: 'Nearby', icon: SocoIconType.discover),
-        (tab: SocoTab.feed, label: 'Feed', icon: SocoIconType.feed),
-        (tab: SocoTab.profile, label: 'Profile', icon: SocoIconType.profile),
+        (tab: SocoTab.chat, label: 'nav.chat', icon: SocoIconType.chat),
+        (
+          tab: SocoTab.contacts,
+          label: 'nav.contacts',
+          icon: SocoIconType.contacts,
+        ),
+        (
+          tab: SocoTab.discover,
+          label: 'nav.discover',
+          icon: SocoIconType.discover,
+        ),
+        (tab: SocoTab.feed, label: 'nav.feed', icon: SocoIconType.feed),
+        (
+          tab: SocoTab.profile,
+          label: 'nav.profile',
+          icon: SocoIconType.profile,
+        ),
       ];
 
   @override
@@ -55,19 +68,55 @@ class SocoBottomNavigationBar extends StatelessWidget {
               AnimatedAlign(
                 duration: reduceMotion
                     ? Duration.zero
-                    : const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment(-1 + index * .5, -.4),
+                    : const Duration(milliseconds: 520),
+                curve: Curves.easeOutBack,
+                alignment: Alignment(-1 + index * .5, 0),
                 child: FractionallySizedBox(
                   widthFactor: 1 / _destinations.length,
                   child: Center(
-                    child: Container(
-                      key: const ValueKey('nav-selection-indicator'),
-                      width: compact ? 49 : 56,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE7EEFF),
-                        borderRadius: BorderRadius.circular(14),
+                    child: TweenAnimationBuilder<double>(
+                      key: ValueKey('nav-pulse-$index'),
+                      tween: Tween(begin: 0, end: 1),
+                      duration: reduceMotion
+                          ? Duration.zero
+                          : const Duration(milliseconds: 520),
+                      builder: (context, t, child) {
+                        double x;
+                        double y;
+                        if (t <= .35) {
+                          final p = t / .35;
+                          x = 1 + .12 * p;
+                          y = 1 - .08 * p;
+                        } else if (t <= .65) {
+                          final p = (t - .35) / .30;
+                          x = 1.12 - .15 * p;
+                          y = .92 + .12 * p;
+                        } else if (t <= .85) {
+                          final p = (t - .65) / .20;
+                          x = .97 + .05 * p;
+                          y = 1.04 - .05 * p;
+                        } else {
+                          final p = (t - .85) / .15;
+                          x = 1.02 - .02 * p;
+                          y = .99 + .01 * p;
+                        }
+                        return Transform.scale(
+                          scaleX: reduceMotion ? 1 : x,
+                          scaleY: reduceMotion ? 1 : y,
+                          child: child,
+                        );
+                      },
+                      child: Container(
+                        key: const ValueKey('nav-selection-indicator'),
+                        // The PWA liquid pill wraps the entire tab, including
+                        // its icon and caption, rather than only the icon.
+                        width: double.infinity,
+                        height: compact ? 63 : 68,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE7EEFF),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
                       ),
                     ),
                   ),
@@ -80,7 +129,7 @@ class SocoBottomNavigationBar extends StatelessWidget {
                       child: Semantics(
                         button: true,
                         selected: selected == item.tab,
-                        label: item.label,
+                        label: tr(context, item.label),
                         child: InkWell(
                           key: ValueKey('nav-${item.tab.name}'),
                           onTap: () => onSelected(item.tab),
@@ -149,7 +198,7 @@ class SocoBottomNavigationBar extends StatelessWidget {
                                   horizontal: 2,
                                 ),
                                 child: Text(
-                                  item.label,
+                                  tr(context, item.label),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(

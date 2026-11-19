@@ -10,7 +10,9 @@ import 'package:share_plus/share_plus.dart';
 
 import 'api.dart';
 import 'feed_post_detail.dart';
+import 'feed_story_create_sheet.dart';
 import 'feed_post_links.dart';
+import 'feed_post_share_sheet.dart';
 import 'feed_visitor_profile.dart';
 import 'media_viewer.dart';
 import 'reaction_participants_sheet.dart';
@@ -23,6 +25,10 @@ class FeedScreen extends ConsumerStatefulWidget {
     required this.api,
     required this.query,
     this.createRequest = 0,
+    this.openPostRequest = 0,
+    this.openPostId,
+    this.showCommunities = false,
+    this.onToggleCommunities,
     this.onOpenConversation,
     this.onOpenOwnProfile,
   });
@@ -30,6 +36,10 @@ class FeedScreen extends ConsumerStatefulWidget {
   final Api api;
   final String query;
   final int createRequest;
+  final int openPostRequest;
+  final int? openPostId;
+  final bool showCommunities;
+  final VoidCallback? onToggleCommunities;
   final ValueChanged<Json>? onOpenConversation;
   final VoidCallback? onOpenOwnProfile;
 
@@ -45,6 +55,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   List<Json> attachments = [];
   List<Json> savedPosts = [];
   bool showingSaved = false;
+  bool loadingCommunities = false;
+  bool moreCommunities = false;
+  List<Json> communities = [];
+  String communitySearch = '';
+  String communityError = '';
   bool morePosts = false;
   bool moreSaved = false;
   bool loadingMore = false;
@@ -73,6 +88,15 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         if (mounted) _openComposer();
       });
     }
+    if (widget.showCommunities && !oldWidget.showCommunities) {
+      _loadCommunities();
+    }
+    if (widget.openPostRequest != oldWidget.openPostRequest &&
+        widget.openPostId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openOriginalPost({'id': widget.openPostId});
+      });
+    }
   }
 
   Future<void> _load() async {
@@ -83,7 +107,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       if (!mounted) return;
       setState(() {
         posts = snapshot.posts.map((post) => post.toJson()).toList();
-        morePosts = posts.length == 20;
+        morePosts = posts.length == 15;
         stories = snapshot.stories
             .where(
               (story) =>
@@ -105,6 +129,179 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     }
   }
 
+  Future<void> _loadCommunities({bool append = false}) async {
+    if (loadingCommunities) return;
+    setState(() {
+      loadingCommunities = true;
+      communityError = '';
+    });
+    try {
+      final offset = append ? communities.length : 0;
+      final result = objects(
+        await widget.api.request(
+          'GET',
+          '/api/conversations?type=group&limit=100&offset=$offset',
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        communities = append
+            ? [
+                ...communities,
+                ...result.where(
+                  (room) => !communities.any((old) => old['id'] == room['id']),
+                ),
+              ]
+            : result;
+        moreCommunities = result.length == 100;
+      });
+    } catch (cause) {
+      if (mounted) setState(() => communityError = cause.toString());
+    } finally {
+      if (mounted) setState(() => loadingCommunities = false);
+    }
+  }
+
+  void _openCommunities() {
+    widget.onToggleCommunities?.call();
+  }
+
+  Widget _communitiesPanel() {
+    final query = communitySearch.trim().toLowerCase();
+    final visible =
+        communities
+            .where(
+              (room) => (room['name']?.toString() ?? '').toLowerCase().contains(
+                query,
+              ),
+            )
+            .toList()
+          ..sort(
+            (a, b) => (a['name']?.toString() ?? '').compareTo(
+              b['name']?.toString() ?? '',
+            ),
+          );
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: socoLine),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                key: const ValueKey('feed-communities-back'),
+                tooltip: 'Quay lại bảng tin',
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: _openCommunities,
+              ),
+              const Expanded(
+                child: Text(
+                  'Cộng đồng',
+                  style: TextStyle(
+                    color: socoNavy,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              Text(
+                '${visible.length} cộng đồng',
+                style: const TextStyle(color: socoMuted),
+              ),
+            ],
+          ),
+          const Text(
+            'Chọn một cộng đồng để mở cuộc trò chuyện trong Tin nhắn.',
+            style: TextStyle(fontSize: 13, color: socoMuted),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey('feed-communities-search'),
+            onChanged: (text) => setState(() => communitySearch = text),
+            decoration: const InputDecoration(
+              hintText: 'Tìm cộng đồng...',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+          ),
+          if (loadingCommunities) const LinearProgressIndicator(),
+          if (communityError.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                communityError,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          if (!loadingCommunities && communityError.isEmpty && visible.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Text(
+                query.isEmpty
+                    ? 'Bạn chưa tham gia cộng đồng nào.'
+                    : 'Không tìm thấy cộng đồng phù hợp.',
+              ),
+            ),
+          for (final room in visible)
+            Material(
+              type: MaterialType.transparency,
+              child: ListTile(
+                key: ValueKey('feed-community-${room['id']}'),
+                leading: UserAvatar(
+                  name: room['name']?.toString() ?? 'Cộng đồng',
+                  group: true,
+                  size: 43,
+                  imageUrl: room['avatarUrl']?.toString(),
+                  fetchProfileImage: false,
+                ),
+                title: Text(
+                  room['name']?.toString() ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${room['memberCount'] ?? 0} thành viên'
+                      '${((room['unreadCount'] as num?)?.toInt() ?? 0) > 0 ? ' · ${room['unreadCount']} tin chưa đọc' : ''}',
+                    ),
+                    Text(
+                      room['lastMessage']?.toString().isNotEmpty == true
+                          ? room['lastMessage'].toString()
+                          : 'Xem cuộc trò chuyện và các kênh của nhóm',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => widget.onOpenConversation?.call(room),
+              ),
+            ),
+          if (moreCommunities)
+            TextButton(
+              key: const ValueKey('feed-communities-load-more'),
+              onPressed: loadingCommunities
+                  ? null
+                  : () => _loadCommunities(append: true),
+              child: const Text('Tải thêm cộng đồng'),
+            ),
+          if (communityError.isNotEmpty)
+            TextButton(
+              onPressed: loadingCommunities ? null : () => _loadCommunities(),
+              child: const Text('Thử lại'),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _loadSaved({bool append = false}) async {
     if (loadingMore) return;
     setState(() => loadingMore = true);
@@ -114,7 +311,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
           : '';
       final response = await widget.api.request(
         'GET',
-        '/api/posts?scope=saved&limit=20$before',
+        '/api/posts?scope=saved&limit=15$before',
       );
       final result = objects(response);
       if (!mounted) return;
@@ -127,7 +324,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 ),
               ]
             : result;
-        moreSaved = result.length == 20;
+        moreSaved = result.length == 15;
       });
     } catch (err) {
       _show(err.toString());
@@ -149,7 +346,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
           .map((p) => (p['id'] as num).toInt())
           .reduce((a, b) => a < b ? a : b);
       final items = objects(
-        await widget.api.request('GET', '/api/posts?limit=20&before=$before'),
+        await widget.api.request('GET', '/api/posts?limit=15&before=$before'),
       );
       if (!mounted) return;
       setState(() {
@@ -157,7 +354,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
           ...posts,
           ...items.where((p) => !posts.any((old) => old['id'] == p['id'])),
         ];
-        morePosts = items.length == 20;
+        morePosts = items.length == 15;
       });
     } catch (err) {
       _show(err.toString());
@@ -221,7 +418,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     }
   }
 
-  Future<void> _createPost() async {
+  Future<bool> _createPost() async {
     final text = postController.text.trim();
     final content = [
       if (checkInLocation.trim().isNotEmpty) '📍 ${checkInLocation.trim()}',
@@ -230,10 +427,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       if (feelingLine.isNotEmpty) feelingLine,
       if (text.isNotEmpty) text,
     ].join('\n');
-    if (posting || (content.isEmpty && attachments.isEmpty)) return;
+    if (posting || (content.isEmpty && attachments.isEmpty)) return false;
     if (content.runes.length > 5000) {
       _show('Nội dung bài viết vượt quá 5.000 ký tự.');
-      return;
+      return false;
     }
     setState(() => posting = true);
     try {
@@ -245,7 +442,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
           'background': postBackground,
         }),
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
         posts = [post, ...posts];
         postController.clear();
@@ -255,24 +452,57 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         feelingLine = '';
         taggedUsernames = [];
       });
+      return true;
     } catch (value) {
       _show(value.toString());
+      return false;
     } finally {
       if (mounted) setState(() => posting = false);
     }
   }
 
-  Future<void> _createStory() async {
+  Future<bool> _publishMediaStory() async {
     final media = await _pickAndUpload('story');
-    if (media == null) return;
+    if (media == null) return false;
     try {
       final story = object(
         await widget.api.request('POST', '/api/stories', {'attachment': media}),
       );
       if (mounted) setState(() => stories = [story, ...stories]);
-    } catch (value) {
-      _show(value.toString());
+      return true;
+    } catch (error) {
+      _show('Không đăng được Story: $error');
+      return false;
     }
+  }
+
+  Future<bool> _publishTextStory(String text, String background) async {
+    try {
+      final story = object(
+        await widget.api.request('POST', '/api/stories', {
+          'text': text.trim(),
+          'background': background,
+        }),
+      );
+      if (mounted) setState(() => stories = [story, ...stories]);
+      return true;
+    } catch (error) {
+      _show('Không đăng được Story dạng văn bản: $error');
+      return false;
+    }
+  }
+
+  Future<void> _createStory() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (_) => FeedStoryCreateSheet(
+        onCreateMedia: _publishMediaStory,
+        onCreateText: _publishTextStory,
+      ),
+    );
   }
 
   Future<void> _like(Json post) async {
@@ -310,6 +540,34 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     );
   }
 
+  Future<void> _sharePost(Json post) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (_) => FeedPostShareSheet(
+        api: widget.api,
+        post: post,
+        onRepostChanged: (updated) async {
+          _applyUpdatedPost(updated);
+          await _load();
+        },
+      ),
+    );
+  }
+
+  Future<void> _openOriginalPost(Json original) async {
+    final id = (original['id'] as num?)?.toInt();
+    if (id == null) return;
+    try {
+      final post = object(await widget.api.request('GET', '/api/posts/$id'));
+      if (mounted) await _openPostDetail(post);
+    } catch (error) {
+      _show('Bài viết gốc không còn khả dụng: $error');
+    }
+  }
+
   Future<void> _openPostDetail(Json post) async {
     if (!mounted) return;
     final profileName = await showDialog<String>(
@@ -320,7 +578,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         api: widget.api,
         initialPost: post,
         onUpdate: _applyUpdatedPost,
-        onShare: (detail) => _postAction(detail, 'share'),
+        onShare: _sharePost,
         onPostAction: (detail, action) => action == 'options'
             ? _showPostOptions(detail)
             : _postAction(detail, action),
@@ -351,10 +609,34 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: AttachmentView(
-                      key: ValueKey(current['id']),
-                      attachment: object(current['attachment']),
-                    ),
+                    child: current['attachment'] is Map
+                        ? AttachmentView(
+                            key: ValueKey(current['id']),
+                            attachment: object(current['attachment']),
+                          )
+                        : Container(
+                            key: const ValueKey('feed-text-story-viewer'),
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.all(30),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors:
+                                    storyBackgrounds[current['background']
+                                            ?.toString() ??
+                                        'berry'] ??
+                                    storyBackgrounds['berry']!,
+                              ),
+                            ),
+                            child: Text(
+                              current['text']?.toString() ?? '',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
                   ),
                   Positioned(
                     top: 10,
@@ -400,6 +682,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                             color: Colors.white,
                           ),
                         IconButton(
+                          key: const ValueKey('feed-story-viewer-close'),
                           tooltip: 'Đóng',
                           onPressed: () => Navigator.pop(context),
                           icon: const Icon(Icons.close_rounded),
@@ -662,11 +945,14 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 child: Divider(height: 1),
               ),
               if (mine) ...[
-                option('edit', Icons.edit_outlined, 'Chỉnh sửa bài viết'),
+                if (post['repostKind'] != 'quick')
+                  option('edit', Icons.edit_outlined, 'Chỉnh sửa bài viết'),
                 option(
                   'delete',
                   Icons.delete_outline_rounded,
-                  'Xóa bài viết',
+                  post['repostKind'] == 'quick'
+                      ? 'Bỏ đăng lại'
+                      : 'Xóa bài viết',
                   danger: true,
                 ),
               ] else
@@ -717,8 +1003,16 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Xóa bài viết?'),
-                content: const Text('Bài viết cùng các bình luận sẽ bị xóa.'),
+                title: Text(
+                  post['repostKind'] == 'quick'
+                      ? 'Bỏ đăng lại bài viết?'
+                      : 'Xóa bài viết?',
+                ),
+                content: Text(
+                  post['repostKind'] == 'quick'
+                      ? 'Bài viết gốc sẽ không bị xóa.'
+                      : 'Bài viết cùng các bình luận sẽ bị xóa.',
+                ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
@@ -726,7 +1020,9 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                   ),
                   FilledButton(
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Xóa'),
+                    child: Text(
+                      post['repostKind'] == 'quick' ? 'Bỏ đăng lại' : 'Xóa',
+                    ),
                   ),
                 ],
               ),
@@ -741,7 +1037,12 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               savedPosts.removeWhere((item) => item['id'] == id);
             });
           }
-          _show('Đã xóa bài viết.');
+          _show(
+            post['repostKind'] == 'quick'
+                ? 'Đã bỏ đăng lại.'
+                : 'Đã xóa bài viết.',
+          );
+          if (post['repostKind'] == 'quick') await _load();
         } catch (err) {
           _show(err.toString());
         }
@@ -1269,13 +1570,9 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                       onPressed: posting
                           ? null
                           : () async {
-                              await _createPost();
+                              final published = await _createPost();
                               if (!sheetContext.mounted) return;
-                              if (postController.text.isEmpty &&
-                                  attachments.isEmpty &&
-                                  taggedUsernames.isEmpty &&
-                                  checkInLocation.isEmpty &&
-                                  feelingLine.isEmpty) {
+                              if (published) {
                                 Navigator.pop(sheetContext);
                               } else {
                                 refreshSheet(() {});
@@ -1367,11 +1664,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             _openComposer,
           ),
           action(
-            Icons.movie_creation_outlined,
+            Icons.auto_stories_outlined,
             const Color(0xFF8852CC),
             const Color(0xFFF4EFFE),
-            'Tạo video',
-            _openComposer,
+            'Story',
+            _createStory,
           ),
           action(
             Icons.location_on_outlined,
@@ -1403,9 +1700,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         action: FilledButton(onPressed: _load, child: const Text('Thử lại')),
       );
     }
-    final visible = filterFeedPosts(
-      showingSaved ? savedPosts : posts,
-      query: widget.query,
+    final visible = collapseQuickReposts(
+      filterFeedPosts(showingSaved ? savedPosts : posts, query: widget.query),
     );
     return ColoredBox(
       color: socoCanvas,
@@ -1420,360 +1716,386 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(15, 4, 15, 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Khoảnh khắc',
-                              style: TextStyle(
-                                color: Color(0xFF1B2944),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
+                    if (widget.showCommunities)
+                      _communitiesPanel()
+                    else ...[
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(15, 4, 15, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Khoảnh khắc',
+                                style: TextStyle(
+                                  color: Color(0xFF1B2944),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
-                          ),
-                          Text(
-                            'Story trong 24 giờ',
-                            style: TextStyle(
-                              color: Color(0xFF8590AA),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      height: 126,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        children: [
-                          _StoryCard(
-                            label: 'Tạo mới',
-                            onTap: _createStory,
-                            child: uploading
-                                ? const CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  )
-                                : Container(
-                                    width: 38,
-                                    height: 38,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: .14,
-                                      ),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.add_rounded,
-                                      color: Colors.white,
-                                      size: 27,
-                                    ),
-                                  ),
-                          ),
-                          for (final story in stories)
-                            _StoryCard(
-                              label: story['author']?.toString() ?? '',
-                              onTap: () => _showStory(story),
-                              attachment: object(story['attachment']),
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (MediaQuery.sizeOf(context).width < 760)
-                      _compactComposer()
-                    else
-                      Container(
-                        margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                        padding: const EdgeInsets.all(11),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: socoLine),
-                          borderRadius: BorderRadius.circular(21),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x0D243572),
-                              blurRadius: 24,
-                              offset: Offset(0, 7),
+                            Text(
+                              'Story trong 24 giờ',
+                              style: TextStyle(
+                                color: Color(0xFF8590AA),
+                                fontSize: 11,
+                              ),
                             ),
                           ],
                         ),
-                        child: Column(
+                      ),
+                      SizedBox(
+                        height: 126,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                           children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                UserAvatar(
-                                  name:
-                                      widget.api.user['displayName']
-                                          ?.toString() ??
-                                      '',
-                                  username: widget.api.user['username']
-                                      ?.toString(),
-                                  size: 44,
-                                  fetchProfileImage: !widget.api.isDemo,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: TextField(
-                                    controller: postController,
-                                    focusNode: postFocusNode,
-                                    minLines: 1,
-                                    maxLines: 5,
-                                    maxLength: 5000,
-                                    onChanged: (_) => setState(() {}),
-                                    decoration: const InputDecoration(
-                                      hintText: 'Hôm nay bạn thế nào?',
-                                      counterText: '',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (attachments.isNotEmpty)
-                              SizedBox(
-                                height: 72,
-                                child: ListView(
-                                  scrollDirection: Axis.horizontal,
-                                  children: [
-                                    for (
-                                      var index = 0;
-                                      index < attachments.length;
-                                      index++
+                            _StoryCard(
+                              label: 'Tạo mới',
+                              onTap: _createStory,
+                              child: uploading
+                                  ? const CircularProgressIndicator(
+                                      strokeWidth: 2,
                                     )
-                                      InputChip(
-                                        avatar: const Icon(
-                                          Icons.image_outlined,
-                                          size: 18,
+                                  : Container(
+                                      width: 38,
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(
+                                          alpha: .14,
                                         ),
-                                        label: Text(
-                                          attachments[index]['name']
-                                                  ?.toString() ??
-                                              'Media',
-                                        ),
-                                        onDeleted: () => setState(
-                                          () => attachments.removeAt(index),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            const SizedBox(height: 9),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: DropdownButton<String>(
-                                value: postVisibility,
-                                underline: const SizedBox.shrink(),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: 'public',
-                                    child: Text('🌐 Công khai'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'friends',
-                                    child: Text('👥 Bạn bè'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'private',
-                                    child: Text('🔒 Chỉ mình tôi'),
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  if (value != null) {
-                                    setState(() => postVisibility = value);
-                                  }
-                                },
-                              ),
-                            ),
-                            GridView.count(
-                              crossAxisCount: 2,
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              childAspectRatio: 3.8,
-                              crossAxisSpacing: 7,
-                              mainAxisSpacing: 7,
-                              children: [
-                                _ComposerAction(
-                                  icon: SocoIconType.photo,
-                                  color: const Color(0xFF3CAD70),
-                                  label: 'Ảnh',
-                                  onTap: uploading
-                                      ? null
-                                      : () => _pickAndUpload(
-                                          'feed',
-                                          multiple: true,
-                                        ),
-                                ),
-                                _ComposerAction(
-                                  icon: SocoIconType.video,
-                                  color: const Color(0xFFDC34BD),
-                                  label: 'Video',
-                                  onTap: uploading
-                                      ? null
-                                      : () => _pickAndUpload(
-                                          'feed',
-                                          multiple: true,
-                                        ),
-                                ),
-                                _ComposerAction(
-                                  icon: SocoIconType.album,
-                                  color: socoBlue,
-                                  label: 'Album',
-                                  onTap: uploading
-                                      ? null
-                                      : () => _pickAndUpload(
-                                          'feed',
-                                          multiple: true,
-                                        ),
-                                ),
-                                _ComposerAction(
-                                  icon: SocoIconType.text,
-                                  color: socoBlue,
-                                  label: 'Nền chữ',
-                                  onTap: () => setState(() {
-                                    postBackground = postBackground.isEmpty
-                                        ? 'violet'
-                                        : '';
-                                    postFocusNode.requestFocus();
-                                  }),
-                                ),
-                              ],
-                            ),
-                            if (postBackground.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Wrap(
-                                  spacing: 5,
-                                  runSpacing: 4,
-                                  children: [
-                                    for (final color in [
-                                      'violet',
-                                      'blue',
-                                      'sunset',
-                                      'mint',
-                                      'night',
-                                    ])
-                                      ChoiceChip(
-                                        label: Text(color),
-                                        selected: postBackground == color,
-                                        onSelected: (_) => setState(
-                                          () => postBackground = color,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
                                         ),
                                       ),
-                                    ActionChip(
-                                      label: const Text('Bỏ nền'),
-                                      onPressed: () =>
-                                          setState(() => postBackground = ''),
+                                      child: const Icon(
+                                        Icons.add_rounded,
+                                        color: Colors.white,
+                                        size: 27,
+                                      ),
                                     ),
-                                  ],
-                                ),
+                            ),
+                            for (final story in stories)
+                              _StoryCard(
+                                label: story['author']?.toString() ?? '',
+                                onTap: () => _showStory(story),
+                                attachment: story['attachment'] is Map
+                                    ? object(story['attachment'])
+                                    : null,
+                                text: story['text']?.toString(),
+                                background: story['background']?.toString(),
                               ),
-                            if (postController.text.trim().isNotEmpty ||
-                                attachments.isNotEmpty) ...[
-                              const SizedBox(height: 9),
-                              SizedBox(
-                                width: double.infinity,
-                                child: FilledButton(
-                                  onPressed: posting ? null : _createPost,
-                                  child: Text(
-                                    posting ? 'Đang đăng...' : 'Đăng',
-                                  ),
-                                ),
+                          ],
+                        ),
+                      ),
+                      if (MediaQuery.sizeOf(context).width < 760)
+                        _compactComposer()
+                      else
+                        Container(
+                          margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                          padding: const EdgeInsets.all(11),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: socoLine),
+                            borderRadius: BorderRadius.circular(21),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x0D243572),
+                                blurRadius: 24,
+                                offset: Offset(0, 7),
                               ),
                             ],
-                          ],
-                        ),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(13, 12, 10, 13),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              showingSaved ? 'Bài đã lưu' : 'Bài viết mới',
-                              style: const TextStyle(
-                                color: socoText,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFDCE4F6),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                for (final choice in [
-                                  (false, 'Mới nhất'),
-                                  (true, 'Đã lưu'),
-                                ])
-                                  TextButton(
-                                    onPressed: () {
-                                      setState(() => showingSaved = choice.$1);
-                                      if (choice.$1) _loadSaved();
-                                    },
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: showingSaved == choice.$1
-                                          ? socoBlue
-                                          : socoMuted,
-                                      backgroundColor: showingSaved == choice.$1
-                                          ? Colors.white
-                                          : Colors.transparent,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 9,
-                                        vertical: 6,
-                                      ),
-                                      minimumSize: const Size(0, 29),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(9),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      choice.$2,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
+                          child: Column(
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  UserAvatar(
+                                    name:
+                                        widget.api.user['displayName']
+                                            ?.toString() ??
+                                        '',
+                                    username: widget.api.user['username']
+                                        ?.toString(),
+                                    size: 44,
+                                    fetchProfileImage: !widget.api.isDemo,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: postController,
+                                      focusNode: postFocusNode,
+                                      minLines: 1,
+                                      maxLines: 5,
+                                      maxLength: 5000,
+                                      onChanged: (_) => setState(() {}),
+                                      decoration: const InputDecoration(
+                                        hintText: 'Hôm nay bạn thế nào?',
+                                        counterText: '',
                                       ),
                                     ),
                                   ),
+                                ],
+                              ),
+                              if (attachments.isNotEmpty)
+                                SizedBox(
+                                  height: 72,
+                                  child: ListView(
+                                    scrollDirection: Axis.horizontal,
+                                    children: [
+                                      for (
+                                        var index = 0;
+                                        index < attachments.length;
+                                        index++
+                                      )
+                                        InputChip(
+                                          avatar: const Icon(
+                                            Icons.image_outlined,
+                                            size: 18,
+                                          ),
+                                          label: Text(
+                                            attachments[index]['name']
+                                                    ?.toString() ??
+                                                'Media',
+                                          ),
+                                          onDeleted: () => setState(
+                                            () => attachments.removeAt(index),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              const SizedBox(height: 9),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: DropdownButton<String>(
+                                  value: postVisibility,
+                                  underline: const SizedBox.shrink(),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'public',
+                                      child: Text('🌐 Công khai'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'friends',
+                                      child: Text('👥 Bạn bè'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'private',
+                                      child: Text('🔒 Chỉ mình tôi'),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      setState(() => postVisibility = value);
+                                    }
+                                  },
+                                ),
+                              ),
+                              GridView.count(
+                                crossAxisCount: 2,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                childAspectRatio: 3.8,
+                                crossAxisSpacing: 7,
+                                mainAxisSpacing: 7,
+                                children: [
+                                  _ComposerAction(
+                                    icon: SocoIconType.photo,
+                                    color: const Color(0xFF3CAD70),
+                                    label: 'Ảnh',
+                                    onTap: uploading
+                                        ? null
+                                        : () => _pickAndUpload(
+                                            'feed',
+                                            multiple: true,
+                                          ),
+                                  ),
+                                  _ComposerAction(
+                                    icon: SocoIconType.video,
+                                    color: const Color(0xFFDC34BD),
+                                    label: 'Video',
+                                    onTap: uploading
+                                        ? null
+                                        : () => _pickAndUpload(
+                                            'feed',
+                                            multiple: true,
+                                          ),
+                                  ),
+                                  _ComposerAction(
+                                    icon: SocoIconType.album,
+                                    color: socoBlue,
+                                    label: 'Album',
+                                    onTap: uploading
+                                        ? null
+                                        : () => _pickAndUpload(
+                                            'feed',
+                                            multiple: true,
+                                          ),
+                                  ),
+                                  _ComposerAction(
+                                    icon: SocoIconType.text,
+                                    color: socoBlue,
+                                    label: 'Nền chữ',
+                                    onTap: () => setState(() {
+                                      postBackground = postBackground.isEmpty
+                                          ? 'violet'
+                                          : '';
+                                      postFocusNode.requestFocus();
+                                    }),
+                                  ),
+                                ],
+                              ),
+                              if (postBackground.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Wrap(
+                                    spacing: 5,
+                                    runSpacing: 4,
+                                    children: [
+                                      for (final color in [
+                                        'violet',
+                                        'blue',
+                                        'sunset',
+                                        'mint',
+                                        'night',
+                                      ])
+                                        ChoiceChip(
+                                          label: Text(color),
+                                          selected: postBackground == color,
+                                          onSelected: (_) => setState(
+                                            () => postBackground = color,
+                                          ),
+                                        ),
+                                      ActionChip(
+                                        label: const Text('Bỏ nền'),
+                                        onPressed: () =>
+                                            setState(() => postBackground = ''),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (postController.text.trim().isNotEmpty ||
+                                  attachments.isNotEmpty) ...[
+                                const SizedBox(height: 9),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton(
+                                    onPressed: posting ? null : _createPost,
+                                    child: Text(
+                                      posting ? 'Đang đăng...' : 'Đăng',
+                                    ),
+                                  ),
+                                ),
                               ],
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (visible.isEmpty)
-                      const EmptyState(
-                        icon: Icons.dynamic_feed_outlined,
-                        title: 'Chưa có bài viết',
-                        description:
-                            'Hãy chia sẻ khoảnh khắc đầu tiên của bạn.',
-                      )
-                    else
-                      for (final post in visible) _post(post),
-                    if (showingSaved ? moreSaved : morePosts)
+                        ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 6, 24, 18),
-                        child: OutlinedButton(
-                          onPressed: loadingMore ? null : _loadMore,
-                          child: Text(
-                            loadingMore ? 'Đang tải...' : 'Tải thêm bài viết',
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            key: const ValueKey('feed-open-communities'),
+                            onPressed: _openCommunities,
+                            icon: const Icon(Icons.groups_outlined),
+                            label: const Text('Cộng đồng'),
                           ),
                         ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(13, 12, 10, 13),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                showingSaved ? 'Bài đã lưu' : 'Bài viết mới',
+                                style: const TextStyle(
+                                  color: socoText,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFDCE4F6),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  for (final choice in [
+                                    (false, 'Mới nhất'),
+                                    (true, 'Đã lưu'),
+                                  ])
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(
+                                          () => showingSaved = choice.$1,
+                                        );
+                                        if (choice.$1) _loadSaved();
+                                      },
+                                      style: TextButton.styleFrom(
+                                        foregroundColor:
+                                            showingSaved == choice.$1
+                                            ? socoBlue
+                                            : socoMuted,
+                                        backgroundColor:
+                                            showingSaved == choice.$1
+                                            ? Colors.white
+                                            : Colors.transparent,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 9,
+                                          vertical: 6,
+                                        ),
+                                        minimumSize: const Size(0, 29),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            9,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        choice.$2,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (visible.isEmpty)
+                        const EmptyState(
+                          icon: Icons.dynamic_feed_outlined,
+                          title: 'Chưa có bài viết',
+                          description:
+                              'Hãy chia sẻ khoảnh khắc đầu tiên của bạn.',
+                        )
+                      else
+                        for (final post in visible) _post(post),
+                      if (showingSaved ? moreSaved : morePosts)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 6, 24, 18),
+                          child: OutlinedButton(
+                            onPressed: loadingMore ? null : _loadMore,
+                            child: Text(
+                              loadingMore ? 'Đang tải...' : 'Tải thêm bài viết',
+                            ),
+                          ),
+                        ),
+                    ],
                   ],
                 ),
               ),
@@ -1786,6 +2108,9 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
 
   Widget _post(Json post) {
     final media = objects(post['attachments']);
+    final original = post['originalPost'] is Map
+        ? object(post['originalPost'])
+        : null;
     final comments = objects(post['comments']);
     final liked = post['liked'] == true;
     final likes = (post['likes'] as num?)?.toInt() ?? 0;
@@ -1795,6 +2120,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
     );
     return Container(
+      key: ValueKey('feed-post-${post['id']}'),
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1805,6 +2131,24 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (post['repostKind'] == 'quick')
+            const Padding(
+              padding: EdgeInsets.only(bottom: 9),
+              child: Row(
+                children: [
+                  Icon(Icons.repeat_rounded, size: 16, color: socoMuted),
+                  SizedBox(width: 6),
+                  Text(
+                    'Đã đăng lại',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: socoMuted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Row(
             children: [
               InkWell(
@@ -1850,6 +2194,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 ),
               ),
               IconButton(
+                key: ValueKey('feed-post-options-${post['id']}'),
                 tooltip: 'Tùy chọn bài viết',
                 icon: const Icon(Icons.more_horiz_rounded, color: socoMuted),
                 onPressed: () => _showPostOptions(post),
@@ -1887,6 +2232,48 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             const SizedBox(height: 12),
             _mediaGrid(media),
           ],
+          if (original != null) ...[
+            const SizedBox(height: 10),
+            InkWell(
+              key: ValueKey('feed-original-post-${post['id']}'),
+              onTap: () => _openOriginalPost(original),
+              borderRadius: BorderRadius.circular(13),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: socoLine),
+                  borderRadius: BorderRadius.circular(13),
+                  color: const Color(0xFFF8FAFE),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      original['authorDisplayName']?.toString().isNotEmpty ==
+                              true
+                          ? original['authorDisplayName'].toString()
+                          : original['author']?.toString() ?? '',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      original['content']?.toString() ?? '',
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (objects(original['attachments']).isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 7),
+                        child: Text(
+                          'Bài viết có tệp phương tiện',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           if (likes > 0 || comments.isNotEmpty)
             Align(
@@ -1916,6 +2303,12 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                         '${comments.length} bình luận',
                         style: const TextStyle(fontSize: 12, color: socoMuted),
                       ),
+                    ),
+                  if ((post['repostCount'] as num?)?.toInt()
+                      case final int count when count > 0)
+                    Text(
+                      '$count lượt đăng lại',
+                      style: const TextStyle(fontSize: 11, color: socoMuted),
                     ),
                 ],
               ),
@@ -1947,7 +2340,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               ),
               Expanded(
                 child: TextButton.icon(
-                  onPressed: () => _postAction(post, 'share'),
+                  key: ValueKey('feed-post-share-${post['id']}'),
+                  onPressed: () => _sharePost(post),
                   style: engagementStyle,
                   icon: const Icon(Icons.ios_share_rounded, size: 19),
                   label: const Text('Chia sẻ'),
@@ -2055,12 +2449,16 @@ class _StoryCard extends StatelessWidget {
     required this.onTap,
     this.child,
     this.attachment,
+    this.text,
+    this.background,
   });
 
   final String label;
   final VoidCallback onTap;
   final Widget? child;
   final Json? attachment;
+  final String? text;
+  final String? background;
 
   @override
   Widget build(BuildContext context) {
@@ -2110,6 +2508,29 @@ class _StoryCard extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
+                        if (text?.isNotEmpty == true)
+                          Container(
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors:
+                                    storyBackgrounds[background ?? 'berry'] ??
+                                    storyBackgrounds['berry']!,
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(7),
+                            child: Text(
+                              text!,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         if (attachment?['kind'] == 'image')
                           Image.network(
                             attachment!['url']?.toString() ?? '',
@@ -2142,7 +2563,7 @@ class _StoryCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (attachment != null) ...[
+              if (attachment != null || text != null) ...[
                 const SizedBox(height: 5),
                 Text(
                   label,
