@@ -882,7 +882,7 @@
     min-height: 64px;
     margin-bottom: 8px;
     padding: 10px 20px;
-    background: transparent;
+    background: color-mix(in srgb, var(--soco-blue) 7%, var(--soco-surface));
     border-bottom: 1px solid var(--soco-line);
   }
   .modern-shell.app-layout .shell-v2-feed-page-header h1 {
@@ -901,7 +901,7 @@
     gap: 2px;
     min-width: 0;
     padding: 3px;
-    border: 1px solid var(--soco-line);
+    border: 1px solid color-mix(in srgb, var(--soco-blue) 15%, var(--soco-line));
     border-radius: 12px;
     background: var(--soco-surface);
   }
@@ -927,8 +927,9 @@
   }
   .modern-shell.app-layout .shell-v2-feed-page-header [role="tab"][aria-selected="true"] {
     border: 0;
-    background: color-mix(in srgb, var(--soco-violet) 15%, var(--soco-surface));
-    color: var(--soco-blue);
+    background: color-mix(in srgb, var(--soco-violet) 22%, var(--soco-surface));
+    color: #4338ca;
+    font-weight: 600;
   }
   .modern-shell.app-layout .shell-v2-feed-page-header [role="tab"]:focus-visible {
     outline: 2px solid var(--soco-blue);
