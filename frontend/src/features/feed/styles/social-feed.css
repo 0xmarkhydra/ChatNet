@@ -883,19 +883,18 @@
   }
 }
 
-/* Keep discovery menus visible while the feed column scrolls.
- * The rail stays within its grid track; if the screen is too short,
- * the rail itself scrolls independently, without moving the posts. */
+/* Keep suggestions below the sticky 64px feed header while posts scroll.
+ * On short screens, the rail scrolls independently inside its grid track. */
 @media (min-width: 1121px) {
   .modern-shell.app-layout .social-feed-grid > .social-feed-side {
     position: sticky;
-    top: 16px;
+    top: 80px;
     align-self: start;
     display: flex;
     flex-direction: column;
     gap: 14px;
     box-sizing: border-box;
-    max-height: calc(100dvh - 126px);
+    max-height: calc(100dvh - 96px);
     min-height: 0;
     padding: 0 5px 1px 0;
     overflow-x: hidden;
