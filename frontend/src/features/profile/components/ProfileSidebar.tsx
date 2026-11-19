@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AtSign, Image as ImageIcon, LockKeyhole, MapPin, PencilLine, ShieldCheck, Users, Video } from 'lucide-react'
 import type { FriendConnection } from '../../contacts'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -18,8 +19,21 @@ type Props = {
 }
 
 export default function ProfileSidebar({ username, email, bio, city, friends, media, onEditProfile, onShowMedia, onShowFriends, onViewFriend, onOpenPost }: Props) {
+  const aside = useRef<HTMLElement>(null)
+  const [stickyTop, setStickyTop] = useState(16)
+  useEffect(() => {
+    const element = aside.current
+    const viewport = element?.closest<HTMLElement>('.profile-page')
+    if (!element || !viewport || typeof ResizeObserver === 'undefined') return
+    const measure = () => setStickyTop(Math.min(16, viewport.clientHeight - element.getBoundingClientRect().height - 16))
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [])
   return (
-        <aside className="profile-page-aside" aria-label="Thông tin, ảnh và bạn bè">
+        <aside ref={aside} className="profile-page-aside" style={{ '--profile-aside-top': `${stickyTop}px` } as CSSProperties} aria-label="Thông tin, ảnh và bạn bè">
           <section className="profile-page-about">
             <h2>Giới thiệu</h2>
             {bio && <p className="profile-page-about-description">{bio}</p>}
