@@ -56,6 +56,8 @@ import MessageTimeline from "./MessageTimeline";
 import PinnedItemsPanel from "./PinnedItemsPanel";
 import type { ChatSectionProps } from "./ChatSectionProps";
 import { useConversationNotificationToggle } from "../hooks/useConversationNotificationToggle";
+import { useChatDragSurface } from "../hooks/useChatDragSurface";
+import useSlidingPill from "../../../shared/ui/useSlidingPill";
 
 export type { ChatSectionProps } from "./ChatSectionProps";
 
@@ -85,11 +87,6 @@ export default function ChatSection({
   changeGroupMemberRole,
   changeTargetLanguage,
   chatCreateError,
-  chatDragActive,
-  chatDragDepth,
-  setChatDragDepth,
-  chatFileInputRef,
-  chatFiltersPill,
   chatFriend,
   chatFriendRelationship,
   allChatConversations,
@@ -187,7 +184,6 @@ export default function ChatSection({
   session,
   setActiveConversationId,
   setChatCreateError,
-  setChatDragActive,
   setChatListFilter,
   setChatListQuery,
   setChatSearchJump,
@@ -243,6 +239,10 @@ export default function ChatSection({
   visibleLanguageOptions,
   visibleMessages,
 }: ChatSectionProps) {
+  const {
+    chatDragActive, chatDragDepth, setChatDragDepth, chatFileInputRef, setChatDragActive,
+  } = useChatDragSurface(activeConversationId);
+  const chatFiltersPill = useSlidingPill<HTMLDivElement>(chatListFilter);
   const readersScope = `${session.sessionId}:${activeConversationId ?? ''}`;
   const [readersTarget, setReadersTarget] = useScopedState<{ message: Message; readerIds: number[]; sessionId: string } | null>(readersScope, null);
   const encryptionScope = activeConversation?.type === 'direct' && activeConversation.otherUserId && !conversationBlocked

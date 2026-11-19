@@ -38,11 +38,6 @@ export type ChatSectionProps = {
   changeGroupMemberRole: (member: GroupMember, role: GroupMember["role"]) => Promise<void>;
   changeTargetLanguage: (next: string) => void;
   chatCreateError: string;
-  chatDragActive: boolean;
-  chatDragDepth: RefObject<number>;
-  setChatDragDepth: (next: number) => void;
-  chatFileInputRef: RefObject<HTMLInputElement | null>;
-  chatFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
   chatFriend: { id: number; username: string; displayName: string; online: boolean; } | null;
   chatFriendRelationship: "accepted" | "incoming" | "outgoing" | "none";
   chatListConversations: Conversation[];
@@ -140,7 +135,6 @@ export type ChatSectionProps = {
   session: Session;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
   setChatCreateError: Dispatch<SetStateAction<string>>;
-  setChatDragActive: Dispatch<SetStateAction<boolean>>;
   setChatListFilter: Dispatch<SetStateAction<"all" | "unread" | "groups">>;
   setChatListQuery: Dispatch<SetStateAction<string>>;
   setChatSearchJump: Dispatch<SetStateAction<{ conversationId: number; messageId: number; revision: number; } | null>>;

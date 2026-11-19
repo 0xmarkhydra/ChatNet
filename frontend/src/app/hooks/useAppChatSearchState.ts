@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState } from "react";
-import useSlidingPill from "../../shared/ui/useSlidingPill";
 import { usePhoneSearchLayout } from "./usePhoneSearchLayout";
 import { useQuickSearchDismiss } from "./useQuickSearchDismiss";
 
@@ -8,7 +7,6 @@ export function useAppChatSearchState() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [chatListQuery, setChatListQuery] = useState("");
   const [chatListFilter, setChatListFilter] = useState<"all" | "unread" | "groups">("all");
-  const chatFiltersPill = useSlidingPill<HTMLDivElement>(chatListFilter);
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const phoneSearchLayout = usePhoneSearchLayout();
   const quickSearchAnchorRef = useRef<HTMLDivElement>(null);
@@ -26,7 +24,6 @@ export function useAppChatSearchState() {
     globalSearch, setGlobalSearch,
     chatListQuery, setChatListQuery,
     chatListFilter, setChatListFilter,
-    chatFiltersPill,
     quickSearchOpen, setQuickSearchOpen,
     phoneSearchLayout, quickSearchAnchorRef,
     chatSearchJump, setChatSearchJump,

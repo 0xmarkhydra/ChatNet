@@ -385,7 +385,7 @@ export default function AuthedApp({
   const tabRef = useLatest(tab);
   const {
     globalSearch, setGlobalSearch, chatListQuery, setChatListQuery,
-    chatListFilter, setChatListFilter, chatFiltersPill,
+    chatListFilter, setChatListFilter,
     quickSearchOpen, setQuickSearchOpen, phoneSearchLayout, quickSearchAnchorRef,
     chatSearchJump, setChatSearchJump, chatSearchJumpRevision,
     nextChatSearchJumpRevision, lastScrolledSearchJump,
@@ -601,10 +601,7 @@ export default function AuthedApp({
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const postComposerRef = useRef<HTMLTextAreaElement>(null);
-  const {
-    messageInputRef, chatFileInputRef,
-    chatDragDepth, setChatDragDepth, chatDragActive, setChatDragActive,
-  } = useChatComposerSurface({ tab, activeConversationId, desktopSection, messageText });
+  const { messageInputRef } = useChatComposerSurface({ tab, activeConversationId, desktopSection, messageText });
 
   useDesktopShortcuts({
     sessionRef,
@@ -2966,11 +2963,6 @@ export default function AuthedApp({
           changeGroupMemberRole={changeGroupMemberRole}
           changeTargetLanguage={changeTargetLanguage}
           chatCreateError={chatCreateError}
-          chatDragActive={chatDragActive}
-          chatDragDepth={chatDragDepth}
-          setChatDragDepth={setChatDragDepth}
-          chatFileInputRef={chatFileInputRef}
-          chatFiltersPill={chatFiltersPill}
           chatFriend={chatFriend}
           chatFriendRelationship={chatFriendRelationship}
           allChatConversations={displayConversations}
@@ -3068,7 +3060,6 @@ export default function AuthedApp({
           session={session}
           setActiveConversationId={selectRoutedConversation}
           setChatCreateError={setChatCreateError}
-          setChatDragActive={setChatDragActive}
           setChatListFilter={setChatListFilter}
           setChatListQuery={setChatListQuery}
           setChatSearchJump={setChatSearchJump}
