@@ -246,39 +246,8 @@
   .profile-page-panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .profile-page-post-feed { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .profile-page-subsection, .profile-page-blank, .profile-page-error { box-sizing: border-box; padding: 20px; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgba(30,51,96,.06), 0 2px 10px rgba(30,51,96,.04); }
-  .modern-shell .profile-page-post-feed .post.zalo-post {
-    min-width: 0;
-    width: 100%;
-    margin: 0;
-    padding: 16px 16px 8px;
-    border: 0;
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(30,51,96,.06), 0 2px 10px rgba(30,51,96,.04);
-    background: #fff;
-    overflow: hidden;
-  }
-  .modern-shell .profile-page-post-feed .post .feed-media-preview { margin-inline: -16px; }
-  .modern-shell .profile-page-post-feed .post .feed-media-preview img { border-radius: 0; }
-  .modern-shell .profile-page-post-feed .post .feed-media-preview,
-  .modern-shell .profile-page-post-feed .post .feed-media-preview .media-attachments,
-  .modern-shell .profile-page-post-feed .post .feed-media-preview .media-item,
-  .modern-shell .profile-page-post-feed .post .feed-media-preview .media-image-button { max-width: none; border-radius: 0; }
-  .modern-shell .profile-page-post-feed .post .feed-post-text { margin-top: 12px; font-size: 15px; line-height: 1.5; }
-  .modern-shell .profile-page-post-feed .post .post-engagement-summary { padding: 10px 0; color: #697894; font-size: 14px; }
-  .modern-shell .profile-page-post-feed .post .post-toolbar { gap: 4px; margin-top: 0; padding: 4px 0; border-top: 1px solid #e8ecf5; }
-  .modern-shell .profile-page-post-feed .post .post-toolbar > button { flex: 1; min-height: 40px; justify-content: center; border-radius: 10px; color: #697894; font-weight: 600; }
-  .modern-shell .profile-page-post-feed .post .post-toolbar > button { background: transparent; }
-  .modern-shell .profile-page-post-feed .post .post-toolbar > button:hover { background: #f3f5fb; color: #2563eb; }
-  .modern-shell .profile-page-post-feed .post .post-toolbar > .feed-like-button.is-liked,
-  .modern-shell .profile-page-post-feed .post .post-toolbar > .feed-like-button.is-liked:hover { color: #ee416a; }
-  .modern-shell .profile-page-post-feed .post .post-toolbar > .feed-like-button.is-liked:hover { background: #fff2f6; }
-  .modern-shell .profile-page-post-feed .post .post-toolbar .post-save-action { display: none; }
-  .modern-shell .profile-page-post-feed .post .post-author strong { font-size: 15px; font-weight: 700; color: #17233d; }
-  .modern-shell .profile-page-post-feed .post .post-author small { color: #697894; font-size: 13px; }
-  .modern-shell .profile-page-post-feed .post .feed-media,
-  .modern-shell .profile-page-post-feed .post .media-attachment-grid,
-  .modern-shell .profile-page-post-feed .post .media-item { max-width: 100%; }
-  .modern-shell .profile-page-post-feed .post img { max-width: 100%; border-radius: 13px; }
+  /* PostCard content and actions inherit the same FeedPostCard styles as the home Feed.
+     Only the profile column width and vertical spacing are controlled above. */
   .profile-page-aside { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; position: sticky; top: var(--profile-aside-top, 16px); align-self: start; }
   .profile-page-about { padding: 20px; }
   .profile-page-about h2, .profile-page-recent h2, .profile-page-subsection h2 {
