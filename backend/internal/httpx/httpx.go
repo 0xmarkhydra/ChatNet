@@ -2,8 +2,22 @@ package httpx
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 )
+
+// DecodeJSON bounds request bodies and accepts exactly one JSON value.
+func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64) error {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBytes))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return err
+	}
+	return nil
+}
 
 func JSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
