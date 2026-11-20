@@ -22,7 +22,8 @@ export default function ProfileAvatarMenu({ username, displayName, avatarClassNa
   const url = avatarSet ? profileAssetUrl(username, 'avatar', avatarVersion) : ''
 
   return <>
-    <UserAvatar username={username} name={displayName} className={avatarClassName} online />
+    <UserAvatar username={username} name={displayName} className={`${avatarClassName} profile-hero-avatar`} online />
+    <span className="sr-only">Đang hoạt động</span>
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button ref={trigger} type="button" aria-label="Tùy chọn ảnh đại diện"

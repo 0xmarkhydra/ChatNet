@@ -2418,6 +2418,8 @@ export default function AuthedApp({
         <VisitorProfile
           key={session.sessionId + ":" + visitorUsername}
           username={visitorUsername}
+          friendOnline={friends.some((friend) => friend.username === visitorUsername.toLowerCase()
+            && friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther && friend.online)}
           request={apiFetch}
           currentUser={name}
           token={session.token}

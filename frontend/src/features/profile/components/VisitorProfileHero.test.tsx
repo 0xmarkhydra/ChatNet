@@ -6,7 +6,7 @@ import VisitorProfileHero from './VisitorProfileHero'
 
 vi.mock('./ProfileNote', () => ({ default: () => null }))
 vi.mock('../../../shared/ui/UserAvatar', () => ({
-  default: ({ username }: { username: string }) => <span>{username}</span>,
+  default: ({ username, online }: { username: string; online?: boolean }) => <span data-online={online}>{username}</span>,
   profileAssetUrl: () => '/cover.jpg',
 }))
 
@@ -20,12 +20,19 @@ describe('VisitorProfileHero actions', () => {
     const root = createRoot(host)
     const onRemoveFriendAction = vi.fn()
     try {
-      await act(async () => root.render(<VisitorProfileHero
+      const renderHero = (online: boolean) => act(async () => root.render(<VisitorProfileHero
+        online={online}
         profile={{ id: 5, username: 'alice', displayName: 'Alice', avatarSet: false,
           coverSet: false, updatedAt: '2026-01-01', allowFriendRequests: true, online: false }}
         relation="accepted" friendBusy={null} action="Bạn bè" request={async () => new Response()}
         onMessage={async () => {}} onFriendAction={() => {}} onRemoveFriendAction={onRemoveFriendAction}
         tabs={[{id:'posts',label:'Bài viết'}]} activeTab="posts" onTabChange={() => {}} />))
+      await renderHero(true)
+      expect(host.querySelector('[data-online="true"]')).not.toBeNull()
+      expect(host.textContent).toContain('Đang hoạt động')
+      await renderHero(false)
+      expect(host.querySelector('[data-online="true"]')).toBeNull()
+      expect(host.textContent).not.toContain('Đang hoạt động')
       const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')
       expect(trigger).not.toBeNull()
       await act(async () => trigger?.click())

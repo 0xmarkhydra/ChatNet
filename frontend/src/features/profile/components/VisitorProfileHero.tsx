@@ -16,6 +16,7 @@ export type VisitorProfileData = FriendSearchResult & {
 
 type Props = {
   profile: VisitorProfileData
+  online?: boolean
   relation: string
   friendBusy: number | null
   action: string
@@ -29,7 +30,7 @@ type Props = {
 }
 
 export default function VisitorProfileHero({
-  profile, relation, friendBusy, action, request, onMessage, onFriendAction, onRemoveFriendAction,
+  profile, online = false, relation, friendBusy, action, request, onMessage, onFriendAction, onRemoveFriendAction,
   tabs, activeTab, onTabChange,
 }: Props) {
   const [menuForUserId, setMenuForUserId] = useState<number | null>(null)
@@ -56,7 +57,8 @@ export default function VisitorProfileHero({
       <div className="visitor-identity">
         <div className="visitor-avatar-wrap">
           <div className="profile-note-avatar">
-            <UserAvatar username={profile.username} name={userLabel(profile.displayName, profile.username)} className="profile-avatar" />
+            <UserAvatar username={profile.username} name={userLabel(profile.displayName, profile.username)} className="profile-avatar profile-hero-avatar" online={online} />
+            {online && <span className="sr-only">Đang hoạt động</span>}
             <ProfileNote username={profile.username} request={request} refreshKey={relation} />
           </div>
         </div>

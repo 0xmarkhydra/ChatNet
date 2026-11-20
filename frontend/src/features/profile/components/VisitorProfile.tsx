@@ -12,6 +12,7 @@ import { useLatest } from '../../../shared/hooks/useLatest'
 
 type Props = {
  username: string
+ friendOnline?: boolean
  request: (path: string, init?: RequestInit) => Promise<Response>
  currentUser: string
  token: string
@@ -35,7 +36,7 @@ type Props = {
  onDeleted: (id: number) => void
  feedback: (message: string, kind?: 'success' | 'error' | 'warning' | 'info') => void
 }
-export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onClose, onPostOpen, onOpenOriginal, onRepostChanged, onShareToChat, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
+export default function VisitorProfile({ username, friendOnline, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onClose, onPostOpen, onOpenOriginal, onRepostChanged, onShareToChat, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
  const scope=JSON.stringify([username,token])
  const [profile,setProfile]=useScopedState<VisitorProfileData|null>(scope,null)
  const [posts,setPosts]=useScopedState<Post[]>(scope,[])
@@ -167,6 +168,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
    {profile&&<>
     <VisitorProfileHero
       profile={profile}
+      online={friendOnline}
       relation={relation}
       friendBusy={friendBusy}
       action={action}

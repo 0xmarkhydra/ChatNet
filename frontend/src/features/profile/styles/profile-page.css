@@ -25,6 +25,17 @@
   line-height: 1;
 }
 
+.profile-hero-avatar.smart-avatar > .presence-dot {
+  box-sizing: border-box;
+  right: 5%;
+  bottom: 5%;
+  width: clamp(14px, 18%, 29px);
+  height: clamp(14px, 18%, 29px);
+  border: clamp(2px, .28vw, 4px) solid var(--soco-surface);
+  background: var(--soco-success);
+  box-shadow: none;
+}
+
 @media (min-width: 761px) {
   .modern-shell.app-layout .profile-page {
     box-sizing: border-box;
