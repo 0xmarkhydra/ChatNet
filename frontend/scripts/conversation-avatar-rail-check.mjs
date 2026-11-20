@@ -247,7 +247,7 @@ try {
       const y = rect => (rect.top + rect.bottom) / 2
       const buttons = [...node.querySelectorAll('.compact-room-actions button')].map(button => button.getBoundingClientRect())
       return { height: head.height, within: actions.top >= head.top && actions.bottom <= head.bottom + 1,
-        squareAvatar: avatar.width === avatar.height && avatar.width > 0,
+        squareAvatar: Math.abs(avatar.width - avatar.height) < 1 && avatar.width > 0,
         sharedRow: Math.abs(y(subtitle) - y(actions)) < 2 && subtitle.right <= actions.left + 1,
         titleAbove: title.bottom <= actions.top + 1,
         targets: buttons.length === 3 && buttons.every(rect =>

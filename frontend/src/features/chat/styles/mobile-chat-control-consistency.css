@@ -177,7 +177,9 @@
     gap: 0 4px;
   }
   .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
-    > .conversation-panel:not(.group-chat-panel) .chat-head :is(.room-info, .room-copy) {
+    > .conversation-panel:not(.group-chat-panel) > .chat-head > .room-info,
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+    > .conversation-panel:not(.group-chat-panel) .chat-head .room-info > .room-copy {
     display: contents;
   }
   .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
