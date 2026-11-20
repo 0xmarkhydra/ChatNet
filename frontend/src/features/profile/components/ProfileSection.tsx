@@ -437,7 +437,7 @@ export default function ProfileSection({
               </>}
               actions={mobileTimeline ? (
                 <>
-                  <Button size="lg" className="min-w-0 gap-1.5 px-2 text-ui-label" onClick={onCreateStory}>
+                  <Button size="lg" className="profile-page-story-action min-w-0 gap-1.5 px-2 text-ui-label" onClick={onCreateStory}>
                     <Plus size={17} aria-hidden="true" />Thêm vào tin
                   </Button>
                   <Button size="lg" variant="secondary" className="min-w-0 gap-1.5 px-2 text-ui-label"

@@ -567,6 +567,12 @@
   margin: 3px 0 0;
 }
 .profile-page-hero-centered .profile-page-hero-actions > button { white-space: normal; }
+.modern-shell .profile-view > .profile-page-hero-centered .profile-page-hero-actions > .profile-page-story-action {
+  color: var(--color-primary-foreground);
+}
+.modern-shell .profile-view > .profile-page-hero-centered button:is(.profile-page-cover-action, .profile-page-avatar-camera) {
+  border-radius: 50%;
+}
 .personal-timeline-view > .profile-mobile-section-picker {
   display: flex;
   flex-wrap: wrap;
