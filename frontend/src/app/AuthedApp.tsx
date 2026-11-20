@@ -289,7 +289,6 @@ import ProfileComposerOverlay from "../features/profile/components/ProfileCompos
 import { useNearbyDiscovery } from "../features/discover/hooks/useNearbyDiscovery";
 import { useAccountSessions } from "../features/auth/hooks/useAccountSessions";
 import { usePushSettings } from "../features/notifications/hooks/usePushSettings";
-import { useMessageLongPress } from "../features/chat/hooks/useMessageLongPress";
 import { useMessageClipboard } from "../features/chat/hooks/useMessageClipboard";
 import { useMediaUploads } from "../features/chat/hooks/useMediaUploads";
 import { useContactActions } from "../features/contacts/hooks/useContactActions";
@@ -394,7 +393,7 @@ export default function AuthedApp({
     number | null
   >(null);
   const selectRoutedConversation = useChatConversationRoute(activeConversationId, setActiveConversationId);
-  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, pinnedExpanded, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setPinnedExpanded, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId, sessionId: session?.sessionId ?? null });
+  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId, sessionId: session?.sessionId ?? null });
 
   const activeConversationIdRef = useRef<number | null>(null);
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
@@ -412,7 +411,6 @@ export default function AuthedApp({
   const ownSendScrollConversation = useRef<number | null>(null);
   const [messageCopyTarget, setMessageCopyTarget] =
     useState<MessageCopyTarget | null>(null);
-  const { beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress, cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress, openMessageActions, openMessageReactions, suppressConversationClick, suppressMessageClick } = useMessageLongPress({ setConversationActionId, setConversationMenuPosition, setMessageActionId, setMessageActionMode, setMessageCopyTarget });
 
   const {
     messageDrafts, setMessageDrafts, channelDrafts, setChannelDrafts,
@@ -1189,7 +1187,6 @@ export default function AuthedApp({
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
     messageScrollAtBottom.current = true;
-    cancelMessageLongPress();
     // useMessageData owns room-specific clearing and its recently-visited
     // cache. A second reset here caused an unnecessary blank render between
     // PWA conversation selections.
@@ -2948,13 +2945,9 @@ export default function AuthedApp({
           addChatFiles={addChatFiles}
           uploadMediaFiles={uploadMediaFiles}
           apiFetch={apiFetch}
-          beginConversationLongPress={beginConversationLongPress}
-          beginMessageLongPress={beginMessageLongPress}
           blockContact={blockContact}
           blockedBusy={blockedBusy}
           bottomRef={bottomRef}
-          cancelConversationLongPress={cancelConversationLongPress}
-          cancelMessageLongPress={cancelMessageLongPress}
           canEditGroup={canEditGroup}
           canInviteActiveGroup={canInviteActiveGroup}
           canManageActiveGroup={canManageActiveGroup}
@@ -3006,8 +2999,8 @@ export default function AuthedApp({
           groupInviteSearch={groupInviteSearch}
           groupInviteSelection={groupInviteSelection}
           groupMembers={groupMembers}
-          groupMemberViewOpen={groupMemberViewOpen}
           groupSettingsOpen={groupSettingsOpen}
+          groupMemberViewOpen={groupMemberViewOpen}
           hasMoreConversations={hasMoreConversations}
           hasMoreMessages={hasMoreMessages}
           historyActionBusy={historyActionBusy}
@@ -3033,18 +3026,13 @@ export default function AuthedApp({
           retryMessageHistory={retryMessageHistory}
           messagesScrollRef={messagesScrollRef}
           messageText={messageText}
-          moveConversationLongPress={moveConversationLongPress}
-          moveMessageLongPress={moveMessageLongPress}
           newChatMode={newChatMode}
           openConnectSurface={openConnectSurface}
           openGroupSettings={openGroupSettings}
-          openMessageActions={openMessageActions}
-          openMessageReactions={openMessageReactions}
           onReactionUsers={(message, emoji) => setReactionTarget({kind: "message", id: message.id, initialEmoji: emoji, reactions: message.reactions})}
           onForwardMessage={setForwardSource}
           openVisitor={openVisitor}
           pinBusy={pinBusy}
-          pinnedExpanded={pinnedExpanded}
           pinnedItems={pinnedItems}
           quickSearchControl={quickSearchControl}
           reactionPreviews={reactionPreviews}
@@ -3064,6 +3052,9 @@ export default function AuthedApp({
           setChatListQuery={setChatListQuery}
           setChatSearchJump={setChatSearchJump}
           setConversationActionId={setConversationActionId}
+          setMessageActionId={setMessageActionId}
+          setMessageActionMode={setMessageActionMode}
+          setMessageCopyTarget={setMessageCopyTarget}
           setConversationDetailsOpen={setConversationDetailsOpen}
           setConversationMenuPosition={setConversationMenuPosition}
           setConversations={setConversations}
@@ -3075,8 +3066,8 @@ export default function AuthedApp({
           setGroupActivityViewedId={setGroupActivityViewedId}
           setGroupInviteSearch={setGroupInviteSearch}
           setGroupInviteSelection={setGroupInviteSelection}
-          setGroupMemberViewOpen={setGroupMemberViewOpen}
           setGroupSettingsOpen={setGroupSettingsOpen}
+          setGroupMemberViewOpen={setGroupMemberViewOpen}
           setLanguageSearch={setLanguageSearch}
           setManuallyTranslated={setManuallyTranslated}
           setMessageAttachments={setMessageAttachments}
@@ -3084,7 +3075,6 @@ export default function AuthedApp({
           setMessageText={setMessageText}
           setNewChatMode={setNewChatMode}
           setNotice={setNotice}
-          setPinnedExpanded={setPinnedExpanded}
           setQrOpen={setQrOpen}
           setQuickSearchOpen={setQuickSearchOpen}
           setReplyingTo={setReplyingTo}
@@ -3097,8 +3087,6 @@ export default function AuthedApp({
           shareMyProfile={shareMyProfile}
           sortedChatListConversations={sortedChatListConversations}
           sortedGroupActivityEvents={sortedGroupActivityEvents}
-          suppressConversationClick={suppressConversationClick}
-          suppressMessageClick={suppressMessageClick}
           switchTab={switchTab}
           t={t}
           toggleMessagePin={toggleMessagePin}
