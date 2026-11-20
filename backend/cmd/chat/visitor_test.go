@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -28,8 +29,8 @@ func TestVisitorProfileIntegration(t *testing.T) {
 	if err := database.Migrate(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	ids := make([]int64, 2)
-	names := make([]string, 2)
+	ids := make([]int64, 3)
+	names := make([]string, 3)
 	for i := range ids {
 		names[i] = fmt.Sprintf("vp_%d_%d", time.Now().UnixNano(), i)
 		if err := db.QueryRow(ctx, "INSERT INTO users(email,username,password_hash,display_name) VALUES($1,$2,'!','Tên có dấu') RETURNING id", names[i]+"@example.invalid", names[i]).Scan(&ids[i]); err != nil {
@@ -38,8 +39,27 @@ func TestVisitorProfileIntegration(t *testing.T) {
 		defer db.Exec(ctx, "DELETE FROM users WHERE id=$1", ids[i])
 	}
 	token, _ := authx.Sign("test", ids[1], names[1], "Viewer")
+	s := &server{db: db, jwtSecret: "test"}
 	mux := http.NewServeMux()
-	mux.Handle("GET /api/users/{username}/profile", authx.Middleware("test", http.HandlerFunc((&server{db: db}).getUserProfile)))
+	mux.Handle("GET /api/users/{username}/profile", authx.Middleware("test", http.HandlerFunc(s.getUserProfile)))
+	mux.Handle("PUT /api/profile", authx.Middleware("test", http.HandlerFunc(s.updateProfile)))
+	owner, _ := authx.Sign("test", ids[0], names[0], "Tên có dấu")
+	update := func(fields string, want int) {
+		req := httptest.NewRequest("PUT", "/api/profile", strings.NewReader(fmt.Sprintf(`{"username":%q,"displayName":"Tên có dấu"%s}`, names[0], fields)))
+		req.Header.Set("Authorization", "Bearer "+owner)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Fatalf("profile update: %d: %s", rec.Code, rec.Body.String())
+		}
+	}
+	update(`,"city":"  Hòa Bình  ","workplace":"  Đội sản phẩm ","school":" Trường Công nghệ "`, 200)
+	update("", 200) // Older clients cannot erase fields they do not send.
+	update(`,"school":"không\nhợp lệ"`, 400)
+	if _, err := db.Exec(ctx, `INSERT INTO friend_connections(user_low,user_high,requested_by,status)
+		VALUES(LEAST($1,$2),GREATEST($1,$2),$1,'accepted'),(LEAST($1,$3),GREATEST($1,$3),$1,'pending')`, ids[0], ids[1], ids[2]); err != nil {
+		t.Fatal(err)
+	}
 	call := func(auth string, want int) map[string]any {
 		req := httptest.NewRequest("GET", "/api/users/"+names[0]+"/profile", nil)
 		if auth != "" {
@@ -58,6 +78,14 @@ func TestVisitorProfileIntegration(t *testing.T) {
 	result := call(token, 200)
 	if result["username"] != names[0] || result["displayName"] != "Tên có dấu" {
 		t.Fatalf("wrong identity: %+v", result)
+	}
+	if result["city"] != "Hòa Bình" || result["workplace"] != "Đội sản phẩm" || result["school"] != "Trường Công nghệ" || result["friendCount"] != float64(1) {
+		t.Fatalf("wrong public details: %+v", result)
+	}
+	update(`,"workplace":"  "`, 200)
+	result = call(token, 200)
+	if result["workplace"] != "" || result["school"] != "Trường Công nghệ" {
+		t.Fatalf("clearing one field changed other details: %+v", result)
 	}
 	for _, key := range []string{"email", "phone", "phone_e164", "password_hash", "token", "searchableByEmail"} {
 		if _, ok := result[key]; ok {

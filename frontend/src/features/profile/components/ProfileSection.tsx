@@ -62,6 +62,7 @@ export type ProfileSectionProps = {
   profileBusy: "avatar" | "cover" | null;
   profileHasMore: boolean;
   profileHeadingRef: RefObject<HTMLHeadingElement | null>;
+  friendCount: number;
   profileIdentityForm: ReactNode;
   profileIdentityRef: RefObject<HTMLButtonElement | null>;
   profileMedia: ProfileMediaState | null;
@@ -148,6 +149,7 @@ export default function ProfileSection({
   profileBusy,
   profileHasMore,
   profileHeadingRef,
+  friendCount,
   profileIdentityForm,
   profileIdentityRef,
   profileMedia,
@@ -400,7 +402,8 @@ export default function ProfileSection({
             {profileTimelineOpen ? (
               <ProfileHero username={name}
                 displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
-                city={profileMedia?.city}
+                city={profileMedia?.city} workplace={profileMedia?.workplace} school={profileMedia?.school}
+                friendCount={friendCount}
                 coverUrl={profileMedia?.coverSet ? profileAssetUrl(name, "cover", profileMedia.updatedAt) : undefined}
                 coverAction={<button type="button" className="profile-page-cover-action"
                   disabled={profileBusy !== null || mediaUploading === "profile"}

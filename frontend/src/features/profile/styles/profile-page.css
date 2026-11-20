@@ -142,8 +142,11 @@
   font-weight: 500;
   line-height: 1.5;
 }
-.profile-page-identity-city { display: flex; align-items: center; gap: 5px; margin: 4px 0 0; color: var(--soco-muted); font-size: 14px; }
-.profile-page-identity-meta > span:not(:first-child)::before { content: '·'; margin-right: 11px; color: #b4bed0; }
+.profile-page-friend-summary { margin: 5px 0 0; color: var(--soco-text); font-size: 14px; font-weight: 700; }
+.profile-page-identity-details { display: flex; flex-wrap: wrap; gap: 5px 12px; margin: 5px 0 0; padding: 0; list-style: none; color: var(--soco-muted); font-size: 14px; line-height: 1.45; }
+.profile-page-identity-details > li { display: flex; align-items: flex-start; gap: 5px; min-width: 0; max-width: 100%; }
+.profile-page-identity-details > li > svg { flex-shrink: 0; margin-top: 2px; }
+.profile-page-identity-details > li > span { min-width: 0; overflow-wrap: anywhere; }
 .profile-page-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
 .profile-page-primary,
 .profile-page-secondary,

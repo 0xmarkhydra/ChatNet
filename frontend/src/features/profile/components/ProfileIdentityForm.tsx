@@ -2,7 +2,8 @@ import type { FormEvent } from 'react'
 import { Input } from '../../../shared/ui/input'
 import { Button } from '../../../shared/ui/button'
 import type { UIMessageKey } from '../../i18n'
-import type { ProfileMediaState } from '../types'
+import type { ProfileMediaState, ProfilePublicDetails } from '../types'
+import ProfilePublicDetailsFields from './ProfilePublicDetailsFields'
 
 type Props = {
   saveProfileIdentity: (event: FormEvent) => void
@@ -13,6 +14,10 @@ type Props = {
   setProfileUsernameDraft: (value: string) => void
   profileSaving: boolean
   profileMedia: ProfileMediaState | null
+  cityDraft: string
+  setCityDraft: (value: string) => void
+  publicDetailsDraft: ProfilePublicDetails
+  setPublicDetailsDraft: (value: ProfilePublicDetails) => void
 }
 
 export default function ProfileIdentityForm({
@@ -24,6 +29,7 @@ export default function ProfileIdentityForm({
   setProfileUsernameDraft,
   profileSaving,
   profileMedia,
+  cityDraft, setCityDraft, publicDetailsDraft, setPublicDetailsDraft,
 }: Props) {
   return (
     <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
@@ -65,6 +71,13 @@ export default function ProfileIdentityForm({
         </div>
         <small>{t('profile.usernameHint')}</small>
       </label>
+      <label className="profile-edit-field">
+        <span>Nơi sống</span>
+        <Input name="city" maxLength={100} value={cityDraft} onChange={event => setCityDraft(event.target.value)}
+          placeholder="Tùy chọn · hiển thị trên hồ sơ" disabled={profileSaving} />
+      </label>
+      <ProfilePublicDetailsFields value={publicDetailsDraft} onChange={setPublicDetailsDraft}
+        fieldClass="profile-edit-field" disabled={profileSaving} />
       <Button
         type="submit"
         className="profile-save-button"
@@ -73,7 +86,10 @@ export default function ProfileIdentityForm({
           !profileMedia ||
           (
             profileDisplayNameDraft.trim() === profileMedia.displayName &&
-            profileUsernameDraft.trim().toLowerCase() === profileMedia.username
+            profileUsernameDraft.trim().toLowerCase() === profileMedia.username &&
+            cityDraft.trim() === (profileMedia.city ?? '') &&
+            publicDetailsDraft.workplace.trim() === (profileMedia.workplace ?? '') &&
+            publicDetailsDraft.school.trim() === (profileMedia.school ?? '')
           )
         }
       >

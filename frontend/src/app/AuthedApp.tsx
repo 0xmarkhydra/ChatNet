@@ -364,7 +364,7 @@ export default function AuthedApp({
   const screenshot = useDesktopScreenshot(setNotice);
   const { chatCreateError, directUsername, groupCreateStep, groupWorkspaceMode, newChatMode, quickCreateOpen, setChatCreateError, setDirectUsername, setGroupCreateStep, setGroupWorkspaceMode, setNewChatMode, setQuickCreateOpen } = useGroupWorkspaceState({  });
 
-  const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({ sessionId: session?.sessionId ?? null });
+  const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profilePublicDetailsDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfilePublicDetailsDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({ sessionId: session?.sessionId ?? null });
 
   const { appLocale, languageSearch, localePickerOpen, localeSearch, setAppLocale, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setTranslationPickerOpen, setUiBundle, setUiLocaleLoading, translationPickerOpen, uiBundle, uiLocaleLoading } = useAppLocaleState({  });
 
@@ -1151,6 +1151,7 @@ export default function AuthedApp({
     setProfileUsernameDraft(profile.username);
     setProfileBioDraft(profile.bio ?? "");
     setProfileCityDraft(profile.city ?? "");
+    setProfilePublicDetailsDraft({ workplace: profile.workplace ?? "", school: profile.school ?? "" });
   }
 
   async function saveProfileIdentity(event: FormEvent) {
@@ -1161,6 +1162,8 @@ export default function AuthedApp({
     const username = profileUsernameDraft.trim().toLowerCase();
     const bio = profileBioDraft.trim();
     const city = profileCityDraft.trim();
+    const workplace = profilePublicDetailsDraft.workplace.trim();
+    const school = profilePublicDetailsDraft.school.trim();
     if (!displayName || !username) {
       setNotice("Tên hiển thị và username không được để trống.", "error");
       return;
@@ -1171,7 +1174,7 @@ export default function AuthedApp({
       const response = await apiFetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName, username, bio, city }),
+        body: JSON.stringify({ displayName, username, bio, city, workplace, school }),
       });
       const result = (await response.json().catch(() => null)) as
         | (ProfileUpdateResponse & { error?: string })
@@ -1191,6 +1194,8 @@ export default function AuthedApp({
         displayName: result.displayName,
         bio: result.bio ?? "",
         city: result.city ?? "",
+        workplace: result.workplace ?? "",
+        school: result.school ?? "",
         avatarSet: result.avatarSet,
         coverSet: result.coverSet,
         updatedAt: result.updatedAt,
@@ -1199,6 +1204,7 @@ export default function AuthedApp({
       setProfileUsernameDraft(result.username);
       setProfileBioDraft(result.bio ?? "");
       setProfileCityDraft(result.city ?? "");
+      setProfilePublicDetailsDraft({ workplace: result.workplace ?? "", school: result.school ?? "" });
 
       const nextSession: Session = {
         ...sessionRef.current,
@@ -2098,6 +2104,7 @@ export default function AuthedApp({
     setProfileUsernameDraft(profileMedia?.username ?? name);
     setProfileBioDraft(profileMedia?.bio ?? "");
     setProfileCityDraft(profileMedia?.city ?? "");
+    setProfilePublicDetailsDraft({ workplace: profileMedia?.workplace ?? "", school: profileMedia?.school ?? "" });
     setProfileEditorOpen(false);
   };
 
@@ -2111,6 +2118,10 @@ export default function AuthedApp({
       setProfileUsernameDraft={setProfileUsernameDraft}
       profileSaving={profileSaving}
       profileMedia={profileMedia}
+      cityDraft={profileCityDraft}
+      setCityDraft={setProfileCityDraft}
+      publicDetailsDraft={profilePublicDetailsDraft}
+      setPublicDetailsDraft={setProfilePublicDetailsDraft}
     />
   );
   const profilePrivacyControls = (
@@ -2675,6 +2686,8 @@ export default function AuthedApp({
           profileBioDraft={profileBioDraft}
           profileBusy={profileBusy}
           profileCityDraft={profileCityDraft}
+          publicDetailsDraft={profilePublicDetailsDraft}
+          setPublicDetailsDraft={setProfilePublicDetailsDraft}
           profileDisplayNameDraft={profileDisplayNameDraft}
           profileEditorOpen={profileEditorOpen}
           profileHasMore={profileHasMore}
@@ -2741,6 +2754,7 @@ export default function AuthedApp({
           profileBusy={profileBusy}
           profileHasMore={profileHasMore}
           profileHeadingRef={profileHeadingRef}
+          friendCount={friends.filter(friend => friend.status === "accepted").length}
           profileIdentityForm={profileIdentityForm}
           profileIdentityRef={profileIdentityRef}
           profileMedia={profileMedia}

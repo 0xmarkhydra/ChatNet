@@ -3,7 +3,8 @@ import { ArrowLeft, Camera, RotateCcw, Save } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import ProfileEditorPrivacyCard from './ProfileEditorPrivacyCard'
 import ProfileEditorPreview from './ProfileEditorPreview'
-import type { ProfileMediaState, UserPrivacy } from '../types'
+import type { ProfileMediaState, ProfilePublicDetails, UserPrivacy } from '../types'
+import ProfilePublicDetailsFields from './ProfilePublicDetailsFields'
 
 type Props = {
   profile: ProfileMediaState | null
@@ -18,6 +19,8 @@ type Props = {
   setBioDraft: (value: string) => void
   cityDraft: string
   setCityDraft: (value: string) => void
+  publicDetailsDraft: ProfilePublicDetails
+  setPublicDetailsDraft: (value: ProfilePublicDetails) => void
   profileSaving: boolean
   mediaBusy: boolean
   privacy: UserPrivacy | null
@@ -36,7 +39,7 @@ type Props = {
 export default function ProfileEditorPage({
   profile, username, displayName, coverUrl,
   displayNameDraft, setDisplayNameDraft, usernameDraft, setUsernameDraft,
-  bioDraft, setBioDraft, cityDraft, setCityDraft, profileSaving, mediaBusy,
+  bioDraft, setBioDraft, cityDraft, setCityDraft, publicDetailsDraft, setPublicDetailsDraft, profileSaving, mediaBusy,
   privacy, privacyBusy, privacyLoading, privacyError, retryPrivacy, changePrivacy,
   onSave, onDiscard, onChangeAvatar, onChangeCover,
 }: Props) {
@@ -47,7 +50,9 @@ export default function ProfileEditorPage({
     displayNameDraft.trim() === profile?.displayName &&
     usernameDraft.trim().toLowerCase() === profile?.username &&
     bioDraft.trim() === (profile?.bio ?? '') &&
-    cityDraft.trim() === (profile?.city ?? '')
+    cityDraft.trim() === (profile?.city ?? '') &&
+    publicDetailsDraft.workplace.trim() === (profile?.workplace ?? '') &&
+    publicDetailsDraft.school.trim() === (profile?.school ?? '')
   const savingDisabled = !profile || profileSaving || same ||
     !displayNameDraft.trim() || !usernameDraft.trim() ||
     Array.from(bioDraft).length > 160 || Array.from(cityDraft).length > 100
@@ -104,6 +109,8 @@ export default function ProfileEditorPage({
             <input type="text" name="city" maxLength={100} disabled={profileSaving} value={cityDraft}
               onChange={event => setCityDraft(event.target.value)} placeholder="Thành phố bạn muốn chia sẻ" />
           </label>
+          <ProfilePublicDetailsFields value={publicDetailsDraft} onChange={setPublicDetailsDraft}
+            fieldClass="profile-editor-field" disabled={profileSaving} />
         </div>
         <footer className="profile-editor-form-footer">
           <span className="profile-editor-save-hint">Ảnh và quyền hiển thị được cập nhật ngay sau khi thay đổi.</span>

@@ -3,7 +3,7 @@ import ProfileEditorPage from "./ProfileEditorPage";
 import { profileAssetUrl } from "../../../shared/ui/UserAvatar";
 import ProfilePage from "./ProfilePage";
 import ProfileNote from "./ProfileNote";
-import type { UserPrivacy, ProfileMediaState } from "../types";
+import type { UserPrivacy, ProfileMediaState, ProfilePublicDetails } from "../types";
 import type { FriendConnection } from "../../contacts";
 import { type Post } from "../../feed";
 import { FormEvent, useState, type SetStateAction } from "react";
@@ -32,6 +32,8 @@ export type ProfileOverviewSectionProps = {
   profileBioDraft: string;
   profileBusy: "avatar" | "cover" | null;
   profileCityDraft: string;
+  publicDetailsDraft: ProfilePublicDetails;
+  setPublicDetailsDraft: (value: ProfilePublicDetails) => void;
   profileDisplayNameDraft: string;
   profileEditorOpen: boolean;
   profileHasMore: boolean;
@@ -77,6 +79,8 @@ export default function ProfileOverviewSection({
   profileBioDraft,
   profileBusy,
   profileCityDraft,
+  publicDetailsDraft,
+  setPublicDetailsDraft,
   profileDisplayNameDraft,
   profileEditorOpen,
   profileHasMore,
@@ -147,6 +151,8 @@ export default function ProfileOverviewSection({
                 bioDraft={profileBioDraft}
                 setBioDraft={setProfileBioDraft}
                 cityDraft={profileCityDraft}
+                publicDetailsDraft={publicDetailsDraft}
+                setPublicDetailsDraft={setPublicDetailsDraft}
                 setCityDraft={setProfileCityDraft}
                 profileSaving={profileSaving}
                 mediaBusy={profileBusy !== null || mediaUploading === "profile"}
@@ -171,6 +177,8 @@ export default function ProfileOverviewSection({
                 email={session.user.email}
                 bio={profileMedia?.bio}
                 city={profileMedia?.city}
+                workplace={profileMedia?.workplace}
+                school={profileMedia?.school}
                 coverUrl={
                   profileMedia?.coverSet
                     ? profileAssetUrl(name, "cover", profileMedia.updatedAt)

@@ -55,7 +55,12 @@ describe('own profile navigation and composer', () => {
       await act(async () => choices[0]?.click())
       expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Bạn chưa có ảnh đại diện.')
       await act(async () => document.querySelector<HTMLButtonElement>('[aria-label="Đóng hộp thoại"]')?.click())
+      await vi.waitFor(() => {
+        expect(document.querySelector('[role="dialog"]')).toBeNull()
+        expect(document.activeElement).toBe(avatar)
+      })
       const reopened = await openAvatarMenu()
+      expect(reopened[1]?.textContent).toBe('Đổi ảnh đại diện')
       await act(async () => reopened[1]?.click())
       expect(onChangeAvatar).toHaveBeenCalledOnce()
       const tabbar = host.querySelector('.profile-page-tabbar')

@@ -20,6 +20,8 @@ type Props = {
   email?: string
   bio?: string
   city?: string
+  workplace?: string
+  school?: string
   coverUrl?: string
   coverSet: boolean
   avatarSet: boolean
@@ -46,7 +48,7 @@ type Props = {
 }
 
 export default function ProfilePage({
-  highlights, username, displayName, email, bio, city, coverUrl, coverSet, avatarSet, avatarVersion, editBusy, friends,
+  highlights, username, displayName, email, bio, city, workplace, school, coverUrl, coverSet, avatarSet, avatarVersion, editBusy, friends,
   posts, pendingPost, postsBusy, postsError, hasMorePosts, postCards, profileNote,
   onEditProfile, onChangeAvatar, onChangeCover, onCreatePost, onCreateStory,
   onReloadPosts, onLoadMorePosts, onViewFriend, onOpenContacts, onOpenPost,
@@ -66,7 +68,7 @@ export default function ProfilePage({
 
   return (
     <div className="profile-page" aria-label="Trang cá nhân">
-      <ProfileHero displayName={displayName} username={username} city={city} friendCount={acceptedFriends.length}
+      <ProfileHero displayName={displayName} username={username} city={city} workplace={workplace} school={school} friendCount={acceptedFriends.length}
         coverUrl={coverSet ? coverUrl : undefined}
         coverAction={<button type="button" className="profile-page-cover-action" onClick={onChangeCover}
           disabled={editBusy} title="Thay đổi ảnh bìa"><Camera size={17} aria-hidden="true" /><span>{coverSet ? 'Đổi ảnh bìa' : 'Thêm ảnh bìa'}</span></button>}

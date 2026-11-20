@@ -21,6 +21,8 @@ type profileState struct {
 	DisplayName string    `json:"displayName"`
 	Bio         string    `json:"bio"`
 	City        string    `json:"city"`
+	Workplace   string    `json:"workplace"`
+	School      string    `json:"school"`
 	AvatarSet   bool      `json:"avatarSet"`
 	CoverSet    bool      `json:"coverSet"`
 	UpdatedAt   time.Time `json:"updatedAt"`
@@ -77,13 +79,15 @@ func (s *server) profileForUserID(r *http.Request, userID int64) (profileState, 
 	var profile profileState
 	var avatarRef, coverRef string
 	err := s.db.QueryRow(r.Context(), `
-		SELECT username,display_name,COALESCE(bio,''),COALESCE(city,''),COALESCE(avatar_ref,''),COALESCE(cover_ref,''),profile_updated_at
+		SELECT username,display_name,COALESCE(bio,''),COALESCE(city,''),COALESCE(workplace,''),COALESCE(school,''),COALESCE(avatar_ref,''),COALESCE(cover_ref,''),profile_updated_at
 		FROM users WHERE id=$1
 	`, userID).Scan(
 		&profile.Username,
 		&profile.DisplayName,
 		&profile.Bio,
 		&profile.City,
+		&profile.Workplace,
+		&profile.School,
 		&avatarRef,
 		&coverRef,
 		&profile.UpdatedAt,
@@ -115,6 +119,8 @@ func (s *server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		DisplayName string  `json:"displayName"`
 		Bio         *string `json:"bio"`
 		City        *string `json:"city"`
+		Workplace   *string `json:"workplace"`
+		School      *string `json:"school"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
 	decoder.DisallowUnknownFields()
@@ -134,29 +140,35 @@ func (s *server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var bio, city any
-	if body.Bio != nil {
-		value, err := normalizeProfileShortText(*body.Bio, 160, "tiểu sử")
+	var bio, city, workplace, school any
+	for _, field := range []struct {
+		input *string
+		max   int
+		label string
+		value *any
+	}{
+		{body.Bio, 160, "tiểu sử", &bio},
+		{body.City, 100, "thành phố", &city},
+		{body.Workplace, 160, "nơi làm việc", &workplace},
+		{body.School, 160, "trường học", &school},
+	} {
+		if field.input == nil {
+			continue
+		}
+		value, err := normalizeProfileShortText(*field.input, field.max, field.label)
 		if err != nil {
 			httpx.Error(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		bio = value
-	}
-	if body.City != nil {
-		value, err := normalizeProfileShortText(*body.City, 100, "thành phố")
-		if err != nil {
-			httpx.Error(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		city = value
+		*field.value = value
 	}
 
 	_, err = s.db.Exec(r.Context(), `
 		UPDATE users
-		SET username=$1, display_name=$2, bio=COALESCE($3,bio), city=COALESCE($4,city), profile_updated_at=NOW()
-		WHERE id=$5
-	`, username, displayName, bio, city, claims.UserID)
+		SET username=$1, display_name=$2, bio=COALESCE($3,bio), city=COALESCE($4,city),
+		    workplace=COALESCE($5,workplace), school=COALESCE($6,school), profile_updated_at=NOW()
+		WHERE id=$7
+	`, username, displayName, bio, city, workplace, school, claims.UserID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -294,14 +306,23 @@ func (s *server) getUserProfile(w http.ResponseWriter, r *http.Request) {
 	var result struct {
 		profileState
 		ID                  int64 `json:"id"`
+		FriendCount         int64 `json:"friendCount"`
 		AllowFriendRequests bool  `json:"allowFriendRequests"`
 	}
 	err = s.db.QueryRow(r.Context(), `
- SELECT u.id,u.username,u.display_name,COALESCE(u.bio,''),COALESCE(u.city,''),COALESCE(u.avatar_ref,'')<>'',COALESCE(u.cover_ref,'')<>'',
- u.profile_updated_at,u.allow_friend_requests FROM users u WHERE u.username=$1
+ SELECT u.id,u.username,u.display_name,COALESCE(u.bio,''),COALESCE(u.city,''),
+ COALESCE(u.workplace,''),COALESCE(u.school,''),COALESCE(u.avatar_ref,'')<>'',COALESCE(u.cover_ref,'')<>'',
+ u.profile_updated_at,u.allow_friend_requests,
+ (SELECT count(*) FROM friend_connections fc
+   WHERE (fc.user_low=u.id OR fc.user_high=u.id) AND fc.status='accepted'
+   AND NOT EXISTS (SELECT 1 FROM user_blocks b
+     WHERE (b.blocker_id=fc.user_low AND b.blocked_id=fc.user_high)
+        OR (b.blocker_id=fc.user_high AND b.blocked_id=fc.user_low)))
+ FROM users u WHERE u.username=$1
  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
  (b.blocker_id=$2 AND b.blocked_id=u.id) OR (b.blocker_id=u.id AND b.blocked_id=$2))
- `, username, claims.UserID).Scan(&result.ID, &result.Username, &result.DisplayName, &result.Bio, &result.City, &result.AvatarSet, &result.CoverSet, &result.UpdatedAt, &result.AllowFriendRequests)
+ `, username, claims.UserID).Scan(&result.ID, &result.Username, &result.DisplayName, &result.Bio, &result.City, &result.Workplace, &result.School,
+		&result.AvatarSet, &result.CoverSet, &result.UpdatedAt, &result.AllowFriendRequests, &result.FriendCount)
 	if err != nil {
 		httpx.Error(w, 404, "profile not found")
 		return
