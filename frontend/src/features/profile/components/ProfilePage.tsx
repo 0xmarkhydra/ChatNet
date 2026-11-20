@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { ArrowRight, MapPin, Camera, ChevronDown, Image as ImageIcon, Mail, PencilLine, Plus, RefreshCw, Users, UserRound } from 'lucide-react'
 import type { Post } from '../../feed'
 import type { FriendConnection } from '../../contacts'
@@ -8,6 +8,8 @@ import UserAvatar from '../../../shared/ui/UserAvatar'
 import PostStatusPrompt from '../../../shared/ui/PostStatusPrompt'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import ProfileAvatarMenu from './ProfileAvatarMenu'
+import ProfileHero from './ProfileHero'
+import ProfileTabs from './ProfileTabs'
 
 type Section = 'posts' | 'media' | 'about' | 'friends'
 
@@ -50,70 +52,30 @@ export default function ProfilePage({
   onReloadPosts, onLoadMorePosts, onViewFriend, onOpenContacts, onOpenPost,
 }: Props) {
   const [section, setSection] = useState<Section>('posts')
-  const tabbarRef = useRef<HTMLDivElement>(null)
-  const activeTabRef = useRef<HTMLButtonElement>(null)
-
-  useLayoutEffect(() => {
-    const tabbar = tabbarRef.current
-    const activeTab = activeTabRef.current
-    if (!tabbar || !activeTab) return
-
-    const placeIndicator = () => {
-      const bar = tabbar.getBoundingClientRect()
-      const tab = activeTab.getBoundingClientRect()
-      tabbar.style.setProperty('--profile-tab-x', `${tab.left - bar.left + tabbar.scrollLeft}px`)
-      tabbar.style.setProperty('--profile-tab-width', `${tab.width}px`)
-      tabbar.classList.add('is-measured')
-    }
-
-    placeIndicator()
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(placeIndicator)
-    observer?.observe(tabbar)
-    observer?.observe(activeTab)
-    tabbar.addEventListener('scroll', placeIndicator, { passive: true })
-    window.addEventListener('resize', placeIndicator)
-    return () => {
-      observer?.disconnect()
-      tabbar.removeEventListener('scroll', placeIndicator)
-      window.removeEventListener('resize', placeIndicator)
-    }
-  }, [section])
   const acceptedFriends = useMemo(() => friends.filter(friend => friend.status === 'accepted'), [friends])
   const media = useMemo<ProfileMediaItem[]>(() => posts.flatMap(post => (post.attachments || [])
     .filter(item => (item.kind === 'image' || item.kind === 'video') && item.url)
     .map((attachment, index) => ({ postId: post.id, attachment, index }))), [posts])
-  const tabs: { id: Section; name: string }[] = [
-    { id: 'posts', name: 'Bài viết' },
-    { id: 'media', name: 'Ảnh & video' },
-    { id: 'about', name: 'Giới thiệu' },
-    { id: 'friends', name: 'Bạn bè' },
+  const tabs: { id: Section; label: string }[] = [
+    { id: 'posts', label: 'Bài viết' },
+    { id: 'media', label: 'Ảnh & video' },
+    { id: 'about', label: 'Giới thiệu' },
+    { id: 'friends', label: 'Bạn bè' },
   ]
 
 
   return (
     <div className="profile-page" aria-label="Trang cá nhân">
-      <section className="profile-page-hero">
-        <div className={`profile-page-cover ${coverSet && coverUrl ? 'has-user-cover' : 'has-default-cover'}`}>
-          {coverSet && coverUrl && <img src={coverUrl} alt="Ảnh bìa hồ sơ của bạn" draggable={false}
-            onError={event => { event.currentTarget.hidden = true; event.currentTarget.parentElement?.classList.remove('has-user-cover') }} />}
-          <button type="button" className="profile-page-cover-action" onClick={onChangeCover}
-            disabled={editBusy} title="Thay đổi ảnh bìa"><Camera size={17} aria-hidden="true" /><span>{coverSet ? 'Đổi ảnh bìa' : 'Thêm ảnh bìa'}</span></button>
-        </div>
-        <div className="profile-page-hero-bottom">
-          <div className="profile-page-avatar-wrap">
-            {profileNote}
-            <ProfileAvatarMenu username={username} displayName={displayName} avatarClassName="profile-page-avatar"
-              avatarSet={avatarSet} avatarVersion={avatarVersion} editBusy={editBusy} onChangeAvatar={onChangeAvatar} />
-          </div>
-          <div className="profile-page-identity-text">
-            <h1>{displayName}</h1>
-            <div className="profile-page-identity-meta">
-              <span>@{username}</span>
-              <span>{acceptedFriends.length.toLocaleString('vi-VN')} bạn bè</span>
-            </div>
-            {city && <p className="profile-page-identity-city"><MapPin size={15} aria-hidden="true" />Sống tại {city}</p>}
-          </div>
-          <div className="profile-page-hero-actions">
+      <ProfileHero displayName={displayName} username={username} city={city} friendCount={acceptedFriends.length}
+        coverUrl={coverSet ? coverUrl : undefined}
+        coverAction={<button type="button" className="profile-page-cover-action" onClick={onChangeCover}
+          disabled={editBusy} title="Thay đổi ảnh bìa"><Camera size={17} aria-hidden="true" /><span>{coverSet ? 'Đổi ảnh bìa' : 'Thêm ảnh bìa'}</span></button>}
+        avatar={<>
+          {profileNote}
+          <ProfileAvatarMenu username={username} displayName={displayName} avatarClassName="profile-page-avatar"
+            avatarSet={avatarSet} avatarVersion={avatarVersion} editBusy={editBusy} onChangeAvatar={onChangeAvatar} />
+        </>}
+        actions={<>
             <button type="button" className="profile-page-primary" onClick={onCreateStory}><Plus size={18} aria-hidden="true" />Thêm vào tin</button>
             <button type="button" className="profile-page-secondary" onClick={onEditProfile}><PencilLine size={17} aria-hidden="true" />Chỉnh sửa trang cá nhân</button>
             <DropdownMenu>
@@ -125,22 +87,12 @@ export default function ProfilePage({
                 <DropdownMenuItem onSelect={() => setSection('media')}><ImageIcon size={18} aria-hidden="true" />Ảnh &amp; video</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        </div>
-      </section>
-      <div className="profile-page-tabbar" ref={tabbarRef} role="tablist" aria-label="Chọn nội dung hồ sơ">
-          <span className="profile-page-tab-indicator" aria-hidden="true" />
-          {tabs.map(tab => (
-            <button key={tab.id} type="button" role="tab" id={`profile-page-tab-${tab.id}`}
-              aria-selected={section === tab.id} aria-controls="profile-page-tab-content"
-              ref={section === tab.id ? activeTabRef : undefined}
-              className={section === tab.id ? 'is-active' : ''} onClick={() => setSection(tab.id)}>{tab.name}</button>
-          ))}
-          {section !== 'posts' && (
-            <button type="button" className="profile-page-post-action" onClick={onReloadPosts}
-              disabled={postsBusy} aria-label="Làm mới nội dung"><RefreshCw size={17} aria-hidden="true" /></button>
-          )}
-        </div>
+        </>} />
+      <ProfileTabs tabs={tabs} active={section} onChange={setSection}
+        action={section !== 'posts' && (
+          <button type="button" className="profile-page-post-action" onClick={onReloadPosts}
+            disabled={postsBusy} aria-label="Làm mới nội dung"><RefreshCw size={17} aria-hidden="true" /></button>
+        )} />
 
       <div className="profile-page-columns">
         <ProfileSidebar username={username} email={email} bio={bio} city={city} friends={acceptedFriends} media={media}
@@ -160,6 +112,7 @@ export default function ProfilePage({
                     onCreatePost={onCreatePost}
                   />
                 </div>
+                <div className="profile-page-about profile-page-timeline-heading"><h2>Bài viết</h2></div>
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
                 <div className="profile-page-post-feed feed zalo-feed">{postCards}</div>

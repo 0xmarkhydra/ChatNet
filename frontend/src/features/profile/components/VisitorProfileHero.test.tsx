@@ -26,8 +26,11 @@ describe('VisitorProfileHero actions', () => {
           coverSet: false, updatedAt: '2026-01-01', allowFriendRequests: true, online: false }}
         relation="accepted" friendBusy={null} action="Bạn bè" request={async () => new Response()}
         onMessage={async () => {}} onFriendAction={() => {}} onRemoveFriendAction={onRemoveFriendAction}
-        tabs={[{id:'posts',label:'Bài viết'}]} activeTab="posts" onTabChange={() => {}} />))
+      />))
       await renderHero(true)
+      expect(host.querySelector('.profile-page-cover.has-default-cover')).not.toBeNull()
+      expect(host.querySelector('.profile-page-hero-bottom .profile-page-hero-actions')).not.toBeNull()
+      expect(host.querySelector('.profile-page-cover-action')).toBeNull()
       expect(host.querySelector('[data-online="true"]')).not.toBeNull()
       expect(host.textContent).toContain('Đang hoạt động')
       await renderHero(false)

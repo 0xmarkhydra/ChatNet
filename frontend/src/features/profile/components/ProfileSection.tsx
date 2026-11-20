@@ -8,6 +8,8 @@ import UserAvatar, { profileAssetUrl } from "../../../shared/ui/UserAvatar";
 import UiIcon from "../../../shared/ui/UiIcon";
 import ProfileNote from "./ProfileNote";
 import ProfileAvatarMenu from "./ProfileAvatarMenu";
+import ProfileHero from "./ProfileHero";
+import ProfileDetailsCard from "./ProfileDetailsCard";
 import { userLabel } from "../../../shared/utils/userLabel";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
@@ -375,7 +377,7 @@ export default function ProfileSection({
             />
 
             {profileTimelineOpen && (
-              <header className="personal-timeline-header">
+              <header className="personal-timeline-header profile-page-toolbar">
                 <button
                   type="button"
                   onClick={closeProfileTimeline}
@@ -383,9 +385,9 @@ export default function ProfileSection({
                 >
                   <ArrowLeft size={20} />
                 </button>
-                <h1 ref={profileHeadingRef} tabIndex={-1}>
+                <h2 ref={profileHeadingRef} tabIndex={-1}>
                   Trang cá nhân
-                </h1>
+                </h2>
                 <button
                   type="button"
                   onClick={() => setProfileEditorOpen(true)}
@@ -395,6 +397,26 @@ export default function ProfileSection({
                 </button>
               </header>
             )}
+            {profileTimelineOpen ? (
+              <ProfileHero username={name}
+                displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
+                city={profileMedia?.city}
+                coverUrl={profileMedia?.coverSet ? profileAssetUrl(name, "cover", profileMedia.updatedAt) : undefined}
+                coverAction={<button type="button" className="profile-page-cover-action"
+                  disabled={profileBusy !== null || mediaUploading === "profile"}
+                  onClick={() => coverFileInputRef.current?.click()}>
+                  <UiIcon name="photo" size={17} />
+                  {profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover")}
+                </button>}
+                avatar={<>
+                  <ProfileNote key={session.sessionId + ":timeline-note"} username={name} owner request={apiFetch} />
+                  <ProfileAvatarMenu username={name}
+                    displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
+                    avatarClassName="profile-page-avatar" avatarSet={Boolean(profileMedia?.avatarSet)}
+                    avatarVersion={profileMedia?.updatedAt} editBusy={profileBusy !== null || mediaUploading === "profile"}
+                    onChangeAvatar={() => avatarFileInputRef.current?.click()} />
+                </>} />
+            ) : (
             <section className="profile-hero">
               <div
                 className={`profile-cover-art ${profileMedia?.coverSet ? "has-cover" : ""}`}
@@ -484,13 +506,18 @@ export default function ProfileSection({
                 </button>
               </div>
             </section>
+            )}
 
             {profileTimelineOpen ? (
               <section
                 className="personal-timeline-content"
                 aria-label="Dòng thời gian cá nhân"
               >
-                <StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} owner />
+                <div className="profile-page-aside">
+                  <ProfileDetailsCard username={name} bio={profileMedia?.bio} city={profileMedia?.city}
+                    hasPrivateEmail={Boolean(session.user.email)} onEdit={() => setProfileEditorOpen(true)} />
+                  <StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} className="profile-page-about" owner />
+                </div>
                 <div className="personal-timeline-intro">
                   <div>
                     <strong>Khoảnh khắc của bạn</strong>
