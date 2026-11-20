@@ -30,10 +30,11 @@ services:
       dockerfile: Dockerfile.backend
     environment:
       PORT: "8080"
+      CHATNET_ENV: local
       DATABASE_URL: postgres://chatnet:chatnet@postgres:5432/chatnet?sslmode=disable
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-chatnet-demo-secret}
-      OTP_PEPPER: ${OTP_PEPPER:-chatnet-demo-otp-pepper}
+      JWT_SECRET: ${JWT_SECRET:-}
+      OTP_PEPPER: ${OTP_PEPPER:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_API_BASE_URL: ${RESEND_API_BASE_URL:-https://api.resend.com}
       CHATNET_EMAIL_FROM: ${CHATNET_EMAIL_FROM:-}
