@@ -57,6 +57,8 @@ import PinnedItemsPanel from "./PinnedItemsPanel";
 import type { ChatSectionProps } from "./ChatSectionProps";
 import { useConversationNotificationToggle } from "../hooks/useConversationNotificationToggle";
 import { useChatDragSurface } from "../hooks/useChatDragSurface";
+import { useChatSectionPanels } from "../hooks/useChatSectionPanels";
+import { useMessageLongPress } from "../hooks/useMessageLongPress";
 import useSlidingPill from "../../../shared/ui/useSlidingPill";
 
 export type { ChatSectionProps } from "./ChatSectionProps";
@@ -72,13 +74,9 @@ export default function ChatSection({
   addChatFiles,
   uploadMediaFiles,
   apiFetch,
-  beginConversationLongPress,
-  beginMessageLongPress,
   blockContact,
   blockedBusy,
   bottomRef,
-  cancelConversationLongPress,
-  cancelMessageLongPress,
   canEditGroup,
   canInviteActiveGroup,
   canManageActiveGroup,
@@ -130,8 +128,8 @@ export default function ChatSection({
   groupInviteSearch,
   groupInviteSelection,
   groupMembers,
-  groupMemberViewOpen,
   groupSettingsOpen,
+  groupMemberViewOpen,
   hasMoreConversations,
   hasMoreMessages,
   historyActionBusy,
@@ -157,18 +155,13 @@ export default function ChatSection({
   retryMessageHistory,
   messagesScrollRef,
   messageText,
-  moveConversationLongPress,
-  moveMessageLongPress,
   newChatMode,
   openConnectSurface,
   openGroupSettings,
-  openMessageActions,
-  openMessageReactions,
   onReactionUsers,
   onForwardMessage,
   openVisitor,
   pinBusy,
-  pinnedExpanded,
   pinnedItems,
   quickSearchControl,
   reactionPreviews,
@@ -188,6 +181,9 @@ export default function ChatSection({
   setChatListQuery,
   setChatSearchJump,
   setConversationActionId,
+  setMessageActionId,
+  setMessageActionMode,
+  setMessageCopyTarget,
   setConversationDetailsOpen,
   setConversationMenuPosition,
   setConversations,
@@ -199,8 +195,8 @@ export default function ChatSection({
   setGroupActivityViewedId,
   setGroupInviteSearch,
   setGroupInviteSelection,
-  setGroupMemberViewOpen,
   setGroupSettingsOpen,
+  setGroupMemberViewOpen,
   setLanguageSearch,
   setManuallyTranslated,
   setMessageAttachments,
@@ -208,7 +204,6 @@ export default function ChatSection({
   setMessageText,
   setNewChatMode,
   setNotice,
-  setPinnedExpanded,
   setQrOpen,
   setQuickSearchOpen,
   setReplyingTo,
@@ -221,8 +216,6 @@ export default function ChatSection({
   shareMyProfile,
   sortedChatListConversations,
   sortedGroupActivityEvents,
-  suppressConversationClick: suppressConversationClickRef,
-  suppressMessageClick,
   switchTab,
   t,
   toggleMessagePin,
@@ -239,6 +232,16 @@ export default function ChatSection({
   visibleLanguageOptions,
   visibleMessages,
 }: ChatSectionProps) {
+  const {
+    beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress,
+    cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress,
+    openMessageActions, openMessageReactions,
+    suppressConversationClick: suppressConversationClickRef, suppressMessageClick,
+  } = useMessageLongPress({
+    activeConversationId, setConversationActionId, setConversationMenuPosition,
+    setMessageActionId, setMessageActionMode, setMessageCopyTarget,
+  });
+  const { pinnedExpanded, setPinnedExpanded } = useChatSectionPanels({ activeConversationId });
   const {
     chatDragActive, chatDragDepth, setChatDragDepth, chatFileInputRef, setChatDragActive,
   } = useChatDragSurface(activeConversationId);

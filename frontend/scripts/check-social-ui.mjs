@@ -67,6 +67,7 @@ const repostOnly = process.argv.includes('--repost-only')
 const postShareMessages = []
 const mediaOnly = process.argv.includes('--media-only')
 const headerOnly = process.argv.includes('--header-only')
+const postHeaderOnly = process.argv.includes('--post-header-only')
 const postPreviewOnly = process.argv.includes('--post-preview-only')
 const postProfileOnly = process.argv.includes('--socco-67-only')
 let genericPreviewRequests = 0
@@ -1135,6 +1136,7 @@ try {
   await feed.waitFor({ state: 'visible' })
   const feedCards = feed.locator('.social-feed-center .post.zalo-post')
   await feedCards.first().waitFor({ state: 'visible' })
+  if (!postHeaderOnly) {
   const socialGeometry = await page.evaluate(() => {
     const keys = ['.social-feed-stories-card', '.social-feed-launcher', '.social-feed-filter-bar',
       '.social-feed-center .post.zalo-post', '.social-feed-suggestions']
@@ -1174,7 +1176,72 @@ try {
         && approx(socialGeometry[selector].width, centerWidth, 2)),
     'Feed cards, composer and stories must share a compact central column next to a narrower rail: '
       + JSON.stringify(socialGeometry))
+  }
   const postCard = feedCards.first()
+  for (const width of [1586, 375, 320]) {
+    await page.setViewportSize({ width, height: 992 })
+    const headerGeometry = await postCard.evaluate(card => {
+      const header = card.querySelector('.feed-post-header')
+      const avatar = header?.querySelector('.avatar')
+      const author = header?.querySelector('.post-author')
+      const name = author?.querySelector('strong')
+      if (!header || !avatar || !author || !name) return null
+      return Object.fromEntries([['card', card], ['header', header], ['avatar', avatar],
+        ['author', author], ['name', name]].map(([key, node]) =>
+        [key, node.getBoundingClientRect().toJSON()]))
+    })
+    assert(headerGeometry && headerGeometry.avatar.width >= 38 &&
+      headerGeometry.avatar.right + 6 <= headerGeometry.author.left &&
+      headerGeometry.author.right <= headerGeometry.card.right + 1 &&
+      headerGeometry.name.left >= headerGeometry.author.left - 1 &&
+      headerGeometry.name.right <= headerGeometry.author.right + 1 &&
+      headerGeometry.header.width <= headerGeometry.card.width &&
+      headerGeometry.avatar.top <= headerGeometry.author.bottom &&
+      headerGeometry.avatar.bottom >= headerGeometry.author.top,
+      'Newsfeed avatar must not overlap the author name at ' + width + 'px: ' + JSON.stringify(headerGeometry))
+  }
+  await page.setViewportSize({ width: 1586, height: 992 })
+  if (postHeaderOnly) {
+    const inspectRail = () => page.evaluate(() => {
+      const selectors = ['.social-feed', '.social-feed-grid', '.social-feed-side', '.social-feed-search-card', '.social-feed-suggestions', '.social-feed-stories-card']
+      return Object.fromEntries(selectors.map(key => {
+        const element = document.querySelector(key)
+        const rect = element?.getBoundingClientRect()
+        const css = element && getComputedStyle(element)
+        return [key, { top: rect?.top, height: rect?.height, position: css?.position, stickyTop: css?.top, scrollTop: element?.scrollTop, scrollHeight: element?.scrollHeight, clientHeight: element?.clientHeight }]
+      }))
+    })
+    // The fixture normally fits within one screen. Force a longer feed to verify
+    // the rail does not jump before sticky positioning engages.
+    await page.locator('.social-feed-center').evaluate(el => { el.style.minHeight = '2200px' })
+    const before = await inspectRail()
+    await feed.evaluate(el => { el.scrollTop = 250 })
+    await page.waitForTimeout(200)
+    const after = await inspectRail()
+    assert(before['.social-feed'].scrollTop === 0 && after['.social-feed'].scrollTop >= 200
+      && Math.abs(before['.social-feed-side'].top - before['.social-feed-stories-card'].top) <= 2
+      && Math.abs(after['.social-feed-side'].top - before['.social-feed-side'].top) <= 2,
+      'Right rail must start aligned with feed and stay pinned while feed scrolls: ' + JSON.stringify({before, after}))
+    const searchInput = page.locator('.social-feed-search-field input')
+    await searchInput.focus()
+    const focusRing = await page.locator('.social-feed-search-field').evaluate(element => {
+      const css = getComputedStyle(element)
+      const parent = element.closest('.social-feed-side')
+      const field = element.getBoundingClientRect()
+      const rail = parent?.getBoundingClientRect()
+      return { outlineWidth: css.outlineWidth, outlineOffset: css.outlineOffset,
+        fieldLeft: field.left, fieldRight: field.right, railLeft: rail?.left, railRight: rail?.right }
+    })
+    assert(focusRing.outlineWidth === '2px' && Number.parseFloat(focusRing.outlineOffset) <= -2
+      && focusRing.railLeft !== undefined && focusRing.railRight !== undefined
+      && focusRing.fieldLeft >= focusRing.railLeft && focusRing.fieldRight <= focusRing.railRight,
+      'Search focus outline must remain fully visible inside the scrolling right rail: ' + JSON.stringify(focusRing))
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('PASS: Pinned right rail, visible search focus outline and post author alignment')
+    await browser.close()
+    server.kill('SIGTERM')
+    process.exit(0)
+  }
   const postActions = postCard.locator('.feed-post-toolbar > button')
   assert(await postActions.count() === 4,
     'Post must show exactly four equal actions: Like, Comment, Share, Save')

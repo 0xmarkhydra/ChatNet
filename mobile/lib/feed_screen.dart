@@ -144,15 +144,13 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         ),
       );
       if (!mounted) return;
+      // Linear-time deduplication for accounts with many groups.
+      final knownIds = communities.map((room) => room['id']).toSet();
+      final additions = append
+          ? result.where((room) => knownIds.add(room['id'])).toList()
+          : result;
       setState(() {
-        communities = append
-            ? [
-                ...communities,
-                ...result.where(
-                  (room) => !communities.any((old) => old['id'] == room['id']),
-                ),
-              ]
-            : result;
+        communities = append ? [...communities, ...additions] : additions;
         moreCommunities = result.length == 100;
       });
     } catch (cause) {

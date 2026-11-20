@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Outlet } from "react-router-dom";
 import type { AppPageContext } from "../router/routePageContext";
+import { useMobileScrollChrome } from "./useMobileScrollChrome";
 
 type AppLayoutProps = {
   className: string;
@@ -14,8 +15,9 @@ type AppLayoutProps = {
 
 /** Shared shell: persistent header/sidebar, a route Outlet, then global dialogs. */
 export default function AppLayout({ className, sidebar, overlays, header, beforePage, outletContext, children }: AppLayoutProps) {
+  const shellRef = useMobileScrollChrome();
   return (
-    <main className={className}>
+    <main className={className} ref={shellRef}>
       {sidebar}
       {overlays}
       {header}

@@ -8,6 +8,7 @@ import SocialFeedComposer from "./SocialFeedComposer";
 import FeedFilters from "./FeedFilters";
 import FeedCommunitiesList from "./FeedCommunitiesList";
 import FeedPendingPost from "./FeedPendingPost";
+import FeedPostsFallback from "./FeedPostsFallback";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import type { FriendSearchResult, FriendConnection } from "../../contacts";
@@ -32,6 +33,7 @@ export type FeedSectionProps = {
   feedFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
   feedInfiniteScrollRef: RefObject<HTMLDivElement | null>;
   feedLoadingMore: boolean;
+  feedInitialLoading: boolean;
   feedPagingError: boolean;
   feedSearchActive: boolean;
   feedViewRef: RefObject<HTMLDivElement | null>;
@@ -47,6 +49,9 @@ export type FeedSectionProps = {
   mediaUploading: "chat" | "feed" | "profile" | "story" | null;
   name: string;
   normalizedSearch: string;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  communityCard: ReactNode;
   openVisitor: (username: string) => void;
   pendingPost: Post | null;
   postComposerRef: RefObject<HTMLTextAreaElement | null>;
@@ -90,6 +95,7 @@ export default function FeedSection({
   feedFiltersPill,
   feedInfiniteScrollRef,
   feedLoadingMore,
+  feedInitialLoading,
   feedPagingError,
   feedSearchActive,
   feedViewRef,
@@ -105,6 +111,9 @@ export default function FeedSection({
   mediaUploading,
   name,
   normalizedSearch,
+  searchQuery,
+  onSearchChange,
+  communityCard,
   openVisitor,
   pendingPost,
   postComposerRef,
@@ -165,8 +174,8 @@ export default function FeedSection({
                 }
               }}
             />
-            <div className="social-feed-grid">
-              <div className="social-feed-center">
+            <div className="social-feed-grid flex w-full min-w-0 flex-col gap-0 p-0 min-[761px]:mx-auto min-[761px]:grid min-[761px]:max-w-[700px] min-[761px]:grid-cols-[minmax(0,1fr)] min-[761px]:items-start min-[761px]:justify-center min-[761px]:gap-[22px] min-[761px]:px-[18px] min-[761px]:pt-[17px] min-[761px]:pb-9 min-[1121px]:max-w-[1040px] min-[1121px]:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] min-[1121px]:gap-[18px] min-[1331px]:grid-cols-[minmax(0,620px)_minmax(260px,320px)] min-[1331px]:gap-[22px] min-[1331px]:px-6 min-[1331px]:pt-5">
+              <div className="social-feed-center flex min-w-0 flex-col gap-0 min-[761px]:gap-[15px] min-[761px]:[&>*]:box-border min-[761px]:[&>*]:w-full min-[761px]:[&>*]:min-w-0">
                 {!feedCommunitiesOpen && (<>
                 {isProfileDesktop ? (
                   <SocialFeedStories
@@ -214,7 +223,7 @@ export default function FeedSection({
                   />
                 </>)}
 
-                {!feedCommunitiesOpen && (
+                {!feedCommunitiesOpen && !isProfileDesktop && (
                   <FeedFilters
                     isProfileDesktop={isProfileDesktop}
                     filter={feedFilter}
@@ -231,7 +240,7 @@ export default function FeedSection({
                     onLoadSaved={() => void loadSavedPosts()}
                   />
                 )}
-                <div className="feed zalo-feed">
+                <div className="feed zalo-feed" aria-busy={feedInitialLoading}>
                   {feedCommunitiesOpen ? (
                     <FeedCommunitiesList
                       groups={conversations}
@@ -244,7 +253,9 @@ export default function FeedSection({
                   {pendingPost && <FeedPendingPost post={pendingPost} />}
 
 
-                  {renderPosts(collapseQuickReposts(searchedPosts), isProfileDesktop)}
+                  {feedInitialLoading
+                    ? <FeedPostsFallback />
+                    : renderPosts(collapseQuickReposts(searchedPosts), isProfileDesktop)}
 
                   {feedPagingError && (
                     <div role="alert" className="soco-feed-load-more">
@@ -277,6 +288,7 @@ export default function FeedSection({
                     style={{ height: 1 }}
                   />
                   {searchedPosts.length === 0 &&
+                    !feedInitialLoading &&
                     !feedLoadingMore &&
                     !(feedSearchActive && postSearch.loading) &&
                     !(feedFilter === "following" && followingFeed.loading) &&
@@ -342,6 +354,9 @@ export default function FeedSection({
                   }}
                   onViewUser={openVisitor}
                   onViewContacts={() => switchTab("contacts")}
+                  searchQuery={searchQuery}
+                  onSearchChange={onSearchChange}
+                  communityCard={communityCard}
                 />
               )}
             </div>

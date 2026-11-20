@@ -1,5 +1,6 @@
 import type { FormEvent, Dispatch, RefObject, ReactNode, SetStateAction } from "react";
 import type { ChatTranslationSettings } from "../lib/conversationTranslationSettings";
+import type { MessageCopyTarget } from "../utils/messageCopyTarget";
 import type { GroupMember, Message, Conversation, NewChatMode, MessageReaction } from "../types";
 import type { FriendSearchResult, FriendConnection } from "../../contacts";
 import type { QueuedChatMessage } from "../lib/chatOutbox";
@@ -23,13 +24,9 @@ export type ChatSectionProps = {
   addChatFiles: (files: File[]) => Promise<void>;
   uploadMediaFiles: (files: File[], scope: 'chat' | 'feed' | 'story' | 'profile') => Promise<MediaAttachment[]>;
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
-  beginConversationLongPress: (id: number, x: number, y: number) => void;
-  beginMessageLongPress: (message: Message, x: number, y: number, button: number, pointerType: string, target: EventTarget | null) => void;
   blockContact: (friend: Pick<FriendSearchResult, "id" | "username" | "displayName">) => Promise<void>;
   blockedBusy: boolean;
   bottomRef: RefObject<HTMLDivElement | null>;
-  cancelConversationLongPress: () => void;
-  cancelMessageLongPress: () => void;
   canEditGroup: boolean;
   canInviteActiveGroup: boolean;
   canManageActiveGroup: boolean;
@@ -81,8 +78,8 @@ export type ChatSectionProps = {
   groupInviteSearch: string;
   groupInviteSelection: number[];
   groupMembers: GroupMember[];
-  groupMemberViewOpen: boolean;
   groupSettingsOpen: boolean;
+  groupMemberViewOpen: boolean;
   hasMoreConversations: boolean;
   hasMoreMessages: boolean;
   historyActionBusy: boolean;
@@ -108,18 +105,13 @@ export type ChatSectionProps = {
   retryMessageHistory: () => void;
   messagesScrollRef: RefObject<HTMLDivElement | null>;
   messageText: string;
-  moveConversationLongPress: (x: number, y: number) => void;
-  moveMessageLongPress: (x: number, y: number) => void;
   newChatMode: NewChatMode;
   openConnectSurface: (query?: string) => void;
   openGroupSettings: (conversation: Conversation) => void;
-  openMessageActions: (message: Message, target?: EventTarget | null) => void;
-  openMessageReactions: (message: Message) => void;
   onReactionUsers: (message: Message, emoji: string) => void;
   onForwardMessage: (message: Message) => void;
   openVisitor: (username: string) => void;
   pinBusy: boolean;
-  pinnedExpanded: boolean;
   pinnedItems: ({ type: "message"; pinnedAt: string; message: Message; } | { type: "activity"; pinnedAt: string; activity: GroupActivity; })[];
   quickSearchControl: ReactNode;
   reactionPreviews: Record<number, MessageReaction[]>;
@@ -139,6 +131,9 @@ export type ChatSectionProps = {
   setChatListQuery: Dispatch<SetStateAction<string>>;
   setChatSearchJump: Dispatch<SetStateAction<{ conversationId: number; messageId: number; revision: number; } | null>>;
   setConversationActionId: Dispatch<SetStateAction<number | null>>;
+  setMessageActionId: Dispatch<SetStateAction<number | null>>;
+  setMessageActionMode: Dispatch<SetStateAction<"reactions" | "actions">>;
+  setMessageCopyTarget: Dispatch<SetStateAction<MessageCopyTarget | null>>;
   setConversationDetailsOpen: Dispatch<SetStateAction<boolean>>;
   setConversationMenuPosition: Dispatch<SetStateAction<{ x: number; y: number; } | null>>;
   setConversations: Dispatch<SetStateAction<Conversation[]>>;
@@ -150,8 +145,8 @@ export type ChatSectionProps = {
   setGroupActivityViewedId: Dispatch<SetStateAction<number | null>>;
   setGroupInviteSearch: Dispatch<SetStateAction<string>>;
   setGroupInviteSelection: Dispatch<SetStateAction<number[]>>;
-  setGroupMemberViewOpen: Dispatch<SetStateAction<boolean>>;
   setGroupSettingsOpen: Dispatch<SetStateAction<boolean>>;
+  setGroupMemberViewOpen: Dispatch<SetStateAction<boolean>>;
   setLanguageSearch: Dispatch<SetStateAction<string>>;
   setManuallyTranslated: Dispatch<SetStateAction<Record<number, boolean>>>;
   setMessageAttachments: (update: SetStateAction<MediaAttachment[]>) => void;
@@ -159,7 +154,6 @@ export type ChatSectionProps = {
   setMessageText: (text: string) => void;
   setNewChatMode: Dispatch<SetStateAction<NewChatMode>>;
   setNotice: (message: string, kind?: ToastKind) => void;
-  setPinnedExpanded: Dispatch<SetStateAction<boolean>>;
   setQrOpen: Dispatch<SetStateAction<"mine" | "scan" | null>>;
   setQuickSearchOpen: Dispatch<SetStateAction<boolean>>;
   setReplyingTo: Dispatch<SetStateAction<Message | null>>;
@@ -172,8 +166,6 @@ export type ChatSectionProps = {
   shareMyProfile: () => Promise<void>;
   sortedChatListConversations: Conversation[];
   sortedGroupActivityEvents: GroupActivityEvent[];
-  suppressConversationClick: RefObject<number | null>;
-  suppressMessageClick: RefObject<number | null>;
   switchTab: (nextTab: Tab) => void;
   t: (key: UIMessageKey) => string;
   toggleMessagePin: (message: Message) => Promise<void>;

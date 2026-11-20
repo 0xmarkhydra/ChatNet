@@ -47,7 +47,7 @@ async function mount() {
 }
 
 afterEach(() => {
-  localStorage.clear()
+  globalThis.localStorage?.clear()
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })

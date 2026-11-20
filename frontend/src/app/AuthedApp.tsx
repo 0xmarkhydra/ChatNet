@@ -27,11 +27,10 @@ import { useUnreadDocumentTitle } from "./hooks/useUnreadDocumentTitle";
 import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
+import { revokeConversationMembership, resetConversationMembershipOnLogout, restoreConversationFromNotification } from "../features/chat/lib/conversationMembershipLifecycle";
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
 import {
   useChatQuickSearch,
-  type ChatQuickContact,
-  type ChatQuickHit,
 } from "../features/chat/hooks/useChatQuickSearch";
 import ChatQuickSearch from "../features/chat/components/ChatQuickSearch";
 import { useContactData } from "../features/contacts/hooks/useContactData";
@@ -89,6 +88,7 @@ import useSlidingPill from "../shared/ui/useSlidingPill";
 import MediaAttachmentsView from "../shared/ui/MediaAttachmentsView";
 import UiIcon from "../shared/ui/UiIcon";
 import NearbyRadar from "../features/discover/components/NearbyRadar";
+import CommunitySuggestions from "../features/discover/components/CommunitySuggestions";
 import PostComposer from "../features/feed/components/PostComposer";
 import FeedPostCard from "../features/feed/components/FeedPostCard";
 import ReactionParticipantsDialog from "../shared/ui/ReactionParticipantsDialog";
@@ -141,7 +141,7 @@ import "../features/chat/styles/community-groups.css";
 import CommunityGroupWizard, { type CommunityCreationExtras } from "../features/chat/components/CommunityGroupWizard";
 import GroupSettingsPanel from "../features/chat/components/GroupSettingsPanel";
 import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
-import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
+import { validGroupChannels } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
 import ContactsView from "../features/contacts/components/ContactsView";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
@@ -272,6 +272,7 @@ import HeaderSearch from "./header/HeaderSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
 import HeaderTitle from "./header/HeaderTitle";
+import HeaderFeedTabs from "./header/HeaderFeedTabs";
 import { searchLabels } from "./header/headerContext";
 import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
@@ -289,7 +290,6 @@ import ProfileComposerOverlay from "../features/profile/components/ProfileCompos
 import { useNearbyDiscovery } from "../features/discover/hooks/useNearbyDiscovery";
 import { useAccountSessions } from "../features/auth/hooks/useAccountSessions";
 import { usePushSettings } from "../features/notifications/hooks/usePushSettings";
-import { useMessageLongPress } from "../features/chat/hooks/useMessageLongPress";
 import { useMessageClipboard } from "../features/chat/hooks/useMessageClipboard";
 import { useMediaUploads } from "../features/chat/hooks/useMediaUploads";
 import { useContactActions } from "../features/contacts/hooks/useContactActions";
@@ -300,6 +300,9 @@ import { useMessageSender } from "../features/chat/hooks/useMessageSender";
 import { useOutboxDelivery } from "../features/chat/hooks/useOutboxDelivery";
 import { useConversationHistory } from "../features/chat/hooks/useConversationHistory";
 import { useGroupChannels } from "../features/chat/hooks/useGroupChannels";
+import { useGroupChannelLiveSync } from "../features/chat/hooks/useGroupChannelLiveSync";
+import { useChatMessageJumpFocus } from "../features/chat/hooks/useChatMessageJumpFocus";
+import { useGroupSettingsEscape } from "../features/chat/hooks/useGroupSettingsEscape";
 import { useDirectConversations } from "../features/chat/hooks/useDirectConversations";
 import { useGroupCreation } from "../features/chat/hooks/useGroupCreation";
 import { usePostSync } from "../features/feed/hooks/usePostSync";
@@ -325,7 +328,12 @@ import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
 import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
 import { useChatDraftState } from "../features/chat/hooks/useChatDraftState";
+import { useChatScrollCoordinator } from "../features/chat/hooks/useChatScrollCoordinator";
+import { useConversationViewReset } from "../features/chat/hooks/useConversationViewReset";
+import { useIncomingMessageAutoTranslation } from "../features/chat/hooks/useIncomingMessageAutoTranslation";
 import { useChatOutboxState } from "../features/chat/hooks/useChatOutboxState";
+import { useChatOutboxReceiptReconciliation } from "../features/chat/hooks/useChatOutboxReceiptReconciliation";
+import { useChatQuickSelectionActions } from "../features/chat/hooks/useChatQuickSelectionActions";
 import { useChatComposerSurface } from "../features/chat/hooks/useChatComposerSurface";
 import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
@@ -374,6 +382,16 @@ export default function AuthedApp({
   const routeLocation = useLocation();
   const isSearchResultsRoute = routeLocation.pathname === "/search";
   const navigate = useNavigate();
+  useEffect(() => {
+    const openSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        navigate(ROUTE.search);
+      }
+    };
+    window.addEventListener("keydown", openSearch);
+    return () => window.removeEventListener("keydown", openSearch);
+  }, [navigate]);
   const {
     tab, setTab, contactsScreen, setContactsScreen,
     desktopProfileSettings, setDesktopProfileSettings,
@@ -394,15 +412,12 @@ export default function AuthedApp({
     number | null
   >(null);
   const selectRoutedConversation = useChatConversationRoute(activeConversationId, setActiveConversationId);
-  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, pinnedExpanded, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setPinnedExpanded, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId, sessionId: session?.sessionId ?? null });
+  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId, sessionId: session?.sessionId ?? null });
 
   const activeConversationIdRef = useRef<number | null>(null);
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
   const activeChannelIdRef = useLatest(selectedChannelId);
   const activeConversationTypeRef = useRef<'group' | 'direct' | null>(null);
-  const [groupChannelUnreadStatus, setGroupChannelUnreadStatus] = useState<{ conversationId: number; available: boolean } | null>(null);
-  const groupChannelUnreadAvailable = groupChannelUnreadStatus?.conversationId === activeConversationId
-    ? groupChannelUnreadStatus.available : true;
   const groupChannels = groupChannelState.conversationId === activeConversationId
     ? groupChannelState.channels
     : validGroupChannels([], activeConversationId ?? 0);
@@ -412,11 +427,10 @@ export default function AuthedApp({
   const ownSendScrollConversation = useRef<number | null>(null);
   const [messageCopyTarget, setMessageCopyTarget] =
     useState<MessageCopyTarget | null>(null);
-  const { beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress, cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress, openMessageActions, openMessageReactions, suppressConversationClick, suppressMessageClick } = useMessageLongPress({ setConversationActionId, setConversationMenuPosition, setMessageActionId, setMessageActionMode, setMessageCopyTarget });
 
   const {
     messageDrafts, setMessageDrafts, channelDrafts, setChannelDrafts,
-    channelDraftKey, draft, messageText, messageAttachments,
+    channelDraftKey, draft, messageText, messageAttachments, setMessageText,
   } = useChatDraftState({
     userId: session?.user.id ?? 0,
     sessionRef,
@@ -710,6 +724,7 @@ export default function AuthedApp({
     hasMoreSavedPosts,
     setHasMoreSavedPosts,
     savedPostsBusy,
+    savedPostsLoaded,
     setSavedPostsBusy,
     savedPagingBusy,
     hasMorePosts,
@@ -763,6 +778,14 @@ export default function AuthedApp({
     sessionId: session?.sessionId,
     request: apiFetch,
   });
+  // The selected Feed view must not flash an empty state while its first page loads.
+  const feedInitialLoading = feedSearchActive
+    ? postSearch.loading
+    : feedFilter === "following"
+      ? followingFeed.loading
+      : feedFilter === "saved"
+        ? (!savedPostsLoaded && !savedPagingError) || (savedPostsBusy && savedPosts.length === 0)
+        : false;
   const feedLoadingMore = feedSearchActive
     ? postSearch.loadingMore
     : feedFilter === "saved"
@@ -777,6 +800,13 @@ export default function AuthedApp({
       : feedFilter === "following"
         ? Boolean(followingFeed.error)
         : postsPagingError;
+  const savedPostsLoader = useLatest(loadSavedPosts);
+  // Deep links and Back/Forward to ?feed=saved must fetch without a prior click.
+  useEffect(() => {
+    if (tab === "feed" && feedFilter === "saved" && session?.sessionId) {
+      void savedPostsLoader.current();
+    }
+  }, [tab, feedFilter, session?.sessionId, savedPostsLoader]);
   const feedInfiniteScrollRef = useFeedInfiniteScroll({
     enabled: tab === "feed" && (!feedSearchActive || searchHasScrolled),
     hasMore: feedSearchActive
@@ -891,18 +921,7 @@ export default function AuthedApp({
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
   }, [groupSettingsOpen, setGroupMemberViewOpen]);
 
-  useEffect(() => {
-    if (!groupSettingsOpen) return;
-    const onEscape = (event: KeyboardEvent) => {
-      if (
-        event.key === "Escape" &&
-        !document.querySelector("dialog[open]")
-      )
-        setGroupSettingsOpen(false);
-    };
-    window.addEventListener("keydown", onEscape);
-    return () => window.removeEventListener("keydown", onEscape);
-  }, [groupSettingsOpen, setGroupSettingsOpen]);
+  useGroupSettingsEscape(groupSettingsOpen, setGroupSettingsOpen);
 
   const conversationListSearch = useConversationListSearch({
     query: chatListQuery,
@@ -920,38 +939,12 @@ export default function AuthedApp({
     enabled: tab === "chat",
     request: apiFetch,
   });
-  useEffect(() => {
-    const jump = chatSearchJump;
-    if (
-      !jump ||
-      jump.conversationId !== activeConversationId ||
-      lastScrolledSearchJump.current === jump.revision ||
-      !messages.some((item) => item.id === jump.messageId)
-    )
-      return;
-    const frame = window.requestAnimationFrame(() => {
-      const target = document.querySelector(
-        `[data-message-id="${jump.messageId}"]`,
-      );
-      if (!target) return;
-      target.scrollIntoView({
-        block: "center",
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-      });
-      // A transient highlight makes the notification's exact message easy to locate.
-      if (target instanceof HTMLElement && typeof target.animate === "function") {
-        target.animate(
-          [
-            { outline: "2px solid var(--accent, #318a65)", outlineOffset: "3px", backgroundColor: "rgba(49,138,101,0.16)" },
-            { outline: "2px solid transparent", outlineOffset: "3px", backgroundColor: "transparent" },
-          ],
-          { duration: 2200, easing: "ease-out" },
-        );
-      }
-      lastScrolledSearchJump.current = jump.revision;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [messages, activeConversationId, chatSearchJump]);
+  useChatMessageJumpFocus({
+    jump: chatSearchJump,
+    activeConversationId,
+    messages,
+    lastScrolledRevision: lastScrolledSearchJump,
+  });
   const name = session?.user.username || "";
   const displayConversations = useMemo(
     () => withContactNicknames(conversations, contactMetadata),
@@ -984,77 +977,15 @@ export default function AuthedApp({
     activeConversationTypeRef.current = activeConversation?.type ?? null;
   }, [activeConversation?.type]);
 
-  // Channel selection stays inside the active group and never leaks into another conversation.
-  useEffect(() => {
-    const id = activeConversation?.type === 'group' ? activeConversation.id : null;
-    setGroupChannelState({ conversationId: id, channels: validGroupChannels([], id ?? 0) });
-    if (!id || !session?.token) return;
-    let activeRequest: AbortController | null = null;
-    const reload = async () => {
-      activeRequest?.abort();
-      const controller = new AbortController();
-      activeRequest = controller;
-      try {
-        const response = await apiFetch(`/api/conversations/${id}/channels`, { signal: controller.signal });
-        if (!response.ok) throw new Error('Không tải được kênh hội thoại.');
-        const raw = await response.json();
-        const channels = validGroupChannels(raw, id);
-        if (!controller.signal.aborted) {
-          const unreadAvailable = Array.isArray(raw) && raw.every(channel =>
-            typeof channel.unreadCount === 'number' && Number.isFinite(channel.unreadCount));
-          setGroupChannelUnreadStatus({ conversationId: id, available: unreadAvailable });
-          setGroupChannelState({ conversationId: id, channels });
-          // Keep the group's list badge in sync with the same per-channel unread
-          // counts shown in the picker. Do not replace the server count if the
-          // channels endpoint has no reliable unread metadata.
-          if (unreadAvailable) {
-            const totalUnread = totalGroupChannelUnread(channels);
-            setConversations(current => current.map(conversation =>
-              conversation.id === id && conversation.type === 'group' && conversation.unreadCount !== totalUnread
-                ? { ...conversation, unreadCount: totalUnread } : conversation));
-          }
-          setChannelSelection(current =>
-            current.conversationId === id && !channels.some(channel => channel.id === current.channelId)
-              ? { conversationId: id, channelId: 0 }
-              : current,
-          );
-
-        }
-      } catch {
-        if (!controller.signal.aborted) setNotice('Không tải được kênh hội thoại.', 'warning');
-      }
-    };
-    void reload();
-    const onUpdate = (event: Event) => {
-      const value = (event as CustomEvent<{ conversationId: number }>).detail;
-      if (value?.conversationId === id) void reload();
-    };
-    const onChannelEvent = (event: Event) => {
-      const detail = (event as CustomEvent<{ message?: Message }>).detail;
-      if (detail?.message?.conversationId === id) void reload();
-    };
-    const onChannelRead = (event: Event) => {
-      const detail = (event as CustomEvent<{ conversationId: number; channelId: number }>).detail;
-      if (detail?.conversationId !== id) return;
-      setGroupChannelState(current => current.conversationId !== id ? current : {
-        ...current,
-        channels: current.channels.map(channel => channel.id === detail.channelId
-          ? { ...channel, unreadCount: 0 } : channel),
-      });
-      // Only the opened channel was marked read; recalculate the group badge
-      // from all channels rather than clearing the entire group's unread count.
-      void reload();
-    };
-    window.addEventListener('chatnet:group-community-updated', onUpdate);
-    window.addEventListener('chatnet:group-channel-event', onChannelEvent);
-    window.addEventListener('chatnet:channel-read', onChannelRead);
-    return () => {
-      activeRequest?.abort();
-      window.removeEventListener('chatnet:group-community-updated', onUpdate);
-      window.removeEventListener('chatnet:group-channel-event', onChannelEvent);
-      window.removeEventListener('chatnet:channel-read', onChannelRead);
-    };
-  }, [activeConversation?.id, activeConversation?.type, session?.token]);
+  const { groupChannelUnreadAvailable } = useGroupChannelLiveSync({
+    groupConversationId: activeConversation?.type === "group" ? activeConversation.id : null,
+    sessionToken: session?.token ?? null,
+    request: apiFetch,
+    setGroupChannelState,
+    setChannelSelection,
+    setConversations,
+    setNotice,
+  });
   const conversationBlocked = Boolean(activeConversation?.type === 'direct' &&
     (activeConversation.blockedByMe || activeConversation.blockedByOther));
   const groupActivities = useGroupActivities(activeConversation?.type === 'group' ? activeConversation.id : null, session?.sessionId, apiFetch);
@@ -1086,16 +1017,27 @@ export default function AuthedApp({
     () => Object.fromEntries(friends.map(friend => [friend.username, friend.displayName || friend.username])),
     [friends],
   );
-  const visiblePosts = applyPostLikePreviews(posts, likePreviews);
-  const visibleMessages = messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
-    reactionPreviews[message.id]
-      ? {
-          ...message,
-          reactions: message.deleted ? [] : reactionPreviews[message.id],
-        }
-      : message,
+  // Message updates should not rebuild the feed previews, and unrelated shell
+  // state changes should not remap every visible message in a long conversation.
+  const visiblePosts = useMemo(
+    () => applyPostLikePreviews(posts, likePreviews),
+    [posts, likePreviews],
   );
-  const visibleProfilePosts = applyPostLikePreviews(profilePosts, likePreviews);
+  const visibleMessages = useMemo(
+    () => messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
+      reactionPreviews[message.id]
+        ? {
+            ...message,
+            reactions: message.deleted ? [] : reactionPreviews[message.id],
+          }
+        : message,
+    ),
+    [messages, selectedChannelId, reactionPreviews],
+  );
+  const visibleProfilePosts = useMemo(
+    () => applyPostLikePreviews(profilePosts, likePreviews),
+    [profilePosts, likePreviews],
+  );
   // Shared links are routed, while opening a card in the feed is local UI state.
   const feedRoutePostId = feedPostIdFromPath(routeLocation.pathname)
     ?? Number(new URLSearchParams(routeLocation.search).get("post"));
@@ -1186,42 +1128,14 @@ export default function AuthedApp({
     }
   }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, navigate]);
 
-  useEffect(() => {
-    activeConversationIdRef.current = activeConversationId;
-    messageScrollAtBottom.current = true;
-    cancelMessageLongPress();
-    // useMessageData owns room-specific clearing and its recently-visited
-    // cache. A second reset here caused an unnecessary blank render between
-    // PWA conversation selections.
-    setHasMoreMessages(false);
-    setMessagesLoadingMore(false);
-    messagesPagingBusy.current = false;
-    setGroupMembers([]);
-  }, [activeConversationId]);
-
-  useEffect(() => {
-    messageScrollAtBottom.current = true;
-  }, [selectedChannelId]);
-
-  function setMessageText(text: string) {
-    if (!activeConversationId) return;
-    if (selectedChannelId > 0) {
-      setChannelDrafts(current => ({
-        ...current,
-        [channelDraftKey]: { ...(current[channelDraftKey] ?? emptyDraft), text },
-      }));
-      return;
-    }
-    setMessageDrafts((current) => ({
-      ...current,
-      [activeConversationId]: {
-        ...(current[activeConversationId] ?? emptyDraft),
-        text,
-      },
-    }));
-  }
-
-
+  useConversationViewReset(activeConversationId, {
+    activeConversationIdRef,
+    messageScrollAtBottom,
+    messagesPagingBusy,
+    setHasMoreMessages,
+    setMessagesLoadingMore,
+    setGroupMembers,
+  });
 
 
   async function loadProfileMedia() {
@@ -1780,29 +1694,24 @@ export default function AuthedApp({
   }, [friendQuery, friendSearchRetry, newChatMode, session?.token, session?.sessionId, tab, desktopSection]);
 
   function purgeConversation(id: number) {
-    responseCache.current.invalidate(["conversations", "messages"]);
-    window.dispatchEvent(new CustomEvent("chatnet:message-history-cleared", { detail: { conversationId: id } }));
-    revokedConversationIds.current.add(id);
-    membershipSnapshot.current?.delete(id);
-    membershipEventSequence.current += 1;
-    setConversations((current) => current.filter((item) => item.id !== id));
-    setMessageDrafts((current) => {
-      const next = { ...current };
-      delete next[id];
-      return next;
+    revokeConversationMembership(id, {
+      responseCache,
+      revokedConversationIds,
+      membershipSnapshot,
+      membershipEventSequence,
+      activeConversationIdRef,
+      setConversations,
+      setMessageDrafts,
+      setActiveConversationId,
+      setHasMoreMessages,
+      setGroupMembers,
+      setGroupSettingsOpen,
+      setSharedContentOpen,
+      setTranslations,
+      setReplyingTo,
+      setMessageActionId,
+      setNotice,
     });
-    if (activeConversationIdRef.current === id) {
-      activeConversationIdRef.current = null;
-      setActiveConversationId(null);
-      setHasMoreMessages(false);
-      setGroupMembers([]);
-      setGroupSettingsOpen(false);
-      setSharedContentOpen(false);
-      setTranslations({});
-      setReplyingTo(null);
-      setMessageActionId(null);
-      setNotice("Bạn không còn là thành viên của nhóm này.");
-    }
   }
 
   function closeProfileTimeline() {
@@ -1847,10 +1756,10 @@ export default function AuthedApp({
     pendingSend.current = null;
     endSession(revoke, clearStorage, setNotice);
     setConversations([]);
-    revokedConversationIds.current.clear();
-    membershipSnapshot.current = null;
-    membershipSyncSequence.current += 1;
-    membershipEventSequence.current += 1;
+    resetConversationMembershipOnLogout({
+      revokedConversationIds, membershipSnapshot,
+      membershipSyncSequence, membershipEventSequence,
+    });
     setHasMoreConversations(false);
     setConversationLoadingMore(false);
     conversationOffset.current = 0;
@@ -1935,14 +1844,13 @@ export default function AuthedApp({
     sound: messageSoundEnabled,
     onError: (message) => setNotice(message, "warning"),
     onOpen: (conversation) => {
-      revokedConversationIds.current.delete(conversation.id);
-      membershipSnapshot.current?.add(conversation.id);
-      setConversations((current) => [
-        conversation,
-        ...current.filter((item) => item.id !== conversation.id),
-      ]);
-      switchTab("chat");
-      selectRoutedConversation(conversation.id);
+      restoreConversationFromNotification(conversation, {
+        revokedConversationIds,
+        membershipSnapshot,
+        setConversations,
+        switchTab,
+        selectConversation: selectRoutedConversation,
+      });
     },
   });
 
@@ -2024,59 +1932,30 @@ export default function AuthedApp({
     refreshStories,
   });
 
-  useLayoutEffect(() => {
-    const container = messagesScrollRef.current;
-    if (ownSendScrollConversation.current !== null) {
-      const sentInCurrentConversation =
-        ownSendScrollConversation.current === activeConversationId;
-      ownSendScrollConversation.current = null;
-      if (sentInCurrentConversation && container) {
-        // Only a local send overrides the reader's position; incoming messages never do.
-        pendingMessageScrollRestore.current = null;
-        container.scrollTop = container.scrollHeight;
-        messageScrollAtBottom.current = true;
-        return;
-      }
-    }
-    const restore = pendingMessageScrollRestore.current;
-    if (restore && container) {
-      container.scrollTop =
-        restore.top + container.scrollHeight - restore.height;
-      pendingMessageScrollRestore.current = null;
-      return;
-    }
-    // Preserve scroll position when reading history; only follow new messages
-    // when the reader was already near the bottom of the conversation.
-    if (container && messageScrollAtBottom.current)
-      container.scrollTop = container.scrollHeight;
-  }, [messages, outgoingMessage, chatOutbox]);
-
-  useEffect(() => {
-    if (
-      !translationPreferencesLoaded ||
-      !effectiveAutoTranslate ||
-      !session ||
-      !activeConversationId
-    )
-      return;
-    const missing = messages.filter(
-      (message) =>
-        !message.deleted &&
-        message.senderId !== session.user.id &&
-        Boolean(message.text.trim()) &&
-        !translations[message.id] &&
-        !translationAttempted.current.has(`${session.sessionId}:${effectiveTargetLanguage}:${message.id}:${message.editedAt ?? ""}`),
-    );
-    missing.forEach((message) => void translateMessage(message, false));
-  }, [
-    effectiveAutoTranslate,
-    translationPreferencesLoaded,
-    messages,
-    effectiveTargetLanguage,
-    session?.user.id,
-    session?.sessionId,
+  useChatScrollCoordinator({
     activeConversationId,
-  ]);
+    selectedChannelId,
+    messages,
+    outgoingMessage,
+    chatOutbox,
+    messagesScrollRef,
+    messageScrollAtBottom,
+    ownSendScrollConversation,
+    pendingMessageScrollRestore,
+  });
+
+  useIncomingMessageAutoTranslation({
+    enabled: effectiveAutoTranslate,
+    preferencesLoaded: translationPreferencesLoaded,
+    messages,
+    targetLanguage: effectiveTargetLanguage,
+    userId: session?.user.id ?? null,
+    sessionId: session?.sessionId ?? null,
+    activeConversationId,
+    translations,
+    attempted: translationAttempted,
+    translateMessage,
+  });
 
   const canSend = useMemo(
     () =>
@@ -2110,30 +1989,13 @@ export default function AuthedApp({
     setChatOnline,
   });
 
-  useEffect(() => {
-    if (!session || !messages.length || !chatOutboxRef.current.length) return;
-    const delivered = new Set(
-      messages
-        .filter(
-          (message) =>
-            message.senderId === session.user.id && Boolean(message.clientId),
-        )
-        .map((message) => `${message.conversationId}:${message.clientId}`),
-    );
-    if (!delivered.size) return;
-    updateChatOutbox((items) => {
-      if (
-        !items.some((item) =>
-          delivered.has(`${item.conversationId}:${item.clientId}`),
-        )
-      )
-        return items;
-      return items.filter(
-        (item) => !delivered.has(`${item.conversationId}:${item.clientId}`),
-      );
-    });
-  }, [messages, session?.sessionId]);
-
+  useChatOutboxReceiptReconciliation({
+    messages,
+    sessionId: session?.sessionId ?? null,
+    userId: session?.user.id ?? null,
+    chatOutboxRef,
+    updateChatOutbox,
+  });
 
   const unreadTotal = nativeNotifications.unreadCount ?? 0;
   const notificationItemCount = countNotificationItems(friendRequests, conversations)
@@ -2175,39 +2037,17 @@ export default function AuthedApp({
     likePreviews,
   });
   const sortedChatListConversations = sortChatListConversations(chatListConversations);
-  const openChatQuickContact = (contact: ChatQuickContact) => {
-    setQuickSearchOpen(false);
-    setGlobalSearch("");
-    setChatSearchJump(null);
-    if (contact.conversation) {
-      const selected = contact.conversation;
-      setConversations((current) =>
-        current.some((item) => item.id === selected.id)
-          ? current
-          : [...current, selected],
-      );
-      selectRoutedConversation(selected.id);
-    } else if (contact.username) {
-      void openDirectByUsername(contact.username);
-    }
-  };
-  const openChatQuickHit = (hit: ChatQuickHit) => {
-    setQuickSearchOpen(false);
-    setGlobalSearch("");
-    setConversations((current) =>
-      current.some((item) => item.id === hit.conversation.id)
-        ? current
-        : [...current, hit.conversation],
-    );
-    setChatSearchJump({
-      conversationId: hit.conversation.id,
-      messageId: hit.id,
-      revision: ++chatSearchJumpRevision.current,
-    });
-    selectRoutedConversation(hit.conversation.id);
-    setTranslations({});
-    setTranslationOriginals({});
-  };
+  const { openChatQuickContact, openChatQuickHit } = useChatQuickSelectionActions({
+    setQuickSearchOpen,
+    setGlobalSearch,
+    setChatSearchJump,
+    setConversations,
+    selectConversation: selectRoutedConversation,
+    openDirectByUsername,
+    nextRevision: nextChatSearchJumpRevision,
+    setTranslations,
+    setTranslationOriginals,
+  });
   async function openMentionPost(mention: PostMentionNotification) {
     if (!isCurrentMentionVisit()) return;
     try {
@@ -2243,8 +2083,7 @@ export default function AuthedApp({
         navigate({ pathname: routeLocation.pathname, search: "" }, { replace: true });
       }
     }
-    if (nextTab === "feed") setFeedFilter("all");
-    setQuickSearchOpen(false);
+     setQuickSearchOpen(false);
     setTab(nextTab);
     setQuickCreateOpen(false);
     setGlobalSearch("");
@@ -2497,7 +2336,6 @@ export default function AuthedApp({
       onChange={(value) => {
         if (tab === "contacts") setFriendQuery(value);
         else if (tab === "profile") {
-          setFeedFilter("all");
           setGlobalSearch(value);
           setTab("feed");
         } else {
@@ -2538,6 +2376,8 @@ export default function AuthedApp({
         notificationCount={notificationItemCount}
         feedSaved={feedFilter === "saved"}
         settingsActive={desktopProfileSettings}
+        searchActive={isSearchResultsRoute}
+        onSearch={() => navigate(ROUTE.search)}
         onNavigate={switchTab}
         onScreenshot={screenshot.captureWithoutWindow}
         screenshotBusy={screenshot.busy}
@@ -2629,8 +2469,9 @@ export default function AuthedApp({
       }
       header={
         <AppHeader
+          mobileSearchActions={tab === "feed"}
           className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
-          title={
+          start={
             <HeaderTitle
               tab={tab}
               searchResults={isSearchResultsRoute}
@@ -2646,8 +2487,16 @@ export default function AuthedApp({
               profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
             />
           }
-          search={searchInConversationList ? null : quickSearchControl}
-        >
+          center={tab === "feed" ? (
+            <>
+              <div className="appbar-feed-desktop"><HeaderFeedTabs
+                filter={feedFilter}
+                onChange={(next) => { setFeedCommunitiesOpen(false); setFeedFilter(next); }}
+              /></div>
+              <div className="appbar-feed-mobile">{quickSearchControl}</div>
+            </>
+          ) : searchInConversationList ? null : quickSearchControl}
+          end={
           <AppHeaderActions
             account={
               <HeaderAccount
@@ -2726,7 +2575,8 @@ export default function AuthedApp({
               }}
             />
           </AppHeaderActions>
-        </AppHeader>
+          }
+        />
       }
       beforePage={<AppShellNotices
         showPushPrompt={pushPrompt && !pushPromptDismissed && !pushEnabled}
@@ -2948,13 +2798,9 @@ export default function AuthedApp({
           addChatFiles={addChatFiles}
           uploadMediaFiles={uploadMediaFiles}
           apiFetch={apiFetch}
-          beginConversationLongPress={beginConversationLongPress}
-          beginMessageLongPress={beginMessageLongPress}
           blockContact={blockContact}
           blockedBusy={blockedBusy}
           bottomRef={bottomRef}
-          cancelConversationLongPress={cancelConversationLongPress}
-          cancelMessageLongPress={cancelMessageLongPress}
           canEditGroup={canEditGroup}
           canInviteActiveGroup={canInviteActiveGroup}
           canManageActiveGroup={canManageActiveGroup}
@@ -3006,8 +2852,8 @@ export default function AuthedApp({
           groupInviteSearch={groupInviteSearch}
           groupInviteSelection={groupInviteSelection}
           groupMembers={groupMembers}
-          groupMemberViewOpen={groupMemberViewOpen}
           groupSettingsOpen={groupSettingsOpen}
+          groupMemberViewOpen={groupMemberViewOpen}
           hasMoreConversations={hasMoreConversations}
           hasMoreMessages={hasMoreMessages}
           historyActionBusy={historyActionBusy}
@@ -3033,18 +2879,13 @@ export default function AuthedApp({
           retryMessageHistory={retryMessageHistory}
           messagesScrollRef={messagesScrollRef}
           messageText={messageText}
-          moveConversationLongPress={moveConversationLongPress}
-          moveMessageLongPress={moveMessageLongPress}
           newChatMode={newChatMode}
           openConnectSurface={openConnectSurface}
           openGroupSettings={openGroupSettings}
-          openMessageActions={openMessageActions}
-          openMessageReactions={openMessageReactions}
           onReactionUsers={(message, emoji) => setReactionTarget({kind: "message", id: message.id, initialEmoji: emoji, reactions: message.reactions})}
           onForwardMessage={setForwardSource}
           openVisitor={openVisitor}
           pinBusy={pinBusy}
-          pinnedExpanded={pinnedExpanded}
           pinnedItems={pinnedItems}
           quickSearchControl={quickSearchControl}
           reactionPreviews={reactionPreviews}
@@ -3064,6 +2905,9 @@ export default function AuthedApp({
           setChatListQuery={setChatListQuery}
           setChatSearchJump={setChatSearchJump}
           setConversationActionId={setConversationActionId}
+          setMessageActionId={setMessageActionId}
+          setMessageActionMode={setMessageActionMode}
+          setMessageCopyTarget={setMessageCopyTarget}
           setConversationDetailsOpen={setConversationDetailsOpen}
           setConversationMenuPosition={setConversationMenuPosition}
           setConversations={setConversations}
@@ -3075,8 +2919,8 @@ export default function AuthedApp({
           setGroupActivityViewedId={setGroupActivityViewedId}
           setGroupInviteSearch={setGroupInviteSearch}
           setGroupInviteSelection={setGroupInviteSelection}
-          setGroupMemberViewOpen={setGroupMemberViewOpen}
           setGroupSettingsOpen={setGroupSettingsOpen}
+          setGroupMemberViewOpen={setGroupMemberViewOpen}
           setLanguageSearch={setLanguageSearch}
           setManuallyTranslated={setManuallyTranslated}
           setMessageAttachments={setMessageAttachments}
@@ -3084,7 +2928,6 @@ export default function AuthedApp({
           setMessageText={setMessageText}
           setNewChatMode={setNewChatMode}
           setNotice={setNotice}
-          setPinnedExpanded={setPinnedExpanded}
           setQrOpen={setQrOpen}
           setQuickSearchOpen={setQuickSearchOpen}
           setReplyingTo={setReplyingTo}
@@ -3097,8 +2940,6 @@ export default function AuthedApp({
           shareMyProfile={shareMyProfile}
           sortedChatListConversations={sortedChatListConversations}
           sortedGroupActivityEvents={sortedGroupActivityEvents}
-          suppressConversationClick={suppressConversationClick}
-          suppressMessageClick={suppressMessageClick}
           switchTab={switchTab}
           t={t}
           toggleMessagePin={toggleMessagePin}
@@ -3205,6 +3046,7 @@ export default function AuthedApp({
           feedFiltersPill={feedFiltersPill}
           feedInfiniteScrollRef={feedInfiniteScrollRef}
           feedLoadingMore={feedLoadingMore}
+          feedInitialLoading={feedInitialLoading}
           feedPagingError={feedPagingError}
           feedSearchActive={feedSearchActive}
           feedViewRef={feedViewRef}
@@ -3220,6 +3062,21 @@ export default function AuthedApp({
           mediaUploading={mediaUploading}
           name={name}
           normalizedSearch={normalizedSearch}
+          searchQuery={globalSearch}
+          onSearchChange={setGlobalSearch}
+          communityCard={<CommunitySuggestions
+            title="Cộng đồng của bạn"
+            joinedItems={conversations.filter(group => group.type === "group").slice(0, 3).map(group => ({
+              id: group.id, name: group.name, memberCount: group.memberCount,
+              avatarUrl: group.avatarUrl,
+            }))}
+            onViewAll={() => switchTab("discover")}
+            onOpenJoined={(id) => {
+              switchTab("chat");
+              setChatListFilter("all");
+              selectRoutedConversation(id);
+            }}
+          />}
           openVisitor={openVisitor}
           pendingPost={pendingPost}
           postComposerRef={postComposerRef}
