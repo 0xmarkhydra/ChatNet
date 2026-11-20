@@ -54,7 +54,7 @@ type post struct {
 	Attachments       []mediax.Attachment `json:"attachments,omitempty"`
 	CreatedAt         time.Time           `json:"createdAt"`
 	RepostKind        string              `json:"repostKind,omitempty"`
-	OriginalPost     *repostPreview      `json:"originalPost,omitempty"`
+	OriginalPost      *repostPreview      `json:"originalPost,omitempty"`
 	RepostCount       int                 `json:"repostCount"`
 	MyRepostID        int64               `json:"myRepostId,omitempty"`
 }

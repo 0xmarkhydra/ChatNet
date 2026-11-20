@@ -60,6 +60,7 @@ export default function StoryViewer({
   const videoRef = useRef<HTMLVideoElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const replyInputRef = useRef<HTMLInputElement>(null)
+  const optionsButtonRef = useRef<HTMLButtonElement>(null)
 
   const groups = useMemo(() => {
     const authors = new Map<string, Story[]>()
@@ -264,7 +265,7 @@ export default function StoryViewer({
                   </button>
                 )}
                 <div className="story-screen-options">
-                  <button type="button" className="story-screen-icon-button" aria-label="Tùy chọn Story"
+                  <button ref={optionsButtonRef} type="button" className="story-screen-icon-button" aria-label="Tùy chọn Story"
                     aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>
                     <MoreHorizontal size={22} />
                   </button>
@@ -353,7 +354,10 @@ export default function StoryViewer({
         </aside>
         {highlightSaved && <p role="status" className="absolute bottom-4 left-4 rounded-lg bg-card p-2 text-foreground">Đã thêm vào Tin nổi bật.</p>}
         {request && isOwner && <Dialog open={highlightOpen} onOpenChange={setHighlightOpen}>
-          <DialogContent>
+          <DialogContent className="story-highlight-dialog z-[352]" onCloseAutoFocus={event => {
+            event.preventDefault()
+            optionsButtonRef.current?.focus()
+          }}>
             <DialogTitle>Thêm vào Tin nổi bật</DialogTitle>
             <DialogDescription>Giữ Story này trên hồ sơ sau khi hết 24 giờ.</DialogDescription>
             <StoryHighlightEditor key={activeStory.id} request={request} storyId={activeStory.id} onSaved={() => {

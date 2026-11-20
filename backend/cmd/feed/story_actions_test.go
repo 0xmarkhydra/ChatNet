@@ -57,13 +57,13 @@ func TestStoryActionsIntegration(t *testing.T) {
 	s := &server{db: db}
 	mux := http.NewServeMux()
 	for pattern, handler := range map[string]http.HandlerFunc{
-		"GET /api/stories": s.listStories,
-		"DELETE /api/stories/{id}": s.deleteStory,
-		"GET /api/stories/{id}/like": s.getStoryLikes,
-		"PUT /api/stories/{id}/like": s.changeStoryLike,
-		"DELETE /api/stories/{id}/like": s.changeStoryLike,
-		"GET /api/stories/highlights": s.listStoryHighlights,
-		"PUT /api/stories/{id}/highlight": s.changeStoryHighlight,
+		"GET /api/stories":                   s.listStories,
+		"DELETE /api/stories/{id}":           s.deleteStory,
+		"GET /api/stories/{id}/like":         s.getStoryLikes,
+		"PUT /api/stories/{id}/like":         s.changeStoryLike,
+		"DELETE /api/stories/{id}/like":      s.changeStoryLike,
+		"GET /api/stories/highlights":        s.listStoryHighlights,
+		"PUT /api/stories/{id}/highlight":    s.changeStoryHighlight,
 		"DELETE /api/stories/{id}/highlight": s.changeStoryHighlight,
 	} {
 		mux.Handle(pattern, authx.Middleware("test", handler))
@@ -91,7 +91,7 @@ func TestStoryActionsIntegration(t *testing.T) {
 	id, ordinaryID := create("Ghim tin"), create("Tin thường")
 	storyPath := fmt.Sprintf("/api/stories/%d", id)
 	likePath, highlightPath := storyPath+"/like", storyPath+"/highlight"
-	listPath := "/api/stories/highlights?username="+names[0]
+	listPath := "/api/stories/highlights?username=" + names[0]
 
 	call(1, "PUT", likePath, "", 204)
 	call(1, "PUT", likePath, "", 204)
