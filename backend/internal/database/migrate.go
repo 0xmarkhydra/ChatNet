@@ -80,6 +80,9 @@ var feedRepostsSQL string
 //go:embed migrations/018_comment_likes.sql
 var commentLikesSQL string
 
+//go:embed migrations/020_story_actions.sql
+var storyActionsSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -165,6 +168,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, commentLikesSQL); err != nil {
 		return fmt.Errorf("apply comment likes migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, storyActionsSQL); err != nil {
+		return fmt.Errorf("apply story actions migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)

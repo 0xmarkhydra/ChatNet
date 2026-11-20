@@ -1,9 +1,9 @@
 package main
 
 import (
-	"errors"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -54,7 +54,7 @@ type post struct {
 	Attachments       []mediax.Attachment `json:"attachments,omitempty"`
 	CreatedAt         time.Time           `json:"createdAt"`
 	RepostKind        string              `json:"repostKind,omitempty"`
-	OriginalPost     *repostPreview      `json:"originalPost,omitempty"`
+	OriginalPost      *repostPreview      `json:"originalPost,omitempty"`
 	RepostCount       int                 `json:"repostCount"`
 	MyRepostID        int64               `json:"myRepostId,omitempty"`
 }
@@ -132,6 +132,12 @@ func main() {
 	mux.Handle("GET /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStories)))
 	mux.Handle("POST /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createStory)))
 	mux.Handle("DELETE /api/stories/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteStory)))
+	mux.Handle("GET /api/stories/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getStoryLikes)))
+	mux.Handle("PUT /api/stories/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryLike)))
+	mux.Handle("DELETE /api/stories/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryLike)))
+	mux.Handle("GET /api/stories/highlights", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStoryHighlights)))
+	mux.Handle("PUT /api/stories/{id}/highlight", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryHighlight)))
+	mux.Handle("DELETE /api/stories/{id}/highlight", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryHighlight)))
 	s.mountMarketplace(mux)
 
 	port := config.Env("PORT", "8083")
@@ -400,7 +406,7 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	// ponytail: rows expire eagerly on reads; add object-store lifecycle cleanup when orphan cleanup ships.
-	_, _ = s.db.Exec(r.Context(), `DELETE FROM stories WHERE expires_at <= NOW()`)
+	_, _ = s.db.Exec(r.Context(), `DELETE FROM stories WHERE expires_at <= NOW() AND highlight_title IS NULL`)
 	rows, err := s.db.Query(r.Context(), `
 		SELECT s.id,u.username,u.display_name,COALESCE(s.storage_ref,''),COALESCE(s.original_name,''),
 		       COALESCE(s.content_type,''),COALESCE(s.size_bytes,0),s.kind,

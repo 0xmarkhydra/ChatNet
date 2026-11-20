@@ -1,3 +1,4 @@
+import { StoryHighlights } from '../../feed'
 import ProfileEditorPage from "./ProfileEditorPage";
 import { profileAssetUrl } from "../../../shared/ui/UserAvatar";
 import ProfilePage from "./ProfilePage";
@@ -160,6 +161,7 @@ export default function ProfileOverviewSection({
               />
             ) : (
               <ProfilePage
+                highlights={<StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} owner />}
                 username={name}
                 displayName={
                   profileMedia?.displayName || session.user.displayName || name

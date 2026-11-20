@@ -1,3 +1,4 @@
+import { StoryHighlights } from '../../feed'
 import VisitorProfileHero, { type VisitorProfileData } from './VisitorProfileHero'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
@@ -191,6 +192,7 @@ export default function VisitorProfile({ username, request, currentUser, token, 
         })
       }}
     />
+    <StoryHighlights key={profile.username} request={request} username={profile.username} />
     {visibleTab==='media' && <section className="visitor-media-panel" aria-label="Ảnh và video"><h2>Ảnh & video</h2><div className="visitor-media-grid">{media.map((item,index)=><button type="button" key={item.storageRef+'-'+index} onClick={()=>{const post=posts.find(post=>post.id===item.postId);if(post)onPostOpen(post)}} aria-label={'Mở bài viết chứa '+(item.kind==='video'?'video':'ảnh')}>
       {item.kind==='image'?<img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/>:<video src={item.url} preload="metadata" aria-label={item.name||'Video bài viết'}/>}
     </button>)}</div></section>}
