@@ -7,6 +7,33 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 @theme inline {
+  --font-sans: var(--soco-font-sans);
+  --font-mono: var(--soco-font-mono);
+  --text-ui-caption: var(--soco-type-caption);
+  --text-ui-label: var(--soco-type-label);
+  --text-ui-body: var(--soco-type-body);
+  --text-ui-subtitle: var(--soco-type-subtitle);
+  --text-ui-section: var(--soco-type-section);
+  --text-ui-page: var(--soco-type-page);
+  --text-ui-display: var(--soco-type-display);
+  --spacing-ui-1: var(--soco-space-1);
+  --spacing-ui-2: var(--soco-space-2);
+  --spacing-ui-3: var(--soco-space-3);
+  --spacing-ui-4: var(--soco-space-4);
+  --spacing-ui-5: var(--soco-space-5);
+  --spacing-ui-6: var(--soco-space-6);
+  --spacing-ui-8: var(--soco-space-8);
+  --radius-ui-sm: var(--soco-radius-sm);
+  --radius-ui-md: var(--soco-radius-md);
+  --radius-ui-lg: var(--soco-radius-lg);
+  --radius-ui-xl: var(--soco-radius-xl);
+  --shadow-ui-sm: var(--soco-shadow-sm);
+  --shadow-ui-md: var(--soco-shadow-md);
+  --shadow-ui-overlay: var(--soco-shadow-overlay);
+  --color-success: var(--soco-success);
+  --color-warning: var(--soco-warning);
+  --color-danger: var(--soco-danger);
+  --color-info: var(--soco-info);
   --color-background: var(--soco-canvas);
   --color-foreground: var(--soco-text);
   --color-card: var(--soco-surface);

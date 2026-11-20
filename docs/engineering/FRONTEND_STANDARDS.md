@@ -48,6 +48,8 @@ When present and approved, `socco-ui-fidelity` and `docs/DESIGN.md` add screen-s
 
 ## Shared UI and design system
 
+- For new or modified UI, follow [SocCO Design System](DESIGN_SYSTEM.md) for the approved font-family, typography, spacing, radius, color semantics, control/icon sizing, elevation, motion, and responsive/a11y checks. Apply these tokens incrementally; do not restyle unrelated legacy screens.
+
 - New reusable controls belong in `frontend/src/shared/ui/`, with feature logic staying in the owning feature. Check for an existing shared control before adding another variant.
 - For **new** interface code use Tailwind CSS v4 utilities and SocCO semantic tokens from `frontend/src/styles/tailwind.css`; avoid hard-coded colors, spacing and shadow values when semantic styles exist. Keep Lucide React for icons.
 - shadcn/ui components are **source-owned** in `shared/ui/`, not a runtime UI package. Before adding a component, inspect the generator's diff, keep imports within the `shared/` boundary and add behavior/a11y tests. The project alias is `@/*`.
