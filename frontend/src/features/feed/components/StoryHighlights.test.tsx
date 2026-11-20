@@ -28,7 +28,9 @@ it('shows an expired highlight on the profile and lets only its author remove it
   }
   try {
     await act(async () => root.render(<StoryHighlights key="visitor" username="owner" request={request} />))
-    await click('Chuyến đi')
+    const tile = host.querySelector<HTMLButtonElement>('ul[role="list"] button[aria-label="Chuyến đi"]')
+    expect(tile?.textContent).toContain('Tin đã hết hạn')
+    await act(async () => tile?.click())
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Tin đã hết hạn')
     expect(document.body.textContent).not.toContain('Gỡ khỏi Tin nổi bật')
     await act(async () => root.render(<StoryHighlights key="owner" username="owner" request={request} owner />))
