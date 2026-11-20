@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { Image as ImageIcon, ShieldCheck, Video } from 'lucide-react'
+import { Image as ImageIcon, Video } from 'lucide-react'
 import type { FriendConnection } from '../../contacts'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import type { ProfileMediaItem } from './ProfileMediaGallery'
@@ -72,7 +72,6 @@ export default function ProfileSidebar({ username, email, bio, city, friends, me
               </div>
             </section>
           )}
-          <div className="profile-page-privacy-note"><ShieldCheck size={18} aria-hidden="true" /><span>Thông tin hiển thị tuân theo cài đặt quyền riêng tư của tài khoản.</span></div>
         </aside>
   )
 }
