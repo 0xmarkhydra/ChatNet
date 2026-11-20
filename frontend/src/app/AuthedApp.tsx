@@ -87,6 +87,7 @@ import useSlidingPill from "../shared/ui/useSlidingPill";
 import MediaAttachmentsView from "../shared/ui/MediaAttachmentsView";
 import UiIcon from "../shared/ui/UiIcon";
 import NearbyRadar from "../features/discover/components/NearbyRadar";
+import CommunitySuggestions from "../features/discover/components/CommunitySuggestions";
 import PostComposer from "../features/feed/components/PostComposer";
 import FeedPostCard from "../features/feed/components/FeedPostCard";
 import ReactionParticipantsDialog from "../shared/ui/ReactionParticipantsDialog";
@@ -270,6 +271,7 @@ import HeaderSearch from "./header/HeaderSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
 import HeaderTitle from "./header/HeaderTitle";
+import HeaderFeedTabs from "./header/HeaderFeedTabs";
 import { searchLabels } from "./header/headerContext";
 import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
@@ -376,6 +378,16 @@ export default function AuthedApp({
   const routeLocation = useLocation();
   const isSearchResultsRoute = routeLocation.pathname === "/search";
   const navigate = useNavigate();
+  useEffect(() => {
+    const openSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        navigate(ROUTE.search);
+      }
+    };
+    window.addEventListener("keydown", openSearch);
+    return () => window.removeEventListener("keydown", openSearch);
+  }, [navigate]);
   const {
     tab, setTab, contactsScreen, setContactsScreen,
     desktopProfileSettings, setDesktopProfileSettings,
@@ -2397,6 +2409,8 @@ export default function AuthedApp({
         notificationCount={notificationItemCount}
         feedSaved={feedFilter === "saved"}
         settingsActive={desktopProfileSettings}
+        searchActive={isSearchResultsRoute}
+        onSearch={() => navigate(ROUTE.search)}
         onNavigate={switchTab}
         onScreenshot={screenshot.captureWithoutWindow}
         screenshotBusy={screenshot.busy}
@@ -2489,7 +2503,7 @@ export default function AuthedApp({
       header={
         <AppHeader
           className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
-          title={
+          start={
             <HeaderTitle
               tab={tab}
               searchResults={isSearchResultsRoute}
@@ -2505,8 +2519,16 @@ export default function AuthedApp({
               profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
             />
           }
-          search={searchInConversationList ? null : quickSearchControl}
-        >
+          center={tab === "feed" ? (
+            <>
+              <div className="appbar-feed-desktop"><HeaderFeedTabs
+                filter={feedFilter}
+                onChange={(next) => { setFeedCommunitiesOpen(false); setFeedFilter(next); }}
+              /></div>
+              <div className="appbar-feed-mobile">{quickSearchControl}</div>
+            </>
+          ) : searchInConversationList ? null : quickSearchControl}
+          end={
           <AppHeaderActions
             account={
               <HeaderAccount
@@ -2585,7 +2607,8 @@ export default function AuthedApp({
               }}
             />
           </AppHeaderActions>
-        </AppHeader>
+          }
+        />
       }
       beforePage={<AppShellNotices
         showPushPrompt={pushPrompt && !pushPromptDismissed && !pushEnabled}
@@ -3070,6 +3093,21 @@ export default function AuthedApp({
           mediaUploading={mediaUploading}
           name={name}
           normalizedSearch={normalizedSearch}
+          searchQuery={globalSearch}
+          onSearchChange={setGlobalSearch}
+          communityCard={<CommunitySuggestions
+            title="Cộng đồng của bạn"
+            joinedItems={conversations.filter(group => group.type === "group").slice(0, 3).map(group => ({
+              id: group.id, name: group.name, memberCount: group.memberCount,
+              avatarUrl: group.avatarUrl,
+            }))}
+            onViewAll={() => switchTab("discover")}
+            onOpenJoined={(id) => {
+              switchTab("chat");
+              setChatListFilter("all");
+              selectRoutedConversation(id);
+            }}
+          />}
           openVisitor={openVisitor}
           pendingPost={pendingPost}
           postComposerRef={postComposerRef}
