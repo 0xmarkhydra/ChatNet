@@ -119,7 +119,8 @@ export default function ProfilePage({
             <button type="button" className="profile-page-more" onClick={onCreatePost} aria-label="Đăng bài mới" title="Đăng bài mới"><Plus size={21} aria-hidden="true" /></button>
           </div>
         </div>
-        <div className="profile-page-tabbar" ref={tabbarRef} role="tablist" aria-label="Chọn nội dung hồ sơ">
+      </section>
+      <div className="profile-page-tabbar" ref={tabbarRef} role="tablist" aria-label="Chọn nội dung hồ sơ">
           <span className="profile-page-tab-indicator" aria-hidden="true" />
           {tabs.map(tab => (
             <button key={tab.id} type="button" role="tab" id={`profile-page-tab-${tab.id}`}
@@ -132,7 +133,6 @@ export default function ProfilePage({
               disabled={postsBusy} aria-label="Làm mới nội dung"><RefreshCw size={17} aria-hidden="true" /></button>
           )}
         </div>
-      </section>
 
       <div className="profile-page-columns">
         <ProfileSidebar username={username} email={email} bio={bio} city={city} friends={acceptedFriends} media={media}

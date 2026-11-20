@@ -30,6 +30,8 @@ describe('own profile navigation and composer', () => {
       />))
       const tabbar = host.querySelector('.profile-page-tabbar')
       expect(tabbar?.querySelector('.profile-page-tab-indicator')).not.toBeNull()
+      expect(tabbar?.parentElement?.classList.contains('profile-page')).toBe(true)
+      expect(host.querySelector('.profile-page-hero')?.contains(tabbar)).toBe(false)
       expect(tabbar?.classList.contains('is-measured')).toBe(true)
       expect(host.textContent).toContain('Trung ơi, bạn đang nghĩ gì?')
       const prompt = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.includes('đang nghĩ gì'))
