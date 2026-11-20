@@ -99,6 +99,8 @@ type server struct {
 	storage   *objectstore.Client
 }
 
+const conversationListDefaultLimit = 100
+
 func main() {
 	ctx := context.Background()
 	db, err := database.Open(ctx, config.Env("DATABASE_URL", "postgres://chatnet:chatnet@localhost:5432/chatnet?sslmode=disable"))
@@ -589,7 +591,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	limit := 2147483647 // Preserve the original unpaginated response for older app versions.
+	limit := conversationListDefaultLimit
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 1 || n > 100 {
