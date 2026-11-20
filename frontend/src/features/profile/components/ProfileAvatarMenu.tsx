@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Camera, Image, ImagePlus } from 'lucide-react'
+import { Image, ImagePlus } from 'lucide-react'
 import UserAvatar, { profileAssetUrl } from '@/shared/ui/UserAvatar'
 import { Button } from '@/shared/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
@@ -12,11 +12,10 @@ type Props = {
   avatarVersion?: string
   avatarSet: boolean
   editBusy: boolean
-  showCamera?: boolean
   onChangeAvatar: (opener: HTMLButtonElement | null) => void
 }
 
-export default function ProfileAvatarMenu({ username, displayName, avatarClassName, avatarVersion, avatarSet, editBusy, showCamera = false, onChangeAvatar }: Props) {
+export default function ProfileAvatarMenu({ username, displayName, avatarClassName, avatarVersion, avatarSet, editBusy, onChangeAvatar }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [failedUrl, setFailedUrl] = useState('')
   const trigger = useRef<HTMLButtonElement>(null)
@@ -52,11 +51,6 @@ export default function ProfileAvatarMenu({ username, displayName, avatarClassNa
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-    {showCamera && <Button type="button" variant="secondary" size="icon" className="profile-page-avatar-camera"
-      aria-label="Đổi ảnh đại diện" title="Đổi ảnh đại diện" disabled={editBusy}
-      onClick={event => onChangeAvatar(event.currentTarget)}>
-      <Camera size={18} aria-hidden="true" />
-    </Button>}
     <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
       <DialogContent className={showPhoto ? undefined : 'max-w-sm gap-4 p-4 sm:p-5'} onCloseAutoFocus={event => {
         event.preventDefault()

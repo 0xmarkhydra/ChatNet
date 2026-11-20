@@ -206,9 +206,10 @@ export default function ProfileSection({
   const [avatarPicker, setAvatarPicker] = useState<{ opener: HTMLButtonElement | null } | null>(null);
   const openAvatarPicker = (opener: HTMLButtonElement | null) => setAvatarPicker({ opener });
   const displayName = userLabel(profileMedia?.displayName || session.user.displayName, name);
-  const [timelineView, setTimelineView] = useState<"all" | "media">("all");
+  const [timelineView, setTimelineView] = useState<"all" | "media" | "edit">("all");
   const mobileTimeline = profileTimelineOpen && !isProfileDesktop;
   const mediaSelected = mobileTimeline && timelineView === "media";
+  const editSelected = mobileTimeline && timelineView === "edit";
   const coverLabel = profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover");
   return (
       <div
@@ -433,18 +434,12 @@ export default function ProfileSection({
                 <ProfileAvatarMenu username={name} displayName={displayName}
                   avatarClassName="profile-page-avatar" avatarSet={Boolean(profileMedia?.avatarSet)}
                   avatarVersion={profileMedia?.updatedAt} editBusy={profileBusy !== null || mediaUploading === "profile"}
-                  showCamera={mobileTimeline} onChangeAvatar={openAvatarPicker} />
+                  onChangeAvatar={openAvatarPicker} />
               </>}
               actions={mobileTimeline ? (
-                <>
-                  <Button size="lg" className="profile-page-story-action min-w-0 gap-1.5 px-2 text-ui-label" onClick={onCreateStory}>
-                    <Plus size={17} aria-hidden="true" />Thêm vào tin
-                  </Button>
-                  <Button size="lg" variant="secondary" className="min-w-0 gap-1.5 px-2 text-ui-label"
-                    onClick={() => setProfileEditorOpen(true)}>
-                    <PencilLine size={16} aria-hidden="true" />Chỉnh sửa hồ sơ
-                  </Button>
-                </>
+                <Button size="lg" className="profile-page-story-action min-w-0 gap-1.5 px-2 text-ui-label" onClick={onCreateStory}>
+                  <Plus size={17} aria-hidden="true" />Tạo tin
+                </Button>
               ) : !profileTimelineOpen && (
                 <>
                   <small className="profile-page-overview-email text-ui-label text-muted-foreground" title={session.user.email}>
@@ -467,10 +462,20 @@ export default function ProfileSection({
                   aria-pressed={timelineView === "all"} onClick={() => setTimelineView("all")}>Tất cả</Button>
                 <Button size="lg" variant={timelineView === "media" ? "secondary" : "ghost"}
                   aria-pressed={timelineView === "media"} onClick={() => setTimelineView("media")}>Ảnh &amp; video</Button>
+                <Button size="lg" variant={timelineView === "edit" ? "secondary" : "ghost"}
+                  aria-pressed={timelineView === "edit"} onClick={() => setTimelineView("edit")}>Chỉnh sửa hồ sơ</Button>
               </div>
             )}
 
-            {mediaSelected ? (
+            {editSelected ? (
+              <section className="personal-timeline-content profile-mobile-edit-panel" aria-label="Chỉnh sửa hồ sơ">
+                {profileIdentityForm}
+                <section className="settings-card profile-field-permissions" aria-label="Quyền trường thông tin">
+                  <h3>Quyền trường thông tin</h3>
+                  {profilePrivacyControls}
+                </section>
+              </section>
+            ) : mediaSelected ? (
               <section className="personal-timeline-content profile-mobile-media" aria-label="Ảnh và video">
                 {profilePostsError && <p role="alert">{profilePostsError}{" "}
                   <Button variant="outline" onClick={() => void loadProfilePosts(false, true)}>Thử lại</Button></p>}
@@ -491,21 +496,8 @@ export default function ProfileSection({
                 <div className="profile-page-aside">
                   <ProfileDetailsCard username={name} bio={profileMedia?.bio} city={profileMedia?.city}
                     workplace={profileMedia?.workplace} school={profileMedia?.school} iconEdit={mobileTimeline}
-                    hasPrivateEmail={Boolean(session.user.email)} onEdit={() => setProfileEditorOpen(true)} />
+                    hasPrivateEmail={Boolean(session.user.email)} onEdit={() => mobileTimeline ? setTimelineView("edit") : setProfileEditorOpen(true)} />
                   <StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} className="profile-page-about" owner />
-                </div>
-                <div className="personal-timeline-intro">
-                  <div>
-                    <strong>Khoảnh khắc của bạn</strong>
-                    <p>Lưu giữ và chia sẻ những câu chuyện mỗi ngày.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setProfileComposerOpen(true)}
-                  >
-                    <PencilLine size={18} />
-                    Đăng bài
-                  </button>
                 </div>
                 <div className="profile-post-launcher">
                   <UserAvatar

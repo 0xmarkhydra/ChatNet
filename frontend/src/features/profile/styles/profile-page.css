@@ -498,8 +498,7 @@
   height: clamp(156px, 48vw, 230px);
   border-radius: 19px 19px 0 0;
 }
-.profile-view > .profile-page-hero-centered .profile-page-cover-action,
-.profile-page-hero-centered .profile-page-avatar-camera {
+.profile-view > .profile-page-hero-centered .profile-page-cover-action {
   box-sizing: border-box;
   width: 44px;
   height: 44px;
@@ -536,17 +535,6 @@
   left: 50%;
   transform: translateX(-50%);
 }
-.profile-page-hero-centered .profile-hero-avatar.smart-avatar > .presence-dot {
-  right: auto;
-  left: 6%;
-  bottom: 6%;
-}
-.profile-page-hero-centered .profile-page-avatar-camera {
-  position: absolute;
-  z-index: 1;
-  right: -2px;
-  bottom: 0;
-}
 .profile-view > .profile-page-hero-centered .profile-page-identity-text { margin: 0; }
 .profile-page-hero-centered .profile-page-identity-text h1 { font-size: clamp(21px, 6.1vw, 29px); }
 .profile-page-hero-centered .profile-page-identity-summary {
@@ -561,7 +549,7 @@
 .profile-view > .profile-page-hero-centered .profile-page-hero-actions {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   width: 100%;
   margin: 3px 0 0;
@@ -570,12 +558,12 @@
 .modern-shell .profile-view > .profile-page-hero-centered .profile-page-hero-actions > .profile-page-story-action {
   color: var(--color-primary-foreground);
 }
-.modern-shell .profile-view > .profile-page-hero-centered button:is(.profile-page-cover-action, .profile-page-avatar-camera) {
+.modern-shell .profile-view > .profile-page-hero-centered button.profile-page-cover-action {
   border-radius: 50%;
 }
 .personal-timeline-view > .profile-mobile-section-picker {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, .76fr) minmax(0, 1fr) minmax(0, 1.28fr);
   gap: 6px;
   box-sizing: border-box;
   width: calc(100% - 24px);
@@ -587,8 +575,21 @@
   background: var(--soco-surface);
   flex-shrink: 0;
 }
+.profile-mobile-section-picker > button {
+  min-width: 0;
+  padding-inline: 4px;
+  white-space: normal;
+  font-size: var(--soco-type-label);
+}
 .profile-mobile-section-picker button[aria-pressed="true"] { background: var(--soco-soft-blue); color: var(--soco-blue); }
-.profile-mobile-media { display: grid; gap: 12px; }
+.profile-mobile-media,
+.profile-mobile-edit-panel { display: grid; gap: 12px; }
+.profile-mobile-edit-panel > :is(.profile-edit-card, .settings-card) {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+}
+.profile-mobile-edit-panel .profile-field-permissions { padding: 14px; }
 .profile-mobile-media > button { justify-self: center; }
 .personal-timeline-content .profile-page-about-heading {
   display: flex;

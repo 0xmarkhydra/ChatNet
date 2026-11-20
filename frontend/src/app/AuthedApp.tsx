@@ -170,7 +170,6 @@ import {
   type DiscussionDraft,
 } from "../features/feed/components/FeedDiscussion";
 import FeedModeration from "../features/feed/components/FeedModeration";
-import ProfileOverlay from "../features/profile/components/ProfileOverlay";
 import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
@@ -3223,27 +3222,6 @@ export default function AuthedApp({
           setProfileComposerOpen={setProfileComposerOpen}
         />
         )}
-      {profileEditorOpen &&
-        !isProfileDesktop &&
-        tab === "profile" &&
-        profileTimelineOpen && (
-          <ProfileOverlay
-            title="Chỉnh sửa hồ sơ"
-            drawer
-            busy={profileSaving || privacyBusy}
-            onClose={() => setProfileEditorOpen(false)}
-          >
-            {profileIdentityForm}
-            <section
-              className="settings-card profile-field-permissions"
-              aria-label="Quyền trường thông tin"
-            >
-              <h3>Quyền trường thông tin</h3>
-              {profilePrivacyControls}
-            </section>
-          </ProfileOverlay>
-        )}
-
       {postLinkToSend && (
         <SharedPostLinkPicker
           key={session.sessionId + ":" + postLinkToSend}
