@@ -105,6 +105,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
+	mux.HandleFunc("GET /live", s.live)
+	mux.HandleFunc("GET /ready", s.ready)
 	mux.HandleFunc("POST /api/auth/register/start", s.registerStart)
 	mux.HandleFunc("POST /api/auth/register/verify", s.registerVerify)
 	mux.HandleFunc("POST /api/auth/register/resend", s.registerResend)
@@ -146,6 +148,43 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]string{
 		"status": "ok", "service": "auth", "email": mailStatus,
 	})
+}
+
+func (s *server) live(w http.ResponseWriter, _ *http.Request) {
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "auth"})
+}
+
+func (s *server) ready(w http.ResponseWriter, r *http.Request) {
+	dependencies := map[string]string{
+		"database": "ok",
+		"redis":    "ok",
+		"email":    "ok",
+	}
+	dbCtx, dbCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+	defer dbCancel()
+	if s.db == nil || s.db.Ping(dbCtx) != nil {
+		dependencies["database"] = "unavailable"
+	}
+	redisCtx, redisCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+	defer redisCancel()
+	if s.redis == nil || s.redis.Ping(redisCtx).Err() != nil {
+		dependencies["redis"] = "unavailable"
+	}
+	if strings.TrimSpace(s.resendKey) == "" || strings.TrimSpace(s.emailFrom) == "" {
+		dependencies["email"] = "missing_config"
+	}
+	ready := true
+	for _, status := range dependencies {
+		if status != "ok" {
+			ready = false
+			break
+		}
+	}
+	status, code := "ok", http.StatusOK
+	if !ready {
+		status, code = "not_ready", http.StatusServiceUnavailable
+	}
+	httpx.JSON(w, code, map[string]any{"status": status, "service": "auth", "dependencies": dependencies})
 }
 
 // Auth credentials and OTP bodies are always small. Reject oversized, malformed,

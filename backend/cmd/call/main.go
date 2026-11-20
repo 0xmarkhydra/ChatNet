@@ -157,6 +157,10 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
+	mux.HandleFunc("GET /live", func(w http.ResponseWriter, _ *http.Request) {
+		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "call"})
+	})
+	mux.HandleFunc("GET /ready", s.ready)
 	mux.Handle("POST /api/calls", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createCall)))
 	mux.Handle("GET /api/calls/current", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.currentCalls)))
 	mux.Handle("GET /api/calls/history", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.callHistory)))
@@ -197,6 +201,35 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"ready":             configured,
 		"livekitConfigured": configured,
 	})
+}
+
+func (s *server) ready(w http.ResponseWriter, r *http.Request) {
+	dependencies := map[string]string{"database": "ok", "redis": "ok", "livekit": "ok"}
+	dbCtx, dbCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+	defer dbCancel()
+	if s.db == nil || s.db.Ping(dbCtx) != nil {
+		dependencies["database"] = "unavailable"
+	}
+	redisCtx, redisCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+	defer redisCancel()
+	if s.redis == nil || s.redis.Ping(redisCtx).Err() != nil {
+		dependencies["redis"] = "unavailable"
+	}
+	if !s.liveKitConfigured() {
+		dependencies["livekit"] = "missing_config"
+	}
+	ready := true
+	for _, status := range dependencies {
+		if status != "ok" {
+			ready = false
+			break
+		}
+	}
+	status, code := "ok", http.StatusOK
+	if !ready {
+		status, code = "not_ready", http.StatusServiceUnavailable
+	}
+	httpx.JSON(w, code, map[string]any{"status": status, "service": "call", "dependencies": dependencies})
 }
 
 // A direct call must never be created or resumed across a blocked pair.

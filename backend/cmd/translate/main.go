@@ -127,6 +127,10 @@ func main() {
 			"apiStyle": s.apiStyle,
 		})
 	})
+	mux.HandleFunc("GET /live", func(w http.ResponseWriter, _ *http.Request) {
+		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "translate"})
+	})
+	mux.HandleFunc("GET /ready", s.ready)
 	mux.HandleFunc("GET /health/provider", s.providerHealth)
 	mux.Handle("POST /api/translate", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.translate)))
 	mux.Handle("POST /api/i18n/bundle", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.translateUIBundle)))
@@ -134,6 +138,24 @@ func main() {
 	port := config.Env("PORT", "8084")
 	log.Printf("translate service listening on :%s provider=%s model=%s style=%s", port, s.provider, s.model, s.apiStyle)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
+}
+
+func (s *server) ready(w http.ResponseWriter, r *http.Request) {
+	dependencies := map[string]string{"database": "ok", "provider": "ok"}
+	dbCtx, dbCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+	defer dbCancel()
+	if s.db == nil || s.db.Ping(dbCtx) != nil {
+		dependencies["database"] = "unavailable"
+	}
+	if strings.TrimSpace(s.apiKey) == "" || strings.TrimSpace(s.baseURL) == "" || strings.TrimSpace(s.model) == "" {
+		dependencies["provider"] = "missing_config"
+	}
+	ready := dependencies["database"] == "ok" && dependencies["provider"] == "ok"
+	status, code := "ok", http.StatusOK
+	if !ready {
+		status, code = "not_ready", http.StatusServiceUnavailable
+	}
+	httpx.JSON(w, code, map[string]any{"status": status, "service": "translate", "dependencies": dependencies})
 }
 
 func (s *server) providerHealth(w http.ResponseWriter, r *http.Request) {

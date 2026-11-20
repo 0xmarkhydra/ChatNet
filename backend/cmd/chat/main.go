@@ -129,6 +129,10 @@ func main() {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
 	})
+	mux.HandleFunc("GET /live", func(w http.ResponseWriter, _ *http.Request) {
+		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
+	})
+	mux.HandleFunc("GET /ready", s.ready)
 	mux.Handle("GET /api/push/config", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.pushConfig)))
 	mux.Handle("POST /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.upsertPushSubscription)))
 	mux.Handle("DELETE /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deletePushSubscription)))
@@ -241,6 +245,26 @@ func main() {
 	port := config.Env("PORT", "8082")
 	log.Printf("chat service listening on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
+}
+
+func (s *server) ready(w http.ResponseWriter, r *http.Request) {
+	dependencies := map[string]string{"database": "ok", "redis": "ok"}
+	dbCtx, dbCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+	defer dbCancel()
+	if s.db == nil || s.db.Ping(dbCtx) != nil {
+		dependencies["database"] = "unavailable"
+	}
+	redisCtx, redisCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+	defer redisCancel()
+	if s.redis == nil || s.redis.Ping(redisCtx).Err() != nil {
+		dependencies["redis"] = "unavailable"
+	}
+	ready := dependencies["database"] == "ok" && dependencies["redis"] == "ok"
+	status, code := "ok", http.StatusOK
+	if !ready {
+		status, code = "not_ready", http.StatusServiceUnavailable
+	}
+	httpx.JSON(w, code, map[string]any{"status": status, "service": "chat", "dependencies": dependencies})
 }
 
 func (s *server) pushConfig(w http.ResponseWriter, r *http.Request) {
