@@ -1134,6 +1134,30 @@ try {
   await sidebar.getByRole('button', { name: 'Bảng tin' }).click()
   const feed = page.locator('.social-feed')
   await feed.waitFor({ state: 'visible' })
+  const searchGeometry = await page.evaluate(() => {
+    const selectors = ['.social-feed-stories-card', '.social-feed-side', '.social-feed-search-card',
+      '.social-feed-search-field', '.social-feed-suggestions']
+    return Object.fromEntries(selectors.map(selector => {
+      const el = document.querySelector(selector)
+      const rect = el?.getBoundingClientRect()
+      return [selector, rect ? { y: rect.y, height: rect.height, width: rect.width,
+        background: getComputedStyle(el).backgroundColor,
+        borderWidth: getComputedStyle(el).borderTopWidth,
+        boxShadow: getComputedStyle(el).boxShadow } : null]
+    }))
+  })
+  const stories = searchGeometry['.social-feed-stories-card']
+  const searchCard = searchGeometry['.social-feed-search-card']
+  const searchField = searchGeometry['.social-feed-search-field']
+  const suggestionsRect = searchGeometry['.social-feed-suggestions']
+  assert(stories && searchCard && searchField && suggestionsRect &&
+    Math.abs(searchField.y - stories.y) <= 2 &&
+    Math.abs(searchCard.y - stories.y) <= 2 &&
+    searchCard.background === 'rgba(0, 0, 0, 0)' &&
+    searchCard.borderWidth === '0px' &&
+    searchCard.boxShadow === 'none' &&
+    suggestionsRect.y >= searchField.y + searchField.height + 8,
+    'Feed search should align to the top of the feed without an outer white card: ' + JSON.stringify(searchGeometry))
   const feedCards = feed.locator('.social-feed-center .post.zalo-post')
   await feedCards.first().waitFor({ state: 'visible' })
   if (!postHeaderOnly) {

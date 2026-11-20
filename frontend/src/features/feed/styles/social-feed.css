@@ -603,7 +603,14 @@
 
 /* Desktop Feed sidebar: existing post search and member communities, not a second search backend. */
 @media (min-width: 761px) {
-  .modern-shell.app-layout .social-feed-search-card { padding: 12px 14px; }
+  /* Search is a standalone control, not a white surface card. */
+  .modern-shell.app-layout .social-feed-side-card.social-feed-search-card {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
   .modern-shell.app-layout .social-feed-search-field {
     display: flex; align-items: center; gap: 9px; min-width: 0;
     height: 44px; padding: 0 12px; border-radius: 22px;
