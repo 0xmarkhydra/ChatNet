@@ -8,6 +8,7 @@ import SocialFeedComposer from "./SocialFeedComposer";
 import FeedFilters from "./FeedFilters";
 import FeedCommunitiesList from "./FeedCommunitiesList";
 import FeedPendingPost from "./FeedPendingPost";
+import FeedPostsFallback from "./FeedPostsFallback";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import type { FriendSearchResult, FriendConnection } from "../../contacts";
@@ -32,6 +33,7 @@ export type FeedSectionProps = {
   feedFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
   feedInfiniteScrollRef: RefObject<HTMLDivElement | null>;
   feedLoadingMore: boolean;
+  feedInitialLoading: boolean;
   feedPagingError: boolean;
   feedSearchActive: boolean;
   feedViewRef: RefObject<HTMLDivElement | null>;
@@ -93,6 +95,7 @@ export default function FeedSection({
   feedFiltersPill,
   feedInfiniteScrollRef,
   feedLoadingMore,
+  feedInitialLoading,
   feedPagingError,
   feedSearchActive,
   feedViewRef,
@@ -237,7 +240,7 @@ export default function FeedSection({
                     onLoadSaved={() => void loadSavedPosts()}
                   />
                 )}
-                <div className="feed zalo-feed">
+                <div className="feed zalo-feed" aria-busy={feedInitialLoading}>
                   {feedCommunitiesOpen ? (
                     <FeedCommunitiesList
                       groups={conversations}
@@ -250,7 +253,9 @@ export default function FeedSection({
                   {pendingPost && <FeedPendingPost post={pendingPost} />}
 
 
-                  {renderPosts(collapseQuickReposts(searchedPosts), isProfileDesktop)}
+                  {feedInitialLoading
+                    ? <FeedPostsFallback />
+                    : renderPosts(collapseQuickReposts(searchedPosts), isProfileDesktop)}
 
                   {feedPagingError && (
                     <div role="alert" className="soco-feed-load-more">
@@ -283,6 +288,7 @@ export default function FeedSection({
                     style={{ height: 1 }}
                   />
                   {searchedPosts.length === 0 &&
+                    !feedInitialLoading &&
                     !feedLoadingMore &&
                     !(feedSearchActive && postSearch.loading) &&
                     !(feedFilter === "following" && followingFeed.loading) &&

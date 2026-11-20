@@ -724,6 +724,7 @@ export default function AuthedApp({
     hasMoreSavedPosts,
     setHasMoreSavedPosts,
     savedPostsBusy,
+    savedPostsLoaded,
     setSavedPostsBusy,
     savedPagingBusy,
     hasMorePosts,
@@ -777,6 +778,14 @@ export default function AuthedApp({
     sessionId: session?.sessionId,
     request: apiFetch,
   });
+  // The selected Feed view must not flash an empty state while its first page loads.
+  const feedInitialLoading = feedSearchActive
+    ? postSearch.loading
+    : feedFilter === "following"
+      ? followingFeed.loading
+      : feedFilter === "saved"
+        ? (!savedPostsLoaded && !savedPagingError) || (savedPostsBusy && savedPosts.length === 0)
+        : false;
   const feedLoadingMore = feedSearchActive
     ? postSearch.loadingMore
     : feedFilter === "saved"
@@ -791,6 +800,13 @@ export default function AuthedApp({
       : feedFilter === "following"
         ? Boolean(followingFeed.error)
         : postsPagingError;
+  const savedPostsLoader = useLatest(loadSavedPosts);
+  // Deep links and Back/Forward to ?feed=saved must fetch without a prior click.
+  useEffect(() => {
+    if (tab === "feed" && feedFilter === "saved" && session?.sessionId) {
+      void savedPostsLoader.current();
+    }
+  }, [tab, feedFilter, session?.sessionId, savedPostsLoader]);
   const feedInfiniteScrollRef = useFeedInfiniteScroll({
     enabled: tab === "feed" && (!feedSearchActive || searchHasScrolled),
     hasMore: feedSearchActive
@@ -2067,8 +2083,7 @@ export default function AuthedApp({
         navigate({ pathname: routeLocation.pathname, search: "" }, { replace: true });
       }
     }
-    if (nextTab === "feed") setFeedFilter("all");
-    setQuickSearchOpen(false);
+     setQuickSearchOpen(false);
     setTab(nextTab);
     setQuickCreateOpen(false);
     setGlobalSearch("");
@@ -2321,7 +2336,6 @@ export default function AuthedApp({
       onChange={(value) => {
         if (tab === "contacts") setFriendQuery(value);
         else if (tab === "profile") {
-          setFeedFilter("all");
           setGlobalSearch(value);
           setTab("feed");
         } else {
@@ -2455,6 +2469,7 @@ export default function AuthedApp({
       }
       header={tab === "profile" && desktopProfileOverview && !profileEditorOpen ? null : (
         <AppHeader
+          mobileSearchActions={tab === "feed"}
           className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
           start={
             <HeaderTitle
@@ -3031,6 +3046,7 @@ export default function AuthedApp({
           feedFiltersPill={feedFiltersPill}
           feedInfiniteScrollRef={feedInfiniteScrollRef}
           feedLoadingMore={feedLoadingMore}
+          feedInitialLoading={feedInitialLoading}
           feedPagingError={feedPagingError}
           feedSearchActive={feedSearchActive}
           feedViewRef={feedViewRef}
