@@ -235,14 +235,43 @@ try {
     fullWidth((await measure()).chat,'direct chat')
     assert.ok(await panel.locator('.media-composer').isVisible(),width+'px direct chat composer')
     const direct = await measure()
-    const directActions = await panel.locator('.translate-controls').evaluate(el =>
-      [...el.querySelectorAll('.call-header-actions > button, .group-settings-toggle')].map(btn => {
-        const r = btn.getBoundingClientRect()
-        return {w:r.width,h:r.height,right:r.right}
-      }))
-    assert.equal(directActions.length,5,width+'px direct chat retains all five header actions')
-    assert.ok(directActions.every(action=>action.w>0 && action.h>0 && action.right<=width+1),
-      width+'px direct chat header actions are visible and within the viewport: '+JSON.stringify(directActions))
+    const header = panel.locator('.chat-head')
+    const calls = header.locator('.compact-room-actions')
+    const directLayout = await header.evaluate(node => {
+      const box = selector => node.querySelector(selector).getBoundingClientRect()
+      const head = node.getBoundingClientRect()
+      const actions = box('.compact-room-actions')
+      const title = box('.room-copy > strong')
+      const subtitle = box('.room-subtitle')
+      const avatar = box('.room-avatar')
+      const y = rect => (rect.top + rect.bottom) / 2
+      const buttons = [...node.querySelectorAll('.compact-room-actions button')].map(button => button.getBoundingClientRect())
+      return { height: head.height, within: actions.top >= head.top && actions.bottom <= head.bottom + 1,
+        squareAvatar: avatar.width === avatar.height && avatar.width > 0,
+        sharedRow: Math.abs(y(subtitle) - y(actions)) < 2 && subtitle.right <= actions.left + 1,
+        titleAbove: title.bottom <= actions.top + 1,
+        targets: buttons.length === 3 && buttons.every(rect =>
+          rect.width >= 43.5 && rect.height >= 43.5 && rect.left >= head.left && rect.right <= head.right + 1) }
+    })
+    assert.ok(directLayout.within && directLayout.squareAvatar && directLayout.targets,
+      width+'px direct call and options controls must fit with 44px targets: '+JSON.stringify(directLayout))
+    if (width <= 365) {
+      assert.ok(directLayout.height <= 84 && directLayout.titleAbove && directLayout.sharedRow,
+        width+'px direct metadata and call controls must share one compact row: '+JSON.stringify(directLayout))
+    }
+    await page.evaluate(() => {
+      window.addEventListener('chatnet:start-call', event => {
+        event.stopImmediatePropagation()
+        window.__chatnetTestMobileCall = event.detail
+      }, {capture:true,once:true})
+    })
+    await calls.getByRole('button', {name:'Gọi video', exact:true}).click()
+    assert.deepEqual(await page.evaluate(() => window.__chatnetTestMobileCall), {conversationId:101,mediaType:'video'})
+    await calls.getByRole('button', {name:'Tùy chọn hội thoại'}).click()
+    for (const label of ['Tìm tin nhắn', 'Dịch AI', 'Thông tin hội thoại']) {
+      await page.getByRole('menuitem', {name:label, exact:true}).waitFor()
+    }
+    await page.keyboard.press('Escape')
     const composerActions = async () => panel.locator('.media-composer').evaluate(form =>
       [...form.querySelectorAll(':scope > .attach-button, :scope > .chat-composer-image, :scope > .voice-record-trigger, :scope > .send-button')]
         .map(btn => {const r=btn.getBoundingClientRect();return {w:r.width,h:r.height}}))
@@ -655,7 +684,7 @@ try {
       width+'px channel picker closes after selection')
     const groupChat = await measure()
     fullWidth(groupChat.chat,'channel chat')
-    assert.ok(Math.abs(groupChat.header.height-direct.header.height)<1.5 &&
+    assert.ok((width <= 365 || Math.abs(groupChat.header.height-direct.header.height)<1.5) &&
       Math.abs(groupChat.chat.height-direct.chat.height)<1.5 &&
       Math.abs(groupChat.composer.width-direct.composer.width)<1.5,
       width+'px group and direct chat share the same layout: '+JSON.stringify({direct,groupChat}))
@@ -670,10 +699,6 @@ try {
     assert.ok(actions.every(action=>Math.abs(action.w-actions[0].w)<1 &&
       Math.abs(action.h-actions[0].h)<1 && action.right<=width+1),
       width+'px chat header actions must be aligned: '+JSON.stringify(actions))
-    assert.ok(actions.every((action,index)=>
-      Math.abs(action.w-directActions[index].w)<0.6 &&
-      Math.abs(action.h-directActions[index].h)<0.6),
-      width+'px direct and channel header buttons must have identical sizes: '+JSON.stringify({directActions,channelActions:actions}))
     const groupComposerActions = await composerActions()
     assert.equal(groupComposerActions.length,directComposerActions.length,
       width+'px direct and channel composers must have the same primary actions')
