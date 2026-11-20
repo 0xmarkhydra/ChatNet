@@ -141,7 +141,7 @@ import "../features/chat/styles/community-groups.css";
 import CommunityGroupWizard, { type CommunityCreationExtras } from "../features/chat/components/CommunityGroupWizard";
 import GroupSettingsPanel from "../features/chat/components/GroupSettingsPanel";
 import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
-import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
+import { validGroupChannels } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
 import ContactsView from "../features/contacts/components/ContactsView";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
@@ -299,6 +299,7 @@ import { useMessageSender } from "../features/chat/hooks/useMessageSender";
 import { useOutboxDelivery } from "../features/chat/hooks/useOutboxDelivery";
 import { useConversationHistory } from "../features/chat/hooks/useConversationHistory";
 import { useGroupChannels } from "../features/chat/hooks/useGroupChannels";
+import { useGroupChannelLiveSync } from "../features/chat/hooks/useGroupChannelLiveSync";
 import { useDirectConversations } from "../features/chat/hooks/useDirectConversations";
 import { useGroupCreation } from "../features/chat/hooks/useGroupCreation";
 import { usePostSync } from "../features/feed/hooks/usePostSync";
@@ -399,9 +400,6 @@ export default function AuthedApp({
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
   const activeChannelIdRef = useLatest(selectedChannelId);
   const activeConversationTypeRef = useRef<'group' | 'direct' | null>(null);
-  const [groupChannelUnreadStatus, setGroupChannelUnreadStatus] = useState<{ conversationId: number; available: boolean } | null>(null);
-  const groupChannelUnreadAvailable = groupChannelUnreadStatus?.conversationId === activeConversationId
-    ? groupChannelUnreadStatus.available : true;
   const groupChannels = groupChannelState.conversationId === activeConversationId
     ? groupChannelState.channels
     : validGroupChannels([], activeConversationId ?? 0);
@@ -982,77 +980,15 @@ export default function AuthedApp({
     activeConversationTypeRef.current = activeConversation?.type ?? null;
   }, [activeConversation?.type]);
 
-  // Channel selection stays inside the active group and never leaks into another conversation.
-  useEffect(() => {
-    const id = activeConversation?.type === 'group' ? activeConversation.id : null;
-    setGroupChannelState({ conversationId: id, channels: validGroupChannels([], id ?? 0) });
-    if (!id || !session?.token) return;
-    let activeRequest: AbortController | null = null;
-    const reload = async () => {
-      activeRequest?.abort();
-      const controller = new AbortController();
-      activeRequest = controller;
-      try {
-        const response = await apiFetch(`/api/conversations/${id}/channels`, { signal: controller.signal });
-        if (!response.ok) throw new Error('Không tải được kênh hội thoại.');
-        const raw = await response.json();
-        const channels = validGroupChannels(raw, id);
-        if (!controller.signal.aborted) {
-          const unreadAvailable = Array.isArray(raw) && raw.every(channel =>
-            typeof channel.unreadCount === 'number' && Number.isFinite(channel.unreadCount));
-          setGroupChannelUnreadStatus({ conversationId: id, available: unreadAvailable });
-          setGroupChannelState({ conversationId: id, channels });
-          // Keep the group's list badge in sync with the same per-channel unread
-          // counts shown in the picker. Do not replace the server count if the
-          // channels endpoint has no reliable unread metadata.
-          if (unreadAvailable) {
-            const totalUnread = totalGroupChannelUnread(channels);
-            setConversations(current => current.map(conversation =>
-              conversation.id === id && conversation.type === 'group' && conversation.unreadCount !== totalUnread
-                ? { ...conversation, unreadCount: totalUnread } : conversation));
-          }
-          setChannelSelection(current =>
-            current.conversationId === id && !channels.some(channel => channel.id === current.channelId)
-              ? { conversationId: id, channelId: 0 }
-              : current,
-          );
-
-        }
-      } catch {
-        if (!controller.signal.aborted) setNotice('Không tải được kênh hội thoại.', 'warning');
-      }
-    };
-    void reload();
-    const onUpdate = (event: Event) => {
-      const value = (event as CustomEvent<{ conversationId: number }>).detail;
-      if (value?.conversationId === id) void reload();
-    };
-    const onChannelEvent = (event: Event) => {
-      const detail = (event as CustomEvent<{ message?: Message }>).detail;
-      if (detail?.message?.conversationId === id) void reload();
-    };
-    const onChannelRead = (event: Event) => {
-      const detail = (event as CustomEvent<{ conversationId: number; channelId: number }>).detail;
-      if (detail?.conversationId !== id) return;
-      setGroupChannelState(current => current.conversationId !== id ? current : {
-        ...current,
-        channels: current.channels.map(channel => channel.id === detail.channelId
-          ? { ...channel, unreadCount: 0 } : channel),
-      });
-      // Only the opened channel was marked read; recalculate the group badge
-      // from all channels rather than clearing the entire group's unread count.
-      void reload();
-    };
-    window.addEventListener('chatnet:group-community-updated', onUpdate);
-    window.addEventListener('chatnet:group-channel-event', onChannelEvent);
-    window.addEventListener('chatnet:channel-read', onChannelRead);
-    return () => {
-      activeRequest?.abort();
-      window.removeEventListener('chatnet:group-community-updated', onUpdate);
-      window.removeEventListener('chatnet:group-channel-event', onChannelEvent);
-      window.removeEventListener('chatnet:channel-read', onChannelRead);
-    };
-  }, [activeConversation?.id, activeConversation?.type, session?.token]);
+  const { groupChannelUnreadAvailable } = useGroupChannelLiveSync({
+    groupConversationId: activeConversation?.type === "group" ? activeConversation.id : null,
+    sessionToken: session?.token ?? null,
+    request: apiFetch,
+    setGroupChannelState,
+    setChannelSelection,
+    setConversations,
+    setNotice,
+  });
   const conversationBlocked = Boolean(activeConversation?.type === 'direct' &&
     (activeConversation.blockedByMe || activeConversation.blockedByOther));
   const groupActivities = useGroupActivities(activeConversation?.type === 'group' ? activeConversation.id : null, session?.sessionId, apiFetch);
