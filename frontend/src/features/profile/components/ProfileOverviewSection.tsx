@@ -23,6 +23,7 @@ export type ProfileOverviewSectionProps = {
   mediaUploading: "chat" | "feed" | "story" | "profile" | null;
   name: string;
   openVisitor: (username: string) => void;
+  onCreateStory: () => void;
   pendingPost: Post | null;
   privacy: UserPrivacy | null;
   privacyBusy: boolean;
@@ -67,6 +68,7 @@ export default function ProfileOverviewSection({
   mediaUploading,
   name,
   openVisitor,
+  onCreateStory,
   pendingPost,
   privacy,
   privacyBusy,
@@ -161,7 +163,7 @@ export default function ProfileOverviewSection({
               />
             ) : (
               <ProfilePage
-                highlights={<StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} owner />}
+                highlights={<StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} className="profile-page-about" owner />}
                 username={name}
                 displayName={
                   profileMedia?.displayName || session.user.displayName || name
@@ -175,6 +177,8 @@ export default function ProfileOverviewSection({
                     : undefined
                 }
                 coverSet={Boolean(profileMedia?.coverSet)}
+                avatarSet={Boolean(profileMedia?.avatarSet)}
+                avatarVersion={profileMedia?.updatedAt}
                 editBusy={profileBusy !== null || mediaUploading === "profile"}
                 friends={friends}
                 posts={profilePosts}
@@ -195,6 +199,7 @@ export default function ProfileOverviewSection({
                 onChangeAvatar={() => setProfilePhotoTarget('avatar')}
                 onChangeCover={() => setProfilePhotoTarget('cover')}
                 onCreatePost={() => setProfileComposerOpen(true)}
+                onCreateStory={onCreateStory}
                 onReloadPosts={() => void loadProfilePosts(false, true)}
                 onLoadMorePosts={() => void loadProfilePosts(true)}
                 onViewFriend={openVisitor}

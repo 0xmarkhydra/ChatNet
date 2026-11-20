@@ -7,7 +7,6 @@ import ProfilePage from './ProfilePage'
 vi.mock('../../../shared/ui/UserAvatar', () => ({
   default: ({ username }: { username: string }) => <span data-avatar={username} />,
 }))
-vi.mock('./ProfileSidebar', () => ({ default: () => <aside>Profile details</aside> }))
 vi.mock('./ProfileMediaGallery', () => ({ default: () => <div>Media gallery</div> }))
 
 describe('own profile navigation and composer', () => {
@@ -19,19 +18,46 @@ describe('own profile navigation and composer', () => {
     document.body.append(host)
     const root = createRoot(host)
     const onCreatePost = vi.fn()
+    const onCreateStory = vi.fn()
+    const onChangeAvatar = vi.fn()
     try {
       await act(async () => root.render(<ProfilePage
-        username="trung" displayName="Trung" coverSet={false} editBusy={false}
+        username="trung" displayName="Trung" coverSet={false} avatarSet={false} editBusy={false}
         friends={[]} posts={[]} pendingPost={null} postsBusy={false} postsError=""
         hasMorePosts={false} postCards={null} profileNote={null}
-        onEditProfile={() => {}} onChangeAvatar={() => {}} onChangeCover={() => {}}
-        onCreatePost={onCreatePost} onReloadPosts={() => {}} onLoadMorePosts={() => {}}
+        highlights={<section aria-label="Tin nổi bật" />}
+        onEditProfile={() => {}} onChangeAvatar={onChangeAvatar} onChangeCover={() => {}}
+        onCreatePost={onCreatePost} onCreateStory={onCreateStory} onReloadPosts={() => {}} onLoadMorePosts={() => {}}
         onViewFriend={() => {}} onOpenContacts={() => {}} onOpenPost={() => {}}
       />))
       const identityRow = host.querySelector('.profile-page-hero-bottom')
       expect(identityRow?.querySelector('.profile-page-avatar-wrap')).not.toBeNull()
       expect(identityRow?.querySelector('.profile-page-identity-text')).not.toBeNull()
       expect(identityRow?.querySelector('.profile-page-hero-actions')).not.toBeNull()
+      const info = host.querySelector('.profile-page-about')
+      expect(info?.querySelector('h2')?.textContent).toBe('Thông tin cá nhân')
+      expect(info?.nextElementSibling?.getAttribute('aria-label')).toBe('Tin nổi bật')
+      expect(host.querySelector('.profile-page-main [aria-label="Tin nổi bật"]')).toBeNull()
+      const story = [...host.querySelectorAll('button')].find(button => button.textContent === 'Thêm vào tin')
+      await act(async () => story?.click())
+      expect(onCreateStory).toHaveBeenCalledOnce()
+
+      const avatar = host.querySelector<HTMLButtonElement>('button[aria-label="Tùy chọn ảnh đại diện"]')
+      async function openAvatarMenu() {
+        await act(async () => {
+          avatar?.focus()
+          avatar?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+        })
+        return [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      }
+      const choices = await openAvatarMenu()
+      expect(choices.map(item => item.textContent)).toEqual(['Xem ảnh đại diện', 'Đổi ảnh đại diện'])
+      await act(async () => choices[0]?.click())
+      expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Bạn chưa có ảnh đại diện.')
+      await act(async () => document.querySelector<HTMLButtonElement>('[aria-label="Đóng hộp thoại"]')?.click())
+      const reopened = await openAvatarMenu()
+      await act(async () => reopened[1]?.click())
+      expect(onChangeAvatar).toHaveBeenCalledOnce()
       const tabbar = host.querySelector('.profile-page-tabbar')
       expect(tabbar?.querySelector('.profile-page-tab-indicator')).not.toBeNull()
       expect(tabbar?.parentElement?.classList.contains('profile-page')).toBe(true)

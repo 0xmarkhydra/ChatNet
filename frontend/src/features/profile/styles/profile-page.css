@@ -73,23 +73,22 @@
     gap: 7px;
     min-height: 33px;
     padding: 0 12px;
-    border: 1px solid rgba(255,255,255,.45);
+    border: 1px solid var(--soco-line);
     border-radius: 10px;
-    background: rgba(18,31,52,.53);
-    color: #fff;
+    background: var(--soco-surface);
+    color: var(--soco-text);
     font: inherit;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     backdrop-filter: blur(7px);
   }
-  .profile-page-cover-action:hover { background: rgba(18,31,52,.75); }
+  .profile-page-cover-action:hover { background: var(--soco-soft-blue); }
   .profile-page-avatar-wrap {
     position: relative;
     z-index: 2;
     box-sizing: border-box;
     width: 168px;
-    margin-top: -98px;
     height: 168px;
     padding: 5px;
     border-radius: 50%;
@@ -102,22 +101,7 @@
     border-radius: 50%;
     font-size: 48px;
   }
-  .profile-page-avatar-wrap > .profile-note { position: absolute; z-index: 2; top: -30px; right: -30px; }
-  .profile-page-avatar-action {
-    position: absolute;
-    z-index: 3;
-    bottom: 10px;
-    right: 4px;
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    border: 3px solid #fff;
-    border-radius: 50%;
-    background: #eef1fb;
-    color: #17233d;
-    cursor: pointer;
-  }
+  .profile-page-avatar-wrap > .profile-note { top: -36px; right: auto; bottom: auto; left: -12px; transform: none; }
   .profile-page-hero-bottom {
     position: relative;
     z-index: 2;
@@ -125,9 +109,9 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: start;
     gap: 12px 20px;
-    padding: 14px 24px 8px 32px;
+    padding: 28px 32px;
   }
-  /* Only the avatar overlaps the cover; identity and actions start below it. */
+  .profile-page-identity-text, .profile-page-hero-actions { margin-top: 22px; }
   .profile-page-identity-text { min-width: 0; overflow-wrap: anywhere; }
   .profile-page-identity-text h1 {
     margin: 0 0 5px;
@@ -148,11 +132,11 @@
     font-weight: 500;
     line-height: 1.5;
   }
-  .profile-page-friend-stack { display: flex; align-items: center; margin-top: 8px; padding-left: 8px; }
-  .profile-page .profile-page-stack-avatar.smart-avatar { width: 32px; height: 32px; margin-left: -8px; border: 2px solid #fff; border-radius: 50%; font-size: 12px; }
+  .profile-page-identity-city { display: flex; align-items: center; gap: 5px; margin: 4px 0 0; color: var(--soco-muted); font-size: 14px; }
   .profile-page-identity-meta > span:not(:first-child)::before { content: '·'; margin-right: 11px; color: #b4bed0; }
   .profile-page-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
   .profile-page-primary,
+  .profile-page-secondary,
   .profile-page-more,
   .profile-page-aside-action,
   .profile-page-info-edit {
@@ -172,11 +156,12 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  .profile-page-primary:hover { filter: brightness(.94); }
-  .profile-page-more { width: 40px; padding: 0; background: #eef1fb; color: #17233d; }
+  .profile-page-primary:hover, .profile-page-secondary:hover, .profile-page-more:hover { filter: brightness(.94); }
+  .profile-page-secondary, .profile-page-more { background: var(--soco-soft-blue); color: var(--soco-text); }
+  .profile-page-more { width: 40px; padding: 0; }
   .profile-page-columns {
     display: grid;
-    grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+    grid-template-columns: minmax(260px, 5fr) minmax(0, 7fr);
     gap: 16px;
     align-items: start;
     max-width: 1060px;
@@ -343,14 +328,15 @@
 
 @media (min-width: 761px) and (max-width: 1200px) {
   .modern-shell.app-layout .profile-page { padding: 0 17px 26px; }
-  .profile-page-columns { grid-template-columns: minmax(0,1fr); gap: 15px; }
-  .profile-page-columns { max-width: none; }
-  .profile-page-aside { grid-template-columns: repeat(2,minmax(0,1fr)); position: static; }
-  .profile-page-hero-bottom { padding-left: 32px; }
+  .profile-page-hero-bottom { padding-inline: 24px; }
+  .profile-page-hero-actions { max-width: 340px; }
 }
 @media (min-width: 761px) and (max-width: 940px) {
-  .profile-page-hero-bottom { grid-template-columns: auto minmax(0, 1fr); padding-left: 24px; }
-  .profile-page-hero-actions { grid-column: 2; }
+  .profile-page-columns { grid-template-columns: minmax(0, 1fr); }
+  .profile-page-aside { position: static; }
+  .profile-page-hero-bottom { grid-template-columns: auto minmax(0, 1fr); }
+  .profile-page-avatar-wrap { grid-row: span 2; }
+  .profile-page-hero-actions { grid-column: 2; margin-top: 0; }
   .profile-page-about { padding-inline: 14px; }
   .profile-page-recent { padding-inline: 13px; }
 }

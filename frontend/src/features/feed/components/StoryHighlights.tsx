@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
 import type { ApiRequest } from '@/shared/types/api'
 import { Button } from '@/shared/ui/button'
+import { cn } from '@/shared/lib/utils'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/shared/ui/dialog'
 import { changeStoryHighlight, readStoryHighlights, type StoryHighlight } from '../api/stories'
 import StoryHighlightEditor from './StoryHighlightEditor'
 import '../styles/story-text.css'
 
-type Props = { request: ApiRequest; username: string; owner?: boolean }
+type Props = { request: ApiRequest; username: string; owner?: boolean; className?: string }
 
 function HighlightMedia({ item, preview = false }: { item: StoryHighlight; preview?: boolean }) {
   const media = item.attachment
-  const thumbnail = 'aspect-square w-full rounded-ui-sm'
+  const thumbnail = 'aspect-[9/16] w-full rounded-ui-md'
   if (!media) {
     const background = item.background ?? 'berry'
     return preview ? (
@@ -22,11 +23,11 @@ function HighlightMedia({ item, preview = false }: { item: StoryHighlight; previ
     )
   }
   if (media.kind === 'video') return <video src={media.url} controls={!preview} muted={preview} playsInline preload={preview ? 'metadata' : 'auto'}
-    aria-label={media.name} aria-hidden={preview || undefined} className={preview ? `${thumbnail} block object-cover` : 'max-h-[52dvh] w-full rounded-lg'} />
-  return <img src={media.url} alt={preview ? '' : media.name} loading="lazy" className={preview ? `${thumbnail} block object-cover` : 'max-h-[52dvh] w-full rounded-lg object-contain'} />
+    aria-label={media.name} aria-hidden={preview || undefined} className={preview ? `${thumbnail} block bg-black object-contain` : 'max-h-[52dvh] w-full rounded-lg'} />
+  return <img src={media.url} alt={preview ? '' : media.name} loading="lazy" className={preview ? `${thumbnail} block bg-black object-contain` : 'max-h-[52dvh] w-full rounded-lg object-contain'} />
 }
 
-export default function StoryHighlights({ request, username, owner = false }: Props) {
+export default function StoryHighlights({ request, username, owner = false, className }: Props) {
   const [items, setItems] = useState<StoryHighlight[] | null>(null)
   const [revision, setRevision] = useState(0)
   const [focus, setFocus] = useState<number | null>(null)
@@ -69,15 +70,15 @@ export default function StoryHighlights({ request, username, owner = false }: Pr
 
   if (!owner && (!items || items.length === 0)) return null
   return (
-    <section className="rounded-ui-lg border border-border bg-card p-3 text-foreground" aria-label="Tin nổi bật">
+    <section className={cn('min-w-0 rounded-ui-lg border border-solid border-border bg-card p-4 text-foreground', className)} aria-label="Tin nổi bật">
       <h2 className="m-0 mb-3 text-ui-section font-semibold">Tin nổi bật</h2>
       {refreshError ? <div><p role="status">Không tải được Tin nổi bật.</p><Button size="sm" type="button" variant="outline" onClick={refresh}>Tải lại</Button></div>
         : !items ? <p role="status">Đang tải…</p>
         : items.length === 0 && <p className="text-sm text-muted-foreground">Mở Story của bạn và chọn “Thêm vào Tin nổi bật” để giữ tin trên hồ sơ.</p>}
       {items && items.length > 0 && (
-        <ul role="list" className="m-0 flex list-none gap-2 overflow-x-auto p-1">
+        <ul role="list" className="m-0 mt-2 grid list-none auto-cols-[calc((100%_-_1rem)/3)] grid-flow-col gap-2 overflow-x-auto overscroll-x-contain p-1">
           {items.map(item => (
-            <li key={item.id} className="w-28 shrink-0">
+            <li key={item.id} className="min-w-0">
               <Dialog open={focus === item.id} onOpenChange={open => {
                 if (!open && busy) return
                 setFocus(open ? item.id : null)
@@ -86,7 +87,7 @@ export default function StoryHighlights({ request, username, owner = false }: Pr
                 setError('')
               }}>
                 <DialogTrigger asChild>
-                  <button type="button" aria-label={item.title} className="grid w-full min-w-0 cursor-pointer appearance-none gap-1.5 rounded-ui-md border border-solid border-border bg-card p-1.5 text-left font-sans text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring">
+                  <button type="button" aria-label={item.title} className="grid w-full min-w-0 cursor-pointer appearance-none gap-1.5 rounded-ui-md border-0 bg-transparent p-0 text-center font-sans text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring">
                     <HighlightMedia item={item} preview />
                     <span className="line-clamp-2 wrap-anywhere px-0.5 pb-0.5 text-ui-label font-medium leading-snug">{item.title}</span>
                   </button>

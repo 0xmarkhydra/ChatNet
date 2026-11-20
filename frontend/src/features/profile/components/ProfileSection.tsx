@@ -7,6 +7,7 @@ import { AccountSessionsPanel } from "../../auth";
 import UserAvatar, { profileAssetUrl } from "../../../shared/ui/UserAvatar";
 import UiIcon from "../../../shared/ui/UiIcon";
 import ProfileNote from "./ProfileNote";
+import ProfileAvatarMenu from "./ProfileAvatarMenu";
 import { userLabel } from "../../../shared/utils/userLabel";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
@@ -447,27 +448,15 @@ export default function ProfileSection({
                     owner
                     request={apiFetch}
                   />
-                  <UserAvatar
+                  <ProfileAvatarMenu
                     username={name}
-                    name={userLabel(
-                      profileMedia?.displayName || session.user.displayName,
-                      name,
-                    )}
-                    className="profile-avatar"
-                    online
+                    displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
+                    avatarClassName="profile-avatar"
+                    avatarSet={Boolean(profileMedia?.avatarSet)}
+                    avatarVersion={profileMedia?.updatedAt}
+                    editBusy={profileBusy !== null || mediaUploading === "profile"}
+                    onChangeAvatar={() => avatarFileInputRef.current?.click()}
                   />
-                  <button
-                    type="button"
-                    className="profile-avatar-edit"
-                    aria-label="Đổi ảnh đại diện"
-                    title="Đổi ảnh đại diện"
-                    disabled={
-                      profileBusy !== null || mediaUploading === "profile"
-                    }
-                    onClick={() => avatarFileInputRef.current?.click()}
-                  >
-                    <UiIcon name="photo" size={17} />
-                  </button>
                 </div>
                 <button
                   type="button"

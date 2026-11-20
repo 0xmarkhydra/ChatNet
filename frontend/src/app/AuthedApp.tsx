@@ -2664,6 +2664,7 @@ export default function AuthedApp({
           mediaUploading={mediaUploading}
           name={name}
           openVisitor={openVisitor}
+          onCreateStory={() => setStoryDraft({ kind: "choose" })}
           pendingPost={pendingPost}
           privacy={privacy}
           privacyBusy={privacyBusy}
@@ -3170,7 +3171,7 @@ export default function AuthedApp({
       }}
     >
 
-      {storyDraft && tab === "feed" && (
+      {storyDraft && (tab === "feed" || tab === "profile") && (
           <StoryDraftOverlay
           createStory={createStory}
           mediaUploading={mediaUploading}

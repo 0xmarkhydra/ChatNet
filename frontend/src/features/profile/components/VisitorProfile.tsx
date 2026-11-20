@@ -192,16 +192,16 @@ export default function VisitorProfile({ username, request, currentUser, token, 
         })
       }}
     />
-    <StoryHighlights key={profile.username} request={request} username={profile.username} />
     {visibleTab==='media' && <section className="visitor-media-panel" aria-label="Ảnh và video"><h2>Ảnh & video</h2><div className="visitor-media-grid">{media.map((item,index)=><button type="button" key={item.storageRef+'-'+index} onClick={()=>{const post=posts.find(post=>post.id===item.postId);if(post)onPostOpen(post)}} aria-label={'Mở bài viết chứa '+(item.kind==='video'?'video':'ảnh')}>
       {item.kind==='image'?<img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/>:<video src={item.url} preload="metadata" aria-label={item.name||'Video bài viết'}/>}
     </button>)}</div></section>}
     {visibleTab==='about' && <section className="visitor-about-panel"><h2>Giới thiệu</h2>{profile.bio&&<p>{profile.bio}</p>}{profile.city&&<p><MapPin size={18} aria-hidden="true"/>Sống tại {profile.city}</p>}<small>Chỉ thông tin công khai được hiển thị.</small></section>}
     {visibleTab==='posts' && <div className="visitor-cols">
-      {(profile.bio||profile.city||media.length>0)&&<aside ref={sidebar} className="visitor-sidebar" style={{'--visitor-sticky-top':sidebarTop+'px'} as CSSProperties}>
-        {(profile.bio||profile.city)&&<section className="visitor-side-section"><h2>Giới thiệu</h2>{profile.bio&&<p>{profile.bio}</p>}{profile.city&&<p className="visitor-side-detail"><span><MapPin size={19} aria-hidden="true"/></span>Sống tại {profile.city}</p>}</section>}
-        {media.some(item=>item.kind==='image')&&<section className="visitor-side-section visitor-side-photos"><div className="visitor-side-heading"><h2>Ảnh</h2><button type="button" onClick={()=>setActiveTab('media')}>Xem tất cả</button></div><div className="visitor-photo-mosaic">{media.filter(item=>item.kind==='image').slice(0,5).map((item,index)=><button type="button" key={item.storageRef+'-'+index} aria-label="Xem ảnh bài viết" onClick={()=>setActiveTab('media')}><img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/></button>)}</div></section>}
-      </aside>}
+      <aside ref={sidebar} className="visitor-sidebar" style={{'--visitor-sticky-top':sidebarTop+'px'} as CSSProperties}>
+        <section className="visitor-side-section visitor-side-card"><h2>Thông tin cá nhân</h2><p>@{profile.username}</p>{profile.bio&&<p>{profile.bio}</p>}{profile.city&&<p className="visitor-side-detail"><span><MapPin size={19} aria-hidden="true"/></span>Sống tại {profile.city}</p>}</section>
+        <StoryHighlights key={profile.username} request={request} username={profile.username} className="visitor-side-section visitor-side-card" />
+        {media.some(item=>item.kind==='image')&&<section className="visitor-side-section visitor-side-card visitor-side-photos"><div className="visitor-side-heading"><h2>Ảnh</h2><button type="button" onClick={()=>setActiveTab('media')}>Xem tất cả</button></div><div className="visitor-photo-mosaic">{media.filter(item=>item.kind==='image').slice(0,5).map((item,index)=><button type="button" key={item.storageRef+'-'+index} aria-label="Xem ảnh bài viết" onClick={()=>setActiveTab('media')}><img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/></button>)}</div></section>}
+      </aside>
       <main className="visitor-posts"><div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
     <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={(id)=>{if(id===post.id)onPostOpen(post);else onOpenOriginal?.(id)}} onRepostChanged={onRepostChanged} onShareToChat={onShareToChat} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
     {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}

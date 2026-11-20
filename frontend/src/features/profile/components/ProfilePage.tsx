@@ -1,11 +1,13 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowRight, MapPin, Camera, Image as ImageIcon, Mail, PencilLine, Plus, RefreshCw, Users, UserRound } from 'lucide-react'
+import { ArrowRight, MapPin, Camera, ChevronDown, Image as ImageIcon, Mail, PencilLine, Plus, RefreshCw, Users, UserRound } from 'lucide-react'
 import type { Post } from '../../feed'
 import type { FriendConnection } from '../../contacts'
 import ProfileMediaGallery, { type ProfileMediaItem } from './ProfileMediaGallery'
 import ProfileSidebar from './ProfileSidebar'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import PostStatusPrompt from '../../../shared/ui/PostStatusPrompt'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
+import ProfileAvatarMenu from './ProfileAvatarMenu'
 
 type Section = 'posts' | 'media' | 'about' | 'friends'
 
@@ -18,6 +20,8 @@ type Props = {
   city?: string
   coverUrl?: string
   coverSet: boolean
+  avatarSet: boolean
+  avatarVersion?: string
   editBusy: boolean
   friends: FriendConnection[]
   posts: Post[]
@@ -31,6 +35,7 @@ type Props = {
   onChangeAvatar: () => void
   onChangeCover: () => void
   onCreatePost: () => void
+  onCreateStory: () => void
   onReloadPosts: () => void
   onLoadMorePosts: () => void
   onViewFriend: (username: string) => void
@@ -39,9 +44,9 @@ type Props = {
 }
 
 export default function ProfilePage({
-  highlights, username, displayName, email, bio, city, coverUrl, coverSet, editBusy, friends,
+  highlights, username, displayName, email, bio, city, coverUrl, coverSet, avatarSet, avatarVersion, editBusy, friends,
   posts, pendingPost, postsBusy, postsError, hasMorePosts, postCards, profileNote,
-  onEditProfile, onChangeAvatar, onChangeCover, onCreatePost,
+  onEditProfile, onChangeAvatar, onChangeCover, onCreatePost, onCreateStory,
   onReloadPosts, onLoadMorePosts, onViewFriend, onOpenContacts, onOpenPost,
 }: Props) {
   const [section, setSection] = useState<Section>('posts')
@@ -97,9 +102,8 @@ export default function ProfilePage({
         <div className="profile-page-hero-bottom">
           <div className="profile-page-avatar-wrap">
             {profileNote}
-            <UserAvatar username={username} name={displayName} className="profile-page-avatar" online />
-            <button type="button" className="profile-page-avatar-action" disabled={editBusy}
-              onClick={onChangeAvatar} aria-label="Đổi ảnh đại diện" title="Đổi ảnh đại diện"><Camera size={17} aria-hidden="true" /></button>
+            <ProfileAvatarMenu username={username} displayName={displayName} avatarClassName="profile-page-avatar"
+              avatarSet={avatarSet} avatarVersion={avatarVersion} editBusy={editBusy} onChangeAvatar={onChangeAvatar} />
           </div>
           <div className="profile-page-identity-text">
             <h1>{displayName}</h1>
@@ -107,17 +111,20 @@ export default function ProfilePage({
               <span>@{username}</span>
               <span>{acceptedFriends.length.toLocaleString('vi-VN')} bạn bè</span>
             </div>
-            {acceptedFriends.length > 0 && (
-              <div className="profile-page-friend-stack" aria-hidden="true">
-                {acceptedFriends.slice(0, 8).map(friend => (
-                  <UserAvatar key={friend.id} username={friend.username} name={friend.displayName || friend.username} className="profile-page-stack-avatar" />
-                ))}
-              </div>
-            )}
+            {city && <p className="profile-page-identity-city"><MapPin size={15} aria-hidden="true" />Sống tại {city}</p>}
           </div>
           <div className="profile-page-hero-actions">
-            <button type="button" className="profile-page-primary" onClick={onEditProfile}><PencilLine size={17} aria-hidden="true" /> Chỉnh sửa hồ sơ</button>
-            <button type="button" className="profile-page-more" onClick={onCreatePost} aria-label="Đăng bài mới" title="Đăng bài mới"><Plus size={21} aria-hidden="true" /></button>
+            <button type="button" className="profile-page-primary" onClick={onCreateStory}><Plus size={18} aria-hidden="true" />Thêm vào tin</button>
+            <button type="button" className="profile-page-secondary" onClick={onEditProfile}><PencilLine size={17} aria-hidden="true" />Chỉnh sửa trang cá nhân</button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="profile-page-more" aria-label="Tùy chọn hồ sơ"><ChevronDown size={19} aria-hidden="true" /></button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={onCreatePost}><Plus size={18} aria-hidden="true" />Đăng bài mới</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSection('media')}><ImageIcon size={18} aria-hidden="true" />Ảnh &amp; video</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </section>
@@ -137,13 +144,13 @@ export default function ProfilePage({
 
       <div className="profile-page-columns">
         <ProfileSidebar username={username} email={email} bio={bio} city={city} friends={acceptedFriends} media={media}
+          highlights={highlights}
           onEditProfile={onEditProfile} onShowMedia={() => setSection('media')} onShowFriends={() => setSection('friends')}
           onViewFriend={onViewFriend} onOpenPost={onOpenPost} />
         <section className="profile-page-main" aria-label="Nội dung trang cá nhân">
           <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel">
             {section === 'posts' && (
               <>
-                {highlights}
                 <div className="profile-page-composer">
                   <PostStatusPrompt
                     username={username}
