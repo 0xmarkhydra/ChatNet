@@ -1,4 +1,4 @@
-import { Bell, MessageCircle, PencilLine, Search, Users } from "lucide-react";
+import { Bell, MessageCircle, PencilLine, Search, UserRoundPlus, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import UiIcon from "../../shared/ui/UiIcon";
 import { Button } from "../../shared/ui/button";
@@ -55,20 +55,20 @@ function ChatActions(p: HeaderActionsProps) {
   return (
     <>
       {!groups && (
-        <HeaderIconButton aria-label="Quét QR" onClick={chat.onScanQr}>
+        <HeaderIconButton className="appbar-qr-action" aria-label="Quét QR" onClick={chat.onScanQr}>
           <UiIcon name="qr" size={28} />
         </HeaderIconButton>
       )}
       <div className="appbar-create-anchor">
         <HeaderIconButton
-          className={cn("appbar-create-trigger", chat.quickCreateOpen && "active")}
+          className={cn("appbar-create-trigger appbar-primary-action", chat.quickCreateOpen && "active")}
           type="button"
           aria-label={groups ? "Tạo cộng đồng mới" : "Tạo mới"}
           aria-expanded={groups ? false : chat.quickCreateOpen}
           aria-haspopup={groups ? undefined : "menu"}
           onClick={groups ? chat.onCreateCommunity : chat.onToggleQuickCreate}
         >
-          <UiIcon name="plus" size={29} />
+          <UiIcon name="plus" size={23} /><span className="appbar-action-label">{groups ? "Tạo cộng đồng" : "Tạo mới"}</span>
         </HeaderIconButton>
         {chat.quickCreateOpen && !groups && (
           <>
@@ -86,7 +86,7 @@ function ChatActions(p: HeaderActionsProps) {
   );
 }
 
-/** Route actions remain feature-specific; notification access stays consistent on every page. */
+/** Page actions live at the end; the existing desktop sidebar owns notifications. */
 export default function HeaderActions(p: HeaderActionsProps) {
   const notification = (
     <HeaderIconButton
@@ -108,7 +108,7 @@ export default function HeaderActions(p: HeaderActionsProps) {
     case "feed":
       pageActions = (
         <HeaderIconButton
-          className="social-feed-header-community"
+          className="social-feed-header-community appbar-mobile-community"
           type="button"
           aria-label="Cộng đồng"
           title="Cộng đồng"
@@ -121,26 +121,26 @@ export default function HeaderActions(p: HeaderActionsProps) {
       break;
     case "profile":
       pageActions = (
-        <HeaderIconButton className="profile-page-header-new" type="button" aria-label="Tạo bài viết" onClick={p.profile.onNewPost}>
-          <PencilLine size={21} aria-hidden="true" />
+        <HeaderIconButton className="profile-page-header-new appbar-primary-action" type="button" aria-label="Đăng bài" onClick={p.profile.onNewPost}>
+          <PencilLine size={20} aria-hidden="true" /><span className="appbar-action-label">Đăng bài</span>
         </HeaderIconButton>
       );
       break;
     case "notifications":
       pageActions = (
-        <HeaderIconButton aria-label="Tạo bài viết mới" onClick={p.notifications.onNewPost}>
-          <UiIcon name="plus" size={27} />
+        <HeaderIconButton className="appbar-primary-action" aria-label="Đăng bài" onClick={p.notifications.onNewPost}>
+          <UiIcon name="plus" size={21} /><span className="appbar-action-label">Đăng bài</span>
         </HeaderIconButton>
       );
       break;
     case "contacts":
       pageActions = (
-        <HeaderIconButton aria-label="Thêm bạn" onClick={p.contacts.onAddFriend}>
-          <UiIcon name="plus" size={27} />
+        <HeaderIconButton className="appbar-primary-action" aria-label="Thêm bạn" onClick={p.contacts.onAddFriend}>
+          <UserRoundPlus size={19} aria-hidden="true" /><span className="appbar-action-label">Thêm bạn</span>
         </HeaderIconButton>
       );
       break;
   }
 
-  return <>{pageActions}{notification}</>;
+  return <>{pageActions}<span className="appbar-mobile-notification">{notification}</span></>;
 }
