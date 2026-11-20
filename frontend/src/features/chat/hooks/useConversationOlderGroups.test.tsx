@@ -91,6 +91,52 @@ describe("older group sync from conversation refresh", () => {
     expect(scans).toBe(2);
   });
 
+  it("invalidates a completed group scan when membership revision changes", async () => {
+    let scans = 0;
+    const request = vi.fn(async (url: string) => {
+      if (url.includes("type=group")) {
+        scans++;
+        return response([group(scans === 1 ? 10 : 20)]);
+      }
+      return response([]);
+    });
+    const app = mountData(request);
+    app.render("A");
+    await app.refresh();
+    await app.settle();
+    expect(scans).toBe(1);
+    app.data.membershipEventSequence.current++;
+    await app.refresh();
+    await app.settle();
+    expect(scans).toBe(2);
+    expect(app.data.conversations.some(c => c.id === 20)).toBe(true);
+  });
+
+  it("starts a fresh scan after membership changes without waiting for a stale request", async () => {
+    const stalePage = deferred<Response>();
+    let scans = 0;
+    const request = vi.fn(async (url: string) => {
+      if (url.includes("type=group")) {
+        scans++;
+        return scans === 1 ? stalePage.promise : response([group(55)]);
+      }
+      return response([]);
+    });
+    const app = mountData(request);
+    app.render("A");
+    await app.refresh();
+    await app.settle();
+    expect(scans).toBe(1);
+    app.data.membershipEventSequence.current++;
+    await app.refresh();
+    await app.settle();
+    expect(scans).toBe(2);
+    expect(app.data.conversations.some(c => c.id === 55)).toBe(true);
+    await act(async () => { stalePage.resolve(response([group(44)])); });
+    await app.settle();
+    expect(app.data.conversations.some(c => c.id === 44)).toBe(false);
+  });
+
   it("ignores late results from account A while account B has started a new scan", async () => {
     const oldPage = deferred<Response>();
     let scans = 0;

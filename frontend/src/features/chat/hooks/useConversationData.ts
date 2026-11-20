@@ -33,22 +33,24 @@ export function useConversationData({
   const pagingSequence = useRef(0)
   const pagingOwnerSession = useRef<string | null>(null)
   const [conversationListError, setConversationListError] = useState('')
-  const lastGroupSync = useRef<{ sessionId: string; at: number } | null>(null)
+  const lastGroupSync = useRef<{ sessionId: string; membershipRevision: number; at: number } | null>(null)
 
-  // Avoid overlapping scans of the same session, but never cache a failed one.
-  const olderGroupScan = useRef<{ sessionId: string; promise: Promise<void> } | null>(null)
+  // Only dedupe scans with matching session and membership revision.
+  const olderGroupScan = useRef<{ sessionId: string; membershipRevision: number; promise: Promise<void> } | null>(null)
   const olderGroupScanSequence = useRef(0)
 
   // The avatar rail also needs groups beyond the first direct-message page.
   function loadEarlierGroups(sessionId: string): Promise<void> {
     if (sessionRef.current?.sessionId !== sessionId) return Promise.resolve()
-    if (olderGroupScan.current?.sessionId === sessionId) {
+    const membershipRevision = membershipEventSequence.current
+    if (olderGroupScan.current?.sessionId === sessionId &&
+        olderGroupScan.current.membershipRevision === membershipRevision) {
       return olderGroupScan.current.promise
     }
     if (lastGroupSync.current?.sessionId === sessionId &&
+        lastGroupSync.current.membershipRevision === membershipRevision &&
         Date.now() - lastGroupSync.current.at < 120_000) return Promise.resolve()
 
-    const membershipRevision = membershipEventSequence.current
     const sequence = ++olderGroupScanSequence.current
     const isCurrent = () => sessionRef.current?.sessionId === sessionId &&
       olderGroupScanSequence.current === sequence &&
@@ -71,10 +73,10 @@ export function useConversationData({
         },
       })
       if (completed && isCurrent()) {
-        lastGroupSync.current = { sessionId, at: Date.now() }
+        lastGroupSync.current = { sessionId, membershipRevision, at: Date.now() }
       }
     })()
-    const scan = { sessionId, promise }
+    const scan = { sessionId, membershipRevision, promise }
     olderGroupScan.current = scan
     void promise.finally(() => {
       if (olderGroupScan.current === scan) olderGroupScan.current = null

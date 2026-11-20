@@ -2467,7 +2467,7 @@ export default function AuthedApp({
       )}
         </>
       }
-      header={
+      header={tab === "profile" && desktopProfileOverview && !profileEditorOpen ? null : (
         <AppHeader
           mobileSearchActions={tab === "feed"}
           className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
@@ -2577,7 +2577,7 @@ export default function AuthedApp({
           </AppHeaderActions>
           }
         />
-      }
+      )}
       beforePage={<AppShellNotices
         showPushPrompt={pushPrompt && !pushPromptDismissed && !pushEnabled}
         pushBusy={pushBusy}
