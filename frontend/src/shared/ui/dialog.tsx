@@ -19,7 +19,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-101 grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-foreground shadow-xl outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "fixed top-1/2 left-1/2 z-101 grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-ui-lg border border-border bg-card p-6 text-foreground shadow-xl outline-none focus-visible:ring-2 focus-visible:ring-ring",
           className,
         )}
         {...props}
@@ -47,11 +47,11 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-  return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-lg font-semibold text-foreground", className)} {...props} />;
+  return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-[length:var(--soco-type-section)] font-semibold text-foreground", className)} {...props} />;
 }
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-sm text-muted-foreground", className)} {...props} />;
+  return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-[length:var(--soco-type-body)] text-muted-foreground", className)} {...props} />;
 }
 
 export { Dialog, DialogTrigger, DialogClose, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription };
