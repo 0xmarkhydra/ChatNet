@@ -328,6 +328,8 @@ import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
 import { useChatDraftState } from "../features/chat/hooks/useChatDraftState";
 import { useChatScrollCoordinator } from "../features/chat/hooks/useChatScrollCoordinator";
+import { useConversationViewReset } from "../features/chat/hooks/useConversationViewReset";
+import { useIncomingMessageAutoTranslation } from "../features/chat/hooks/useIncomingMessageAutoTranslation";
 import { useChatOutboxState } from "../features/chat/hooks/useChatOutboxState";
 import { useChatOutboxReceiptReconciliation } from "../features/chat/hooks/useChatOutboxReceiptReconciliation";
 import { useChatQuickSelectionActions } from "../features/chat/hooks/useChatQuickSelectionActions";
@@ -1109,17 +1111,14 @@ export default function AuthedApp({
     }
   }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, navigate]);
 
-  useEffect(() => {
-    activeConversationIdRef.current = activeConversationId;
-    messageScrollAtBottom.current = true;
-    // useMessageData owns room-specific clearing and its recently-visited
-    // cache. A second reset here caused an unnecessary blank render between
-    // PWA conversation selections.
-    setHasMoreMessages(false);
-    setMessagesLoadingMore(false);
-    messagesPagingBusy.current = false;
-    setGroupMembers([]);
-  }, [activeConversationId]);
+  useConversationViewReset(activeConversationId, {
+    activeConversationIdRef,
+    messageScrollAtBottom,
+    messagesPagingBusy,
+    setHasMoreMessages,
+    setMessagesLoadingMore,
+    setGroupMembers,
+  });
 
 
   async function loadProfileMedia() {
@@ -1934,32 +1933,18 @@ export default function AuthedApp({
     pendingMessageScrollRestore,
   });
 
-  useEffect(() => {
-    if (
-      !translationPreferencesLoaded ||
-      !effectiveAutoTranslate ||
-      !session ||
-      !activeConversationId
-    )
-      return;
-    const missing = messages.filter(
-      (message) =>
-        !message.deleted &&
-        message.senderId !== session.user.id &&
-        Boolean(message.text.trim()) &&
-        !translations[message.id] &&
-        !translationAttempted.current.has(`${session.sessionId}:${effectiveTargetLanguage}:${message.id}:${message.editedAt ?? ""}`),
-    );
-    missing.forEach((message) => void translateMessage(message, false));
-  }, [
-    effectiveAutoTranslate,
-    translationPreferencesLoaded,
+  useIncomingMessageAutoTranslation({
+    enabled: effectiveAutoTranslate,
+    preferencesLoaded: translationPreferencesLoaded,
     messages,
-    effectiveTargetLanguage,
-    session?.user.id,
-    session?.sessionId,
+    targetLanguage: effectiveTargetLanguage,
+    userId: session?.user.id ?? null,
+    sessionId: session?.sessionId ?? null,
     activeConversationId,
-  ]);
+    translations,
+    attempted: translationAttempted,
+    translateMessage,
+  });
 
   const canSend = useMemo(
     () =>
