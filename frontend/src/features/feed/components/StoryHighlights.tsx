@@ -1,36 +1,35 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { MoreHorizontal } from 'lucide-react'
 import type { ApiRequest } from '@/shared/types/api'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/shared/ui/dialog'
 import { changeStoryHighlight, readStoryHighlights, type StoryHighlight } from '../api/stories'
 import StoryHighlightEditor from './StoryHighlightEditor'
+import StoryViewer from './StoryViewer'
 import '../styles/story-text.css'
 
 type Props = { request: ApiRequest; username: string; owner?: boolean; className?: string }
 
-function HighlightMedia({ item, preview = false }: { item: StoryHighlight; preview?: boolean }) {
+function HighlightPreview({ item }: { item: StoryHighlight }) {
   const media = item.attachment
   const thumbnail = 'aspect-[9/16] w-full rounded-ui-md'
-  if (!media) {
-    const background = item.background ?? 'berry'
-    return preview ? (
-      <span data-story-background={background} className={`${thumbnail} grid box-border place-items-center overflow-hidden p-2 text-center text-ui-label font-medium leading-snug text-white`}>
-        <span className="line-clamp-3 wrap-anywhere">{item.text}</span>
-      </span>
-    ) : (
-      <div data-story-background={background} className="rounded-lg p-6 text-center text-white"><p className="wrap-anywhere whitespace-pre-wrap">{item.text}</p></div>
-    )
-  }
-  if (media.kind === 'video') return <video src={media.url} controls={!preview} muted={preview} playsInline preload={preview ? 'metadata' : 'auto'}
-    aria-label={media.name} aria-hidden={preview || undefined} className={preview ? `${thumbnail} block bg-black object-contain` : 'max-h-[52dvh] w-full rounded-lg'} />
-  return <img src={media.url} alt={preview ? '' : media.name} loading="lazy" className={preview ? `${thumbnail} block bg-black object-contain` : 'max-h-[52dvh] w-full rounded-lg object-contain'} />
+  if (!media) return (
+    <span data-story-background={item.background} className={`${thumbnail} grid box-border place-items-center overflow-hidden p-2 text-center text-ui-label font-medium leading-snug text-white`}>
+      <span className="line-clamp-3 wrap-anywhere">{item.text}</span>
+    </span>
+  )
+  if (media.kind === 'video') return <video src={media.url} muted playsInline preload="metadata" aria-hidden="true"
+    className={`${thumbnail} block bg-black object-contain`} />
+  return <img src={media.url} alt="" loading="lazy" className={`${thumbnail} block bg-black object-contain`} />
 }
 
 export default function StoryHighlights({ request, username, owner = false, className }: Props) {
   const [items, setItems] = useState<StoryHighlight[] | null>(null)
   const [revision, setRevision] = useState(0)
-  const [focus, setFocus] = useState<number | null>(null)
+  const [activeStoryId, setActiveStoryId] = useState<number | null>(null)
+  const [managementId, setManagementId] = useState<number | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [edit, setEdit] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -59,7 +58,7 @@ export default function StoryHighlights({ request, username, owner = false, clas
     try {
       await changeStoryHighlight(request, id)
       setItems(current => current?.filter(item => item.id !== id) ?? null)
-      setFocus(null)
+      setManagementId(null)
       refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể gỡ Tin nổi bật.')
@@ -68,6 +67,7 @@ export default function StoryHighlights({ request, username, owner = false, clas
     }
   }
 
+  const activeStory = items?.find(item => item.id === activeStoryId)
   if (!owner && (!items || items.length === 0)) return null
   return (
     <section className={cn('min-w-0 rounded-ui-lg border border-solid border-border bg-card p-4 text-foreground', className)} aria-label="Tin nổi bật">
@@ -78,43 +78,50 @@ export default function StoryHighlights({ request, username, owner = false, clas
       {items && items.length > 0 && (
         <ul role="list" className="m-0 mt-2 grid list-none auto-cols-[calc((100%_-_1rem)/3)] grid-flow-col gap-2 overflow-x-auto overscroll-x-contain p-1">
           {items.map(item => (
-            <li key={item.id} className="min-w-0">
-              <Dialog open={focus === item.id} onOpenChange={open => {
+            <li key={item.id} className="relative min-w-0">
+              <button type="button" aria-label={item.title} onClick={() => setActiveStoryId(item.id)}
+                className="grid w-full min-w-0 cursor-pointer appearance-none gap-1.5 rounded-ui-md border-0 bg-transparent p-0 text-center font-sans text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring">
+                <HighlightPreview item={item} />
+                <span className="line-clamp-2 wrap-anywhere px-0.5 pb-0.5 text-ui-label font-medium leading-snug">{item.title}</span>
+              </button>
+              {owner && <Dialog open={managementId === item.id} onOpenChange={open => {
                 if (!open && busy) return
-                setFocus(open ? item.id : null)
+                setManagementId(open ? item.id : null)
                 setConfirmRemove(false)
                 setEdit(false)
                 setError('')
               }}>
                 <DialogTrigger asChild>
-                  <button type="button" aria-label={item.title} className="grid w-full min-w-0 cursor-pointer appearance-none gap-1.5 rounded-ui-md border-0 bg-transparent p-0 text-center font-sans text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring">
-                    <HighlightMedia item={item} preview />
-                    <span className="line-clamp-2 wrap-anywhere px-0.5 pb-0.5 text-ui-label font-medium leading-snug">{item.title}</span>
-                  </button>
+                  <Button aria-label={'Quản lý Tin nổi bật: ' + item.title} variant="ghost"
+                    className="absolute right-1 top-1 size-11 bg-card/90 p-0 shadow-sm hover:bg-card">
+                    <MoreHorizontal size={19} aria-hidden="true" />
+                  </Button>
                 </DialogTrigger>
                 <DialogContent>
-                  <DialogTitle>{item.title}</DialogTitle>
-                  <DialogDescription>Tin nổi bật trên hồ sơ của {item.authorDisplayName || item.author}.</DialogDescription>
-                  <HighlightMedia item={item} />
-                  {owner && <>
-                    {error && <p role="alert">{error}</p>}
-                    {edit ? <StoryHighlightEditor request={request} storyId={item.id} initialTitle={item.title} onSaved={() => {
-                      setEdit(false)
-                      refresh()
-                    }} /> : <Button type="button" variant="outline" disabled={busy || confirmRemove} onClick={() => setEdit(true)}>Đổi tên</Button>}
-                    {confirmRemove ? <div className="grid gap-2">
-                      <p>Gỡ tin khỏi hồ sơ? Story chưa hết hạn vẫn xuất hiện trong danh sách Story thường.</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" disabled={busy} onClick={() => void remove(item.id)}>Xác nhận gỡ</Button>
-                        <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmRemove(false)}>Giữ lại</Button>
-                      </div>
-                    </div> : <Button type="button" variant="outline" disabled={busy || edit} onClick={() => setConfirmRemove(true)}>Gỡ khỏi Tin nổi bật</Button>}
-                  </>}
+                  <DialogTitle>Quản lý Tin nổi bật</DialogTitle>
+                  <DialogDescription>{item.title}</DialogDescription>
+                  {error && <p role="alert">{error}</p>}
+                  {edit ? <StoryHighlightEditor request={request} storyId={item.id} initialTitle={item.title} onSaved={() => {
+                    setEdit(false)
+                    refresh()
+                  }} /> : <Button type="button" variant="outline" disabled={busy || confirmRemove} onClick={() => setEdit(true)}>Đổi tên</Button>}
+                  {confirmRemove ? <div className="grid gap-2">
+                    <p>Gỡ tin khỏi hồ sơ? Story chưa hết hạn vẫn xuất hiện trong danh sách Story thường.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" disabled={busy} onClick={() => void remove(item.id)}>Xác nhận gỡ</Button>
+                      <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmRemove(false)}>Giữ lại</Button>
+                    </div>
+                  </div> : <Button type="button" variant="outline" disabled={busy || edit} onClick={() => setConfirmRemove(true)}>Gỡ khỏi Tin nổi bật</Button>}
                 </DialogContent>
-              </Dialog>
+              </Dialog>}
             </li>
           ))}
         </ul>
+      )}
+      {items && activeStory && createPortal(
+        <StoryViewer mode="highlight" title={activeStory.title} activeStory={activeStory}
+          stories={items} setActiveStoryId={setActiveStoryId} />,
+        document.body,
       )}
     </section>
   )
