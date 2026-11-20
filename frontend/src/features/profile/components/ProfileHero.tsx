@@ -9,15 +9,17 @@ type Props = {
   school?: string
   friendCount?: number
   coverUrl?: string
+  fallbackCoverTone?: number
   coverAction?: ReactNode
   avatar: ReactNode
   actions?: ReactNode
   identityNotice?: ReactNode
 }
 
-export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, coverAction, avatar, actions, identityNotice }: Props) {
+export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice }: Props) {
   const [failedCover, setFailedCover] = useState<string>()
   const showCover = coverUrl && coverUrl !== failedCover
+  const coverClass = showCover ? 'has-user-cover' : fallbackCoverTone === undefined ? 'has-default-cover' : `has-account-cover avatar-tone-${fallbackCoverTone}`
   const details = [
     { id: 'city', text: city?.trim(), label: 'Nơi sống', Icon: MapPin },
     { id: 'workplace', text: workplace?.trim(), label: 'Nơi làm việc', Icon: BriefcaseBusiness },
@@ -25,7 +27,7 @@ export default function ProfileHero({ displayName, username, city, workplace, sc
   ].filter(detail => detail.text)
   return (
     <section className="profile-page-hero">
-      <div className={`profile-page-cover ${showCover ? 'has-user-cover' : 'has-default-cover'}`}>
+      <div className={`profile-page-cover ${coverClass}`}>
         {showCover && <img src={coverUrl} alt="Ảnh bìa" draggable={false} onError={() => setFailedCover(coverUrl)} />}
         {coverAction}
       </div>

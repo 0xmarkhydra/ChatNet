@@ -2228,7 +2228,7 @@
   position: relative;
   isolation: isolate;
   overflow: visible;
-  background: linear-gradient(145deg, #2859d8, #6157e8);
+  background: var(--soco-avatar-gradient, linear-gradient(145deg, #2859d8, #6157e8));
   color: #fff;
   box-shadow: 0 7px 18px rgba(44, 98, 180, .18);
   border-radius: var(--avatar-radius);
@@ -2302,14 +2302,14 @@
   pointer-events: none;
 }
 
-.avatar-tone-0 { background: linear-gradient(145deg, #2859d8, #2859d8); }
-.avatar-tone-1 { background: linear-gradient(145deg, #6d65ef, #a850d5); }
-.avatar-tone-2 { background: linear-gradient(145deg, #18ad91, #2859d8); }
-.avatar-tone-3 { background: linear-gradient(145deg, #f2984a, #df5b79); }
-.avatar-tone-4 { background: linear-gradient(145deg, #6ba85b, #1f887c); }
-.avatar-tone-5 { background: linear-gradient(145deg, #e06f9a, #8a62dc); }
-.avatar-tone-6 { background: linear-gradient(145deg, #df8051, #ba4d58); }
-.avatar-tone-7 { background: linear-gradient(145deg, #2859d8, #2859d8); }
+.avatar-tone-0 { --soco-avatar-gradient: linear-gradient(145deg, #2859d8, #2859d8); }
+.avatar-tone-1 { --soco-avatar-gradient: linear-gradient(145deg, #6d65ef, #a850d5); }
+.avatar-tone-2 { --soco-avatar-gradient: linear-gradient(145deg, #18ad91, #2859d8); }
+.avatar-tone-3 { --soco-avatar-gradient: linear-gradient(145deg, #f2984a, #df5b79); }
+.avatar-tone-4 { --soco-avatar-gradient: linear-gradient(145deg, #6ba85b, #1f887c); }
+.avatar-tone-5 { --soco-avatar-gradient: linear-gradient(145deg, #e06f9a, #8a62dc); }
+.avatar-tone-6 { --soco-avatar-gradient: linear-gradient(145deg, #df8051, #ba4d58); }
+.avatar-tone-7 { --soco-avatar-gradient: linear-gradient(145deg, #2859d8, #2859d8); }
 
 .smart-avatar.group {
   background: linear-gradient(145deg, #2859d8, #8e58de);

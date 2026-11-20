@@ -1,10 +1,11 @@
 import { StoryHighlights } from '../../feed'
 import { SettingsWorkspace } from "../../settings";
-import { PencilLine, Download, LogOut, ChevronDown, Volume2, ArrowLeft, Settings, Images, RefreshCw } from "lucide-react";
+import { PencilLine, Download, LogOut, ChevronDown, ChevronRight, Volume2, ArrowLeft, Settings, Images, RefreshCw } from "lucide-react";
 import { BlockedUsersPanel } from "../../contacts";
 import { isDesktopBuild } from "../../../platform/desktop";
 import { AccountSessionsPanel } from "../../auth";
-import UserAvatar, { profileAssetUrl } from "../../../shared/ui/UserAvatar";
+import UserAvatar, { avatarTone, profileAssetUrl } from "../../../shared/ui/UserAvatar";
+import { Button } from "@/shared/ui/button";
 import UiIcon from "../../../shared/ui/UiIcon";
 import ProfileNote from "./ProfileNote";
 import ProfileAvatarMenu from "./ProfileAvatarMenu";
@@ -199,6 +200,7 @@ export default function ProfileSection({
 }: ProfileSectionProps) {
   const [avatarPicker, setAvatarPicker] = useState<{ opener: HTMLButtonElement | null } | null>(null);
   const openAvatarPicker = (opener: HTMLButtonElement | null) => setAvatarPicker({ opener });
+  const displayName = userLabel(profileMedia?.displayName || session.user.displayName, name);
   return (
       <div
             className={`simple-view profile-view ${profileTimelineOpen ? "personal-timeline-view" : ""} ${isProfileDesktop && desktopProfileSettings ? "settings-workspace-open" : ""}`}
@@ -403,106 +405,37 @@ export default function ProfileSection({
                 </button>
               </header>
             )}
-            {profileTimelineOpen ? (
-              <ProfileHero username={name}
-                displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
-                city={profileMedia?.city} workplace={profileMedia?.workplace} school={profileMedia?.school}
-                friendCount={friendCount}
-                coverUrl={profileMedia?.coverSet ? profileAssetUrl(name, "cover", profileMedia.updatedAt) : undefined}
-                coverAction={<button type="button" className="profile-page-cover-action"
-                  disabled={profileBusy !== null || mediaUploading === "profile"}
-                  onClick={() => coverFileInputRef.current?.click()}>
-                  <UiIcon name="photo" size={17} />
-                  {profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover")}
-                </button>}
-                avatar={<>
-                  <ProfileNote key={session.sessionId + ":timeline-note"} username={name} owner request={apiFetch} />
-                  <ProfileAvatarMenu username={name}
-                    displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
-                    avatarClassName="profile-page-avatar" avatarSet={Boolean(profileMedia?.avatarSet)}
-                    avatarVersion={profileMedia?.updatedAt} editBusy={profileBusy !== null || mediaUploading === "profile"}
-                    onChangeAvatar={openAvatarPicker} />
-                </>} />
-            ) : (
-            <section className="profile-hero">
-              <div
-                className={`profile-cover-art ${profileMedia?.coverSet ? "has-cover" : ""}`}
-              >
-                <div className="profile-cover-placeholder">
-                  <strong>SocCO</strong>
-                  <small>Understand. Connect. Together.</small>
+            <ProfileHero username={name}
+              displayName={displayName}
+              city={profileMedia?.city} workplace={profileMedia?.workplace} school={profileMedia?.school}
+              friendCount={friendCount}
+              coverUrl={profileMedia?.coverSet ? profileAssetUrl(name, "cover", profileMedia.updatedAt) : undefined}
+              fallbackCoverTone={isProfileDesktop ? undefined : avatarTone(displayName)}
+              coverAction={<button type="button" className="profile-page-cover-action"
+                disabled={profileBusy !== null || mediaUploading === "profile"}
+                onClick={() => coverFileInputRef.current?.click()}>
+                <UiIcon name="photo" size={17} />
+                {profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover")}
+              </button>}
+              avatar={<>
+                <ProfileNote key={session.sessionId + ":profile-note"} username={name} displayName={displayName} owner request={apiFetch} />
+                <ProfileAvatarMenu username={name} displayName={displayName}
+                  avatarClassName="profile-page-avatar" avatarSet={Boolean(profileMedia?.avatarSet)}
+                  avatarVersion={profileMedia?.updatedAt} editBusy={profileBusy !== null || mediaUploading === "profile"}
+                  onChangeAvatar={openAvatarPicker} />
+              </>}
+              identityNotice={!profileTimelineOpen && (
+                <div className="mt-1.5 grid min-w-0 justify-items-start gap-2">
+                  <small className="wrap-anywhere text-ui-label text-muted-foreground">{session.user.email}</small>
+                  <Button ref={profileIdentityRef} variant="outline" size="lg" className="max-w-full gap-1 px-2.5 text-primary"
+                    aria-label="Mở trang cá nhân" onClick={() => {
+                      setProfileTimelineOpen(true);
+                      setGlobalSearch("");
+                    }}>
+                    Xem trang cá nhân <ChevronRight size={16} aria-hidden="true" />
+                  </Button>
                 </div>
-                {profileMedia?.coverSet && (
-                  <img
-                    src={profileAssetUrl(name, "cover", profileMedia.updatedAt)}
-                    alt="Ảnh bìa"
-                    draggable={false}
-                    onError={(event) => {
-                      event.currentTarget.hidden = true;
-                      event.currentTarget.parentElement?.classList.remove(
-                        "has-cover",
-                      );
-                    }}
-                  />
-                )}
-                <button
-                  type="button"
-                  className="profile-cover-edit"
-                  disabled={
-                    profileBusy !== null || mediaUploading === "profile"
-                  }
-                  onClick={() => coverFileInputRef.current?.click()}
-                >
-                  <UiIcon name="photo" size={17} />
-                  {profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover")}
-                </button>
-              </div>
-
-              <div className="profile-identity">
-                <div className="profile-avatar-editor">
-                  <ProfileNote
-                    key={session.sessionId + ":note"}
-                    username={name}
-                    owner
-                    request={apiFetch}
-                  />
-                  <ProfileAvatarMenu
-                    username={name}
-                    displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
-                    avatarClassName="profile-avatar"
-                    avatarSet={Boolean(profileMedia?.avatarSet)}
-                    avatarVersion={profileMedia?.updatedAt}
-                    editBusy={profileBusy !== null || mediaUploading === "profile"}
-                    onChangeAvatar={openAvatarPicker}
-                  />
-                </div>
-                <button
-                  type="button"
-                  ref={profileIdentityRef}
-                  className="profile-identity-copy profile-identity-link"
-                  aria-label="Mở trang cá nhân"
-                  disabled={profileTimelineOpen}
-                  onClick={() => {
-                    setProfileTimelineOpen(true);
-                    setGlobalSearch("");
-                  }}
-                >
-                  <strong>
-                    {profileMedia?.displayName ||
-                      session.user.displayName ||
-                      name}
-                  </strong>
-                  <span>@{name}</span>
-                  <small className="profile-email">{session.user.email}</small>
-                  {!profileTimelineOpen && (
-                    <small className="profile-media-hint">
-                      Xem trang cá nhân · Dòng thời gian ›
-                    </small>
-                  )}
-                </button>
-              </div>
-            </section>
-            )}
+              )} />
 
             {profileTimelineOpen ? (
               <section

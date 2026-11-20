@@ -99,10 +99,24 @@ try {
     })
     await page.goto(origin)
     await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('button', { name: 'Cá nhân' }).click()
+    async function checkMobileProfileColors() {
+      const colors = await page.evaluate(() => {
+        const avatar = document.querySelector('.profile-view > .profile-page-hero .profile-hero-avatar')
+        const account = document.querySelector('.app-sidebar-avatar')
+        const cover = document.querySelector('.profile-view > .profile-page-hero .has-account-cover')
+        if (!avatar || !account || !cover) return null
+        const read = node => getComputedStyle(node).getPropertyValue('--soco-avatar-gradient').trim()
+        return { cover: read(cover), account: read(account), avatar: getComputedStyle(avatar).backgroundImage,
+          accountAvatar: getComputedStyle(account).backgroundImage, overflow: document.documentElement.scrollWidth > innerWidth + 1 }
+      })
+      check(colors?.account && colors.cover === colors.account, 'Mobile fallback cover must share the account palette')
+      check(colors.avatar === colors.accountAvatar && !colors.overflow, 'Mobile avatar color or profile width differs from the account layout')
+    }
     if (width === 390) {
       const avatar = page.getByRole('button', { name: 'Tùy chọn ảnh đại diện' })
       const profileLink = page.getByRole('button', { name: 'Mở trang cá nhân' })
       await profileLink.waitFor()
+      await checkMobileProfileColors()
       await avatar.click()
       await page.getByRole('menuitem', { name: 'Xem ảnh đại diện' }).click()
       const preview = page.getByRole('dialog', { name: 'Ảnh đại diện', exact: true })
@@ -124,6 +138,7 @@ try {
     }
     await page.getByRole('button', { name: 'Mở trang cá nhân' }).click()
     await page.getByRole('heading', { name: 'Trang cá nhân', exact: true }).waitFor()
+    if (width === 390) await checkMobileProfileColors()
     if (avatarOnly) {
       await context.close()
       continue
@@ -193,7 +208,7 @@ try {
     posts = posts.filter(post => post.id !== 100).map(post => ({ ...post, liked: false, likes: 0 }))
   }
   check(errors.length === 0, errors.join('\n'))
-  console.log(avatarOnly ? 'PASS: mobile avatar navigation, preview, picker and focus return'
+  console.log(avatarOnly ? 'PASS: mobile profile colors, avatar navigation, preview, picker and focus return'
     : 'PASS: profile timeline, pagination, publishing, privacy input, failed drafts, likes, recovery and responsive widths')
 } finally {
   await browser?.close()

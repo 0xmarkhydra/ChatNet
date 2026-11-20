@@ -25,7 +25,7 @@ export default function ProfileAvatarMenu({ username, displayName, avatarClassNa
   const showPhoto = url !== '' && failedUrl !== url
 
   return <>
-    <UserAvatar username={username} name={displayName} className={`${avatarClassName} profile-hero-avatar`} online />
+    <UserAvatar username={username} name={displayName} className={`${avatarClassName} profile-hero-avatar`} initialsOnly={!avatarSet} online />
     <span className="sr-only">Đang hoạt động</span>
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
