@@ -47,7 +47,7 @@ export default function VisitorProfileHero({
   }, [friendMenuOpen])
 
   return (
-    <section className="visitor-hero">
+    <section className="visitor-hero relative min-w-0 rounded-b-2xl border border-[#e8ecf7] bg-white max-[900px]:rounded-3xl">
       <div className="visitor-cover">
         <div className="visitor-cover-art" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div>
         {profile.coverSet && <img src={profileAssetUrl(profile.username, 'cover', profile.updatedAt)} alt="Ảnh bìa" onError={event => { event.currentTarget.hidden = true }} />}
@@ -60,13 +60,13 @@ export default function VisitorProfileHero({
             <ProfileNote username={profile.username} request={request} refreshKey={relation} />
           </div>
         </div>
-        <div className="visitor-person">
+        <div className="visitor-person min-w-0 self-center pt-[22px] max-[900px]:pt-0">
           <h1>{userLabel(profile.displayName, profile.username)}</h1>
-          <p className="visitor-handle">@{profile.username}{profile.city && <span className="visitor-city"> · <MapPin size={14} aria-hidden="true" />{profile.city}</span>}</p>
+          <p className="visitor-handle">@{profile.username}{profile.city && <span className="visitor-city inline-flex items-center gap-1"> · <MapPin size={14} aria-hidden="true" />{profile.city}</span>}</p>
           {profile.bio && <p className="visitor-profile-bio">{profile.bio}</p>}
           {!profile.allowFriendRequests && relation === 'none' && <small>Tài khoản này đang tắt nhận lời mời kết bạn.</small>}
         </div>
-        <div className="visitor-actions">
+        <div className="visitor-actions flex items-center gap-2.5 self-center justify-self-end pt-5 min-[901px]:max-[1100px]:col-start-2 min-[901px]:max-[1100px]:justify-self-start min-[901px]:max-[1100px]:pt-0 max-[900px]:col-start-1 max-[900px]:w-full max-[900px]:justify-self-stretch max-[900px]:pt-2">
           {relation === 'accepted' ? (
             <div className="visitor-friend-menu" ref={friendMenuRef}
               onBlur={event => {
@@ -106,7 +106,7 @@ export default function VisitorProfileHero({
           </button>
         </div>
       </div>
-      <nav className="visitor-tabs" aria-label="Nội dung hồ sơ">
+      <nav className="visitor-tabs flex gap-1 overflow-x-auto border-t border-[#e8ecf7] px-6 [scrollbar-width:thin] max-[900px]:px-3 max-[900px]:py-2" aria-label="Nội dung hồ sơ">
         {tabs.map(tab => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? 'page' : undefined}
           onClick={() => onTabChange(tab.id)}>{tab.label}</button>)}
       </nav>
