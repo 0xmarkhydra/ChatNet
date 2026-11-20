@@ -70,17 +70,27 @@ export default function BottomNavigation({
     const animate = previousActiveKey.current !== null && previousActiveKey.current !== activeKey
     previousActiveKey.current = activeKey
     measure(animate)
-    const update = () => measure()
+    // ResizeObserver and scroll may fire several times in one frame. Measure
+    // after layout once per paint rather than reading layout for every event.
+    let pendingFrame: number | null = null
+    const update = () => {
+      if (pendingFrame !== null) return
+      pendingFrame = window.requestAnimationFrame(() => {
+        pendingFrame = null
+        measure()
+      })
+    }
     const observer = new ResizeObserver(update)
     observer.observe(nav)
     observer.observe(activeButton)
-    nav.addEventListener('scroll', update)
+    nav.addEventListener('scroll', update, { passive: true })
     window.addEventListener('resize', update)
 
     return () => {
       observer.disconnect()
       nav.removeEventListener('scroll', update)
       window.removeEventListener('resize', update)
+      if (pendingFrame !== null) window.cancelAnimationFrame(pendingFrame)
       if (slideTimerRef.current) clearTimeout(slideTimerRef.current)
     }
   }, [activeKey])
