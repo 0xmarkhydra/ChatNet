@@ -8,7 +8,7 @@ import type { Post } from '../types'
 import type { ToastKind } from '../../../shared/utils/toast'
 import { API } from '../../../shared/lib/config'
 import { FeedText } from './FeedDiscussion'
-import FeedPostActions, { FeedSaveAction } from './FeedPostActions'
+import FeedPostActions from './FeedPostActions'
 import PostExtrasView from './PostExtrasView'
 import { parsePostExtras } from '../utils/postExtras'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -151,8 +151,6 @@ export default function FeedPostCard({
           </button>
           <FeedRepostAction post={post} request={apiFetch} onUpdated={syncFeedPost} onRemoved={removeFeedPost}
             onChanged={onRepostChanged} onShareToChat={onShareToChat} onFeedback={setNotice} />
-          <FeedSaveAction post={post} request={apiFetch} onUpdated={syncFeedPost}
-            onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
         </div>
         {discussion && (
           <section id={commentsId} className="feed-inline-comments" aria-label="Bình luận về bài viết">
