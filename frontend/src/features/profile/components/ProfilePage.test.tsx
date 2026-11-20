@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import ProfilePage from './ProfilePage'
 
 vi.mock('../../../shared/ui/UserAvatar', () => ({
-  default: ({ username }: { username: string }) => <span data-avatar={username} />,
+  default: ({ username, initialsOnly }: { username: string; initialsOnly?: boolean }) => <span data-avatar={username} data-initials-only={initialsOnly} />,
 }))
 vi.mock('./ProfileMediaGallery', () => ({ default: () => <div>Media gallery</div> }))
 
@@ -59,10 +59,21 @@ describe('own profile navigation and composer', () => {
         expect(document.querySelector('[role="dialog"]')).toBeNull()
         expect(document.activeElement).toBe(avatar)
       })
+      const previewAgain = await openAvatarMenu()
+      await act(async () => previewAgain[0]?.click())
+      const preview = document.querySelector('[role="dialog"]')
+      expect(preview?.querySelector('[data-initials-only="true"]')).not.toBeNull()
+      const addPhoto = [...(preview?.querySelectorAll('button') ?? [])].find(button => button.textContent?.includes('Thêm ảnh đại diện'))
+      expect(addPhoto).toBeDefined()
+      await act(async () => addPhoto?.click())
+      await vi.waitFor(() => {
+        expect(document.querySelector('[role="dialog"]')).toBeNull()
+        expect(onChangeAvatar).toHaveBeenCalledWith(avatar)
+      })
       const reopened = await openAvatarMenu()
       expect(reopened[1]?.textContent).toBe('Đổi ảnh đại diện')
       await act(async () => reopened[1]?.click())
-      expect(onChangeAvatar).toHaveBeenCalledOnce()
+      expect(onChangeAvatar).toHaveBeenCalledTimes(2)
       const tabbar = host.querySelector('.profile-page-tabbar')
       expect(tabbar?.querySelector('.profile-page-tab-indicator')).not.toBeNull()
       expect(tabbar?.parentElement?.classList.contains('profile-page')).toBe(true)

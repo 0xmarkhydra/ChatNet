@@ -30,6 +30,7 @@ export default function UserAvatar({
   online = false,
   group = false,
   imageUrl: suppliedImageUrl,
+  initialsOnly = false,
 }: {
   name: string
   username?: string
@@ -37,9 +38,10 @@ export default function UserAvatar({
   online?: boolean
   group?: boolean
   imageUrl?: string
+  initialsOnly?: boolean
 }) {
   const version = avatarRefreshVersions.get(username)
-  const imageUrl = group ? (suppliedImageUrl || '') : profileAssetUrl(username, 'avatar', version)
+  const imageUrl = initialsOnly ? '' : group ? (suppliedImageUrl || '') : profileAssetUrl(username, 'avatar', version)
   const [imageFailed, setImageFailed] = useScopedState(imageUrl, false)
 
   return (
