@@ -129,7 +129,7 @@
     margin-top: -84px;
     padding: 0 24px 0 32px;
   }
-  /* Identity and edit actions align at the avatar bottom, below the cover actions. */
+  /* Keep identity at the avatar bottom; center the edit actions with the name line. */
   .profile-page-identity-text { min-width: 0; flex: 1 1 auto; }
   .profile-page-identity-text h1 {
     margin: 0 0 5px;
@@ -153,7 +153,7 @@
   .profile-page-friend-stack { display: flex; align-items: center; margin-top: 8px; padding-left: 8px; }
   .profile-page .profile-page-stack-avatar.smart-avatar { width: 32px; height: 32px; margin-left: -8px; border: 2px solid #fff; border-radius: 50%; font-size: 12px; }
   .profile-page-identity-meta > span:not(:first-child)::before { content: '·'; margin-right: 11px; color: #b4bed0; }
-  .profile-page-hero-actions { display: flex; align-items: center; gap: 9px; flex-shrink: 0; margin-bottom: 0; }
+  .profile-page-hero-actions { display: flex; align-self: center; align-items: center; gap: 9px; flex-shrink: 0; margin-bottom: 0; }
   .profile-page-primary,
   .profile-page-more,
   .profile-page-aside-action,
