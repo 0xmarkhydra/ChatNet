@@ -587,6 +587,7 @@
   .modern-shell.app-layout .bottom-navigation .nav-icon,
   .modern-shell.app-layout .bottom-navigation > button { transition: none; transform: none; }
 }
+
 /* Feed mobile header: notifications and search share a compact action group. */
 .appbar-mobile-controls { display: contents; }
 .appbar-mobile-search-trigger, .appbar-mobile-search-back { display: none; }
@@ -657,22 +658,34 @@
   .modern-shell .chatnet-appbar:has(.appbar-mobile-controls .mobile-search-expanded) > .appbar-mobile-controls {
     position: absolute;
     inset: 0;
+    grid-area: auto;
     z-index: 120;
     display: flex;
     width: 100%;
-    padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+    padding: 0;
     box-sizing: border-box;
     background: #fff;
   }
   .modern-shell .chatnet-appbar .appbar-mobile-controls:has(.mobile-search-expanded) .appbar-actions {
     display: none;
   }
-  .modern-shell .chatnet-appbar .appbar-mobile-controls .appbar-search-anchor.mobile-search-expanded {
+  /* Overlay the entire header instead of inheriting the 42px icon slot. */
+  .modern-shell.app-layout > .chatnet-appbar:has(.mobile-search-expanded) .appbar-mobile-controls .appbar-search-anchor.mobile-search-expanded {
+    position: absolute;
+    inset: 0;
+    grid-area: auto;
+    z-index: 1;
     display: flex;
-    flex: 1 1 auto;
+    flex: none;
     align-items: center;
-    width: 100%;
+    gap: 6px;
+    box-sizing: border-box;
+    width: calc(100% - 28px);
+    max-width: none;
     min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
     animation: soco-mobile-search-in 240ms ease-out both;
   }
   .modern-shell .chatnet-appbar .appbar-mobile-controls .mobile-search-expanded .appbar-mobile-search-trigger {
@@ -727,5 +740,32 @@
 @media (prefers-reduced-motion: reduce) {
   .modern-shell .chatnet-appbar .appbar-mobile-controls .mobile-search-expanded {
     animation: none;
+  }
+}
+
+/* Hide both mobile chrome bars when scrolling into content; reveal on upward scroll. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout > .chatnet-appbar,
+  .modern-shell.app-layout > .bottom-navigation {
+    transition: transform 230ms ease, margin 230ms ease, opacity 230ms ease;
+    will-change: transform;
+  }
+  .modern-shell.app-layout.mobile-chrome-hidden > .chatnet-appbar:not(.mobile-section-header) {
+    transform: translateY(-100%);
+    margin-top: calc(-1 * var(--mobile-header-height, 0px));
+    opacity: 0;
+    pointer-events: none;
+  }
+  .modern-shell.app-layout.mobile-chrome-hidden > .bottom-navigation {
+    transform: translateY(100%);
+    margin-bottom: calc(-1 * var(--mobile-nav-height, 0px));
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout > .chatnet-appbar,
+  .modern-shell.app-layout > .bottom-navigation {
+    transition: none;
   }
 }
