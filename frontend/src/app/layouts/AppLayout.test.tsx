@@ -7,6 +7,8 @@ import AppLayout from "./AppLayout";
 import PageRoute from "../router/PageRoute";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
 const dispose: Array<() => void> = [];
 afterEach(() => {
   while (dispose.length) dispose.pop()!();
