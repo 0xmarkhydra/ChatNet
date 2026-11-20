@@ -1,4 +1,5 @@
-type FeedFilter = "all" | "following" | "latest" | "saved";
+import useSlidingPill from "../../shared/ui/useSlidingPill";
+import type { FeedFilter } from "../../features/feed/utils/feedFilterRoute";
 
 type Props = {
   filter: FeedFilter;
@@ -13,10 +14,13 @@ const tabs = [
 
 /** Desktop filter tabs share Feed's existing filter state, not an independent copy. */
 export default function HeaderFeedTabs({ filter, onChange }: Props) {
+  const { hostRef, activeRef, pillRef } = useSlidingPill<HTMLDivElement>(filter);
   return (
-    <div className="appbar-feed-tabs" role="tablist" aria-label="Lọc bảng tin">
+    <div ref={hostRef} className="appbar-feed-tabs sliding-pill-host" role="tablist" aria-label="Lọc bảng tin">
+      <span ref={pillRef} className="sliding-pill appbar-feed-active-pill" aria-hidden="true" />
       {tabs.map((item) => (
         <button
+          ref={filter === item.value ? activeRef : undefined}
           key={item.value}
           type="button"
           role="tab"
@@ -28,7 +32,7 @@ export default function HeaderFeedTabs({ filter, onChange }: Props) {
         </button>
       ))}
       {filter === "saved" && (
-        <button type="button" role="tab" aria-selected={true} className="is-active">
+        <button ref={activeRef} type="button" role="tab" aria-selected={true} className="is-active">
           Đã lưu
         </button>
       )}
