@@ -722,11 +722,9 @@ export default function AuthedApp({
     savedPosts,
     setSavedPosts,
     hasMoreSavedPosts,
-    setHasMoreSavedPosts,
     savedPostsBusy,
     savedPostsLoaded,
-    setSavedPostsBusy,
-    savedPagingBusy,
+    resetSavedPosts,
     hasMorePosts,
     setHasMorePosts,
     postsLoadingMore,
@@ -784,7 +782,7 @@ export default function AuthedApp({
     : feedFilter === "following"
       ? followingFeed.loading
       : feedFilter === "saved"
-        ? (!savedPostsLoaded && !savedPagingError) || (savedPostsBusy && savedPosts.length === 0)
+        ? !savedPostsLoaded && !savedPagingError
         : false;
   const feedLoadingMore = feedSearchActive
     ? postSearch.loadingMore
@@ -801,12 +799,16 @@ export default function AuthedApp({
         ? Boolean(followingFeed.error)
         : postsPagingError;
   const savedPostsLoader = useLatest(loadSavedPosts);
-  // Deep links and Back/Forward to ?feed=saved must fetch without a prior click.
   useEffect(() => {
-    if (tab === "feed" && feedFilter === "saved" && session?.sessionId) {
+    if (tab !== "feed" || !session?.sessionId || feedSearchActive) return;
+    if (feedFilter === "saved") {
       void savedPostsLoader.current();
+      return;
     }
-  }, [tab, feedFilter, session?.sessionId, savedPostsLoader]);
+    // Warm the first saved page after giving the visible feed a head start.
+    const timer = window.setTimeout(() => void savedPostsLoader.current(), 350);
+    return () => window.clearTimeout(timer);
+  }, [tab, feedFilter, feedSearchActive, session?.sessionId, savedPostsLoader]);
   const feedInfiniteScrollRef = useFeedInfiniteScroll({
     enabled: tab === "feed" && (!feedSearchActive || searchHasScrolled),
     hasMore: feedSearchActive
@@ -1812,8 +1814,7 @@ export default function AuthedApp({
     setPostEditBusy(false);
     draftBeforeEdit.current = null;
     setPosts([]);
-    setSavedPosts([]);
-    setHasMoreSavedPosts(false);
+    resetSavedPosts();
     ++profileLoadSequence.current;
     profilePagingBusy.current = false;
     setProfileTimelineOpen(false);
@@ -2395,7 +2396,6 @@ export default function AuthedApp({
         onSaved={() => {
           switchTab("feed");
           setFeedFilter("saved");
-          void loadSavedPosts();
         }}
         onSettings={() => {
           switchTab("profile");
@@ -3105,7 +3105,6 @@ export default function AuthedApp({
           profileMedia={profileMedia}
           refreshPosts={refreshPosts}
           renderPosts={renderPosts}
-          savedPosts={savedPosts}
           searchedPosts={searchedPosts}
           session={session}
           setActiveConversationId={selectRoutedConversation}
