@@ -93,13 +93,13 @@ export default function ProfilePage({
           <button type="button" className="profile-page-cover-action" onClick={onChangeCover}
             disabled={editBusy} title="Thay đổi ảnh bìa"><Camera size={17} aria-hidden="true" /><span>{coverSet ? 'Đổi ảnh bìa' : 'Thêm ảnh bìa'}</span></button>
         </div>
-        <div className="profile-page-avatar-wrap">
-          {profileNote}
-          <UserAvatar username={username} name={displayName} className="profile-page-avatar" online />
-          <button type="button" className="profile-page-avatar-action" disabled={editBusy}
-            onClick={onChangeAvatar} aria-label="Đổi ảnh đại diện" title="Đổi ảnh đại diện"><Camera size={17} aria-hidden="true" /></button>
-        </div>
         <div className="profile-page-hero-bottom">
+          <div className="profile-page-avatar-wrap">
+            {profileNote}
+            <UserAvatar username={username} name={displayName} className="profile-page-avatar" online />
+            <button type="button" className="profile-page-avatar-action" disabled={editBusy}
+              onClick={onChangeAvatar} aria-label="Đổi ảnh đại diện" title="Đổi ảnh đại diện"><Camera size={17} aria-hidden="true" /></button>
+          </div>
           <div className="profile-page-identity-text">
             <h1>{displayName}</h1>
             <div className="profile-page-identity-meta">

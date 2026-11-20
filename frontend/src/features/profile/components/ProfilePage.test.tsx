@@ -28,6 +28,10 @@ describe('own profile navigation and composer', () => {
         onCreatePost={onCreatePost} onReloadPosts={() => {}} onLoadMorePosts={() => {}}
         onViewFriend={() => {}} onOpenContacts={() => {}} onOpenPost={() => {}}
       />))
+      const identityRow = host.querySelector('.profile-page-hero-bottom')
+      expect(identityRow?.querySelector('.profile-page-avatar-wrap')).not.toBeNull()
+      expect(identityRow?.querySelector('.profile-page-identity-text')).not.toBeNull()
+      expect(identityRow?.querySelector('.profile-page-hero-actions')).not.toBeNull()
       const tabbar = host.querySelector('.profile-page-tabbar')
       expect(tabbar?.querySelector('.profile-page-tab-indicator')).not.toBeNull()
       expect(tabbar?.parentElement?.classList.contains('profile-page')).toBe(true)
