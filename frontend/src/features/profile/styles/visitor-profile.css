@@ -95,6 +95,8 @@
  .visitor-cols{display:flex;flex-direction:column;gap:16px;margin-top:16px}
  .visitor-sidebar{position:static!important;align-self:stretch;width:100%;box-sizing:border-box}
  .visitor-posts{width:100%}
+ .visitor-posts .feed.zalo-feed{display:flex;flex-direction:column;gap:2px}
+ .visitor-posts .feed.zalo-feed>.post.feed-post-card{margin:0;border-left:0;border-right:0;border-radius:0}
  .visitor-side-photos{display:none}
  .visitor-media-panel,.visitor-about-panel{margin-top:16px;padding:18px}
 }

@@ -513,7 +513,15 @@
 
 @media (max-width: 760px) {
   .modern-shell.app-layout .feed-view.zalo-feed-view.social-feed {
-    padding: 0 12px max(24px, env(safe-area-inset-bottom)) !important;
+    padding: 0 0 max(24px, env(safe-area-inset-bottom)) !important;
+  }
+  .modern-shell.app-layout .social-feed-center > .feed.zalo-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .modern-shell.app-layout .social-feed-center > .feed.zalo-feed > .post.feed-post-card {
+    margin: 0;
   }
   .modern-shell.app-layout .social-feed-center > .soco-feed-section-label,
   .modern-shell.app-layout .social-feed-center > .stories-row,

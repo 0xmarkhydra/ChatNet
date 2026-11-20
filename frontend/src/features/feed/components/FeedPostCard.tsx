@@ -67,7 +67,7 @@ export default function FeedPostCard({
 
   return (
     <Card asChild>
-      <article className="post zalo-post feed-post-card flex! flex-col! gap-y-2! min-w-0! m-0! px-[18px]! pt-[14px]! pb-[11px]! overflow-hidden! rounded-2xl! border! border-[#e8ecf5]! bg-white! shadow-[0_3px_16px_rgba(30,51,96,0.035)]!">
+      <article className="post zalo-post feed-post-card flex! flex-col! gap-y-2! min-w-0! m-0! px-[18px]! pt-[14px]! pb-[11px]! max-[760px]:px-4! max-[760px]:pt-3! max-[760px]:pb-2.5! overflow-hidden! rounded-2xl! max-[760px]:rounded-none! border! border-[#e8ecf5]! bg-white! shadow-[0_3px_16px_rgba(30,51,96,0.035)]!">
         <PostCardHeader post={post} authorLabel={authorLabel} name={name} onAuthorOpen={onAuthorOpen}
           onEditPost={onEditPost} openPost={openPost} apiFetch={apiFetch} syncFeedPost={syncFeedPost}
           removeFeedPost={removeFeedPost} setNotice={setNotice} onRepostChanged={onRepostChanged} />
