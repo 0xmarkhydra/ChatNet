@@ -13,32 +13,6 @@
     background: #f7f9fd;
     scrollbar-gutter: auto;
   }
-  .modern-shell.app-layout .social-feed-grid {
-    box-sizing: border-box;
-    display: grid;
-    grid-template-columns: minmax(0, 620px) minmax(260px, 320px);
-    align-items: start;
-    justify-content: center;
-    gap: 22px;
-    width: 100%;
-    max-width: 1040px;
-    min-width: 0;
-    margin-inline: auto;
-    padding: 20px 24px 36px;
-  }
-  .modern-shell.app-layout .social-feed-center,
-  .modern-shell.app-layout .social-feed-side {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    gap: 15px;
-  }
-  .modern-shell.app-layout .social-feed-center > *,
-  .modern-shell.app-layout .social-feed-side > * {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-  }
   .modern-shell.app-layout .social-feed-stories-card,
   .modern-shell.app-layout .social-feed-launcher,
   .modern-shell.app-layout .social-feed-filter-bar,
@@ -372,9 +346,6 @@
   }
 
   /* Right discovery rail */
-  .modern-shell.app-layout .social-feed-side {
-    gap: 16px;
-  }
   .modern-shell.app-layout .social-feed-side-card {
     padding: 17px 19px 19px;
   }
@@ -527,16 +498,6 @@
 }
 
 @media (min-width: 761px) and (max-width: 1330px) {
-  .modern-shell.app-layout .social-feed-grid {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 700px;
-    padding: 17px 18px 36px;
-  }
-  .modern-shell.app-layout .social-feed-side {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-  }
   .social-feed-story-strip {
     overflow-x: auto;
   }
@@ -553,15 +514,6 @@
 @media (max-width: 760px) {
   .modern-shell.app-layout .feed-view.zalo-feed-view.social-feed {
     padding: 0 12px max(24px, env(safe-area-inset-bottom)) !important;
-  }
-  .modern-shell.app-layout .social-feed-grid,
-  .modern-shell.app-layout .social-feed-center {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    width: 100%;
-    min-width: 0;
-    padding: 0;
   }
   .modern-shell.app-layout .social-feed-center > .soco-feed-section-label,
   .modern-shell.app-layout .social-feed-center > .stories-row,
@@ -582,9 +534,6 @@
   }
   .modern-shell.app-layout .social-feed-center > .zalo-post-composer {
     margin-bottom: 15px;
-  }
-  .modern-shell.app-layout .social-feed-side {
-    display: none;
   }
 }
 
@@ -660,27 +609,10 @@
     border-radius: 6px;
     background: #c5d2e7;
   }
-  .modern-shell.app-layout .social-feed-grid > .social-feed-side > * {
-    flex: 0 0 auto;
-  }
-}
-
-/* Keep connection suggestions beside the feed on compact laptop screens. */
-@media (min-width: 1121px) and (max-width: 1330px) {
-  .modern-shell.app-layout .social-feed-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
-    max-width: 1040px;
-    gap: 18px;
-    padding: 17px 18px 36px;
-  }
-  .modern-shell.app-layout .social-feed-grid > .social-feed-side {
-    grid-template-columns: none;
-  }
 }
 
 /* Use denser connection suggestions on short desktop viewports. */
 @media (min-width: 1121px) and (max-height: 780px) {
-  .modern-shell.app-layout .social-feed-grid > .social-feed-side { gap: 11px; }
   .modern-shell.app-layout .social-feed-side-card { padding: 13px 15px 15px; }
   .modern-shell.app-layout .social-feed-suggestions { min-height: 260px; }
 }

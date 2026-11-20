@@ -30,8 +30,6 @@ import { useConversationData } from "../features/chat/hooks/useConversationData"
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
 import {
   useChatQuickSearch,
-  type ChatQuickContact,
-  type ChatQuickHit,
 } from "../features/chat/hooks/useChatQuickSearch";
 import ChatQuickSearch from "../features/chat/components/ChatQuickSearch";
 import { useContactData } from "../features/contacts/hooks/useContactData";
@@ -330,6 +328,8 @@ import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
 import { useChatDraftState } from "../features/chat/hooks/useChatDraftState";
 import { useChatOutboxState } from "../features/chat/hooks/useChatOutboxState";
+import { useChatOutboxReceiptReconciliation } from "../features/chat/hooks/useChatOutboxReceiptReconciliation";
+import { useChatQuickSelectionActions } from "../features/chat/hooks/useChatQuickSelectionActions";
 import { useChatComposerSurface } from "../features/chat/hooks/useChatComposerSurface";
 import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
@@ -997,16 +997,27 @@ export default function AuthedApp({
     () => Object.fromEntries(friends.map(friend => [friend.username, friend.displayName || friend.username])),
     [friends],
   );
-  const visiblePosts = applyPostLikePreviews(posts, likePreviews);
-  const visibleMessages = messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
-    reactionPreviews[message.id]
-      ? {
-          ...message,
-          reactions: message.deleted ? [] : reactionPreviews[message.id],
-        }
-      : message,
+  // Message updates should not rebuild the feed previews, and unrelated shell
+  // state changes should not remap every visible message in a long conversation.
+  const visiblePosts = useMemo(
+    () => applyPostLikePreviews(posts, likePreviews),
+    [posts, likePreviews],
   );
-  const visibleProfilePosts = applyPostLikePreviews(profilePosts, likePreviews);
+  const visibleMessages = useMemo(
+    () => messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
+      reactionPreviews[message.id]
+        ? {
+            ...message,
+            reactions: message.deleted ? [] : reactionPreviews[message.id],
+          }
+        : message,
+    ),
+    [messages, selectedChannelId, reactionPreviews],
+  );
+  const visibleProfilePosts = useMemo(
+    () => applyPostLikePreviews(profilePosts, likePreviews),
+    [profilePosts, likePreviews],
+  );
   // Shared links are routed, while opening a card in the feed is local UI state.
   const feedRoutePostId = feedPostIdFromPath(routeLocation.pathname)
     ?? Number(new URLSearchParams(routeLocation.search).get("post"));
@@ -2020,30 +2031,13 @@ export default function AuthedApp({
     setChatOnline,
   });
 
-  useEffect(() => {
-    if (!session || !messages.length || !chatOutboxRef.current.length) return;
-    const delivered = new Set(
-      messages
-        .filter(
-          (message) =>
-            message.senderId === session.user.id && Boolean(message.clientId),
-        )
-        .map((message) => `${message.conversationId}:${message.clientId}`),
-    );
-    if (!delivered.size) return;
-    updateChatOutbox((items) => {
-      if (
-        !items.some((item) =>
-          delivered.has(`${item.conversationId}:${item.clientId}`),
-        )
-      )
-        return items;
-      return items.filter(
-        (item) => !delivered.has(`${item.conversationId}:${item.clientId}`),
-      );
-    });
-  }, [messages, session?.sessionId]);
-
+  useChatOutboxReceiptReconciliation({
+    messages,
+    sessionId: session?.sessionId ?? null,
+    userId: session?.user.id ?? null,
+    chatOutboxRef,
+    updateChatOutbox,
+  });
 
   const unreadTotal = nativeNotifications.unreadCount ?? 0;
   const notificationItemCount = countNotificationItems(friendRequests, conversations)
@@ -2085,39 +2079,17 @@ export default function AuthedApp({
     likePreviews,
   });
   const sortedChatListConversations = sortChatListConversations(chatListConversations);
-  const openChatQuickContact = (contact: ChatQuickContact) => {
-    setQuickSearchOpen(false);
-    setGlobalSearch("");
-    setChatSearchJump(null);
-    if (contact.conversation) {
-      const selected = contact.conversation;
-      setConversations((current) =>
-        current.some((item) => item.id === selected.id)
-          ? current
-          : [...current, selected],
-      );
-      selectRoutedConversation(selected.id);
-    } else if (contact.username) {
-      void openDirectByUsername(contact.username);
-    }
-  };
-  const openChatQuickHit = (hit: ChatQuickHit) => {
-    setQuickSearchOpen(false);
-    setGlobalSearch("");
-    setConversations((current) =>
-      current.some((item) => item.id === hit.conversation.id)
-        ? current
-        : [...current, hit.conversation],
-    );
-    setChatSearchJump({
-      conversationId: hit.conversation.id,
-      messageId: hit.id,
-      revision: ++chatSearchJumpRevision.current,
-    });
-    selectRoutedConversation(hit.conversation.id);
-    setTranslations({});
-    setTranslationOriginals({});
-  };
+  const { openChatQuickContact, openChatQuickHit } = useChatQuickSelectionActions({
+    setQuickSearchOpen,
+    setGlobalSearch,
+    setChatSearchJump,
+    setConversations,
+    selectConversation: selectRoutedConversation,
+    openDirectByUsername,
+    nextRevision: nextChatSearchJumpRevision,
+    setTranslations,
+    setTranslationOriginals,
+  });
   async function openMentionPost(mention: PostMentionNotification) {
     if (!isCurrentMentionVisit()) return;
     try {
