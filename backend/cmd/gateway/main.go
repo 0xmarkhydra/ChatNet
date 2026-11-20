@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"chatnet/internal/config"
+	"chatnet/internal/httpx"
 	"chatnet/internal/mediax"
 )
 
@@ -143,16 +144,7 @@ func spaHandler(staticDir string) http.Handler {
 }
 
 func cors(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-ChatNet-Relay-Token")
-		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+	return httpx.CORS(next)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
