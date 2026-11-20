@@ -161,6 +161,7 @@ export default function VisitorProfile({ username, friendOnline, request, curren
  return <section ref={surface} onKeyDown={event=>{
   if(event.key!=='Tab'||document.querySelector('dialog[open]'))return
   const controls=Array.from(surface.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')||[])
+   .filter(control => control.tabIndex >= 0)
   const first=controls[0],last=controls[controls.length-1]
   if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
   else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}
