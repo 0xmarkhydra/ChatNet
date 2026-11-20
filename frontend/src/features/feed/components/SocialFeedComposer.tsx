@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import FeedComposerIconButton from './FeedComposerIconButton'
-import UserAvatar from '../../../shared/ui/UserAvatar'
+import PostStatusPrompt from '../../../shared/ui/PostStatusPrompt'
 
 type Props = {
   username: string
@@ -22,10 +22,15 @@ export default function SocialFeedComposer({
   return (
     <section className="social-feed-launcher" aria-label="Tạo nội dung mới">
       <div className="social-feed-launcher-top">
-        <UserAvatar username={username} name={displayName} className="social-feed-me-avatar" />
-        <button type="button" className="social-feed-launcher-prompt" onClick={onCreatePost} disabled={pending}>
-          {draft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
-        </button>
+        <PostStatusPrompt
+          username={username}
+          displayName={displayName}
+          avatarClassName="social-feed-me-avatar"
+          promptClassName="social-feed-launcher-prompt"
+          prompt={draft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
+          onCreatePost={onCreatePost}
+          pending={pending}
+        />
         <div className="social-feed-launcher-shortcuts" role="group" aria-label="Tạo nội dung nhanh">
           <input ref={quickMediaInput} className="hidden-media-input" type="file" accept="image/*,video/*" multiple
             aria-label="Chọn ảnh hoặc video đăng bài"
