@@ -127,7 +127,8 @@
     min-height: 96px;
     padding: 16px 24px 14px 220px;
   }
-  .profile-page-identity-text { min-width: 0; flex: 1 1 auto; }
+  /* Align the name and profile details vertically with the overlapping avatar. */
+  .profile-page-identity-text { min-width: 0; flex: 1 1 auto; transform: translateY(-52px); }
   .profile-page-identity-text h1 {
     margin: 0 0 5px;
     color: #152441;
