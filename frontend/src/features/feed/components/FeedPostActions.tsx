@@ -41,36 +41,6 @@ async function sharePost(id: number, feedback: Feedback, copyOnly = false) {
   }
 }
 
-/** Save/unsave is a first-class footer action in the Social UI Social V4 feed. */
-export function FeedSaveAction<P extends FeedActionPost>({
-  post, request, onUpdated, onFeedback,
-}: Pick<Props<P>, 'post' | 'request' | 'onUpdated' | 'onFeedback'>) {
-  const [busy, setBusy] = useState(false)
-  async function toggle() {
-    if (busy) return
-    setBusy(true)
-    try {
-      const response = await request('/api/posts/' + post.id + '/save', { method: 'POST' })
-      const result = await response.json().catch(() => null) as P & { error?: string } | null
-      if (!response.ok || !result || result.id !== post.id || typeof result.saved !== 'boolean') {
-        throw new Error(result?.error || 'Không lưu được bài viết.')
-      }
-      onUpdated(result)
-      onFeedback(result.saved ? 'Đã lưu bài viết.' : 'Đã bỏ lưu bài viết.', 'success')
-    } catch (error) {
-      onFeedback(error instanceof Error ? error.message : 'Không thể lưu bài viết.', 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
-  return <button type="button" className={post.saved ? 'post-stat post-save-action is-saved' : 'post-stat post-save-action'}
-    disabled={busy} aria-pressed={Boolean(post.saved)} aria-busy={busy}
-    aria-label={post.saved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'} onClick={() => void toggle()}>
-    <Bookmark size={20} fill={post.saved ? 'currentColor' : 'none'} aria-hidden="true" />
-    <span>{post.saved ? 'Đã lưu' : 'Lưu'}</span>
-  </button>
-}
-
 export default function FeedPostActions<P extends FeedActionPost>({ post, mine, request, onUpdated, onDeleted, onFeedback, onEdit }: Props<P>) {
   const quickRepost = post.repostKind === 'quick'
   const deleteLabel = quickRepost ? 'Bỏ đăng lại' : 'Xóa bài viết'
