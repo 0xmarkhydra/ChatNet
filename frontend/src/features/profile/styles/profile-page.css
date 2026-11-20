@@ -387,6 +387,10 @@
   .profile-view > .profile-page-hero .profile-page-avatar-wrap { margin-top: -34px; }
   .profile-view > .profile-page-hero .profile-page-identity-text { margin-top: 0; }
   .profile-view > .profile-page-hero .profile-page-cover-action { min-height: 44px; }
+  .modern-shell .profile-view:not(.personal-timeline-view) > .profile-edit-card {
+    width: calc(100% - 24px);
+    margin-inline: auto;
+  }
   .personal-timeline-content > .profile-page-aside { margin-bottom: 16px; }
   .profile-page-media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
