@@ -145,7 +145,7 @@ export default function FeedSection({
 }: FeedSectionProps) {
   return (
       <div
-            className="feed-view zalo-feed-view social-feed"
+            className="feed-view zalo-feed-view social-feed box-border h-full min-h-0 w-full min-w-0 overflow-x-hidden overflow-y-auto bg-[#f7f9fd] max-[760px]:px-0! max-[760px]:pb-[max(24px,env(safe-area-inset-bottom))]!"
             ref={feedViewRef}
             onScroll={(event) => {
               if (feedSearchActive && event.currentTarget.scrollTop > 0)
@@ -240,7 +240,7 @@ export default function FeedSection({
                     onLoadSaved={() => void loadSavedPosts()}
                   />
                 )}
-                <div className="feed zalo-feed" aria-busy={feedInitialLoading}>
+                <div className="feed zalo-feed flex w-full min-w-0 flex-col gap-[2px] p-0 min-[761px]:gap-[13px] [&>.post]:m-0" aria-busy={feedInitialLoading}>
                   {feedCommunitiesOpen ? (
                     <FeedCommunitiesList
                       groups={conversations}
@@ -258,7 +258,7 @@ export default function FeedSection({
                     : renderPosts(collapseQuickReposts(searchedPosts), isProfileDesktop)}
 
                   {feedPagingError && (
-                    <div role="alert" className="soco-feed-load-more">
+                    <div role="alert" className="soco-feed-load-more min-[761px]:rounded-xl min-[761px]:border min-[761px]:border-[#e8ecf5] min-[761px]:bg-white min-[761px]:p-[14px] min-[761px]:text-center min-[761px]:text-xs min-[761px]:text-[#7284a0]">
                       <span>
                         {feedSearchActive
                           ? postSearch.error
@@ -293,7 +293,7 @@ export default function FeedSection({
                     !(feedSearchActive && postSearch.loading) &&
                     !(feedFilter === "following" && followingFeed.loading) &&
                     !feedPagingError && (
-                      <div className="feed-empty">
+                      <div className="feed-empty min-[761px]:rounded-[15px] min-[761px]:border min-[761px]:border-[#e8ecf5] min-[761px]:bg-white">
                         <SocoEmptyState
                           title={
                             normalizedSearch

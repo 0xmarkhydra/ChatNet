@@ -686,7 +686,6 @@
     height: 100%;
     margin: 0;
     padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
-    animation: soco-mobile-search-in 240ms ease-out both;
   }
   .modern-shell .chatnet-appbar .appbar-mobile-controls .mobile-search-expanded .appbar-mobile-search-trigger {
     display: none;
@@ -732,17 +731,7 @@
     top: calc(100% + 6px);
     width: 100%;
   }
-  @keyframes soco-mobile-search-in {
-    from { opacity: .45; transform: translateX(14px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
 }
-@media (prefers-reduced-motion: reduce) {
-  .modern-shell .chatnet-appbar .appbar-mobile-controls .mobile-search-expanded {
-    animation: none;
-  }
-}
-
 /* Hide both mobile chrome bars when scrolling into content; reveal on upward scroll. */
 @media (max-width: 760px) {
   .modern-shell.app-layout > .chatnet-appbar,

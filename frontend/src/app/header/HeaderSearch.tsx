@@ -37,7 +37,7 @@ export default function HeaderSearch({
   };
 
   return (
-    <div className={`appbar-search-anchor${mobileOpen ? " mobile-search-expanded" : ""}`} ref={anchorRef}>
+    <div className={`appbar-search-anchor${mobileOpen ? " mobile-search-expanded max-[760px]:animate-search-enter max-[760px]:motion-reduce:animate-none" : ""}`} ref={anchorRef}>
       <button className="appbar-mobile-search-trigger" type="button" aria-label="Mở tìm kiếm" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>
         <Search size={23} aria-hidden="true" />
       </button>

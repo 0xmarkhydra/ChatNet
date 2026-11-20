@@ -131,7 +131,7 @@ export default function PostComposer({
           void addFeedFiles(files)
         }} />
       {activeTool === 'checkin' && checkInOpen && setCheckInLocation && (
-        <label className="social-feed-checkin-field">
+        <label className="social-feed-checkin-field my-2 flex flex-col gap-2 rounded-xl border border-[#e5ecfa] bg-[#f8fafe] px-[15px] py-3 [&_strong]:text-[13px] [&_strong]:font-bold [&_strong]:text-[#435b84] [&_input]:box-border [&_input]:min-h-[41px] [&_input]:w-full [&_input]:rounded-[9px] [&_input]:border [&_input]:border-[#e4eafa] [&_input]:bg-white [&_input]:px-3 [&_input]:text-[13px] [&_input]:text-[#253955] [&_input]:outline-none [&_input:focus-visible]:border-[#93b6fc] [&_input:focus-visible]:shadow-[0_0_0_2px_#bdd3fd6b] [&_small]:text-[11px] [&_small]:leading-[1.35] [&_small]:text-[#8494af]">
           <span className="smart-checkin-heading">
             <strong><MapPin size={16} aria-hidden="true" /> Check-in tại</strong>
             <button type="button" aria-label="Bỏ check-in" disabled={isPosting}
