@@ -67,11 +67,11 @@ export default function FeedPostCard({
 
   return (
     <Card asChild>
-      <article className="post zalo-post feed-post-card grid! grid-cols-1! gap-y-1.5! min-w-0! m-0! px-[18px]! pt-[14px]! pb-[11px]! overflow-hidden! rounded-2xl! border! border-[#e8ecf5]! bg-white! shadow-[0_3px_16px_rgba(30,51,96,0.035)]!">
-      <div className="post-body contents! [&>*]:col-span-full! [&>*]:min-w-0!">
+      <article className="post zalo-post feed-post-card flex! flex-col! gap-y-2! min-w-0! m-0! px-[18px]! pt-[14px]! pb-[11px]! overflow-hidden! rounded-2xl! border! border-[#e8ecf5]! bg-white! shadow-[0_3px_16px_rgba(30,51,96,0.035)]!">
         <PostCardHeader post={post} authorLabel={authorLabel} name={name} onAuthorOpen={onAuthorOpen}
           onEditPost={onEditPost} openPost={openPost} apiFetch={apiFetch} syncFeedPost={syncFeedPost}
           removeFeedPost={removeFeedPost} setNotice={setNotice} onRepostChanged={onRepostChanged} />
+        <div className="post-body grid! w-full! min-w-0! gap-1.5! [&>*]:min-w-0!">
         <PostExtrasView extras={extras} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
         {extras.caption && (
           <div className={post.background ? 'feed-post-clickable feed-text-background bg-' + post.background : 'feed-post-clickable feed-post-text pt-1.5! [&_.feed-text>p]:m-0! [&_.feed-text>p]:mb-1! [&_.feed-text>p]:text-sm! [&_.feed-text>p]:leading-normal!'}
