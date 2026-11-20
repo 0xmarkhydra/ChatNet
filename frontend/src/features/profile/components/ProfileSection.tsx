@@ -458,18 +458,7 @@ export default function ProfileSection({
                 </button>
               </div>
 
-              <div
-                className="profile-identity"
-                onClick={(event) => {
-                  if (
-                    !profileTimelineOpen &&
-                    !(event.target as HTMLElement).closest("button")
-                  ) {
-                    setProfileTimelineOpen(true);
-                    setGlobalSearch("");
-                  }
-                }}
-              >
+              <div className="profile-identity">
                 <div className="profile-avatar-editor">
                   <ProfileNote
                     key={session.sessionId + ":note"}

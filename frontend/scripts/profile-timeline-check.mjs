@@ -42,6 +42,7 @@ let failCreate = false
 let privacy = { searchableByUsername: true, searchableByName: true, searchableByEmail: false, allowFriendRequests: true, showOnlineStatus: true }
 let privacyWrites = 0
 const errors = []
+const avatarOnly = process.argv.includes('--avatar-navigation')
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization, Content-Type', 'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS' }
 try {
   for (let i = 0; i < 60; i++) {
@@ -55,7 +56,7 @@ try {
     if (!String(error).includes("Executable doesn't exist")) throw error
     browser = await chromium.launch({ headless: true, channel: 'chrome' })
   }
-  for (const width of [390, 768, 1024, 1440]) {
+  for (const width of avatarOnly ? [390] : [390, 768, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: 'reduce', serviceWorkers: 'block' })
     await context.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
     const page = await context.newPage()
@@ -98,8 +99,35 @@ try {
     })
     await page.goto(origin)
     await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('button', { name: 'Cá nhân' }).click()
+    if (width === 390) {
+      const avatar = page.getByRole('button', { name: 'Tùy chọn ảnh đại diện' })
+      const profileLink = page.getByRole('button', { name: 'Mở trang cá nhân' })
+      await profileLink.waitFor()
+      await avatar.click()
+      await page.getByRole('menuitem', { name: 'Xem ảnh đại diện' }).click()
+      const preview = page.getByRole('dialog', { name: 'Ảnh đại diện', exact: true })
+      await preview.waitFor()
+      await preview.getByRole('button', { name: 'Thêm ảnh đại diện' }).click()
+      await preview.waitFor({ state: 'hidden' })
+      const picker = page.getByRole('dialog', { name: 'Đổi ảnh đại diện' })
+      await picker.waitFor()
+      await page.keyboard.press('Escape')
+      await picker.waitFor({ state: 'hidden' })
+      await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Tùy chọn ảnh đại diện')
+      check(await profileLink.isVisible(), 'Avatar preview changed the profile screen')
+      await avatar.click()
+      await page.getByRole('menuitem', { name: 'Đổi ảnh đại diện' }).click()
+      await picker.waitFor()
+      await page.keyboard.press('Escape')
+      await picker.waitFor({ state: 'hidden' })
+      check(await profileLink.isVisible(), 'Avatar picker changed the profile screen')
+    }
     await page.getByRole('button', { name: 'Mở trang cá nhân' }).click()
     await page.getByRole('heading', { name: 'Trang cá nhân', exact: true }).waitFor()
+    if (avatarOnly) {
+      await context.close()
+      continue
+    }
     const timeline = page.getByRole('region', { name: 'Dòng thời gian cá nhân' })
     await timeline.locator('.post').nth(14).waitFor()
     check(await timeline.locator('.post').count() === 15, 'First page must have 15 own posts')
@@ -165,7 +193,8 @@ try {
     posts = posts.filter(post => post.id !== 100).map(post => ({ ...post, liked: false, likes: 0 }))
   }
   check(errors.length === 0, errors.join('\n'))
-  console.log('PASS: profile timeline, pagination, publishing, privacy input, failed drafts, likes, recovery and responsive widths')
+  console.log(avatarOnly ? 'PASS: mobile avatar navigation, preview, picker and focus return'
+    : 'PASS: profile timeline, pagination, publishing, privacy input, failed drafts, likes, recovery and responsive widths')
 } finally {
   await browser?.close()
   server.kill()
