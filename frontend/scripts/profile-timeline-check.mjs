@@ -143,7 +143,21 @@ try {
     }
     await page.getByRole('button', { name: 'Mở trang cá nhân' }).click()
     await page.getByRole('heading', { name: 'Trang cá nhân', exact: true }).waitFor()
-    if (width === 390) await checkMobileProfileColors()
+    if (width === 390) {
+      await checkMobileProfileColors()
+      const hero = page.locator('.profile-page-hero-centered')
+      await hero.waitFor()
+      const cover = await hero.locator('.profile-page-cover').boundingBox()
+      const avatar = await hero.locator('.profile-page-avatar-wrap').boundingBox()
+      check(cover && avatar && Math.abs((cover.x + cover.width / 2) - (avatar.x + avatar.width / 2)) <= 1
+        && avatar.y < cover.y + cover.height && avatar.y + avatar.height > cover.y + cover.height, 'Timeline avatar must center across the cover edge')
+      check(await hero.getByRole('button', { name: 'Thêm vào tin' }).isVisible(), 'Mobile Story action missing')
+      check(await hero.getByRole('button', { name: 'Chỉnh sửa hồ sơ' }).isVisible(), 'Mobile profile edit action missing')
+      await page.getByRole('button', { name: 'Ảnh & video' }).click()
+      await page.getByRole('region', { name: 'Ảnh và video' }).waitFor()
+      await page.getByRole('button', { name: 'Tất cả', exact: true }).click()
+      await page.getByRole('region', { name: 'Dòng thời gian cá nhân' }).waitFor()
+    }
     if (avatarOnly) {
       await context.close()
       continue
@@ -213,7 +227,7 @@ try {
     posts = posts.filter(post => post.id !== 100).map(post => ({ ...post, liked: false, likes: 0 }))
   }
   check(errors.length === 0, errors.join('\n'))
-  console.log(avatarOnly ? 'PASS: mobile profile colors, avatar navigation, preview, picker and focus return'
+  console.log(avatarOnly ? 'PASS: mobile profile colors, avatar navigation, compact overview and centered timeline'
     : 'PASS: profile timeline, pagination, publishing, privacy input, failed drafts, likes, recovery and responsive widths')
 } finally {
   await browser?.close()

@@ -488,3 +488,120 @@
 @media (prefers-reduced-motion: reduce) {
   .profile-page * { scroll-behavior: auto; transition: none !important; }
 }
+/* The full mobile timeline uses a centered profile masthead. The overview stays compact. */
+.profile-view > .profile-page-hero-centered {
+  --profile-mobile-avatar-size: clamp(100px, 31vw, 142px);
+  width: calc(100% - 24px);
+  border-radius: 20px;
+}
+.profile-view > .profile-page-hero-centered .profile-page-cover {
+  height: clamp(156px, 48vw, 230px);
+  border-radius: 19px 19px 0 0;
+}
+.profile-view > .profile-page-hero-centered .profile-page-cover-action,
+.profile-page-hero-centered .profile-page-avatar-camera {
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--soco-line);
+  background: var(--soco-surface);
+  color: var(--soco-text);
+  box-shadow: 0 2px 8px rgba(21,36,65,.1);
+}
+.profile-view > .profile-page-hero-centered .profile-page-hero-bottom {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 9px;
+  padding: 0 12px 14px;
+  text-align: center;
+}
+.profile-view > .profile-page-hero-centered .profile-page-avatar-wrap {
+  grid-row: auto;
+  width: var(--profile-mobile-avatar-size);
+  height: var(--profile-mobile-avatar-size);
+  margin-top: calc(-.48 * var(--profile-mobile-avatar-size));
+  padding: 4px;
+}
+.profile-page-hero-centered .profile-page-avatar {
+  width: calc(var(--profile-mobile-avatar-size) - 8px);
+  height: calc(var(--profile-mobile-avatar-size) - 8px);
+  font-size: clamp(30px, 8vw, 40px);
+}
+.profile-page-hero-centered .profile-page-avatar-wrap > .profile-note {
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.profile-page-hero-centered .profile-hero-avatar.smart-avatar > .presence-dot {
+  right: auto;
+  left: 6%;
+  bottom: 6%;
+}
+.profile-page-hero-centered .profile-page-avatar-camera {
+  position: absolute;
+  z-index: 1;
+  right: -2px;
+  bottom: 0;
+}
+.profile-view > .profile-page-hero-centered .profile-page-identity-text { margin: 0; }
+.profile-page-hero-centered .profile-page-identity-text h1 { font-size: clamp(21px, 6.1vw, 29px); }
+.profile-page-hero-centered .profile-page-identity-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 3px 10px;
+}
+.profile-page-hero-centered .profile-page-friend-summary { margin: 0; }
+.profile-page-hero-centered .profile-page-identity-details { justify-content: center; margin: 8px 0 0; }
+.profile-view > .profile-page-hero-centered .profile-page-hero-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 8px;
+  width: 100%;
+  margin: 3px 0 0;
+}
+.profile-page-hero-centered .profile-page-hero-actions > button { white-space: normal; }
+.personal-timeline-view > .profile-mobile-section-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  box-sizing: border-box;
+  width: calc(100% - 24px);
+  max-width: 860px;
+  margin: 10px auto 0;
+  padding: 4px;
+  border: 1px solid var(--soco-line);
+  border-radius: 16px;
+  background: var(--soco-surface);
+  flex-shrink: 0;
+}
+.profile-mobile-section-picker button[aria-pressed="true"] { background: var(--soco-soft-blue); color: var(--soco-blue); }
+.profile-mobile-media { display: grid; gap: 12px; }
+.profile-mobile-media > button { justify-self: center; }
+.personal-timeline-content .profile-page-about-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.personal-timeline-content .profile-page-about-heading > h2 { margin: 0; }
+.profile-page-about-edit-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--soco-muted);
+  cursor: pointer;
+}
+.profile-page-about-edit-icon:hover,
+.profile-page-about-edit-icon:focus-visible { background: var(--soco-soft-blue); color: var(--soco-blue); }

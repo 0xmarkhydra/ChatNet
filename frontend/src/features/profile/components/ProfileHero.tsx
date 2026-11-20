@@ -15,9 +15,10 @@ type Props = {
   actions?: ReactNode
   identityNotice?: ReactNode
   compact?: boolean
+  centered?: boolean
 }
 
-export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice, compact = false }: Props) {
+export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice, compact = false, centered = false }: Props) {
   const [failedCover, setFailedCover] = useState<string>()
   const showCover = coverUrl && coverUrl !== failedCover
   const coverClass = showCover ? 'has-user-cover' : fallbackCoverTone === undefined ? 'has-default-cover' : `has-account-cover avatar-tone-${fallbackCoverTone}`
@@ -27,7 +28,7 @@ export default function ProfileHero({ displayName, username, city, workplace, sc
     { id: 'school', text: school?.trim(), label: 'Trường học', Icon: GraduationCap },
   ].filter(detail => detail.text)
   return (
-    <section className={compact ? 'profile-page-hero profile-page-hero-compact' : 'profile-page-hero'}>
+    <section className={'profile-page-hero' + (compact ? ' profile-page-hero-compact' : centered ? ' profile-page-hero-centered' : '')}>
       <div className={`profile-page-cover ${coverClass}`}>
         {showCover && <img src={coverUrl} alt="Ảnh bìa" draggable={false} onError={() => setFailedCover(coverUrl)} />}
         {coverAction}

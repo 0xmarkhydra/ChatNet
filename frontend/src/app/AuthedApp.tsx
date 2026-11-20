@@ -2717,6 +2717,8 @@ export default function AuthedApp({
         {!desktopProfileOverview && (
           <ProfileSection
           apiFetch={apiFetch}
+          onCreateStory={() => setStoryDraft({ kind: "choose" })}
+          onOpenPost={setActivePostId}
           appLocale={appLocale}
           autoTranslate={autoTranslate}
           avatarFileInputRef={avatarFileInputRef}
