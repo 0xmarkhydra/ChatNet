@@ -327,6 +327,7 @@ import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
 import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
 import { useChatDraftState } from "../features/chat/hooks/useChatDraftState";
+import { useChatScrollCoordinator } from "../features/chat/hooks/useChatScrollCoordinator";
 import { useChatOutboxState } from "../features/chat/hooks/useChatOutboxState";
 import { useChatOutboxReceiptReconciliation } from "../features/chat/hooks/useChatOutboxReceiptReconciliation";
 import { useChatQuickSelectionActions } from "../features/chat/hooks/useChatQuickSelectionActions";
@@ -426,7 +427,7 @@ export default function AuthedApp({
 
   const {
     messageDrafts, setMessageDrafts, channelDrafts, setChannelDrafts,
-    channelDraftKey, draft, messageText, messageAttachments,
+    channelDraftKey, draft, messageText, messageAttachments, setMessageText,
   } = useChatDraftState({
     userId: session?.user.id ?? 0,
     sessionRef,
@@ -1108,30 +1109,6 @@ export default function AuthedApp({
     messagesPagingBusy.current = false;
     setGroupMembers([]);
   }, [activeConversationId]);
-
-  useEffect(() => {
-    messageScrollAtBottom.current = true;
-  }, [selectedChannelId]);
-
-  function setMessageText(text: string) {
-    if (!activeConversationId) return;
-    if (selectedChannelId > 0) {
-      setChannelDrafts(current => ({
-        ...current,
-        [channelDraftKey]: { ...(current[channelDraftKey] ?? emptyDraft), text },
-      }));
-      return;
-    }
-    setMessageDrafts((current) => ({
-      ...current,
-      [activeConversationId]: {
-        ...(current[activeConversationId] ?? emptyDraft),
-        text,
-      },
-    }));
-  }
-
-
 
 
   async function loadProfileMedia() {
@@ -1934,32 +1911,17 @@ export default function AuthedApp({
     refreshStories,
   });
 
-  useLayoutEffect(() => {
-    const container = messagesScrollRef.current;
-    if (ownSendScrollConversation.current !== null) {
-      const sentInCurrentConversation =
-        ownSendScrollConversation.current === activeConversationId;
-      ownSendScrollConversation.current = null;
-      if (sentInCurrentConversation && container) {
-        // Only a local send overrides the reader's position; incoming messages never do.
-        pendingMessageScrollRestore.current = null;
-        container.scrollTop = container.scrollHeight;
-        messageScrollAtBottom.current = true;
-        return;
-      }
-    }
-    const restore = pendingMessageScrollRestore.current;
-    if (restore && container) {
-      container.scrollTop =
-        restore.top + container.scrollHeight - restore.height;
-      pendingMessageScrollRestore.current = null;
-      return;
-    }
-    // Preserve scroll position when reading history; only follow new messages
-    // when the reader was already near the bottom of the conversation.
-    if (container && messageScrollAtBottom.current)
-      container.scrollTop = container.scrollHeight;
-  }, [messages, outgoingMessage, chatOutbox]);
+  useChatScrollCoordinator({
+    activeConversationId,
+    selectedChannelId,
+    messages,
+    outgoingMessage,
+    chatOutbox,
+    messagesScrollRef,
+    messageScrollAtBottom,
+    ownSendScrollConversation,
+    pendingMessageScrollRestore,
+  });
 
   useEffect(() => {
     if (

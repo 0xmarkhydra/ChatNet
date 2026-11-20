@@ -64,6 +64,31 @@ describe("useChatDraftState", () => {
     expect(app.render(8).messageText).toBe("conversation");
   });
 
+  it("updates the active conversation text without losing attachments", () => {
+    const app = mountDrafts();
+    let state = app.render(8);
+    const attachments = [{ id: "persist" }] as never;
+    act(() => state.setMessageDrafts({ 8: { text: "before", attachments } }));
+    state = app.render(8);
+    act(() => state.setMessageText("after"));
+    state = app.render(8);
+    expect(state.messageText).toBe("after");
+    expect(state.messageAttachments).toBe(attachments);
+    expect(app.render(9).messageText).toBe("");
+    expect(app.render(8).messageText).toBe("after");
+  });
+
+  it("writes channel text independently from conversation and other channel drafts", () => {
+    const app = mountDrafts();
+    let state = app.render(8);
+    act(() => state.setMessageText("direct"));
+    state = app.render(8, 2);
+    act(() => state.setMessageText("channel-2"));
+    expect(app.render(8, 3).messageText).toBe("");
+    expect(app.render(8, 2).messageText).toBe("channel-2");
+    expect(app.render(8).messageText).toBe("direct");
+  });
+
   it("does not write drafts for an invalid user", () => {
     const app = mountDrafts(0);
     const state = app.render(5);
