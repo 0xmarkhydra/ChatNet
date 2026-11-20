@@ -26,7 +26,6 @@ export function useChatPanelState({
   const [messageActionMode, setMessageActionMode] = useState<'reactions' | 'actions'>('actions');
   const [conversationActionId, setConversationActionId] = useScopedState<number | null>(conversationScope, null);
   const [conversationMenuPosition, setConversationMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const [pinnedExpanded, setPinnedExpanded] = useScopedState(conversationScope, false);
   const [groupActivityCreateKind, setGroupActivityCreateKind] = useScopedState<GroupActivityKind | null>(conversationScope, null);
   const [groupActivityViewedId, setGroupActivityViewedId] = useScopedState<number | null>(conversationScope, null);
   const [sharedContentOpen, setSharedContentOpen] = useScopedState(channelScope, false);
@@ -48,7 +47,6 @@ export function useChatPanelState({
     messageActionId,
     messageActionMode,
     messageSearchOpen,
-    pinnedExpanded,
     replyingTo,
     setChannelSelection,
     setConversationActionId,
@@ -63,7 +61,6 @@ export function useChatPanelState({
     setMessageActionId,
     setMessageActionMode,
     setMessageSearchOpen,
-    setPinnedExpanded,
     setReplyingTo,
     setSharedContentOpen,
     sharedContentOpen,
