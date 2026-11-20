@@ -27,6 +27,7 @@ import { useUnreadDocumentTitle } from "./hooks/useUnreadDocumentTitle";
 import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
+import { revokeConversationMembership, resetConversationMembershipOnLogout, restoreConversationFromNotification } from "../features/chat/lib/conversationMembershipLifecycle";
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
 import {
   useChatQuickSearch,
@@ -1677,29 +1678,24 @@ export default function AuthedApp({
   }, [friendQuery, friendSearchRetry, newChatMode, session?.token, session?.sessionId, tab, desktopSection]);
 
   function purgeConversation(id: number) {
-    responseCache.current.invalidate(["conversations", "messages"]);
-    window.dispatchEvent(new CustomEvent("chatnet:message-history-cleared", { detail: { conversationId: id } }));
-    revokedConversationIds.current.add(id);
-    membershipSnapshot.current?.delete(id);
-    membershipEventSequence.current += 1;
-    setConversations((current) => current.filter((item) => item.id !== id));
-    setMessageDrafts((current) => {
-      const next = { ...current };
-      delete next[id];
-      return next;
+    revokeConversationMembership(id, {
+      responseCache,
+      revokedConversationIds,
+      membershipSnapshot,
+      membershipEventSequence,
+      activeConversationIdRef,
+      setConversations,
+      setMessageDrafts,
+      setActiveConversationId,
+      setHasMoreMessages,
+      setGroupMembers,
+      setGroupSettingsOpen,
+      setSharedContentOpen,
+      setTranslations,
+      setReplyingTo,
+      setMessageActionId,
+      setNotice,
     });
-    if (activeConversationIdRef.current === id) {
-      activeConversationIdRef.current = null;
-      setActiveConversationId(null);
-      setHasMoreMessages(false);
-      setGroupMembers([]);
-      setGroupSettingsOpen(false);
-      setSharedContentOpen(false);
-      setTranslations({});
-      setReplyingTo(null);
-      setMessageActionId(null);
-      setNotice("Bạn không còn là thành viên của nhóm này.");
-    }
   }
 
   function closeProfileTimeline() {
@@ -1744,10 +1740,10 @@ export default function AuthedApp({
     pendingSend.current = null;
     endSession(revoke, clearStorage, setNotice);
     setConversations([]);
-    revokedConversationIds.current.clear();
-    membershipSnapshot.current = null;
-    membershipSyncSequence.current += 1;
-    membershipEventSequence.current += 1;
+    resetConversationMembershipOnLogout({
+      revokedConversationIds, membershipSnapshot,
+      membershipSyncSequence, membershipEventSequence,
+    });
     setHasMoreConversations(false);
     setConversationLoadingMore(false);
     conversationOffset.current = 0;
@@ -1832,14 +1828,13 @@ export default function AuthedApp({
     sound: messageSoundEnabled,
     onError: (message) => setNotice(message, "warning"),
     onOpen: (conversation) => {
-      revokedConversationIds.current.delete(conversation.id);
-      membershipSnapshot.current?.add(conversation.id);
-      setConversations((current) => [
-        conversation,
-        ...current.filter((item) => item.id !== conversation.id),
-      ]);
-      switchTab("chat");
-      selectRoutedConversation(conversation.id);
+      restoreConversationFromNotification(conversation, {
+        revokedConversationIds,
+        membershipSnapshot,
+        setConversations,
+        switchTab,
+        selectConversation: selectRoutedConversation,
+      });
     },
   });
 
