@@ -1202,6 +1202,26 @@ try {
   }
   await page.setViewportSize({ width: 1586, height: 992 })
   if (postHeaderOnly) {
+    const inspectRail = () => page.evaluate(() => {
+      const selectors = ['.social-feed', '.social-feed-grid', '.social-feed-side', '.social-feed-search-card', '.social-feed-suggestions', '.social-feed-stories-card']
+      return Object.fromEntries(selectors.map(key => {
+        const element = document.querySelector(key)
+        const rect = element?.getBoundingClientRect()
+        const css = element && getComputedStyle(element)
+        return [key, { top: rect?.top, height: rect?.height, position: css?.position, stickyTop: css?.top, scrollTop: element?.scrollTop, scrollHeight: element?.scrollHeight, clientHeight: element?.clientHeight }]
+      }))
+    })
+    // The fixture normally fits within one screen. Force a longer feed to verify
+    // the rail does not jump before sticky positioning engages.
+    await page.locator('.social-feed-center').evaluate(el => { el.style.minHeight = '2200px' })
+    const before = await inspectRail()
+    await feed.evaluate(el => { el.scrollTop = 250 })
+    await page.waitForTimeout(200)
+    const after = await inspectRail()
+    assert(before['.social-feed'].scrollTop === 0 && after['.social-feed'].scrollTop >= 200
+      && Math.abs(before['.social-feed-side'].top - before['.social-feed-stories-card'].top) <= 2
+      && Math.abs(after['.social-feed-side'].top - before['.social-feed-side'].top) <= 2,
+      'Right rail must start aligned with feed and stay pinned while feed scrolls: ' + JSON.stringify({before, after}))
     assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
     console.log('PASS: Newsfeed avatar and author name do not overlap at desktop, 375px and 320px')
     await browser.close()
