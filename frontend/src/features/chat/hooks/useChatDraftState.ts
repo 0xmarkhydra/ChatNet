@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
 import { emptyDraft, type MessageDraft } from "../types";
 import { loadChatDrafts, saveChatDrafts } from "../lib/chatPersistence";
 import type { Session } from "../../../shared/types/session";
@@ -37,6 +37,21 @@ export function useChatDraftState({
 
   const [channelDrafts, setChannelDrafts] = useState<Record<string, MessageDraft>>({});
   const channelDraftKey = `${activeConversationId ?? 0}:${selectedChannelId}`;
+  const setMessageText = useCallback((text: string) => {
+    if (!activeConversationId) return;
+    if (selectedChannelId > 0) {
+      setChannelDrafts(current => ({
+        ...current,
+        [channelDraftKey]: { ...(current[channelDraftKey] ?? emptyDraft), text },
+      }));
+      return;
+    }
+    setMessageDrafts(current => ({
+      ...current,
+      [activeConversationId]: { ...(current[activeConversationId] ?? emptyDraft), text },
+    }));
+  }, [activeConversationId, selectedChannelId, channelDraftKey]);
+
   const draft = selectedChannelId > 0
     ? channelDrafts[channelDraftKey] ?? emptyDraft
     : messageDrafts[activeConversationId ?? 0] ?? emptyDraft;
@@ -50,5 +65,6 @@ export function useChatDraftState({
     draft,
     messageText: draft.text,
     messageAttachments: draft.attachments,
+    setMessageText,
   };
 }
