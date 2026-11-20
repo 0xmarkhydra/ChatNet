@@ -532,6 +532,10 @@
   .modern-shell.app-layout .social-feed-center > .soco-feed-posts-label {
     margin-top: 23px;
   }
+  /* Keep a viewport of results below the filters, even when the next list is empty. */
+  .modern-shell.app-layout .social-feed-center > .soco-feed-posts-label + .zalo-feed {
+    min-block-size: calc(100dvh - var(--mobile-nav-height, 0px));
+  }
   .modern-shell.app-layout .social-feed-center > .zalo-post-composer {
     margin-bottom: 15px;
   }

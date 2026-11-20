@@ -536,11 +536,12 @@ export default function AuthedApp({
     apiFetch,
     onReadError: message => setNotice(message, "error"),
   });
+  // Only entering the feed or changing the search resets its scroll position.
   useLayoutEffect(() => {
     if (tab !== "feed") return;
     if (feedViewRef.current) feedViewRef.current.scrollTop = 0;
     setSearchHasScrolled(false);
-  }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN"), feedFilter]);
+  }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN")]);
   // Router location is authoritative for browser Back/Forward on post URLs.
   useEffect(() => {
     if (tab !== "feed") return;
