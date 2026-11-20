@@ -586,8 +586,10 @@
  * The rail can scroll independently on shorter screens. */
 @media (min-width: 1121px) {
   .modern-shell.app-layout .social-feed-grid > .social-feed-side {
+    /* Scrollport starts below the shared header. Match the feed grid's
+       20px inset so the rail is pinned from the first frame, not after scrolling. */
     position: sticky;
-    top: 80px;
+    top: 20px;
     align-self: start;
     display: flex;
     flex-direction: column;
@@ -619,7 +621,13 @@
 
 /* Desktop Feed sidebar: existing post search and member communities, not a second search backend. */
 @media (min-width: 761px) {
-  .modern-shell.app-layout .social-feed-search-card { padding: 12px 14px; }
+  .modern-shell.app-layout .social-feed-side-card.social-feed-search-card {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
   .modern-shell.app-layout .social-feed-search-field {
     display: flex; align-items: center; gap: 9px; min-width: 0;
     height: 44px; padding: 0 12px; border-radius: 22px;
@@ -629,7 +637,8 @@
     flex: 1; min-width: 0; width: 100%; border: 0; outline: 0;
     background: transparent; color: #17233d; font: inherit; font-size: 12px;
   }
-  .modern-shell.app-layout .social-feed-search-field:focus-within { outline: 2px solid var(--soco-blue, #2563eb); outline-offset: 2px; }
+  /* Draw the focus ring inside the field: the independently scrolling rail clips outward outlines. */
+  .modern-shell.app-layout .social-feed-search-field:focus-within { outline: 2px solid var(--soco-blue, #2563eb); outline-offset: -2px; }
   .modern-shell.app-layout .social-feed-search-field kbd {
     flex: 0 0 auto; border: 1px solid #dce3f5; border-radius: 5px;
     padding: 3px 5px; background: #fff; color: #697894; font-size: 10px;
