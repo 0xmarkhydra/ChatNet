@@ -1,13 +1,14 @@
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cn } from "../lib/utils";
 
-/**
- * Opt-in card primitives for new SocCO screens.
- * A neutral default avoids changing the established Feed/Profile post card styles.
- */
-function Card({ className, ...props }: React.ComponentProps<"section">) {
+/** Feature-agnostic card surface. Use asChild to preserve article/section semantics. */
+type CardProps = React.ComponentProps<"section"> & { asChild?: boolean };
+
+function Card({ className, asChild = false, ...props }: CardProps) {
+  const Component = asChild ? Slot : "section";
   return (
-    <section
+    <Component
       data-slot="card"
       className={cn("min-w-0 rounded-ui-lg border border-border bg-card text-card-foreground", className)}
       {...props}
