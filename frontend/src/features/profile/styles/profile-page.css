@@ -122,14 +122,14 @@
     position: relative;
     z-index: 2;
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
     gap: 20px;
     min-height: 168px;
     margin-top: -84px;
     padding: 0 24px 0 32px;
   }
-  /* Avatar, identity and actions share one layout row with the same vertical center. */
+  /* Identity and edit actions align at the avatar bottom, below the cover actions. */
   .profile-page-identity-text { min-width: 0; flex: 1 1 auto; }
   .profile-page-identity-text h1 {
     margin: 0 0 5px;
