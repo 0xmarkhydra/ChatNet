@@ -31,7 +31,7 @@ type Props = {
   changePrivacy: (key: keyof UserPrivacy) => Promise<void>
   onSave: (event: FormEvent<HTMLFormElement>) => void
   onDiscard: () => void
-  onChangeAvatar: () => void
+  onChangeAvatar: (opener: HTMLButtonElement) => void
   onChangeCover: () => void
 }
 
@@ -81,7 +81,7 @@ export default function ProfileEditorPage({
         <div className="profile-editor-cover-slot">{cover(false)}</div>
         <div className="profile-editor-avatar-ring">
           <UserAvatar username={username} name={displayName} className="profile-editor-avatar" online />
-          <button type="button" className="profile-editor-avatar-button" disabled={mediaBusy} onClick={onChangeAvatar}
+          <button type="button" className="profile-editor-avatar-button" disabled={mediaBusy} onClick={event => onChangeAvatar(event.currentTarget)}
             aria-label="Đổi ảnh đại diện" title="Đổi ảnh đại diện"><Camera size={17} aria-hidden="true" /></button>
         </div>
 

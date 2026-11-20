@@ -8,6 +8,7 @@ import UserAvatar, { profileAssetUrl } from "../../../shared/ui/UserAvatar";
 import UiIcon from "../../../shared/ui/UiIcon";
 import ProfileNote from "./ProfileNote";
 import ProfileAvatarMenu from "./ProfileAvatarMenu";
+import ProfileAvatarPicker from "./ProfileAvatarPicker";
 import ProfileHero from "./ProfileHero";
 import ProfileDetailsCard from "./ProfileDetailsCard";
 import { userLabel } from "../../../shared/utils/userLabel";
@@ -17,7 +18,7 @@ import type { ManagedAccountSession } from "../../auth";
 import { type Post } from "../../feed";
 import type { UserPrivacy, ProfileMediaState } from "../types";
 import { type Session } from "../../../shared/types/session";
-import { type SetStateAction } from "react";
+import { useState, type SetStateAction } from "react";
 import type { Tab } from "../../../shared/types/navigation";
 import { UI_MESSAGES } from "../../i18n";
 import type { LanguageOption } from "../../i18n";
@@ -196,6 +197,8 @@ export default function ProfileSection({
   visibleProfilePosts,
   visibleTranslationSettingsOptions,
 }: ProfileSectionProps) {
+  const [avatarPicker, setAvatarPicker] = useState<{ opener: HTMLButtonElement | null } | null>(null);
+  const openAvatarPicker = (opener: HTMLButtonElement | null) => setAvatarPicker({ opener });
   return (
       <div
             className={`simple-view profile-view ${profileTimelineOpen ? "personal-timeline-view" : ""} ${isProfileDesktop && desktopProfileSettings ? "settings-workspace-open" : ""}`}
@@ -353,18 +356,19 @@ export default function ProfileSection({
                 }
               />
             )}
-            <input
-              ref={avatarFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh đại diện"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("avatar", file);
-              }}
-            />
+            {avatarPicker && (
+              <ProfileAvatarPicker
+                key={session.sessionId}
+                username={name}
+                avatarUrl={profileMedia?.avatarSet ? profileAssetUrl(name, 'avatar', profileMedia.updatedAt) : undefined}
+                posts={profilePosts}
+                busy={profileBusy !== null || mediaUploading === 'profile'}
+                opener={avatarPicker.opener}
+                inputRef={avatarFileInputRef}
+                onSave={file => updateProfileImage('avatar', file)}
+                onClose={() => setAvatarPicker(null)}
+              />
+            )}
             <input
               ref={coverFileInputRef}
               className="hidden-media-input"
@@ -417,7 +421,7 @@ export default function ProfileSection({
                     displayName={userLabel(profileMedia?.displayName || session.user.displayName, name)}
                     avatarClassName="profile-page-avatar" avatarSet={Boolean(profileMedia?.avatarSet)}
                     avatarVersion={profileMedia?.updatedAt} editBusy={profileBusy !== null || mediaUploading === "profile"}
-                    onChangeAvatar={() => avatarFileInputRef.current?.click()} />
+                    onChangeAvatar={openAvatarPicker} />
                 </>} />
             ) : (
             <section className="profile-hero">
@@ -480,7 +484,7 @@ export default function ProfileSection({
                     avatarSet={Boolean(profileMedia?.avatarSet)}
                     avatarVersion={profileMedia?.updatedAt}
                     editBusy={profileBusy !== null || mediaUploading === "profile"}
-                    onChangeAvatar={() => avatarFileInputRef.current?.click()}
+                    onChangeAvatar={openAvatarPicker}
                   />
                 </div>
                 <button

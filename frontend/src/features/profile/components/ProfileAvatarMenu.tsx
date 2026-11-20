@@ -11,14 +11,14 @@ type Props = {
   avatarVersion?: string
   avatarSet: boolean
   editBusy: boolean
-  onChangeAvatar: () => void
+  onChangeAvatar: (opener: HTMLButtonElement | null) => void
 }
 
 export default function ProfileAvatarMenu({ username, displayName, avatarClassName, avatarVersion, avatarSet, editBusy, onChangeAvatar }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [failedUrl, setFailedUrl] = useState('')
   const trigger = useRef<HTMLButtonElement>(null)
-  const openingPreview = useRef(false)
+  const openingDialog = useRef(false)
   const url = avatarSet ? profileAssetUrl(username, 'avatar', avatarVersion) : ''
 
   return <>
@@ -30,17 +30,20 @@ export default function ProfileAvatarMenu({ username, displayName, avatarClassNa
           className="absolute inset-0 size-full cursor-pointer appearance-none rounded-full border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" aria-label="Ảnh đại diện" onCloseAutoFocus={event => {
-        if (openingPreview.current) {
-          openingPreview.current = false
+        if (openingDialog.current) {
+          openingDialog.current = false
           event.preventDefault()
         }
       }}>
         <DropdownMenuItem onSelect={() => {
-          openingPreview.current = true
+          openingDialog.current = true
           setFailedUrl('')
           setPreviewOpen(true)
         }}><Image size={18} aria-hidden="true" />Xem ảnh đại diện</DropdownMenuItem>
-        <DropdownMenuItem disabled={editBusy} onSelect={onChangeAvatar}>
+        <DropdownMenuItem disabled={editBusy} onSelect={() => {
+          openingDialog.current = true
+          onChangeAvatar(trigger.current)
+        }}>
           <ImagePlus size={18} aria-hidden="true" />Đổi ảnh đại diện
         </DropdownMenuItem>
       </DropdownMenuContent>

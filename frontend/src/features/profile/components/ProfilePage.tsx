@@ -36,7 +36,7 @@ type Props = {
   postCards: ReactNode
   profileNote: ReactNode
   onEditProfile: () => void
-  onChangeAvatar: () => void
+  onChangeAvatar: (opener: HTMLButtonElement | null) => void
   onChangeCover: () => void
   onCreatePost: () => void
   onCreateStory: () => void
