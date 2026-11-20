@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"context"
 	"encoding/json"
 	"io"
@@ -21,7 +20,6 @@ import (
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
 	"chatnet/internal/searchx"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -54,7 +52,7 @@ type post struct {
 	Attachments       []mediax.Attachment `json:"attachments,omitempty"`
 	CreatedAt         time.Time           `json:"createdAt"`
 	RepostKind        string              `json:"repostKind,omitempty"`
-	OriginalPost     *repostPreview      `json:"originalPost,omitempty"`
+	OriginalPost      *repostPreview      `json:"originalPost,omitempty"`
 	RepostCount       int                 `json:"repostCount"`
 	MyRepostID        int64               `json:"myRepostId,omitempty"`
 }
@@ -72,12 +70,19 @@ type story struct {
 
 const storyTextLimit = 200
 
+const maxFeedComments = 50
+
 type server struct {
 	db        *pgxpool.Pool
 	redis     *redis.Client
 	jwtSecret string
 	push      *onesignalx.Client
 	storage   *objectstore.Client
+}
+
+type feedRow struct {
+	post
+	originalID int64
 }
 
 func main() {
@@ -203,10 +208,6 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	type feedRow struct {
-		post
-		originalID int64
-	}
 	var entries []feedRow
 	for rows.Next() {
 		var p post
@@ -222,21 +223,43 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close()
 	posts := make([]post, 0, len(entries))
+	if len(entries) == 0 {
+		httpx.JSON(w, http.StatusOK, posts)
+		return
+	}
+	ids := make([]int64, 0, len(entries))
+	originalIDs := make([]int64, 0, len(entries))
 	for _, entry := range entries {
-		p, originalID := entry.post, entry.originalID
-		if err := s.attachPostReactions(r.Context(), &p, claims.UserID); err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot load post reactions")
-			return
+		ids = append(ids, entry.ID)
+		if entry.originalID != 0 {
+			originalIDs = append(originalIDs, entry.originalID)
 		}
-		p.Comments = s.comments(r, p.ID, claims.UserID)
-		p.Attachments = s.postAttachments(r.Context(), p.ID)
-		if err := s.attachRepost(r.Context(), &p, originalID, claims.UserID); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				continue
-			}
-			httpx.Error(w, http.StatusInternalServerError, "cannot load repost")
-			return
+	}
+	comments, err := s.commentsBatch(r.Context(), ids, claims.UserID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load comments")
+		return
+	}
+	attachments, err := s.postAttachmentsBatch(r.Context(), append(ids, originalIDs...))
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load attachments")
+		return
+	}
+	if err := s.attachPostReactionsBatch(r.Context(), &entries, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load post reactions")
+		return
+	}
+	if err := s.attachRepostsBatch(r.Context(), &entries, originalIDs, claims.UserID, attachments); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load repost")
+		return
+	}
+	for _, entry := range entries {
+		p := entry.post
+		if entry.originalID != 0 && p.OriginalPost == nil {
+			continue
 		}
+		p.Comments = comments[p.ID]
+		p.Attachments = attachments[p.ID]
 		posts = append(posts, p)
 	}
 	httpx.JSON(w, http.StatusOK, posts)
@@ -249,7 +272,7 @@ func (s *server) comments(r *http.Request, postID, viewerID int64) []comment {
 		FROM comments c JOIN users u ON u.id=c.user_id
 		WHERE c.post_id=$1 AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		  (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))
-		ORDER BY c.id ASC`, postID, viewerID)
+		ORDER BY c.id ASC LIMIT $3`, postID, viewerID, maxFeedComments)
 	if err != nil {
 		return []comment{}
 	}
@@ -265,12 +288,45 @@ func (s *server) comments(r *http.Request, postID, viewerID int64) []comment {
 	return items
 }
 
+func (s *server) commentsBatch(ctx context.Context, postIDs []int64, viewerID int64) (map[int64][]comment, error) {
+	items := make(map[int64][]comment, len(postIDs))
+	for _, id := range postIDs {
+		items[id] = []comment{}
+	}
+	rows, err := s.db.Query(ctx, `
+		SELECT visible.post_id,visible.id,visible.parent_id,visible.username,visible.display_name,
+		       visible.content,visible.created_at,visible.updated_at,visible.liked
+		FROM (SELECT DISTINCT unnest($1::bigint[]) AS post_id) AS requested
+		JOIN LATERAL (
+			SELECT c.post_id,c.id,c.parent_id,u.username,u.display_name,c.content,c.created_at,c.updated_at,
+			       EXISTS(SELECT 1 FROM comment_likes l WHERE l.comment_id=c.id AND l.user_id=$2) AS liked
+			FROM comments c JOIN users u ON u.id=c.user_id
+			WHERE c.post_id=requested.post_id AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+			  (b.blocker_id=$2 AND b.blocked_id=c.user_id) OR (b.blocked_id=$2 AND b.blocker_id=c.user_id))
+			ORDER BY c.id ASC LIMIT $3
+		) visible ON true
+		ORDER BY visible.post_id,visible.id`, postIDs, viewerID, maxFeedComments)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var postID int64
+		var c comment
+		if err := rows.Scan(&postID, &c.ID, &c.ParentID, &c.Author, &c.AuthorDisplayName, &c.Content, &c.CreatedAt, &c.UpdatedAt, &c.Liked); err != nil {
+			return nil, err
+		}
+		items[postID] = append(items[postID], c)
+	}
+	return items, rows.Err()
+}
+
 func (s *server) postAttachments(ctx context.Context, postID int64) []mediax.Attachment {
 	rows, err := s.db.Query(ctx, `
 		SELECT id,storage_ref,original_name,content_type,size_bytes,kind
 		FROM post_attachments
 		WHERE post_id=$1
-		ORDER BY position,id`, postID)
+		ORDER BY position,id LIMIT $2`, postID, mediax.MaxFeedAttachments)
 	if err != nil {
 		return []mediax.Attachment{}
 	}
@@ -292,6 +348,165 @@ func (s *server) postAttachments(ctx context.Context, postID int64) []mediax.Att
 		}
 	}
 	return items
+}
+
+func (s *server) postAttachmentsBatch(ctx context.Context, postIDs []int64) (map[int64][]mediax.Attachment, error) {
+	items := make(map[int64][]mediax.Attachment, len(postIDs))
+	for _, id := range postIDs {
+		items[id] = []mediax.Attachment{}
+	}
+	if len(postIDs) == 0 {
+		return items, nil
+	}
+	rows, err := s.db.Query(ctx, `
+		SELECT visible.post_id,visible.id,visible.storage_ref,visible.original_name,visible.content_type,
+		       visible.size_bytes,visible.kind
+		FROM (SELECT DISTINCT unnest($1::bigint[]) AS post_id) AS requested
+		JOIN LATERAL (
+			SELECT a.post_id,a.id,a.storage_ref,a.original_name,a.content_type,a.size_bytes,a.kind
+			FROM post_attachments a
+			WHERE a.post_id=requested.post_id
+			ORDER BY a.position,a.id LIMIT $2
+		) visible ON true
+		ORDER BY visible.post_id,visible.id`, postIDs, mediax.MaxFeedAttachments)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var postID int64
+		var attachment mediax.Attachment
+		if err := rows.Scan(&postID, &attachment.ID, &attachment.StorageRef, &attachment.Name, &attachment.ContentType, &attachment.SizeBytes, &attachment.Kind); err != nil {
+			return nil, err
+		}
+		mediax.SignAttachment(s.storage, &attachment)
+		items[postID] = append(items[postID], attachment)
+	}
+	return items, rows.Err()
+}
+
+func (s *server) attachPostReactionsBatch(ctx context.Context, entries *[]feedRow, viewerID int64) error {
+	ids := make([]int64, 0, len(*entries))
+	for i := range *entries {
+		(*entries)[i].Reactions = []postReaction{}
+		(*entries)[i].MyReaction = ""
+		(*entries)[i].Liked = false
+		ids = append(ids, (*entries)[i].ID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := s.db.Query(ctx, `
+		SELECT post_id,emoji,COUNT(*)::int,BOOL_OR(user_id=$2)
+		FROM post_likes
+		WHERE post_id=ANY($1::bigint[])
+		GROUP BY post_id,emoji
+		ORDER BY post_id,COUNT(*) DESC,emoji`, ids, viewerID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	byID := make(map[int64]*post, len(*entries))
+	for i := range *entries {
+		byID[(*entries)[i].ID] = &(*entries)[i].post
+	}
+	for rows.Next() {
+		var postID int64
+		var reaction postReaction
+		var mine bool
+		if err := rows.Scan(&postID, &reaction.Emoji, &reaction.Count, &mine); err != nil {
+			return err
+		}
+		p := byID[postID]
+		if p == nil {
+			continue
+		}
+		p.Reactions = append(p.Reactions, reaction)
+		if mine {
+			p.MyReaction = reaction.Emoji
+			p.Liked = true
+		}
+	}
+	return rows.Err()
+}
+
+func (s *server) attachRepostsBatch(ctx context.Context, entries *[]feedRow, originalIDs []int64, viewerID int64, attachments map[int64][]mediax.Attachment) error {
+	if len(originalIDs) > 0 {
+		rows, err := s.db.Query(ctx, `
+			SELECT p.id,u.username,u.display_name,p.content
+			FROM posts p JOIN users u ON u.id=p.user_id
+			WHERE p.id=ANY($1::bigint[]) AND p.repost_of IS NULL AND p.visibility<>'private' AND `+directPostAccessSQL, originalIDs, viewerID)
+		if err != nil {
+			return err
+		}
+		sources := make(map[int64]repostPreview, len(originalIDs))
+		for rows.Next() {
+			var source repostPreview
+			if err := rows.Scan(&source.ID, &source.Author, &source.AuthorDisplayName, &source.Content); err != nil {
+				rows.Close()
+				return err
+			}
+			source.Attachments = attachments[source.ID]
+			sources[source.ID] = source
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return err
+		}
+		rows.Close()
+		for i := range *entries {
+			if (*entries)[i].originalID == 0 {
+				continue
+			}
+			if source, ok := sources[(*entries)[i].originalID]; ok {
+				(*entries)[i].OriginalPost = &source
+			}
+		}
+	}
+
+	countIDs := make([]int64, 0, len(*entries))
+	for i := range *entries {
+		if (*entries)[i].originalID == 0 && (*entries)[i].Visibility != "private" {
+			countIDs = append(countIDs, (*entries)[i].ID)
+		}
+	}
+	if len(countIDs) == 0 {
+		return nil
+	}
+	rows, err := s.db.Query(ctx, `
+		SELECT p.repost_of,COUNT(*)::int,COALESCE(MAX(p.id) FILTER (WHERE p.user_id=$2 AND p.repost_kind='quick'),0)
+		FROM posts p
+		WHERE p.repost_of=ANY($1::bigint[]) AND `+directPostAccessSQL+`
+		GROUP BY p.repost_of`, countIDs, viewerID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	counts := make(map[int64]struct {
+		count int
+		mine  int64
+	}, len(countIDs))
+	for rows.Next() {
+		var id int64
+		var value struct {
+			count int
+			mine  int64
+		}
+		if err := rows.Scan(&id, &value.count, &value.mine); err != nil {
+			return err
+		}
+		counts[id] = value
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for i := range *entries {
+		if value, ok := counts[(*entries)[i].ID]; ok && (*entries)[i].originalID == 0 {
+			(*entries)[i].RepostCount = value.count
+			(*entries)[i].MyRepostID = value.mine
+		}
+	}
+	return nil
 }
 
 func (s *server) create(w http.ResponseWriter, r *http.Request) {
