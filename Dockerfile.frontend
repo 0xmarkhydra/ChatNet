@@ -1,4 +1,7 @@
 FROM node:24-alpine AS build
+# Pin the API origin for Docker preview builds; never fall back to local demo data.
+ARG VITE_API_URL=https://api-chat.codelocal.cloud
+ENV VITE_API_URL=${VITE_API_URL}
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
