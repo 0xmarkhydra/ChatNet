@@ -45,7 +45,7 @@ export function PostCardHeader({
   openPost: () => void
 }) {
   return (
-    <header className="feed-post-header post-card-header flex! w-full! min-w-0! items-center! gap-[11px]!">
+    <header className="feed-post-header post-card-header flex! w-full! min-w-0! items-center! gap-[9px]!">
       <UserAvatar username={post.author} name={authorLabel} className="avatar size-11! basis-11! shrink-0! rounded-full!" />
       <div className="post-author flex! min-h-11! min-w-0! flex-1! items-center! justify-between!">
         <div className="min-w-0!">

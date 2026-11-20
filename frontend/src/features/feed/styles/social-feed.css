@@ -582,10 +582,26 @@
   }
 }
 
-/* Keep discovery menus visible while the feed column scrolls.
- * The rail stays within its grid track; if the screen is too short,
- * the rail itself scrolls independently, without moving the posts. */
+/* Keep connection suggestions below the desktop feed header as posts scroll.
+ * The rail can scroll independently on shorter screens. */
 @media (min-width: 1121px) {
+  .modern-shell.app-layout .social-feed-grid > .social-feed-side {
+    position: sticky;
+    top: 80px;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-sizing: border-box;
+    max-height: calc(100dvh - 96px);
+    min-height: 0;
+    padding: 0 5px 1px 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #c5d2e7 transparent;
+  }
   .modern-shell.app-layout .social-feed-grid > .social-feed-side::-webkit-scrollbar {
     width: 5px;
   }

@@ -68,8 +68,10 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-}
-        VITE_API_PROXY: "1"
+        # Keep Docker preview on the same cloud account/data as chat.codelocal.cloud.
+        # An empty VITE_API_URL must not silently switch to the local demo backend.
+        VITE_API_URL: ${VITE_API_URL:-https://api-chat.codelocal.cloud}
+        VITE_API_PROXY: "0"
     environment:
       PORT: "8080"
       BACKEND_URL: http://backend:8080
