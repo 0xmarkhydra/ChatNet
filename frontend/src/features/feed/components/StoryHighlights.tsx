@@ -93,8 +93,10 @@ export default function StoryHighlights({ request, username, owner = false, clas
               }}>
                 <DialogTrigger asChild>
                   <Button aria-label={'Quản lý Tin nổi bật: ' + item.title} variant="ghost"
-                    className="absolute right-1 top-1 size-11 bg-card/90 p-0 shadow-sm hover:bg-card">
-                    <MoreHorizontal size={19} aria-hidden="true" />
+                    className="group absolute right-1 top-1 size-11 items-start justify-end p-0 hover:bg-transparent">
+                    <span className="pointer-events-none grid size-7 place-items-center rounded-lg bg-card/90 shadow-sm group-hover:bg-card">
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
