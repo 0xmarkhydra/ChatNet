@@ -998,16 +998,27 @@ export default function AuthedApp({
     () => Object.fromEntries(friends.map(friend => [friend.username, friend.displayName || friend.username])),
     [friends],
   );
-  const visiblePosts = applyPostLikePreviews(posts, likePreviews);
-  const visibleMessages = messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
-    reactionPreviews[message.id]
-      ? {
-          ...message,
-          reactions: message.deleted ? [] : reactionPreviews[message.id],
-        }
-      : message,
+  // Message updates should not rebuild the feed previews, and unrelated shell
+  // state changes should not remap every visible message in a long conversation.
+  const visiblePosts = useMemo(
+    () => applyPostLikePreviews(posts, likePreviews),
+    [posts, likePreviews],
   );
-  const visibleProfilePosts = applyPostLikePreviews(profilePosts, likePreviews);
+  const visibleMessages = useMemo(
+    () => messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
+      reactionPreviews[message.id]
+        ? {
+            ...message,
+            reactions: message.deleted ? [] : reactionPreviews[message.id],
+          }
+        : message,
+    ),
+    [messages, selectedChannelId, reactionPreviews],
+  );
+  const visibleProfilePosts = useMemo(
+    () => applyPostLikePreviews(profilePosts, likePreviews),
+    [profilePosts, likePreviews],
+  );
   // Shared links are routed, while opening a card in the feed is local UI state.
   const feedRoutePostId = feedPostIdFromPath(routeLocation.pathname)
     ?? Number(new URLSearchParams(routeLocation.search).get("post"));
