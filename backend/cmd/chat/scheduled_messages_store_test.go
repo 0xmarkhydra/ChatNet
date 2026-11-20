@@ -2,13 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"chatnet/internal/authx"
 	"chatnet/internal/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,13 +34,8 @@ func TestScheduledMessageStoreIntegration(t *testing.T) {
 	if err := database.Migrate(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	// The proposed migration is tested before registration with the shared migrator.
-	ddl, err := os.ReadFile("../../internal/database/migrations/019_scheduled_messages.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
 	for range 2 {
-		if _, err := db.Exec(ctx, string(ddl)); err != nil {
+		if err := database.MigrateScheduledMessages(ctx, db); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -75,7 +75,9 @@ func TestScheduledMessageStoreIntegration(t *testing.T) {
 		}
 		return m
 	}
-	makeDue := func(id int64) { mustExec("UPDATE scheduled_messages SET send_at=NOW()-INTERVAL '1 second' WHERE id=$1", id) }
+	makeDue := func(id int64) {
+		mustExec("UPDATE scheduled_messages SET send_at=NOW()-INTERVAL '1 second' WHERE id=$1", id)
+	}
 	checkState := func(id int64, want string) {
 		t.Helper()
 		m, err := scanScheduled(db.QueryRow(ctx, "SELECT "+scheduledColumns+" FROM scheduled_messages WHERE id=$1", id))
@@ -83,6 +85,53 @@ func TestScheduledMessageStoreIntegration(t *testing.T) {
 			t.Fatalf("id %d state want %s got %s, message link=%v, err=%v", id, want, m.State, m.MessageID != nil, err)
 		}
 	}
+
+	t.Run("HTTP queue is private and validates the request", func(t *testing.T) {
+		mux := http.NewServeMux()
+		const queue = "/api/conversations/{id}/scheduled-messages"
+		mux.Handle("POST "+queue, authx.Middleware("test", http.HandlerFunc(s.scheduleMessage)))
+		mux.Handle("GET "+queue, authx.Middleware("test", http.HandlerFunc(s.listScheduledMessages)))
+		mux.Handle("PATCH "+queue+"/{scheduleId}", authx.Middleware("test", http.HandlerFunc(s.moveScheduledMessage)))
+		mux.Handle("DELETE "+queue+"/{scheduleId}", authx.Middleware("test", http.HandlerFunc(s.removeScheduledMessage)))
+		req := func(method string, suffix string, body string, user int64, want int) *httptest.ResponseRecorder {
+			t.Helper()
+			r := httptest.NewRequest(method, fmt.Sprintf("/api/conversations/%d/scheduled-messages%s", room, suffix), strings.NewReader(body))
+			if user != 0 {
+				token, err := authx.Sign("test", user, "schedule-user", "Schedule User")
+				if err != nil {
+					t.Fatal(err)
+				}
+				r.Header.Set("Authorization", "Bearer "+token)
+			}
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, r)
+			if w.Code != want {
+				t.Fatalf("%s as %d returned %d, want %d: %s", method, user, w.Code, want, w.Body)
+			}
+			return w
+		}
+		req("GET", "", "", 0, http.StatusUnauthorized)
+		req("GET", "", "", outsider, http.StatusForbidden)
+		req("POST", "", `{"attachments":[]}`, a, http.StatusBadRequest)
+		w := req("POST", "", fmt.Sprintf(`{"text":"private queue body","clientId":"http-job","sendAt":%q}`, when.Format(time.RFC3339Nano)), a, http.StatusCreated)
+		var job scheduledMessage
+		if err := json.Unmarshal(w.Body.Bytes(), &job); err != nil || job.ID == 0 {
+			t.Fatalf("invalid scheduling response: %v", err)
+		}
+		if got := req("GET", "", "", b, http.StatusOK); strings.TrimSpace(got.Body.String()) != "[]" {
+			t.Fatal("another member must not see the queue")
+		}
+		if got := req("GET", "", "", a, http.StatusOK); !strings.Contains(got.Body.String(), "private queue body") || got.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("owner must see the queue and response must not be cached")
+		}
+		item := fmt.Sprintf("/%d", job.ID)
+		reschedule := fmt.Sprintf(`{"sendAt":%q}`, when.Add(time.Hour).Format(time.RFC3339Nano))
+		req("PATCH", item, reschedule, b, http.StatusNotFound)
+		req("PATCH", item, reschedule, a, http.StatusOK)
+		req("DELETE", item, "", b, http.StatusNotFound)
+		req("DELETE", item, "", a, http.StatusNoContent)
+		req("DELETE", item, "", a, http.StatusNoContent)
+	})
 
 	job := create("delivery-retry")
 	if _, err := s.cancelScheduledMessage(ctx, room, outsider, job.ID); !errors.Is(err, pgx.ErrNoRows) {
