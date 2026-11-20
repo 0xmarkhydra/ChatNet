@@ -101,6 +101,9 @@ func main() {
 		Addr:              ":" + port,
 		Handler:           cors(mux),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		// Keep WriteTimeout disabled: gateway proxies long-lived SSE and WebSocket streams.
+		IdleTimeout:       60 * time.Second,
 	}
 	log.Printf("gateway listening on :%s", port)
 	log.Fatal(server.ListenAndServe())
