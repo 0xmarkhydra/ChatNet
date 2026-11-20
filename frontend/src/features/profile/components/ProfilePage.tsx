@@ -1,10 +1,11 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowRight, MapPin, Camera, Image as ImageIcon, Mail, PencilLine, Plus, RefreshCw, Users, UserRound } from 'lucide-react'
 import type { Post } from '../../feed'
 import type { FriendConnection } from '../../contacts'
 import ProfileMediaGallery, { type ProfileMediaItem } from './ProfileMediaGallery'
 import ProfileSidebar from './ProfileSidebar'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import PostStatusPrompt from '../../../shared/ui/PostStatusPrompt'
 
 type Section = 'posts' | 'media' | 'about' | 'friends'
 
@@ -43,6 +44,34 @@ export default function ProfilePage({
   onReloadPosts, onLoadMorePosts, onViewFriend, onOpenContacts, onOpenPost,
 }: Props) {
   const [section, setSection] = useState<Section>('posts')
+  const tabbarRef = useRef<HTMLDivElement>(null)
+  const activeTabRef = useRef<HTMLButtonElement>(null)
+
+  useLayoutEffect(() => {
+    const tabbar = tabbarRef.current
+    const activeTab = activeTabRef.current
+    if (!tabbar || !activeTab) return
+
+    const placeIndicator = () => {
+      const bar = tabbar.getBoundingClientRect()
+      const tab = activeTab.getBoundingClientRect()
+      tabbar.style.setProperty('--profile-tab-x', `${tab.left - bar.left + tabbar.scrollLeft}px`)
+      tabbar.style.setProperty('--profile-tab-width', `${tab.width}px`)
+      tabbar.classList.add('is-measured')
+    }
+
+    placeIndicator()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(placeIndicator)
+    observer?.observe(tabbar)
+    observer?.observe(activeTab)
+    tabbar.addEventListener('scroll', placeIndicator, { passive: true })
+    window.addEventListener('resize', placeIndicator)
+    return () => {
+      observer?.disconnect()
+      tabbar.removeEventListener('scroll', placeIndicator)
+      window.removeEventListener('resize', placeIndicator)
+    }
+  }, [section])
   const acceptedFriends = useMemo(() => friends.filter(friend => friend.status === 'accepted'), [friends])
   const media = useMemo<ProfileMediaItem[]>(() => posts.flatMap(post => (post.attachments || [])
     .filter(item => (item.kind === 'image' || item.kind === 'video') && item.url)
@@ -90,10 +119,12 @@ export default function ProfilePage({
             <button type="button" className="profile-page-more" onClick={onCreatePost} aria-label="Đăng bài mới" title="Đăng bài mới"><Plus size={21} aria-hidden="true" /></button>
           </div>
         </div>
-        <div className="profile-page-tabbar" role="tablist" aria-label="Chọn nội dung hồ sơ">
+        <div className="profile-page-tabbar" ref={tabbarRef} role="tablist" aria-label="Chọn nội dung hồ sơ">
+          <span className="profile-page-tab-indicator" aria-hidden="true" />
           {tabs.map(tab => (
             <button key={tab.id} type="button" role="tab" id={`profile-page-tab-${tab.id}`}
               aria-selected={section === tab.id} aria-controls="profile-page-tab-content"
+              ref={section === tab.id ? activeTabRef : undefined}
               className={section === tab.id ? 'is-active' : ''} onClick={() => setSection(tab.id)}>{tab.name}</button>
           ))}
           {section !== 'posts' && (
@@ -112,8 +143,13 @@ export default function ProfilePage({
             {section === 'posts' && (
               <>
                 <div className="profile-page-composer">
-                  <UserAvatar username={username} name={displayName} className="profile-page-composer-avatar" />
-                  <button type="button" onClick={onCreatePost}>{displayName.split(' ').slice(-1)[0]} ơi, bạn đang nghĩ gì?</button>
+                  <PostStatusPrompt
+                    username={username}
+                    displayName={displayName}
+                    avatarClassName="profile-page-composer-avatar"
+                    prompt={`${displayName.split(' ').slice(-1)[0]} ơi, bạn đang nghĩ gì?`}
+                    onCreatePost={onCreatePost}
+                  />
                 </div>
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
