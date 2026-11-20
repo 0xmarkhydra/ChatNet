@@ -47,6 +47,9 @@ export type FeedSectionProps = {
   mediaUploading: "chat" | "feed" | "profile" | "story" | null;
   name: string;
   normalizedSearch: string;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  communityCard: ReactNode;
   openVisitor: (username: string) => void;
   pendingPost: Post | null;
   postComposerRef: RefObject<HTMLTextAreaElement | null>;
@@ -105,6 +108,9 @@ export default function FeedSection({
   mediaUploading,
   name,
   normalizedSearch,
+  searchQuery,
+  onSearchChange,
+  communityCard,
   openVisitor,
   pendingPost,
   postComposerRef,
@@ -214,7 +220,7 @@ export default function FeedSection({
                   />
                 </>)}
 
-                {!feedCommunitiesOpen && (
+                {!feedCommunitiesOpen && !isProfileDesktop && (
                   <FeedFilters
                     isProfileDesktop={isProfileDesktop}
                     filter={feedFilter}
@@ -342,6 +348,9 @@ export default function FeedSection({
                   }}
                   onViewUser={openVisitor}
                   onViewContacts={() => switchTab("contacts")}
+                  searchQuery={searchQuery}
+                  onSearchChange={onSearchChange}
+                  communityCard={communityCard}
                 />
               )}
             </div>

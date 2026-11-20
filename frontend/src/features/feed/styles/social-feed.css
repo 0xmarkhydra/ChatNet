@@ -685,3 +685,44 @@
   .modern-shell.app-layout .social-feed-side-card { padding: 13px 15px 15px; }
   .modern-shell.app-layout .social-feed-suggestions { min-height: 260px; }
 }
+
+/* Desktop Feed sidebar: existing post search and member communities, not a second search backend. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-feed-search-card { padding: 12px 14px; }
+  .modern-shell.app-layout .social-feed-search-field {
+    display: flex; align-items: center; gap: 9px; min-width: 0;
+    height: 44px; padding: 0 12px; border-radius: 22px;
+    background: #eef1fb; color: #697894;
+  }
+  .modern-shell.app-layout .social-feed-search-field input {
+    flex: 1; min-width: 0; width: 100%; border: 0; outline: 0;
+    background: transparent; color: #17233d; font: inherit; font-size: 12px;
+  }
+  .modern-shell.app-layout .social-feed-search-field:focus-within { outline: 2px solid var(--soco-blue, #2563eb); outline-offset: 2px; }
+  .modern-shell.app-layout .social-feed-search-field kbd {
+    flex: 0 0 auto; border: 1px solid #dce3f5; border-radius: 5px;
+    padding: 3px 5px; background: #fff; color: #697894; font-size: 10px;
+  }
+  .modern-shell.app-layout .social-feed-community-list {
+    display: grid; gap: 6px; margin-top: 13px;
+  }
+  .modern-shell.app-layout .social-feed-community-item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    min-height: 52px; padding: 6px 8px; border: 0; border-radius: 10px;
+    background: transparent; text-align: left; cursor: pointer; color: #17233d;
+  }
+  .modern-shell.app-layout .social-feed-community-item:hover { background: #f0f3ff; }
+  .modern-shell.app-layout .social-feed-community-item:focus-visible { outline: 2px solid var(--soco-blue, #2563eb); outline-offset: 2px; }
+  .modern-shell.app-layout .social-feed-community-icon {
+    display: grid; place-items: center; flex: 0 0 38px;
+    width: 38px; height: 38px; border-radius: 11px; background: #eef1fb; color: #2563eb;
+  }
+  .modern-shell.app-layout .social-feed-community-item > span:last-child {
+    display: flex; flex-direction: column; min-width: 0; gap: 3px;
+  }
+  .modern-shell.app-layout .social-feed-community-item strong {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;
+  }
+  .modern-shell.app-layout .social-feed-community-item small,
+  .modern-shell.app-layout .social-feed-community-empty { color: #697894; font-size: 11px; }
+}

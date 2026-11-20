@@ -2,22 +2,22 @@ import type { ReactNode } from "react";
 
 type AppHeaderProps = {
   className: string;
-  title: ReactNode;
-  search?: ReactNode;
-  children: ReactNode;
+  start: ReactNode;
+  center?: ReactNode;
+  end: ReactNode;
 };
 
-/** Shared application header structure; each route supplies only its context and actions. */
-export default function AppHeader({ className, title, search, children }: AppHeaderProps) {
+/** One shared three-zone shell; page-specific title, search/filter, and actions are supplied by the caller. */
+export default function AppHeader({ className, start, center, end }: AppHeaderProps) {
   return (
     <header className={className} aria-label="Thanh công cụ chính">
-      {title}
+      <div className="appbar-start">{start}</div>
       <div className="appbar-brand" aria-label="SocCO">
         <img src="/soco-mark.svg" width="32" height="32" alt="" />
         <strong>SocCO</strong>
       </div>
-      {search}
-      {children}
+      <div className="appbar-center">{center}</div>
+      <div className="appbar-end">{end}</div>
     </header>
   );
 }

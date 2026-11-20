@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, UserPlus, UsersRound } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { ArrowRight, Search, UserPlus, UsersRound } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from '../../contacts'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
@@ -14,11 +14,15 @@ type Props = {
   onFriend: (friend: FriendSearchResult) => void
   onViewUser: (username: string) => void
   onViewContacts: () => void
+  searchQuery: string
+  onSearchChange: (query: string) => void
+  communityCard: ReactNode
 }
 
 export default function SocialFeedSidebar({
   username, sessionId, friends, friendRequests, friendBusyIds,
   request, onFriend, onViewUser, onViewContacts,
+  searchQuery, onSearchChange, communityCard,
 }: Props) {
   const requestRef = useLatest(request)
   const [revision, setRevision] = useState(0)
@@ -61,6 +65,15 @@ export default function SocialFeedSidebar({
 
   return (
     <aside className="social-feed-side" aria-label="Gợi ý trên bảng tin">
+      <section className="social-feed-side-card social-feed-search-card" aria-label="Tìm kiếm trên Bảng tin">
+        <label className="social-feed-search-field">
+          <Search size={19} aria-hidden="true" />
+          <input type="search" value={searchQuery} maxLength={120}
+            onChange={event => onSearchChange(event.target.value)}
+            placeholder="Tìm kiếm trên SocCo" aria-label="Tìm bài viết hoặc tác giả" />
+          <kbd aria-label="Phím tắt tìm kiếm toàn cục">Ctrl K</kbd>
+        </label>
+      </section>
       <section className="social-feed-side-card social-feed-suggestions" aria-label="Gợi ý kết nối">
         <header><h2>Gợi ý kết nối</h2><button type="button" onClick={onViewContacts}>Xem tất cả <ArrowRight size={16} aria-hidden="true" /></button></header>
 
@@ -93,6 +106,7 @@ export default function SocialFeedSidebar({
           ))}
         </div>
       </section>
+      {communityCard}
     </aside>
   )
 }
