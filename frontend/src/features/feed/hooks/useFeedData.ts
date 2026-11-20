@@ -24,6 +24,7 @@ export function useFeedData({
   const [savedPosts, setSavedPosts] = useState<Post[]>([])
   const [hasMoreSavedPosts, setHasMoreSavedPosts] = useState(false)
   const [savedPostsBusy, setSavedPostsBusy] = useState(false)
+  const [savedLoadedSession, setSavedLoadedSession] = useState<string | null>(null)
   const savedPagingBusy = useRef(false)
   const [hasMorePosts, setHasMorePosts] = useState(false)
   const [postsLoadingMore, setPostsLoadingMore] = useState(false)
@@ -105,8 +106,10 @@ export function useFeedData({
         return appendUniquePosts(current, data)
       })
       setHasMoreSavedPosts(data.length === FEED_PAGE_SIZE)
+      if (!more) setSavedLoadedSession(sessionId)
     } catch (error) {
       if (sessionRef.current?.sessionId === sessionId) {
+        if (!more) setSavedLoadedSession(sessionId)
         setSavedPagingError(true)
         setNotice(error instanceof Error ? error.message : 'Không tải được bài đã lưu.', 'error')
       }
@@ -141,6 +144,7 @@ export function useFeedData({
     hasMoreSavedPosts,
     setHasMoreSavedPosts,
     savedPostsBusy,
+    savedPostsLoaded: savedLoadedSession === session?.sessionId,
     setSavedPostsBusy,
     savedPagingBusy,
     hasMorePosts,

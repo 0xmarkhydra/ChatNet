@@ -903,9 +903,13 @@
     background: transparent; color: #697894; font: inherit; font-size: 13px;
     font-weight: 600; white-space: nowrap; cursor: pointer;
   }
+  .modern-shell.app-layout .appbar-feed-tabs .appbar-feed-active-pill {
+    border-radius: 9px;
+    background: #eaf0ff;
+  }
   .modern-shell.app-layout .appbar-feed-tabs button.is-active,
   .modern-shell.app-layout .appbar-feed-tabs button[aria-selected="true"] {
-    background: #eaf0ff; color: var(--soco-blue, #2563eb); font-weight: 750;
+    background: transparent; color: var(--soco-blue, #2563eb); font-weight: 750;
   }
   .modern-shell.app-layout .appbar-feed-tabs button:focus-visible { outline: 3px solid #9bb7fa; outline-offset: 2px; }
   .modern-shell.app-layout > .chatnet-appbar .appbar-end .app-header-account { display: none; }
