@@ -160,7 +160,7 @@ void main() {
       createdAt: stamp,
       expiresAt: stamp,
     );
-    expect(Story.fromJson(story.toJson()).attachment.kind, MediaKind.image);
+    expect(Story.fromJson(story.toJson()).attachment?.kind, MediaKind.image);
   });
 
   test('friend, group channel and identity preserve types', () {

@@ -10,6 +10,10 @@ COPY backend/cmd/call/translation.go /backend/cmd/call/translation.go
 COPY backend/cmd/call/main.go /backend/cmd/call/main.go
 COPY backend/cmd/call/revocations.go /backend/cmd/call/revocations.go
 COPY backend/cmd/chat/groups.go /backend/cmd/chat/groups.go
+ARG VITE_API_URL
+ARG VITE_API_PROXY
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_API_PROXY=${VITE_API_PROXY}
 RUN npm run build \
     && npm run check:pwa \
     && npm run check:session \
@@ -18,6 +22,7 @@ RUN npm run build \
     && npm run check:call-live
 
 FROM nginx:1.27-alpine
+COPY frontend-nginx-security-headers.conf /etc/nginx/chatnet-security-headers.conf
 COPY frontend-nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /src/dist /usr/share/nginx/html
 ENV PORT=8080

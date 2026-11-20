@@ -76,34 +76,45 @@ export default function ProfilePage({
             <div className="profile-page-identity-meta">
               <span>@{username}</span>
               <span>{acceptedFriends.length.toLocaleString('vi-VN')} bạn bè</span>
-              <span>{posts.length.toLocaleString('vi-VN')}{hasMorePosts ? '+' : ''} bài viết đã tải</span>
-              <span>{media.length.toLocaleString('vi-VN')} ảnh/video đã tải</span>
             </div>
+            {acceptedFriends.length > 0 && (
+              <div className="profile-page-friend-stack" aria-hidden="true">
+                {acceptedFriends.slice(0, 8).map(friend => (
+                  <UserAvatar key={friend.id} username={friend.username} name={friend.displayName || friend.username} className="profile-page-stack-avatar" />
+                ))}
+              </div>
+            )}
           </div>
           <div className="profile-page-hero-actions">
             <button type="button" className="profile-page-primary" onClick={onEditProfile}><PencilLine size={17} aria-hidden="true" /> Chỉnh sửa hồ sơ</button>
             <button type="button" className="profile-page-more" onClick={onCreatePost} aria-label="Đăng bài mới" title="Đăng bài mới"><Plus size={21} aria-hidden="true" /></button>
           </div>
         </div>
+        <div className="profile-page-tabbar" role="tablist" aria-label="Chọn nội dung hồ sơ">
+          {tabs.map(tab => (
+            <button key={tab.id} type="button" role="tab" id={`profile-page-tab-${tab.id}`}
+              aria-selected={section === tab.id} aria-controls="profile-page-tab-content"
+              className={section === tab.id ? 'is-active' : ''} onClick={() => setSection(tab.id)}>{tab.name}</button>
+          ))}
+          {section !== 'posts' && (
+            <button type="button" className="profile-page-post-action" onClick={onReloadPosts}
+              disabled={postsBusy} aria-label="Làm mới nội dung"><RefreshCw size={17} aria-hidden="true" /></button>
+          )}
+        </div>
       </section>
 
       <div className="profile-page-columns">
+        <ProfileSidebar username={username} email={email} bio={bio} city={city} friends={acceptedFriends} media={media}
+          onEditProfile={onEditProfile} onShowMedia={() => setSection('media')} onShowFriends={() => setSection('friends')}
+          onViewFriend={onViewFriend} onOpenPost={onOpenPost} />
         <section className="profile-page-main" aria-label="Nội dung trang cá nhân">
-          <div className="profile-page-tabbar" role="tablist" aria-label="Chọn nội dung hồ sơ">
-            {tabs.map(tab => (
-              <button key={tab.id} type="button" role="tab" id={`profile-page-tab-${tab.id}`}
-                aria-selected={section === tab.id} aria-controls="profile-page-tab-content"
-                className={section === tab.id ? 'is-active' : ''} onClick={() => setSection(tab.id)}>{tab.name}</button>
-            ))}
-            <button type="button" className="profile-page-post-action" onClick={section === 'posts' ? onCreatePost : onReloadPosts}
-              disabled={section !== 'posts' && postsBusy} aria-label={section === 'posts' ? 'Đăng bài viết mới' : 'Làm mới nội dung'}>
-              {section === 'posts' ? <><Plus size={16} /> Đăng bài</> : <RefreshCw size={17} />}
-            </button>
-          </div>
-
           <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel">
             {section === 'posts' && (
               <>
+                <div className="profile-page-composer">
+                  <UserAvatar username={username} name={displayName} className="profile-page-composer-avatar" />
+                  <button type="button" onClick={onCreatePost}>{displayName.split(' ').slice(-1)[0]} ơi, bạn đang nghĩ gì?</button>
+                </div>
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
                 <div className="profile-page-post-feed feed zalo-feed">{postCards}</div>
@@ -153,8 +164,6 @@ export default function ProfilePage({
             )}
           </div>
         </section>
-
-        <ProfileSidebar username={username} email={email} bio={bio} city={city} acceptedFriendCount={acceptedFriends.length} media={media} onEditProfile={onEditProfile} onShowMedia={() => setSection('media')} onOpenPost={onOpenPost} />
       </div>
     </div>
   )

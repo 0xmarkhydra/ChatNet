@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-const uiBundleVersion = '2026-10-14.1';
+const uiBundleVersion = '2026-11-18.1';
 
 const uiSourceMessages = <String, String>{
   'nav.chat': 'Tin nhắn',
-  'nav.contacts': 'Danh bạ',
+  'nav.contacts': 'Bạn bè',
   'nav.discover': 'Quanh đây',
   'nav.feed': 'Bảng tin',
   'nav.profile': 'Cá nhân',
@@ -61,7 +61,7 @@ const uiSourceMessages = <String, String>{
 
 const demoEnglishBundle = <String, String>{
   'nav.chat': 'Messages',
-  'nav.contacts': 'Contacts',
+  'nav.contacts': 'Friends',
   'nav.discover': 'Nearby',
   'nav.feed': 'Feed',
   'nav.profile': 'Profile',

@@ -6,9 +6,6 @@ import MobileFeedStories from "./MobileFeedStories";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import SocialFeedComposer from "./SocialFeedComposer";
 import FeedFilters from "./FeedFilters";
-import PageHeader from "../../../shared/ui/PageHeader";
-import { Button } from "../../../shared/ui/button";
-import { Users } from "lucide-react";
 import FeedCommunitiesList from "./FeedCommunitiesList";
 import FeedPendingPost from "./FeedPendingPost";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
@@ -31,7 +28,6 @@ export type FeedSectionProps = {
   conversationLoadingMore: boolean;
   conversations: Conversation[];
   feedCommunitiesOpen: boolean;
-  onToggleCommunities: () => void;
   feedFilter: "all" | "following" | "latest" | "saved";
   feedFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
   feedInfiniteScrollRef: RefObject<HTMLDivElement | null>;
@@ -51,6 +47,9 @@ export type FeedSectionProps = {
   mediaUploading: "chat" | "feed" | "profile" | "story" | null;
   name: string;
   normalizedSearch: string;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  communityCard: ReactNode;
   openVisitor: (username: string) => void;
   pendingPost: Post | null;
   postComposerRef: RefObject<HTMLTextAreaElement | null>;
@@ -90,7 +89,6 @@ export default function FeedSection({
   conversationLoadingMore,
   conversations,
   feedCommunitiesOpen,
-  onToggleCommunities,
   feedFilter,
   feedFiltersPill,
   feedInfiniteScrollRef,
@@ -110,6 +108,9 @@ export default function FeedSection({
   mediaUploading,
   name,
   normalizedSearch,
+  searchQuery,
+  onSearchChange,
+  communityCard,
   openVisitor,
   pendingPost,
   postComposerRef,
@@ -148,14 +149,6 @@ export default function FeedSection({
                 setSearchHasScrolled(true);
             }}
           >
-            <PageHeader
-              className="shell-v2-feed-page-header"
-              title="Bảng tin"
-              tabs={[{ id: 'all', label: 'Dành cho bạn' }, { id: 'following', label: 'Đang theo dõi' }, { id: 'latest', label: 'Mới nhất' }, ...(feedFilter === 'saved' ? [{ id: 'saved', label: 'Đã lưu' }] : [])]}
-              activeTab={feedFilter}
-              onTabChange={(next) => { setFeedCommunitiesOpen(false); setFeedFilter(next as typeof feedFilter) }}
-              actions={<Button variant="outline" type="button" aria-pressed={feedCommunitiesOpen} onClick={onToggleCommunities}><Users size={18} aria-hidden="true" />Cộng đồng</Button>}
-            />
             <FeedModeration
               request={apiFetch}
               onRemoved={(type, id) => {
@@ -227,8 +220,8 @@ export default function FeedSection({
                   />
                 </>)}
 
-                {!feedCommunitiesOpen && (
-                  <div className="shell-v2-feed-filter-legacy"><FeedFilters
+                {!feedCommunitiesOpen && !isProfileDesktop && (
+                  <FeedFilters
                     isProfileDesktop={isProfileDesktop}
                     filter={feedFilter}
                     onHostMount={feedFiltersPill.hostRef}
@@ -242,7 +235,7 @@ export default function FeedSection({
                       else void refreshPosts();
                     }}
                     onLoadSaved={() => void loadSavedPosts()}
-                  /></div>
+                  />
                 )}
                 <div className="feed zalo-feed">
                   {feedCommunitiesOpen ? (
@@ -301,14 +294,18 @@ export default function FeedSection({
                               ? "Không tìm thấy bài viết"
                               : feedFilter === "following"
                                 ? "Chưa có bài viết từ bạn bè"
-                                : "Chưa có bài viết"
+                                : feedFilter === "saved"
+                                  ? "Chưa có bài viết đã lưu"
+                                  : "Chưa có bài viết"
                           }
                           description={
                             normalizedSearch
                               ? "Thử một từ khóa khác nhé."
                               : feedFilter === "following"
                                 ? "Kết bạn để xem các bài viết được chia sẻ với bạn."
-                                : "Hãy chia sẻ khoảnh khắc đầu tiên của bạn."
+                                : feedFilter === "saved"
+                                  ? "Mở menu của bài viết và chọn Lưu bài viết để xem lại ở đây."
+                                  : "Hãy chia sẻ khoảnh khắc đầu tiên của bạn."
                           }
                           action={
                             !normalizedSearch && (
@@ -316,15 +313,19 @@ export default function FeedSection({
                                 onClick={() =>
                                   feedFilter === "following"
                                     ? switchTab("contacts")
-                                    : isProfileDesktop
-                                      ? (setFeedCheckInOpen(false),
-                                        setFeedComposerOpen(true))
-                                      : postComposerRef.current?.focus()
+                                    : feedFilter === "saved"
+                                      ? setFeedFilter("all")
+                                      : isProfileDesktop
+                                        ? (setFeedCheckInOpen(false),
+                                          setFeedComposerOpen(true))
+                                        : postComposerRef.current?.focus()
                                 }
                               >
                                 {feedFilter === "following"
                                   ? "Tìm bạn bè"
-                                  : "Tạo bài viết"}
+                                  : feedFilter === "saved"
+                                    ? "Quay lại Bảng tin"
+                                    : "Tạo bài viết"}
                               </SocoTextAction>
                             )
                           }
@@ -347,6 +348,9 @@ export default function FeedSection({
                   }}
                   onViewUser={openVisitor}
                   onViewContacts={() => switchTab("contacts")}
+                  searchQuery={searchQuery}
+                  onSearchChange={onSearchChange}
+                  communityCard={communityCard}
                 />
               )}
             </div>

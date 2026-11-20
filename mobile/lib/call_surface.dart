@@ -166,10 +166,9 @@ class _CallSurfaceState extends State<_CallSurface> {
                       ),
                       if (widget.video)
                         _CallButton(
-                          label: 'Đổi camera',
+                          label: 'Đổi camera (không hỗ trợ trong demo)',
                           icon: Icons.cameraswitch_rounded,
-                          active: true,
-                          onPressed: () {},
+                          onPressed: null,
                         ),
                       _CallButton(
                         label: 'Kết thúc',
@@ -306,7 +305,7 @@ class _CallButton extends StatelessWidget {
 
   final String label;
   final IconData icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool active;
   final bool danger;
 
@@ -319,6 +318,7 @@ class _CallButton extends StatelessWidget {
         : Colors.white24;
     return Semantics(
       button: true,
+      enabled: onPressed != null,
       label: label,
       child: Column(
         mainAxisSize: MainAxisSize.min,

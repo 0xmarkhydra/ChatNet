@@ -11,10 +11,11 @@ import VoiceRecorder from "./VoiceRecorder";
 import ChatMentionInput from "./ChatMentionInput";
 import type { GroupMember } from "../types";
 import type { ChatSectionProps } from "./ChatSectionProps";
+import type { RefObject } from "react";
 
 const CHAT_ATTACHMENT_ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip';
 
-type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "chatFileInputRef" | "groupChannels" | "isProfileDesktop" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo" | "t">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[] };
+type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "groupChannels" | "isProfileDesktop" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo" | "t">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[]; chatFileInputRef: RefObject<HTMLInputElement | null> };
 
 export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, canSend, chatFileInputRef, groupChannels, isProfileDesktop, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, t, groupMembers }: Props) {
   function openAttachmentPicker(mediaOnly: boolean) {

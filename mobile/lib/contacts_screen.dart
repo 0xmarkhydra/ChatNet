@@ -71,7 +71,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   void didUpdateWidget(covariant ContactsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.newFriendRequest != widget.newFriendRequest) {
-      setState(() => contactTab = 4);
+      // Match the PWA: the header's add-friend action opens invitations.
+      setState(() {
+        contactTab = 2;
+        invitationTab = 'incoming';
+      });
     }
     if (oldWidget.query != widget.query) {
       _scheduleSearch(widget.query);

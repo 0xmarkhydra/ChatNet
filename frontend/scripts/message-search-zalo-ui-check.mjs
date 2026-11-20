@@ -1,7 +1,7 @@
 import { chromium } from 'playwright'
 import assert from 'node:assert/strict'
 
-const origin = 'http://127.0.0.1:5195'
+const origin = process.env.CHATNET_UI_TEST_ORIGIN || 'http://127.0.0.1:5195'
 let browser
 for (const channel of [undefined, 'chrome', 'msedge']) {
   try {
@@ -61,8 +61,8 @@ try {
     if (path === '/api/push/config') return json({ configured: false })
     return json([])
   })
-  await page.goto(origin)
-  await page.locator('.zalo-conversation-list .conversation-item').first().click()
+  // Deep link directly into the conversation; the desktop rail may start collapsed.
+  await page.goto(`${origin}/chat/101`)
   await page.getByRole('button', { name: 'Tìm tin nhắn trong cuộc trò chuyện' }).last().click()
   const panel = page.getByRole('dialog', { name: 'Tìm kiếm trong trò chuyện' })
   await panel.waitFor({ state: 'visible' })

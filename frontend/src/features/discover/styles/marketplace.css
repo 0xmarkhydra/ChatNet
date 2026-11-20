@@ -29,3 +29,13 @@
 .marketplace-sell textarea{min-height:80px;resize:vertical}
 .marketplace-view button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:560px){.marketplace-entry{margin:12px;flex-direction:column;align-items:stretch}.marketplace-entry button{width:100%}.marketplace-body{padding:12px}.marketplace-header{padding:12px}.marketplace-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.marketplace-card{padding:10px}.marketplace-card button{font-size:12px;padding:8px}.marketplace-tabs{padding:6px 8px}.marketplace-tabs button{font-size:12px;padding:9px 10px}}
+
+/* Keep Sell and the other navigation controls in view on narrow screens. */
+@media (max-width: 560px) {
+  .marketplace-tabs {
+    flex-wrap: wrap;
+  }
+  .marketplace-tabs button {
+    min-height: 44px;
+  }
+}

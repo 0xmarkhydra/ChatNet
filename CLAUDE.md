@@ -14,7 +14,7 @@ Read this project policy and the relevant local skills before editing code.
 - Write commit subjects as a single-line Conventional Commit in English; do not add a commit body unless requested.
 - Truthfully report PASS/FAIL/NOT RUN/BLOCKED and independently identify commit, push, merge, CI and deployment status.
 
-See `docs/AI_SKILLS_SETUP.md` for source provenance, dispatch and update instructions.
+See `docs/engineering/AI_SKILLS_SETUP.md` for source provenance, dispatch and update instructions.
 
 <!-- CODELOCAL-SKILLS:BEGIN -->
 ## CodeLocal Skills — coding agent instructions
@@ -50,4 +50,4 @@ in effect. Ponytail is third-party MIT-licensed; provenance is under
 
 ## Frontend architecture and React requirements (mandatory)
 
-The authoritative shared policy for Claude, ChatGPT and human contributors is **`docs/engineering/FRONTEND_STANDARDS.md`**. Read and follow it for every `frontend/` change, alongside `docs/FRONTEND_STRUCTURE.md` and the relevant React and Ponytail skills. The architecture, React 19, API ownership, session isolation, layout, testing and PR rules are enforced there. Do not imitate known legacy violations, expand lint/architecture baselines or bypass CI to make a change pass.
+The authoritative shared policy for Claude, ChatGPT and human contributors is **`docs/engineering/FRONTEND_STANDARDS.md`**. Read and follow it for every `frontend/` change, alongside `docs/engineering/FRONTEND_STRUCTURE.md` and the relevant React and Ponytail skills. The architecture, React 19, API ownership, session isolation, layout, testing and PR rules are enforced there. Do not imitate known legacy violations, expand lint/architecture baselines or bypass CI to make a change pass.

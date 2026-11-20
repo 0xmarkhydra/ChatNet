@@ -1,0 +1,100 @@
+{
+  "asyncapi": "3.1.0",
+  "info": {
+    "title": "ChatNet — Sự kiện SSE từ Chat",
+    "version": "0.1.1",
+    "description": "Danh mục một phần của SSE. Mô tả JSON trong trường data, không mô hình hóa khung SSE hay gọi qua WebSocket."
+  },
+  "x-source-baseline": "40c1f1b35958ee22c1278986bf82ff57520137a1",
+  "defaultContentType": "application/json",
+  "channels": {
+    "chatEvents": {
+      "address": "/api/events",
+      "description": "Một stream HTTP SSE theo phiên, mang cập nhật Chat và tín hiệu Call. Xác thực bearer rồi kiểm phiên. Web dùng EventSource với query bearer; tránh ghi URL chứa token vào log. Không dùng hợp đồng này để suy ra độ bền hoặc replay.",
+      "x-transport": "sse",
+      "messages": {
+        "update": {
+          "$ref": "#/components/messages/ChatUpdate"
+        },
+        "sessionRevoked": {
+          "$ref": "#/components/messages/SessionRevoked"
+        }
+      }
+    }
+  },
+  "operations": {
+    "sendChatEvents": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/chatEvents"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/chatEvents/messages/update"
+        },
+        {
+          "$ref": "#/channels/chatEvents/messages/sessionRevoked"
+        }
+      ]
+    }
+  },
+  "components": {
+    "messages": {
+      "ChatUpdate": {
+        "name": "update",
+        "description": "Envelope tối thiểu của SSE update. Chat và Call phát qua kênh Redis tương ứng người dùng. Phiên bản này chưa mô hình hóa đầy đủ các biến thể theo type và object lồng.",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "conversationId": {
+              "type": "integer",
+              "format": "int64",
+              "description": "Có thể bằng 0 với cập nhật không gắn hội thoại, ví dụ friend.updated."
+            },
+            "categoryId": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "message": {
+              "type": "object"
+            },
+            "conversation": {
+              "type": "object"
+            },
+            "readerId": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "lastReadMessageId": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "callId": {
+              "type": "string",
+              "description": "Do Call phát trong các cập nhật call.*, không phải credential tham gia LiveKit."
+            },
+            "call": {
+              "type": "object",
+              "description": "Ảnh chụp trạng thái chỉ có ở một số cập nhật Call. Các trường con nằm ngoài phạm vi hợp đồng này."
+            }
+          },
+          "required": [
+            "type",
+            "conversationId"
+          ]
+        }
+      },
+      "SessionRevoked": {
+        "name": "session-revoked",
+        "description": "Session không còn hiệu lực. Server đóng stream sau event này. Lỗi backend có thể đóng stream mà không phát event.",
+        "payload": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      }
+    }
+  }
+}

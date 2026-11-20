@@ -1,6 +1,6 @@
 # Frontend engineering standards (mandatory)
 
-This is the single source of truth for **new and changed frontend code** in ChatNet. It applies equally to humans, ChatGPT, Claude and automated coding agents. Read `AGENTS.md` / `CLAUDE.md` and the relevant React and Ponytail skills first; use `docs/FRONTEND_STRUCTURE.md` for the directory map.
+This is the single source of truth for **new and changed frontend code** in ChatNet. It applies equally to humans, ChatGPT, Claude and automated coding agents. Read `AGENTS.md` / `CLAUDE.md` and the relevant React and Ponytail skills first; use `docs/engineering/FRONTEND_STRUCTURE.md` for the directory map.
 
 ## Goal and scope
 
@@ -47,6 +47,8 @@ For UI design, UI implementation, responsive fixes and visual review, follow [UI
 When present and approved, `socco-ui-fidelity` and `docs/DESIGN.md` add screen-specific visual checks. These currently may be pending integration in another agent's worktree; do not overwrite that uncommitted work. Review responsive and accessibility evidence, and report when Python-based UI UX Pro Max search is unavailable rather than claiming it ran.
 
 ## Shared UI and design system
+
+- For new or modified UI, follow [SocCO Design System](DESIGN_SYSTEM.md) for the approved font-family, typography, spacing, radius, color semantics, control/icon sizing, elevation, motion, and responsive/a11y checks. Apply these tokens incrementally; do not restyle unrelated legacy screens.
 
 - New reusable controls belong in `frontend/src/shared/ui/`, with feature logic staying in the owning feature. Check for an existing shared control before adding another variant.
 - For **new** interface code use Tailwind CSS v4 utilities and SocCO semantic tokens from `frontend/src/styles/tailwind.css`; avoid hard-coded colors, spacing and shadow values when semantic styles exist. Keep Lucide React for icons.

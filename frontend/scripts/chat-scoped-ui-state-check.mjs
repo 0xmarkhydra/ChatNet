@@ -79,7 +79,11 @@ try {
       if (path.endsWith('/read') || path.endsWith('/channel-read')) return reply({})
       return route.abort() // unmocked writes must never leave the browser
     }
-    if (path === '/api/conversations') return reply([conversation(1, 'Bạn A', 'a'), conversation(2, 'Bạn B', 'b')])
+    if (path === '/api/conversations') {
+      const rows = [conversation(1, 'Bạn A', 'a'), conversation(2, 'Bạn B', 'b')]
+      const id = new URL(request.url()).searchParams.get('id')
+      return reply(id === null ? rows : rows.filter(row => String(row.id) === id))
+    }
     if (/^\/api\/conversations\/\d+\/e2ee\/status$/.test(path)) return reply({ mode: 'legacy', autoEnabled: false })
     const list = path.match(/^\/api\/conversations\/(\d+)\/messages$/)
     if (list) return reply(history[Number(list[1])] ?? [])
