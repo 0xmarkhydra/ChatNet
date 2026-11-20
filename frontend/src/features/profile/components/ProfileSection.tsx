@@ -1,3 +1,4 @@
+import { StoryHighlights } from '../../feed'
 import { SettingsWorkspace } from "../../settings";
 import { PencilLine, Download, LogOut, ChevronDown, Volume2, ArrowLeft, Settings, Images, RefreshCw } from "lucide-react";
 import { BlockedUsersPanel } from "../../contacts";
@@ -500,6 +501,7 @@ export default function ProfileSection({
                 className="personal-timeline-content"
                 aria-label="Dòng thời gian cá nhân"
               >
+                <StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} owner />
                 <div className="personal-timeline-intro">
                   <div>
                     <strong>Khoảnh khắc của bạn</strong>

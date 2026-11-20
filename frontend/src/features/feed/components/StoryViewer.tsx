@@ -1,18 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
-  ChevronLeft, ChevronRight, Flag, Heart, LockKeyhole, MessageCircle,
+  BookmarkPlus, ChevronLeft, ChevronRight, Flag, LockKeyhole, MessageCircle,
   MoreHorizontal, Pause, Play, Send, Share2, Trash2, UserRound,
   Volume2, VolumeX, X,
 } from 'lucide-react'
 import { userLabel } from '../../../shared/utils/userLabel'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Story } from '../types'
+import type { ApiRequest } from '@/shared/types/api'
+import StoryLikeControl from './StoryLikeControl'
+import StoryHighlightEditor from './StoryHighlightEditor'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/shared/ui/dialog'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/story-text.css'
 
 type Props = {
   activeStory: Story
+  request?: ApiRequest
   stories: Story[]
   name: string
   storyBusy: boolean
@@ -36,7 +41,7 @@ function relativeStoryTime(date: string): string {
 }
 
 export default function StoryViewer({
-  activeStory, stories, name, storyBusy, deleteStory, setActiveStoryId,
+  activeStory, request, stories, name, storyBusy, deleteStory, setActiveStoryId,
   onReply, onProfile, onShare, onReport,
 }: Props) {
   const authorLabel = userLabel(activeStory.authorDisplayName, activeStory.author)
@@ -46,6 +51,8 @@ export default function StoryViewer({
   const [imageProgress, setImageProgress] = useScopedState(activeStory.id, 0)
   const [reply, setReply] = useScopedState(activeStory.id, '')
   const [replySending, setReplySending] = useScopedState(activeStory.id, false)
+  const [highlightOpen, setHighlightOpen] = useScopedState(activeStory.id, false)
+  const [highlightSaved, setHighlightSaved] = useScopedState(activeStory.id, false)
   const [menuOpen, setMenuOpen] = useScopedState(activeStory.id, false)
   const imageElapsedRef = useRef(0)
   const replySequence = useRef(0)
@@ -112,6 +119,7 @@ export default function StoryViewer({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (highlightOpen) return
       if (event.key === 'Escape') {
         event.preventDefault()
         if (menuOpen) setMenuOpen(false)
@@ -136,7 +144,7 @@ export default function StoryViewer({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [menuOpen, nextId, previousId, setActiveStoryId, setMenuOpen, setPaused])
+  }, [highlightOpen, menuOpen, nextId, previousId, setActiveStoryId, setMenuOpen, setPaused])
 
   async function submitReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -244,6 +252,7 @@ export default function StoryViewer({
               </button>
               <time dateTime={activeStory.createdAt}>{relativeStoryTime(activeStory.createdAt)}</time>
               <div className="story-screen-author-controls">
+                {request && <StoryLikeControl key={activeStory.id} request={request} storyId={activeStory.id} owner={isOwner} onInspect={() => setPaused(true)} />}
                 <button type="button" className="story-screen-icon-button" title={paused ? 'Tiếp tục' : 'Tạm dừng'}
                   aria-label={paused ? 'Tiếp tục Story' : 'Tạm dừng Story'} onClick={() => setPaused((v) => !v)}>
                   {paused ? <Play size={19} /> : <Pause size={19} />}
@@ -271,6 +280,13 @@ export default function StoryViewer({
                           setMenuOpen(false)
                           onReport(activeStory)
                         }}><Flag size={17} /> Báo cáo Story</button>
+                      )}
+                      {request && isOwner && (
+                        <button type="button" onClick={() => {
+                          setMenuOpen(false)
+                          setPaused(true)
+                          setHighlightOpen(true)
+                        }}><BookmarkPlus size={17} aria-hidden="true" /> Thêm vào Tin nổi bật</button>
                       )}
                       <button type="button" onClick={() => {
                         setMenuOpen(false)
@@ -320,9 +336,6 @@ export default function StoryViewer({
             <button type="button" disabled={isOwner} onClick={() => replyInputRef.current?.focus()}>
               <MessageCircle size={22} aria-hidden="true" /> Trả lời
             </button>
-            <button type="button" disabled title="Thả tim Story chưa được hỗ trợ trên máy chủ">
-              <Heart size={22} aria-hidden="true" /> Thả tim
-            </button>
             <button type="button" onClick={() => onProfile(activeStory.author)}>
               <UserRound size={22} aria-hidden="true" /> Xem hồ sơ
             </button>
@@ -338,6 +351,17 @@ export default function StoryViewer({
             <p>Hiển thị theo quyền riêng tư của tác giả.</p>
           </div>
         </aside>
+        {highlightSaved && <p role="status" className="absolute bottom-4 left-4 rounded-lg bg-card p-2 text-foreground">Đã thêm vào Tin nổi bật.</p>}
+        {request && isOwner && <Dialog open={highlightOpen} onOpenChange={setHighlightOpen}>
+          <DialogContent>
+            <DialogTitle>Thêm vào Tin nổi bật</DialogTitle>
+            <DialogDescription>Giữ Story này trên hồ sơ sau khi hết 24 giờ.</DialogDescription>
+            <StoryHighlightEditor key={activeStory.id} request={request} storyId={activeStory.id} onSaved={() => {
+              setHighlightOpen(false)
+              setHighlightSaved(true)
+            }} />
+          </DialogContent>
+        </Dialog>}
       </div>
     </div>
   )

@@ -9,6 +9,7 @@ import UserAvatar from '../../../shared/ui/UserAvatar'
 type Section = 'posts' | 'media' | 'about' | 'friends'
 
 type Props = {
+  highlights?: ReactNode
   username: string
   displayName: string
   email?: string
@@ -37,7 +38,7 @@ type Props = {
 }
 
 export default function ProfilePage({
-  username, displayName, email, bio, city, coverUrl, coverSet, editBusy, friends,
+  highlights, username, displayName, email, bio, city, coverUrl, coverSet, editBusy, friends,
   posts, pendingPost, postsBusy, postsError, hasMorePosts, postCards, profileNote,
   onEditProfile, onChangeAvatar, onChangeCover, onCreatePost,
   onReloadPosts, onLoadMorePosts, onViewFriend, onOpenContacts, onOpenPost,
@@ -111,6 +112,7 @@ export default function ProfilePage({
           <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel">
             {section === 'posts' && (
               <>
+                {highlights}
                 <div className="profile-page-composer">
                   <UserAvatar username={username} name={displayName} className="profile-page-composer-avatar" />
                   <button type="button" onClick={onCreatePost}>{displayName.split(' ').slice(-1)[0]} ơi, bạn đang nghĩ gì?</button>

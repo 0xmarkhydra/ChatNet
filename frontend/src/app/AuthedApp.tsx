@@ -3151,6 +3151,8 @@ export default function AuthedApp({
 
         {activeStory && (
           <StoryOverlay
+          key={session.sessionId}
+          request={apiFetch}
           activeStory={activeStory}
           deleteStory={deleteStory}
           name={name}
