@@ -116,6 +116,12 @@ type bearerTransport struct {
 	token string
 }
 
+var (
+	errCallNoLongerActive = errors.New("call is no longer active")
+	errCallPrivacyDenied  = errors.New("call privacy check denied join")
+	errCallBlocked        = errors.New("blocked participant cannot join call")
+)
+
 func (t bearerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	clone := req.Clone(req.Context())
 	clone.Header = req.Header.Clone()
@@ -526,66 +532,22 @@ func (s *server) joinCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Serialize simultaneous joins to prevent blocked users joining the same
-	// LiveKit room even when different service instances handle the requests.
-	tx, err := s.db.Begin(r.Context())
-	if err != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+	call, err = s.joinCallState(r.Context(), call, claims.UserID)
+	if errors.Is(err, errCallNoLongerActive) {
+		httpx.Error(w, http.StatusConflict, "call is no longer active")
 		return
 	}
-	defer tx.Rollback(r.Context())
-	if _, err := tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", call.ID); err != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
-		return
-	}
-	var stillAllowed bool
-	err = tx.QueryRow(r.Context(), `SELECT EXISTS(
-		SELECT 1 FROM call_sessions cs
-		JOIN conversations c ON c.id=cs.conversation_id
-		JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=$2
-		WHERE cs.id=$1 AND cs.status IN ('ringing','active')
-		  AND (c.type<>'direct' OR NOT EXISTS(
-		    SELECT 1 FROM conversation_members other JOIN user_blocks b ON
-		      (b.blocker_id=$2 AND b.blocked_id=other.user_id) OR
-		      (b.blocked_id=$2 AND b.blocker_id=other.user_id)
-		    WHERE other.conversation_id=c.id AND other.user_id<>$2
-		  ))
-	)`, call.ID, claims.UserID).Scan(&stillAllowed)
-	if err != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
-		return
-	}
-	if !stillAllowed {
+	if errors.Is(err, errCallPrivacyDenied) {
 		httpx.Error(w, http.StatusForbidden, "not allowed to join this call")
 		return
 	}
-	var conflict bool
-	err = tx.QueryRow(r.Context(), `SELECT EXISTS(
-      SELECT 1 FROM call_participants cp JOIN user_blocks b ON
-        (b.blocker_id=$2 AND b.blocked_id=cp.user_id) OR
-        (b.blocked_id=$2 AND b.blocker_id=cp.user_id)
-      WHERE cp.call_id=$1 AND cp.user_id<>$2 AND cp.joined_at IS NOT NULL
-        AND cp.left_at IS NULL AND cp.declined_at IS NULL)`, call.ID, claims.UserID).Scan(&conflict)
-	if err != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
-		return
-	}
-	if conflict {
+	if errors.Is(err, errCallBlocked) {
 		httpx.Error(w, http.StatusForbidden, "blocked participants cannot join the same call")
 		return
 	}
-	tag, err := tx.Exec(r.Context(), `
-        UPDATE call_participants SET joined_at=COALESCE(joined_at,NOW()),left_at=NULL
-        WHERE call_id=$1 AND user_id=$2 AND declined_at IS NULL`, call.ID, claims.UserID)
-	if err != nil || tag.RowsAffected() == 0 || tx.Commit(r.Context()) != nil {
+	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot join call")
 		return
-	}
-	if claims.UserID != call.CreatedBy {
-		_, _ = s.db.Exec(r.Context(), `
-			UPDATE call_sessions SET status='active',started_at=COALESCE(started_at,NOW())
-			WHERE id=$1 AND status='ringing'`, call.ID)
-		call.Status = "active"
 	}
 
 	identity := participantIdentity(claims.UserID)
@@ -607,6 +569,87 @@ func (s *server) joinCall(w http.ResponseWriter, r *http.Request) {
 		"e2eeRequired":        true,
 		"expiresInSeconds":    int(liveKitTokenTTL.Seconds()),
 	})
+}
+
+func (s *server) joinCallState(ctx context.Context, call callSession, userID int64) (callSession, error) {
+	// Lock session row so call end and join serialize before either state commits.
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return call, err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", call.ID); err != nil {
+		return call, err
+	}
+	if err := tx.QueryRow(ctx, `
+		SELECT status,started_at,ended_at FROM call_sessions WHERE id=$1 FOR UPDATE`, call.ID).
+		Scan(&call.Status, &call.StartedAt, &call.EndedAt); err != nil {
+		return call, err
+	}
+	if call.Status != "ringing" && call.Status != "active" {
+		return call, errCallNoLongerActive
+	}
+
+	var stillAllowed bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(
+		SELECT 1 FROM call_sessions cs
+		JOIN conversations c ON c.id=cs.conversation_id
+		JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=$2
+		WHERE cs.id=$1 AND cs.status IN ('ringing','active')
+		  AND (c.type<>'direct' OR NOT EXISTS(
+		    SELECT 1 FROM conversation_members other JOIN user_blocks b ON
+		      (b.blocker_id=$2 AND b.blocked_id=other.user_id) OR
+		      (b.blocked_id=$2 AND b.blocker_id=other.user_id)
+		    WHERE other.conversation_id=c.id AND other.user_id<>$2
+		  ))
+	)`, call.ID, userID).Scan(&stillAllowed); err != nil {
+		return call, err
+	}
+	if !stillAllowed {
+		return call, errCallPrivacyDenied
+	}
+
+	var conflict bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(
+      SELECT 1 FROM call_participants cp JOIN user_blocks b ON
+        (b.blocker_id=$2 AND b.blocked_id=cp.user_id) OR
+        (b.blocked_id=$2 AND b.blocker_id=cp.user_id)
+      WHERE cp.call_id=$1 AND cp.user_id<>$2 AND cp.joined_at IS NOT NULL
+        AND cp.left_at IS NULL AND cp.declined_at IS NULL)`, call.ID, userID).Scan(&conflict); err != nil {
+		return call, err
+	}
+	if conflict {
+		return call, errCallBlocked
+	}
+
+	tag, err := tx.Exec(ctx, `
+        UPDATE call_participants SET joined_at=COALESCE(joined_at,NOW()),left_at=NULL
+        WHERE call_id=$1 AND user_id=$2 AND declined_at IS NULL`, call.ID, userID)
+	if err != nil {
+		return call, err
+	}
+	if tag.RowsAffected() == 0 {
+		return call, errors.New("call participant not found")
+	}
+	if userID != call.CreatedBy && call.Status == "ringing" {
+		tag, err = tx.Exec(ctx, `
+			UPDATE call_sessions SET status='active',started_at=COALESCE(started_at,NOW())
+			WHERE id=$1 AND status='ringing'`, call.ID)
+		if err != nil {
+			return call, err
+		}
+		if tag.RowsAffected() != 1 {
+			return call, errCallNoLongerActive
+		}
+		call.Status = "active"
+		if err := tx.QueryRow(ctx, `SELECT started_at FROM call_sessions WHERE id=$1`, call.ID).Scan(&call.StartedAt); err != nil {
+			return call, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return call, err
+	}
+	return call, nil
 }
 
 func (s *server) declineCall(w http.ResponseWriter, r *http.Request) {
