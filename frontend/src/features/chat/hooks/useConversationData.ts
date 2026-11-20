@@ -1,6 +1,7 @@
 import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { AppDataContext } from '../../../shared/types/api'
 import { listConversations, listGroupConversations, listMembershipIds } from '../api/conversations'
+import { loadVerifiedMembershipSnapshot } from '../lib/membershipSnapshot'
 import { CHAT_LIST_PAGE_SIZE, type Conversation, type MessageDraft } from '../types'
 type Options = AppDataContext & {
   activeConversationIdRef: RefObject<number | null>
@@ -72,45 +73,32 @@ export function useConversationData({
   }
 
   async function reconcileConversationMemberships() {
-    const sessionId = session?.sessionId
-    if (!sessionId) return
-    const sequence = ++membershipSyncSequence.current
-    const membershipEventAtStart = membershipEventSequence.current
-    const authorized = new Set<number>()
-    let after = 0
-    try {
-      // Fetch only IDs, not full message metadata. Never prune on partial
-      // snapshots: a failed page is not proof of lost group membership.
-      for (let page = 0; page < 200; page += 1) {
-        const response = await listMembershipIds(apiFetch, after)
-        if (!response.ok) return
-        const data = (await response.json()) as { ids: number[]; nextAfter: number | null }
-        if (!Array.isArray(data.ids) || data.ids.length > 500 ||
-          data.ids.some((id) => !Number.isSafeInteger(id) || id <= after)) return
-        for (const id of data.ids) authorized.add(id)
-        if (data.nextAfter === null) {
-          if (sessionRef.current?.sessionId !== sessionId ||
-              sequence !== membershipSyncSequence.current ||
-              membershipEventAtStart !== membershipEventSequence.current) return
-          membershipSnapshot.current = authorized
-          for (const id of authorized) revokedConversationIds.current.delete(id)
-          setConversations((current) => current.filter((item) => authorized.has(item.id)))
-          setMessageDrafts((current) => Object.fromEntries(
-            Object.entries(current).filter(([id]) => authorized.has(Number(id))),
-          ))
-          if (activeConversationIdRef.current && !authorized.has(activeConversationIdRef.current)) {
-            purgeConversation(activeConversationIdRef.current)
-          }
-          void refreshConversations()
-          return
-        }
-        if (!Number.isSafeInteger(data.nextAfter) || data.nextAfter <= after ||
-            data.nextAfter !== data.ids[data.ids.length - 1]) return
-        after = data.nextAfter
-      }
-    } catch {
-      // Connectivity failures must never be interpreted as revoked rights.
+    const sessionId = session?.sessionId;
+    if (!sessionId) return;
+    const sequence = ++membershipSyncSequence.current;
+    const membershipEventAtStart = membershipEventSequence.current;
+    const isCurrent = () =>
+      sessionRef.current?.sessionId === sessionId &&
+      sequence === membershipSyncSequence.current &&
+      membershipEventAtStart === membershipEventSequence.current;
+
+    // Never revoke access from incomplete pages, network errors, or stale data.
+    const authorized = await loadVerifiedMembershipSnapshot(
+      after => listMembershipIds(apiFetch, after),
+      isCurrent,
+    );
+    if (!authorized || !isCurrent()) return;
+
+    membershipSnapshot.current = authorized;
+    for (const id of authorized) revokedConversationIds.current.delete(id);
+    setConversations(current => current.filter(item => authorized.has(item.id)));
+    setMessageDrafts(current => Object.fromEntries(
+      Object.entries(current).filter(([id]) => authorized.has(Number(id))),
+    ));
+    if (activeConversationIdRef.current && !authorized.has(activeConversationIdRef.current)) {
+      purgeConversation(activeConversationIdRef.current);
     }
+    void refreshConversations();
   }
 
   async function refreshConversations() {
