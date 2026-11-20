@@ -17,9 +17,9 @@ import type { RefObject } from "react";
 
 const CHAT_ATTACHMENT_ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip';
 
-type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "groupChannels" | "isProfileDesktop" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo" | "t">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[]; chatFileInputRef: RefObject<HTMLInputElement | null>; apiFetch: ApiRequest; canSchedule: boolean };
+type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[]; chatFileInputRef: RefObject<HTMLInputElement | null>; apiFetch: ApiRequest; canSchedule: boolean };
 
-export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, apiFetch, canSchedule, canSend, chatFileInputRef, groupChannels, isProfileDesktop, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, t, groupMembers }: Props) {
+export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, apiFetch, canSchedule, canSend, chatFileInputRef, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, groupMembers }: Props) {
   function openAttachmentPicker(mediaOnly: boolean) {
     const input = chatFileInputRef.current;
     if (!input) return;
@@ -40,8 +40,19 @@ export default function MessageComposer({ activeConversation, activeConversation
     });
   }
 
+  function composerMenu(onSchedule?: () => void) {
+    return <ChatComposerPlusMenu
+      disabled={Boolean(mediaUploading) || messageSending}
+      onAttachFile={() => openAttachmentPicker(false)}
+      onAttachMedia={() => openAttachmentPicker(true)}
+      onInsertEmoji={insertEmoji}
+      onSchedule={onSchedule}
+      onGroupActivity={activeConversation.type === 'group' ? setGroupActivityCreateKind : undefined}
+    />
+  }
+
   return (
-    <form className="composer media-composer" onSubmit={(event) => {
+    <form className="composer media-composer compact-chat-composer" onSubmit={(event) => {
                     void sendMessage(event)
                     if (isDesktopBuild) messageInputRef.current?.focus()
                   }}>
@@ -75,12 +86,14 @@ export default function MessageComposer({ activeConversation, activeConversation
                         />
                       </div>
                     )}
-                    <ChatComposerPlusMenu
-                      disabled={Boolean(mediaUploading) || messageSending}
-                      onAttachFile={() => openAttachmentPicker(false)}
-                      onAttachMedia={() => openAttachmentPicker(true)}
-                      onInsertEmoji={insertEmoji}
-                    />
+                    {canSchedule ? <ScheduledMessageQueue
+                      key={session.sessionId}
+                      request={apiFetch}
+                      conversationId={activeConversation.id}
+                      channelId={selectedChannelId}
+                      initialText={!messageAttachments.length && !replyingTo ? messageText : ""}
+                      renderTrigger={composerMenu}
+                    /> : composerMenu()}
                     <button className="ghost-action chat-composer-image" type="button"
                       onClick={() => openAttachmentPicker(true)}
                       disabled={Boolean(mediaUploading) || messageSending}
@@ -99,13 +112,6 @@ export default function MessageComposer({ activeConversation, activeConversation
                         onCreate={setGroupActivityCreateKind}
                       />
                     )}
-                    {canSchedule && <ScheduledMessageQueue
-                      key={session.sessionId}
-                      request={apiFetch}
-                      conversationId={activeConversation.id}
-                      channelId={selectedChannelId}
-                      initialText={!messageAttachments.length && !replyingTo ? messageText : ""}
-                    />}
                     <ChatMentionInput
                       key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
                       conversationId={activeConversation.id}
@@ -113,7 +119,7 @@ export default function MessageComposer({ activeConversation, activeConversation
                       inputRef={messageInputRef}
                       text={messageText}
                       setText={setMessageText}
-                      placeholder={isProfileDesktop ? 'Nhập tin nhắn...' : activeConversation.type === 'group' ? selectedChannelId ? `Nhắn vào # ${groupChannels.find(channel => channel.id === selectedChannelId)?.name || 'kênh hội thoại'}...` : `Nhắn vào ${activeConversation.name}...` : `Nhắn ${activeConversation.name}...`}
+                      placeholder="Nhập tin nhắn…"
                       onFilesPaste={(event) => {
                         const files = chatFilesFromClipboard(event.clipboardData)
                         if (files.length === 0) return
@@ -121,7 +127,7 @@ export default function MessageComposer({ activeConversation, activeConversation
                         void addChatFiles(files)
                       }}
                     />
-                    <button className="send-button polished-send" disabled={!canSend} aria-label="Gửi tin nhắn">
+                    <button className="send-button polished-send" type="submit" disabled={!canSend} aria-label="Gửi tin nhắn">
                       <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>
                     </button>
                   </form>

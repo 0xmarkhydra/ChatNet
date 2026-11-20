@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react"
 import { Clock3 } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/shared/ui/dialog"
@@ -8,11 +8,12 @@ import type { ApiRequest } from "@/shared/types/api"
 import { cancelScheduledMessage, createScheduledMessage, listScheduledMessages, moveScheduledMessage, type ScheduledMessage } from "../api/scheduledMessages"
 import { scheduledInstant, scheduledLocalValue } from "../utils/scheduledMessageTime"
 
-type Props = { request: ApiRequest; conversationId: number; channelId: number; initialText: string }
+type Props = { request: ApiRequest; conversationId: number; channelId: number; initialText: string; renderTrigger?: (open: () => void) => ReactNode }
 const formatTime = new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" })
 const initialTime = () => scheduledLocalValue(new Date(Date.now() + 15 * 60 * 1000))
 
-export default function ScheduledMessageQueue({ request, conversationId, channelId, initialText }: Props) {
+export default function ScheduledMessageQueue({ request, conversationId, channelId, initialText, renderTrigger }: Props) {
+  const returnFocus = useRef<HTMLElement | null>(null)
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<ScheduledMessage[] | null>(null)
   const [revision, setRevision] = useState(0)
@@ -121,12 +122,17 @@ export default function ScheduledMessageQueue({ request, conversationId, channel
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger asChild>
+      {renderTrigger ? renderTrigger(() => changeOpen(true)) : <DialogTrigger asChild>
         <button type="button" className="ghost-action attach-button" aria-label="Tin nhắn hẹn giờ" title="Tin nhắn hẹn giờ">
           <Clock3 size={20} aria-hidden="true" />
         </button>
-      </DialogTrigger>
-      <DialogContent onEscapeKeyDown={event => { if (busy) event.preventDefault() }}>
+      </DialogTrigger>}
+      <DialogContent onEscapeKeyDown={event => { if (busy) event.preventDefault() }}
+        onOpenAutoFocus={renderTrigger ? () => {
+          const active = document.activeElement
+          returnFocus.current = active instanceof HTMLElement ? active : null
+        } : undefined}
+        onCloseAutoFocus={renderTrigger ? event => { event.preventDefault(); returnFocus.current?.focus({ preventScroll: true }) } : undefined}>
         <DialogTitle>Tin nhắn hẹn giờ</DialogTitle>
         <DialogDescription>Giờ hiển thị theo thiết bị này. Chỉ hỗ trợ tin văn bản trong cuộc trò chuyện không mã hóa đầu cuối.</DialogDescription>
         {notice && <p role="status">{notice}</p>}

@@ -1040,9 +1040,7 @@ export default function ChatSection({
                 canSchedule={activeConversation.type !== 'direct' || mlsPilotMode === 'legacy'}
                 canSend={canSend}
                 chatFileInputRef={chatFileInputRef}
-                groupChannels={groupChannels}
                 groupMembers={groupMembers}
-                isProfileDesktop={isProfileDesktop}
                 mediaUploading={mediaUploading}
                 messageAttachments={messageAttachments}
                 messageInputRef={messageInputRef}
@@ -1057,7 +1055,6 @@ export default function ChatSection({
                 setMessageText={setMessageText}
                 setNotice={setNotice}
                 setReplyingTo={setReplyingTo}
-                t={t}
               />
 
                   )}

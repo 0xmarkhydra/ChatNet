@@ -1,8 +1,10 @@
-import { Search, Users, Languages, MoreHorizontal, X, Hash } from "lucide-react";
+import { Search, Users, Languages, MoreHorizontal, X, Hash, Phone, Video, Info } from "lucide-react";
 import ConversationAvatar from "./ConversationAvatar";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { CategoryAssignment } from "./ConversationCategories";
-import { CallHeaderActions } from "../../calls";
+import { CallHeaderActions, startConversationCall } from "../../calls";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
+import { Button } from "@/shared/ui/button";
 import { createPortal } from "react-dom";
 import type { ChatSectionProps } from "./ChatSectionProps";
 import type { Dispatch, SetStateAction } from "react";
@@ -15,6 +17,16 @@ type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "changeAutoTrans
   selectedChannelDescription?: string;
 };
 export default function ConversationHeader({ activeConversation, changeAutoTranslate, changeTargetLanguage, conversationBlocked, conversationCategories, conversationDetailsOpen, effectiveAutoTranslate, effectiveTargetLanguage, groupSettingsOpen, languageSearch, openGroupSettings, openVisitor, setActiveConversationId, setConversationDetailsOpen, setGroupMemberViewOpen, setGroupSettingsOpen, setLanguageSearch, setMessageSearchOpen, setTranslationMenuOpen, t, translationMenuOpen, visibleLanguageOptions, setChannelSidebarOpen, setMobileChannelSelected, selectedChannelId, selectedRoomTitle, selectedRoomAvatar, selectedChannelDescription }: Props) {
+  function toggleTranslation() {
+    if (!translationMenuOpen) setLanguageSearch("");
+    setTranslationMenuOpen(!translationMenuOpen);
+  }
+
+  function toggleDetails() {
+    setGroupSettingsOpen(false);
+    setConversationDetailsOpen(open => !open);
+  }
+
  return (
 <header className="chat-head">
                     <div className="room-info">
@@ -78,35 +90,35 @@ export default function ConversationHeader({ activeConversation, changeAutoTrans
                       </div>
                     </div>
 
-                    {activeConversation.type === 'group' && (
-                      <div className="group-mobile-actions">
-                        <CallHeaderActions conversationId={activeConversation.id} disabled={conversationBlocked} />
-                        <button type="button" className="group-more-trigger"
-                          aria-label="Tìm tin nhắn trong cuộc trò chuyện"
-                          onClick={() => setMessageSearchOpen(true)}>
-                          <Search size={20} aria-hidden="true" />
-                        </button>
-                        <div className="translation-hub">
-                          <button type="button" className="group-more-trigger translation-toolbar-toggle"
-                            aria-label={effectiveAutoTranslate ? 'Cài đặt dịch AI, đang bật' : 'Cài đặt dịch AI, đang tắt'}
-                            title="Cài đặt dịch AI"
-                            aria-expanded={translationMenuOpen}
-                            aria-controls="chat-translation-dialog"
-                            onClick={() => {
-                              setLanguageSearch('')
-                              setTranslationMenuOpen((open) => !open)
-                            }}>
-                            <Languages size={20} strokeWidth={1.9} aria-hidden="true" />
-                          </button>
-                        </div>
-                        <button type="button" className="group-more-trigger"
-                          aria-label="Thông tin hội thoại" aria-controls="conversation-details-panel"
-                          aria-expanded={conversationDetailsOpen}
-                          onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}>
-                          <MoreHorizontal size={23} aria-hidden="true" />
-                        </button>
-                      </div>
-                    )}
+                    <div className="compact-room-actions flex shrink-0 items-center min-[761px]:hidden">
+                      <Button type="button" variant="ghost" className="size-11 p-0 text-primary"
+                        aria-label="Gọi thoại" disabled={conversationBlocked}
+                        onClick={() => startConversationCall(activeConversation.id, "audio")}>
+                        <Phone size={20} aria-hidden="true" />
+                      </Button>
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button type="button" variant="ghost" className="size-11 p-0 text-primary" aria-label="Tùy chọn hội thoại">
+                            <MoreHorizontal size={22} aria-hidden="true" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onCloseAutoFocus={event => { if (translationMenuOpen) event.preventDefault() }}>
+                          <DropdownMenuItem disabled={conversationBlocked} onSelect={() => startConversationCall(activeConversation.id, "video")}>
+                            <Video size={18} aria-hidden="true" /> Gọi video
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setMessageSearchOpen(true)}>
+                            <Search size={18} aria-hidden="true" /> Tìm tin nhắn
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={toggleTranslation}>
+                            <Languages size={18} aria-hidden="true" /> {effectiveAutoTranslate ? "Dịch AI · Đang bật" : "Dịch AI"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={toggleDetails}>
+                            <Info size={18} aria-hidden="true" /> Thông tin hội thoại
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
 
                     <div className="translate-controls">
                       <CallHeaderActions conversationId={activeConversation.id} disabled={conversationBlocked} />
@@ -119,13 +131,7 @@ export default function ConversationHeader({ activeConversation, changeAutoTrans
                           aria-controls="chat-translation-dialog"
                           aria-label={effectiveAutoTranslate ? 'Cài đặt dịch AI, đang bật' : 'Cài đặt dịch AI, đang tắt'}
                           title="Cài đặt dịch AI"
-                          onClick={() => {
-                            setTranslationMenuOpen((current) => {
-                              const next = !current
-                              if (next) setLanguageSearch('')
-                              return next
-                            })
-                          }}
+                          onClick={toggleTranslation}
                         >
                           <Languages size={21} strokeWidth={1.9} aria-hidden="true" />
                         </button>
@@ -213,7 +219,7 @@ export default function ConversationHeader({ activeConversation, changeAutoTrans
                         )}
                       </div>
                       <button type="button" className={conversationDetailsOpen ? 'group-settings-toggle active' : 'group-settings-toggle'}
-                        onClick={() => { setGroupSettingsOpen(false); setConversationDetailsOpen((open) => !open) }}
+                        onClick={toggleDetails}
                         title="Thông tin hội thoại" aria-label="Thông tin hội thoại"
                         aria-controls="conversation-details-panel" aria-expanded={conversationDetailsOpen}>
                         <MoreHorizontal size={22} aria-hidden="true" />

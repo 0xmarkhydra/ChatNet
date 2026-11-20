@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, FileText, Images, Plus, Smile } from 'lucide-react'
+import { ArrowLeft, CalendarClock, ClipboardList, Clock3, FileText, Images, Plus, Smile } from 'lucide-react'
 import ChatEmojiPicker from './ChatEmojiPicker'
 import { positionChatComposerMenu, type ChatComposerMenuPosition } from '../utils/positionChatComposerMenu'
+import type { GroupActivityKind } from './GroupActivities'
 import './ChatEmojiPicker.css'
 
 type MenuMode = 'closed' | 'actions' | 'emoji'
@@ -12,12 +13,16 @@ type Props = {
   onAttachFile: () => void
   onAttachMedia: () => void
   onInsertEmoji: (emoji: string) => void
+  onSchedule?: () => void
+  onGroupActivity?: (kind: GroupActivityKind) => void
 }
 
-export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachMedia, onInsertEmoji }: Props) {
+export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachMedia, onInsertEmoji, onSchedule, onGroupActivity }: Props) {
   const [mode, setMode] = useState<MenuMode>('closed')
   const [position, setPosition] = useState<ChatComposerMenuPosition | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const actionHeight = 198 + (onSchedule ? 44 : 0)
+  const groupHeight = onGroupActivity ? 132 : 0
   const panelRef = useRef<HTMLDivElement>(null)
 
   function locate(nextMode: Exclude<MenuMode, 'closed'>) {
@@ -29,7 +34,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
       top: visual?.offsetTop ?? 0,
       width: visual?.width ?? window.innerWidth,
       height: visual?.height ?? window.innerHeight,
-    }, nextMode === 'emoji' ? 430 : 235))
+    }, nextMode === 'emoji' ? 430 : actionHeight + (window.innerWidth <= 760 ? groupHeight : 0)))
   }
 
   function show(nextMode: Exclude<MenuMode, 'closed'>) {
@@ -61,7 +66,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
         top: visual?.offsetTop ?? 0,
         width: visual?.width ?? window.innerWidth,
         height: visual?.height ?? window.innerHeight,
-      }, mode === 'emoji' ? 430 : 235))
+      }, mode === 'emoji' ? 430 : actionHeight + (window.innerWidth <= 760 ? groupHeight : 0)))
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -77,10 +82,15 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
       window.visualViewport?.removeEventListener('resize', onViewportChange)
       window.visualViewport?.removeEventListener('scroll', onViewportChange)
     }
+  }, [mode, triggerRef, actionHeight, groupHeight])
+
+  useEffect(() => {
+    if (mode !== 'closed') panelRef.current?.querySelector('button')?.focus({ preventScroll: true })
   }, [mode])
 
   const choose = (action: () => void) => {
     setMode('closed')
+    triggerRef.current?.focus({ preventScroll: true })
     action()
   }
 
@@ -94,7 +104,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
         aria-label="Mở menu thêm nội dung"
         aria-haspopup="dialog"
         aria-expanded={mode !== 'closed'}
-        title="Thêm tệp, ảnh hoặc emoji"
+        title="Tùy chọn soạn tin"
         onClick={() => mode === 'closed' ? show('actions') : setMode('closed')}
       >
         <Plus className="chat-composer-plus" size={22} aria-hidden="true" />
@@ -109,7 +119,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
         >
           {mode === 'actions' ? (
             <>
-              <p className="chat-composer-plus-title">Thêm vào tin nhắn</p>
+              <p className="chat-composer-plus-title">Tùy chọn soạn tin</p>
               <button type="button" className="chat-composer-plus-option" onClick={() => choose(onAttachFile)}>
                 <FileText size={19} aria-hidden="true" /><span>Tệp tin</span>
               </button>
@@ -119,6 +129,22 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
               <button type="button" className="chat-composer-plus-option" onClick={() => show('emoji')}>
                 <Smile size={19} aria-hidden="true" /><span>Emoji</span>
               </button>
+              {onSchedule && (
+                <button type="button" className="chat-composer-plus-option" onClick={() => choose(onSchedule)}>
+                  <Clock3 size={19} aria-hidden="true" /><span>Hẹn giờ gửi</span>
+                </button>
+              )}
+              {onGroupActivity && <>
+                <button type="button" className="chat-composer-plus-option chat-composer-mobile-option" onClick={() => choose(() => onGroupActivity('poll'))}>
+                  <ClipboardList size={19} aria-hidden="true" /><span>Bình chọn</span>
+                </button>
+                <button type="button" className="chat-composer-plus-option chat-composer-mobile-option" onClick={() => choose(() => onGroupActivity('note'))}>
+                  <FileText size={19} aria-hidden="true" /><span>Ghi chú nhóm</span>
+                </button>
+                <button type="button" className="chat-composer-plus-option chat-composer-mobile-option" onClick={() => choose(() => onGroupActivity('reminder'))}>
+                  <CalendarClock size={19} aria-hidden="true" /><span>Nhắc hẹn nhóm</span>
+                </button>
+              </>}
             </>
           ) : (
             <>
