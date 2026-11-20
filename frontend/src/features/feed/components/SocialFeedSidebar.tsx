@@ -64,7 +64,7 @@ export default function SocialFeedSidebar({
   }, [sessionId, revision, requestRef])
 
   return (
-    <aside className="social-feed-side" aria-label="Gợi ý trên bảng tin">
+    <aside className="social-feed-side box-border hidden min-w-0 min-[761px]:grid min-[761px]:grid-cols-[minmax(0,1fr)] min-[761px]:content-start min-[761px]:gap-4 min-[761px]:[&>*]:box-border min-[761px]:[&>*]:w-full min-[761px]:[&>*]:min-w-0 min-[1121px]:sticky min-[1121px]:top-4 min-[1121px]:flex min-[1121px]:max-h-[calc(100dvh-126px)] min-[1121px]:min-h-0 min-[1121px]:flex-col min-[1121px]:self-start min-[1121px]:gap-[14px] min-[1121px]:overflow-x-hidden min-[1121px]:overflow-y-auto min-[1121px]:overscroll-y-contain min-[1121px]:pr-[5px] min-[1121px]:pb-px min-[1121px]:[scrollbar-width:thin] min-[1121px]:[scrollbar-color:#c5d2e7_transparent] min-[1121px]:[&>*]:flex-none" aria-label="Gợi ý trên bảng tin">
       <section className="social-feed-side-card social-feed-search-card" aria-label="Tìm kiếm trên Bảng tin">
         <label className="social-feed-search-field">
           <Search size={19} aria-hidden="true" />
