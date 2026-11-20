@@ -300,6 +300,8 @@ import { useOutboxDelivery } from "../features/chat/hooks/useOutboxDelivery";
 import { useConversationHistory } from "../features/chat/hooks/useConversationHistory";
 import { useGroupChannels } from "../features/chat/hooks/useGroupChannels";
 import { useGroupChannelLiveSync } from "../features/chat/hooks/useGroupChannelLiveSync";
+import { useChatMessageJumpFocus } from "../features/chat/hooks/useChatMessageJumpFocus";
+import { useGroupSettingsEscape } from "../features/chat/hooks/useGroupSettingsEscape";
 import { useDirectConversations } from "../features/chat/hooks/useDirectConversations";
 import { useGroupCreation } from "../features/chat/hooks/useGroupCreation";
 import { usePostSync } from "../features/feed/hooks/usePostSync";
@@ -887,18 +889,7 @@ export default function AuthedApp({
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
   }, [groupSettingsOpen, setGroupMemberViewOpen]);
 
-  useEffect(() => {
-    if (!groupSettingsOpen) return;
-    const onEscape = (event: KeyboardEvent) => {
-      if (
-        event.key === "Escape" &&
-        !document.querySelector("dialog[open]")
-      )
-        setGroupSettingsOpen(false);
-    };
-    window.addEventListener("keydown", onEscape);
-    return () => window.removeEventListener("keydown", onEscape);
-  }, [groupSettingsOpen, setGroupSettingsOpen]);
+  useGroupSettingsEscape(groupSettingsOpen, setGroupSettingsOpen);
 
   const conversationListSearch = useConversationListSearch({
     query: chatListQuery,
@@ -916,38 +907,12 @@ export default function AuthedApp({
     enabled: tab === "chat",
     request: apiFetch,
   });
-  useEffect(() => {
-    const jump = chatSearchJump;
-    if (
-      !jump ||
-      jump.conversationId !== activeConversationId ||
-      lastScrolledSearchJump.current === jump.revision ||
-      !messages.some((item) => item.id === jump.messageId)
-    )
-      return;
-    const frame = window.requestAnimationFrame(() => {
-      const target = document.querySelector(
-        `[data-message-id="${jump.messageId}"]`,
-      );
-      if (!target) return;
-      target.scrollIntoView({
-        block: "center",
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-      });
-      // A transient highlight makes the notification's exact message easy to locate.
-      if (target instanceof HTMLElement && typeof target.animate === "function") {
-        target.animate(
-          [
-            { outline: "2px solid var(--accent, #318a65)", outlineOffset: "3px", backgroundColor: "rgba(49,138,101,0.16)" },
-            { outline: "2px solid transparent", outlineOffset: "3px", backgroundColor: "transparent" },
-          ],
-          { duration: 2200, easing: "ease-out" },
-        );
-      }
-      lastScrolledSearchJump.current = jump.revision;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [messages, activeConversationId, chatSearchJump]);
+  useChatMessageJumpFocus({
+    jump: chatSearchJump,
+    activeConversationId,
+    messages,
+    lastScrolledRevision: lastScrolledSearchJump,
+  });
   const name = session?.user.username || "";
   const displayConversations = useMemo(
     () => withContactNicknames(conversations, contactMetadata),
