@@ -5,7 +5,7 @@ version: 1.0.0
 status: Draft
 owner: Platform Engineering
 baseline_commit: 40c1f1b35958ee22c1278986bf82ff57520137a1
-last_updated: 2026-11-19
+last_updated: 2026-11-21
 normative_basis: "ISO/IEC/IEEE 12207:2026, ISO/IEC/IEEE 15289:2019"
 ---
 
@@ -18,6 +18,20 @@ Tài liệu nêu quy trình bảo trì, xử lý sự cố, khôi phục dữ li
 ## 1. Phạm vi và quan hệ
 
 Bổ sung cho [triển khai và vận hành](DEPLOYMENT_AND_OPERATIONS.md), [cấu hình môi trường](ENVIRONMENT_CONFIGURATION.md) và [phát hành](RELEASE_MANAGEMENT.md). Mục tiêu định lượng nằm ở quyết định mở [TBD-01](../01-product/SOFTWARE_REQUIREMENTS_SPECIFICATION.md#81-quyết-định-mở-tbd).
+
+## Cổng mục tiêu vận hành và khôi phục
+
+Release owner duy trì một bản ghi cho từng môi trường. Chưa chốt con số không được xem là đạt.
+
+| Gate | Evidence bắt buộc để ghi `PASS` | Trạng thái tài liệu này |
+|---|---|---|
+| SLO | Chỉ tiêu availability/latency/error-rate được owner phê duyệt, cửa sổ đo, nguồn số liệu và kết quả | NOT SET |
+| RPO | Giá trị tối đa mất dữ liệu được phê duyệt và đo trong restore/failure drill | NOT SET |
+| RTO | Thời gian khôi phục được phê duyệt, đo từ incident đến service usable | NOT SET |
+| Backup restore | ID bản backup, thời điểm, môi trường cách ly, thời gian restore, integrity/schema check và người xác nhận | NOT RUN |
+| Rollback | Artifact trước, schema compatibility check, lệnh rollback/forward-fix, smoke sau rollback và kết quả | NOT RUN |
+
+Gate `SLO`, `RPO` hoặc `RTO` ở `NOT SET` chặn production release. `PASS` chỉ dùng khi record có SHA/build, môi trường, thời điểm và evidence link.
 
 ## 2. Vận hành và quan sát
 
