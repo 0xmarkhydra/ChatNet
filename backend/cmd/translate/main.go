@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"chatnet/internal/database"
 	"chatnet/internal/httpx"
 	"chatnet/internal/languagecatalog"
+	"chatnet/internal/ratelimit"
 	"chatnet/internal/redisx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -35,7 +38,19 @@ type server struct {
 	jwtSecret  string
 	client     *http.Client
 	redis      *redis.Client
+	limiter           ratelimit.Limiter
+	rateLimitEnabled  bool
+	providerSlots     chan struct{}
 }
+
+const (
+	translationRateLimitWindow = time.Minute
+	translationUserRateLimit  = 30
+	translationIPRateLimit    = 120
+	providerConcurrencyLimit  = 8
+)
+
+var errProviderBusy = errors.New("translation provider is busy")
 
 type responsePayload struct {
 	OutputText string `json:"output_text"`
@@ -104,6 +119,9 @@ func main() {
 		jwtSecret:  config.Env("JWT_SECRET", "dev-secret-change-me"),
 		client:     &http.Client{Timeout: 30 * time.Second},
 		redis:      cache,
+		limiter:           ratelimit.Limiter{Redis: cache},
+		rateLimitEnabled: true,
+		providerSlots:     make(chan struct{}, providerConcurrencyLimit),
 	}
 
 	switch s.apiStyle {
@@ -235,6 +253,9 @@ func (s *server) translate(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusServiceUnavailable, "AI translation is not configured")
 		return
 	}
+	if !s.allowTranslation(w, r, claims) {
+		return
+	}
 
 	key := s.cacheKey(text, target)
 	if s.redis != nil {
@@ -251,9 +272,13 @@ func (s *server) translate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
 	translated, usedStyle, err := s.callAI(r, text, target)
 	if err != nil {
+		var callErr *aiCallError
+		if errors.As(err, &callErr) && callErr.Status == http.StatusServiceUnavailable && errors.Is(callErr.Err, errProviderBusy) {
+			httpx.Error(w, http.StatusServiceUnavailable, "translation provider is busy")
+			return
+		}
 		log.Printf("translate error provider=%s model=%s style=%s: %v", s.provider, s.model, s.apiStyle, err)
 		httpx.Error(w, http.StatusBadGateway, "AI translation failed")
 		return
@@ -297,6 +322,12 @@ func (s *server) callAI(r *http.Request, text, target string) (string, string, e
 }
 
 func (s *server) callAIWithInstructions(r *http.Request, instructions, text string, maxTokens int) (string, string, error) {
+	release, err := s.acquireProvider(r.Context())
+	if err != nil {
+		return "", "", &aiCallError{Status: http.StatusServiceUnavailable, Err: err}
+	}
+	defer release()
+
 	if maxTokens < 1 {
 		maxTokens = 700
 	}
@@ -321,6 +352,63 @@ func (s *server) callAIWithInstructions(r *http.Request, instructions, text stri
 		}
 		return "", "responses", err
 	}
+}
+
+func (s *server) acquireProvider(ctx context.Context) (func(), error) {
+	if s.providerSlots == nil {
+		return func() {}, nil
+	}
+	select {
+	case s.providerSlots <- struct{}{}:
+		return func() { <-s.providerSlots }, nil
+	default:
+		return nil, errProviderBusy
+	}
+}
+
+func (s *server) allowTranslation(w http.ResponseWriter, r *http.Request, claims *authx.Claims) bool {
+	if !s.rateLimitEnabled {
+		return true
+	}
+	if s.limiter.Redis == nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "rate limiter unavailable")
+		return false
+	}
+	userID := "unknown"
+	if claims != nil && claims.UserID > 0 {
+		userID = strconv.FormatInt(claims.UserID, 10)
+	}
+	for _, limit := range []struct {
+		scope  string
+		subject string
+		limit  int64
+	}{
+		{scope: "translate:user", subject: "u:" + userID, limit: translationUserRateLimit},
+		{scope: "translate:ip", subject: "ip:" + requestIP(r), limit: translationIPRateLimit},
+	} {
+		allowed, _, err := s.limiter.Allow(r.Context(), limit.scope, limit.subject, limit.limit, translationRateLimitWindow)
+		if err != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "rate limiter unavailable")
+			return false
+		}
+		if !allowed {
+			w.Header().Set("Retry-After", strconv.Itoa(int(translationRateLimitWindow.Seconds())))
+			httpx.Error(w, http.StatusTooManyRequests, "too many translation requests; try again later")
+			return false
+		}
+	}
+	return true
+}
+
+func requestIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err == nil && host != "" {
+		return host
+	}
+	if value := strings.TrimSpace(r.RemoteAddr); value != "" {
+		return value
+	}
+	return "unknown"
 }
 
 func (s *server) callResponses(ctx context.Context, instructions, text string) (string, error) {
