@@ -2,6 +2,7 @@ import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } 
 import type { AppDataContext } from '../../../shared/types/api'
 import { listConversations, listGroupConversations, listMembershipIds } from '../api/conversations'
 import { loadVerifiedMembershipSnapshot } from '../lib/membershipSnapshot'
+import { appendConversationPage, loadVerifiedConversationPage } from '../lib/conversationPages'
 import { CHAT_LIST_PAGE_SIZE, type Conversation, type MessageDraft } from '../types'
 type Options = AppDataContext & {
   activeConversationIdRef: RefObject<number | null>
@@ -27,6 +28,9 @@ export function useConversationData({
   const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
   const conversationPagingBusy = useRef(false)
   const conversationOffset = useRef(0)
+  const refreshSequence = useRef(0)
+  const pagingSequence = useRef(0)
+  const pagingOwnerSession = useRef<string | null>(null)
   const [conversationListError, setConversationListError] = useState('')
   const lastGroupSync = useRef<{ sessionId: string; at: number } | null>(null)
 
@@ -103,52 +107,69 @@ export function useConversationData({
 
   async function refreshConversations() {
     const sessionId = session?.sessionId
-    if (!sessionId) return
-    try {
-      const response = await listConversations(apiFetch, CHAT_LIST_PAGE_SIZE)
-      if (!response.ok) throw new Error('conversation list request failed')
-      const page = (await response.json()) as Conversation[]
-      if (!Array.isArray(page)) throw new Error('invalid conversation list response')
-      const data = page.filter((item) => !revokedConversationIds.current.has(item.id) &&
-        (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
-      if (sessionRef.current?.sessionId !== sessionId) return
-      setConversationListError('')
-      setConversations((current) => {
-        const freshIds = new Set(data.map((item) => item.id))
-        return [...data, ...current.filter((item) => !freshIds.has(item.id))]
-      })
-      conversationOffset.current = Math.max(conversationOffset.current, page.length)
-      if (conversationOffset.current === page.length) setHasMoreConversations(page.length === CHAT_LIST_PAGE_SIZE)
-      void loadEarlierGroups(sessionId)
-    } catch {
-      if (sessionRef.current?.sessionId !== sessionId) return
+    if (!sessionId || sessionRef.current?.sessionId !== sessionId) return
+    const requestSequence = ++refreshSequence.current
+    const isCurrent = () => sessionRef.current?.sessionId === sessionId &&
+      refreshSequence.current === requestSequence
+    const page = await loadVerifiedConversationPage(
+      () => listConversations(apiFetch, CHAT_LIST_PAGE_SIZE),
+      isCurrent,
+    )
+    if (!isCurrent()) return
+    if (!page) {
       setConversationListError('Không tải được danh sách hội thoại từ máy chủ.')
       setStatus('Đang kết nối lại...')
+      return
     }
+    const data = page.filter(item => !revokedConversationIds.current.has(item.id) &&
+      (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
+    setConversationListError('')
+    setConversations(current => {
+      if (!isCurrent()) return current
+      const freshIds = new Set(data.map(item => item.id))
+      return [...data, ...current.filter(item => !freshIds.has(item.id))]
+    })
+    conversationOffset.current = Math.max(conversationOffset.current, page.length)
+    if (conversationOffset.current === page.length) setHasMoreConversations(page.length === CHAT_LIST_PAGE_SIZE)
+    void loadEarlierGroups(sessionId)
   }
 
   async function loadMoreConversations() {
-    if (!session || conversationPagingBusy.current || !hasMoreConversations) return
+    if (!session || sessionRef.current?.sessionId !== session.sessionId || !hasMoreConversations) return
     const sessionId = session.sessionId
+    if (conversationPagingBusy.current && pagingOwnerSession.current === sessionId) return
+    const requestSequence = ++pagingSequence.current
+    pagingOwnerSession.current = sessionId
+    const offset = conversationOffset.current
+    const isCurrent = () => sessionRef.current?.sessionId === sessionId &&
+      pagingSequence.current === requestSequence
     conversationPagingBusy.current = true
     setConversationLoadingMore(true)
     try {
-      const response = await listConversations(apiFetch, CHAT_LIST_PAGE_SIZE, conversationOffset.current)
-      if (!response.ok) throw new Error('Không tải thêm được hội thoại')
-      const data = (await response.json()) as Conversation[]
-      if (sessionRef.current?.sessionId !== sessionId) return
-      conversationOffset.current += data.length
+      const data = await loadVerifiedConversationPage(
+        () => listConversations(apiFetch, CHAT_LIST_PAGE_SIZE, offset),
+        isCurrent,
+      )
+      if (!isCurrent()) return
+      if (!data) {
+        setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
+        return
+      }
+      conversationOffset.current = offset + data.length
       setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
-      setConversations((current) => {
-        const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id) && !revokedConversationIds.current.has(item.id) &&
-          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))]
+      setConversations(current => {
+        if (!isCurrent()) return current
+        return appendConversationPage(current, data, item =>
+          !revokedConversationIds.current.has(item.id) &&
+          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
       })
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
     } finally {
-      conversationPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId) setConversationLoadingMore(false)
+      // An earlier session's request must never release a newer page request.
+      if (isCurrent()) {
+        conversationPagingBusy.current = false
+        pagingOwnerSession.current = null
+        setConversationLoadingMore(false)
+      }
     }
   }
 

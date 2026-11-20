@@ -2469,6 +2469,7 @@ export default function AuthedApp({
       }
       header={
         <AppHeader
+          mobileSearchActions={tab === "feed"}
           className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
           start={
             <HeaderTitle
