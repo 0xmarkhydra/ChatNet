@@ -18,6 +18,38 @@ Future<void> openDirectChat(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('mobile tabs initialize on first visit and retain their state', (
+    tester,
+  ) async {
+    await openMobile(tester, DemoApi());
+    expect(
+      find.byKey(const ValueKey('contacts'), skipOffstage: false),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('feed'), skipOffstage: false),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('nav-contacts')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('contacts'), skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('feed'), skipOffstage: false),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('nav-chat')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('contacts'), skipOffstage: false),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('chat searches sender text without leaving the conversation', (
     tester,
   ) async {
@@ -262,7 +294,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Thêm bạn'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('friend-invitation-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('friend-invitation-screen')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('invitation-incoming')), findsOneWidget);
     expect(find.text('Chấp nhận'), findsWidgets);
   });
