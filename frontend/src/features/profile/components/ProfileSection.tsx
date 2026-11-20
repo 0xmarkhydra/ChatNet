@@ -406,6 +406,7 @@ export default function ProfileSection({
               </header>
             )}
             <ProfileHero username={name}
+              compact={!profileTimelineOpen && !isProfileDesktop}
               displayName={displayName}
               city={profileMedia?.city} workplace={profileMedia?.workplace} school={profileMedia?.school}
               friendCount={friendCount}
@@ -424,17 +425,19 @@ export default function ProfileSection({
                   avatarVersion={profileMedia?.updatedAt} editBusy={profileBusy !== null || mediaUploading === "profile"}
                   onChangeAvatar={openAvatarPicker} />
               </>}
-              identityNotice={!profileTimelineOpen && (
-                <div className="mt-1.5 grid min-w-0 justify-items-start gap-2">
-                  <small className="wrap-anywhere text-ui-label text-muted-foreground">{session.user.email}</small>
-                  <Button ref={profileIdentityRef} variant="outline" size="lg" className="max-w-full gap-1 px-2.5 text-primary"
+              actions={!profileTimelineOpen && (
+                <>
+                  <small className="profile-page-overview-email text-ui-label text-muted-foreground" title={session.user.email}>
+                    {session.user.email}
+                  </small>
+                  <Button ref={profileIdentityRef} variant="ghost" size="lg" className="gap-1 px-2 text-primary"
                     aria-label="Mở trang cá nhân" onClick={() => {
                       setProfileTimelineOpen(true);
                       setGlobalSearch("");
                     }}>
                     Xem trang cá nhân <ChevronRight size={16} aria-hidden="true" />
                   </Button>
-                </div>
+                </>
               )} />
 
             {profileTimelineOpen ? (

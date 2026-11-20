@@ -387,6 +387,66 @@
   .profile-view > .profile-page-hero .profile-page-avatar-wrap { margin-top: -34px; }
   .profile-view > .profile-page-hero .profile-page-identity-text { margin-top: 0; }
   .profile-view > .profile-page-hero .profile-page-cover-action { min-height: 44px; }
+  .profile-view > .profile-page-hero-compact .profile-page-cover { height: 56px; }
+  .profile-view > .profile-page-hero-compact .profile-page-cover-action {
+    top: 6px;
+    right: 10px;
+    bottom: auto;
+    padding-inline: 9px;
+  }
+  .profile-view > .profile-page-hero-compact .profile-page-hero-bottom {
+    align-items: center;
+    gap: 4px 10px;
+    padding: 8px 10px 6px;
+  }
+  .profile-view > .profile-page-hero-compact .profile-page-avatar-wrap {
+    width: 52px;
+    height: 52px;
+    margin-top: 0;
+    padding: 2px;
+    align-self: start;
+  }
+  .profile-page-hero-compact .profile-page-avatar { width: 48px; height: 48px; font-size: 19px; }
+  .profile-page-hero-compact .profile-page-avatar-wrap > .profile-note {
+    top: -58px;
+    max-width: min(148px, 42vw);
+  }
+  .profile-page-hero-compact .profile-note-bubble {
+    min-height: 44px;
+    max-width: 100%;
+    padding: 6px 9px;
+    border-radius: 10px;
+  }
+  .profile-page-hero-compact .profile-note-bubble > span {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .profile-page-hero-compact .profile-note-bubble::after { display: none; }
+  .profile-page-hero-compact .profile-page-identity-text h1 { font-size: 18px; margin-bottom: 3px; }
+  .profile-page-hero-compact .profile-page-identity-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px 9px;
+  }
+  .profile-page-hero-compact .profile-page-identity-meta,
+  .profile-page-hero-compact .profile-page-friend-summary { margin: 0; font-size: 12px; }
+  .profile-page-hero-compact .profile-page-hero-actions {
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 4px;
+    min-width: 0;
+    margin: 0;
+    border-top: 1px solid var(--soco-line);
+  }
+  .profile-page-hero-compact .profile-page-overview-email {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
   .modern-shell .profile-view:not(.personal-timeline-view) > .profile-edit-card {
     width: calc(100% - 24px);
     margin-inline: auto;

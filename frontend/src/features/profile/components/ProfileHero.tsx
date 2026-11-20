@@ -14,9 +14,10 @@ type Props = {
   avatar: ReactNode
   actions?: ReactNode
   identityNotice?: ReactNode
+  compact?: boolean
 }
 
-export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice }: Props) {
+export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice, compact = false }: Props) {
   const [failedCover, setFailedCover] = useState<string>()
   const showCover = coverUrl && coverUrl !== failedCover
   const coverClass = showCover ? 'has-user-cover' : fallbackCoverTone === undefined ? 'has-default-cover' : `has-account-cover avatar-tone-${fallbackCoverTone}`
@@ -26,7 +27,7 @@ export default function ProfileHero({ displayName, username, city, workplace, sc
     { id: 'school', text: school?.trim(), label: 'Trường học', Icon: GraduationCap },
   ].filter(detail => detail.text)
   return (
-    <section className="profile-page-hero">
+    <section className={compact ? 'profile-page-hero profile-page-hero-compact' : 'profile-page-hero'}>
       <div className={`profile-page-cover ${coverClass}`}>
         {showCover && <img src={coverUrl} alt="Ảnh bìa" draggable={false} onError={() => setFailedCover(coverUrl)} />}
         {coverAction}
@@ -35,9 +36,11 @@ export default function ProfileHero({ displayName, username, city, workplace, sc
         <div className="profile-page-avatar-wrap">{avatar}</div>
         <div className="profile-page-identity-text">
           <h1>{displayName}</h1>
-          <div className="profile-page-identity-meta">@{username}</div>
-          {friendCount !== undefined && friendCount > 0 &&
-            <p className="profile-page-friend-summary">{friendCount.toLocaleString('vi-VN')} người bạn</p>}
+          <div className="profile-page-identity-summary">
+            <div className="profile-page-identity-meta">@{username}</div>
+            {friendCount !== undefined && friendCount > 0 &&
+              <p className="profile-page-friend-summary">{friendCount.toLocaleString('vi-VN')} người bạn</p>}
+          </div>
           {details.length > 0 && <ul role="list" className="profile-page-identity-details">
             {details.map(({ id, text, label, Icon }) => <li key={id}>
               <Icon size={15} aria-hidden="true" />
