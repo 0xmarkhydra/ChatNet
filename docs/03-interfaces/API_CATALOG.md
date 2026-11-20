@@ -1,11 +1,11 @@
 ---
 document_id: API-CAT-001
 title: ChatNet HTTP API Catalog
-version: 1.1.0
+version: 1.2.0
 status: Draft
 owner: Backend Engineering
-baseline_commit: 40c1f1b35958ee22c1278986bf82ff57520137a1
-last_updated: 2026-11-19
+baseline_commit: 05a3caab51b55cc5393c8f47fee625fc1eaaa19d
+last_updated: 2026-11-21
 normative_basis: OpenAPI Specification 3.2.1; IETF RFC 9110
 ---
 
@@ -19,7 +19,7 @@ Tra method và path theo dịch vụ. Khai báo route không xác nhận quyền
 
 This catalog is derived from Go ServeMux registrations in the committed source baseline. It records route patterns and owning services; it is not a complete OpenAPI contract. Request schemas, response schemas, status-code matrices, authorization rules and examples still require handler-level extraction and validation.
 
-[OpenAPI 3.2.1](openapi.json) đặc tả chi tiết ba thao tác (health, SSE, tạo yêu cầu đơn Marketplace) và kiểm kê 177 thao tác còn lại của bảng này mà không có schema, mã trạng thái hay yêu cầu xác thực. Route trong bảng không đồng nghĩa đã xác nhận đầy đủ schema hay quyền. Xem [danh mục lỗi](ERROR_CATALOG.md).
+[OpenAPI 3.2.1](openapi.json) đặc tả 21 thao tác đã đối chiếu tới handler và kiểm kê 163 thao tác còn lại. Route gắn `route-inventory` chưa có schema, mã trạng thái hoặc yêu cầu xác thực đã đối chiếu. Route trong bảng không đồng nghĩa đã xác nhận đầy đủ schema hay quyền. Xem [danh mục lỗi](ERROR_CATALOG.md).
 
 ## 2. Public API routing
 
@@ -259,8 +259,6 @@ The translation-stream route upgrades to WebSocket in the handler; it is not an 
 
 ## 6. Feed service
 
-Phần này liệt kê route tại baseline `40c1f1b`. Bốn route đăng lại bài và thích bình luận của `3664430` được ghi riêng trong [bảng chênh lệch](../00-governance/BASELINE_AND_CHANGE_CONTROL.md#21-chênh-lệch-với-checkout-phát-triển).
-
 Source: backend/cmd/feed/main.go
 
 | Method | Path |
@@ -275,9 +273,13 @@ Source: backend/cmd/feed/main.go
 | POST | /api/posts/{id}/like |
 | POST | /api/posts/{id}/reactions |
 | GET | /api/posts/{id}/reactions |
+| POST | /api/posts/{id}/repost |
+| DELETE | /api/posts/{id}/repost |
 | POST | /api/posts/{id}/comments |
 | PATCH | /api/posts/{id}/comments/{commentId} |
 | DELETE | /api/posts/{id}/comments/{commentId} |
+| PUT | /api/posts/{id}/comments/{commentId}/like |
+| DELETE | /api/posts/{id}/comments/{commentId}/like |
 | GET | /api/feed/mentions |
 | POST | /api/feed/mentions/{id}/read |
 | POST | /api/feed/reports |
@@ -325,16 +327,17 @@ The Gateway path map is not the complete security policy. Service handlers and m
 
 ## 10. Contract gaps
 
-- OpenAPI mới là kiểm kê route cho 177 trong 180 thao tác `/api/*`. Chưa có mô tả hợp đồng đầy đủ.
+- OpenAPI mô tả đầy đủ route cho 184 thao tác `/api/*`; 21 thao tác đã đối chiếu handler, 163 thao tác còn ở trạng thái `route-inventory`.
 - Request and response schemas are not fully captured in this catalog.
 - Error response schemas and status-code guarantees need handler-level verification.
 - Pagination, idempotency, rate limits and authorization requirements vary by route.
 - Realtime event payloads need a versioned schema.
-- The route list MUST be regenerated or reviewed when service registrations change.
+- The route list MUST be regenerated or reviewed when service registrations change. Run `node scripts/check-api-contract.mjs` in CI.
 
 See [Contract governance](CONTRACT_GOVERNANCE.md) before generating a machine-readable contract.
 
 ## Lịch sử thay đổi
 
+- 1.2.0 (2026-11-21) — Đối chiếu 21 thao tác rủi ro cao; đồng bộ 184 route với source; thêm kiểm tra route-to-spec cho CI.
 - 1.1.0 (2026-11-19) — Cập nhật trạng thái OpenAPI sang bản kiểm kê route.
 - 1.0.0 (2026-11-19) — Chuẩn hóa nội dung và đối chiếu baseline.
