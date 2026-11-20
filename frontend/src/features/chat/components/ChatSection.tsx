@@ -1036,6 +1036,8 @@ export default function ChatSection({
                 activeConversation={activeConversation}
                 activeConversationId={activeConversationId}
                 addChatFiles={addChatFiles}
+                apiFetch={apiFetch}
+                canSchedule={activeConversation.type !== 'direct' || mlsPilotMode === 'legacy'}
                 canSend={canSend}
                 chatFileInputRef={chatFileInputRef}
                 groupChannels={groupChannels}

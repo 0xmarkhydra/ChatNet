@@ -1,5 +1,7 @@
 import { Images } from "lucide-react";
 import ChatComposerPlusMenu from "./ChatComposerPlusMenu";
+import ScheduledMessageQueue from "./ScheduledMessageQueue";
+import type { ApiRequest } from "@/shared/types/api";
 import UiIcon from "../../../shared/ui/UiIcon";
 import { userLabel } from "../../../shared/utils/userLabel";
 import { attachmentLabel } from "../../../shared/utils/format";
@@ -15,9 +17,9 @@ import type { RefObject } from "react";
 
 const CHAT_ATTACHMENT_ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip';
 
-type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "groupChannels" | "isProfileDesktop" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo" | "t">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[]; chatFileInputRef: RefObject<HTMLInputElement | null> };
+type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "groupChannels" | "isProfileDesktop" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo" | "t">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[]; chatFileInputRef: RefObject<HTMLInputElement | null>; apiFetch: ApiRequest; canSchedule: boolean };
 
-export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, canSend, chatFileInputRef, groupChannels, isProfileDesktop, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, t, groupMembers }: Props) {
+export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, apiFetch, canSchedule, canSend, chatFileInputRef, groupChannels, isProfileDesktop, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, t, groupMembers }: Props) {
   function openAttachmentPicker(mediaOnly: boolean) {
     const input = chatFileInputRef.current;
     if (!input) return;
@@ -97,6 +99,13 @@ export default function MessageComposer({ activeConversation, activeConversation
                         onCreate={setGroupActivityCreateKind}
                       />
                     )}
+                    {canSchedule && <ScheduledMessageQueue
+                      key={session.sessionId}
+                      request={apiFetch}
+                      conversationId={activeConversation.id}
+                      channelId={selectedChannelId}
+                      initialText={!messageAttachments.length && !replyingTo ? messageText : ""}
+                    />}
                     <ChatMentionInput
                       key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
                       conversationId={activeConversation.id}
