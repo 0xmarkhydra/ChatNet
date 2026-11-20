@@ -240,7 +240,6 @@ import {
 const ProfileQr = lazy(() => import("../features/profile/components/ProfileQr"));
 import {
   defaultBundle,
-  loadAppLocalePreference,
   loadCachedBundle,
   resolveEffectiveLocale,
   saveAppLocalePreference,
@@ -427,6 +426,7 @@ export default function AuthedApp({
   const [messageCopyTarget, setMessageCopyTarget] =
     useState<MessageCopyTarget | null>(null);
   const { beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress, cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress, openMessageActions, openMessageReactions, suppressConversationClick, suppressMessageClick } = useMessageLongPress({ setConversationActionId, setConversationMenuPosition, setMessageActionId, setMessageActionMode, setMessageCopyTarget });
+  const latestCancelMessageLongPress = useLatest(cancelMessageLongPress);
 
   // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
   const [messageDrafts, setMessageDrafts] = useState<
@@ -516,6 +516,7 @@ export default function AuthedApp({
     setChatOutbox(next);
     return next;
   }
+  const latestUpdateChatOutbox = useLatest(updateChatOutbox);
   useEffect(() => {
     const nextSessionId = session?.sessionId ?? "";
     if (nextSessionId === chatOutboxSession.current) return;
@@ -526,7 +527,7 @@ export default function AuthedApp({
     sendingClientIDs.current = new Set<string>();
     actionLocks.current = new Set<string>();
     retryOutboxBusy.current = false;
-  }, [session?.sessionId]);
+  }, [session?.sessionId, session?.user.id]);
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
   function openVisitor(username: string, returnTo?: string) {
@@ -541,6 +542,7 @@ export default function AuthedApp({
     if (friend) openVisitor(friend.username);
     else if (visitorUsername) closeVisitor();
   }
+  const latestOpenVisitor = useLatest(openVisitor);
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
   const [desktopSectionState, setDesktopSection] = useState<
     "groups" | "calls" | null
@@ -565,7 +567,7 @@ export default function AuthedApp({
       setProfileComposerOpen(false);
       setProfileEditorOpen(false);
     }
-  }, [tab, profileTimelineOpen, desktopProfileOverview]);
+  }, [tab, profileTimelineOpen, desktopProfileOverview, setProfileComposerOpen, setProfileEditorOpen]);
   useEffect(() => {
     if (
       (!profileTimelineOpen && !desktopProfileOverview) ||
@@ -573,10 +575,11 @@ export default function AuthedApp({
       !session?.sessionId
     )
       return;
-    void loadProfilePosts();
+    void latestLoadProfilePosts.current();
     profileHeadingRef.current?.focus();
+    const loadSequence = profileLoadSequence;
     return () => {
-      ++profileLoadSequence.current;
+      ++loadSequence.current;
       profilePagingBusy.current = false;
     };
   }, [
@@ -585,6 +588,10 @@ export default function AuthedApp({
     tab,
     session?.sessionId,
     session?.user.username,
+    latestLoadProfilePosts,
+    profileHeadingRef,
+    profileLoadSequence,
+    profilePagingBusy,
   ]);
   const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
   const { mentions: postMentions, readPostMention, isCurrentVisit: isCurrentMentionVisit } = usePostMentions({
@@ -593,18 +600,19 @@ export default function AuthedApp({
     apiFetch,
     onReadError: message => setNotice(message, "error"),
   });
+  const normalizedFeedSearch = globalSearch.trim().toLocaleLowerCase("vi-VN");
   useLayoutEffect(() => {
     if (tab !== "feed") return;
     if (feedViewRef.current) feedViewRef.current.scrollTop = 0;
     setSearchHasScrolled(false);
-  }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN"), feedFilter]);
+  }, [tab, normalizedFeedSearch, feedFilter, feedViewRef, setSearchHasScrolled]);
   // Router location is authoritative for browser Back/Forward on post URLs.
   useEffect(() => {
     if (tab !== "feed") return;
     const routeId = feedPostIdFromPath(routeLocation.pathname);
     const id = routeId ?? Number(new URLSearchParams(routeLocation.search).get("post"));
     setActivePostId(Number.isSafeInteger(id) && id > 0 ? id : null);
-  }, [tab, routeLocation.pathname, routeLocation.search]);
+  }, [tab, routeLocation.pathname, routeLocation.search, setActivePostId]);
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -619,8 +627,7 @@ export default function AuthedApp({
     setConversationTranslationOverrides(
       session?.user.id ? readConversationTranslationSettings(session.user.id) : {},
     );
-    setTranslationSettingsConversationId(null);
-  }, [session?.user.id]);
+  }, [session?.user.id, setConversationTranslationOverrides]);
   const activeChatTranslationSettings = activeConversationId === null
     ? undefined : conversationTranslationOverrides[activeConversationId];
   const effectiveAutoTranslate = activeChatTranslationSettings?.enabled ?? autoTranslate;
@@ -667,8 +674,9 @@ export default function AuthedApp({
   }, [messageSoundEnabledRef]);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushInitFailed, setPushInitFailed] = useState(false);
-  const [pushPrompt, setPushPrompt] = useState(false);
-  const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
+  const pushStateScope = `${session?.sessionId ?? ""}:${session?.token ?? ""}`;
+  const [pushPrompt, setPushPrompt] = useScopedState(pushStateScope, false);
+  const [pushPromptDismissed, setPushPromptDismissed] = useScopedState(pushStateScope, false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const postComposerRef = useRef<HTMLTextAreaElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
@@ -796,6 +804,7 @@ export default function AuthedApp({
     setStatus,
     setNotice,
   });
+  const latestRefreshFriendConnections = useLatest(refreshFriendConnections);
 
   const {
     feedRevision,
@@ -1151,7 +1160,16 @@ export default function AuthedApp({
       window.removeEventListener('chatnet:group-channel-event', onChannelEvent);
       window.removeEventListener('chatnet:channel-read', onChannelRead);
     };
-  }, [activeConversation?.id, activeConversation?.type, session?.token]);
+  }, [
+    activeConversation?.id,
+    activeConversation?.type,
+    session?.token,
+    apiFetch,
+    setChannelSelection,
+    setConversations,
+    setGroupChannelState,
+    setNotice,
+  ]);
   const conversationBlocked = Boolean(activeConversation?.type === 'direct' &&
     (activeConversation.blockedByMe || activeConversation.blockedByOther));
   const groupActivities = useGroupActivities(activeConversation?.type === 'group' ? activeConversation.id : null, session?.sessionId, apiFetch);
@@ -1251,6 +1269,7 @@ export default function AuthedApp({
 
   const { removeFeedPost, syncFeedPost } = usePostSync({ feedRevisionRef: feedRevision, followingFeed, postSearch, removeFeedDataPost, setProfilePosts, syncFeedDataPost });
   const { loadProfilePosts } = useProfilePosts({ feedRevisionRef: feedRevision, profileLoadSequenceRef: profileLoadSequence, profilePagingBusyRef: profilePagingBusy, profilePosts, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError });
+  const latestLoadProfilePosts = useLatest(loadProfilePosts);
   const { createPost, draftBeforeEdit, editingPost, openEditPost, postAttachments, postBackground, postEditBusy, postFeelingId, postTaggedFriends, postText, postVisibility, restoreDraftAfterEdit, setEditingPost, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostTaggedFriends, setPostText, setPostVisibility, setShowPostBackgrounds, showPostBackgrounds } = usePostComposer({ actionLocks, feedCheckInLocation, feedCheckInOpen, feedRevisionRef: feedRevision, friends, mediaUploading, name, pendingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setPendingPost, setPosts, setPostSubmitError, setProfileComposerOpen, setProfilePosts, syncFeedPost, tab });
   const { like } = usePostReactions({ actionLocks, feedRevisionRef: feedRevision, followingFeed, postSearch, refreshPosts, setLikePreviews, setPosts, setProfilePosts, setSavedPosts });
   const { addComment, manageFeedComment, reportFeedComment, setCommentLike } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
@@ -1262,12 +1281,14 @@ export default function AuthedApp({
   const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
 
   const { changeAppLocale, changeAutoTranslate, changeTargetLanguage, saveConversationTranslationSettings, translateMessage } = useTranslationActions({ activeChatTranslationSettings, activeConversationId, activeConversationIdRef, apiFetch, appLocale, autoTranslate, conversationTranslationOverrides, effectiveTargetLanguage, preferenceRevision, advancePreferenceRevision, session, sessionRef, setAppLocale, setAutoTranslate, setConversationTranslationOverrides, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setManuallyTranslated, setNotice, setTargetLanguage, setTranslationFailures, setTranslationMenuOpen, setTranslationOriginals, setTranslationPending, setTranslationPickerOpen, setTranslations, setTranslationSettingsSearch, targetLanguage, translationAttempted, translationFailures, translationLanguageRef, translations });
+  const latestTranslateMessage = useLatest(translateMessage);
 
   const { addChatFiles, addFeedFiles, setMessageAttachments, uploadMediaFiles } = useMediaUploads({ activeConversationId, apiFetch, channelDraftKey, mediaUploadAbort, mediaUploading, messageAttachments, messageSending, pendingPost, postAttachments, selectedChannelId, session, sessionRef, setChannelDrafts, setMediaUploading, setMediaUploadProgress, setMessageDrafts, setNotice, setPostAttachments });
 
   const { copyMessageContent } = useMessageClipboard({ setMessageActionId, setNotice });
 
   const { installApp, previewMessageSound, sendTestPush, syncPushState, toggleMessageSound, togglePush } = usePushSettings({ apiFetch, installPrompt, isStandalone, messageSound, messageSoundEnabledRef, pushAppId, pushBusy, pushConfigured, pushEnabled, pushInitFailed, session, setInstallPrompt, setMessageSoundEnabled, setNotice, setPushBusy, setPushEnabled, setPushInitFailed, setPushPrompt });
+  const latestSyncPushState = useLatest(syncPushState);
 
   const { findNearby, stopNearby } = useNearbyDiscovery({ apiFetch, nearbyBusy, nearbyRadiusKm, nearbyRequest, session, sessionRef, setNearbyBusy, setNearbyResultRadiusKm, setNearbyScanning, setNearbyUntil, setNearbyUsers, setNotice });
 
@@ -1279,14 +1300,14 @@ export default function AuthedApp({
     navigate(target.to, { replace: true, state: routeLocation.state });
     if (target.username.toLocaleLowerCase("vi-VN") !==
         session.user.username.toLocaleLowerCase("vi-VN")) {
-      openVisitor(target.username, returnTo);
+      latestOpenVisitor.current(target.username, returnTo);
     }
-  }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, navigate]);
+  }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, routeLocation, navigate, session?.user.username, latestOpenVisitor]);
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
     messageScrollAtBottom.current = true;
-    cancelMessageLongPress();
+    latestCancelMessageLongPress.current();
     // useMessageData owns room-specific clearing and its recently-visited
     // cache. A second reset here caused an unnecessary blank render between
     // PWA conversation selections.
@@ -1294,7 +1315,14 @@ export default function AuthedApp({
     setMessagesLoadingMore(false);
     messagesPagingBusy.current = false;
     setGroupMembers([]);
-  }, [activeConversationId]);
+  }, [
+    activeConversationId,
+    latestCancelMessageLongPress,
+    messagesPagingBusy,
+    setGroupMembers,
+    setHasMoreMessages,
+    setMessagesLoadingMore,
+  ]);
 
   useEffect(() => {
     messageScrollAtBottom.current = true;
@@ -1335,6 +1363,7 @@ export default function AuthedApp({
     setProfileBioDraft(profile.bio ?? "");
     setProfileCityDraft(profile.city ?? "");
   }
+  const latestLoadProfileMedia = useLatest(loadProfileMedia);
 
   async function saveProfileIdentity(event: FormEvent) {
     event.preventDefault();
@@ -1466,15 +1495,11 @@ export default function AuthedApp({
       setProfileMedia(null);
       return;
     }
-    void loadProfileMedia().catch(() => setStatus("Đang kết nối lại..."));
-  }, [session?.sessionId]);
+    void latestLoadProfileMedia.current().catch(() => setStatus("Đang kết nối lại..."));
+  }, [session?.sessionId, session?.token, latestLoadProfileMedia, setProfileMedia]);
 
   useEffect(() => {
     if (!session?.token) {
-      setTranslationPreferencesLoaded(false);
-      setAutoTranslate(true);
-      setTargetLanguage("en");
-      setAppLocale(loadAppLocalePreference());
       return;
     }
 
@@ -1581,7 +1606,15 @@ export default function AuthedApp({
     return () => {
       cancelled = true;
     };
-  }, [session?.sessionId]);
+  }, [
+    session?.sessionId,
+    session?.token,
+    session?.user.id,
+    apiFetch,
+    setAppLocale,
+    setAutoTranslate,
+    setTargetLanguage,
+  ]);
 
   useEffect(() => {
     document.documentElement.lang = effectiveAppLocale;
@@ -1639,7 +1672,15 @@ export default function AuthedApp({
     return () => {
       cancelled = true;
     };
-  }, [effectiveAppLocale, session?.token]);
+  }, [
+    effectiveAppLocale,
+    session?.token,
+    session?.sessionId,
+    apiFetch,
+    sessionRef,
+    setUiBundle,
+    setUiLocaleLoading,
+  ]);
 
   useEffect(() => {
     if (!session?.token) return;
@@ -1664,16 +1705,10 @@ export default function AuthedApp({
       navigate(target.to, { replace: true, state: routeLocation.state });
     };
     openNotificationTarget();
-  }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, navigate]);
+  }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, routeLocation, navigate]);
 
   useEffect(() => {
-    setPushPrompt(false);
-    setPushPromptDismissed(false);
     if (!session?.token) {
-      setPushConfigured(false);
-      setPushAppId("");
-      setPushEnabled(false);
-      setPushInitFailed(false);
       return;
     }
 
@@ -1710,7 +1745,7 @@ export default function AuthedApp({
                   nextState.permission === "default" &&
                   !isPushDisabled(),
               );
-              await syncPushState(nextState);
+              await latestSyncPushState.current(nextState);
             },
           );
 
@@ -1721,7 +1756,7 @@ export default function AuthedApp({
                 state.permission === "default" &&
                 !isPushDisabled(),
             );
-            await syncPushState(state);
+            await latestSyncPushState.current(state);
           }
         } catch (error) {
           if (!cancelled) {
@@ -1740,7 +1775,13 @@ export default function AuthedApp({
     return () => {
       cancelled = true;
     };
-  }, [session?.sessionId]);
+  }, [
+    session?.sessionId,
+    session?.token,
+    apiFetch,
+    latestSyncPushState,
+    setPushPrompt,
+  ]);
 
   async function changePrivacy(key: keyof UserPrivacy) {
     if (!privacy || privacyBusy) return;
@@ -1800,11 +1841,27 @@ export default function AuthedApp({
       (tab === "chat" && desktopSection === "calls") ||
       newChatMode === "friends" ||
       newChatMode === "group" ||
-      chatFriend
+      Boolean(chatFriend?.id)
     ) {
-      void refreshFriendConnections();
+      void latestRefreshFriendConnections.current();
     }
-  }, [session?.token, tab, desktopSection, newChatMode, chatFriend?.id]);
+  }, [
+    session?.token,
+    tab,
+    desktopSection,
+    newChatMode,
+    chatFriend?.id,
+    latestRefreshFriendConnections,
+    setFriends,
+    setFriendRequests,
+    setContactMetadata,
+    setFriendSyncSessionId,
+    setFriendSyncError,
+    setBlockedUsers,
+    setBlockedOpen,
+    setBlockedError,
+    friendSyncRequest,
+  ]);
 
   const friendSearchSessionRef = useRef(session?.sessionId);
   useEffect(() => {
@@ -1874,7 +1931,19 @@ export default function AuthedApp({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, session?.sessionId, tab, desktopSection]);
+  }, [
+    friendQuery,
+    friendSearchRetry,
+    newChatMode,
+    session?.token,
+    session?.sessionId,
+    tab,
+    desktopSection,
+    apiFetch,
+    setFriendResults,
+    setFriendSearching,
+    setFriendSearchError,
+  ]);
 
   function purgeConversation(id: number) {
     responseCache.current.invalidate(["conversations", "messages"]);
@@ -2146,13 +2215,19 @@ export default function AuthedApp({
     // when the reader was already near the bottom of the conversation.
     if (container && messageScrollAtBottom.current)
       container.scrollTop = container.scrollHeight;
-  }, [messages, outgoingMessage, chatOutbox]);
+  }, [
+    messages,
+    outgoingMessage,
+    chatOutbox,
+    pendingMessageScrollRestore,
+    activeConversationId,
+  ]);
 
   useEffect(() => {
     if (
       !translationPreferencesLoaded ||
       !effectiveAutoTranslate ||
-      !session ||
+      !session?.sessionId ||
       !activeConversationId
     )
       return;
@@ -2164,7 +2239,7 @@ export default function AuthedApp({
         !translations[message.id] &&
         !translationAttempted.current.has(`${session.sessionId}:${effectiveTargetLanguage}:${message.id}:${message.editedAt ?? ""}`),
     );
-    missing.forEach((message) => void translateMessage(message, false));
+    missing.forEach((message) => void latestTranslateMessage.current(message, false));
   }, [
     effectiveAutoTranslate,
     translationPreferencesLoaded,
@@ -2173,6 +2248,9 @@ export default function AuthedApp({
     session?.user.id,
     session?.sessionId,
     activeConversationId,
+    latestTranslateMessage,
+    translationAttempted,
+    translations,
   ]);
 
   const canSend = useMemo(
@@ -2208,7 +2286,7 @@ export default function AuthedApp({
   });
 
   useEffect(() => {
-    if (!session || !messages.length || !chatOutboxRef.current.length) return;
+    if (!session?.user.id || !messages.length || !chatOutboxRef.current.length) return;
     const delivered = new Set(
       messages
         .filter(
@@ -2218,7 +2296,7 @@ export default function AuthedApp({
         .map((message) => `${message.conversationId}:${message.clientId}`),
     );
     if (!delivered.size) return;
-    updateChatOutbox((items) => {
+    latestUpdateChatOutbox.current((items) => {
       if (
         !items.some((item) =>
           delivered.has(`${item.conversationId}:${item.clientId}`),
@@ -2229,7 +2307,7 @@ export default function AuthedApp({
         (item) => !delivered.has(`${item.conversationId}:${item.clientId}`),
       );
     });
-  }, [messages, session?.sessionId]);
+  }, [messages, session?.sessionId, session?.user.id, latestUpdateChatOutbox]);
 
 
   const unreadTotal = nativeNotifications.unreadCount ?? 0;
