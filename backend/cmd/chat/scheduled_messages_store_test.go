@@ -201,6 +201,42 @@ func TestScheduledMessageStoreIntegration(t *testing.T) {
 		t.Fatalf("new block must stop a pending job, got id=%d handled=%v err=%v", id, ok, err)
 	}
 	checkState(blocked.ID, "failed")
+
+	t.Run("deleted group channel cannot receive a scheduled message", func(t *testing.T) {
+		var group, channel int64
+		if err := db.QueryRow(ctx, "INSERT INTO conversations(type,created_by) VALUES('group',$1) RETURNING id", a).Scan(&group); err != nil {
+			t.Fatal(err)
+		}
+		mustExec("INSERT INTO conversation_members(conversation_id,user_id) VALUES($1,$2)", group, a)
+		if err := db.QueryRow(ctx, "INSERT INTO group_channels(conversation_id,name,created_by) VALUES($1,$2,$3) RETURNING id", group, "scheduled-test", a).Scan(&channel); err != nil {
+			t.Fatal(err)
+		}
+		queued, err := s.createScheduledMessage(ctx, group, a, scheduleMessageInput{
+			Text: "must not send to deleted channel", SendAt: when, ClientID: "deleted-channel", Channel: channel,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mustExec("UPDATE group_channels SET deleted_at=NOW() WHERE id=$1", channel)
+		if _, err := s.createScheduledMessage(ctx, group, a, scheduleMessageInput{
+			Text: "new schedule into deleted channel", SendAt: when, ClientID: "deleted-channel-new", Channel: channel,
+		}); !errors.Is(err, errScheduledForbidden) {
+			t.Fatalf("new schedules to deleted channels must be rejected: %v", err)
+		}
+		if _, err := s.rescheduleMessage(ctx, group, a, queued.ID, when.Add(time.Hour)); !errors.Is(err, errScheduledForbidden) {
+			t.Fatalf("rescheduling for a deleted channel must be rejected: %v", err)
+		}
+		makeDue(queued.ID)
+		id, _, handled, err := s.dispatchScheduledMessage(ctx)
+		if err != nil || id != 0 || !handled {
+			t.Fatalf("deleted channel must not receive a scheduled message: id=%d handled=%v err=%v", id, handled, err)
+		}
+		checkState(queued.ID, "failed")
+		var delivered int
+		if err := db.QueryRow(ctx, "SELECT count(*) FROM messages WHERE conversation_id=$1", group).Scan(&delivered); err != nil || delivered != 0 {
+			t.Fatalf("deleted channel received %d messages: %v", delivered, err)
+		}
+	})
 	var count int
 	if err := db.QueryRow(ctx, "SELECT count(*) FROM messages WHERE conversation_id=$1", room).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("expected one delivered message, got %d, %v", count, err)

@@ -58,7 +58,7 @@ func checkScheduledRoom(ctx context.Context, tx pgx.Tx, conversationID, userID, 
 	}
 	if channelID != 0 {
 		var found int64
-		err := tx.QueryRow(ctx, `SELECT id FROM group_channels WHERE id=$1 AND conversation_id=$2 FOR SHARE`,
+		err := tx.QueryRow(ctx, `SELECT id FROM group_channels WHERE id=$1 AND conversation_id=$2 AND deleted_at IS NULL FOR SHARE`,
 			channelID, conversationID).Scan(&found)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return errScheduledForbidden
