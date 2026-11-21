@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuthFlow } from "../../features/auth/hooks/useAuthFlow";
-import { createSessionClient, loadSession, type Session } from "../../features/auth/lib/session";
+import {
+  clearPersistedSession,
+  createSessionClient,
+  loadSession,
+  persistSession,
+  type Session,
+} from "../../features/auth/lib/session";
 import { clearChatPersistence } from "../../features/chat/lib/chatPersistence";
 import { clearChatOutbox } from "../../features/chat/lib/chatOutbox";
 import { desktopBridge, isDesktopBuild } from "../../platform/desktop";
@@ -33,9 +39,9 @@ export function useAppSession(initialSession?: Session | null) {
     if (isDesktopBuild) {
       if (next.refreshToken !== undefined)
         throw new Error("Desktop credential boundary violation");
-      localStorage.removeItem("chatnet-session");
+      clearPersistedSession();
     } else {
-      localStorage.setItem("chatnet-session", JSON.stringify(next));
+      persistSession(next);
     }
     sessionEpoch.current += 1;
     sessionRef.current = next;
@@ -92,7 +98,7 @@ export function useAppSession(initialSession?: Session | null) {
       clearChatPersistence(current.user.id);
       clearChatOutbox(current.user.id);
     }
-    if (clearStorage) localStorage.removeItem("chatnet-session");
+    if (clearStorage) clearPersistedSession();
     sessionRef.current = null;
     auth.resetRegistration();
     auth.setAuthMode("login");
@@ -112,8 +118,11 @@ export function useAppSession(initialSession?: Session | null) {
     }
     const sync = (event: StorageEvent) => {
       if (event.key !== "chatnet-session" && event.key !== null) return;
-      const next = loadSession();
       const previous = sessionRef.current;
+      const stored = loadSession();
+      const next = stored && previous?.sessionId === stored.sessionId && previous.user.id === stored.user.id
+        ? { ...stored, refreshToken: previous.refreshToken }
+        : stored;
       // A session identifier alone is not an account boundary: storage can
       // change to a different user while retaining the same session ID.
       if (previous?.sessionId !== next?.sessionId || previous?.user.id !== next?.user.id)
