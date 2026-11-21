@@ -212,3 +212,64 @@
     grid-row: 2;
   }
 }
+
+/* The demo composer groups secondary actions in +, while main retains the
+   approved 44px call and send controls. */
+@media (min-width: 761px) {
+  .chat-composer-plus-popover > .chat-composer-mobile-option {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel > .media-composer.compact-chat-composer {
+    gap: 4px;
+    padding: 6px 8px;
+    min-height: 58px;
+    align-items: center;
+    background: var(--soco-surface);
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel > .media-composer.compact-chat-composer
+  > button:is(.chat-composer-image, .group-activity-composer-trigger) {
+    display: none;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel > .media-composer.compact-chat-composer
+  > button:is(.chat-plus-trigger, .voice-record-trigger, .send-button) {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel > .media-composer.compact-chat-composer
+  > button:is(.chat-plus-trigger, .voice-record-trigger) {
+    border: 0;
+    background: transparent;
+    color: var(--soco-blue);
+  }
+
+  .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
+  > .conversation-panel > .media-composer.compact-chat-composer
+  > button:is(.chat-plus-trigger, .voice-record-trigger):is(:hover, :focus-visible, [aria-expanded="true"]) {
+    background: var(--soco-soft-blue);
+  }
+
+  .social-chat-layout .compact-chat-composer > .chat-mention-input {
+    min-width: 0;
+    border-radius: var(--soco-radius-md);
+    background: var(--soco-canvas);
+  }
+  .social-chat-layout .compact-chat-composer .chat-mention-editor > :is(.chat-message-input, .chat-mention-highlight) {
+    padding-inline: 10px;
+  }
+  .social-chat-layout .compact-chat-composer > .voice-recorder {
+    flex: 1 0 100%;
+  }
+}

@@ -1,3 +1,4 @@
+import type { ApiRequest } from "@/shared/types/api";
 import StoryViewer from "./StoryViewer";
 import { type Story } from "../types";
 import { type SetStateAction } from "react";
@@ -5,6 +6,7 @@ import type { Dispatch } from "react";
 
 export type StoryOverlayProps = {
   activeStory: Story;
+  request: ApiRequest;
   deleteStory: (story: Story) => Promise<void>;
   name: string;
   openVisitor: (username: string) => void;
@@ -18,6 +20,7 @@ export type StoryOverlayProps = {
 
 export default function StoryOverlay({
   activeStory,
+  request,
   deleteStory,
   name,
   openVisitor,
@@ -31,6 +34,7 @@ export default function StoryOverlay({
   return (
       <StoryViewer
             activeStory={activeStory}
+            request={request}
             stories={stories}
             name={name}
             storyBusy={storyBusy}

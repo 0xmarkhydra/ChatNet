@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, MessageCircle, UserPlus, UserMinus, UserCheck, MapPin } from 'lucide-react'
+import { ChevronDown, MessageCircle, UserPlus, UserMinus, UserCheck } from 'lucide-react'
 import UserAvatar, { profileAssetUrl } from '../../../shared/ui/UserAvatar'
 import { userLabel } from '../../../shared/utils/userLabel'
 import type { FriendSearchResult } from '../../contacts'
 import ProfileNote from './ProfileNote'
+import ProfileHero from './ProfileHero'
 
 export type VisitorProfileData = FriendSearchResult & {
   avatarSet: boolean
@@ -12,10 +13,14 @@ export type VisitorProfileData = FriendSearchResult & {
   allowFriendRequests: boolean
   bio?: string
   city?: string
+  workplace?: string
+  school?: string
+  friendCount?: number
 }
 
 type Props = {
   profile: VisitorProfileData
+  online?: boolean
   relation: string
   friendBusy: number | null
   action: string
@@ -23,14 +28,10 @@ type Props = {
   onMessage: (username: string) => Promise<void>
   onFriendAction: () => void
   onRemoveFriendAction: () => void
-  tabs: { id: string; label: string }[]
-  activeTab: string
-  onTabChange: (tab: string) => void
 }
 
 export default function VisitorProfileHero({
-  profile, relation, friendBusy, action, request, onMessage, onFriendAction, onRemoveFriendAction,
-  tabs, activeTab, onTabChange,
+  profile, online = false, relation, friendBusy, action, request, onMessage, onFriendAction, onRemoveFriendAction,
 }: Props) {
   const [menuForUserId, setMenuForUserId] = useState<number | null>(null)
   const friendMenuOpen = relation === 'accepted' && menuForUserId === profile.id
@@ -46,27 +47,17 @@ export default function VisitorProfileHero({
     return () => document.removeEventListener('pointerdown', closeOnOutside)
   }, [friendMenuOpen])
 
-  return (
-    <section className="visitor-hero">
-      <div className="visitor-cover">
-        <div className="visitor-cover-art" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div>
-        {profile.coverSet && <img src={profileAssetUrl(profile.username, 'cover', profile.updatedAt)} alt="Ảnh bìa" onError={event => { event.currentTarget.hidden = true }} />}
-        <span>Khoảnh khắc và những câu chuyện</span>
-      </div>
-      <div className="visitor-identity">
-        <div className="visitor-avatar-wrap">
-          <div className="profile-note-avatar">
-            <UserAvatar username={profile.username} name={userLabel(profile.displayName, profile.username)} className="profile-avatar" />
-            <ProfileNote username={profile.username} request={request} refreshKey={relation} />
-          </div>
-        </div>
-        <div className="visitor-person">
-          <h1>{userLabel(profile.displayName, profile.username)}</h1>
-          <p className="visitor-handle">@{profile.username}{profile.city && <span className="visitor-city"> · <MapPin size={14} aria-hidden="true" />{profile.city}</span>}</p>
-          {profile.bio && <p className="visitor-profile-bio">{profile.bio}</p>}
-          {!profile.allowFriendRequests && relation === 'none' && <small>Tài khoản này đang tắt nhận lời mời kết bạn.</small>}
-        </div>
-        <div className="visitor-actions">
+  const displayName = userLabel(profile.displayName, profile.username)
+  return <ProfileHero displayName={displayName} username={profile.username} city={profile.city}
+    workplace={profile.workplace} school={profile.school} friendCount={profile.friendCount}
+    coverUrl={profile.coverSet ? profileAssetUrl(profile.username, 'cover', profile.updatedAt) : undefined}
+    avatar={<>
+      <UserAvatar username={profile.username} name={displayName} className="profile-page-avatar profile-hero-avatar" online={online} />
+      {online && <span className="sr-only">Đang hoạt động</span>}
+      <ProfileNote username={profile.username} request={request} refreshKey={relation} />
+    </>}
+    identityNotice={!profile.allowFriendRequests && relation === 'none' && <small className="profile-page-hint">Tài khoản này đang tắt nhận lời mời kết bạn.</small>}
+    actions={<>
           {relation === 'accepted' ? (
             <div className="visitor-friend-menu" ref={friendMenuRef}
               onBlur={event => {
@@ -79,7 +70,7 @@ export default function VisitorProfileHero({
                 setMenuForUserId(null)
                 friendMenuTrigger.current?.focus()
               }}>
-              <button ref={friendMenuTrigger} type="button" className="visitor-primary"
+              <button ref={friendMenuTrigger} type="button" className="profile-page-secondary"
                 aria-haspopup="menu" aria-expanded={friendMenuOpen} disabled={friendBusy === profile.id}
                 onClick={() => setMenuForUserId(current => current === profile.id ? null : profile.id)}>
                 <UserCheck size={18} aria-hidden="true" />Bạn bè<ChevronDown size={16} aria-hidden="true" />
@@ -94,22 +85,15 @@ export default function VisitorProfileHero({
               )}
             </div>
           ) : (
-            <button type="button" className={'visitor-primary' + (relation === 'outgoing' ? ' is-outgoing' : '')}
+            <button type="button" className={relation === 'outgoing' ? 'profile-page-secondary' : 'profile-page-primary'}
               disabled={friendBusy === profile.id || (!profile.allowFriendRequests && relation === 'none')}
               onClick={onFriendAction}>
               {relation === 'outgoing' ? <UserMinus size={18} aria-hidden="true" /> : relation === 'incoming' ? <UserCheck size={18} aria-hidden="true" /> : <UserPlus size={18} aria-hidden="true" />}
               {action}
             </button>
           )}
-          <button type="button" className="visitor-message" onClick={() => void onMessage(profile.username)}>
+          <button type="button" className={relation === 'accepted' || relation === 'outgoing' ? 'profile-page-primary' : 'profile-page-secondary'} onClick={() => void onMessage(profile.username)}>
             <MessageCircle size={18} aria-hidden="true" />Nhắn tin
           </button>
-        </div>
-      </div>
-      <nav className="visitor-tabs" aria-label="Nội dung hồ sơ">
-        {tabs.map(tab => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? 'page' : undefined}
-          onClick={() => onTabChange(tab.id)}>{tab.label}</button>)}
-      </nav>
-    </section>
-  )
+    </>} />
 }

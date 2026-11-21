@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { AtSign, Image as ImageIcon, LockKeyhole, MapPin, PencilLine, ShieldCheck, Users, Video } from 'lucide-react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Image as ImageIcon, Video } from 'lucide-react'
 import type { FriendConnection } from '../../contacts'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import type { ProfileMediaItem } from './ProfileMediaGallery'
+import ProfileDetailsCard from './ProfileDetailsCard'
 
 type Props = {
   username: string
@@ -11,6 +12,7 @@ type Props = {
   city?: string
   friends: FriendConnection[]
   media: ProfileMediaItem[]
+  highlights?: ReactNode
   onEditProfile: () => void
   onShowMedia: () => void
   onShowFriends: () => void
@@ -18,7 +20,7 @@ type Props = {
   onOpenPost: (postId: number) => void
 }
 
-export default function ProfileSidebar({ username, email, bio, city, friends, media, onEditProfile, onShowMedia, onShowFriends, onViewFriend, onOpenPost }: Props) {
+export default function ProfileSidebar({ username, email, bio, city, friends, media, highlights, onEditProfile, onShowMedia, onShowFriends, onViewFriend, onOpenPost }: Props) {
   const aside = useRef<HTMLElement>(null)
   const [stickyTop, setStickyTop] = useState(16)
   useEffect(() => {
@@ -34,15 +36,9 @@ export default function ProfileSidebar({ username, email, bio, city, friends, me
   }, [])
   return (
         <aside ref={aside} className="profile-page-aside" style={{ '--profile-aside-top': `${stickyTop}px` } as CSSProperties} aria-label="Thông tin, ảnh và bạn bè">
-          <section className="profile-page-about">
-            <h2>Giới thiệu</h2>
-            {bio && <p className="profile-page-about-description">{bio}</p>}
-            <button type="button" className="profile-page-aside-action" onClick={onEditProfile}><PencilLine size={17} aria-hidden="true" />Chỉnh sửa thông tin</button>
-            {city && <div className="profile-page-about-row"><MapPin size={20} aria-hidden="true" /><span>Sống tại <strong>{city}</strong></span></div>}
-            <div className="profile-page-about-row"><AtSign size={20} aria-hidden="true" /><span>Tài khoản <strong>@{username}</strong></span></div>
-            <div className="profile-page-about-row"><Users size={20} aria-hidden="true" /><span>Có <strong>{friends.length.toLocaleString('vi-VN')}</strong> bạn bè</span></div>
-            {email && <div className="profile-page-about-row"><LockKeyhole size={20} aria-hidden="true" /><span>Email chỉ hiển thị với bạn</span></div>}
-          </section>
+          <ProfileDetailsCard username={username} bio={bio} city={city} friendCount={friends.length}
+            hasPrivateEmail={Boolean(email)} onEdit={onEditProfile} />
+          {highlights}
           <section className="profile-page-recent">
             <div className="profile-page-recent-heading"><h2>Ảnh</h2>
               <button type="button" onClick={onShowMedia}>Xem tất cả ảnh</button>
@@ -76,7 +72,6 @@ export default function ProfileSidebar({ username, email, bio, city, friends, me
               </div>
             </section>
           )}
-          <div className="profile-page-privacy-note"><ShieldCheck size={18} aria-hidden="true" /><span>Thông tin hiển thị tuân theo cài đặt quyền riêng tư của tài khoản.</span></div>
         </aside>
   )
 }

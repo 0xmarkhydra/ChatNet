@@ -170,7 +170,6 @@ import {
   type DiscussionDraft,
 } from "../features/feed/components/FeedDiscussion";
 import FeedModeration from "../features/feed/components/FeedModeration";
-import ProfileOverlay from "../features/profile/components/ProfileOverlay";
 import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
@@ -364,7 +363,7 @@ export default function AuthedApp({
   const screenshot = useDesktopScreenshot(setNotice);
   const { chatCreateError, directUsername, groupCreateStep, groupWorkspaceMode, newChatMode, quickCreateOpen, setChatCreateError, setDirectUsername, setGroupCreateStep, setGroupWorkspaceMode, setNewChatMode, setQuickCreateOpen } = useGroupWorkspaceState({  });
 
-  const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({ sessionId: session?.sessionId ?? null });
+  const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profilePublicDetailsDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfilePublicDetailsDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({ sessionId: session?.sessionId ?? null });
 
   const { appLocale, languageSearch, localePickerOpen, localeSearch, setAppLocale, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setTranslationPickerOpen, setUiBundle, setUiLocaleLoading, translationPickerOpen, uiBundle, uiLocaleLoading } = useAppLocaleState({  });
 
@@ -537,11 +536,12 @@ export default function AuthedApp({
     apiFetch,
     onReadError: message => setNotice(message, "error"),
   });
+  // Only entering the feed or changing the search resets its scroll position.
   useLayoutEffect(() => {
     if (tab !== "feed") return;
     if (feedViewRef.current) feedViewRef.current.scrollTop = 0;
     setSearchHasScrolled(false);
-  }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN"), feedFilter]);
+  }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN")]);
   // Router location is authoritative for browser Back/Forward on post URLs.
   useEffect(() => {
     if (tab !== "feed") return;
@@ -722,11 +722,9 @@ export default function AuthedApp({
     savedPosts,
     setSavedPosts,
     hasMoreSavedPosts,
-    setHasMoreSavedPosts,
     savedPostsBusy,
     savedPostsLoaded,
-    setSavedPostsBusy,
-    savedPagingBusy,
+    resetSavedPosts,
     hasMorePosts,
     setHasMorePosts,
     postsLoadingMore,
@@ -784,7 +782,7 @@ export default function AuthedApp({
     : feedFilter === "following"
       ? followingFeed.loading
       : feedFilter === "saved"
-        ? (!savedPostsLoaded && !savedPagingError) || (savedPostsBusy && savedPosts.length === 0)
+        ? !savedPostsLoaded && !savedPagingError
         : false;
   const feedLoadingMore = feedSearchActive
     ? postSearch.loadingMore
@@ -801,12 +799,16 @@ export default function AuthedApp({
         ? Boolean(followingFeed.error)
         : postsPagingError;
   const savedPostsLoader = useLatest(loadSavedPosts);
-  // Deep links and Back/Forward to ?feed=saved must fetch without a prior click.
   useEffect(() => {
-    if (tab === "feed" && feedFilter === "saved" && session?.sessionId) {
+    if (tab !== "feed" || !session?.sessionId || feedSearchActive) return;
+    if (feedFilter === "saved") {
       void savedPostsLoader.current();
+      return;
     }
-  }, [tab, feedFilter, session?.sessionId, savedPostsLoader]);
+    // Warm the first saved page after giving the visible feed a head start.
+    const timer = window.setTimeout(() => void savedPostsLoader.current(), 350);
+    return () => window.clearTimeout(timer);
+  }, [tab, feedFilter, feedSearchActive, session?.sessionId, savedPostsLoader]);
   const feedInfiniteScrollRef = useFeedInfiniteScroll({
     enabled: tab === "feed" && (!feedSearchActive || searchHasScrolled),
     hasMore: feedSearchActive
@@ -1151,6 +1153,7 @@ export default function AuthedApp({
     setProfileUsernameDraft(profile.username);
     setProfileBioDraft(profile.bio ?? "");
     setProfileCityDraft(profile.city ?? "");
+    setProfilePublicDetailsDraft({ workplace: profile.workplace ?? "", school: profile.school ?? "" });
   }
 
   async function saveProfileIdentity(event: FormEvent) {
@@ -1161,6 +1164,8 @@ export default function AuthedApp({
     const username = profileUsernameDraft.trim().toLowerCase();
     const bio = profileBioDraft.trim();
     const city = profileCityDraft.trim();
+    const workplace = profilePublicDetailsDraft.workplace.trim();
+    const school = profilePublicDetailsDraft.school.trim();
     if (!displayName || !username) {
       setNotice("Tên hiển thị và username không được để trống.", "error");
       return;
@@ -1171,7 +1176,7 @@ export default function AuthedApp({
       const response = await apiFetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName, username, bio, city }),
+        body: JSON.stringify({ displayName, username, bio, city, workplace, school }),
       });
       const result = (await response.json().catch(() => null)) as
         | (ProfileUpdateResponse & { error?: string })
@@ -1191,6 +1196,8 @@ export default function AuthedApp({
         displayName: result.displayName,
         bio: result.bio ?? "",
         city: result.city ?? "",
+        workplace: result.workplace ?? "",
+        school: result.school ?? "",
         avatarSet: result.avatarSet,
         coverSet: result.coverSet,
         updatedAt: result.updatedAt,
@@ -1199,6 +1206,7 @@ export default function AuthedApp({
       setProfileUsernameDraft(result.username);
       setProfileBioDraft(result.bio ?? "");
       setProfileCityDraft(result.city ?? "");
+      setProfilePublicDetailsDraft({ workplace: result.workplace ?? "", school: result.school ?? "" });
 
       const nextSession: Session = {
         ...sessionRef.current,
@@ -1806,8 +1814,7 @@ export default function AuthedApp({
     setPostEditBusy(false);
     draftBeforeEdit.current = null;
     setPosts([]);
-    setSavedPosts([]);
-    setHasMoreSavedPosts(false);
+    resetSavedPosts();
     ++profileLoadSequence.current;
     profilePagingBusy.current = false;
     setProfileTimelineOpen(false);
@@ -2098,6 +2105,7 @@ export default function AuthedApp({
     setProfileUsernameDraft(profileMedia?.username ?? name);
     setProfileBioDraft(profileMedia?.bio ?? "");
     setProfileCityDraft(profileMedia?.city ?? "");
+    setProfilePublicDetailsDraft({ workplace: profileMedia?.workplace ?? "", school: profileMedia?.school ?? "" });
     setProfileEditorOpen(false);
   };
 
@@ -2111,6 +2119,10 @@ export default function AuthedApp({
       setProfileUsernameDraft={setProfileUsernameDraft}
       profileSaving={profileSaving}
       profileMedia={profileMedia}
+      cityDraft={profileCityDraft}
+      setCityDraft={setProfileCityDraft}
+      publicDetailsDraft={profilePublicDetailsDraft}
+      setPublicDetailsDraft={setProfilePublicDetailsDraft}
     />
   );
   const profilePrivacyControls = (
@@ -2384,7 +2396,6 @@ export default function AuthedApp({
         onSaved={() => {
           switchTab("feed");
           setFeedFilter("saved");
-          void loadSavedPosts();
         }}
         onSettings={() => {
           switchTab("profile");
@@ -2418,6 +2429,8 @@ export default function AuthedApp({
         <VisitorProfile
           key={session.sessionId + ":" + visitorUsername}
           username={visitorUsername}
+          friendOnline={friends.some((friend) => friend.username === visitorUsername.toLowerCase()
+            && friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther && friend.online)}
           request={apiFetch}
           currentUser={name}
           token={session.token}
@@ -2664,6 +2677,7 @@ export default function AuthedApp({
           mediaUploading={mediaUploading}
           name={name}
           openVisitor={openVisitor}
+          onCreateStory={() => setStoryDraft({ kind: "choose" })}
           pendingPost={pendingPost}
           privacy={privacy}
           privacyBusy={privacyBusy}
@@ -2672,6 +2686,8 @@ export default function AuthedApp({
           profileBioDraft={profileBioDraft}
           profileBusy={profileBusy}
           profileCityDraft={profileCityDraft}
+          publicDetailsDraft={profilePublicDetailsDraft}
+          setPublicDetailsDraft={setProfilePublicDetailsDraft}
           profileDisplayNameDraft={profileDisplayNameDraft}
           profileEditorOpen={profileEditorOpen}
           profileHasMore={profileHasMore}
@@ -2701,6 +2717,8 @@ export default function AuthedApp({
         {!desktopProfileOverview && (
           <ProfileSection
           apiFetch={apiFetch}
+          onCreateStory={() => setStoryDraft({ kind: "choose" })}
+          onOpenPost={setActivePostId}
           appLocale={appLocale}
           autoTranslate={autoTranslate}
           avatarFileInputRef={avatarFileInputRef}
@@ -2738,6 +2756,7 @@ export default function AuthedApp({
           profileBusy={profileBusy}
           profileHasMore={profileHasMore}
           profileHeadingRef={profileHeadingRef}
+          friendCount={friends.filter(friend => friend.status === "accepted").length}
           profileIdentityForm={profileIdentityForm}
           profileIdentityRef={profileIdentityRef}
           profileMedia={profileMedia}
@@ -3086,7 +3105,6 @@ export default function AuthedApp({
           profileMedia={profileMedia}
           refreshPosts={refreshPosts}
           renderPosts={renderPosts}
-          savedPosts={savedPosts}
           searchedPosts={searchedPosts}
           session={session}
           setActiveConversationId={selectRoutedConversation}
@@ -3151,6 +3169,8 @@ export default function AuthedApp({
 
         {activeStory && (
           <StoryOverlay
+          key={session.sessionId}
+          request={apiFetch}
           activeStory={activeStory}
           deleteStory={deleteStory}
           name={name}
@@ -3168,7 +3188,7 @@ export default function AuthedApp({
       }}
     >
 
-      {storyDraft && tab === "feed" && (
+      {storyDraft && (tab === "feed" || tab === "profile") && (
           <StoryDraftOverlay
           createStory={createStory}
           mediaUploading={mediaUploading}
@@ -3202,27 +3222,6 @@ export default function AuthedApp({
           setProfileComposerOpen={setProfileComposerOpen}
         />
         )}
-      {profileEditorOpen &&
-        !isProfileDesktop &&
-        tab === "profile" &&
-        profileTimelineOpen && (
-          <ProfileOverlay
-            title="Chỉnh sửa hồ sơ"
-            drawer
-            busy={profileSaving || privacyBusy}
-            onClose={() => setProfileEditorOpen(false)}
-          >
-            {profileIdentityForm}
-            <section
-              className="settings-card profile-field-permissions"
-              aria-label="Quyền trường thông tin"
-            >
-              <h3>Quyền trường thông tin</h3>
-              {profilePrivacyControls}
-            </section>
-          </ProfileOverlay>
-        )}
-
       {postLinkToSend && (
         <SharedPostLinkPicker
           key={session.sessionId + ":" + postLinkToSend}
