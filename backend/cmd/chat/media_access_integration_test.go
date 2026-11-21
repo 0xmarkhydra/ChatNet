@@ -28,9 +28,12 @@ func TestP008LocalIntegration(t *testing.T) {
 		t.Skip("P0-08 local integration test is opt-in")
 	}
 	if getenv := strings.TrimSpace(os.Getenv("CHATNET_P008_LOCAL_E2E")); getenv != "1" {
-		t.Skip("set CHATNET_P008_LOCAL_E2E=1 to exercise local PostgreSQL + S3 simulator")
+		t.Skip("set CHATNET_P008_LOCAL_E2E=1 to exercise disposable PostgreSQL + in-memory S3 simulator")
 	}
-	const dsn = "postgres://chatnet:chatnet@127.0.0.1:5432/chatnet?sslmode=disable"
+	dsn := strings.TrimSpace(os.Getenv("CHATNET_TEST_DATABASE_URL"))
+	if dsn == "" {
+		dsn = "postgres://chatnet:chatnet@127.0.0.1:5432/chatnet?sslmode=disable"
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	db, err := database.Open(ctx, dsn)
@@ -38,6 +41,9 @@ func TestP008LocalIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(db.Close)
+	if err := database.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
 
 	ids := make([]int64, 3)
 	stamp := time.Now().UnixNano()
