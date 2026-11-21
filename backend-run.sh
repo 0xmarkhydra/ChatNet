@@ -1,8 +1,10 @@
 #!/bin/sh
 set -eu
 
-export JWT_SECRET="${JWT_SECRET:-chatnet-dev-secret}"
-export OTP_PEPPER="${OTP_PEPPER:-$JWT_SECRET}"
+if [ "${CHATNET_ENV:-}" = "local" ]; then
+  export JWT_SECRET="${JWT_SECRET:-chatnet-local-jwt-secret}"
+  export OTP_PEPPER="${OTP_PEPPER:-chatnet-local-otp-pepper}"
+fi
 
 export AUTH_URL="http://127.0.0.1:8081"
 export CHAT_URL="http://127.0.0.1:8082"

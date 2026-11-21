@@ -125,6 +125,10 @@ func (t bearerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func main() {
 	ctx := context.Background()
+	jwtSecret, err := config.RequiredSecret("JWT_SECRET")
+	if err != nil {
+		log.Fatal(err)
+	}
 	db, err := database.Open(ctx, config.Env("DATABASE_URL", "postgres://chatnet:chatnet@localhost:5432/chatnet?sslmode=disable"))
 	if err != nil {
 		log.Fatal(err)
@@ -143,7 +147,7 @@ func main() {
 	s := &server{
 		db:               db,
 		redis:            rdb,
-		jwtSecret:        config.Env("JWT_SECRET", "dev-secret-change-me"),
+		jwtSecret:        jwtSecret,
 		liveKitURL:       strings.TrimSpace(config.Env("LIVEKIT_URL", "")),
 		liveKitAPIKey:    strings.TrimSpace(config.Env("LIVEKIT_API_KEY", "")),
 		liveKitAPISecret: strings.TrimSpace(config.Env("LIVEKIT_API_SECRET", "")),

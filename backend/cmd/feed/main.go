@@ -82,6 +82,10 @@ type server struct {
 
 func main() {
 	ctx := context.Background()
+	jwtSecret, err := config.RequiredSecret("JWT_SECRET")
+	if err != nil {
+		log.Fatal(err)
+	}
 	db, err := database.Open(ctx, config.Env("DATABASE_URL", "postgres://chatnet:chatnet@localhost:5432/chatnet?sslmode=disable"))
 	if err != nil {
 		log.Fatal(err)
@@ -99,7 +103,7 @@ func main() {
 	s := &server{
 		db:        db,
 		redis:     rdb,
-		jwtSecret: config.Env("JWT_SECRET", "dev-secret-change-me"),
+		jwtSecret: jwtSecret,
 		push:      onesignalx.New(config.Env("ONESIGNAL_APP_ID", ""), config.Env("ONESIGNAL_REST_API_KEY", "")),
 		storage:   objectstore.NewFromEnv(),
 	}

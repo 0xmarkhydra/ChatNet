@@ -74,6 +74,14 @@ type pendingSignup struct {
 
 func main() {
 	ctx := context.Background()
+	jwtSecret, err := config.RequiredSecret("JWT_SECRET")
+	if err != nil {
+		log.Fatal(err)
+	}
+	otpPepper, err := config.RequiredSecret("OTP_PEPPER")
+	if err != nil {
+		log.Fatal(err)
+	}
 	db, err := database.Open(ctx, config.Env("DATABASE_URL", "postgres://chatnet:chatnet@localhost:5432/chatnet?sslmode=disable"))
 	if err != nil {
 		log.Fatal(err)
@@ -90,14 +98,13 @@ func main() {
 	}
 	defer rdb.Close()
 
-	jwtSecret := config.Env("JWT_SECRET", "dev-secret-change-me")
 	localMail := localMailEnv()
 	s := &server{
 		db:         db,
 		redis:      rdb,
 		limiter:    ratelimit.Limiter{Redis: rdb},
 		jwtSecret:  jwtSecret,
-		otpPepper:  config.Env("OTP_PEPPER", jwtSecret),
+		otpPepper:  otpPepper,
 		emailFrom:  config.Env("CHATNET_EMAIL_FROM", localMail["CHATNET_EMAIL_FROM"]),
 		resendKey:  config.Env("RESEND_API_KEY", localMail["RESEND_API_KEY"]),
 		resendBase: config.Env("RESEND_API_BASE_URL", localMail["RESEND_API_BASE_URL"]),

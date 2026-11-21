@@ -76,6 +76,10 @@ func (e *aiCallError) Error() string {
 
 func main() {
 	ctx := context.Background()
+	jwtSecret, err := config.RequiredSecret("JWT_SECRET")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	db, err := database.Open(ctx, config.Env("DATABASE_URL", "postgres://chatnet:chatnet@localhost:5432/chatnet?sslmode=disable"))
 	if err != nil {
@@ -101,7 +105,7 @@ func main() {
 		provider:   firstEnvDefault("custom", "AI_PROVIDER"),
 		authHeader: firstEnvDefault("Authorization", "AI_AUTH_HEADER"),
 		authScheme: firstEnvDefault("Bearer", "AI_AUTH_SCHEME"),
-		jwtSecret:  config.Env("JWT_SECRET", "dev-secret-change-me"),
+		jwtSecret:  jwtSecret,
 		client:     &http.Client{Timeout: 30 * time.Second},
 		redis:      cache,
 	}
