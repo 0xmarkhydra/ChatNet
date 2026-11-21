@@ -57,7 +57,7 @@ func TestVisitorProfileIntegration(t *testing.T) {
 	update("", 200) // Older clients cannot erase fields they do not send.
 	update(`,"school":"không\nhợp lệ"`, 400)
 	if _, err := db.Exec(ctx, `INSERT INTO friend_connections(user_low,user_high,requested_by,status)
-		VALUES(LEAST($1,$2),GREATEST($1,$2),$1,'accepted'),(LEAST($1,$3),GREATEST($1,$3),$1,'pending')`, ids[0], ids[1], ids[2]); err != nil {
+		VALUES(LEAST($1::bigint,$2::bigint),GREATEST($1::bigint,$2::bigint),$1,'accepted'),(LEAST($1::bigint,$3::bigint),GREATEST($1::bigint,$3::bigint),$1,'pending')`, ids[0], ids[1], ids[2]); err != nil {
 		t.Fatal(err)
 	}
 	call := func(auth string, want int) map[string]any {
