@@ -1,6 +1,9 @@
 import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { AppDataContext } from '../../../shared/types/api'
 import { listConversations, listGroupConversations, listMembershipIds } from '../api/conversations'
+import { loadVerifiedMembershipSnapshot } from '../lib/membershipSnapshot'
+import { appendConversationPage, loadVerifiedConversationPage } from '../lib/conversationPages'
+import { mergeOlderGroups, scanOlderGroupPages } from '../lib/olderGroupPages'
 import { CHAT_LIST_PAGE_SIZE, type Conversation, type MessageDraft } from '../types'
 type Options = AppDataContext & {
   activeConversationIdRef: RefObject<number | null>
@@ -26,129 +29,155 @@ export function useConversationData({
   const [conversationLoadingMore, setConversationLoadingMore] = useState(false)
   const conversationPagingBusy = useRef(false)
   const conversationOffset = useRef(0)
+  const refreshSequence = useRef(0)
+  const pagingSequence = useRef(0)
+  const pagingOwnerSession = useRef<string | null>(null)
   const [conversationListError, setConversationListError] = useState('')
-  const lastGroupSync = useRef<{ sessionId: string; at: number } | null>(null)
+  const lastGroupSync = useRef<{ sessionId: string; membershipRevision: number; at: number } | null>(null)
 
-  // The avatar rail replaces the old list, so include older groups even when
-  // their last activity falls beyond the first page of direct conversations.
-  async function loadEarlierGroups(sessionId: string) {
-    if (lastGroupSync.current?.sessionId === sessionId &&
-        Date.now() - lastGroupSync.current.at < 120_000) return
-    lastGroupSync.current = { sessionId, at: Date.now() }
-    try {
-      for (let offset = 0; offset < 2000; offset += 100) {
-        const response = await listGroupConversations(apiFetch, 100, offset)
-        if (!response.ok) return
-        const page = (await response.json()) as Conversation[]
-        if (!Array.isArray(page) || sessionRef.current?.sessionId !== sessionId) return
-        const groups = page.filter(item => item.type === 'group' &&
-          !revokedConversationIds.current.has(item.id) &&
-          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
-        if (groups.length) {
-          setConversations(current => {
-            const fresh = new Map(groups.map(item => [item.id, item]))
-            const existingIds = new Set(current.map(item => item.id))
-            return [...current.map(item => fresh.get(item.id) || item),
-              ...groups.filter(item => !existingIds.has(item.id))]
-          })
-        }
-        if (page.length < 100) break
-      }
-    } catch {
-      // The ordinary conversation list remains usable if group prefetch fails.
+  // Only dedupe scans with matching session and membership revision.
+  const olderGroupScan = useRef<{ sessionId: string; membershipRevision: number; promise: Promise<void> } | null>(null)
+  const olderGroupScanSequence = useRef(0)
+
+  // The avatar rail also needs groups beyond the first direct-message page.
+  function loadEarlierGroups(sessionId: string): Promise<void> {
+    if (sessionRef.current?.sessionId !== sessionId) return Promise.resolve()
+    const membershipRevision = membershipEventSequence.current
+    if (olderGroupScan.current?.sessionId === sessionId &&
+        olderGroupScan.current.membershipRevision === membershipRevision) {
+      return olderGroupScan.current.promise
     }
+    if (lastGroupSync.current?.sessionId === sessionId &&
+        lastGroupSync.current.membershipRevision === membershipRevision &&
+        Date.now() - lastGroupSync.current.at < 120_000) return Promise.resolve()
+
+    const sequence = ++olderGroupScanSequence.current
+    const isCurrent = () => sessionRef.current?.sessionId === sessionId &&
+      olderGroupScanSequence.current === sequence &&
+      membershipEventSequence.current === membershipRevision
+
+    const promise = (async () => {
+      // Yield once so the new scan lease is installed before the first request.
+      await Promise.resolve()
+      const completed = await scanOlderGroupPages({
+        fetchPage: (limit, offset) => listGroupConversations(apiFetch, limit, offset),
+        isCurrent,
+        onBatch: groups => {
+          if (!isCurrent()) return
+          setConversations(current => {
+            if (!isCurrent()) return current
+            return mergeOlderGroups(current, groups, item =>
+              !revokedConversationIds.current.has(item.id) &&
+              (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
+          })
+        },
+      })
+      if (completed && isCurrent()) {
+        lastGroupSync.current = { sessionId, membershipRevision, at: Date.now() }
+      }
+    })()
+    const scan = { sessionId, membershipRevision, promise }
+    olderGroupScan.current = scan
+    void promise.finally(() => {
+      if (olderGroupScan.current === scan) olderGroupScan.current = null
+    })
+    return promise
   }
 
   async function reconcileConversationMemberships() {
-    const sessionId = session?.sessionId
-    if (!sessionId) return
-    const sequence = ++membershipSyncSequence.current
-    const membershipEventAtStart = membershipEventSequence.current
-    const authorized = new Set<number>()
-    let after = 0
-    try {
-      // Fetch only IDs, not full message metadata. Never prune on partial
-      // snapshots: a failed page is not proof of lost group membership.
-      for (let page = 0; page < 200; page += 1) {
-        const response = await listMembershipIds(apiFetch, after)
-        if (!response.ok) return
-        const data = (await response.json()) as { ids: number[]; nextAfter: number | null }
-        if (!Array.isArray(data.ids) || data.ids.length > 500 ||
-          data.ids.some((id) => !Number.isSafeInteger(id) || id <= after)) return
-        for (const id of data.ids) authorized.add(id)
-        if (data.nextAfter === null) {
-          if (sessionRef.current?.sessionId !== sessionId ||
-              sequence !== membershipSyncSequence.current ||
-              membershipEventAtStart !== membershipEventSequence.current) return
-          membershipSnapshot.current = authorized
-          for (const id of authorized) revokedConversationIds.current.delete(id)
-          setConversations((current) => current.filter((item) => authorized.has(item.id)))
-          setMessageDrafts((current) => Object.fromEntries(
-            Object.entries(current).filter(([id]) => authorized.has(Number(id))),
-          ))
-          if (activeConversationIdRef.current && !authorized.has(activeConversationIdRef.current)) {
-            purgeConversation(activeConversationIdRef.current)
-          }
-          void refreshConversations()
-          return
-        }
-        if (!Number.isSafeInteger(data.nextAfter) || data.nextAfter <= after ||
-            data.nextAfter !== data.ids[data.ids.length - 1]) return
-        after = data.nextAfter
-      }
-    } catch {
-      // Connectivity failures must never be interpreted as revoked rights.
+    const sessionId = session?.sessionId;
+    if (!sessionId) return;
+    const sequence = ++membershipSyncSequence.current;
+    const membershipEventAtStart = membershipEventSequence.current;
+    const isCurrent = () =>
+      sessionRef.current?.sessionId === sessionId &&
+      sequence === membershipSyncSequence.current &&
+      membershipEventAtStart === membershipEventSequence.current;
+
+    // Never revoke access from incomplete pages, network errors, or stale data.
+    const authorized = await loadVerifiedMembershipSnapshot(
+      after => listMembershipIds(apiFetch, after),
+      isCurrent,
+    );
+    if (!authorized || !isCurrent()) return;
+
+    membershipSnapshot.current = authorized;
+    for (const id of authorized) revokedConversationIds.current.delete(id);
+    setConversations(current => current.filter(item => authorized.has(item.id)));
+    setMessageDrafts(current => Object.fromEntries(
+      Object.entries(current).filter(([id]) => authorized.has(Number(id))),
+    ));
+    if (activeConversationIdRef.current && !authorized.has(activeConversationIdRef.current)) {
+      purgeConversation(activeConversationIdRef.current);
     }
+    void refreshConversations();
   }
 
   async function refreshConversations() {
     const sessionId = session?.sessionId
-    if (!sessionId) return
-    try {
-      const response = await listConversations(apiFetch, CHAT_LIST_PAGE_SIZE)
-      if (!response.ok) throw new Error('conversation list request failed')
-      const page = (await response.json()) as Conversation[]
-      if (!Array.isArray(page)) throw new Error('invalid conversation list response')
-      const data = page.filter((item) => !revokedConversationIds.current.has(item.id) &&
-        (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
-      if (sessionRef.current?.sessionId !== sessionId) return
-      setConversationListError('')
-      setConversations((current) => {
-        const freshIds = new Set(data.map((item) => item.id))
-        return [...data, ...current.filter((item) => !freshIds.has(item.id))]
-      })
-      conversationOffset.current = Math.max(conversationOffset.current, page.length)
-      if (conversationOffset.current === page.length) setHasMoreConversations(page.length === CHAT_LIST_PAGE_SIZE)
-      void loadEarlierGroups(sessionId)
-    } catch {
-      if (sessionRef.current?.sessionId !== sessionId) return
+    if (!sessionId || sessionRef.current?.sessionId !== sessionId) return
+    const requestSequence = ++refreshSequence.current
+    const isCurrent = () => sessionRef.current?.sessionId === sessionId &&
+      refreshSequence.current === requestSequence
+    const page = await loadVerifiedConversationPage(
+      () => listConversations(apiFetch, CHAT_LIST_PAGE_SIZE),
+      isCurrent,
+    )
+    if (!isCurrent()) return
+    if (!page) {
       setConversationListError('Không tải được danh sách hội thoại từ máy chủ.')
       setStatus('Đang kết nối lại...')
+      return
     }
+    const data = page.filter(item => !revokedConversationIds.current.has(item.id) &&
+      (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
+    setConversationListError('')
+    setConversations(current => {
+      if (!isCurrent()) return current
+      const freshIds = new Set(data.map(item => item.id))
+      return [...data, ...current.filter(item => !freshIds.has(item.id))]
+    })
+    conversationOffset.current = Math.max(conversationOffset.current, page.length)
+    if (conversationOffset.current === page.length) setHasMoreConversations(page.length === CHAT_LIST_PAGE_SIZE)
+    void loadEarlierGroups(sessionId)
   }
 
   async function loadMoreConversations() {
-    if (!session || conversationPagingBusy.current || !hasMoreConversations) return
+    if (!session || sessionRef.current?.sessionId !== session.sessionId || !hasMoreConversations) return
     const sessionId = session.sessionId
+    if (conversationPagingBusy.current && pagingOwnerSession.current === sessionId) return
+    const requestSequence = ++pagingSequence.current
+    pagingOwnerSession.current = sessionId
+    const offset = conversationOffset.current
+    const isCurrent = () => sessionRef.current?.sessionId === sessionId &&
+      pagingSequence.current === requestSequence
     conversationPagingBusy.current = true
     setConversationLoadingMore(true)
     try {
-      const response = await listConversations(apiFetch, CHAT_LIST_PAGE_SIZE, conversationOffset.current)
-      if (!response.ok) throw new Error('Không tải thêm được hội thoại')
-      const data = (await response.json()) as Conversation[]
-      if (sessionRef.current?.sessionId !== sessionId) return
-      conversationOffset.current += data.length
+      const data = await loadVerifiedConversationPage(
+        () => listConversations(apiFetch, CHAT_LIST_PAGE_SIZE, offset),
+        isCurrent,
+      )
+      if (!isCurrent()) return
+      if (!data) {
+        setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
+        return
+      }
+      conversationOffset.current = offset + data.length
       setHasMoreConversations(data.length === CHAT_LIST_PAGE_SIZE)
-      setConversations((current) => {
-        const ids = new Set(current.map((item) => item.id))
-        return [...current, ...data.filter((item) => !ids.has(item.id) && !revokedConversationIds.current.has(item.id) &&
-          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))]
+      setConversations(current => {
+        if (!isCurrent()) return current
+        return appendConversationPage(current, data, item =>
+          !revokedConversationIds.current.has(item.id) &&
+          (!membershipSnapshot.current || membershipSnapshot.current.has(item.id)))
       })
-    } catch {
-      if (sessionRef.current?.sessionId === sessionId) setNotice('Không tải thêm được hội thoại. Hãy thử lại.', 'error')
     } finally {
-      conversationPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId) setConversationLoadingMore(false)
+      // An earlier session's request must never release a newer page request.
+      if (isCurrent()) {
+        conversationPagingBusy.current = false
+        pagingOwnerSession.current = null
+        setConversationLoadingMore(false)
+      }
     }
   }
 

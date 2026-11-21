@@ -28,6 +28,10 @@ class AuthScreen extends ConsumerStatefulWidget {
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   final emailController = TextEditingController();
   final otpController = TextEditingController();
+  final passwordController = TextEditingController();
+  bool registering = false;
+  bool passwordLogin = true;
+  bool showPassword = false;
   String? verificationToken;
   String maskedEmail = '';
   int secondsLeft = 0;
@@ -40,6 +44,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     timer?.cancel();
     emailController.dispose();
     otpController.dispose();
+    passwordController.dispose();
     super.dispose();
   }
 
@@ -55,6 +60,41 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         setState(() => secondsLeft--);
       }
     });
+  }
+
+  Future<void> _loginWithPassword() async {
+    final email = emailController.text.trim();
+    if (!email.contains('@') || passwordController.text.isEmpty) {
+      setState(() => error = 'Nhập email và mật khẩu hợp lệ.');
+      return;
+    }
+    if (busy) return;
+    setState(() {
+      busy = true;
+      error = '';
+    });
+    try {
+      final result = object(
+        await widget.api.request('POST', '/api/auth/login', {
+          'email': email,
+          'password': passwordController.text,
+        }),
+      );
+      await widget.api.authenticate(result);
+      if (mounted) widget.onAuthenticated();
+    } on ApiError catch (cause) {
+      if (mounted) {
+        setState(
+          () => error = cause.status == 401
+              ? 'Email hoặc mật khẩu không đúng. Bạn cũng có thể dùng OTP.'
+              : cause.toString(),
+        );
+      }
+    } catch (cause) {
+      if (mounted) setState(() => error = 'Không thể đăng nhập: $cause');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> _start() async {
@@ -171,7 +211,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             Text(
                               otp
                                   ? 'Kiểm tra email của bạn'
-                                  : 'Chào mừng đến SocCO',
+                                  : registering
+                                  ? 'Tạo tài khoản SocCO'
+                                  : 'Chào mừng trở lại',
                               style: Theme.of(context).textTheme.headlineSmall,
                               textAlign: TextAlign.center,
                             ),
@@ -179,11 +221,36 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             Text(
                               otp
                                   ? 'SocCO đã gửi mã xác minh 6 số tới $maskedEmail.'
-                                  : 'Nhập email để đăng ký hoặc đăng nhập.',
+                                  : registering
+                                  ? 'Bắt đầu kết nối qua xác minh email.'
+                                  : 'Đăng nhập để khám phá cộng đồng SocCO.',
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 16),
+                            if (!otp)
+                              SegmentedButton<bool>(
+                                key: const ValueKey('auth-mode'),
+                                segments: const [
+                                  ButtonSegment(
+                                    value: false,
+                                    label: Text('Đăng nhập'),
+                                  ),
+                                  ButtonSegment(
+                                    value: true,
+                                    label: Text('Tạo tài khoản'),
+                                  ),
+                                ],
+                                selected: {registering},
+                                onSelectionChanged: busy
+                                    ? null
+                                    : (values) => setState(() {
+                                        registering = values.first;
+                                        passwordLogin = !registering;
+                                        error = '';
+                                      }),
+                              ),
+                            const SizedBox(height: 16),
                             if (!otp)
                               TextField(
                                 controller: emailController,
@@ -191,7 +258,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 keyboardType: TextInputType.emailAddress,
                                 autofillHints: const [AutofillHints.email],
                                 textInputAction: TextInputAction.done,
-                                onSubmitted: (_) => _start(),
+                                onSubmitted: (_) => passwordLogin
+                                    ? _loginWithPassword()
+                                    : _start(),
                                 decoration: const InputDecoration(
                                   labelText: 'Email',
                                   hintText: 'you@example.com',
@@ -221,6 +290,58 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                   counterText: '',
                                 ),
                               ),
+                            if (!otp && !registering) ...[
+                              const SizedBox(height: 12),
+                              TextButton.icon(
+                                key: const ValueKey('auth-toggle-method'),
+                                onPressed: busy
+                                    ? null
+                                    : () => setState(() {
+                                        passwordLogin = !passwordLogin;
+                                        error = '';
+                                      }),
+                                icon: Icon(
+                                  passwordLogin
+                                      ? Icons.mail_outline_rounded
+                                      : Icons.lock_outline_rounded,
+                                ),
+                                label: Text(
+                                  passwordLogin
+                                      ? 'Đăng nhập bằng OTP qua email'
+                                      : 'Đăng nhập bằng mật khẩu',
+                                ),
+                              ),
+                            ],
+                            if (!otp && passwordLogin && !registering) ...[
+                              TextField(
+                                key: const ValueKey('auth-password-input'),
+                                controller: passwordController,
+                                enabled: !busy,
+                                obscureText: !showPassword,
+                                autofillHints: const [AutofillHints.password],
+                                onSubmitted: (_) => _loginWithPassword(),
+                                decoration: InputDecoration(
+                                  labelText: 'Mật khẩu',
+                                  prefixIcon: const Icon(
+                                    Icons.lock_outline_rounded,
+                                  ),
+                                  suffixIcon: IconButton(
+                                    key: const ValueKey('auth-show-password'),
+                                    tooltip: showPassword
+                                        ? 'Ẩn mật khẩu'
+                                        : 'Hiện mật khẩu',
+                                    onPressed: () => setState(
+                                      () => showPassword = !showPassword,
+                                    ),
+                                    icon: Icon(
+                                      showPassword
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                             if (otp) ...[
                               const SizedBox(height: 12),
                               Row(
@@ -266,7 +387,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                           (otpController.text.length != 6 ||
                                               secondsLeft == 0))
                                   ? null
-                                  : (otp ? _verify : _start),
+                                  : (otp
+                                        ? _verify
+                                        : passwordLogin && !registering
+                                        ? _loginWithPassword
+                                        : _start),
                               child: busy
                                   ? const SizedBox.square(
                                       dimension: 20,
@@ -276,7 +401,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                       ),
                                     )
                                   : Text(
-                                      otp ? 'Xác minh & vào SocCO' : 'Tiếp tục',
+                                      otp
+                                          ? 'Xác minh & vào SocCO'
+                                          : registering
+                                          ? 'Gửi mã xác minh'
+                                          : passwordLogin
+                                          ? 'Đăng nhập'
+                                          : 'Gửi mã OTP',
                                     ),
                             ),
                             if (otp)

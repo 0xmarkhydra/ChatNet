@@ -13,7 +13,7 @@ vi.stubGlobal("ResizeObserver", class {
 
 const roots: Array<{ unmount: () => void; element: HTMLElement }> = [];
 
-function renderSidebar(tab: Tab, settingsActive = false, feedSaved = false, screenshot?: { onScreenshot: () => void; screenshotBusy?: boolean }) {
+function renderSidebar(tab: Tab, settingsActive = false, feedSaved = false, screenshot?: { onScreenshot?: () => void; screenshotBusy?: boolean; onSearch?: () => void; searchActive?: boolean }) {
   const element = document.createElement("div");
   document.body.append(element);
   const root = createRoot(element);
@@ -58,6 +58,19 @@ afterEach(() => {
 });
 
 describe("AppSidebar navigation", () => {
+  it('opens global search from the first navigation item and marks its route active', () => {
+    const onSearch = vi.fn();
+    const { button } = renderSidebar('discover', false, false, { onSearch, searchActive: true });
+    const search = button('Tìm kiếm');
+    expect(search.closest('nav')?.querySelector('button[aria-label]')).toBe(search);
+    expect(search.getAttribute('aria-current')).toBe('page');
+    expect(search.getAttribute('aria-keyshortcuts')).toBe('Control+K Meta+K');
+    expect(button('Khám phá').hasAttribute('aria-current')).toBe(false);
+    expect(document.querySelectorAll('button[aria-label="Thông báo"]')).toHaveLength(1);
+    act(() => search.click());
+    expect(onSearch).toHaveBeenCalledOnce();
+  });
+
   it('groups capture with notifications, saved posts and settings without changing the route', () => {
     const onScreenshot = vi.fn();
     const { button, onNavigate } = renderSidebar('feed', false, false, { onScreenshot });

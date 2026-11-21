@@ -10,33 +10,36 @@ export type LanguageOption = {
   searchText: string
 }
 
-const ISO_639_1_CODES = `
-aa ab ae af ak am an ar as av ay az
-ba be bg bh bi bm bn bo br bs
-ca ce ch co cr cs cu cv cy
-da de dv dz
-ee el en eo es et eu
-fa ff fi fj fo fr fy
-ga gd gl gn gu gv
-ha he hi ho hr ht hu hy hz
-ia id ie ig ii ik io is it iu
-ja jv
-ka kg ki kj kk kl km kn ko kr ks ku kv kw ky
-la lb lg li ln lo lt lu lv
-mg mh mi mk ml mn mr ms mt my
-na nb nd ne ng nl nn no nr nv ny
-oc oj om or os
-pa pi pl ps pt
-qu
-rm rn ro ru rw
-sa sc sd se sg si sk sl sm sn so sq sr ss st su sv sw
-ta te tg th ti tk tl tn to tr ts tt tw ty
-ug uk ur uz
-ve vi vo
-wa wo
-xh yi yo
-za zh zu
-`.trim().split(/\s+/)
+// English ISO 639 names cover codes missing from the browser's ICU data.
+// Keep the supported code set and the fallback labels in one catalogue.
+const ENGLISH_LANGUAGE_NAMES: Readonly<Record<string, string>> = {
+  aa: "Afar", ab: "Abkhazian", ae: "Avestan", af: "Afrikaans", ak: "Akan", am: "Amharic", an: "Aragonese", ar: "Arabic", as: "Assamese", av: "Avaric", ay: "Aymara", az: "Azerbaijani",
+  ba: "Bashkir", be: "Belarusian", bg: "Bulgarian", bh: "Bihari languages", bi: "Bislama", bm: "Bambara", bn: "Bengali", bo: "Tibetan", br: "Breton", bs: "Bosnian",
+  ca: "Catalan", ce: "Chechen", ch: "Chamorro", co: "Corsican", cr: "Cree", cs: "Czech", cu: "Church Slavonic", cv: "Chuvash", cy: "Welsh",
+  da: "Danish", de: "German", dv: "Divehi", dz: "Dzongkha",
+  ee: "Ewe", el: "Greek, Modern (1453-)", en: "English", eo: "Esperanto", es: "Spanish", et: "Estonian", eu: "Basque",
+  fa: "Persian", ff: "Fulah", fi: "Finnish", fj: "Fijian", fo: "Faroese", fr: "French", fy: "Western Frisian",
+  ga: "Irish", gd: "Gaelic", gl: "Galician", gn: "Guarani", gu: "Gujarati", gv: "Manx",
+  ha: "Hausa", he: "Hebrew", hi: "Hindi", ho: "Hiri Motu", hr: "Croatian", ht: "Haitian", hu: "Hungarian", hy: "Armenian", hz: "Herero",
+  ia: "Interlingua (International Auxiliary Language Association)", id: "Indonesian", ie: "Interlingue", ig: "Igbo", ii: "Sichuan Yi", ik: "Inupiaq", io: "Ido", is: "Icelandic", it: "Italian", iu: "Inuktitut",
+  ja: "Japanese", jv: "Javanese",
+  ka: "Georgian", kg: "Kongo", ki: "Kikuyu", kj: "Kuanyama", kk: "Kazakh", kl: "Kalaallisut", km: "Central Khmer", kn: "Kannada", ko: "Korean", kr: "Kanuri", ks: "Kashmiri", ku: "Kurdish", kv: "Komi", kw: "Cornish", ky: "Kirghiz",
+  la: "Latin", lb: "Luxembourgish", lg: "Ganda", li: "Limburgan", ln: "Lingala", lo: "Lao", lt: "Lithuanian", lu: "Luba-Katanga", lv: "Latvian",
+  mg: "Malagasy", mh: "Marshallese", mi: "Maori", mk: "Macedonian", ml: "Malayalam", mn: "Mongolian", mr: "Marathi", ms: "Malay", mt: "Maltese", my: "Burmese",
+  na: "Nauru", nb: "Bokmål, Norwegian", nd: "North Ndebele", ne: "Nepali", ng: "Ndonga", nl: "Dutch", nn: "Norwegian Nynorsk", no: "Norwegian", nr: "South Ndebele", nv: "Navajo", ny: "Chichewa",
+  oc: "Occitan (post 1500)", oj: "Ojibwe", om: "Oromo", or: "Oriya", os: "Ossetian",
+  pa: "Panjabi", pi: "Pali", pl: "Polish", ps: "Pushto", pt: "Portuguese",
+  qu: "Quechua",
+  rm: "Romansh", rn: "Rundi", ro: "Romanian", ru: "Russian", rw: "Kinyarwanda",
+  sa: "Sanskrit", sc: "Sardinian", sd: "Sindhi", se: "Northern Sami", sg: "Sango", si: "Sinhala", sk: "Slovak", sl: "Slovenian", sm: "Samoan", sn: "Shona", so: "Somali", sq: "Albanian", sr: "Serbian", ss: "Swati", st: "Sotho, Southern", su: "Sundanese", sv: "Swedish", sw: "Swahili",
+  ta: "Tamil", te: "Telugu", tg: "Tajik", th: "Thai", ti: "Tigrinya", tk: "Turkmen", tl: "Tagalog", tn: "Tswana", to: "Tonga (Tonga Islands)", tr: "Turkish", ts: "Tsonga", tt: "Tatar", tw: "Twi", ty: "Tahitian",
+  ug: "Uighur", uk: "Ukrainian", ur: "Urdu", uz: "Uzbek",
+  ve: "Venda", vi: "Vietnamese", vo: "Volapük",
+  wa: "Walloon", wo: "Wolof",
+  xh: "Xhosa", yi: "Yiddish", yo: "Yoruba",
+  za: "Zhuang", zh: "Chinese", zu: "Zulu",
+}
+const ISO_639_1_CODES = Object.keys(ENGLISH_LANGUAGE_NAMES)
 
 const ISO_639_1_SET = new Set(ISO_639_1_CODES)
 
@@ -46,10 +49,10 @@ export function isSupportedLanguageCode(value: string) {
 
 function safeDisplayName(locale: string, type: 'language' | 'region', value: string) {
   try {
-    const names = new Intl.DisplayNames([locale], { type })
-    return names.of(value) || value
+    const names = new Intl.DisplayNames([locale], { type, fallback: 'none' })
+    return names.of(value)
   } catch {
-    return value
+    return undefined
   }
 }
 
@@ -79,14 +82,17 @@ export function buildLanguageOptions(interfaceLocale = 'vi'): LanguageOption[] {
   return ISO_639_1_CODES.map((code) => {
     const region = regionForLanguage(code)
     const localizedLanguage = safeDisplayName(locale, 'language', code)
-    const nativeLanguage = safeDisplayName(code, 'language', code)
-    const localizedRegion = safeDisplayName(locale, 'region', region)
-    const nativeRegion = safeDisplayName(code, 'region', region)
+      ?? safeDisplayName('en', 'language', code)
+      ?? ENGLISH_LANGUAGE_NAMES[code]
+    const nativeLanguage = safeDisplayName(code, 'language', code) ?? localizedLanguage
+    const localizedRegion = safeDisplayName(locale, 'region', region) ?? region
+    const nativeRegion = safeDisplayName(code, 'region', region) ?? localizedRegion
     const flag = flagForRegion(region)
     const searchText = normalizeSearch([
       code,
       localizedLanguage,
       nativeLanguage,
+      ENGLISH_LANGUAGE_NAMES[code],
       localizedRegion,
       nativeRegion,
       region,

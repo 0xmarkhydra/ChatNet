@@ -1,19 +1,16 @@
-import { useId, type ReactNode } from 'react'
-import { Heart } from 'lucide-react'
+import type { ReactNode } from 'react'
 import FeedRepostAction from './FeedRepostAction'
 import FeedRepostPreview from './FeedRepostPreview'
-import FeedLikeButton from './FeedLikeButton'
 import { userLabel } from '../../../shared/utils/userLabel'
 import type { Post } from '../types'
 import type { ToastKind } from '../../../shared/utils/toast'
 import { API } from '../../../shared/lib/config'
 import { FeedText } from './FeedDiscussion'
-import FeedPostActions, { FeedSaveAction } from './FeedPostActions'
 import PostExtrasView from './PostExtrasView'
 import { parsePostExtras } from '../utils/postExtras'
-import UserAvatar from '../../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../../shared/ui/MediaAttachmentsView'
-import UiIcon from '../../../shared/ui/UiIcon'
+import { Card } from '../../../shared/ui/card'
+import { PostCardEngagement, PostCardHeader, PostCardToolbar } from './PostCardSections'
 
 type Props = {
   post: Post;
@@ -40,22 +37,6 @@ type Props = {
   taggedNames?: Record<string, string>;
 };
 
-function formatCount(count: number): string {
-  if (count < 1000) return count.toLocaleString('vi-VN')
-  return (count / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + 'K'
-}
-
-function relativeDate(value: string): string {
-  const parsed = Date.parse(value)
-  if (!Number.isFinite(parsed)) return value
-  const minutes = Math.max(0, Math.floor((Date.now() - parsed) / 60000))
-  if (minutes < 1) return 'Vừa xong'
-  if (minutes < 60) return `${minutes} phút trước`
-  if (minutes < 1440) return `${Math.floor(minutes / 60)} giờ trước`
-  if (minutes < 10080) return `${Math.floor(minutes / 1440)} ngày trước`
-  return new Date(parsed).toLocaleDateString('vi-VN')
-}
-
 export default function FeedPostCard({
   post,
   name,
@@ -81,36 +62,19 @@ export default function FeedPostCard({
 }: Props) {
   const authorLabel = userLabel(post.author === name ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
   const likeBusy = likePreviews[post.id] !== undefined
-  const commentsCount = post.comments?.length ?? 0
   const extras = parsePostExtras(post.content)
-  const commentsId = useId()
   const openPost = () => setActivePostId(post.id)
 
   return (
-    <article className="post zalo-post feed-post-card" key={post.id}>
-      <UserAvatar username={post.author} name={authorLabel} className="avatar" />
-      <div className="post-body">
-        <div className="post-author">
-          <div>
-            <strong>{onAuthorOpen ? <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(post.author)}>{authorLabel}</button> : authorLabel}</strong>
-            {post.repostKind && <span className="block text-sm text-muted-foreground">{post.repostKind === 'quick' ? 'Đã đăng lại' : 'Đã trích dẫn'}</span>}
-            <small><button type="button" className="feed-post-open-date" aria-label="Mở bài viết" onClick={openPost}>
-              {relativeDate(post.createdAt)}
-            </button> · {post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}</small>
-          </div>
-          <FeedPostActions
-            onEdit={post.repostKind === 'quick' ? undefined : onEditPost}
-            post={post}
-            mine={post.author === name}
-            request={apiFetch}
-            onUpdated={syncFeedPost}
-            onDeleted={(id) => { removeFeedPost(id); if (post.repostKind) onRepostChanged?.() }}
-            onFeedback={(text, kind) => setNotice(text, kind || "success")}
-          />
-        </div>
+    <Card asChild>
+      <article className="post zalo-post feed-post-card flex! flex-col! gap-y-2! min-w-0! m-0! px-[18px]! pt-[14px]! pb-[11px]! overflow-hidden! rounded-2xl! border! border-[#e8ecf5]! bg-white! shadow-[0_3px_16px_rgba(30,51,96,0.035)]!">
+        <PostCardHeader post={post} authorLabel={authorLabel} name={name} onAuthorOpen={onAuthorOpen}
+          onEditPost={onEditPost} openPost={openPost} apiFetch={apiFetch} syncFeedPost={syncFeedPost}
+          removeFeedPost={removeFeedPost} setNotice={setNotice} onRepostChanged={onRepostChanged} />
+        <div className="post-body grid! w-full! min-w-0! gap-1.5! [&>*]:min-w-0!">
         <PostExtrasView extras={extras} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
         {extras.caption && (
-          <div className={post.background ? 'feed-post-clickable feed-text-background bg-' + post.background : 'feed-post-clickable feed-post-text'}
+          <div className={post.background ? 'feed-post-clickable feed-text-background bg-' + post.background : 'feed-post-clickable feed-post-text pt-1.5! [&_.feed-text>p]:m-0! [&_.feed-text>p]:mb-1! [&_.feed-text>p]:text-sm! [&_.feed-text>p]:leading-normal!'}
             onClick={(event) => {
               if (event.target instanceof Element && !event.target.closest('button,a,input,textarea') && !window.getSelection()?.toString()) openPost()
             }}>
@@ -120,7 +84,7 @@ export default function FeedPostCard({
           </div>
         )}
         {Boolean(post.attachments?.length) && (
-          <div className="feed-media-preview">
+          <div className="feed-media-preview mt-2! min-w-0! overflow-hidden! rounded-xl! [&_.media-attachments]:w-full! [&_.media-attachments]:max-w-none! [&_.media-attachments]:m-0! [&_.media-count-1_.media-item_img]:h-auto! [&_.media-count-1_.media-item_img]:max-h-[440px]! [&_.media-count-1_.media-item_img]:object-contain! [&_.media-count-1_.media-item_img]:rounded-xl! [&_.media-count-1_.media-item_video]:h-auto! [&_.media-count-1_.media-item_video]:max-h-[440px]! [&_.media-count-1_.media-item_video]:object-contain!">
             <MediaAttachmentsView items={post.attachments} onImageClick={openPost} />
           </div>
         )}
@@ -130,38 +94,14 @@ export default function FeedPostCard({
             onShareToChat={onShareToChat} onFeedback={setNotice} />
         </div>}
         {post.repostKind !== 'quick' && <>
-        <div className="post-engagement-summary feed-post-engagement">
-          <button type="button" className="feed-post-likes feed-reaction-users-trigger"
-            disabled={post.likes === 0} aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`}
-            onClick={() => onReactionUsers(post)}>
-            <Heart size={22} fill="currentColor" aria-hidden="true" />
-            <span>{formatCount(post.likes)} lượt thích</span>
-          </button>
-          <span className="feed-post-conversation-stats">
-            {commentsCount.toLocaleString('vi-VN')} bình luận{Boolean(post.repostCount) && ` · ${formatCount(post.repostCount ?? 0)} lượt đăng lại`}
-          </span>
-        </div>
-        <div className="post-toolbar feed-post-toolbar">
-          <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void like(post, emoji)} />
-          <button type="button" className="post-stat post-detail-trigger"
-            aria-expanded={onToggleComments ? Boolean(discussion) : undefined}
-            aria-controls={discussion ? commentsId : undefined}
-            onClick={onToggleComments ?? openPost}>
-            <UiIcon name="comment" size={22} /><span>Bình luận</span>
-          </button>
-          <FeedRepostAction post={post} request={apiFetch} onUpdated={syncFeedPost} onRemoved={removeFeedPost}
-            onChanged={onRepostChanged} onShareToChat={onShareToChat} onFeedback={setNotice} />
-          <FeedSaveAction post={post} request={apiFetch} onUpdated={syncFeedPost}
-            onFeedback={(text, kind) => setNotice(text, kind || 'success')} />
-        </div>
-        {discussion && (
-          <section id={commentsId} className="feed-inline-comments" aria-label="Bình luận về bài viết">
-            {!post.comments?.length && <p className="post-comments-empty">Chưa có bình luận. Hãy bắt đầu cuộc trò chuyện.</p>}
-            {discussion}
-          </section>
-        )}
+        <PostCardEngagement post={post} onReactionUsers={onReactionUsers} />
+        <PostCardToolbar post={post} busy={likeBusy} like={like} apiFetch={apiFetch}
+          syncFeedPost={syncFeedPost} removeFeedPost={removeFeedPost} setNotice={setNotice}
+          onRepostChanged={onRepostChanged} onShareToChat={onShareToChat}
+          onToggleComments={onToggleComments} discussion={discussion} openPost={openPost} />
         </>}
       </div>
-    </article>
+      </article>
+    </Card>
   )
 }

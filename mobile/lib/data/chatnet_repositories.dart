@@ -58,7 +58,7 @@ class FeedRepository {
   final Api api;
 
   Future<List<FeedPost>> posts({
-    int limit = 20,
+    int limit = 15,
     int? before,
     bool saved = false,
   }) async {
@@ -71,7 +71,9 @@ class FeedRepository {
   }
 
   Future<List<Story>> stories() async {
-    final data = objects(await api.request('GET', '/api/stories'));
+    final data = objects(
+      await api.request('GET', '/api/stories?includeText=true'),
+    );
     return List.unmodifiable(data.map(Story.fromJson));
   }
 }

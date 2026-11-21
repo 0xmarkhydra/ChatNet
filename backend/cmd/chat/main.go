@@ -129,6 +129,9 @@ func main() {
 	if err := database.Migrate(ctx, db); err != nil {
 		log.Fatalf("chat schema migration: %v", err)
 	}
+	if err := database.MigrateScheduledMessages(ctx, db); err != nil {
+		log.Fatalf("chat scheduled messages migration: %v", err)
+	}
 
 	rdb, err := redisx.Open(ctx)
 	if err != nil {
@@ -148,6 +151,8 @@ func main() {
 	go s.expireNearby(ctx)
 	go s.cleanupOrphanChatMedia(ctx)
 	mux := http.NewServeMux()
+	s.registerScheduledMessages(mux)
+	go s.runScheduledMessages(ctx)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
 	})

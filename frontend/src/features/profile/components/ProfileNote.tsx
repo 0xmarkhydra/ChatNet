@@ -6,8 +6,8 @@ import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/profile-note.css'
 import { loadProfileNote, saveProfileNote, deleteProfileNote } from '../api/profile'
 type Note = { content: string; visibility: 'friends'|'public'|'private'; version: string; createdAt: string; expiresAt: string }
-type Props = { username: string; owner?: boolean; refreshKey?: string; request: (path: string, init?: RequestInit) => Promise<Response> }
-export default function ProfileNote({ username, owner = false, refreshKey, request }: Props) {
+type Props = { username: string; displayName?: string; owner?: boolean; refreshKey?: string; request: (path: string, init?: RequestInit) => Promise<Response> }
+export default function ProfileNote({ username, displayName = username, owner = false, refreshKey, request }: Props) {
  const [note,setNote] = useState<Note|null>(null)
  const [loaded,setLoaded] = useState(false)
  const [error,setError] = useState('')
@@ -89,7 +89,7 @@ export default function ProfileNote({ username, owner = false, refreshKey, reque
     <p className="profile-note-hint">Một suy nghĩ nhỏ, một ngày mới. Ghi chú hiển thị trong 24 giờ.</p>
     <div className="profile-note-compose">
      <BubbleTextarea className="profile-note-input-bubble" aria-label="Nội dung ghi chú" placeholder="Chia sẻ suy nghĩ…" value={draft} disabled={busy} onChange={e=>setDraft(e.target.value)} autoFocus />
-     <UserAvatar username={username} name={username} className="profile-note-compose-avatar" />
+     <UserAvatar username={username} name={displayName} className="profile-note-compose-avatar" />
      <span className={'profile-note-count'+(count>60?' over-limit':'')}>{count}/60</span>
     </div>
     <label className="profile-note-audience"><Users size={16}/><span>Ai có thể xem?</span>

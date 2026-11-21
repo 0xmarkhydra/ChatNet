@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef } from 'react'
-import { Bell, Bookmark, BookUser, Compass, MessageCircle, Newspaper, Scan, Settings, ShoppingBag } from 'lucide-react'
+import { useId, useLayoutEffect, useRef } from 'react'
+import { Bell, Bookmark, BookUser, Compass, MessageCircle, Newspaper, Scan, Search, Settings, ShoppingBag } from 'lucide-react'
 import { formatUnreadMessageDescription } from '../../features/i18n/lib/i18n'
 import type { Tab } from '../../shared/types/navigation'
 import UserAvatar from '../../shared/ui/UserAvatar'
@@ -15,6 +15,8 @@ type Props = {
   notificationCount: number
   feedSaved: boolean
   settingsActive: boolean
+  searchActive?: boolean
+  onSearch?: () => void
   onNavigate: (tab: Tab) => void
   onSaved: () => void
   onSettings: () => void
@@ -24,9 +26,10 @@ type Props = {
 
 export default function AppSidebar({
   tab, section, username, displayName, unreadTotal, notificationCount, feedSaved, settingsActive,
-  onNavigate, onSaved, onSettings, onScreenshot, screenshotBusy,
+  onNavigate, onSaved, onSettings, onScreenshot, screenshotBusy, searchActive = false, onSearch,
 }: Props) {
-  const activeKey = `${tab}:${section ?? ''}:${feedSaved}:${settingsActive}`
+  const activeKey = `${tab}:${section ?? ''}:${feedSaved}:${settingsActive}:${searchActive}`
+  const unreadDescriptionId = useId()
   const navRef = useRef<HTMLElement>(null)
   const activeButtonRef = useRef<HTMLButtonElement>(null)
   const pillRef = useRef<HTMLSpanElement>(null)
@@ -91,9 +94,10 @@ export default function AppSidebar({
   }, [activeKey])
 
   const mainItems = [
+    ...(onSearch ? [{ label: 'Tìm kiếm', Icon: Search, active: searchActive, action: onSearch }] : []),
     { label: 'Bảng tin', Icon: Newspaper, active: tab === 'feed' && !feedSaved, action: () => onNavigate('feed') },
     { label: 'Tin nhắn', Icon: MessageCircle, active: tab === 'chat' && section === null, action: () => onNavigate('chat'), count: unreadTotal },
-    { label: 'Khám phá', Icon: Compass, active: tab === 'discover', action: () => onNavigate('discover') },
+    { label: 'Khám phá', Icon: Compass, active: tab === 'discover' && !searchActive, action: () => onNavigate('discover') },
     { label: 'Danh bạ', Icon: BookUser, active: tab === 'contacts', action: () => onNavigate('contacts') },
     { label: 'Marketplace', Icon: ShoppingBag, active: tab === 'market', action: () => onNavigate('market') },
   ]
@@ -110,7 +114,9 @@ export default function AppSidebar({
           <Button
             variant="ghost"
             key={label}
-            aria-label={count ? `${label}, ${formatUnreadMessageDescription(count)}` : label}
+            aria-label={label}
+            aria-keyshortcuts={label === 'Tìm kiếm' ? 'Control+K Meta+K' : undefined}
+            aria-describedby={count ? unreadDescriptionId : undefined}
             className={cn('app-sidebar-link justify-start', active && 'is-active')}
             aria-current={active ? 'page' : undefined}
             ref={active ? activeButtonRef : undefined}

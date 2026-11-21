@@ -8,6 +8,7 @@ import SocialFeedComposer from "./SocialFeedComposer";
 import FeedFilters from "./FeedFilters";
 import FeedCommunitiesList from "./FeedCommunitiesList";
 import FeedPendingPost from "./FeedPendingPost";
+import FeedPostsFallback from "./FeedPostsFallback";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import type { FriendSearchResult, FriendConnection } from "../../contacts";
@@ -32,6 +33,7 @@ export type FeedSectionProps = {
   feedFiltersPill: { hostRef: (node: HTMLDivElement | null) => void; activeRef: (node: HTMLButtonElement | null) => void; pillRef: (node: HTMLSpanElement | null) => void; };
   feedInfiniteScrollRef: RefObject<HTMLDivElement | null>;
   feedLoadingMore: boolean;
+  feedInitialLoading: boolean;
   feedPagingError: boolean;
   feedSearchActive: boolean;
   feedViewRef: RefObject<HTMLDivElement | null>;
@@ -43,10 +45,13 @@ export type FeedSectionProps = {
   isProfileDesktop: boolean;
   loadMoreConversations: () => Promise<void>;
   loadMorePosts: () => Promise<void>;
-  loadSavedPosts: (more?: boolean) => Promise<void>;
+  loadSavedPosts: (more?: boolean, mode?: "open" | "refresh") => Promise<void>;
   mediaUploading: "chat" | "feed" | "profile" | "story" | null;
   name: string;
   normalizedSearch: string;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  communityCard: ReactNode;
   openVisitor: (username: string) => void;
   pendingPost: Post | null;
   postComposerRef: RefObject<HTMLTextAreaElement | null>;
@@ -56,7 +61,6 @@ export type FeedSectionProps = {
   profileMedia: ProfileMediaState | null;
   refreshPosts: () => Promise<void>;
   renderPosts: (items: Post[], showSave?: boolean) => ReactNode[];
-  savedPosts: Post[];
   searchedPosts: Post[];
   session: Session;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
@@ -90,6 +94,7 @@ export default function FeedSection({
   feedFiltersPill,
   feedInfiniteScrollRef,
   feedLoadingMore,
+  feedInitialLoading,
   feedPagingError,
   feedSearchActive,
   feedViewRef,
@@ -105,6 +110,9 @@ export default function FeedSection({
   mediaUploading,
   name,
   normalizedSearch,
+  searchQuery,
+  onSearchChange,
+  communityCard,
   openVisitor,
   pendingPost,
   postComposerRef,
@@ -114,7 +122,6 @@ export default function FeedSection({
   profileMedia,
   refreshPosts,
   renderPosts,
-  savedPosts,
   searchedPosts,
   session,
   setActiveConversationId,
@@ -165,8 +172,8 @@ export default function FeedSection({
                 }
               }}
             />
-            <div className="social-feed-grid">
-              <div className="social-feed-center">
+            <div className="social-feed-grid flex w-full min-w-0 flex-col gap-0 p-0 min-[761px]:mx-auto min-[761px]:grid min-[761px]:max-w-[700px] min-[761px]:grid-cols-[minmax(0,1fr)] min-[761px]:items-start min-[761px]:justify-center min-[761px]:gap-[22px] min-[761px]:px-[18px] min-[761px]:pt-[17px] min-[761px]:pb-9 min-[1121px]:max-w-[1040px] min-[1121px]:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] min-[1121px]:gap-[18px] min-[1331px]:grid-cols-[minmax(0,620px)_minmax(260px,320px)] min-[1331px]:gap-[22px] min-[1331px]:px-6 min-[1331px]:pt-5">
+              <div className="social-feed-center flex min-w-0 flex-col gap-0 min-[761px]:gap-[15px] min-[761px]:[&>*]:box-border min-[761px]:[&>*]:w-full min-[761px]:[&>*]:min-w-0">
                 {!feedCommunitiesOpen && (<>
                 {isProfileDesktop ? (
                   <SocialFeedStories
@@ -214,7 +221,7 @@ export default function FeedSection({
                   />
                 </>)}
 
-                {!feedCommunitiesOpen && (
+                {!feedCommunitiesOpen && !isProfileDesktop && (
                   <FeedFilters
                     isProfileDesktop={isProfileDesktop}
                     filter={feedFilter}
@@ -225,13 +232,12 @@ export default function FeedSection({
                     onCloseCommunities={() => setFeedCommunitiesOpen(false)}
                     onRefresh={() => {
                       if (feedFilter === "following") followingFeed.refresh();
-                      else if (feedFilter === "saved") void loadSavedPosts();
+                      else if (feedFilter === "saved") void loadSavedPosts(false, "refresh");
                       else void refreshPosts();
                     }}
-                    onLoadSaved={() => void loadSavedPosts()}
                   />
                 )}
-                <div className="feed zalo-feed">
+                <div className="feed zalo-feed" aria-busy={feedInitialLoading}>
                   {feedCommunitiesOpen ? (
                     <FeedCommunitiesList
                       groups={conversations}
@@ -244,7 +250,9 @@ export default function FeedSection({
                   {pendingPost && <FeedPendingPost post={pendingPost} />}
 
 
-                  {renderPosts(collapseQuickReposts(searchedPosts), isProfileDesktop)}
+                  {feedInitialLoading
+                    ? <FeedPostsFallback />
+                    : renderPosts(collapseQuickReposts(searchedPosts), isProfileDesktop)}
 
                   {feedPagingError && (
                     <div role="alert" className="soco-feed-load-more">
@@ -260,7 +268,7 @@ export default function FeedSection({
                         onClick={() => {
                           if (feedSearchActive) postSearch.retry();
                           else if (feedFilter === "saved")
-                            void loadSavedPosts(savedPosts.length > 0);
+                            void loadSavedPosts(false, "refresh");
                           else if (feedFilter === "following")
                             followingFeed.refresh();
                           else if (posts.length === 0) void refreshPosts();
@@ -277,7 +285,8 @@ export default function FeedSection({
                     style={{ height: 1 }}
                   />
                   {searchedPosts.length === 0 &&
-                    !feedLoadingMore &&
+                    !feedInitialLoading &&
+                    (!feedLoadingMore || feedFilter === "saved") &&
                     !(feedSearchActive && postSearch.loading) &&
                     !(feedFilter === "following" && followingFeed.loading) &&
                     !feedPagingError && (
@@ -288,14 +297,18 @@ export default function FeedSection({
                               ? "Không tìm thấy bài viết"
                               : feedFilter === "following"
                                 ? "Chưa có bài viết từ bạn bè"
-                                : "Chưa có bài viết"
+                                : feedFilter === "saved"
+                                  ? "Chưa có bài viết đã lưu"
+                                  : "Chưa có bài viết"
                           }
                           description={
                             normalizedSearch
                               ? "Thử một từ khóa khác nhé."
                               : feedFilter === "following"
                                 ? "Kết bạn để xem các bài viết được chia sẻ với bạn."
-                                : "Hãy chia sẻ khoảnh khắc đầu tiên của bạn."
+                                : feedFilter === "saved"
+                                  ? "Mở menu của bài viết và chọn Lưu bài viết để xem lại ở đây."
+                                  : "Hãy chia sẻ khoảnh khắc đầu tiên của bạn."
                           }
                           action={
                             !normalizedSearch && (
@@ -303,15 +316,19 @@ export default function FeedSection({
                                 onClick={() =>
                                   feedFilter === "following"
                                     ? switchTab("contacts")
-                                    : isProfileDesktop
-                                      ? (setFeedCheckInOpen(false),
-                                        setFeedComposerOpen(true))
-                                      : postComposerRef.current?.focus()
+                                    : feedFilter === "saved"
+                                      ? setFeedFilter("all")
+                                      : isProfileDesktop
+                                        ? (setFeedCheckInOpen(false),
+                                          setFeedComposerOpen(true))
+                                        : postComposerRef.current?.focus()
                                 }
                               >
                                 {feedFilter === "following"
                                   ? "Tìm bạn bè"
-                                  : "Tạo bài viết"}
+                                  : feedFilter === "saved"
+                                    ? "Quay lại Bảng tin"
+                                    : "Tạo bài viết"}
                               </SocoTextAction>
                             )
                           }
@@ -334,6 +351,9 @@ export default function FeedSection({
                   }}
                   onViewUser={openVisitor}
                   onViewContacts={() => switchTab("contacts")}
+                  searchQuery={searchQuery}
+                  onSearchChange={onSearchChange}
+                  communityCard={communityCard}
                 />
               )}
             </div>

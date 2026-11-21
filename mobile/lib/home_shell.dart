@@ -37,10 +37,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int get unreadTotal => ref.read(mobileShellProvider).unreadTotal;
   String search = '';
   Json? requestedConversation;
+  int openConversationRequest = 0;
   int createChatRequest = 0;
   int chatHomeRequest = 0;
   int createPostRequest = 0;
+  int openPostRequest = 0;
+  int? requestedPostId;
   int newFriendRequest = 0;
+  int profileVisitRequest = 0;
+  bool feedCommunitiesOpen = false;
+  // Mount screens only after their first visit; IndexedStack still preserves
+  // navigation state and scroll positions for every previously opened tab.
+  final Set<SocoTab> _visitedTabs = <SocoTab>{};
   final contentKey = GlobalKey();
   late final TextEditingController searchController = TextEditingController();
 
@@ -51,6 +59,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       search = '';
       searchController.clear();
       if (destination == SocoTab.chat) chatHomeRequest++;
+      if (destination == SocoTab.profile) profileVisitRequest++;
     });
   }
 
@@ -59,9 +68,36 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     ref.read(mobileShellProvider.notifier).openConversation();
     setState(() {
       requestedConversation = room;
+      openConversationRequest++;
       search = '';
       searchController.clear();
     });
+  }
+
+  void _openFeedPost(int postId) {
+    ref.read(mobileShellProvider.notifier).select(SocoTab.feed);
+    setState(() {
+      requestedPostId = postId;
+      feedCommunitiesOpen = false;
+      openPostRequest++;
+      search = '';
+      searchController.clear();
+    });
+  }
+
+  void _openInvitations() {
+    ref.read(mobileShellProvider.notifier).select(SocoTab.contacts);
+    setState(() => newFriendRequest++);
+  }
+
+  void _showNotifications() {
+    showNotificationSheet(
+      context,
+      widget.api,
+      onOpenConversation: _openChat,
+      onOpenPost: _openFeedPost,
+      onOpenInvitations: _openInvitations,
+    );
   }
 
   void _createChat() {
@@ -78,62 +114,95 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   };
 
   Widget _screens() {
+    _visitedTabs.add(tab);
     return IndexedStack(
       index: tab.index,
       children: [
-        ChatScreen(
-          key: const ValueKey('chat'),
-          api: widget.api,
-          query: tab == SocoTab.chat ? search : '',
-          requestedConversation: requestedConversation,
-          createRequest: createChatRequest,
-          resetRequest: chatHomeRequest,
-          onUnreadChanged: (count) {
-            if (mounted) {
-              ref.read(mobileShellProvider.notifier).setUnreadTotal(count);
-            }
-          },
-          onConversationChanged: (value) {
-            if (mounted) {
-              ref.read(mobileShellProvider.notifier).setConversationOpen(value);
-            }
-          },
-        ),
-        ContactsScreen(
-          key: const ValueKey('contacts'),
-          api: widget.api,
-          query: tab == SocoTab.contacts ? search : '',
-          onOpenConversation: _openChat,
-          onAddFriend: _createChat,
-          onCreateGroup: _createChat,
-          newFriendRequest: newFriendRequest,
-          onScanQr: () => _showQr(initialScan: true),
-          onShowQr: () => _showQr(),
-        ),
-        DiscoverScreen(
-          key: const ValueKey('discover'),
-          api: widget.api,
-          query: tab == SocoTab.discover ? search : '',
-        ),
-        FeedScreen(
-          key: const ValueKey('feed'),
-          api: widget.api,
-          query: tab == SocoTab.feed ? search : '',
-          createRequest: createPostRequest,
-          onOpenOwnProfile: () => _select(SocoTab.profile.index),
-          onOpenConversation: _openChat,
-        ),
-        ProfileScreen(
-          key: const ValueKey('profile'),
-          api: widget.api,
-          onLogout: widget.onLogout,
-          onConnect: _connectProfile,
-          onLocaleChanged: widget.onLocaleChanged,
-          onCreatePost: () {
-            ref.read(mobileShellProvider.notifier).select(SocoTab.feed);
-            setState(() => createPostRequest++);
-          },
-        ),
+        if (_visitedTabs.contains(SocoTab.chat))
+          ChatScreen(
+            key: const ValueKey('chat'),
+            api: widget.api,
+            query: tab == SocoTab.chat ? search : '',
+            requestedConversation: requestedConversation,
+            openConversationRequest: openConversationRequest,
+            createRequest: createChatRequest,
+            resetRequest: chatHomeRequest,
+            onUnreadChanged: (count) {
+              if (mounted) {
+                ref.read(mobileShellProvider.notifier).setUnreadTotal(count);
+              }
+            },
+            onConversationChanged: (value) {
+              if (mounted) {
+                ref
+                    .read(mobileShellProvider.notifier)
+                    .setConversationOpen(value);
+              }
+            },
+          )
+        else
+          const SizedBox.shrink(),
+        if (_visitedTabs.contains(SocoTab.contacts))
+          ContactsScreen(
+            key: const ValueKey('contacts'),
+            api: widget.api,
+            query: tab == SocoTab.contacts ? search : '',
+            onOpenConversation: _openChat,
+            onAddFriend: _createChat,
+            onCreateGroup: _createChat,
+            newFriendRequest: newFriendRequest,
+            onScanQr: () => _showQr(initialScan: true),
+            onShowQr: () => _showQr(),
+          )
+        else
+          const SizedBox.shrink(),
+        if (_visitedTabs.contains(SocoTab.discover))
+          DiscoverScreen(
+            key: const ValueKey('discover'),
+            api: widget.api,
+            query: tab == SocoTab.discover ? search : '',
+            onOpenConversation: _openChat,
+          )
+        else
+          const SizedBox.shrink(),
+        if (_visitedTabs.contains(SocoTab.feed))
+          FeedScreen(
+            key: const ValueKey('feed'),
+            api: widget.api,
+            query: tab == SocoTab.feed ? search : '',
+            createRequest: createPostRequest,
+            showCommunities: feedCommunitiesOpen,
+            onToggleCommunities: () =>
+                setState(() => feedCommunitiesOpen = !feedCommunitiesOpen),
+            openPostId: requestedPostId,
+            openPostRequest: openPostRequest,
+            onOpenOwnProfile: () => _select(SocoTab.profile.index),
+            onOpenConversation: _openChat,
+          )
+        else
+          const SizedBox.shrink(),
+        if (_visitedTabs.contains(SocoTab.profile))
+          ProfileScreen(
+            key: const ValueKey('profile'),
+            api: widget.api,
+            refreshRequest: profileVisitRequest,
+            onLogout: widget.onLogout,
+            onConnect: _connectProfile,
+            onLocaleChanged: widget.onLocaleChanged,
+            onNotifications: _showNotifications,
+            onOpenPost: _openFeedPost,
+            onOpenContacts: () => _select(SocoTab.contacts.index),
+            onOpenConversation: _openChat,
+            onCreatePost: () {
+              ref.read(mobileShellProvider.notifier).select(SocoTab.feed);
+              setState(() {
+                feedCommunitiesOpen = false;
+                createPostRequest++;
+              });
+            },
+          )
+        else
+          const SizedBox.shrink(),
       ],
     );
   }
@@ -207,16 +276,21 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final bell = IconButton(
       tooltip: 'Thông báo',
       style: style,
-      onPressed: () => showNotificationSheet(context, widget.api),
+      onPressed: _showNotifications,
       icon: const SocoIcon(SocoIconType.bell, size: 26),
     );
     if (tab == SocoTab.feed) {
       return [
         IconButton(
-          tooltip: 'Bạn bè',
+          key: const ValueKey('feed-communities-toggle'),
+          tooltip: 'Cộng đồng',
           style: style,
-          onPressed: () => _select(SocoTab.contacts.index),
-          icon: const Icon(Icons.people_outline_rounded, size: 27),
+          onPressed: () =>
+              setState(() => feedCommunitiesOpen = !feedCommunitiesOpen),
+          icon: Icon(
+            feedCommunitiesOpen ? Icons.groups_rounded : Icons.groups_outlined,
+            size: 27,
+          ),
         ),
         bell,
         Padding(

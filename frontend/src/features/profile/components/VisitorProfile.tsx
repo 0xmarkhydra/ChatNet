@@ -1,7 +1,10 @@
+import { StoryHighlights } from '../../feed'
 import VisitorProfileHero, { type VisitorProfileData } from './VisitorProfileHero'
-import { useEffect, useRef } from 'react'
+import ProfileTabs from './ProfileTabs'
+import ProfileDetailsCard from './ProfileDetailsCard'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft, RefreshCw, MapPin } from 'lucide-react'
 import { FeedPostCard } from '../../feed'
 import type { Post } from '../../feed'
 import type { FriendSearchResult } from '../../contacts'
@@ -11,6 +14,7 @@ import { useLatest } from '../../../shared/hooks/useLatest'
 
 type Props = {
  username: string
+ friendOnline?: boolean
  request: (path: string, init?: RequestInit) => Promise<Response>
  currentUser: string
  token: string
@@ -34,7 +38,7 @@ type Props = {
  onDeleted: (id: number) => void
  feedback: (message: string, kind?: 'success' | 'error' | 'warning' | 'info') => void
 }
-export default function VisitorProfile({ username, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onClose, onPostOpen, onOpenOriginal, onRepostChanged, onShareToChat, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
+export default function VisitorProfile({ username, friendOnline, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onClose, onPostOpen, onOpenOriginal, onRepostChanged, onShareToChat, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
  const scope=JSON.stringify([username,token])
  const [profile,setProfile]=useScopedState<VisitorProfileData|null>(scope,null)
  const [posts,setPosts]=useScopedState<Post[]>(scope,[])
@@ -43,6 +47,10 @@ export default function VisitorProfile({ username, request, currentUser, token, 
  const [error,setError]=useScopedState(scope,'')
  const [retry,setRetry]=useScopedState(scope,0)
  const [likeBusy,setLikeBusy]=useScopedState<Record<number,boolean>>(scope,{})
+ const [activeTab,setActiveTab]=useScopedState(scope,'posts')
+ const [sidebarTop,setSidebarTop]=useState(16)
+ const sidebar=useRef<HTMLElement>(null)
+ const scroller=useRef<HTMLDivElement>(null)
  const alive=useRef(true)
  const latestToken=useLatest(token)
  const latestRequest=useLatest(request)
@@ -136,18 +144,34 @@ export default function VisitorProfile({ username, request, currentUser, token, 
   return ()=>{cancelled=true}
  },[relation,profile?.username])
  const action=relation==='accepted'?'Bạn bè':relation==='incoming'?'Chấp nhận kết bạn':relation==='outgoing'?'Hủy lời mời':'Kết bạn'
+ const media=posts.flatMap(post=>(post.attachments||[]).filter(attachment=>(attachment.kind==='image'||attachment.kind==='video')&&Boolean(attachment.url)).map(attachment=>({...attachment,postId:post.id})))
+ const tabs=[{id:'posts',label:'Bài viết'},...(media.length?[{id:'media',label:'Ảnh & video'}]:[]),...(profile?.bio||profile?.city?[{id:'about',label:'Giới thiệu'}]:[])]
+ const visibleTab=tabs.some(tab=>tab.id===activeTab)?activeTab:'posts'
+ useEffect(()=>{
+  const element=sidebar.current
+  const viewport=scroller.current
+  if(!element||!viewport||typeof ResizeObserver==='undefined')return
+  const measure=()=>setSidebarTop(Math.min(16,viewport.clientHeight-element.getBoundingClientRect().height-16))
+  const observer=new ResizeObserver(measure)
+  observer.observe(element)
+  observer.observe(viewport)
+  measure()
+  return()=>observer.disconnect()
+ },[profile?.username,visibleTab])
  return <section ref={surface} onKeyDown={event=>{
   if(event.key!=='Tab'||document.querySelector('dialog[open]'))return
   const controls=Array.from(surface.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')||[])
+   .filter(control => control.tabIndex >= 0)
   const first=controls[0],last=controls[controls.length-1]
   if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
   else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}
  }} className="visitor-profile" role="dialog" aria-modal="true" aria-label="Trang cá nhân người dùng">
-  <header className="visitor-toolbar"><button ref={back} type="button" onClick={onClose} aria-label="Quay lại"><ArrowLeft size={21}/></button><strong>Trang cá nhân</strong><button type="button" onClick={()=>setRetry(n=>n+1)} disabled={loading} aria-label="Tải lại hồ sơ"><RefreshCw size={19}/></button></header>
-  <div className="visitor-scroll"><div className="visitor-content">
+  <header className="visitor-toolbar profile-page-toolbar"><button ref={back} type="button" onClick={onClose} aria-label="Quay lại"><ArrowLeft size={21}/></button><strong>Trang cá nhân</strong><button type="button" onClick={()=>setRetry(n=>n+1)} disabled={loading} aria-label="Tải lại hồ sơ"><RefreshCw size={19}/></button></header>
+  <div className="visitor-scroll" ref={scroller}><div className="visitor-content">
    {profile&&<>
     <VisitorProfileHero
       profile={profile}
+      online={friendOnline}
       relation={relation}
       friendBusy={friendBusy}
       action={action}
@@ -170,13 +194,31 @@ export default function VisitorProfile({ username, request, currentUser, token, 
         })
       }}
     />
-    <div className="visitor-timeline-title"><h2>Dòng thời gian</h2><span>Các bài viết được chia sẻ với bạn</span></div>
-    <div className="feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={(id)=>{if(id===post.id)onPostOpen(post);else onOpenOriginal?.(id)}} onRepostChanged={onRepostChanged} onShareToChat={onShareToChat} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
-    {!loading&&!error&&posts.length===0&&<div className="visitor-empty"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
-    {more&&<button type="button" className="soco-load-more" disabled={loading} onClick={()=>void loadMore()}>Xem bài viết cũ hơn</button>}
+    <ProfileTabs idPrefix="visitor-profile" tabs={tabs} active={visibleTab} onChange={setActiveTab} />
+    <div className="profile-page-columns">
+      <aside ref={sidebar} className="profile-page-aside" style={{'--profile-aside-top':sidebarTop+'px'} as CSSProperties}>
+        <ProfileDetailsCard username={profile.username} bio={profile.bio} city={profile.city} />
+        <StoryHighlights key={profile.username} request={request} username={profile.username} className="profile-page-about" />
+        {media.some(item=>item.kind==='image')&&<section className="profile-page-recent"><div className="profile-page-recent-heading"><h2>Ảnh</h2><button type="button" onClick={()=>setActiveTab('media')}>Xem tất cả</button></div><div className="profile-page-recent-grid">{media.filter(item=>item.kind==='image').slice(0,5).map((item,index)=><button type="button" key={item.storageRef+'-'+index} aria-label="Xem ảnh bài viết" onClick={()=>setActiveTab('media')}><img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/></button>)}</div></section>}
+      </aside>
+      <section id="visitor-profile-tab-content" className="profile-page-main profile-page-panel" role="tabpanel"
+        aria-labelledby={`visitor-profile-tab-${visibleTab}`}>
+    {visibleTab==='media' && <section className="profile-page-subsection" aria-label="Ảnh và video"><h2>Ảnh & video</h2><div className="profile-page-media-grid visitor-media-grid">{media.map((item,index)=><button type="button" className="profile-page-media-item" key={item.storageRef+'-'+index} onClick={()=>{const post=posts.find(post=>post.id===item.postId);if(post)onPostOpen(post)}} aria-label={'Mở bài viết chứa '+(item.kind==='video'?'video':'ảnh')}>
+      {item.kind==='image'?<img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/>:<video src={item.url} preload="metadata" aria-label={item.name||'Video bài viết'}/>}
+    </button>)}</div></section>}
+    {visibleTab==='about' && <section className="profile-page-subsection"><h2>Giới thiệu</h2>{profile.bio&&<p>{profile.bio}</p>}{profile.city&&<p><MapPin size={18} aria-hidden="true"/>Sống tại {profile.city}</p>}<small>Chỉ thông tin công khai được hiển thị.</small></section>}
+        {visibleTab==='posts' && <>
+
+      <div className="profile-page-about profile-page-timeline-heading"><h2>Bài viết</h2></div>
+    <div className="profile-page-post-feed feed zalo-feed">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={(id)=>{if(id===post.id)onPostOpen(post);else onOpenOriginal?.(id)}} onRepostChanged={onRepostChanged} onShareToChat={onShareToChat} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
+    {!loading&&!error&&posts.length===0&&<div className="profile-page-blank"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
+    {more&&<button type="button" className="profile-page-more-posts" disabled={loading} onClick={()=>void loadMore()}>Xem bài viết cũ hơn</button>}
+        </>}
+      </section>
+    </div>
    </>}
 
-   {error&&<div role="alert" className="visitor-empty"><p>{error}</p><button type="button" disabled={loading} onClick={()=>more&&posts.length?void loadMore():setRetry(n=>n+1)}>Thử lại</button></div>}
+   {error&&<div role="alert" className="visitor-empty profile-page-error"><p>{error}</p><button type="button" disabled={loading} onClick={()=>more&&posts.length?void loadMore():setRetry(n=>n+1)}>Thử lại</button></div>}
   </div></div>
  </section>
 }

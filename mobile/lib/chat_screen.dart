@@ -32,6 +32,7 @@ class ChatScreen extends ConsumerStatefulWidget {
     required this.query,
     required this.onConversationChanged,
     this.requestedConversation,
+    this.openConversationRequest = 0,
     this.createRequest = 0,
     this.resetRequest = 0,
     this.onUnreadChanged,
@@ -41,6 +42,7 @@ class ChatScreen extends ConsumerStatefulWidget {
   final String query;
   final ValueChanged<bool> onConversationChanged;
   final Json? requestedConversation;
+  final int openConversationRequest;
   final int createRequest;
   final int resetRequest;
   final ValueChanged<int>? onUnreadChanged;
@@ -129,7 +131,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     super.didUpdateWidget(oldWidget);
     final requested = widget.requestedConversation;
     if (requested != null &&
-        !identical(requested, oldWidget.requestedConversation) &&
+        (widget.openConversationRequest != oldWidget.openConversationRequest ||
+            !identical(requested, oldWidget.requestedConversation)) &&
         requested['id'] != active?['id']) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && widget.requestedConversation == requested) {

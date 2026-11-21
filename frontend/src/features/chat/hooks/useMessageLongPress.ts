@@ -1,9 +1,10 @@
-import { useRef, type SetStateAction } from "react";
+import { useEffect, useRef, type SetStateAction } from "react";
 import { type Message } from "../types";
 import { resolveMessageCopyTarget, type MessageCopyTarget } from "../utils/messageCopyTarget";
 import type { Dispatch } from "react";
 
 export type UseMessageLongPressDeps = {
+  activeConversationId: number | null;
   setConversationActionId: Dispatch<SetStateAction<number | null>>;
   setConversationMenuPosition: Dispatch<SetStateAction<{ x: number; y: number; } | null>>;
   setMessageActionId: Dispatch<SetStateAction<number | null>>;
@@ -12,6 +13,7 @@ export type UseMessageLongPressDeps = {
 };
 
 export function useMessageLongPress({
+  activeConversationId,
   setConversationActionId,
   setConversationMenuPosition,
   setMessageActionId,
@@ -27,6 +29,19 @@ export function useMessageLongPress({
     y: number;
     messageId: number;
   } | null>(null);
+  useEffect(() => {
+    const clearPendingPresses = () => {
+      if (conversationLongPress.current) window.clearTimeout(conversationLongPress.current.timer);
+      if (messageLongPressTimer.current !== null) window.clearTimeout(messageLongPressTimer.current);
+      conversationLongPress.current = null;
+      messageLongPressTimer.current = null;
+      messageLongPressStart.current = null;
+      suppressConversationClick.current = null;
+      suppressMessageClick.current = null;
+    };
+    clearPendingPresses();
+    return clearPendingPresses;
+  }, [activeConversationId]);
   function cancelConversationLongPress() {
     if (conversationLongPress.current) {
       window.clearTimeout(conversationLongPress.current.timer);

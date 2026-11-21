@@ -134,7 +134,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Linh Nguyễn').first);
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('friend-profile-content')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('friend-profile-content')),
+      findsOneWidget,
+    );
     await tester.tap(find.byTooltip('Nhắn tin'));
     await tester.pumpAndSettle();
 
@@ -276,10 +279,26 @@ void main() {
     await tester.tap(find.byTooltip('Thông báo'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Tin nhắn mới'), findsOneWidget);
-    expect(find.text('Kết bạn'), findsOneWidget);
-    expect(find.text('Cuộc gọi'), findsOneWidget);
-    expect(find.text('Chốt bản demo sáng mai nhé!'), findsWidgets);
+    // The PWA-aligned notification sheet now shows real activity rather than
+    // the legacy notification-preferences mock.
+    expect(
+      find.byKey(const ValueKey('notification-filter-all')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('notification-filter-unread')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('notification-filter-mentions')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('notification-chat:2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('notification-friend:5')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notification-mention:60')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('profile QR dialog renders without camera startup', (
@@ -310,6 +329,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('nav-profile')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('profile-settings-open')));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Ngôn ngữ ứng dụng'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ngôn ngữ ứng dụng'));
@@ -328,9 +349,12 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(SocoApp(api: DemoApi()));
+    final api = DemoApi();
+    await tester.pumpWidget(SocoApp(api: api));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('nav-profile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('profile-settings-open')));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Ngôn ngữ ứng dụng'));
     await tester.pumpAndSettle();
@@ -339,7 +363,8 @@ void main() {
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Profile'), findsOneWidget);
+    expect(api.preferences['appLocale'], 'en');
+    expect(find.byKey(const ValueKey('profile-back')), findsOneWidget);
     expect(find.text('App language'), findsOneWidget);
     expect(find.text('Log out'), findsOneWidget);
   });

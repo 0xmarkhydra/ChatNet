@@ -24,7 +24,8 @@ export function useFeedData({
   const [savedPosts, setSavedPosts] = useState<Post[]>([])
   const [hasMoreSavedPosts, setHasMoreSavedPosts] = useState(false)
   const [savedPostsBusy, setSavedPostsBusy] = useState(false)
-  const savedPagingBusy = useRef(false)
+  const [savedLoadedSession, setSavedLoadedSession] = useState<string | null>(null)
+  const savedQuery = useRef<{ sessionId: string; pending: boolean; loadedAt: number } | null>(null)
   const [hasMorePosts, setHasMorePosts] = useState(false)
   const [postsLoadingMore, setPostsLoadingMore] = useState(false)
   const [postsPagingError, setPostsPagingError] = useState(false)
@@ -88,32 +89,48 @@ export function useFeedData({
     }
   }
 
-  async function loadSavedPosts(more = false) {
-    if (!session || savedPagingBusy.current) return
+  async function loadSavedPosts(more = false, mode: 'open' | 'refresh' = 'open') {
+    if (!session) return
     const sessionId = session.sessionId
-    savedPagingBusy.current = true
+    const query = savedQuery.current?.sessionId === sessionId
+      ? savedQuery.current
+      : { sessionId, pending: false, loadedAt: 0 }
+    if (query.pending || (more && (!hasMoreSavedPosts || savedPosts.length === 0))) return
+    // Match the session response cache's feed freshness window.
+    if (!more && mode !== 'refresh' && Date.now() - query.loadedAt < 15_000) return
+    savedQuery.current = query
+    const current = () => savedQuery.current === query && sessionRef.current?.sessionId === sessionId
+    query.pending = true
     setSavedPostsBusy(true)
     setSavedPagingError(false)
     try {
-      const before = more && savedPosts.length ? '&before=' + Math.min(...savedPosts.map(p => p.id)) : ''
-      const response = await apiFetch('/api/posts?scope=saved&limit=' + FEED_PAGE_SIZE + before)
+      const before = more ? '&before=' + Math.min(...savedPosts.map(p => p.id)) : ''
+      const response = await apiFetch('/api/posts?scope=saved&limit=' + FEED_PAGE_SIZE + before,
+        mode === 'refresh' ? { cache: 'reload' } : {})
       if (!response.ok) throw new Error('Không tải được các bài đã lưu.')
       const data = await response.json() as Post[]
-      if (sessionRef.current?.sessionId !== sessionId) return
-      setSavedPosts(current => {
-        if (!more) return data
-        return appendUniquePosts(current, data)
-      })
+      if (!current()) return
+      setSavedPosts(existing => more ? appendUniquePosts(existing, data) : data)
       setHasMoreSavedPosts(data.length === FEED_PAGE_SIZE)
-    } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId) {
-        setSavedPagingError(true)
-        setNotice(error instanceof Error ? error.message : 'Không tải được bài đã lưu.', 'error')
+      if (!more) {
+        setSavedLoadedSession(sessionId)
+        query.loadedAt = Date.now()
       }
+    } catch {
+      if (current()) setSavedPagingError(true)
     } finally {
-      savedPagingBusy.current = false
-      if (sessionRef.current?.sessionId === sessionId) setSavedPostsBusy(false)
+      query.pending = false
+      if (current()) setSavedPostsBusy(false)
     }
+  }
+
+  function resetSavedPosts() {
+    savedQuery.current = null
+    setSavedPosts([])
+    setHasMoreSavedPosts(false)
+    setSavedPostsBusy(false)
+    setSavedLoadedSession(null)
+    setSavedPagingError(false)
   }
 
   function syncFeedPost(updated: Post) {
@@ -139,10 +156,9 @@ export function useFeedData({
     savedPosts,
     setSavedPosts,
     hasMoreSavedPosts,
-    setHasMoreSavedPosts,
     savedPostsBusy,
-    setSavedPostsBusy,
-    savedPagingBusy,
+    savedPostsLoaded: savedLoadedSession === session?.sessionId,
+    resetSavedPosts,
     hasMorePosts,
     setHasMorePosts,
     postsLoadingMore,

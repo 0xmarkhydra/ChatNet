@@ -5,6 +5,7 @@ import type { ApiRequest } from '../../../shared/types/api'
 import { publishRepost, undoRepost } from '../api/posts'
 import { postShareUrl } from '../utils/postSharing'
 import type { Post } from '../types'
+import { postActionClassName } from './postCardStyles'
 
 type Props = {
   post: Post
@@ -80,7 +81,7 @@ export default function FeedRepostAction({ post, request, onUpdated, onRemoved, 
   }
 
   return <>
-    <button type="button" className="post-stat feed-share-action feed-repost-action" data-reposted={Boolean(removedId)} aria-haspopup="dialog"
+    <button type="button" className={`post-stat feed-share-action feed-repost-action ${postActionClassName} data-[reposted=true]:text-primary!`} data-reposted={Boolean(removedId)} aria-haspopup="dialog"
       aria-expanded={open} aria-label="Chia sẻ bài viết" onClick={() => { setError(''); setQuote(false); setOpen(true) }}>
       <Share2 size={20} aria-hidden="true" /><span>Chia sẻ</span>
     </button>

@@ -14,25 +14,25 @@ describe("shared application header", () => {
       await act(async () => root.render(
         <AppHeader
           className="chatnet-appbar"
-          title={<h1>Tin nhắn</h1>}
-          search={<input type="search" aria-label="Tìm kiếm" />}
-        >
-          <AppHeaderActions account={<button type="button">Tài khoản</button>}>
+          start={<h1>Tin nhắn</h1>}
+          center={<input type="search" aria-label="Tìm kiếm" />}
+          end={<AppHeaderActions account={<button type="button">Tài khoản</button>}>
             <button type="button">Tạo mới</button>
-          </AppHeaderActions>
-        </AppHeader>,
+          </AppHeaderActions>}
+        />,
       ));
       const header = host.querySelector("header");
       expect(header?.getAttribute("aria-label")).toBe("Thanh công cụ chính");
       expect(header?.querySelector("h1")?.textContent).toBe("Tin nhắn");
       expect(header?.querySelector(".appbar-brand")?.textContent).toBe("SocCO");
-      expect(header?.querySelector("input[type=search]")).not.toBeNull();
+      expect(header?.querySelector(".appbar-start h1")?.textContent).toBe("Tin nhắn");
+      expect(header?.querySelector(".appbar-center input[type=search]")).not.toBeNull();
+      expect(header?.querySelector(".appbar-end .appbar-actions")).not.toBeNull();
       expect(Array.from(header?.querySelectorAll(".appbar-actions button") ?? []).map(x => x.textContent)).toEqual(["Tạo mới", "Tài khoản"]);
 
       await act(async () => root.render(
-        <AppHeader className="chatnet-appbar" title={<h1>Khám phá</h1>}>
-          <AppHeaderActions account={null}><button type="button">Tạo mới</button></AppHeaderActions>
-        </AppHeader>,
+        <AppHeader className="chatnet-appbar" start={<h1>Khám phá</h1>}
+          end={<AppHeaderActions account={null}><button type="button">Tạo mới</button></AppHeaderActions>} />,
       ));
       expect(host.querySelector("header h1")?.textContent).toBe("Khám phá");
       expect(host.querySelector("header input")).toBeNull();
