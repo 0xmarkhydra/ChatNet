@@ -1,0 +1,62 @@
+name: Flutter client quality gates
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feat/chatnet-*'
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-flutter-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-test:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: android, os: ubuntu-latest, command: 'apk --debug' }
+          - { target: ios, os: macos-latest, command: 'ios --debug --no-codesign' }
+          - { target: linux, os: ubuntu-latest, command: 'linux --debug' }
+          - { target: macos, os: macos-latest, command: 'macos --debug' }
+          - { target: web, os: ubuntu-latest, command: 'web --release' }
+          - { target: windows, os: windows-latest, command: 'windows --debug' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ${{ matrix.command }}
