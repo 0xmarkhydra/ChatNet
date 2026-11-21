@@ -3,8 +3,6 @@ package main
 import (
 	"errors"
 	"context"
-	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -309,7 +307,7 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		Background  string                   `json:"background"`
 		Attachments []mediax.AttachmentInput `json:"attachments"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 64<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -470,9 +468,7 @@ func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
 		Text       *string `json:"text"`
 		Background *string `json:"background"`
 	}
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8*1024))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF {
+	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -576,9 +572,7 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 		Content  string `json:"content"`
 		ParentID *int64 `json:"parentId"`
 	}
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16*1024))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF {
+	if err := httpx.DecodeJSON(w, r, &body, 16<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}

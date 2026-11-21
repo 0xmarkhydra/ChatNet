@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -260,18 +259,13 @@ func (s *server) pushConfig(w http.ResponseWriter, r *http.Request) {
 func (s *server) presignMedia(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	const maxMetadataBytes = 8 << 10
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxMetadataBytes))
-	if err != nil {
+	var body mediax.UploadRequest
+	if err := httpx.DecodeJSON(w, r, &body, maxMetadataBytes); err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
 			httpx.Error(w, http.StatusRequestEntityTooLarge, "request body too large")
 			return
 		}
-		httpx.Error(w, http.StatusBadRequest, "invalid body")
-		return
-	}
-	var body mediax.UploadRequest
-	if err := json.Unmarshal(data, &body); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -293,7 +287,7 @@ func (s *server) upsertPushSubscription(w http.ResponseWriter, r *http.Request) 
 	var body struct {
 		SubscriptionID string `json:"subscriptionId"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -320,7 +314,7 @@ func (s *server) deletePushSubscription(w http.ResponseWriter, r *http.Request) 
 	var body struct {
 		SubscriptionID string `json:"subscriptionId"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -549,7 +543,7 @@ func (s *server) updateTranslationPreferences(w http.ResponseWriter, r *http.Req
 		TargetLanguage string `json:"targetLanguage"`
 		AutoTranslate  bool   `json:"autoTranslate"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -788,7 +782,7 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Username string `json:"username"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -872,7 +866,7 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 		Rules       string   `json:"rules"`
 		Visibility  string   `json:"visibility"`
 	}
-	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -1277,7 +1271,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		ChannelID        int64                    `json:"channelId"`
 		Attachments      []mediax.AttachmentInput `json:"attachments"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 64<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -1506,7 +1500,7 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Text string `json:"text"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -1615,7 +1609,7 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Emoji string `json:"emoji"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}

@@ -206,7 +206,7 @@ func (s *server) translate(w http.ResponseWriter, r *http.Request) {
 		Target    string `json:"target"`
 		MessageID int64  `json:"messageId,omitempty"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 64<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
