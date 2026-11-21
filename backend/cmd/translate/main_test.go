@@ -2,11 +2,29 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
+
+func TestAcquireProviderRejectsWhenFull(t *testing.T) {
+	s := &server{providerSlots: make(chan struct{}, 1)}
+	s.providerSlots <- struct{}{}
+	if _, err := s.acquireProvider(context.Background()); !errors.Is(err, errProviderBusy) {
+		t.Fatalf("acquireProvider error=%v, want %v", err, errProviderBusy)
+	}
+}
+
+func TestRequestIPDoesNotTrustForwardedHeader(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
+	r.RemoteAddr = "192.0.2.10:1234"
+	r.Header.Set("X-Forwarded-For", "198.51.100.20")
+	if got := requestIP(r); got != "192.0.2.10" {
+		t.Fatalf("requestIP=%q", got)
+	}
+}
 
 func TestLanguageName(t *testing.T) {
 	if got := languageName("vi"); got != "Vietnamese" {
