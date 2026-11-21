@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"chatnet/internal/config"
@@ -31,14 +32,17 @@ func main() {
 
 	healthClient := &http.Client{Timeout: 1200 * time.Millisecond}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/live", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "backend"})
+	})
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
-		components := map[string]bool{
-			"auth":      healthy(healthClient, authURL+"/health"),
-			"chat":      healthy(healthClient, chatURL+"/health"),
-			"feed":      healthy(healthClient, feedURL+"/health"),
-			"translate": healthy(healthClient, translateURL+"/health"),
-			"call":      healthy(healthClient, callURL+"/health"),
-		}
+		components := checkComponents(healthClient, map[string]string{
+			"auth":      authURL + "/health",
+			"chat":      chatURL + "/health",
+			"feed":      feedURL + "/health",
+			"translate": translateURL + "/health",
+			"call":      callURL + "/health",
+		})
 		status := "ok"
 		code := http.StatusOK
 		for _, ok := range components {
@@ -48,12 +52,28 @@ func main() {
 				break
 			}
 		}
-		writeJSON(w, code, map[string]any{
-			"status":     status,
-			"service":    "backend",
-			"components": components,
-		})
+		writeJSON(w, code, map[string]any{"status": status, "service": "backend", "components": components})
 	})
+	readiness := func(w http.ResponseWriter, _ *http.Request) {
+		components := checkComponents(healthClient, map[string]string{
+			"auth":      authURL + "/ready",
+			"chat":      chatURL + "/ready",
+			"feed":      feedURL + "/ready",
+			"translate": translateURL + "/ready",
+			"call":      callURL + "/ready",
+		})
+		status := "ok"
+		code := http.StatusOK
+		for _, ok := range components {
+			if !ok {
+				status = "not_ready"
+				code = http.StatusServiceUnavailable
+				break
+			}
+		}
+		writeJSON(w, code, map[string]any{"status": status, "service": "backend", "components": components})
+	}
+	mux.HandleFunc("GET /api/ready", readiness)
 	mux.Handle("GET /__chatnet_copy_image", mediax.ClipboardImageHandler(nil))
 	mux.Handle("/api/auth/", authProxy)
 	mux.Handle("GET /api/link-preview", chatProxy)
@@ -117,6 +137,29 @@ func healthy(client *http.Client, endpoint string) bool {
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode >= 200 && resp.StatusCode < 300
+}
+
+func checkComponents(client *http.Client, endpoints map[string]string) map[string]bool {
+	type result struct {
+		name string
+		ok   bool
+	}
+	results := make(chan result, len(endpoints))
+	var wait sync.WaitGroup
+	wait.Add(len(endpoints))
+	for name, endpoint := range endpoints {
+		go func() {
+			defer wait.Done()
+			results <- result{name: name, ok: healthy(client, endpoint)}
+		}()
+	}
+	wait.Wait()
+	close(results)
+	components := make(map[string]bool, len(endpoints))
+	for item := range results {
+		components[item.name] = item.ok
+	}
+	return components
 }
 
 func mustProxy(rawURL string) *httputil.ReverseProxy {
