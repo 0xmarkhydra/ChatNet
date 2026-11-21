@@ -106,8 +106,11 @@ function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
 }
 
 function buildQuery(latitude: number, longitude: number, radiusMeters: number, category: NearbyPlaceCategory) {
+  // Public Overpass providers only need an approximate search center.
+  const coarseLatitude = Math.round(latitude * 1000) / 1000
+  const coarseLongitude = Math.round(longitude * 1000) / 1000
   const selectors = categorySelectors[category]
-    .map((selector) => `nwr(around:${radiusMeters},${latitude},${longitude})${selector};`)
+    .map((selector) => `nwr(around:${radiusMeters},${coarseLatitude},${coarseLongitude})${selector};`)
     .join('\n')
   return `[out:json][timeout:18];
 (

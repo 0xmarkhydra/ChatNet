@@ -148,6 +148,7 @@ export default function NearbyExplorer({
     {mode === 'places' && <div className="nearby-categories" aria-label="Loại địa điểm">{categories.map((item) =>
       <button key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>}
     {mode === 'people' && <p className="nearby-privacy"><ShieldCheck size={16} />Vị trí chính xác của bạn không được chia sẻ.</p>}
+    {mode === 'places' && <p className="nearby-privacy"><ShieldCheck size={16} />ChatNet gửi vị trí gần đúng (khoảng 100 m) tới dịch vụ Overpass công cộng của OpenStreetMap để tìm địa điểm. Vị trí chính xác chỉ dùng trên thiết bị.</p>}
     {locating && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang xác định vị trí…</p>}
     {loading && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang tải địa điểm…</p>}
     {locationError && mode === 'places' && <p className="nearby-error" role="alert">{locationError}</p>}
