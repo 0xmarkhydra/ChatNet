@@ -100,6 +100,9 @@ func TestConversationSearchGlobalIntegration(t *testing.T) {
 	for i := 0; i < 28; i++ {
 		create("group", fmt.Sprintf("unrelated_%02d", i), false)
 	}
+	for i := 28; i < conversationListDefaultLimit+5; i++ {
+		create("group", fmt.Sprintf("unrelated_%02d", i), false)
+	}
 	named := create("group", "Kế hoạch "+prefix+" topic_"+prefix, false)
 	hidden := create("group", "topic_"+prefix, false)
 	if _, err := db.Exec(ctx, "DELETE FROM conversation_members WHERE conversation_id=$1 AND user_id=$2", hidden, users[0]); err != nil {
@@ -127,6 +130,24 @@ func TestConversationSearchGlobalIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 		return result
+	}
+	listDefault := func() []conversation {
+		t.Helper()
+		req := httptest.NewRequest("GET", "/api/conversations", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		authx.Middleware("test", http.HandlerFunc(s.listConversations)).ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("default list: %d %s", w.Code, w.Body.String())
+		}
+		var result []conversation
+		if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	if result := listDefault(); len(result) != conversationListDefaultLimit {
+		t.Fatalf("default pagination returned %d conversations, want %d", len(result), conversationListDefaultLimit)
 	}
 	if result := list("historic_"+prefix, 0); len(result) != 1 || result[0].ID != old {
 		t.Fatalf("historical message not searchable: %+v", result)

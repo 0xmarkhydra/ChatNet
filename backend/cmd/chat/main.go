@@ -99,6 +99,8 @@ type server struct {
 	storage   *objectstore.Client
 }
 
+const conversationListDefaultLimit = 100
+
 func main() {
 	ctx := context.Background()
 	jwtSecret, err := config.RequiredSecret("JWT_SECRET")
@@ -593,7 +595,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	limit := 2147483647 // Preserve the original unpaginated response for older app versions.
+	limit := conversationListDefaultLimit
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 1 || n > 100 {
