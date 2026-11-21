@@ -568,31 +568,6 @@ export default function AuthedApp({
       setProfileEditorOpen(false);
     }
   }, [tab, profileTimelineOpen, desktopProfileOverview, setProfileComposerOpen, setProfileEditorOpen]);
-  useEffect(() => {
-    if (
-      (!profileTimelineOpen && !desktopProfileOverview) ||
-      tab !== "profile" ||
-      !session?.sessionId
-    )
-      return;
-    void latestLoadProfilePosts.current();
-    profileHeadingRef.current?.focus();
-    const loadSequence = profileLoadSequence;
-    return () => {
-      ++loadSequence.current;
-      profilePagingBusy.current = false;
-    };
-  }, [
-    profileTimelineOpen,
-    desktopProfileOverview,
-    tab,
-    session?.sessionId,
-    session?.user.username,
-    latestLoadProfilePosts,
-    profileHeadingRef,
-    profileLoadSequence,
-    profilePagingBusy,
-  ]);
   const feedFiltersPill = useSlidingPill<HTMLDivElement>(feedFilter);
   const { mentions: postMentions, readPostMention, isCurrentVisit: isCurrentMentionVisit } = usePostMentions({
     sessionId: session?.sessionId ?? null,
@@ -1270,6 +1245,31 @@ export default function AuthedApp({
   const { removeFeedPost, syncFeedPost } = usePostSync({ feedRevisionRef: feedRevision, followingFeed, postSearch, removeFeedDataPost, setProfilePosts, syncFeedDataPost });
   const { loadProfilePosts } = useProfilePosts({ feedRevisionRef: feedRevision, profileLoadSequenceRef: profileLoadSequence, profilePagingBusyRef: profilePagingBusy, profilePosts, setProfileHasMore, setProfilePosts, setProfilePostsBusy, setProfilePostsError });
   const latestLoadProfilePosts = useLatest(loadProfilePosts);
+  useEffect(() => {
+    if (
+      (!profileTimelineOpen && !desktopProfileOverview) ||
+      tab !== "profile" ||
+      !session?.sessionId
+    )
+      return;
+    void latestLoadProfilePosts.current();
+    profileHeadingRef.current?.focus();
+    const loadSequence = profileLoadSequence;
+    return () => {
+      ++loadSequence.current;
+      profilePagingBusy.current = false;
+    };
+  }, [
+    profileTimelineOpen,
+    desktopProfileOverview,
+    tab,
+    session?.sessionId,
+    session?.user.username,
+    latestLoadProfilePosts,
+    profileHeadingRef,
+    profileLoadSequence,
+    profilePagingBusy,
+  ]);
   const { createPost, draftBeforeEdit, editingPost, openEditPost, postAttachments, postBackground, postEditBusy, postFeelingId, postTaggedFriends, postText, postVisibility, restoreDraftAfterEdit, setEditingPost, setPostAttachments, setPostBackground, setPostEditBusy, setPostFeelingId, setPostTaggedFriends, setPostText, setPostVisibility, setShowPostBackgrounds, showPostBackgrounds } = usePostComposer({ actionLocks, feedCheckInLocation, feedCheckInOpen, feedRevisionRef: feedRevision, friends, mediaUploading, name, pendingPost, setFeedCheckInLocation, setFeedCheckInOpen, setFeedComposerOpen, setPendingPost, setPosts, setPostSubmitError, setProfileComposerOpen, setProfilePosts, syncFeedPost, tab });
   const { like } = usePostReactions({ actionLocks, feedRevisionRef: feedRevision, followingFeed, postSearch, refreshPosts, setLikePreviews, setPosts, setProfilePosts, setSavedPosts });
   const { addComment, manageFeedComment, reportFeedComment, setCommentLike } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
