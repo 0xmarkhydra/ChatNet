@@ -142,8 +142,16 @@ func main() {
 	s.mountMarketplace(mux)
 
 	port := config.Env("PORT", "8083")
+	httpServer := &http.Server{
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	log.Printf("feed service listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Fatal(httpServer.ListenAndServe())
 }
 
 func (s *server) list(w http.ResponseWriter, r *http.Request) {

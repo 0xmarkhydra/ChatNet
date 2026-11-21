@@ -154,8 +154,16 @@ func main() {
 	mux.Handle("POST /api/i18n/bundle", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.translateUIBundle)))
 
 	port := config.Env("PORT", "8084")
+	httpServer := &http.Server{
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	log.Printf("translate service listening on :%s provider=%s model=%s style=%s", port, s.provider, s.model, s.apiStyle)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Fatal(httpServer.ListenAndServe())
 }
 
 func (s *server) providerHealth(w http.ResponseWriter, r *http.Request) {

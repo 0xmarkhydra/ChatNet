@@ -261,8 +261,16 @@ func main() {
 	mux.Handle("GET /api/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.events)))
 
 	port := config.Env("PORT", "8082")
+	httpServer := &http.Server{
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		// Keep WriteTimeout disabled: /api/events is long-lived SSE.
+		IdleTimeout:       60 * time.Second,
+	}
 	log.Printf("chat service listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Fatal(httpServer.ListenAndServe())
 }
 
 func (s *server) pushConfig(w http.ResponseWriter, r *http.Request) {

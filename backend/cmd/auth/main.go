@@ -141,8 +141,16 @@ func main() {
 		})))
 
 	port := config.Env("PORT", "8081")
+	httpServer := &http.Server{
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	log.Printf("auth service listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Fatal(httpServer.ListenAndServe())
 }
 
 func (s *server) health(w http.ResponseWriter, _ *http.Request) {
