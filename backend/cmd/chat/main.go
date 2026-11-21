@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"chatnet/internal/authx"
@@ -90,12 +91,26 @@ type realtimeEvent struct {
 	LastReadMessageID int64         `json:"lastReadMessageId,omitempty"`
 }
 
+const (
+	pushQueueCapacity = 64
+	pushWorkerCount   = 4
+)
+
+type pushJob struct {
+	userIDs      []int64
+	notification onesignalx.Notification
+}
+
 type server struct {
 	db        *pgxpool.Pool
 	redis     *redis.Client
 	jwtSecret string
 	push      *onesignalx.Client
 	storage   *objectstore.Client
+	pushQueue chan pushJob
+	pushCtx   context.Context
+	pushStop  context.CancelFunc
+	pushStart sync.Once
 }
 
 const conversationListDefaultLimit = 100
@@ -128,6 +143,8 @@ func main() {
 		push:      onesignalx.New(config.Env("ONESIGNAL_APP_ID", ""), config.Env("ONESIGNAL_REST_API_KEY", "")),
 		storage:   objectstore.NewFromEnv(),
 	}
+	s.startPushWorkers(ctx)
+	defer s.stopPushWorkers()
 	go s.expireNearby(ctx)
 	go s.cleanupOrphanChatMedia(ctx)
 	mux := http.NewServeMux()
@@ -1961,40 +1978,87 @@ func (s *server) resolveGroupMembers(ctx context.Context, ownerID int64, ownerUs
 	return userIDs, missing
 }
 
+func (s *server) startPushWorkers(parent context.Context) {
+	if !s.push.Configured() {
+		return
+	}
+	s.pushStart.Do(func() {
+		s.pushCtx, s.pushStop = context.WithCancel(parent)
+		s.pushQueue = make(chan pushJob, pushQueueCapacity)
+		for i := 0; i < pushWorkerCount; i++ {
+			go s.pushWorker(s.pushCtx)
+		}
+	})
+}
+
+func (s *server) stopPushWorkers() {
+	if s.pushStop != nil {
+		s.pushStop()
+	}
+}
+
+func (s *server) pushWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case job := <-s.pushQueue:
+			s.deliverPush(ctx, job)
+		}
+	}
+}
+
 func (s *server) sendPushAsync(userIDs []int64, notification onesignalx.Notification) {
 	if !s.push.Configured() || len(userIDs) == 0 {
 		return
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-		defer cancel()
+	s.startPushWorkers(context.Background())
+	job := pushJob{
+		userIDs:      append([]int64(nil), userIDs...),
+		notification: notification,
+	}
+	select {
+	case <-s.pushCtx.Done():
+		log.Printf("push notification enqueue canceled")
+	case s.pushQueue <- job:
+	default:
+		log.Printf("push notification queue full; dropping notification")
+	}
+}
 
-		rows, err := s.db.Query(ctx, `
-			SELECT subscription_id::text
-			FROM push_subscriptions
-			WHERE user_id = ANY($1::bigint[])
-			ORDER BY updated_at DESC`, userIDs)
-		if err != nil {
-			log.Printf("load push subscriptions failed: %v", err)
-			return
-		}
-		defer rows.Close()
+func (s *server) deliverPush(parent context.Context, job pushJob) {
+	ctx, cancel := context.WithTimeout(parent, 8*time.Second)
+	defer cancel()
 
-		subscriptionIDs := []string{}
-		for rows.Next() {
-			var id string
-			if rows.Scan(&id) == nil && id != "" {
-				subscriptionIDs = append(subscriptionIDs, id)
-			}
-		}
-		if len(subscriptionIDs) == 0 {
-			return
-		}
+	rows, err := s.db.Query(ctx, `
+		SELECT subscription_id::text
+		FROM push_subscriptions
+		WHERE user_id = ANY($1::bigint[])
+		ORDER BY updated_at DESC`, job.userIDs)
+	if err != nil {
+		log.Printf("load push subscriptions failed: %v", err)
+		return
+	}
+	defer rows.Close()
 
-		if err := s.push.SendToSubscriptions(ctx, subscriptionIDs, notification); err != nil {
-			log.Printf("onesignal notification failed: %v", err)
+	subscriptionIDs := []string{}
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil && id != "" {
+			subscriptionIDs = append(subscriptionIDs, id)
 		}
-	}()
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("load push subscriptions failed: %v", err)
+		return
+	}
+	if len(subscriptionIDs) == 0 {
+		return
+	}
+
+	if err := s.push.SendToSubscriptions(ctx, subscriptionIDs, job.notification); err != nil {
+		log.Printf("onesignal notification failed: %v", err)
+	}
 }
 
 func directKey(a, b int64) string {

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,6 +48,38 @@ func TestPushConfigRequiresAppIDAndAPIKey(t *testing.T) {
 				t.Fatalf("got %+v, want configured=%v appId=%q", result, tc.configured, tc.appID)
 			}
 		})
+	}
+}
+
+func TestPushNotificationQueueBackpressureAndCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &server{
+		push:      onesignalx.New("app-id", "api-key"),
+		pushCtx:   ctx,
+		pushQueue: make(chan pushJob, 1),
+	}
+	s.pushStart.Do(func() {})
+	s.pushQueue <- pushJob{}
+
+	var logs bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&logs)
+	t.Cleanup(func() {
+		log.SetOutput(previous)
+	})
+
+	s.sendPushAsync([]int64{1}, onesignalx.Notification{Title: "test"})
+	if got := len(s.pushQueue); got != 1 {
+		t.Fatalf("queue length changed after backpressure: got %d, want 1", got)
+	}
+	if !strings.Contains(logs.String(), "push notification queue full; dropping notification") {
+		t.Fatalf("missing queue full log: %q", logs.String())
+	}
+
+	cancel()
+	s.sendPushAsync([]int64{2}, onesignalx.Notification{Title: "test"})
+	if !strings.Contains(logs.String(), "push notification enqueue canceled") {
+		t.Fatalf("missing cancellation log: %q", logs.String())
 	}
 }
 
