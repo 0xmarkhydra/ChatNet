@@ -261,12 +261,21 @@ try {
         return {w:r.width,h:r.height,right:r.right}
       }))
     const directActions = await mobileActions()
-    assert.equal(directActions.length, 2, width+'px: leave only voice call and more actions in the chat header')
+    assert.equal(directActions.length, 3, width+'px: voice, video and more actions remain visible')
     assert.ok(directActions.every(action=>action.w>=43.5 && action.h>=43.5 && action.right<=width+1),
-      width+'px: both header actions fit and have comfortable tap targets: '+JSON.stringify(directActions))
+      width+'px: all three header actions fit with 44px touch targets: '+JSON.stringify(directActions))
+    await page.evaluate(() => {
+      window.addEventListener('chatnet:start-call', event => {
+        event.stopImmediatePropagation()
+        window.__chatnetTestMobileCall = event.detail
+      }, {capture:true,once:true})
+    })
+    await panel.locator('.compact-room-actions').getByRole('button', {name:'Gọi video', exact:true}).click()
+    assert.deepEqual(await page.evaluate(() => window.__chatnetTestMobileCall),
+      {conversationId:101,mediaType:'video'})
     const more = panel.getByRole('button', {name:'Tùy chọn hội thoại'})
     await more.click()
-    for (const label of ['Gọi video', 'Tìm tin nhắn', 'Dịch AI', 'Thông tin hội thoại']) {
+    for (const label of ['Tìm tin nhắn', 'Dịch AI', 'Thông tin hội thoại']) {
       await page.getByRole('menuitem', {name:label, exact:true}).waitFor()
     }
     await page.keyboard.press('Escape')
@@ -337,21 +346,18 @@ try {
         width+'px channel picker closes after selection')
       const groupChat = await measure()
       fullWidth(groupChat.chat,'channel chat')
-      assert.ok(Math.abs(groupChat.header.height-direct.header.height)<1.5 &&
-        Math.abs(groupChat.chat.height-direct.chat.height)<1.5 &&
+      assert.ok(Math.abs(groupChat.chat.height-direct.chat.height)<1.5 &&
         Math.abs(groupChat.composer.width-direct.composer.width)<1.5,
-        width+'px group and direct chat share the same layout: '+JSON.stringify({direct,groupChat}))
+        width+'px group and direct chat share a full-width composer: '+JSON.stringify({direct,groupChat}))
       assert.ok(await panel.locator('.media-composer').isVisible(),
         width+'px channel chat composer remains usable')
-      const actions = await mobileActions()
-      assert.equal(actions.length,2,width+'px: group chat keeps the same compact header')
-      assert.ok(actions.every(action=>Math.abs(action.w-actions[0].w)<1 &&
-        Math.abs(action.h-actions[0].h)<1 && action.right<=width+1),
-        width+'px chat header actions must be aligned: '+JSON.stringify(actions))
-      assert.ok(actions.every((action,index)=>
-        Math.abs(action.w-directActions[index].w)<0.6 &&
-        Math.abs(action.h-directActions[index].h)<0.6),
-        width+'px direct and channel header buttons must have identical sizes: '+JSON.stringify({directActions,channelActions:actions}))
+      const actions = await panel.locator('.group-mobile-actions').evaluate(el =>
+        [...el.querySelectorAll('button')].map(btn => {
+          const rect = btn.getBoundingClientRect()
+          return {w:rect.width,h:rect.height,right:rect.right}
+        }))
+      assert.ok(actions.length >= 4 && actions.every(action => action.w>0 && action.h>0 && action.right<=width+1),
+        width+'px group chat call/search/translation/details actions remain available: '+JSON.stringify(actions))
       const groupComposerActions = await composerActions()
       assert.equal(groupComposerActions.length,directComposerActions.length,
         width+'px direct and channel composers must have the same primary actions')
@@ -368,8 +374,7 @@ try {
 
       // Regression: the group/channel info sheet must retain its full mobile
       // width instead of inheriting the narrow avatar/channel split.
-      await more.click()
-      await page.getByRole('menuitem',{name:'Thông tin hội thoại'}).click()
+      await panel.locator('.group-mobile-actions').getByRole('button',{name:'Thông tin hội thoại'}).click()
       await page.locator('#conversation-details-panel').waitFor({state:'visible'})
       const mobileInfo = await page.locator('#conversation-details-panel').evaluate(el => {
         const rect = el.getBoundingClientRect(), root = document.querySelector('.social-chat-layout').getBoundingClientRect()

@@ -511,6 +511,43 @@ try {
     server.kill()
     process.exit(0)
   }
+  if (process.argv.includes('--mobile-post-composer-only')) {
+    await page.goto(origin + '/feed', { waitUntil: 'domcontentloaded', timeout: 90000 })
+    const launcher = page.locator('.social-feed-launcher-prompt')
+    const dialog = page.getByRole('dialog', { name: 'Tạo bài viết', exact: true })
+    for (const [width, height] of [[260, 480], [284, 642], [320, 568], [390, 844]]) {
+      await page.setViewportSize({ width, height })
+      await launcher.click()
+      const geometry = await dialog.evaluate(node => {
+        const body = node.querySelector('.profile-overlay-body')
+        const toolbar = node.querySelector('.smart-composer-actions')
+        const title = toolbar.querySelector('.smart-composer-actions-title')
+        const icons = [...toolbar.querySelectorAll('.smart-composer-action-icons > button')]
+          .map(button => button.getBoundingClientRect().toJSON())
+        return { viewport: innerWidth, box: node.getBoundingClientRect().toJSON(),
+          width: body.clientWidth, scrollWidth: body.scrollWidth, title: title.getBoundingClientRect().toJSON(),
+          lineHeight: parseFloat(getComputedStyle(title).lineHeight), icons }
+      })
+      assert(geometry.box.left >= 0 && geometry.box.right <= geometry.viewport
+        && geometry.scrollWidth <= geometry.width + 1 && geometry.title.height <= geometry.lineHeight + 1
+        && geometry.icons.length === 5 && geometry.icons.every(icon => icon.width >= 43.5 && icon.height >= 43.5
+          && icon.left >= geometry.box.left && icon.right <= geometry.box.right
+          && icon.top >= geometry.title.bottom + 2
+          && (width < 284 || Math.abs(icon.top - geometry.icons[0].top) < 1)),
+      width + 'px: five reachable composer actions below an unwrapped title without horizontal scroll: ' + JSON.stringify(geometry))
+      await dialog.getByRole('button', { name: 'Check-in địa điểm' }).click()
+      await dialog.getByRole('textbox', { name: 'Địa điểm check-in' }).waitFor()
+      assert(await dialog.locator('.profile-overlay-body').evaluate(body => body.scrollWidth <= body.clientWidth + 1),
+        width + 'px: the open check-in panel must not cause horizontal overflow')
+      await dialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+      await dialog.waitFor({ state: 'hidden' })
+    }
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('PASS: post composer layout and check-in at 260, 284, 320 and 390px')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
   if (process.argv.includes('--socco-feed-layout-only')) {
     await page.goto(origin + '/feed')
     const headerAccount = page.locator('header.chatnet-appbar').getByRole('button', { name: 'Mở trang cá nhân' })
