@@ -2,15 +2,15 @@
   "openapi": "3.2.1",
   "info": {
     "title": "ChatNet — Hợp đồng HTTP đối chiếu từ source",
-    "version": "0.2.0",
-    "description": "Bản nháp. Ba thao tác health, SSE và tạo yêu cầu đơn Marketplace được đối chiếu tới handler. Các thao tác còn lại chỉ là kiểm kê route lấy từ danh mục API (x-chatnet-contract-status: route-inventory). Chúng không có schema, mã trạng thái hay yêu cầu xác thực đã xác minh. Không dùng để sinh mã, suy ra hợp đồng đầy đủ, thanh toán thật hay live deployment."
+    "version": "0.3.0",
+    "description": "Draft contract. Health, SSE, and selected high-risk auth, chat, feed, call, and translation operations are handler-verified. Remaining registered routes stay route inventory and must not drive code generation."
   },
   "servers": [
     {
       "url": "/"
     }
   ],
-  "x-source-baseline": "40c1f1b35958ee22c1278986bf82ff57520137a1",
+  "x-source-baseline": "05a3caab51b55cc5393c8f47fee625fc1eaaa19d",
   "paths": {
     "/api/health": {
       "get": {
@@ -38,7 +38,8 @@
               }
             }
           }
-        }
+        },
+        "x-chatnet-contract-status": "verified"
       }
     },
     "/api/events": {
@@ -96,7 +97,8 @@
               }
             }
           }
-        }
+        },
+        "x-chatnet-contract-status": "verified"
       }
     },
     "/api/marketplace/orders": {
@@ -244,7 +246,8 @@
               }
             }
           }
-        }
+        },
+        "x-chatnet-contract-status": "verified"
       },
       "get": {
         "operationId": "feed_get_api_marketplace_orders",
@@ -262,34 +265,182 @@
     },
     "/api/auth/register/start": {
       "post": {
-        "operationId": "auth_post_api_auth_register_start",
+        "operationId": "authRegisterStart",
         "tags": [
           "auth"
         ],
-        "summary": "Start registration",
+        "summary": "Start email verification",
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "202": {
+            "description": "Verification request created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Handler error (409).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Handler error (429).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Handler error (502).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "x-source": "backend/cmd/auth/main.go",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterStartRequest"
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/api/auth/register/verify": {
       "post": {
-        "operationId": "auth_post_api_auth_register_verify",
+        "operationId": "authRegisterVerify",
         "tags": [
           "auth"
         ],
-        "summary": "Verify registration",
+        "summary": "Verify email code and create session",
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Email-only account verified.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Account created and session started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Handler error (409).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Handler error (410).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "x-source": "backend/cmd/auth/main.go",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterVerifyRequest"
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/api/auth/register/resend": {
@@ -358,114 +509,423 @@
     },
     "/api/auth/login": {
       "post": {
-        "operationId": "auth_post_api_auth_login",
+        "operationId": "authLogin",
         "tags": [
           "auth"
         ],
-        "summary": "Login",
+        "summary": "Create authenticated session",
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Session created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Handler error (429).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "x-source": "backend/cmd/auth/main.go",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/api/auth/refresh": {
       "post": {
-        "operationId": "auth_post_api_auth_refresh",
+        "operationId": "authRefresh",
         "tags": [
           "auth"
         ],
-        "summary": "Refresh session",
+        "summary": "Refresh access token with refresh token",
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Access token refreshed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "x-source": "backend/cmd/auth/session.go",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/api/auth/logout": {
       "post": {
-        "operationId": "auth_post_api_auth_logout",
+        "operationId": "authLogout",
         "tags": [
           "auth"
         ],
-        "summary": "Logout",
+        "summary": "Revoke refresh session",
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "204": {
+            "description": "Session revoked or already absent."
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "x-source": "backend/cmd/auth/session.go",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/api/auth/sessions/list": {
       "post": {
-        "operationId": "auth_post_api_auth_sessions_list",
+        "operationId": "authListSessions",
         "tags": [
           "auth"
         ],
-        "summary": "List managed sessions",
+        "summary": "List sessions owned by refresh token",
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Active sessions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ManagedSession"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "x-source": "backend/cmd/auth/sessions_management.go",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionManagementRequest"
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/api/auth/sessions/revoke": {
       "post": {
-        "operationId": "auth_post_api_auth_sessions_revoke",
+        "operationId": "authRevokeSession",
         "tags": [
           "auth"
         ],
-        "summary": "Revoke a session",
+        "summary": "Revoke one owned session",
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "204": {
+            "description": "Session revoked."
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Handler error (404).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "x-source": "backend/cmd/auth/sessions_management.go",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionManagementRequest"
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/api/auth/sessions/revoke-others": {
       "post": {
-        "operationId": "auth_post_api_auth_sessions_revoke_others",
+        "operationId": "authRevokeOtherSessions",
         "tags": [
           "auth"
         ],
-        "summary": "Revoke other sessions",
+        "summary": "Revoke other sessions owned by refresh token",
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "204": {
+            "description": "Other sessions revoked."
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "x-source": "backend/cmd/auth/sessions_management.go",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionManagementRequest"
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/api/auth/me": {
       "get": {
-        "operationId": "auth_get_api_auth_me",
+        "operationId": "authMe",
         "tags": [
           "auth"
         ],
-        "summary": "Current user",
+        "summary": "Get current user",
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Current user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Handler error (404).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "x-source": "backend/cmd/auth/main.go",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/auth/session/status": {
@@ -1494,7 +1954,7 @@
     },
     "/api/conversations/{id}/messages": {
       "get": {
-        "operationId": "chat_get_api_conversations_by_id_messages",
+        "operationId": "chatListMessages",
         "tags": [
           "chat"
         ],
@@ -1503,22 +1963,159 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Kiểu giá trị chưa được xác minh.",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "target",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sender",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "tzOffset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": -840,
+              "maximum": 840
             }
           }
         ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Messages in ascending ID order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Handler error (403).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Handler error (404).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Handler error (500).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/chat/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/chat/",
+        "x-source": "backend/cmd/chat/main.go",
+        "summary": "List authorized conversation messages",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "post": {
-        "operationId": "chat_post_api_conversations_by_id_messages",
+        "operationId": "chatCreateMessage",
         "tags": [
           "chat"
         ],
@@ -1527,24 +2124,108 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Kiểu giá trị chưa được xác minh.",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Existing idempotent message returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Message created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Handler error (403).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Handler error (404).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Handler error (409).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Handler error (500).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/chat/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/chat/",
+        "x-source": "backend/cmd/chat/main.go",
+        "summary": "Create idempotent conversation message",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageRequest"
+              }
+            }
+          }
+        }
       }
     },
     "/api/conversations/{id}/read": {
       "post": {
-        "operationId": "chat_post_api_conversations_by_id_read",
+        "operationId": "chatMarkRead",
         "tags": [
           "chat"
         ],
@@ -1553,19 +2234,63 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Kiểu giá trị chưa được xác minh.",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Read state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadState"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Handler error (403).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Handler error (500).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/chat/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/chat/",
+        "x-source": "backend/cmd/chat/main.go",
+        "summary": "Advance conversation read state",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/conversations/{id}/history": {
@@ -3057,32 +3782,133 @@
     },
     "/api/calls": {
       "post": {
-        "operationId": "call_post_api_calls",
+        "operationId": "callCreate",
         "tags": [
           "call"
         ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "201": {
+            "description": "Call created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Handler error (403).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Handler error (409).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Handler error (500).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/call/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/call/",
+        "x-source": "backend/cmd/call/main.go",
+        "summary": "Create ringing call",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallCreateRequest"
+              }
+            }
+          }
+        }
       }
     },
     "/api/calls/current": {
       "get": {
-        "operationId": "call_get_api_calls_current",
+        "operationId": "callCurrent",
         "tags": [
           "call"
         ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Current calls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CallView"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Handler error (500).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/call/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/call/",
+        "x-source": "backend/cmd/call/main.go",
+        "summary": "List current calls for user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/calls/history": {
@@ -3479,30 +4305,172 @@
     },
     "/api/posts": {
       "get": {
-        "operationId": "feed_get_api_posts",
+        "operationId": "feedListPosts",
         "tags": [
           "feed"
         ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Feed posts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Post"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Handler error (500).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/feed/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/feed/",
+        "x-source": "backend/cmd/feed/main.go",
+        "summary": "List authorized feed posts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "saved",
+                "mine",
+                "following"
+              ]
+            }
+          }
+        ]
       },
       "post": {
-        "operationId": "feed_post_api_posts",
+        "operationId": "feedCreatePost",
         "tags": [
           "feed"
         ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "201": {
+            "description": "Post created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Handler error (500).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/feed/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/feed/",
+        "x-source": "backend/cmd/feed/main.go",
+        "summary": "Create feed post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostCreateRequest"
+              }
+            }
+          }
+        }
       }
     },
     "/api/posts/{id}": {
@@ -4077,32 +5045,288 @@
     },
     "/api/translate": {
       "post": {
-        "operationId": "translate_post_api_translate",
+        "operationId": "translateText",
         "tags": [
           "translate"
         ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Translated text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Handler error (404).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Handler error (502).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/translate/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/translate/",
+        "x-source": "backend/cmd/translate/main.go",
+        "summary": "Translate text or authorized message",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationRequest"
+              }
+            }
+          }
+        }
       }
     },
     "/api/i18n/bundle": {
       "post": {
-        "operationId": "translate_post_api_i18n_bundle",
+        "operationId": "translateUIBundle",
         "tags": [
           "translate"
         ],
         "responses": {
+          "200": {
+            "description": "Localized UI bundle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UIBundleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Handler error (502).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Handler error (503).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          }
+        },
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/translate/",
+        "x-source": "backend/cmd/translate/i18n.go",
+        "summary": "Translate UI message bundle",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UIBundleRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/posts/{id}/repost": {
+      "post": {
+        "operationId": "feed_post__api_posts_by_id_repost",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Route parameter not yet modeled.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
           "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+            "description": "Not modeled. Handler status, body, and authentication requirements require extraction."
           }
         },
         "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/translate/"
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "delete": {
+        "operationId": "feed_delete__api_posts_by_id_repost",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Route parameter not yet modeled.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Not modeled. Handler status, body, and authentication requirements require extraction."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      }
+    },
+    "/api/posts/{id}/comments/{commentId}/like": {
+      "put": {
+        "operationId": "feed_put__api_posts_by_id_comments_by_commentId_like",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Route parameter not yet modeled.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "required": true,
+            "description": "Route parameter not yet modeled.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Not modeled. Handler status, body, and authentication requirements require extraction."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
+      },
+      "delete": {
+        "operationId": "feed_delete__api_posts_by_id_comments_by_commentId_like",
+        "tags": [
+          "feed"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Route parameter not yet modeled.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "required": true,
+            "description": "Route parameter not yet modeled.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Not modeled. Handler status, body, and authentication requirements require extraction."
+          }
+        },
+        "x-chatnet-contract-status": "route-inventory",
+        "x-chatnet-source": "backend/cmd/feed/"
       }
     }
   },
@@ -4180,6 +5404,818 @@
           "service",
           "status",
           "components"
+        ]
+      },
+      "MediaAttachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "storageRef": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageRef",
+          "name",
+          "sizeBytes",
+          "contentType",
+          "kind"
+        ]
+      },
+      "AuthUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "username",
+          "displayName",
+          "createdAt"
+        ]
+      },
+      "AuthSessionResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          }
+        },
+        "required": [
+          "token",
+          "refreshToken",
+          "user"
+        ]
+      },
+      "VerificationResponse": {
+        "type": "object",
+        "properties": {
+          "verificationToken": {
+            "type": "string"
+          },
+          "emailMasked": {
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "verificationToken",
+          "emailMasked",
+          "expiresInSeconds"
+        ]
+      },
+      "RegisterStartRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "RegisterVerifyRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "code"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "RefreshTokenRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionManagementRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "ManagedSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userAgent": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "userAgent",
+          "createdAt",
+          "lastSeenAt",
+          "expiresAt",
+          "current"
+        ]
+      },
+      "MessageReaction": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "mine": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "emoji",
+          "count",
+          "mine"
+        ]
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "channelId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "senderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderDisplayName": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "forwarded": {
+            "type": "boolean"
+          },
+          "replyToMessageId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "replyToSender": {
+            "type": "string"
+          },
+          "replyToDisplayName": {
+            "type": "string"
+          },
+          "replyToText": {
+            "type": "string"
+          },
+          "editedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageReaction"
+            }
+          },
+          "readByUserIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "translatedText": {
+            "type": "string"
+          },
+          "translationLanguage": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAttachment"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "senderId",
+          "sender",
+          "text",
+          "createdAt"
+        ]
+      },
+      "MessageRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "replyToMessageId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "forwarded": {
+            "type": "boolean"
+          },
+          "channelId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAttachmentInput"
+            }
+          }
+        }
+      },
+      "ReadState": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastReadMessageId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "conversationId",
+          "lastReadMessageId"
+        ]
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "parentId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "author": {
+            "type": "string"
+          },
+          "authorDisplayName": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "liked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "content",
+          "createdAt",
+          "liked"
+        ]
+      },
+      "PostReaction": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "emoji",
+          "count"
+        ]
+      },
+      "Post": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string"
+          },
+          "background": {
+            "type": "string"
+          },
+          "saved": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "author": {
+            "type": "string"
+          },
+          "authorDisplayName": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "likes": {
+            "type": "integer"
+          },
+          "liked": {
+            "type": "boolean"
+          },
+          "myReaction": {
+            "type": "string"
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostReaction"
+            }
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Comment"
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAttachment"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "repostKind": {
+            "type": "string"
+          },
+          "originalPost": {
+            "$ref": "#/components/schemas/RepostPreview"
+          },
+          "repostCount": {
+            "type": "integer"
+          },
+          "myRepostId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "visibility",
+          "background",
+          "saved",
+          "updatedAt",
+          "id",
+          "author",
+          "content",
+          "likes",
+          "liked",
+          "comments",
+          "createdAt",
+          "repostCount"
+        ]
+      },
+      "PostCreateRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "background": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAttachmentInput"
+            }
+          }
+        }
+      },
+      "CallSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdBy": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "createdBy",
+          "mediaType",
+          "status",
+          "createdAt"
+        ]
+      },
+      "CallView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdBy": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "role": {
+            "type": "string"
+          },
+          "joined": {
+            "type": "boolean"
+          },
+          "incoming": {
+            "type": "boolean"
+          },
+          "canEnd": {
+            "type": "boolean"
+          },
+          "e2eeReady": {
+            "type": "boolean"
+          },
+          "configured": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "createdBy",
+          "mediaType",
+          "status",
+          "createdAt",
+          "role",
+          "joined",
+          "incoming",
+          "canEnd",
+          "e2eeReady",
+          "configured"
+        ]
+      },
+      "CallCreateRequest": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video"
+            ]
+          }
+        },
+        "required": [
+          "conversationId",
+          "mediaType"
+        ]
+      },
+      "TranslationRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "target"
+        ]
+      },
+      "TranslationResponse": {
+        "type": "object",
+        "properties": {
+          "translatedText": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "apiStyle": {
+            "type": "string"
+          },
+          "cache": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "translatedText",
+          "provider",
+          "model",
+          "cache"
+        ]
+      },
+      "UIBundleRequest": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "locale",
+          "version",
+          "messages"
+        ]
+      },
+      "UIBundleResponse": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "cache": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "locale",
+          "version",
+          "messages",
+          "cache"
+        ]
+      },
+      "MediaAttachmentInput": {
+        "type": "object",
+        "properties": {
+          "storageRef": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "storageRef",
+          "name",
+          "sizeBytes",
+          "contentType",
+          "kind"
+        ]
+      },
+      "RepostPreview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "author": {
+            "type": "string"
+          },
+          "authorDisplayName": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAttachment"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "content"
         ]
       }
     }
