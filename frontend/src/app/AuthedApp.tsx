@@ -2665,6 +2665,11 @@ export default function AuthedApp({
           name={name}
           openVisitor={openVisitor}
           pendingPost={pendingPost}
+          postDraft={postText}
+          onCreateMediaPost={(files) => { setProfileComposerOpen(true); void addFeedFiles(files); }}
+          onCreateStory={() => setStoryDraft({ kind: 'choose' })}
+          onCheckIn={() => { setFeedCheckInOpen(true); setProfileComposerOpen(true); }}
+          storyBusy={storyBusy || mediaUploading === 'story'}
           privacy={privacy}
           privacyBusy={privacyBusy}
           privacyError={privacyError}
@@ -3168,7 +3173,7 @@ export default function AuthedApp({
       }}
     >
 
-      {storyDraft && tab === "feed" && (
+      {storyDraft && (tab === "feed" || tab === "profile") && (
           <StoryDraftOverlay
           createStory={createStory}
           mediaUploading={mediaUploading}
@@ -3200,6 +3205,7 @@ export default function AuthedApp({
           postEditBusy={postEditBusy}
           restoreDraftAfterEdit={restoreDraftAfterEdit}
           setProfileComposerOpen={setProfileComposerOpen}
+          setFeedCheckInOpen={setFeedCheckInOpen}
         />
         )}
       {profileEditorOpen &&

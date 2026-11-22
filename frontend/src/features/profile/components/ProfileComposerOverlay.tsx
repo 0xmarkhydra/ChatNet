@@ -11,6 +11,7 @@ export type ProfileComposerOverlayProps = {
   postEditBusy: boolean;
   restoreDraftAfterEdit: () => void;
   setProfileComposerOpen: Dispatch<SetStateAction<boolean>>;
+  setFeedCheckInOpen: Dispatch<SetStateAction<boolean>>;
 };
 
 export default function ProfileComposerOverlay({
@@ -21,6 +22,7 @@ export default function ProfileComposerOverlay({
   postEditBusy,
   restoreDraftAfterEdit,
   setProfileComposerOpen,
+  setFeedCheckInOpen,
 }: ProfileComposerOverlayProps) {
   return (
       <ProfileOverlay
@@ -29,6 +31,7 @@ export default function ProfileComposerOverlay({
             onClose={() => {
               setProfileComposerOpen(false);
               if (editingPost) restoreDraftAfterEdit();
+              else setFeedCheckInOpen(false);
             }}
           >
             {postComposer}

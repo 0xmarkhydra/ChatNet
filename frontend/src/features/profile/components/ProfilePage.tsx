@@ -5,7 +5,7 @@ import type { FriendConnection } from '../../contacts'
 import ProfileMediaGallery, { type ProfileMediaItem } from './ProfileMediaGallery'
 import ProfileSidebar from './ProfileSidebar'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import PostStatusPrompt from '../../../shared/ui/PostStatusPrompt'
+import PostComposerLauncher from '../../../shared/ui/PostComposerLauncher'
 
 type Section = 'posts' | 'media' | 'about' | 'friends'
 
@@ -30,6 +30,12 @@ type Props = {
   onChangeAvatar: () => void
   onChangeCover: () => void
   onCreatePost: () => void
+  onCreateMediaPost: (files: File[]) => void
+  onCreateStory: () => void
+  onCheckIn: () => void
+  composerPending?: boolean
+  storyBusy?: boolean
+  postDraft?: string
   onReloadPosts: () => void
   onLoadMorePosts: () => void
   onViewFriend: (username: string) => void
@@ -41,6 +47,7 @@ export default function ProfilePage({
   username, displayName, email, bio, city, coverUrl, coverSet, editBusy, friends,
   posts, pendingPost, postsBusy, postsError, hasMorePosts, postCards, profileNote,
   onEditProfile, onChangeAvatar, onChangeCover, onCreatePost,
+  onCreateMediaPost, onCreateStory, onCheckIn, composerPending = false, storyBusy = false, postDraft = '',
   onReloadPosts, onLoadMorePosts, onViewFriend, onOpenContacts, onOpenPost,
 }: Props) {
   const [section, setSection] = useState<Section>('posts')
@@ -142,15 +149,17 @@ export default function ProfilePage({
           <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel">
             {section === 'posts' && (
               <>
-                <div className="profile-page-composer">
-                  <PostStatusPrompt
-                    username={username}
-                    displayName={displayName}
-                    avatarClassName="profile-page-composer-avatar"
-                    prompt={`${displayName.split(' ').slice(-1)[0]} ơi, bạn đang nghĩ gì?`}
-                    onCreatePost={onCreatePost}
-                  />
-                </div>
+                <PostComposerLauncher
+                  username={username}
+                  displayName={displayName}
+                  prompt={postDraft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
+                  onCreatePost={onCreatePost}
+                  onCreateMediaPost={onCreateMediaPost}
+                  onCreateStory={onCreateStory}
+                  onCheckIn={onCheckIn}
+                  pending={composerPending}
+                  storyBusy={storyBusy}
+                />
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
                 <div className="profile-page-post-feed feed zalo-feed">{postCards}</div>
