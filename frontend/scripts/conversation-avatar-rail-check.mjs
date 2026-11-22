@@ -40,6 +40,7 @@ const channels = [
   { id: 7, conversationId: 102, name: 'Hỏi đáp', description: 'Hỏi đáp thiết kế', unreadCount: 3,
     lastMessage: 'Tin hỏi đáp', lastMessageAt: now },
 ]
+const compactOnly = process.argv.includes('--compact-chat-only')
 let browser
 try {
   let ready = false
@@ -48,7 +49,14 @@ try {
     await delay(150)
   }
   assert.ok(ready, 'Vite did not start')
-  browser = await chromium.launch({headless:true})
+  for (const channel of [undefined, 'chrome', 'msedge']) {
+    try {
+      browser = await chromium.launch({headless:true, channel})
+      break
+    } catch (error) {
+      if (!/doesn't exist|not found/.test(String(error)) || channel === 'msedge') throw error
+    }
+  }
   for (const width of (process.env.CHATNET_DESKTOP_ONLY ? [] : [320,390,430])) {
     const context = await browser.newContext({
       viewport: {width,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true,serviceWorkers:'block',
@@ -73,6 +81,8 @@ try {
     }, session)
     const page = await context.newPage()
     let channelFetches = 0
+    const scheduledMessages = []
+    let immediateSends = 0
     const realtimeConversationUpdates = new Map()
     const messageHistoryFetches = new Map()
     const messageHistoryCompleted = new Map()
@@ -91,6 +101,7 @@ try {
         const current = chats.map(chat => ({ ...chat, ...realtimeConversationUpdates.get(chat.id) }))
         return json(lookupId ? current.filter(chat => chat.id === Number(lookupId)) : current)
       }
+      if (path === '/api/conversations/101/e2ee/status') return json({mode:'legacy',epoch:0,pilotEnabled:false})
       if (path === '/api/conversation-categories') return json([{id:5,name:'Công việc',color:'orange'}])
       if (path === '/api/conversations/memberships') return json({ids:chats.map(c=>c.id),nextAfter:null})
       if (path === '/api/conversations/102/channels') {
@@ -102,7 +113,16 @@ try {
         {id:0,conversationId:104,name:'Thảo luận chung',description:'Sản phẩm',unreadCount:0,lastMessage:'',lastMessageAt:now},
         {id:9,conversationId:104,name:'Changelog',description:'Cập nhật',unreadCount:1,lastMessage:'Tính năng mới',lastMessageAt:now},
       ])
+      if (/^\/api\/conversations\/\d+\/scheduled-messages$/.test(path)) {
+        if (req.method() === 'POST') {
+          const item = { ...req.postDataJSON(), id: 1, state: 'pending' }
+          scheduledMessages.push(item)
+          return json(item, 201)
+        }
+        return json(scheduledMessages)
+      }
       if (/^\/api\/conversations\/\d+\/messages$/.test(path)) {
+        if (req.method() === 'POST') immediateSends++
         const id = Number(path.split('/')[3])
         if (id !== 101 && id !== 103) return json([])
         const fetchCount = (messageHistoryFetches.get(id) || 0) + 1
@@ -235,18 +255,59 @@ try {
     fullWidth((await measure()).chat,'direct chat')
     assert.ok(await panel.locator('.media-composer').isVisible(),width+'px direct chat composer')
     const direct = await measure()
-    const directActions = await panel.locator('.translate-controls').evaluate(el =>
-      [...el.querySelectorAll('.call-header-actions > button, .group-settings-toggle')].map(btn => {
+    const mobileActions = () => panel.locator('.compact-room-actions').evaluate(el =>
+      [...el.querySelectorAll('button')].map(btn => {
         const r = btn.getBoundingClientRect()
         return {w:r.width,h:r.height,right:r.right}
       }))
-    assert.equal(directActions.length,5,width+'px direct chat retains all five header actions')
-    assert.ok(directActions.every(action=>action.w>0 && action.h>0 && action.right<=width+1),
-      width+'px direct chat header actions are visible and within the viewport: '+JSON.stringify(directActions))
+    const directActions = await mobileActions()
+    assert.equal(directActions.length, 3, width+'px: voice, video and more actions remain visible')
+    assert.ok(directActions.every(action=>action.w>=43.5 && action.h>=43.5 && action.right<=width+1),
+      width+'px: all three header actions fit with 44px touch targets: '+JSON.stringify(directActions))
+    assert.ok(await panel.locator('.compact-room-actions')
+      .getByRole('button', {name:'Gọi video', exact:true}).isVisible(),
+      width+'px: video call remains a primary action without initiating a real call in fixture QA')
+    const more = panel.getByRole('button', {name:'Tùy chọn hội thoại'})
+    await more.click()
+    for (const label of ['Tìm tin nhắn', 'Dịch AI', 'Thông tin hội thoại']) {
+      await page.getByRole('menuitem', {name:label, exact:true}).waitFor()
+    }
+    await page.keyboard.press('Escape')
     const composerActions = async () => panel.locator('.media-composer').evaluate(form =>
-      [...form.querySelectorAll(':scope > .attach-button, :scope > .chat-composer-image, :scope > .voice-record-trigger, :scope > .send-button')]
+      [...form.querySelectorAll(':scope > .attach-button, :scope > .voice-record-trigger, :scope > .send-button')]
         .map(btn => {const r=btn.getBoundingClientRect();return {w:r.width,h:r.height}}))
     const directComposerActions = await composerActions()
+    assert.equal(directComposerActions.length, 3, 'Composer exposes only add, microphone and send')
+    assert.ok(directComposerActions.every(action => action.w >= 43.5 && action.h >= 43.5),
+      width+'px: composer actions should have 44px touch targets')
+    const messageInput = panel.getByRole('textbox', {name:'Tin nhắn', exact:true})
+    const inputBox = await messageInput.boundingBox()
+    assert.ok(inputBox && inputBox.width >= width * 0.43 && inputBox.height < 55,
+      width+'px: the message input should be wide and only one row when empty: '+JSON.stringify(inputBox))
+    assert.equal(await panel.getByRole('button',{name:'Đính kèm ảnh hoặc video'}).isVisible(),false)
+    const plus = panel.getByRole('button',{name:'Mở menu thêm nội dung'})
+    await messageInput.fill('Tin kiểm thử hẹn giờ')
+    await plus.click()
+    const composerMenu = page.getByRole('dialog',{name:'Thêm nội dung vào tin nhắn'})
+    await composerMenu.getByRole('button',{name:'Ảnh / Video'}).waitFor()
+    await composerMenu.getByRole('button',{name:'Hẹn giờ gửi'}).click()
+    const schedule = page.getByRole('dialog',{name:'Tin nhắn hẹn giờ'})
+    await schedule.waitFor()
+    assert.equal(await schedule.getByLabel('Nội dung').inputValue(),'Tin kiểm thử hẹn giờ')
+    assert.equal(scheduledMessages.length + immediateSends,0,'Opening scheduling must not send or schedule anything')
+    await page.keyboard.press('Escape')
+    await schedule.waitFor({state:'hidden'})
+    assert.equal(await messageInput.inputValue(),'Tin kiểm thử hẹn giờ')
+    assert.equal(scheduledMessages.length + immediateSends,0,'Dismissing scheduling must not write')
+    await plus.click()
+    await composerMenu.getByRole('button',{name:'Hẹn giờ gửi'}).click()
+    await schedule.getByRole('button',{name:'Lên lịch gửi'}).click()
+    await schedule.getByText('Đã lên lịch gửi.',{exact:true}).waitFor()
+    assert.equal(scheduledMessages.length,1,'Only explicit confirmation schedules a message')
+    assert.equal(immediateSends,0,'Scheduling never uses the immediate send endpoint')
+    await page.keyboard.press('Escape')
+    await schedule.waitFor({state:'hidden'})
+    await messageInput.fill('')
     await panel.getByRole('button',{name:'Quay lại danh sách'}).click()
     await rail.waitFor({state:'visible'})
     await page.waitForTimeout(150)
@@ -266,6 +327,73 @@ try {
     fullWidth((await measure()).rail,'conversation list after direct chat')
     assert.equal(await panel.isVisible(),false,
       width+'px direct chat closes when returning to the full list')
+
+    async function verifyChannelChat() {
+      // Screen 3: selecting a channel opens a full-width channel chat.
+      await page.locator('.group-chat-panel .group-room-title > strong').getByText('Hỏi đáp').waitFor()
+      await page.waitForTimeout(350)
+      assert.ok(await layout.evaluate(el=>el.classList.contains('mobile-rail-chat-view')),
+        width+'px selecting a channel enters chat-only view')
+      assert.equal(await rail.isVisible(),false,
+        width+'px avatar dock is hidden while reading a channel')
+      assert.equal(await picker.isVisible(),false,
+        width+'px channel picker closes after selection')
+      const groupChat = await measure()
+      fullWidth(groupChat.chat,'channel chat')
+      assert.ok(Math.abs(groupChat.chat.height-direct.chat.height)<1.5 &&
+        Math.abs(groupChat.composer.width-direct.composer.width)<1.5,
+        width+'px group and direct chat share a full-width composer: '+JSON.stringify({direct,groupChat}))
+      assert.ok(await panel.locator('.media-composer').isVisible(),
+        width+'px channel chat composer remains usable')
+      const actions = await panel.locator('.group-mobile-actions').evaluate(el =>
+        [...el.querySelectorAll('button')].map(btn => {
+          const rect = btn.getBoundingClientRect()
+          return {w:rect.width,h:rect.height,right:rect.right}
+        }))
+      assert.ok(actions.length >= 4 && actions.every(action => action.w>0 && action.h>0 && action.right<=width+1),
+        width+'px group chat call/search/translation/details actions remain available: '+JSON.stringify(actions))
+      const groupComposerActions = await composerActions()
+      assert.equal(groupComposerActions.length,directComposerActions.length,
+        width+'px direct and channel composers must have the same primary actions')
+      assert.ok(groupComposerActions.every((action,index)=>
+        Math.abs(action.w-directComposerActions[index].w)<0.6 &&
+        Math.abs(action.h-directComposerActions[index].h)<0.6),
+        width+'px direct and channel composer controls must have identical sizes: '+JSON.stringify({directComposerActions,groupComposerActions}))
+      assert.equal(await panel.locator('.group-activity-composer-trigger').isVisible(),false)
+      await plus.click()
+      for (const label of ['Bình chọn', 'Ghi chú nhóm', 'Nhắc hẹn nhóm']) {
+        await composerMenu.getByRole('button',{name:label,exact:true}).waitFor()
+      }
+      await page.keyboard.press('Escape')
+
+      // Regression: the group/channel info sheet must retain its full mobile
+      // width instead of inheriting the narrow avatar/channel split.
+      await panel.locator('.group-mobile-actions').getByRole('button',{name:'Thông tin hội thoại'}).click()
+      await page.locator('#conversation-details-panel').waitFor({state:'visible'})
+      const mobileInfo = await page.locator('#conversation-details-panel').evaluate(el => {
+        const rect = el.getBoundingClientRect(), root = document.querySelector('.social-chat-layout').getBoundingClientRect()
+        const style = getComputedStyle(el)
+        return {left:rect.left,right:rect.right,width:rect.width,height:rect.height,
+          rootLeft:root.left,rootRight:root.right,position:style.position,
+          visibility:style.visibility,display:style.display,zIndex:style.zIndex,
+          title:el.querySelector('h2')?.textContent}
+      })
+      assert.ok(mobileInfo.width >= Math.min(width,350)-5 && mobileInfo.left >= -1 &&
+        mobileInfo.right <= width+1 && mobileInfo.height > 500 &&
+        mobileInfo.display !== 'none' && mobileInfo.title === 'Thông tin kênh',
+        width+'px channel details must use full viewport and not be clipped: '+JSON.stringify(mobileInfo))
+      await page.getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
+    }
+
+    if (compactOnly) {
+      await rail.locator('.conversation-avatar-rail-item[title="SocCo Design Team"]').click()
+      await picker.getByRole('button',{name:/Mở kênh Hỏi đáp/}).click()
+      await verifyChannelChat()
+      assert.deepEqual(pageErrors, [])
+      console.log('PASS '+width+'px: chat and channel controls, wide composer, scheduling only after explicit confirmation')
+      await context.close()
+      continue
+    }
 
     // Screen 2b: group opens the *joined* narrow avatar dock + channel picker.
     await rail.locator('.conversation-avatar-rail-item[title="SocCo Design Team"]').click()
@@ -644,65 +772,7 @@ try {
     await picker.getByRole('searchbox',{name:'Tìm kênh hội thoại'}).fill('')
     await picker.getByRole('button',{name:/Mở kênh Hỏi đáp/}).click()
 
-    // Screen 3: selecting a channel opens a full-width channel chat.
-    await page.locator('.group-chat-panel .group-room-title > strong').getByText('Hỏi đáp').waitFor()
-    await page.waitForTimeout(350)
-    assert.ok(await layout.evaluate(el=>el.classList.contains('mobile-rail-chat-view')),
-      width+'px selecting a channel enters chat-only view')
-    assert.equal(await rail.isVisible(),false,
-      width+'px avatar dock is hidden while reading a channel')
-    assert.equal(await picker.isVisible(),false,
-      width+'px channel picker closes after selection')
-    const groupChat = await measure()
-    fullWidth(groupChat.chat,'channel chat')
-    assert.ok(Math.abs(groupChat.header.height-direct.header.height)<1.5 &&
-      Math.abs(groupChat.chat.height-direct.chat.height)<1.5 &&
-      Math.abs(groupChat.composer.width-direct.composer.width)<1.5,
-      width+'px group and direct chat share the same layout: '+JSON.stringify({direct,groupChat}))
-    assert.ok(await panel.locator('.media-composer').isVisible(),
-      width+'px channel chat composer remains usable')
-    const actions=await panel.locator('.group-mobile-actions').evaluate(el =>
-      [...el.querySelectorAll('.call-header-actions button, .group-more-trigger')].map(btn=>{
-        const r=btn.getBoundingClientRect()
-        return {w:r.width,h:r.height,right:r.right}
-      }))
-    assert.equal(actions.length,5,width+'px chat header retains all five actions')
-    assert.ok(actions.every(action=>Math.abs(action.w-actions[0].w)<1 &&
-      Math.abs(action.h-actions[0].h)<1 && action.right<=width+1),
-      width+'px chat header actions must be aligned: '+JSON.stringify(actions))
-    assert.ok(actions.every((action,index)=>
-      Math.abs(action.w-directActions[index].w)<0.6 &&
-      Math.abs(action.h-directActions[index].h)<0.6),
-      width+'px direct and channel header buttons must have identical sizes: '+JSON.stringify({directActions,channelActions:actions}))
-    const groupComposerActions = await composerActions()
-    assert.equal(groupComposerActions.length,directComposerActions.length,
-      width+'px direct and channel composers must have the same primary actions')
-    assert.ok(groupComposerActions.every((action,index)=>
-      Math.abs(action.w-directComposerActions[index].w)<0.6 &&
-      Math.abs(action.h-directComposerActions[index].h)<0.6),
-      width+'px direct and channel composer controls must have identical sizes: '+JSON.stringify({directComposerActions,groupComposerActions}))
-    const activity = await panel.locator('.group-activity-composer-trigger').boundingBox()
-    assert.ok(activity && Math.abs(activity.width-groupComposerActions[0].w)<0.6 &&
-      Math.abs(activity.height-groupComposerActions[0].h)<0.6,
-      width+'px group activity should match attach/image/voice button sizing: '+JSON.stringify(activity))
-
-    // Regression: the group/channel info sheet must retain its full mobile
-    // width instead of inheriting the narrow avatar/channel split.
-    await panel.locator('.group-mobile-actions').getByRole('button',{name:'Thông tin hội thoại'}).click()
-    await page.locator('#conversation-details-panel').waitFor({state:'visible'})
-    const mobileInfo = await page.locator('#conversation-details-panel').evaluate(el => {
-      const rect = el.getBoundingClientRect(), root = document.querySelector('.social-chat-layout').getBoundingClientRect()
-      const style = getComputedStyle(el)
-      return {left:rect.left,right:rect.right,width:rect.width,height:rect.height,
-        rootLeft:root.left,rootRight:root.right,position:style.position,
-        visibility:style.visibility,display:style.display,zIndex:style.zIndex,
-        title:el.querySelector('h2')?.textContent}
-    })
-    assert.ok(mobileInfo.width >= Math.min(width,350)-5 && mobileInfo.left >= -1 &&
-      mobileInfo.right <= width+1 && mobileInfo.height > 500 &&
-      mobileInfo.display !== 'none' && mobileInfo.title === 'Thông tin kênh',
-      width+'px channel details must use full viewport and not be clipped: '+JSON.stringify(mobileInfo))
-    await page.getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
+    await verifyChannelChat()
 
     // Back from channel goes to picker, not the conversation list.
     await panel.getByRole('button',{name:'Quay lại danh sách kênh'}).click()
@@ -786,6 +856,12 @@ try {
     assert.ok(pageErrors.length===0,width+'px no client runtime exceptions: '+JSON.stringify(pageErrors))
     await context.close()
     console.log('PASS '+width+'px: one expanding rail → group → channel → direct → expand/collapse')
+  }
+
+  if (compactOnly) {
+    await browser.close()
+    vite.kill()
+    process.exit(0)
   }
 
   // Regression: older groups must populate the NEW avatar rail even when the

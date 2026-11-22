@@ -45,7 +45,7 @@ export type FeedSectionProps = {
   isProfileDesktop: boolean;
   loadMoreConversations: () => Promise<void>;
   loadMorePosts: () => Promise<void>;
-  loadSavedPosts: (more?: boolean) => Promise<void>;
+  loadSavedPosts: (more?: boolean, mode?: "open" | "refresh") => Promise<void>;
   mediaUploading: "chat" | "feed" | "profile" | "story" | null;
   name: string;
   normalizedSearch: string;
@@ -61,7 +61,6 @@ export type FeedSectionProps = {
   profileMedia: ProfileMediaState | null;
   refreshPosts: () => Promise<void>;
   renderPosts: (items: Post[], showSave?: boolean) => ReactNode[];
-  savedPosts: Post[];
   searchedPosts: Post[];
   session: Session;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
@@ -123,7 +122,6 @@ export default function FeedSection({
   profileMedia,
   refreshPosts,
   renderPosts,
-  savedPosts,
   searchedPosts,
   session,
   setActiveConversationId,
@@ -234,13 +232,12 @@ export default function FeedSection({
                     onCloseCommunities={() => setFeedCommunitiesOpen(false)}
                     onRefresh={() => {
                       if (feedFilter === "following") followingFeed.refresh();
-                      else if (feedFilter === "saved") void loadSavedPosts();
+                      else if (feedFilter === "saved") void loadSavedPosts(false, "refresh");
                       else void refreshPosts();
                     }}
-                    onLoadSaved={() => void loadSavedPosts()}
                   />
                 )}
-                <div className="feed zalo-feed flex w-full min-w-0 flex-col gap-[2px] p-0 min-[761px]:gap-[13px] [&>.post]:m-0" aria-busy={feedInitialLoading}>
+                <div className={`feed zalo-feed flex w-full min-w-0 flex-col gap-[2px] p-0 min-[761px]:gap-[13px] [&>.post]:m-0 ${feedCommunitiesOpen ? "" : "max-[760px]:min-h-[calc(100dvh-var(--mobile-nav-height,0px))]"}`} aria-busy={feedInitialLoading}>
                   {feedCommunitiesOpen ? (
                     <FeedCommunitiesList
                       groups={conversations}
@@ -271,7 +268,7 @@ export default function FeedSection({
                         onClick={() => {
                           if (feedSearchActive) postSearch.retry();
                           else if (feedFilter === "saved")
-                            void loadSavedPosts(savedPosts.length > 0);
+                            void loadSavedPosts(false, "refresh");
                           else if (feedFilter === "following")
                             followingFeed.refresh();
                           else if (posts.length === 0) void refreshPosts();
@@ -289,7 +286,7 @@ export default function FeedSection({
                   />
                   {searchedPosts.length === 0 &&
                     !feedInitialLoading &&
-                    !feedLoadingMore &&
+                    (!feedLoadingMore || feedFilter === "saved") &&
                     !(feedSearchActive && postSearch.loading) &&
                     !(feedFilter === "following" && followingFeed.loading) &&
                     !feedPagingError && (

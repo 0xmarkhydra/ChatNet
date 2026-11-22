@@ -12,11 +12,10 @@ export type FeedFiltersProps = {
   setFilter: Dispatch<SetStateAction<FeedFilter>>
   onCloseCommunities: () => void
   onRefresh: () => void
-  onLoadSaved: () => void
 }
 
 export default function FeedFilters({
-  isProfileDesktop, filter, onHostMount, onActiveMount, onPillMount, setFilter, onCloseCommunities, onRefresh, onLoadSaved,
+  isProfileDesktop, filter, onHostMount, onActiveMount, onPillMount, setFilter, onCloseCommunities, onRefresh,
 }: FeedFiltersProps) {
   function chooseFilter(next: FeedFilter) {
     onCloseCommunities()
@@ -52,7 +51,7 @@ export default function FeedFilters({
           Mới nhất
         </button>
         <button ref={filter === 'saved' ? onActiveMount : undefined} type="button"
-          aria-pressed={filter === 'saved'} onClick={() => { chooseFilter('saved'); onLoadSaved() }}>
+          aria-pressed={filter === 'saved'} onClick={() => chooseFilter('saved')}>
           Đã lưu
         </button>
       </div>
