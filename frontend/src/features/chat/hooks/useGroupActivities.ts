@@ -108,4 +108,3 @@ export function useGroupActivities(
     refresh, create, vote, setPin,
   };
 }
-

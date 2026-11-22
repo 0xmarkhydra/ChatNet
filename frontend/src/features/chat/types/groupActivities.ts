@@ -25,4 +25,3 @@ export type ActivityData = {
   activities: GroupActivity[];
   events: GroupActivityEvent[];
 };
-
