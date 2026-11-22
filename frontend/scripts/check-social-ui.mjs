@@ -49,6 +49,7 @@ let commentRequests = 0
 const suggestions = [{id: 4, username:'phuonglinh', displayName:'Phương Linh', online:true}]
 let followingRequests = 0
 let savedRequests = 0
+let savedDelay = 0
 let lastFeedCreated = null
 let lastFeedEdited = null
 let mentionReadCalls = 0
@@ -258,7 +259,11 @@ try {
         return json(createdFeedPost)
       }
       if (params.get('scope') === 'following') { followingRequests++; return json(feedPosts) }
-      if (params.get('scope') === 'saved') { savedRequests++; return json(feedPosts.filter(post=>post.saved)) }
+      if (params.get('scope') === 'saved') {
+        savedRequests++
+        const respond = () => json(feedPosts.filter(post => post.saved))
+        return savedDelay ? new Promise(resolve => setTimeout(resolve, savedDelay)).then(respond) : respond()
+      }
       if (params.get('q')) return json(feedPosts.filter(post=>post.content.toLowerCase().includes(params.get('q').toLowerCase())))
       if (params.get('author') === 'minhanh') return json(feedPosts)
       if (params.get('scope') === 'mine') return json([{
@@ -321,6 +326,40 @@ try {
     if (path === '/api/users/nearby') return json({ users: [], expiresAt: new Date().toISOString() })
     return json({})
   })
+  if (process.argv.includes('--feed-filter-scroll-only')) {
+    feedPosts.push(...Array.from({ length: 4 }, (_, i) => ({ ...fixturePost, id: 900 + i })))
+    savedDelay = 800
+    const warmed = page.waitForResponse(response => new URL(response.url()).searchParams.get('scope') === 'saved')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(origin + '/feed?feed=all', { waitUntil: 'domcontentloaded', timeout: 90000 })
+    const feed = page.locator('.feed-view.social-feed')
+    const filters = feed.getByRole('group', { name: 'Lọc bảng tin' })
+    const latest = filters.getByRole('button', { name: 'Mới nhất', exact: true })
+    const saved = filters.getByRole('button', { name: 'Đã lưu', exact: true })
+    await feed.locator('.feed-post-card').first().waitFor()
+    const previous = await feed.evaluate(el => { el.scrollTop = 120; return el.scrollTop })
+    assert(previous >= 100, 'Fixture needs enough scroll distance to catch a reset')
+    await warmed
+    await saved.click()
+    await feed.getByText('Chưa có bài viết đã lưu', { exact: true }).waitFor()
+    assert(await saved.getAttribute('aria-pressed') === 'true', 'Saved tab should be selected')
+    const savedTop = await feed.evaluate(el => el.scrollTop)
+    assert(Math.abs(savedTop - previous) <= 1, 'Saved empty state reset the feed from ' + previous + ' to ' + savedTop)
+    await latest.click()
+    await feed.locator('.feed-post-card').first().waitFor()
+    assert(await latest.getAttribute('aria-pressed') === 'true', 'Latest tab should be selected again')
+    const latestTop = await feed.evaluate(el => el.scrollTop)
+    assert(Math.abs(latestTop - previous) <= 1, 'Latest tab reset the feed from ' + previous + ' to ' + latestTop)
+    await saved.click()
+    await feed.getByText('Chưa có bài viết đã lưu', { exact: true }).waitFor()
+    assert(savedRequests === 1, 'First Saved page should be warmed once and reused across filter changes')
+    console.log('PASS: one background Saved request despite 800 ms latency and repeated switches')
+    console.log('PASS: mobile feed scroll across Latest → empty Saved → Latest (' + previous + ' → ' + savedTop + ' → ' + latestTop + ' px)')
+    await browser.close()
+    browser = null
+    server.kill()
+    process.exit(0)
+  }
   if (repostOnly) {
     await page.goto(origin + '/feed', { waitUntil: 'domcontentloaded', timeout: 90000 })
     const toolbar = page.locator('.feed-post-card .feed-post-toolbar').first()
@@ -468,6 +507,43 @@ try {
     }
     assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
     console.log('Post detail dock PASS: footer hit targets and aligned columns on desktop, stacked layout and composer focus on mobile')
+    await browser.close()
+    server.kill()
+    process.exit(0)
+  }
+  if (process.argv.includes('--mobile-post-composer-only')) {
+    await page.goto(origin + '/feed', { waitUntil: 'domcontentloaded', timeout: 90000 })
+    const launcher = page.locator('.social-feed-launcher-prompt')
+    const dialog = page.getByRole('dialog', { name: 'Tạo bài viết', exact: true })
+    for (const [width, height] of [[260, 480], [284, 642], [320, 568], [390, 844]]) {
+      await page.setViewportSize({ width, height })
+      await launcher.click()
+      const geometry = await dialog.evaluate(node => {
+        const body = node.querySelector('.profile-overlay-body')
+        const toolbar = node.querySelector('.smart-composer-actions')
+        const title = toolbar.querySelector('.smart-composer-actions-title')
+        const icons = [...toolbar.querySelectorAll('.smart-composer-action-icons > button')]
+          .map(button => button.getBoundingClientRect().toJSON())
+        return { viewport: innerWidth, box: node.getBoundingClientRect().toJSON(),
+          width: body.clientWidth, scrollWidth: body.scrollWidth, title: title.getBoundingClientRect().toJSON(),
+          lineHeight: parseFloat(getComputedStyle(title).lineHeight), icons }
+      })
+      assert(geometry.box.left >= 0 && geometry.box.right <= geometry.viewport
+        && geometry.scrollWidth <= geometry.width + 1 && geometry.title.height <= geometry.lineHeight + 1
+        && geometry.icons.length === 5 && geometry.icons.every(icon => icon.width >= 43.5 && icon.height >= 43.5
+          && icon.left >= geometry.box.left && icon.right <= geometry.box.right
+          && icon.top >= geometry.title.bottom + 2
+          && (width < 284 || Math.abs(icon.top - geometry.icons[0].top) < 1)),
+      width + 'px: five reachable composer actions below an unwrapped title without horizontal scroll: ' + JSON.stringify(geometry))
+      await dialog.getByRole('button', { name: 'Check-in địa điểm' }).click()
+      await dialog.getByRole('textbox', { name: 'Địa điểm check-in' }).waitFor()
+      assert(await dialog.locator('.profile-overlay-body').evaluate(body => body.scrollWidth <= body.clientWidth + 1),
+        width + 'px: the open check-in panel must not cause horizontal overflow')
+      await dialog.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
+      await dialog.waitFor({ state: 'hidden' })
+    }
+    assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
+    console.log('PASS: post composer layout and check-in at 260, 284, 320 and 390px')
     await browser.close()
     server.kill()
     process.exit(0)

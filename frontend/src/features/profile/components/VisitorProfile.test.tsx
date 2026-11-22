@@ -10,7 +10,7 @@ vi.mock('../api/profile', () => ({
   loadVisitorPosts: vi.fn(),
   reactToVisitorPost: vi.fn(),
 }))
-vi.mock('./VisitorProfileHero', () => ({ default: ({ profile, tabs, onTabChange }: { profile: { username: string }; tabs: {id:string;label:string}[]; onTabChange:(tab:string)=>void }) => <div>Hồ sơ @{profile.username}<nav>{tabs.map(tab=><button type="button" key={tab.id} onClick={()=>onTabChange(tab.id)}>{tab.label}</button>)}</nav></div> }))
+vi.mock('./VisitorProfileHero', () => ({ default: ({ profile }: { profile: { username: string } }) => <div>Hồ sơ @{profile.username}</div> }))
 vi.mock('../../feed/components/FeedPostCard', () => ({ default: ({ post }: { post: { id: number } }) => <div>Bài {post.id}</div> }))
 
 describe('VisitorProfile session isolation', () => {
@@ -83,6 +83,11 @@ describe('VisitorProfile data-driven sections', () => {
       vi.mocked(loadVisitorPosts).mockResolvedValue(new Response('[]'))
       await act(async () => root.render(<VisitorProfile {...props} />))
       expect(element.textContent).toContain('Bài viết')
+      expect(element.querySelector('.profile-page-tabbar [role="tab"][aria-selected="true"]')?.textContent).toBe('Bài viết')
+      expect(element.querySelector('.profile-page-aside .profile-page-about h2')?.textContent).toBe('Thông tin cá nhân')
+      expect(element.querySelector('.profile-page-main[role="tabpanel"]')).not.toBeNull()
+      expect(element.textContent).not.toContain('Chỉnh sửa thông tin')
+      expect(element.textContent).not.toContain('Email chỉ hiển thị với bạn')
       expect(element.textContent).not.toContain('Ảnh & video')
       expect(element.textContent).not.toContain('Giới thiệu')
       expect(element.textContent).not.toContain('Bạn chung')

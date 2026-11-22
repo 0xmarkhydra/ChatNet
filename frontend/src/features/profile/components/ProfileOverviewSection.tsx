@@ -1,8 +1,10 @@
+import { StoryHighlights } from '../../feed'
 import ProfileEditorPage from "./ProfileEditorPage";
 import { profileAssetUrl } from "../../../shared/ui/UserAvatar";
 import ProfilePage from "./ProfilePage";
 import ProfileNote from "./ProfileNote";
-import type { UserPrivacy, ProfileMediaState } from "../types";
+import ProfileAvatarPicker from "./ProfileAvatarPicker";
+import type { UserPrivacy, ProfileMediaState, ProfilePublicDetails } from "../types";
 import type { FriendConnection } from "../../contacts";
 import { type Post } from "../../feed";
 import { FormEvent, useState, type SetStateAction } from "react";
@@ -22,10 +24,10 @@ export type ProfileOverviewSectionProps = {
   mediaUploading: "chat" | "feed" | "story" | "profile" | null;
   name: string;
   openVisitor: (username: string) => void;
+  onCreateStory: () => void;
   pendingPost: Post | null;
   postDraft: string;
   onCreateMediaPost: (files: File[]) => void;
-  onCreateStory: () => void;
   onCheckIn: () => void;
   storyBusy: boolean;
   privacy: UserPrivacy | null;
@@ -35,6 +37,8 @@ export type ProfileOverviewSectionProps = {
   profileBioDraft: string;
   profileBusy: "avatar" | "cover" | null;
   profileCityDraft: string;
+  publicDetailsDraft: ProfilePublicDetails;
+  setPublicDetailsDraft: (value: ProfilePublicDetails) => void;
   profileDisplayNameDraft: string;
   profileEditorOpen: boolean;
   profileHasMore: boolean;
@@ -71,10 +75,10 @@ export default function ProfileOverviewSection({
   mediaUploading,
   name,
   openVisitor,
+  onCreateStory,
   pendingPost,
   postDraft,
   onCreateMediaPost,
-  onCreateStory,
   onCheckIn,
   storyBusy,
   privacy,
@@ -84,6 +88,8 @@ export default function ProfileOverviewSection({
   profileBioDraft,
   profileBusy,
   profileCityDraft,
+  publicDetailsDraft,
+  setPublicDetailsDraft,
   profileDisplayNameDraft,
   profileEditorOpen,
   profileHasMore,
@@ -108,21 +114,11 @@ export default function ProfileOverviewSection({
   updateProfileImage,
   visibleProfilePosts,
 }: ProfileOverviewSectionProps) {
-  const [profilePhotoTarget, setProfilePhotoTarget] = useState<'avatar' | 'cover' | null>(null);
+  const [avatarPicker, setAvatarPicker] = useState<{ opener: HTMLButtonElement | null } | null>(null);
+  const [coverEditorOpen, setCoverEditorOpen] = useState(false);
+  const openAvatarPicker = (opener: HTMLButtonElement | null) => setAvatarPicker({ opener });
   return (
       <>
-            <input
-              ref={avatarFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh đại diện"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("avatar", file);
-              }}
-            />
             <input
               ref={coverFileInputRef}
               className="hidden-media-input"
@@ -154,6 +150,8 @@ export default function ProfileOverviewSection({
                 bioDraft={profileBioDraft}
                 setBioDraft={setProfileBioDraft}
                 cityDraft={profileCityDraft}
+                publicDetailsDraft={publicDetailsDraft}
+                setPublicDetailsDraft={setPublicDetailsDraft}
                 setCityDraft={setProfileCityDraft}
                 profileSaving={profileSaving}
                 mediaBusy={profileBusy !== null || mediaUploading === "profile"}
@@ -165,11 +163,12 @@ export default function ProfileOverviewSection({
                 changePrivacy={changePrivacy}
                 onSave={saveProfileIdentity}
                 onDiscard={discardDesktopProfileEdits}
-                onChangeAvatar={() => setProfilePhotoTarget('avatar')}
-                onChangeCover={() => setProfilePhotoTarget('cover')}
+                onChangeAvatar={openAvatarPicker}
+                onChangeCover={() => setCoverEditorOpen(true)}
               />
             ) : (
               <ProfilePage
+                highlights={<StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} className="profile-page-about" owner />}
                 username={name}
                 displayName={
                   profileMedia?.displayName || session.user.displayName || name
@@ -177,12 +176,16 @@ export default function ProfileOverviewSection({
                 email={session.user.email}
                 bio={profileMedia?.bio}
                 city={profileMedia?.city}
+                workplace={profileMedia?.workplace}
+                school={profileMedia?.school}
                 coverUrl={
                   profileMedia?.coverSet
                     ? profileAssetUrl(name, "cover", profileMedia.updatedAt)
                     : undefined
                 }
                 coverSet={Boolean(profileMedia?.coverSet)}
+                avatarSet={Boolean(profileMedia?.avatarSet)}
+                avatarVersion={profileMedia?.updatedAt}
                 editBusy={profileBusy !== null || mediaUploading === "profile"}
                 friends={friends}
                 posts={profilePosts}
@@ -206,8 +209,8 @@ export default function ProfileOverviewSection({
                   />
                 }
                 onEditProfile={() => setProfileEditorOpen(true)}
-                onChangeAvatar={() => setProfilePhotoTarget('avatar')}
-                onChangeCover={() => setProfilePhotoTarget('cover')}
+                onChangeAvatar={openAvatarPicker}
+                onChangeCover={() => setCoverEditorOpen(true)}
                 onCreatePost={() => setProfileComposerOpen(true)}
                 onReloadPosts={() => void loadProfilePosts(false, true)}
                 onLoadMorePosts={() => void loadProfilePosts(true)}
@@ -216,18 +219,29 @@ export default function ProfileOverviewSection({
                 onOpenPost={setActivePostId}
               />
             )}
-            {profilePhotoTarget && (
+            {avatarPicker && (
+              <ProfileAvatarPicker
+                key={session.sessionId}
+                username={name}
+                avatarUrl={profileMedia?.avatarSet ? profileAssetUrl(name, 'avatar', profileMedia.updatedAt) : undefined}
+                posts={profilePosts}
+                busy={profileBusy !== null || mediaUploading === 'profile'}
+                opener={avatarPicker.opener}
+                inputRef={avatarFileInputRef}
+                onSave={file => updateProfileImage('avatar', file)}
+                onClose={() => setAvatarPicker(null)}
+              />
+            )}
+            {coverEditorOpen && (
               <GroupAvatarEditor
                 target={{
                   name: profileMedia?.displayName || session.user.displayName || name,
-                  kind: profilePhotoTarget,
-                  avatarUrl: profilePhotoTarget === 'avatar'
-                    ? (profileMedia?.avatarSet ? profileAssetUrl(name, 'avatar', profileMedia.updatedAt) : undefined)
-                    : (profileMedia?.coverSet ? profileAssetUrl(name, 'cover', profileMedia.updatedAt) : undefined),
+                  kind: 'cover',
+                  avatarUrl: profileMedia?.coverSet ? profileAssetUrl(name, 'cover', profileMedia.updatedAt) : undefined,
                 }}
                 busy={profileBusy !== null || mediaUploading === 'profile'}
-                onSave={async (_target, file) => updateProfileImage(profilePhotoTarget, file)}
-                onClose={() => setProfilePhotoTarget(null)}
+                onSave={(_target, file) => updateProfileImage('cover', file)}
+                onClose={() => setCoverEditorOpen(false)}
               />
             )}
           </>

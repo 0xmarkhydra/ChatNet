@@ -14,7 +14,7 @@ type Props = {
   storyBusy?: boolean
 }
 
-const shortcutClass = 'inline-grid size-10 shrink-0 place-items-center rounded-xl border border-transparent transition-[background-color,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-45 max-[760px]:size-[36px]'
+const shortcutClass = 'inline-grid size-10 shrink-0 place-items-center rounded-xl border border-transparent transition-[background-color,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-blue-400 disabled:cursor-not-allowed! disabled:opacity-45! max-[760px]:size-[36px]'
 
 /** One Tailwind-owned launcher for Feed and Profile. Parent page CSS must not style its internals. */
 export default function PostComposerLauncher({
@@ -31,7 +31,7 @@ export default function PostComposerLauncher({
           username={username}
           displayName={displayName}
           avatarClassName="relative size-10! shrink-0! overflow-hidden rounded-full! max-[760px]:size-9!"
-          promptClassName="box-border min-h-[41px] min-w-0 flex-1 rounded-full border border-[#eef0f4] bg-[#f3f5f8] px-[17px] py-2 text-left text-sm font-normal leading-normal text-[#687487] transition-colors hover:border-[#e2e7f0] hover:bg-[#edf1f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-45 max-[760px]:min-h-10 max-[760px]:px-[11px] max-[760px]:text-xs"
+          promptClassName="box-border min-h-[41px] min-w-0 flex-1 rounded-full border border-[#eef0f4] bg-[#f3f5f8] px-[17px] py-2 text-left text-sm font-normal leading-normal text-[#687487] transition-colors hover:border-[#e2e7f0] hover:bg-[#edf1f7] focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-blue-400 disabled:cursor-not-allowed! disabled:opacity-45! max-[760px]:min-h-10 max-[760px]:px-[11px] max-[760px]:text-xs"
           prompt={prompt}
           onCreatePost={onCreatePost}
           pending={pending}
