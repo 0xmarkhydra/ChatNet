@@ -1,8 +1,10 @@
-import { Search, Users, Languages, MoreHorizontal, X, Hash } from "lucide-react";
+import { Search, Users, Languages, MoreHorizontal, X, Hash, Info } from "lucide-react";
 import ConversationAvatar from "./ConversationAvatar";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { CategoryAssignment } from "./ConversationCategories";
 import { CallHeaderActions } from "../../calls";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
+import { Button } from "@/shared/ui/button";
 import { createPortal } from "react-dom";
 import type { ChatSectionProps } from "./ChatSectionProps";
 import type { Dispatch, SetStateAction } from "react";
@@ -15,6 +17,16 @@ type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "changeAutoTrans
   selectedChannelDescription?: string;
 };
 export default function ConversationHeader({ activeConversation, changeAutoTranslate, changeTargetLanguage, conversationBlocked, conversationCategories, conversationDetailsOpen, effectiveAutoTranslate, effectiveTargetLanguage, groupSettingsOpen, languageSearch, openGroupSettings, openVisitor, setActiveConversationId, setConversationDetailsOpen, setGroupMemberViewOpen, setGroupSettingsOpen, setLanguageSearch, setMessageSearchOpen, setTranslationMenuOpen, t, translationMenuOpen, visibleLanguageOptions, setChannelSidebarOpen, setMobileChannelSelected, selectedChannelId, selectedRoomTitle, selectedRoomAvatar, selectedChannelDescription }: Props) {
+  function openMobileTranslation() {
+    setLanguageSearch("");
+    setTranslationMenuOpen(true);
+  }
+
+  function toggleMobileDetails() {
+    setGroupSettingsOpen(false);
+    setConversationDetailsOpen(open => !open);
+  }
+
  return (
 <header className="chat-head">
                     <div className="room-info">
@@ -29,7 +41,7 @@ export default function ConversationHeader({ activeConversation, changeAutoTrans
                       {activeConversation.type === 'group' && selectedChannelId !== 0
                         ? <UserAvatar name={selectedRoomTitle} className="room-avatar" group imageUrl={selectedRoomAvatar} />
                         : <ConversationAvatar conversation={activeConversation} className="room-avatar" />}
-                      <div className={activeConversation.type === 'group' ? 'group-room-details' : ''}>
+                      <div className={activeConversation.type === 'group' ? 'group-room-details' : 'room-copy'}>
                         {activeConversation.type === 'group' ? (
                           <>
                             <div className="group-room-title">
@@ -62,7 +74,7 @@ export default function ConversationHeader({ activeConversation, changeAutoTrans
                           </>
                         ) : (
                           <>
-                            <strong>{activeConversation.otherUsername
+                            <strong title={activeConversation.name}>{activeConversation.otherUsername
                               ? <button type="button" className="visitor-name-link"
                                 onClick={() => openVisitor(activeConversation.otherUsername!)}
                                 aria-label="Xem trang cá nhân">{activeConversation.name}</button>
@@ -77,6 +89,31 @@ export default function ConversationHeader({ activeConversation, changeAutoTrans
                         )}
                       </div>
                     </div>
+
+                    {activeConversation.type !== 'group' && (
+                      <div className="compact-room-actions">
+                        <CallHeaderActions conversationId={activeConversation.id} disabled={conversationBlocked} />
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button type="button" variant="ghost" className="size-11 p-0 text-primary" aria-label="Tùy chọn hội thoại">
+                              <MoreHorizontal size={22} aria-hidden="true" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onCloseAutoFocus={event => { if (translationMenuOpen) event.preventDefault() }}>
+                            <DropdownMenuItem onSelect={() => setMessageSearchOpen(true)}>
+                              <Search size={18} aria-hidden="true" /> Tìm tin nhắn
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={openMobileTranslation}>
+                              <Languages size={18} aria-hidden="true" /> {effectiveAutoTranslate ? "Dịch AI · Đang bật" : "Dịch AI"}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={toggleMobileDetails}>
+                              <Info size={18} aria-hidden="true" /> Thông tin hội thoại
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
 
                     {activeConversation.type === 'group' && (
                       <div className="group-mobile-actions">

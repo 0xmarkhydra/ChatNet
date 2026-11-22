@@ -497,16 +497,34 @@
   .social-feed-launcher .social-feed-launcher-shortcuts > button svg { width: 19px; height: 19px; }
 }
 @media (max-width: 480px) {
-  .profile-overlay.profile-post-dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 16px; }
+  .profile-overlay.profile-post-dialog {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 16px;
+  }
   .profile-post-dialog .profile-overlay-heading { min-height: 59px; padding: 10px 52px; }
   .profile-post-dialog .profile-overlay-heading h2 { font-size: 18px; }
   .profile-post-dialog .profile-overlay-heading > button { top: 11px; right: 11px; }
-  .modern-shell .profile-post-dialog .profile-popup-composer { gap: 11px; padding: 13px 14px 16px; }
+  .profile-post-dialog .profile-overlay-body { min-width: 0; overflow-x: hidden; }
+  .modern-shell .profile-post-dialog .profile-popup-composer { gap: 10px; padding: 12px 10px 14px; }
   .modern-shell .profile-popup-composer .post-prompt textarea { min-height: 52px; font-size: 18px; }
-  .modern-shell .profile-popup-composer .composer-shortcuts { gap: 8px; padding: 8px 9px; }
-  .smart-composer-actions-title { font-size: 12px; }
-  .smart-composer-action-icons { gap: 4px; }
-  .modern-shell .profile-popup-composer .smart-composer-action-icons > button { flex-basis: 36px; width: 36px; height: 36px; min-height: 36px; }
+  .modern-shell .profile-popup-composer .smart-composer-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 7px 6px;
+  }
+  .smart-composer-actions-title { padding-inline: 2px; font-size: 12px; }
+  .smart-composer-action-icons { justify-content: center; flex-wrap: wrap; gap: 2px; }
+  .modern-shell .profile-popup-composer .smart-composer-action-icons > button {
+    flex: 1 1 44px;
+    width: 44px;
+    min-width: 44px;
+    max-width: 54px;
+    height: 44px;
+    min-height: 44px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .social-feed-launcher .social-feed-launcher-prompt,
@@ -700,6 +718,19 @@
   transform: translateY(0);
 }
 
+@media (max-width: 480px) {
+  .profile-popup-composer .smart-composer-action-icons > button[data-tooltip]:not(:is(:hover, :focus-visible))::after {
+    content: none;
+  }
+  .profile-popup-composer .smart-composer-action-icons > button[data-tooltip]:first-child::after {
+    left: 0;
+    transform: none;
+  }
+}
+@media (max-width: 480px) and (hover: none) {
+  .profile-popup-composer .smart-composer-action-icons > button[data-tooltip]::after { content: none; }
+}
+
 /* Friend tagging picker follows the same compact card and control rhythm. */
 .profile-popup-composer .smart-tag-picker {
   order: 2;
@@ -836,13 +867,6 @@
 }
 .smart-tag-empty { padding: 12px 5px; text-align: center; }
 @media (max-width: 480px) {
-  .modern-shell .profile-popup-composer .smart-composer-action-icons > button {
-    flex-basis: 34px;
-    width: 34px;
-    height: 36px;
-    min-height: 36px;
-  }
-  .profile-popup-composer .smart-composer-action-icons { gap: 3px; }
   .smart-tag-picker { padding: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1169,14 +1193,4 @@
   .smart-feeling-picker { padding: 10px; }
   .smart-feeling-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .smart-feeling-options > button { min-height: 42px; }
-}
-@media (max-width: 360px) {
-  .modern-shell .profile-popup-composer .smart-composer-action-icons > button {
-    flex-basis: 30px;
-    width: 30px;
-    min-width: 30px;
-    height: 35px;
-    min-height: 35px;
-  }
-  .profile-popup-composer .smart-composer-action-icons { gap: 2px; }
 }

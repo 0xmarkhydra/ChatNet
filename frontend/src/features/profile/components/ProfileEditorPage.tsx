@@ -3,7 +3,8 @@ import { ArrowLeft, Camera, RotateCcw, Save } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import ProfileEditorPrivacyCard from './ProfileEditorPrivacyCard'
 import ProfileEditorPreview from './ProfileEditorPreview'
-import type { ProfileMediaState, UserPrivacy } from '../types'
+import type { ProfileMediaState, ProfilePublicDetails, UserPrivacy } from '../types'
+import ProfilePublicDetailsFields from './ProfilePublicDetailsFields'
 
 type Props = {
   profile: ProfileMediaState | null
@@ -18,6 +19,8 @@ type Props = {
   setBioDraft: (value: string) => void
   cityDraft: string
   setCityDraft: (value: string) => void
+  publicDetailsDraft: ProfilePublicDetails
+  setPublicDetailsDraft: (value: ProfilePublicDetails) => void
   profileSaving: boolean
   mediaBusy: boolean
   privacy: UserPrivacy | null
@@ -28,7 +31,7 @@ type Props = {
   changePrivacy: (key: keyof UserPrivacy) => Promise<void>
   onSave: (event: FormEvent<HTMLFormElement>) => void
   onDiscard: () => void
-  onChangeAvatar: () => void
+  onChangeAvatar: (opener: HTMLButtonElement) => void
   onChangeCover: () => void
 }
 
@@ -36,7 +39,7 @@ type Props = {
 export default function ProfileEditorPage({
   profile, username, displayName, coverUrl,
   displayNameDraft, setDisplayNameDraft, usernameDraft, setUsernameDraft,
-  bioDraft, setBioDraft, cityDraft, setCityDraft, profileSaving, mediaBusy,
+  bioDraft, setBioDraft, cityDraft, setCityDraft, publicDetailsDraft, setPublicDetailsDraft, profileSaving, mediaBusy,
   privacy, privacyBusy, privacyLoading, privacyError, retryPrivacy, changePrivacy,
   onSave, onDiscard, onChangeAvatar, onChangeCover,
 }: Props) {
@@ -47,7 +50,9 @@ export default function ProfileEditorPage({
     displayNameDraft.trim() === profile?.displayName &&
     usernameDraft.trim().toLowerCase() === profile?.username &&
     bioDraft.trim() === (profile?.bio ?? '') &&
-    cityDraft.trim() === (profile?.city ?? '')
+    cityDraft.trim() === (profile?.city ?? '') &&
+    publicDetailsDraft.workplace.trim() === (profile?.workplace ?? '') &&
+    publicDetailsDraft.school.trim() === (profile?.school ?? '')
   const savingDisabled = !profile || profileSaving || same ||
     !displayNameDraft.trim() || !usernameDraft.trim() ||
     Array.from(bioDraft).length > 160 || Array.from(cityDraft).length > 100
@@ -76,7 +81,7 @@ export default function ProfileEditorPage({
         <div className="profile-editor-cover-slot min-[761px]:mt-[3px] min-[761px]:shrink-0">{cover(false)}</div>
         <div className="profile-editor-avatar-ring">
           <UserAvatar username={username} name={displayName} className="profile-editor-avatar" online />
-          <button type="button" className="profile-editor-avatar-button" disabled={mediaBusy} onClick={onChangeAvatar}
+          <button type="button" className="profile-editor-avatar-button" disabled={mediaBusy} onClick={event => onChangeAvatar(event.currentTarget)}
             aria-label="Đổi ảnh đại diện" title="Đổi ảnh đại diện"><Camera size={17} aria-hidden="true" /></button>
         </div>
 
@@ -104,6 +109,8 @@ export default function ProfileEditorPage({
             <input className="min-[761px]:box-border min-[761px]:h-[45px] min-[761px]:w-full min-[761px]:min-w-0 min-[761px]:rounded-[10px] min-[761px]:border min-[761px]:border-transparent min-[761px]:bg-[#f8fafe] min-[761px]:px-[15px] min-[761px]:text-[13px] min-[761px]:font-medium min-[761px]:text-[#344561] min-[761px]:outline-none min-[761px]:placeholder:text-[#a1adc0] min-[761px]:focus-visible:border-[#9ab9ff] min-[761px]:focus-visible:ring-[3px] min-[761px]:focus-visible:ring-blue-500/10" type="text" name="city" maxLength={100} disabled={profileSaving} value={cityDraft}
               onChange={event => setCityDraft(event.target.value)} placeholder="Thành phố bạn muốn chia sẻ" />
           </label>
+          <ProfilePublicDetailsFields value={publicDetailsDraft} onChange={setPublicDetailsDraft}
+            fieldClass="profile-editor-field" disabled={profileSaving} />
         </div>
         <footer className="profile-editor-form-footer min-[761px]:mt-auto min-[761px]:flex min-[761px]:min-h-[67px] min-[761px]:flex-wrap min-[761px]:items-end min-[761px]:justify-end min-[761px]:gap-[13px] min-[761px]:border-t min-[761px]:border-[#e8ecf5] min-[761px]:pt-[21px] min-[761px]:pr-[7px]">
           <span className="profile-editor-save-hint min-[761px]:mr-auto min-[761px]:max-w-[260px] min-[761px]:flex-[1_1_150px] min-[761px]:self-center min-[761px]:text-[11px] min-[761px]:leading-[1.4] min-[761px]:text-[#8291aa] min-[761px]:max-[1000px]:max-w-none min-[761px]:max-[1000px]:basis-full">Ảnh và quyền hiển thị được cập nhật ngay sau khi thay đổi.</span>
