@@ -27,7 +27,7 @@ export function useGroupActivities(
     activities: [],
     events: [],
   });
-  const [error, setError] = useState("");
+  const [error, setError] = useState({ conversationId: null as number | null, sessionKey: undefined as string | undefined, message: "" });
 
   const refresh = useCallback(async () => {
     if (!conversationId) return;
@@ -45,22 +45,21 @@ export function useGroupActivities(
         activities: result.activities || [],
         events: result.events || [],
       });
-      setError("");
+      setError({ conversationId, sessionKey, message: "" });
     } catch (e) {
       if (
         activeRef.current.conversationId !== conversationId ||
         activeRef.current.sessionKey !== sessionKey
       )
         return;
-      setError(
-        e instanceof Error ? e.message : "Không tải được hoạt động của nhóm.",
-      );
+      setError({
+        conversationId, sessionKey,
+        message: e instanceof Error ? e.message : "Không tải được hoạt động của nhóm.",
+      });
     }
   }, [activeRef, conversationId, requestRef, sessionKey]);
 
   useEffect(() => {
-    setData({ conversationId, sessionKey, activities: [], events: [] });
-    setError("");
     if (!conversationId) return;
     void refresh();
     const onChange = (event: Event) => {
@@ -105,7 +104,7 @@ export function useGroupActivities(
   return {
     activities: isCurrent ? data.activities : [],
     events: isCurrent ? data.events : [],
-    error: isCurrent ? error : "",
+    error: error.conversationId === conversationId && error.sessionKey === sessionKey ? error.message : "",
     refresh, create, vote, setPin,
   };
 }
