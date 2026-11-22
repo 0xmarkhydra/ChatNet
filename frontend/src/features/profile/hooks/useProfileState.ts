@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useScopedState } from "../../../shared/hooks/useScopedState";
 import { type Post } from "../../feed";
-import type { ProfileMediaState } from "../types";
+import type { ProfilePublicDetails, ProfileMediaState } from "../types";
 
 export type UseProfileStateDeps = {
   sessionId: string | null;
@@ -41,6 +41,7 @@ export function useProfileState({ sessionId }: UseProfileStateDeps) {
   const [profileUsernameDraft, setProfileUsernameDraft] = useState("");
   const [profileBioDraft, setProfileBioDraft] = useState("");
   const [profileCityDraft, setProfileCityDraft] = useState("");
+  const [profilePublicDetailsDraft, setProfilePublicDetailsDraft] = useState<ProfilePublicDetails>({ workplace: "", school: "" });
   const [profileSaving, setProfileSaving] = useState(false);
 
   return {
@@ -49,6 +50,7 @@ export function useProfileState({ sessionId }: UseProfileStateDeps) {
     profileBioDraft,
     profileBusy,
     profileCityDraft,
+    profilePublicDetailsDraft,
     profileComposerOpen,
     profileDisplayNameDraft,
     profileEditorOpen,
@@ -68,6 +70,7 @@ export function useProfileState({ sessionId }: UseProfileStateDeps) {
     setProfileBioDraft,
     setProfileBusy,
     setProfileCityDraft,
+    setProfilePublicDetailsDraft,
     setProfileComposerOpen,
     setProfileDisplayNameDraft,
     setProfileEditorOpen,

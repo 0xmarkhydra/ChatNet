@@ -10,6 +10,11 @@
 
 .story-screen-backdrop * { box-sizing: border-box; }
 
+/* The shared dialog portals to body, above the full-screen Story viewer. */
+body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
+  z-index: 351;
+}
+
 .story-screen {
   width: min(100%, 1586px);
   height: min(100dvh, 992px);
