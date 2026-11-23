@@ -102,11 +102,11 @@ it('renders every result type from the real APIs and narrows by type and filter'
   expect(text).toContain('Sách thiết kế UI')
   expect(text).toContain('120.000 VND')
 
-  await view.click(view.host.querySelector('.srch-panel .srch-type:nth-child(2)') ?? undefined)
+  await view.click([...view.host.querySelectorAll('aside[aria-label="Tìm kiếm và bộ lọc"] button')].find(button => button.textContent === 'Mọi người'))
   expect(view.route()).toBe('?q=thi%E1%BA%BFt&type=people')
   expect(view.host.textContent).toContain('Bob Trần')
 
-  await view.click(view.host.querySelector('.srch-panel .srch-acc-head') ?? undefined)
+  await view.click(view.host.querySelector('aside[aria-label="Tìm kiếm và bộ lọc"] button[aria-expanded]') ?? undefined)
   await view.click(view.button('Đang hoạt động'))
   expect(view.route()).toContain('status=online')
   expect(view.host.textContent).not.toContain('Bob Trần')
@@ -164,7 +164,7 @@ it('ignores a late response from a previous query', async () => {
     return Promise.resolve(ok([]))
   }) as unknown as ApiRequest
   const view = await mount(request, '/search?q=first&type=people')
-  const input = view.host.querySelector('.srch-panel input[type="search"]') as HTMLInputElement
+  const input = view.host.querySelector('aside[aria-label="Tìm kiếm và bộ lọc"] input[type="search"]') as HTMLInputElement
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'second')
     input.dispatchEvent(new Event('input', { bubbles: true }))
