@@ -89,9 +89,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('mention marks as read on server and navigates to post detail', (
-    tester,
-  ) async {
+  testWidgets('mention opens post detail on first feed mount', (tester) async {
     final api = DemoApi();
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;

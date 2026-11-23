@@ -78,6 +78,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   void initState() {
     super.initState();
     _load();
+    if (widget.openPostRequest > 0) _scheduleOpenRequestedPost();
   }
 
   @override
@@ -91,12 +92,17 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     if (widget.showCommunities && !oldWidget.showCommunities) {
       _loadCommunities();
     }
-    if (widget.openPostRequest != oldWidget.openPostRequest &&
-        widget.openPostId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _openOriginalPost({'id': widget.openPostId});
-      });
+    if (widget.openPostRequest != oldWidget.openPostRequest) {
+      _scheduleOpenRequestedPost();
     }
+  }
+
+  void _scheduleOpenRequestedPost() {
+    final postId = widget.openPostId;
+    if (postId == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openOriginalPost({'id': postId});
+    });
   }
 
   Future<void> _load() async {
