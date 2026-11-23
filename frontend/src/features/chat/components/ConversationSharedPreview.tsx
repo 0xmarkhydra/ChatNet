@@ -1,53 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
 import { ChevronRight, Film, Images } from 'lucide-react'
 import MediaViewer from '../../../shared/ui/MediaViewer'
-import { loadSharedContent, type SharedAttachment } from '../lib/sharedContentLoader'
+import { useConversationSharedPreview } from '../hooks/useConversationSharedPreview'
 import '../styles/conversation-shared-preview.css'
 
-type PreviewItem = { id: string; kind: 'image' | 'video'; url: string; name: string }
-
-export default function ConversationSharedPreview({
-  conversationId, channelId, request, onOpen,
-}: {
+type Props = {
   conversationId: number
   channelId: number
   request: (path: string, init?: RequestInit) => Promise<Response>
   onOpen: (tab?: 'media' | 'files' | 'links') => void
-}) {
-  const requestRef = useRef(request)
-  useEffect(() => { requestRef.current = request }, [request])
-  const [items, setItems] = useState<PreviewItem[]>([])
-  const [mediaCount, setMediaCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  const [retryKey, setRetryKey] = useState(0)
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
+}
 
-  useEffect(() => {
-    const controller = new AbortController()
-    void loadSharedContent({
-      conversationId, channelId, kind: 'media', limit: 24,
-      request: requestRef.current, signal: controller.signal,
-    })
-      .then(data => {
-        if (controller.signal.aborted) return
-        const media = (data.items || []).flatMap(message => (message.attachments || [])
-          .filter((item): item is SharedAttachment & { kind: 'image' | 'video'; url: string } =>
-            (item.kind === 'image' || item.kind === 'video') && Boolean(item.url))
-          .map(item => ({
-            id: `${message.id}-${item.id || item.url}`,
-            kind: item.kind,
-            name: item.name || 'Phương tiện đã chia sẻ',
-            url: item.url,
-          })))
-        setItems(media.slice(0, 4))
-        setMediaCount(media.length)
-      })
-      .catch(() => { if (!controller.signal.aborted) setError(true) })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
-    return () => controller.abort()
-  }, [conversationId, channelId, retryKey])
+export default function ConversationSharedPreview(props: Props) {
+  return <ConversationSharedPreviewContent key={JSON.stringify([props.conversationId, props.channelId])} {...props} />
+}
 
+function ConversationSharedPreviewContent({ conversationId, channelId, request, onOpen }: Props) {
+  const { items, mediaCount, loading, error, viewerIndex, setViewerIndex, retry } =
+    useConversationSharedPreview({ conversationId, channelId, request })
   return (
     <section className="conversation-shared-preview" aria-label="File phương tiện, liên kết">
       {items.length > 0 ? (
@@ -67,7 +36,7 @@ export default function ConversationSharedPreview({
           ))}
         </div>
       ) : (
-        <button type="button" className="conversation-shared-preview-empty" onClick={() => { if (error) { setItems([]); setViewerIndex(null); setMediaCount(0); setLoading(true); setError(false); setRetryKey(key => key + 1) } else onOpen('media') }}>
+        <button type="button" className="conversation-shared-preview-empty" onClick={() => { if (error) retry(); else onOpen('media') }}>
           {loading ? 'Đang tải phương tiện...' : error
             ? 'Không tải được ảnh xem trước. Nhấn để thử lại.'
             : 'Chưa có ảnh hoặc video được chia sẻ'}
