@@ -101,10 +101,11 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
   const activeFilterCount = Object.values(selectedKinds).filter(value => !value).length + Number(range !== 'any') + Number(sort !== 'relevant')
 
   return (
-    <section className="s08-search-page" aria-label="Kết quả tìm kiếm">
+    <section className="s08-search-page [&_:is(button,a,select,input):focus-visible]:outline-[3px_solid_var(--soco-blue)]! [&_:is(button,a,select,input):focus-visible]:outline-offset-2!" aria-label="Kết quả tìm kiếm">
       <form className="s08-search-form" onSubmit={submit} role="search">
         <Search size={22} aria-hidden="true" />
         <input aria-label="Tìm kiếm trên SocCo" value={draft} onChange={event => setDraft(event.target.value)}
+          className="min-w-0 flex-1 border-0 bg-transparent text-[17px]! font-semibold! leading-[1.4]! text-foreground placeholder:font-normal placeholder:text-muted-foreground max-[520px]:text-[16px]!"
           maxLength={120} placeholder="Tìm người, bài viết, cộng đồng và sản phẩm…" />
         <button className="s08-search-submit" type="submit"><Search size={18} aria-hidden="true" /> Tìm kiếm</button>
       </form>
