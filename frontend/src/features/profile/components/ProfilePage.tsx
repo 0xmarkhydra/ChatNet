@@ -5,7 +5,7 @@ import type { FriendConnection } from '../../contacts'
 import ProfileMediaGallery, { type ProfileMediaItem } from './ProfileMediaGallery'
 import ProfileSidebar from './ProfileSidebar'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import PostStatusPrompt from '../../../shared/ui/PostStatusPrompt'
+import PostComposerLauncher from '../../../shared/ui/PostComposerLauncher'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import ProfileAvatarMenu from './ProfileAvatarMenu'
 import ProfileHero from './ProfileHero'
@@ -39,7 +39,12 @@ type Props = {
   onChangeAvatar: (opener: HTMLButtonElement | null) => void
   onChangeCover: () => void
   onCreatePost: () => void
+  onCreateMediaPost: (files: File[]) => void
   onCreateStory: () => void
+  onCheckIn: () => void
+  composerPending?: boolean
+  storyBusy?: boolean
+  postDraft?: string
   onReloadPosts: () => void
   onLoadMorePosts: () => void
   onViewFriend: (username: string) => void
@@ -50,7 +55,8 @@ type Props = {
 export default function ProfilePage({
   highlights, username, displayName, email, bio, city, workplace, school, coverUrl, coverSet, avatarSet, avatarVersion, editBusy, friends,
   posts, pendingPost, postsBusy, postsError, hasMorePosts, postCards, profileNote,
-  onEditProfile, onChangeAvatar, onChangeCover, onCreatePost, onCreateStory,
+  onEditProfile, onChangeAvatar, onChangeCover, onCreatePost, onCreateMediaPost, onCreateStory, onCheckIn,
+  composerPending = false, storyBusy = false, postDraft = '',
   onReloadPosts, onLoadMorePosts, onViewFriend, onOpenContacts, onOpenPost,
 }: Props) {
   const [section, setSection] = useState<Section>('posts')
@@ -105,15 +111,17 @@ export default function ProfilePage({
           <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel">
             {section === 'posts' && (
               <>
-                <div className="profile-page-composer">
-                  <PostStatusPrompt
-                    username={username}
-                    displayName={displayName}
-                    avatarClassName="profile-page-composer-avatar"
-                    prompt={`${displayName.split(' ').slice(-1)[0]} ơi, bạn đang nghĩ gì?`}
-                    onCreatePost={onCreatePost}
-                  />
-                </div>
+                <PostComposerLauncher
+                  username={username}
+                  displayName={displayName}
+                  prompt={postDraft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
+                  onCreatePost={onCreatePost}
+                  onCreateMediaPost={onCreateMediaPost}
+                  onCreateStory={onCreateStory}
+                  onCheckIn={onCheckIn}
+                  pending={composerPending}
+                  storyBusy={storyBusy}
+                />
                 <div className="profile-page-about profile-page-timeline-heading"><h2>Bài viết</h2></div>
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
