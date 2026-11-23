@@ -108,7 +108,7 @@ export default function ProfilePage({
           onEditProfile={onEditProfile} onShowMedia={() => setSection('media')} onShowFriends={() => setSection('friends')}
           onViewFriend={onViewFriend} onOpenPost={onOpenPost} />
         <section className="profile-page-main" aria-label="Nội dung trang cá nhân">
-          <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel">
+          <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel app-desktop:flex app-desktop:min-w-0 app-desktop:flex-col app-desktop:gap-4">
             {section === 'posts' && (
               <>
                 <PostComposerLauncher
@@ -125,11 +125,11 @@ export default function ProfilePage({
                 <div className="profile-page-about profile-page-timeline-heading"><h2>Bài viết</h2></div>
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
-                <div className="profile-page-post-feed feed zalo-feed">{postCards}</div>
+                <div className="profile-page-post-feed feed zalo-feed app-desktop:flex app-desktop:min-w-0 app-desktop:flex-col app-desktop:gap-4">{postCards}</div>
                 {!postsBusy && !postsError && posts.length === 0 && !pendingPost &&
                   <div className="profile-page-blank"><ImageIcon size={30} aria-hidden="true" /><p>Bạn chưa có bài viết nào.</p>
                     <button type="button" onClick={onCreatePost}>Đăng bài đầu tiên</button></div>}
-                {hasMorePosts && <button className="profile-page-more-posts" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>
+                {hasMorePosts && <button className="profile-page-more-posts app-desktop:mt-[15px] app-desktop:flex app-desktop:min-h-[42px] app-desktop:w-full app-desktop:cursor-pointer app-desktop:items-center app-desktop:justify-center app-desktop:gap-2 app-desktop:rounded-[11px] app-desktop:border app-desktop:border-[#dde7fa] app-desktop:bg-[#f5f7ff] app-desktop:text-xs app-desktop:font-bold app-desktop:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>
                   Xem bài viết cũ hơn <ArrowRight size={16} aria-hidden="true" /></button>}
               </>
             )}
@@ -138,7 +138,7 @@ export default function ProfilePage({
                 <h2>Ảnh & video</h2>
                 <p>Ảnh và video từ các bài viết đã tải của bạn.</p>
                 <ProfileMediaGallery items={media} emptyText="Chưa có ảnh hoặc video trong các bài viết đã tải." postsBusy={postsBusy} onOpenPost={onOpenPost} onCreatePost={onCreatePost} />
-                {hasMorePosts && <button className="profile-page-more-posts" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>Tải thêm bài viết để xem ảnh cũ hơn</button>}
+                {hasMorePosts && <button className="profile-page-more-posts app-desktop:mt-[15px] app-desktop:flex app-desktop:min-h-[42px] app-desktop:w-full app-desktop:cursor-pointer app-desktop:items-center app-desktop:justify-center app-desktop:gap-2 app-desktop:rounded-[11px] app-desktop:border app-desktop:border-[#dde7fa] app-desktop:bg-[#f5f7ff] app-desktop:text-xs app-desktop:font-bold app-desktop:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>Tải thêm bài viết để xem ảnh cũ hơn</button>}
               </div>
             )}
             {section === 'about' && (
@@ -157,16 +157,16 @@ export default function ProfilePage({
               <div className="profile-page-subsection">
                 <h2>Bạn bè của bạn</h2>
                 <p>{acceptedFriends.length.toLocaleString('vi-VN')} liên hệ đã kết bạn.</p>
-                <div className="profile-page-friends">
+                <div className="profile-page-friends app-desktop:grid app-desktop:grid-cols-2 app-desktop:gap-2.5">
                   {acceptedFriends.slice(0, 12).map(friend => (
-                    <button type="button" key={friend.id} className="profile-page-friend"
+                    <button type="button" key={friend.id} className="profile-page-friend app-desktop:flex app-desktop:min-w-0 app-desktop:cursor-pointer app-desktop:items-center app-desktop:gap-[11px] app-desktop:rounded-xl app-desktop:border app-desktop:border-[#e9edf5] app-desktop:bg-white app-desktop:p-3 app-desktop:text-left app-desktop:hover:bg-[#f6f8ff] app-desktop:[&>svg]:shrink-0 app-desktop:[&>svg]:text-[#9aabc6]"
                       onClick={() => onViewFriend(friend.username)} title={`Xem hồ sơ ${friend.displayName || friend.username}`}>
                       <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="profile-page-friend-avatar" online={friend.online} />
                       <span><strong>{friend.displayName || friend.username}</strong><small>@{friend.username}</small></span><ArrowRight size={16} aria-hidden="true" />
                     </button>
                   ))}
                 </div>
-                {acceptedFriends.length === 0 && <p className="profile-page-hint">Chưa có bạn bè trong danh bạ.</p>}
+                {acceptedFriends.length === 0 && <p className="profile-page-hint app-desktop:text-[13px] app-desktop:text-[#8391a9]">Chưa có bạn bè trong danh bạ.</p>}
                 <button type="button" className="profile-page-info-edit" onClick={onOpenContacts}>Mở danh bạ <ArrowRight size={16} /></button>
               </div>
             )}

@@ -13,9 +13,9 @@ type Props = {
 
 export default function ProfileMediaGallery({ items, emptyText, postsBusy, onOpenPost, onCreatePost }: Props) {
   return items.length ? (
-    <div className="profile-page-media-grid">
+    <div className="profile-page-media-grid app-desktop:grid app-desktop:grid-cols-3 app-desktop:gap-3">
       {items.map(({ postId, attachment, index }) => (
-        <button className="profile-page-media-item" type="button" key={`${postId}:${attachment.id ?? attachment.storageRef}:${index}`}
+        <button className="profile-page-media-item app-desktop:relative app-desktop:block app-desktop:aspect-[1.3] app-desktop:w-full app-desktop:cursor-pointer app-desktop:overflow-hidden app-desktop:rounded-[13px] app-desktop:border-0 app-desktop:bg-[#ecf0f8] app-desktop:p-0 app-desktop:[&_img]:h-full app-desktop:[&_img]:w-full app-desktop:[&_img]:object-cover app-desktop:[&_video]:h-full app-desktop:[&_video]:w-full app-desktop:[&_video]:object-cover" type="button" key={`${postId}:${attachment.id ?? attachment.storageRef}:${index}`}
           onClick={() => onOpenPost(postId)} aria-label={`Xem bài viết chứa ${attachment.name || 'ảnh hoặc video'}`}>
           {attachment.kind === 'image'
             ? <img src={attachment.url} alt={attachment.name || 'Ảnh bài viết'} loading="lazy" />

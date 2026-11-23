@@ -18,6 +18,23 @@
     color: #263956;
     scrollbar-gutter: auto;
   }
+  .profile-editor-form-card,
+  .profile-editor-preview-card,
+  .profile-editor-privacy-card {
+    box-sizing: border-box;
+    min-width: 0;
+    border: 1px solid #e8ecf5;
+    border-radius: 17px;
+    background: #fff;
+    box-shadow: 0 3px 18px rgba(30,51,96,.035);
+  }
+  .profile-editor-form-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 836px;
+    margin: 0;
+    padding: 20px 27px 28px;
+  }
   .profile-editor-back {
     display: none;
     flex: 0 0 auto;
@@ -92,6 +109,34 @@
     color: #fff;
     cursor: pointer;
   }
+  .profile-editor-discard,
+  .profile-editor-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 43px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 11px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 725;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .profile-editor-discard { min-width: 154px; background: #eff3ff; color: #2563eb; }
+  .profile-editor-submit { min-width: 172px; background: #2563eb; color: #fff; }
+  .profile-editor-submit:not(:disabled):hover { background: #1a52d4; }
+  .profile-editor-discard:not(:disabled):hover { background: #e4ebff; }
+  .profile-editor-preview-card > h2,
+  .profile-editor-privacy-heading h2 {
+    margin: 0;
+    color: #1b2d4b;
+    font-size: 18px;
+    font-weight: 790;
+    line-height: 26px;
+  }
   .profile-editor-preview-cover { height: 133px; margin-top: 18px; border-radius: 11px; }
   .profile-editor-privacy-row button {
     display: inline-flex;
@@ -113,13 +158,14 @@
   .profile-editor-privacy-row button i { display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #c7cfdf; color: transparent; }
   .profile-editor-privacy-row button.is-on i { color: #fff; background: #2563eb; }
   .profile-editor-privacy-note { padding: 14px; color: #64748b; font-size: 12px; }
-  .profile-editor-privacy-error { margin-bottom: 9px; padding: 10px; border-radius: 9px; color: #af3535; background: #fff0f0; font-size: 12px; }
   .profile-editor-privacy-error button { margin-left: 10px; border: 0; color: #a11c1c; background: transparent; cursor: pointer; }
   .modern-shell.app-layout .profile-editor-page button:focus-visible { outline: 3px solid #9db9f4; outline-offset: 2px; }
   .modern-shell.app-layout .profile-editor-page button:disabled { opacity: .58; cursor: not-allowed; }
 }
 @media (min-width: 761px) and (max-width: 1380px) {
   .modern-shell.app-layout .profile-editor-page { display: flex; flex-direction: column; align-items: stretch; padding: 20px; }
+  .profile-editor-form-card { flex: 0 0 auto; width: 100%; min-height: 785px; }
+  .profile-editor-preview-card { min-width: 0; }
   .profile-editor-form-heading .profile-editor-back { display: grid; }
 }
 @media (min-width: 761px) and (max-width: 1000px) {

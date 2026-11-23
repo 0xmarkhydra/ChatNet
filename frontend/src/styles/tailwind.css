@@ -6,6 +6,9 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
+/* Matches the existing 760px mobile / 761px desktop app shell boundary. */
+@custom-variant app-desktop (@media (min-width: 761px));
+
 @theme inline {
   --font-sans: var(--soco-font-sans);
   --font-mono: var(--soco-font-mono);
