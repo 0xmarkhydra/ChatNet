@@ -9,9 +9,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"chatnet/internal/authx"
 	"chatnet/internal/httpx"
+	"chatnet/internal/searchx"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -105,6 +107,17 @@ func (s *server) marketProductsMine(w http.ResponseWriter, r *http.Request) {
 	s.marketListProducts(w, r, true)
 }
 func (s *server) marketListProducts(w http.ResponseWriter, r *http.Request, mine bool) {
+	if !mine {
+		page, paged, pageErr := searchx.ParsePageRequest(r.URL.Query())
+		if pageErr != nil {
+			httpx.Error(w, http.StatusBadRequest, pageErr.Error())
+			return
+		}
+		if paged {
+			s.marketSearchProducts(w, r, page)
+			return
+		}
+	}
 	before, limit, ok := marketPage(r)
 	if !ok {
 		httpx.Error(w, 400, "invalid pagination")
@@ -132,6 +145,118 @@ func (s *server) marketListProducts(w http.ResponseWriter, r *http.Request, mine
 		return
 	}
 	httpx.JSON(w, 200, map[string]any{"products": products})
+}
+
+type productSearchCursor struct {
+	Rank      int       `json:"r"`
+	ID        int64     `json:"i"`
+	CreatedAt time.Time `json:"t,omitempty"`
+}
+
+func (s *server) marketSearchProducts(w http.ResponseWriter, r *http.Request, page searchx.PageRequest) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len([]rune(q)) > 120 {
+		httpx.Error(w, http.StatusBadRequest, "search query too long")
+		return
+	}
+	items := make([]marketProduct, 0)
+	if q == "" {
+		httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nil})
+		return
+	}
+	var cursor productSearchCursor
+	if page.Cursor != "" {
+		var err error
+		cursor, err = searchx.DecodeCursor[productSearchCursor](page.Cursor)
+		if err != nil || cursor.ID <= 0 || (page.Sort == "newest" && cursor.CreatedAt.IsZero()) ||
+			(page.Sort == "relevance" && (cursor.Rank < 0 || cursor.Rank > 4)) {
+			httpx.Error(w, http.StatusBadRequest, "invalid cursor")
+			return
+		}
+	}
+	rankSQL := `CASE
+		WHEN ` + searchx.FoldSQL("title") + `=` + searchx.FoldSQL("$1") + ` THEN 0
+		WHEN strpos(` + searchx.FoldSQL("title") + `,` + searchx.FoldSQL("$1") + `)=1 THEN 1
+		WHEN strpos(` + searchx.FoldSQL("title") + `,` + searchx.FoldSQL("$1") + `)>0 THEN 2
+		WHEN strpos(` + searchx.FoldSQL("description") + `,` + searchx.FoldSQL("$1") + `)=1 THEN 3
+		ELSE 4 END`
+	query := `WITH candidates AS (
+		SELECT id,seller_id,title,description,price_amount,price_unit,stock,status,created_at,` + rankSQL + ` AS rank
+		FROM market_products
+		WHERE status='published'
+		  AND (strpos(` + searchx.FoldSQL("title") + `,` + searchx.FoldSQL("$1") + `)>0 OR strpos(` + searchx.FoldSQL("description") + `,` + searchx.FoldSQL("$1") + `)>0)
+		  AND ($2::timestamptz IS NULL OR created_at >= $2)
+	)
+	SELECT id,seller_id,title,description,price_amount,price_unit,stock,status,created_at,rank FROM candidates`
+	args := []any{q, page.Since}
+	if cursor.ID > 0 {
+		if page.Sort == "newest" {
+			query += ` WHERE (created_at,id)<($3::timestamptz,$4::bigint)`
+			args = append(args, cursor.CreatedAt, cursor.ID)
+		} else {
+			query += ` WHERE rank>$3 OR (rank=$3 AND id<$4)`
+			args = append(args, cursor.Rank, cursor.ID)
+		}
+	}
+	if page.Sort == "newest" {
+		query += ` ORDER BY created_at DESC,id DESC`
+	} else {
+		query += ` ORDER BY rank ASC,id DESC`
+	}
+	query += ` LIMIT $` + strconv.Itoa(len(args)+1)
+	args = append(args, page.Limit+1)
+	rows, err := s.db.Query(r.Context(), query, args...)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load products")
+		return
+	}
+	type result struct {
+		item      marketProduct
+		createdAt time.Time
+		rank      int
+	}
+	results := make([]result, 0, page.Limit+1)
+	for rows.Next() {
+		var item result
+		if rows.Scan(&item.item.ID, &item.item.SellerID, &item.item.Title, &item.item.Description,
+			&item.item.PriceAmount, &item.item.PriceUnit, &item.item.Stock, &item.item.Status,
+			&item.createdAt, &item.rank) != nil {
+			rows.Close()
+			httpx.Error(w, http.StatusInternalServerError, "cannot load products")
+			return
+		}
+		results = append(results, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		httpx.Error(w, http.StatusInternalServerError, "cannot load products")
+		return
+	}
+	rows.Close()
+	hasMore := len(results) > page.Limit
+	if hasMore {
+		results = results[:page.Limit]
+	}
+	for _, result := range results {
+		items = append(items, result.item)
+	}
+	var nextCursor any
+	if hasMore && len(results) > 0 {
+		last := results[len(results)-1]
+		value := productSearchCursor{ID: last.item.ID}
+		if page.Sort == "newest" {
+			value.CreatedAt = last.createdAt
+		} else {
+			value.Rank = last.rank
+		}
+		encoded, err := searchx.EncodeCursor(value)
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot create search cursor")
+			return
+		}
+		nextCursor = encoded
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nextCursor})
 }
 func (s *server) marketDraft(w http.ResponseWriter, r *http.Request) {
 	var b struct {

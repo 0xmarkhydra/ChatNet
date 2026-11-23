@@ -223,19 +223,29 @@ func TestStoryExpiryAndOwnershipIntegration(t *testing.T) {
 	}
 
 	var activeID, expiredID, otherStoryID int64
+	var expiredRef string
 	insert := func(userID int64, expires string, target *int64) {
 		t.Helper()
+		storageRef := fmt.Sprintf("s3://test/story/%d", time.Now().UnixNano())
 		if err := db.QueryRow(ctx, `
 			INSERT INTO stories(user_id,storage_ref,original_name,content_type,size_bytes,kind,expires_at)
 			VALUES($1,$2,'story.jpg','image/jpeg',100,'image',`+expires+`)
-			RETURNING id`, userID, fmt.Sprintf("s3://test/story/%d", time.Now().UnixNano()),
+			RETURNING id`, userID, storageRef,
 		).Scan(target); err != nil {
 			t.Fatal(err)
+		}
+		if target == &expiredID {
+			expiredRef = storageRef
 		}
 	}
 	insert(ownerID, `NOW()+INTERVAL '1 hour'`, &activeID)
 	insert(ownerID, `NOW()-INTERVAL '1 second'`, &expiredID)
 	insert(otherID, `NOW()+INTERVAL '1 hour'`, &otherStoryID)
+	defer func() {
+		if expiredRef != "" {
+			_, _ = db.Exec(context.Background(), `DELETE FROM story_media_cleanup WHERE storage_ref=$1`, expiredRef)
+		}
+	}()
 
 	token, err := authx.Sign("test", ownerID, base+"_0", base+"_0")
 	if err != nil {
@@ -275,6 +285,10 @@ func TestStoryExpiryAndOwnershipIntegration(t *testing.T) {
 	}
 	if len(items) != 2 || items[0].ID != activeID || items[0].Attachment == nil {
 		t.Fatalf("legacy media list/order incorrect: %+v", items)
+	}
+	var cleanupJobs int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM story_media_cleanup WHERE storage_ref=$1`, expiredRef).Scan(&cleanupJobs); err != nil || cleanupJobs != 1 {
+		t.Fatalf("expired story media cleanup jobs=%d err=%v", cleanupJobs, err)
 	}
 	all := call(http.MethodGet, "/api/stories?includeText=true")
 	var allItems []story

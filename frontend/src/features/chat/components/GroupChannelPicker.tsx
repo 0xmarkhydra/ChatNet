@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, type FormEvent } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { ChevronDown, Hash, Plus, X } from 'lucide-react'
 import type { GroupChannel } from '../utils/groupChannels'
@@ -20,15 +20,21 @@ export default function GroupChannelPicker({ conversationId, channels, selectedI
   const [name, setName] = useScopedState(conversationId, '')
   const [description, setDescription] = useScopedState(conversationId, '')
   const root = useRef<HTMLDivElement>(null)
+  const selectorRef = useRef<HTMLButtonElement>(null)
   const selected = channels.find(channel => channel.id === selectedId)
+  const closeMenu = useCallback((restoreFocus = true) => {
+    setOpen(false)
+    setCreating(false)
+    if (restoreFocus) selectorRef.current?.focus({ preventScroll: true })
+  }, [setOpen, setCreating])
   useEffect(() => {
     if (!open) return
-    const onPointer = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) { setOpen(false); setCreating(false) } }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); setCreating(false) } }
+    const onPointer = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) closeMenu(false) }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') closeMenu() }
     document.addEventListener('pointerdown', onPointer)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey) }
-  }, [open, setOpen, setCreating])
+  }, [open, closeMenu])
 
   async function create(event: FormEvent) {
     event.preventDefault()
@@ -49,6 +55,7 @@ export default function GroupChannelPicker({ conversationId, channels, selectedI
           {selected?.name || 'Thảo luận chung'}
         </span>
         <button type="button" className="group-channel-selector"
+          ref={selectorRef}
           aria-label={'Chọn kênh hội thoại: ' + (selected?.name || 'Thảo luận chung')}
           aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(value => !value)}>
           <ChevronDown size={16} aria-hidden="true" />
@@ -61,7 +68,7 @@ export default function GroupChannelPicker({ conversationId, channels, selectedI
         </div>
         {channels.map(channel => <button key={channel.id} type="button" role="menuitemradio"
           aria-checked={channel.id === selectedId} className={channel.id === selectedId ? 'selected' : ''}
-          onClick={() => { onSelect(channel.id); setOpen(false); setCreating(false) }}>
+          onClick={() => { onSelect(channel.id); closeMenu() }}>
           <Hash size={16} aria-hidden="true" /><span>{channel.name}</span>
           {channel.unreadCount > 0 && <b className="group-channel-menu-unread" aria-hidden="true">{channel.unreadCount > 99 ? '99+' : channel.unreadCount}</b>}
           {channel.id === selectedId && <span aria-hidden="true">✓</span>}

@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -21,6 +19,7 @@ import (
 	"chatnet/internal/onesignalx"
 	"chatnet/internal/redisx"
 	"chatnet/internal/searchx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -74,16 +73,28 @@ const storyTextLimit = 200
 const maxFeedComments = 50
 
 type server struct {
-	db        *pgxpool.Pool
-	redis     *redis.Client
-	jwtSecret string
-	push      *onesignalx.Client
-	storage   *objectstore.Client
+	db               *pgxpool.Pool
+	redis            *redis.Client
+	jwtSecret        string
+	push             *onesignalx.Client
+	storage          *objectstore.Client
+	deleteStoryMedia func(context.Context, string) error
 }
+
+type storyMediaCleanupJob struct {
+	id         int64
+	storageRef string
+}
+
+const storyMediaCleanupBatch = 50
+
+// Keep completed refs blocked beyond the 10-minute upload URL lifetime.
+const storyMediaCleanupReuseGuard = 15 * time.Minute
 
 type feedRow struct {
 	post
 	originalID int64
+	searchRank int
 }
 
 func main() {
@@ -113,6 +124,7 @@ func main() {
 		push:      onesignalx.New(config.Env("ONESIGNAL_APP_ID", ""), config.Env("ONESIGNAL_REST_API_KEY", "")),
 		storage:   objectstore.NewFromEnv(),
 	}
+	go s.processStoryMediaCleanup(ctx)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "feed"})
@@ -188,10 +200,17 @@ func (s *server) ready(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) list(w http.ResponseWriter, r *http.Request) {
+	page, paged, pageErr := searchx.ParsePageRequest(r.URL.Query())
+	if pageErr != nil {
+		httpx.Error(w, http.StatusBadRequest, pageErr.Error())
+		return
+	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	// Backwards-compatible default; clients using load-more request bounded pages.
 	limit := 100
-	if value := r.URL.Query().Get("limit"); value != "" {
+	if paged {
+		limit = page.Limit + 1
+	} else if value := r.URL.Query().Get("limit"); value != "" {
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 1 || n > 100 {
 			httpx.Error(w, http.StatusBadRequest, "invalid limit (1-100)")
@@ -200,6 +219,9 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 	author := strings.TrimSpace(r.URL.Query().Get("author"))
+	if paged {
+		author = ""
+	}
 	if len(author) > 64 {
 		httpx.Error(w, 400, "invalid author")
 		return
@@ -210,6 +232,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid search query (max 120 characters)")
 		return
 	}
+	searchTerm := query
 	// Treat LIKE metacharacters as literal input, not as user-supplied wildcards.
 	query = strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(query)
 	scope := r.URL.Query().Get("scope")
@@ -220,8 +243,11 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	if scope == "" {
 		scope = "all"
 	}
+	if paged {
+		scope = "all"
+	}
 	var before int64
-	if value := r.URL.Query().Get("before"); value != "" {
+	if value := r.URL.Query().Get("before"); value != "" && !paged {
 		n, err := strconv.ParseInt(value, 10, 64)
 		if err != nil || n < 1 {
 			httpx.Error(w, http.StatusBadRequest, "invalid before cursor")
@@ -229,22 +255,68 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		}
 		before = n
 	}
-	rows, err := s.db.Query(r.Context(), `
+	if paged && searchTerm == "" {
+		httpx.JSON(w, http.StatusOK, map[string]any{"items": []post{}, "nextCursor": nil})
+		return
+	}
+	var cursor postSearchCursor
+	if paged && page.Cursor != "" {
+		var err error
+		cursor, err = searchx.DecodeCursor[postSearchCursor](page.Cursor)
+		if err != nil || cursor.ID <= 0 || (page.Sort == "newest" && cursor.CreatedAt.IsZero()) ||
+			(page.Sort == "relevance" && (cursor.Rank < 0 || cursor.Rank > 5)) {
+			httpx.Error(w, http.StatusBadRequest, "invalid cursor")
+			return
+		}
+	}
+	rankSQL := "0"
+	if paged {
+		rankSQL = `CASE
+			WHEN ` + searchx.FoldSQL("p.content") + `=` + searchx.FoldSQL("$7") + ` THEN 0
+			WHEN strpos(` + searchx.FoldSQL("p.content") + `,` + searchx.FoldSQL("$7") + `)=1 THEN 1
+			WHEN ` + searchx.FoldSQL("u.username") + `=` + searchx.FoldSQL("$7") + ` THEN 2
+			WHEN strpos(` + searchx.FoldSQL("u.username") + `,` + searchx.FoldSQL("$7") + `)=1 THEN 3
+			WHEN strpos(` + searchx.FoldSQL("u.display_name") + `,` + searchx.FoldSQL("$7") + `)=1 THEN 4
+			ELSE 5 END`
+	}
+	querySQL := `
 		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
 		       p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0),
-		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
+		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2),` + rankSQL + ` AS search_rank
 		FROM posts p JOIN users u ON u.id=p.user_id
-		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND `+feedAccessSQL+`
+		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND ` + feedAccessSQL + `
 		  AND ($4='all' OR ($4='mine' AND p.user_id=$2)
 		       OR ($4='saved' AND EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2))
 		       OR ($4='following' AND (p.user_id=$2 OR EXISTS (
 		         SELECT 1 FROM friend_connections f WHERE f.status='accepted'
 		         AND ((f.user_low=$2 AND f.user_high=p.user_id) OR (f.user_high=$2 AND f.user_low=p.user_id))
 		       ))))
-		  AND ($6='' OR `+searchx.FoldSQL("p.content")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%'
-		       OR `+searchx.FoldSQL("u.username")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%'
-		       OR `+searchx.FoldSQL("u.display_name")+` LIKE '%' || `+searchx.FoldSQL("$6")+` || '%')
-		ORDER BY p.id DESC LIMIT $3`, before, claims.UserID, limit, scope, author, query)
+		  AND ($6='' OR ` + searchx.FoldSQL("p.content") + ` LIKE '%' || ` + searchx.FoldSQL("$6") + ` || '%'
+		       OR ` + searchx.FoldSQL("u.username") + ` LIKE '%' || ` + searchx.FoldSQL("$6") + ` || '%'
+		       OR ` + searchx.FoldSQL("u.display_name") + ` LIKE '%' || ` + searchx.FoldSQL("$6") + ` || '%')`
+	args := []any{before, claims.UserID, limit, scope, author, query}
+	if paged {
+		args = append(args, searchTerm, page.Since)
+		querySQL += ` AND p.visibility='public' AND ($8::timestamptz IS NULL OR p.created_at >= $8)`
+		if page.Cursor != "" {
+			if page.Sort == "newest" {
+				querySQL += ` AND (p.created_at,p.id)<($9::timestamptz,$10::bigint)`
+				args = append(args, cursor.CreatedAt, cursor.ID)
+			} else {
+				querySQL += ` AND (` + rankSQL + `>$9 OR (` + rankSQL + `=$9 AND p.id<$10))`
+				args = append(args, cursor.Rank, cursor.ID)
+			}
+		}
+		if page.Sort == "newest" {
+			querySQL += ` ORDER BY p.created_at DESC,p.id DESC`
+		} else {
+			querySQL += ` ORDER BY search_rank ASC,p.id DESC`
+		}
+	} else {
+		querySQL += ` ORDER BY p.id DESC`
+	}
+	querySQL += ` LIMIT $3`
+	rows, err := s.db.Query(r.Context(), querySQL, args...)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")
 		return
@@ -255,19 +327,28 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var p post
 		var originalID int64
-		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.Saved) != nil {
+		var searchRank int
+		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.Saved, &searchRank) != nil {
 			continue
 		}
-		entries = append(entries, feedRow{post: p, originalID: originalID})
+		entries = append(entries, feedRow{post: p, originalID: originalID, searchRank: searchRank})
 	}
 	if rows.Err() != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load posts")
 		return
 	}
 	rows.Close()
+	hasMore := paged && len(entries) > page.Limit
+	if hasMore {
+		entries = entries[:page.Limit]
+	}
 	posts := make([]post, 0, len(entries))
 	if len(entries) == 0 {
-		httpx.JSON(w, http.StatusOK, posts)
+		if paged {
+			httpx.JSON(w, http.StatusOK, map[string]any{"items": posts, "nextCursor": nil})
+		} else {
+			httpx.JSON(w, http.StatusOK, posts)
+		}
 		return
 	}
 	ids := make([]int64, 0, len(entries))
@@ -305,7 +386,31 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		p.Attachments = attachments[p.ID]
 		posts = append(posts, p)
 	}
+	if paged {
+		var nextCursor any
+		if hasMore && len(entries) > 0 {
+			last := entries[len(entries)-1]
+			value := postSearchCursor{Rank: last.searchRank, ID: last.ID}
+			if page.Sort == "newest" {
+				value.CreatedAt = last.CreatedAt
+			}
+			encoded, err := searchx.EncodeCursor(value)
+			if err != nil {
+				httpx.Error(w, http.StatusInternalServerError, "cannot create search cursor")
+				return
+			}
+			nextCursor = encoded
+		}
+		httpx.JSON(w, http.StatusOK, map[string]any{"items": posts, "nextCursor": nextCursor})
+		return
+	}
 	httpx.JSON(w, http.StatusOK, posts)
+}
+
+type postSearchCursor struct {
+	Rank      int       `json:"r"`
+	ID        int64     `json:"i"`
+	CreatedAt time.Time `json:"t,omitempty"`
 }
 
 func (s *server) comments(r *http.Request, postID, viewerID int64) []comment {
@@ -655,10 +760,234 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, p)
 }
 
+func (s *server) deleteStoryObject(ctx context.Context, storageRef string) error {
+	storageRef = strings.TrimSpace(storageRef)
+	if storageRef == "" {
+		return nil
+	}
+	if s.deleteStoryMedia != nil {
+		return s.deleteStoryMedia(ctx, storageRef)
+	}
+	if s.storage == nil || !s.storage.Configured() {
+		return errors.New("story media storage is not configured")
+	}
+	return s.storage.Delete(ctx, storageRef)
+}
+
+func (s *server) enqueueStoryMediaCleanup(ctx context.Context, tx pgx.Tx, storageRef string) error {
+	storageRef = strings.TrimSpace(storageRef)
+	if storageRef == "" {
+		return nil
+	}
+	if err := lockStoryMediaRef(ctx, tx, storageRef); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `
+		INSERT INTO story_media_cleanup(storage_ref)
+		SELECT $1
+		WHERE NOT EXISTS (SELECT 1 FROM stories WHERE storage_ref=$1)
+		ON CONFLICT (storage_ref) DO NOTHING`, storageRef)
+	return err
+}
+
+func lockStoryMediaRef(ctx context.Context, tx pgx.Tx, storageRef string) error {
+	storageRef = strings.TrimSpace(storageRef)
+	if storageRef == "" {
+		return nil
+	}
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, "chatnet:story-media:"+storageRef)
+	return err
+}
+
+func reserveStoryMediaUse(ctx context.Context, tx pgx.Tx, storageRef string) (bool, error) {
+	if err := lockStoryMediaRef(ctx, tx, storageRef); err != nil {
+		return false, err
+	}
+	var cleanupPending bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM story_media_cleanup WHERE storage_ref=$1
+	)`, storageRef).Scan(&cleanupPending)
+	return cleanupPending, err
+}
+
+func (s *server) cleanupExpiredStories(ctx context.Context) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		log.Printf("story expiry transaction failed: %v", err)
+		return
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `
+		SELECT id,COALESCE(storage_ref,'')
+		FROM stories
+		WHERE expires_at <= NOW() AND highlight_title IS NULL
+		ORDER BY id
+		LIMIT 100
+		FOR UPDATE SKIP LOCKED`)
+	if err != nil {
+		log.Printf("story expiry scan failed: %v", err)
+		return
+	}
+	items := make([]storyMediaCleanupJob, 0, 100)
+	for rows.Next() {
+		var item storyMediaCleanupJob
+		if err := rows.Scan(&item.id, &item.storageRef); err != nil {
+			rows.Close()
+			log.Printf("story expiry scan failed: %v", err)
+			return
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		log.Printf("story expiry scan failed: %v", err)
+		return
+	}
+	rows.Close()
+	for _, item := range items {
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM stories
+			WHERE id=$1 AND expires_at <= NOW() AND highlight_title IS NULL`, item.id); err != nil {
+			log.Printf("story expiry delete failed story=%d: %v", item.id, err)
+			return
+		}
+		if err := s.enqueueStoryMediaCleanup(ctx, tx, item.storageRef); err != nil {
+			log.Printf("story media cleanup enqueue failed story=%d: %v", item.id, err)
+			return
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("story expiry transaction commit failed: %v", err)
+	}
+}
+
+func (s *server) processStoryMediaCleanup(ctx context.Context) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sweepCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+			s.cleanupExpiredStories(sweepCtx)
+			s.sweepStoryMediaCleanup(sweepCtx)
+			cancel()
+		}
+	}
+}
+
+func (s *server) claimStoryMediaCleanup(ctx context.Context) []storyMediaCleanupJob {
+	if s.deleteStoryMedia == nil && (s.storage == nil || !s.storage.Configured()) {
+		return nil
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		log.Printf("story media cleanup claim failed: %v", err)
+		return nil
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `
+		UPDATE story_media_cleanup
+		SET locked_until=NOW()+INTERVAL '5 minutes'
+		WHERE id IN (
+			SELECT id FROM story_media_cleanup
+			WHERE available_at <= NOW()
+			  AND completed_at IS NULL
+			  AND (locked_until IS NULL OR locked_until < NOW())
+			ORDER BY id
+			LIMIT $1
+			FOR UPDATE SKIP LOCKED
+		)
+		RETURNING id,storage_ref`, storyMediaCleanupBatch)
+	if err != nil {
+		log.Printf("story media cleanup claim failed: %v", err)
+		return nil
+	}
+	jobs := make([]storyMediaCleanupJob, 0, storyMediaCleanupBatch)
+	for rows.Next() {
+		var job storyMediaCleanupJob
+		if err := rows.Scan(&job.id, &job.storageRef); err != nil {
+			rows.Close()
+			log.Printf("story media cleanup claim failed: %v", err)
+			return nil
+		}
+		jobs = append(jobs, job)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		log.Printf("story media cleanup claim failed: %v", err)
+		return nil
+	}
+	rows.Close()
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("story media cleanup claim commit failed: %v", err)
+		return nil
+	}
+	return jobs
+}
+
+func (s *server) retryStoryMediaCleanup(ctx context.Context, jobID int64, cause error) error {
+	_, err := s.db.Exec(ctx, `
+		UPDATE story_media_cleanup
+		SET attempts=attempts+1, available_at=NOW()+INTERVAL '5 minutes',
+		    locked_until=NULL, last_error=$2
+		WHERE id=$1`, jobID, cause.Error())
+	return err
+}
+
+func (s *server) completeStoryMediaCleanup(ctx context.Context, jobID int64) error {
+	_, err := s.db.Exec(ctx, `
+		UPDATE story_media_cleanup
+		SET completed_at=NOW(), locked_until=NULL, last_error=NULL
+		WHERE id=$1 AND completed_at IS NULL`, jobID)
+	return err
+}
+
+func (s *server) purgeCompletedStoryMediaCleanup(ctx context.Context) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM story_media_cleanup
+		WHERE completed_at IS NOT NULL AND completed_at <= NOW()-($1 * INTERVAL '1 second')`, storyMediaCleanupReuseGuard.Seconds())
+	return err
+}
+
+func (s *server) sweepStoryMediaCleanup(ctx context.Context) {
+	if err := s.purgeCompletedStoryMediaCleanup(ctx); err != nil {
+		log.Printf("completed story media cleanup purge failed: %v", err)
+		return
+	}
+	for _, job := range s.claimStoryMediaCleanup(ctx) {
+		var referenced bool
+		if err := s.db.QueryRow(ctx, `SELECT EXISTS (
+			SELECT 1 FROM stories WHERE storage_ref=$1
+		)`, job.storageRef).Scan(&referenced); err != nil {
+			log.Printf("story media cleanup reference check failed job=%d: %v", job.id, err)
+			if updateErr := s.retryStoryMediaCleanup(ctx, job.id, err); updateErr != nil {
+				log.Printf("story media cleanup retry update failed job=%d: %v", job.id, updateErr)
+			}
+			continue
+		}
+		if referenced {
+			if _, err := s.db.Exec(ctx, "DELETE FROM story_media_cleanup WHERE id=$1", job.id); err != nil {
+				log.Printf("story media cleanup cancellation failed job=%d: %v", job.id, err)
+			}
+			continue
+		}
+		if err := s.deleteStoryObject(ctx, job.storageRef); err != nil {
+			log.Printf("story media cleanup failed job=%d: %v", job.id, err)
+			if updateErr := s.retryStoryMediaCleanup(ctx, job.id, err); updateErr != nil {
+				log.Printf("story media cleanup retry update failed job=%d: %v", job.id, updateErr)
+			}
+			continue
+		}
+		if err := s.completeStoryMediaCleanup(ctx, job.id); err != nil {
+			log.Printf("story media cleanup completion failed job=%d: %v", job.id, err)
+		}
+	}
+}
+
 func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
-	// ponytail: rows expire eagerly on reads; add object-store lifecycle cleanup when orphan cleanup ships.
-	_, _ = s.db.Exec(r.Context(), `DELETE FROM stories WHERE expires_at <= NOW() AND highlight_title IS NULL`)
+	s.cleanupExpiredStories(r.Context())
 	rows, err := s.db.Query(r.Context(), `
 		SELECT s.id,u.username,u.display_name,COALESCE(s.storage_ref,''),COALESCE(s.original_name,''),
 		       COALESCE(s.content_type,''),COALESCE(s.size_bytes,0),s.kind,
@@ -770,12 +1099,30 @@ func (s *server) createStory(w http.ResponseWriter, r *http.Request) {
 	}
 	var err error
 	if a := item.Attachment; a != nil {
-		err = s.db.QueryRow(r.Context(), `
+		tx, err := s.db.Begin(r.Context())
+		if err != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "story service unavailable")
+			return
+		}
+		defer tx.Rollback(r.Context())
+		cleanupPending, err := reserveStoryMediaUse(r.Context(), tx, a.StorageRef)
+		if err != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "story service unavailable")
+			return
+		}
+		if cleanupPending {
+			httpx.Error(w, http.StatusBadRequest, "story media reference cannot be reused; upload a new file")
+			return
+		}
+		err = tx.QueryRow(r.Context(), `
 			INSERT INTO stories(user_id,storage_ref,original_name,content_type,size_bytes,kind)
 			VALUES($1,$2,$3,$4,$5,$6)
 			RETURNING id,created_at,expires_at`,
 			claims.UserID, a.StorageRef, a.Name, a.ContentType, a.SizeBytes, a.Kind,
 		).Scan(&item.ID, &item.CreatedAt, &item.ExpiresAt)
+		if err == nil {
+			err = tx.Commit(r.Context())
+		}
 	} else {
 		err = s.db.QueryRow(r.Context(), `
 			INSERT INTO stories(user_id,kind,text_content,text_background)
@@ -798,13 +1145,39 @@ func (s *server) deleteStory(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid story id")
 		return
 	}
-	tag, err := s.db.Exec(r.Context(), `DELETE FROM stories WHERE id=$1 AND user_id=$2`, id, claims.UserID)
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "story service unavailable")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	var storageRef string
+	err = tx.QueryRow(r.Context(), `
+		SELECT COALESCE(storage_ref,'')
+		FROM stories WHERE id=$1 AND user_id=$2 FOR UPDATE`, id, claims.UserID).Scan(&storageRef)
+	if errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, http.StatusNotFound, "story not found")
+		return
+	}
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot load story")
+		return
+	}
+	tag, err := tx.Exec(r.Context(), `DELETE FROM stories WHERE id=$1 AND user_id=$2`, id, claims.UserID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot delete story")
 		return
 	}
 	if tag.RowsAffected() == 0 {
 		httpx.Error(w, http.StatusNotFound, "story not found")
+		return
+	}
+	if err := s.enqueueStoryMediaCleanup(r.Context(), tx, storageRef); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "story cleanup unavailable")
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot delete story")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
