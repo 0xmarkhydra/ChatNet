@@ -1,4 +1,9 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 const storyBackgrounds = <String, List<Color>>{
   'berry': [Color(0xFFB82C78), Color(0xFF702F9D)],
@@ -13,6 +18,20 @@ const storyBackgroundNames = <String, String>{
   'sunset': 'Cam hoàng hôn',
 };
 
+String? validateStoryMedia(String name, int? size) {
+  const images = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'};
+  const videos = {'mp4', 'mov', 'm4v', 'webm'};
+  final extension = name.split('.').last.toLowerCase();
+  if (!images.contains(extension) && !videos.contains(extension)) {
+    return 'Chỉ hỗ trợ ảnh JPG, PNG, WebP, GIF, HEIC hoặc video MP4, MOV, M4V, WebM.';
+  }
+  final maxMB = videos.contains(extension) ? 150 : 20;
+  if (size == null || size <= 0 || size > maxMB * 1024 * 1024) {
+    return 'Dung lượng tối đa cho ${videos.contains(extension) ? 'video' : 'ảnh'} là $maxMB MB.';
+  }
+  return null;
+}
+
 class FeedStoryCreateSheet extends StatefulWidget {
   const FeedStoryCreateSheet({
     super.key,
@@ -20,7 +39,7 @@ class FeedStoryCreateSheet extends StatefulWidget {
     required this.onCreateText,
   });
 
-  final Future<bool> Function() onCreateMedia;
+  final Future<bool> Function(PlatformFile file) onCreateMedia;
   final Future<bool> Function(String text, String background) onCreateText;
 
   @override
@@ -33,29 +52,152 @@ class _FeedStoryCreateSheetState extends State<FeedStoryCreateSheet> {
   bool busy = false;
   String background = 'berry';
   String error = '';
+  PlatformFile? selectedMedia;
+  int? selectedSize;
+  Future<Uint8List>? previewImageBytes;
+  VideoPlayerController? videoController;
+  Future<void>? initializingVideo;
 
   @override
   void dispose() {
+    videoController?.dispose();
     textController.dispose();
     super.dispose();
+  }
+
+  Future<void> _chooseMedia() async {
+    if (busy) return;
+    try {
+      final file = await FilePicker.pickFile(type: FileType.media);
+      if (!mounted || file == null) return;
+      int? size;
+      try {
+        size = file.lengthSync();
+      } catch (_) {
+        // Some file picker backends only support asynchronous size lookup.
+      }
+      size ??= await file.length();
+      if (!mounted) return;
+      final issue = validateStoryMedia(file.name, size);
+      if (issue != null) {
+        setState(() => error = issue);
+        return;
+      }
+      final previous = videoController;
+      final ext = file.name.split('.').last.toLowerCase();
+      final isVideo = {'mp4', 'mov', 'm4v', 'webm'}.contains(ext);
+      final video = isVideo && file.path != null
+          ? VideoPlayerController.file(File(file.path!))
+          : null;
+      setState(() {
+        selectedMedia = file;
+        selectedSize = size;
+        previewImageBytes = !isVideo && file.path == null ? file.readAsBytes() : null;
+        videoController = video;
+        initializingVideo = video?.initialize();
+        error = '';
+      });
+      await previous?.dispose();
+    } catch (_) {
+      if (mounted) setState(() => error = 'Không thể đọc tệp. Hãy chọn lại ảnh hoặc video.');
+    }
+  }
+
+  void _backToChoice() {
+    if (busy) return;
+    videoController?.dispose();
+    setState(() {
+      editingText = false;
+      selectedMedia = null;
+      selectedSize = null;
+      previewImageBytes = null;
+      videoController = null;
+      initializingVideo = null;
+      error = '';
+    });
+  }
+
+  Widget _mediaPreview(PlatformFile file) {
+    final extension = file.name.split('.').last.toLowerCase();
+    final isVideo = {'mp4', 'mov', 'm4v', 'webm'}.contains(extension);
+    final controller = videoController;
+    final Widget content;
+    if (!isVideo) {
+      content = file.path != null
+          ? Image.file(File(file.path!), fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined, color: Colors.white, size: 64))
+          : FutureBuilder<Uint8List>(
+              future: previewImageBytes,
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  return Image.memory(snapshot.data!, fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined, color: Colors.white));
+                }
+                if (snapshot.hasError) {
+                  return const Center(child: Text('Không thể xem trước ảnh này.', style: TextStyle(color: Colors.white)));
+                }
+                return const Center(child: CircularProgressIndicator());
+              },
+            );
+    } else if (controller == null) {
+      content = const Center(child: Text('Không thể xem trước video trên thiết bị này.', style: TextStyle(color: Colors.white)));
+    } else {
+      content = FutureBuilder<void>(
+        future: initializingVideo,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError || !controller.value.isInitialized) {
+            return const Center(child: Text('Không thể xem trước video này.', style: TextStyle(color: Colors.white)));
+          }
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              Center(child: AspectRatio(
+                aspectRatio: controller.value.aspectRatio,
+                child: VideoPlayer(controller),
+              )),
+              IconButton.filledTonal(
+                tooltip: controller.value.isPlaying ? 'Tạm dừng' : 'Phát video',
+                onPressed: () {
+                  controller.value.isPlaying ? controller.pause() : controller.play();
+                  setState(() {});
+                },
+                icon: Icon(controller.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+              ),
+            ],
+          );
+        },
+      );
+    }
+    return ClipRRect(
+      key: const ValueKey('story-media-preview'),
+      borderRadius: BorderRadius.circular(16),
+      child: ColoredBox(
+        color: Colors.black87,
+        child: SizedBox(height: 230, width: double.infinity, child: content),
+      ),
+    );
   }
 
   Future<void> _submit({bool media = false}) async {
     if (busy) return;
     final text = textController.text.trim();
     if (!media && (text.isEmpty || text.runes.length > 200)) return;
+    if (media && selectedMedia == null) return;
     setState(() {
       busy = true;
       error = '';
     });
     try {
       final ok = media
-          ? await widget.onCreateMedia()
+          ? await widget.onCreateMedia(selectedMedia!)
           : await widget.onCreateText(text, background);
       if (!mounted) return;
       if (ok) {
         Navigator.of(context).pop();
-      } else if (!media) {
+      } else {
         setState(() => error = 'Chưa đăng được Story. Bản nháp vẫn được giữ.');
       }
     } catch (_) {
@@ -85,13 +227,13 @@ class _FeedStoryCreateSheetState extends State<FeedStoryCreateSheet> {
             children: [
               Row(
                 children: [
-                  if (editingText)
+                  if (editingText || selectedMedia != null)
                     IconButton(
                       key: const ValueKey('story-back-to-choice'),
                       tooltip: 'Quay lại chọn loại tin',
                       onPressed: busy
                           ? null
-                          : () => setState(() => editingText = false),
+                          : _backToChoice,
                       icon: const Icon(Icons.arrow_back_rounded),
                     ),
                   Expanded(
@@ -111,7 +253,28 @@ class _FeedStoryCreateSheetState extends State<FeedStoryCreateSheet> {
                 ],
               ),
               const SizedBox(height: 10),
-              if (!editingText) ...[
+              if (selectedMedia != null && !editingText) ...[
+                _mediaPreview(selectedMedia!),
+                const SizedBox(height: 10),
+                Text(selectedMedia!.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text('${((selectedSize ?? 0) / (1024 * 1024)).toStringAsFixed(1)} MB · Story hiển thị trong 24 giờ.'),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: busy ? null : _chooseMedia,
+                    icon: const Icon(Icons.image_outlined),
+                    label: const Text('Chọn tệp khác'),
+                  ),
+                ),
+                FilledButton.icon(
+                  key: const ValueKey('story-media-publish'),
+                  onPressed: busy ? null : () => _submit(media: true),
+                  icon: const Icon(Icons.send_rounded),
+                  label: Text(busy ? 'Đang đăng...' : 'Đăng Story'),
+                ),
+              ] else if (!editingText) ...[
                 Row(
                   children: [
                     Expanded(
@@ -120,7 +283,7 @@ class _FeedStoryCreateSheetState extends State<FeedStoryCreateSheet> {
                         title: 'Tạo tin có ảnh hoặc video',
                         icon: Icons.photo_library_outlined,
                         colors: storyBackgrounds['indigo']!,
-                        onTap: busy ? null : () => _submit(media: true),
+                        onTap: busy ? null : _chooseMedia,
                       ),
                     ),
                     const SizedBox(width: 12),
