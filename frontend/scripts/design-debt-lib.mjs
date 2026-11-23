@@ -135,6 +135,32 @@ export function findOrphanTokens(frontendRoot) {
   return defined.filter((token) => !used.has(token))
 }
 
+/** Most common 6-digit hex values in CSS/TSX with the existing token that has exactly that value, if any. */
+export function topColours(frontendRoot, limit = 20) {
+  const theme = readFileSync(join(frontendRoot, 'src/styles/soco-theme.css'), 'utf8')
+  const tokens = {}
+  for (const match of theme.matchAll(/^\s*(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;/gm)) {
+    const hex = match[2].toLowerCase()
+    tokens[hex] = tokens[hex] || match[1]
+  }
+  const found = {}
+  for (const file of walk(join(frontendRoot, 'src'), ['.css', '.tsx', '.ts'])) {
+    const css = file.endsWith('.css')
+    for (const line of prepareLines(readFileSync(file, 'utf8'), { css })) {
+      if (css && !line.includes(':')) continue
+      for (const match of line.matchAll(/#[0-9a-fA-F]{6}\b/g)) {
+        const hex = match[0].toLowerCase()
+        const lower = line.toLowerCase()
+        found[hex] ||= { total: 0, fallback: 0 }
+        found[hex].total += 1
+        if (lower.includes(', ' + hex + ')') || lower.includes(',' + hex + ')')) found[hex].fallback += 1
+      }
+    }
+  }
+  return Object.entries(found).sort((a, b) => b[1].total - a[1].total).slice(0, limit)
+    .map(([hex, count]) => ({ hex, ...count, token: tokens[hex] }))
+}
+
 /** File/metric pairs that got worse than the baseline. New files with debt count as worse. */
 export function findRegressions(baseline, current) {
   return Object.entries(current)

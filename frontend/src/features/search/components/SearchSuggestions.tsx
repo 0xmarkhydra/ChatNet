@@ -32,7 +32,7 @@ export default function SearchSuggestions({ listId, draft, options, active, onPi
 
   return (
     <div id={listId} role="listbox" aria-label="Gợi ý tìm kiếm"
-      className="absolute top-full right-0 left-0 z-20 mt-ui-2 rounded-ui-lg border border-border bg-card p-ui-2 text-foreground shadow-ui-overlay">
+      className="absolute top-full right-0 left-0 z-(--soco-z-dropdown) mt-ui-2 rounded-ui-lg border border-border bg-card p-ui-2 text-foreground shadow-ui-overlay">
       {sections.map(section => (
         <div key={section.title || 'queries'} role="presentation">
           {section.title && <p className={heading} role="presentation">{section.title}</p>}
