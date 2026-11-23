@@ -67,11 +67,11 @@ export default function FeedPostCard({
 
   return (
     <Card asChild>
-      <article className="post zalo-post feed-post-card flex! flex-col! gap-y-2! min-w-0! m-0! px-[18px]! pt-[14px]! pb-[11px]! overflow-hidden! rounded-2xl! border! border-[#e8ecf5]! bg-white! shadow-[0_3px_16px_rgba(30,51,96,0.035)]!">
+      <article className="post zalo-post feed-post-card flex! flex-col! gap-y-2! min-w-0! m-0! px-0! pt-[14px]! pb-[11px]! overflow-hidden! rounded-none! border-x-0! border-y! border-[#e8ecf5]! bg-white! shadow-none! min-[761px]:rounded-2xl! min-[761px]:border-0! min-[761px]:shadow-[0_3px_16px_rgba(30,51,96,0.06)]! [&>.feed-post-header]:px-4!">
         <PostCardHeader post={post} authorLabel={authorLabel} name={name} onAuthorOpen={onAuthorOpen}
           onEditPost={onEditPost} openPost={openPost} apiFetch={apiFetch} syncFeedPost={syncFeedPost}
           removeFeedPost={removeFeedPost} setNotice={setNotice} onRepostChanged={onRepostChanged} />
-        <div className="post-body grid! w-full! min-w-0! gap-1.5! [&>*]:min-w-0!">
+        <div className="post-body grid! w-full! min-w-0! gap-1.5! [&>*]:min-w-0! [&>*:not(.feed-media-preview):not(.feed-post-toolbar)]:px-4!">
         <PostExtrasView extras={extras} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
         {extras.caption && (
           <div className={post.background ? 'feed-post-clickable feed-text-background bg-' + post.background : 'feed-post-clickable feed-post-text pt-1.5! [&_.feed-text>p]:m-0! [&_.feed-text>p]:mb-1! [&_.feed-text>p]:text-sm! [&_.feed-text>p]:leading-normal!'}
@@ -84,7 +84,7 @@ export default function FeedPostCard({
           </div>
         )}
         {Boolean(post.attachments?.length) && (
-          <div className="feed-media-preview mt-2! min-w-0! overflow-hidden! rounded-xl! [&_.media-attachments]:w-full! [&_.media-attachments]:max-w-none! [&_.media-attachments]:m-0! [&_.media-count-1_.media-item_img]:h-auto! [&_.media-count-1_.media-item_img]:max-h-[440px]! [&_.media-count-1_.media-item_img]:object-contain! [&_.media-count-1_.media-item_img]:rounded-xl! [&_.media-count-1_.media-item_video]:h-auto! [&_.media-count-1_.media-item_video]:max-h-[440px]! [&_.media-count-1_.media-item_video]:object-contain!">
+          <div className="feed-media-preview mt-2! min-w-0! overflow-hidden! rounded-none! [&_.media-attachments]:rounded-none! [&_.media-item]:rounded-none! [&_.media-image-button]:rounded-none! [&_.media-item_img]:rounded-none! [&_.media-item_video]:rounded-none! [&_.media-attachments]:w-full! [&_.media-attachments]:max-w-none! [&_.media-attachments]:m-0! [&_.media-count-1_.media-item_img]:h-auto! [&_.media-count-1_.media-item_img]:max-h-[440px]! [&_.media-count-1_.media-item_img]:object-contain! [&_.media-count-1_.media-item_img]:rounded-none! [&_.media-count-1_.media-item_video]:h-auto! [&_.media-count-1_.media-item_video]:max-h-[440px]! [&_.media-count-1_.media-item_video]:object-contain!">
             <MediaAttachmentsView items={post.attachments} onImageClick={openPost} />
           </div>
         )}

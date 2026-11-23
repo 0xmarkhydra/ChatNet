@@ -1,14 +1,11 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Camera, Check, ImagePlus, RotateCcw, Trash2, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { useGroupAvatarEditor } from '../hooks/useGroupAvatarEditor'
+export { photoFileError } from '../utils/photoFileValidation'
 import '../styles/group-avatar-editor.css'
 
-export type GroupPhotoTarget = {
-  name: string
-  avatarUrl?: string
-  kind?: 'group' | 'avatar' | 'cover' | 'channel'
-  channelId?: number
-}
+import type { GroupPhotoTarget } from '../utils/groupPhotoTarget'
+export type { GroupPhotoTarget } from '../utils/groupPhotoTarget'
 
 type Props = {
   target: GroupPhotoTarget
@@ -17,91 +14,11 @@ type Props = {
   onClose: () => void
 }
 
-const MAX_SIZE = 12 * 1024 * 1024
-const supportedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'])
-const extensions = /\.(jpe?g|png|webp|gif|heic|heif)$/i
-
-export function photoFileError(file: File): string {
-  if (file.size > MAX_SIZE) {
-    const sizeMb = (file.size / (1024 * 1024)).toLocaleString('vi-VN', { maximumFractionDigits: 1 })
-    return `Ảnh ${file.name} có dung lượng ${sizeMb} MB, vượt quá giới hạn 12 MB. Vui lòng chọn ảnh nhỏ hơn.`
-  }
-  if (!file.size) return 'Ảnh trống, vui lòng chọn ảnh khác.'
-  if (!supportedTypes.has(file.type.toLowerCase()) || !extensions.test(file.name)) {
-    return 'Vui lòng chọn ảnh JPG, PNG, WebP, GIF hoặc HEIC.'
-  }
-  return ''
-}
 
 export default function GroupAvatarEditor({ target, busy, onSave, onClose }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const chooseRef = useRef<HTMLButtonElement>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState('')
-  const [remove, setRemove] = useState(false)
-  const [error, setError] = useState('')
-  const [dragging, setDragging] = useState(false)
-  const [imageError, setImageError] = useState(false)
-
-  const label = target.kind === 'cover' ? 'ảnh bìa' : target.kind === 'avatar' ? 'ảnh đại diện' : target.kind === 'channel' ? 'ảnh kênh' : 'ảnh nhóm'
-  const isCover = target.kind === 'cover'
-
-  useEffect(() => {
-    chooseRef.current?.focus()
-  }, [])
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
-  useEffect(() => {
-    if (busy) return
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        event.stopPropagation()
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', handleEscape, true)
-    return () => document.removeEventListener('keydown', handleEscape, true)
-  }, [busy, onClose])
-
-  const choose = (selected?: File) => {
-    if (!selected || busy) return
-    const validation = photoFileError(selected)
-    if (validation) {
-      setFile(null)
-      setPreview('')
-      setRemove(false)
-      setError(validation)
-      return
-    }
-    setError('')
-    setRemove(false)
-    setImageError(false)
-    setPreview(URL.createObjectURL(selected))
-    setFile(selected)
-  }
-  const onDrop = (event: DragEvent<HTMLButtonElement>) => {
-    event.preventDefault()
-    setDragging(false)
-    if (busy) return
-    const dropped = Array.from(event.dataTransfer.files)
-    if (dropped.length !== 1) {
-      setError('Chỉ chọn một ảnh mỗi lần.')
-      return
-    }
-    choose(dropped[0])
-  }
-  const reset = () => {
-    setPreview('')
-    setFile(null)
-    setRemove(false)
-    setImageError(false)
-    setError('')
-  }
-  const submit = async () => {
-    if (busy || (!file && !remove)) return
-    if (await onSave(target, remove ? null : file)) onClose()
-  }
-  const imageUrl = remove ? '' : preview || target.avatarUrl || ''
+  const { inputRef, chooseRef, file, remove, error, dragging, setDragging,
+    imageError, setImageError, label, isCover, choose, onDrop, reset, submit, imageUrl, removePhoto } =
+    useGroupAvatarEditor({ target, busy, onSave, onClose })
 
   return createPortal(
     <div className="group-photo-modal-layer">
@@ -139,7 +56,7 @@ export default function GroupAvatarEditor({ target, busy, onSave, onClose }: Pro
           {target.avatarUrl && (file || remove) && <button type="button" disabled={busy} onClick={reset}
             aria-label="Hoàn tác thay đổi ảnh"><RotateCcw size={16} /> Hoàn tác</button>}
           {target.avatarUrl && !remove && <button type="button" disabled={busy}
-            onClick={() => { setFile(null); setPreview(''); setRemove(true); setError(''); setImageError(false) }}>
+            onClick={removePhoto}>
             <Trash2 size={16} /> Gỡ ảnh
           </button>}
           <button className="group-photo-save" type="button" disabled={busy || (!file && !remove)}
