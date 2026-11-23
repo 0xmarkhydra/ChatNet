@@ -79,9 +79,9 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('nav-contacts')));
     await tester.pumpAndSettle();
-    expect(find.text('Danh sách bạn bè'), findsWidgets);
-    expect(find.text('Danh sách nhóm'), findsWidgets);
-    expect(find.text('Lời mời kết bạn'), findsWidgets);
+    expect(find.text('Bạn bè'), findsWidgets);
+    expect(find.text('Nhóm chat'), findsWidgets);
+    expect(find.text('Lời mời'), findsWidgets);
     expect(find.byKey(const ValueKey('friends-local-search')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('nav-feed')));
