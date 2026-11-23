@@ -469,27 +469,6 @@ button:disabled {
   font-size: 13px;
 }
 
-.post-toolbar {
-  display: flex;
-  gap: 8px;
-  margin-top: 5px;
-  padding-top: 9px;
-  border-top: 1px solid #f0f2f6;
-}
-
-.post-toolbar button {
-  border: 0;
-  border-radius: 10px;
-  padding: 7px 9px;
-  background: #f6f8fc;
-  color: #5f6d83;
-}
-
-.post-toolbar button.liked {
-  background: #fff0f3;
-  color: #d43b55;
-}
-
 .comments {
   display: grid;
   gap: 6px;

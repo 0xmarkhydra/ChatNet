@@ -373,21 +373,6 @@ select {
     gap: 9px;
   }
 
-  .post-toolbar {
-    gap: 5px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .post-toolbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .post-toolbar button {
-    flex: 0 0 auto;
-    min-height: 38px;
-  }
-
   .comment {
     align-items: flex-start;
     overflow-wrap: anywhere;
