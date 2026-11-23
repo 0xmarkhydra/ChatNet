@@ -2257,7 +2257,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     child: ListView.builder(
                       key: const ValueKey('mobile-avatar-rail'),
                       controller: avatarScrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
+                      // Clamp overscroll on both platforms: only the inbox
+                      // viewport moves, never its search header or bottom tabs.
+                      physics: const ClampingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
                       padding: const EdgeInsets.fromLTRB(5, 6, 5, 22),
                       itemCount: visible.isEmpty
                           ? 1
