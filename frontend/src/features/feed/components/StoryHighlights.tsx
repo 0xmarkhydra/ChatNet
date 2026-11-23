@@ -70,13 +70,13 @@ export default function StoryHighlights({ request, username, owner = false, clas
   const activeStory = items?.find(item => item.id === activeStoryId)
   if (!owner && (!items || items.length === 0)) return null
   return (
-    <section className={cn('min-w-0 rounded-ui-lg border border-solid border-border bg-card p-4 text-foreground', className)} aria-label="Tin nổi bật">
+    <section className={cn('min-w-0 rounded-ui-lg border border-solid border-border bg-card p-ui-4 text-foreground', className)} aria-label="Tin nổi bật">
       <h2 className="m-0 mb-3 text-ui-section font-semibold">Tin nổi bật</h2>
       {refreshError ? <div><p role="status">Không tải được Tin nổi bật.</p><Button size="sm" type="button" variant="outline" onClick={refresh}>Tải lại</Button></div>
         : !items ? <p role="status">Đang tải…</p>
         : items.length === 0 && <p className="text-sm text-muted-foreground">Mở Story của bạn và chọn “Thêm vào Tin nổi bật” để giữ tin trên hồ sơ.</p>}
       {items && items.length > 0 && (
-        <ul role="list" className="m-0 mt-2 grid list-none auto-cols-[calc((100%_-_1rem)/3)] grid-flow-col gap-2 overflow-x-auto overscroll-x-contain p-1">
+        <ul role="list" className="m-0 mt-2 grid list-none auto-cols-[calc((100%_-_1rem)/3)] grid-flow-col gap-ui-2 overflow-x-auto overscroll-x-contain p-1">
           {items.map(item => (
             <li key={item.id} className="relative min-w-0">
               <button type="button" aria-label={item.title} onClick={() => setActiveStoryId(item.id)}
@@ -93,7 +93,7 @@ export default function StoryHighlights({ request, username, owner = false, clas
               }}>
                 <DialogTrigger asChild>
                   <Button aria-label={'Quản lý Tin nổi bật: ' + item.title} variant="ghost"
-                    className="group absolute right-1 top-1 size-11 items-start justify-end p-0 hover:bg-transparent">
+                    className="group absolute right-1 top-1 size-control-touch items-start justify-end p-0 hover:bg-transparent">
                     <span className="pointer-events-none grid size-7 place-items-center rounded-lg bg-card/90 shadow-sm group-hover:bg-card">
                       <MoreHorizontal size={16} aria-hidden="true" />
                     </span>

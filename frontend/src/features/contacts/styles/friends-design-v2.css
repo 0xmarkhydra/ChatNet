@@ -1,6 +1,6 @@
 /* Friends directory + invitations, based on the two supplied SocCo screen references. */
 .friends-design-v2 {
- --fd-blue:#2563eb;--fd-ink:#182947;--fd-muted:#7384a6;--fd-bg:#f6f8ff;
+ --fd-blue:var(--soco-blue);--fd-ink:#182947;--fd-muted:#7384a6;--fd-bg:#f6f8ff;
  --fd-border:#edf0f8;
  width:100%;height:100%;min-height:0;min-width:0;padding:20px 26px 28px;
  box-sizing:border-box;overflow:auto;display:flex;flex-direction:column;gap:20px;
@@ -19,9 +19,9 @@
  border:0;border-radius:11px;padding:10px 15px;min-height:41px;
  font-size:13px;font-weight:720;white-space:nowrap;
 }
-.friends-design-v2 .fd-primary{background:#2563eb;color:#fff}
+.friends-design-v2 .fd-primary{background:var(--soco-blue);color:#fff}
 .friends-design-v2 .fd-primary:hover:not(:disabled){background:#1857da}
-.friends-design-v2 .fd-secondary{background:#edf2ff;color:#2563eb}
+.friends-design-v2 .fd-secondary{background:#edf2ff;color:var(--soco-blue)}
 .friends-design-v2 .fd-secondary:hover:not(:disabled){background:#dfe9ff}
 .fd-searchbar{
  flex:0 0 auto;min-height:82px;border:1px solid #e9eef8;background:#fff;
@@ -46,9 +46,9 @@
 .fd-list-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:1px 11px 11px}
 .fd-list-header span,.fd-list-header p{font-size:12px;color:var(--fd-muted)}
 .fd-list-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto}
-.fd-list-actions button{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:9px;background:#edf3ff;color:#2563eb}
+.fd-list-actions button{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:9px;background:#edf3ff;color:var(--soco-blue)}
 .fd-list-actions button:hover:not(:disabled){background:#dfe9ff}
-.friends-design-v2 .fd-text-button{border:0;background:transparent;color:#2563eb;font-size:12px;font-weight:700}
+.friends-design-v2 .fd-text-button{border:0;background:transparent;color:var(--soco-blue);font-size:12px;font-weight:700}
 .fd-filters{display:flex;gap:8px;flex:0 0 auto;padding:3px 7px 14px}
 .fd-filters button{border:0;border-radius:12px;min-height:34px;padding:7px 14px;background:transparent;color:#64789c;font-size:12px}
 .fd-filters button.active{background:transparent;color:#2465eb;font-weight:800}
@@ -66,9 +66,9 @@
 .fd-person-identity strong{font-size:14px;font-weight:800;color:#1b2d4c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fd-person-identity small{font-size:11px;color:#8190ad;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fd-avatar{width:54px!important;height:54px!important;flex:0 0 54px;border-radius:50%!important}
-.fd-icon-btn{display:grid;place-items:center;flex:0 0 30px;width:30px;height:34px;background:transparent;border:0;color:#2563eb;border-radius:8px;padding:0}
+.fd-icon-btn{display:grid;place-items:center;flex:0 0 30px;width:30px;height:34px;background:transparent;border:0;color:var(--soco-blue);border-radius:8px;padding:0}
 .fd-icon-btn:last-child{color:#7990b6}
-.fd-icon-btn:hover{background:#dde7ff;color:#2563eb}
+.fd-icon-btn:hover{background:#dde7ff;color:var(--soco-blue)}
 .friends-design-v2 .fd-search-action{padding:9px 11px;min-height:34px;font-size:12px}
 .fd-empty{padding:23px 15px;text-align:center;font-size:13px;color:#8795ad}
 .fd-empty h2{margin-top:8px}
@@ -88,7 +88,7 @@
 .fd-profile-core h2{margin:11px 0 4px;font-size:22px;max-width:100%;overflow-wrap:anywhere}
 .fd-profile-info p,.fd-profile-info button{min-width:0;overflow-wrap:anywhere}
 .fd-profile-options>div:nth-child(2)>button{min-height:32px;padding:5px 4px;border-radius:6px}
-.fd-profile-options>div:nth-child(2)>button:focus-visible,.fd-profile-info button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.fd-profile-options>div:nth-child(2)>button:focus-visible,.fd-profile-info button:focus-visible{outline:2px solid var(--soco-blue);outline-offset:2px}
 .fd-profile-core p{font-size:12px;color:#798aab}
 .fd-profile-core p.fd-online{color:#00a86e}
 .fd-profile-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:30px 5px 23px}
@@ -96,15 +96,15 @@
 .fd-profile-info{border-top:1px solid #e7edf7;padding:22px 18px 13px;display:grid;gap:18px}
 .fd-profile-info h3{margin-bottom:2px}
 .fd-profile-info p,.fd-profile-info button{display:flex;align-items:center;gap:11px;color:#30415f;font-size:13px;text-align:left}
-.fd-profile-info p svg,.fd-profile-info button svg{color:#2563eb;flex:0 0 19px}
+.fd-profile-info p svg,.fd-profile-info button svg{color:var(--soco-blue);flex:0 0 19px}
 .fd-profile-info button{border:0;background:transparent;padding:0}
-.fd-profile-info button:hover{color:#2563eb}
+.fd-profile-info button:hover{color:var(--soco-blue)}
 .fd-profile-options{margin:20px 4px 3px;padding:18px 20px;border-radius:13px;background:#f7f9fd;position:relative}
 .fd-profile-options h3{font-size:13px;display:flex;align-items:center;gap:9px}
 .fd-profile-options h3 svg{color:#697ea4}
 .fd-profile-options>div:nth-child(2){display:flex;gap:4px;flex-wrap:wrap;margin-top:11px;align-items:center}
 .fd-profile-options>div:nth-child(2)>button{background:transparent;border:0;padding:1px;font-size:11px;color:#7185a9}
-.fd-profile-options>div:nth-child(2)>button:hover{color:#2563eb;text-decoration:underline}
+.fd-profile-options>div:nth-child(2)>button:hover{color:var(--soco-blue);text-decoration:underline}
 .fd-profile-options>div:nth-child(2)>span{font-size:11px;color:#a8b4ca}
 .fd-options{position:absolute;right:10px;top:9px;z-index:5}
 .fd-options>button{display:grid;place-items:center;width:29px;height:29px;background:transparent;border:0;color:#7e90b1;border-radius:9px}
@@ -117,7 +117,7 @@
 .fd-invitation-tabs .fd-back:hover{background:#e6edff;color:#2459c9}
 .fd-invitation-tabs>div{display:flex;gap:6px;align-items:center;flex:1}
 .fd-invitation-tabs [role=tab]{min-height:44px;border:0;background:transparent;color:#7385a7;border-radius:11px;padding:10px 19px;font-size:12px;white-space:nowrap}
-.fd-invitation-tabs [role=tab].active{background:transparent;color:#2563eb;font-weight:800}
+.fd-invitation-tabs [role=tab].active{background:transparent;color:var(--soco-blue);font-weight:800}
 .fd-invitation-tabs .invitation-active-pill{background:#ebf0ff;border-radius:11px}
 .fd-invitation-tabs>small{font-size:12px;color:#8091b0;white-space:nowrap}
 /* Tabs and invitation list are the same width; QR starts beside the tabs. */
@@ -135,7 +135,7 @@
 .fd-request-row[aria-busy="true"]{background:#f4f7ff}
 .fd-request-copy strong,.fd-request-copy span{max-width:100%}
 .fd-request-row button:focus-visible{position:relative;z-index:1}
-.fd-outgoing-summary{width:100%;min-height:78px;display:flex;align-items:center;gap:15px;padding:15px;border:0;border-radius:13px;margin-top:auto;background:#eef2ff;text-align:left;color:#2563eb}
+.fd-outgoing-summary{width:100%;min-height:78px;display:flex;align-items:center;gap:15px;padding:15px;border:0;border-radius:13px;margin-top:auto;background:#eef2ff;text-align:left;color:var(--soco-blue)}
 .fd-outgoing-summary>span{display:grid;flex:1;gap:5px}
 .fd-outgoing-summary strong{font-size:13px;color:#283c5d}
 .fd-outgoing-summary small{font-size:11px;color:#8596b4}

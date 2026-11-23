@@ -52,7 +52,7 @@
 .unified-contacts-groups { height: 100%; overflow: auto; padding: 20px 26px; }
 .unified-contacts-group-search {
   display: flex; align-items: center; gap: 10px; background: white;
-  color: #2563eb; border: 1px solid #e5ebf5; border-radius: 12px;
+  color: var(--soco-blue); border: 1px solid #e5ebf5; border-radius: 12px;
   padding: 0 14px; min-height: 46px; margin-bottom: 16px;
 }
 .unified-contacts-group-search:focus-within { border-color: #7ca6fc; box-shadow: 0 0 0 3px #dce9ff; }
@@ -72,7 +72,7 @@
 .unified-contacts-groups .fd-person-identity strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .unified-contacts-groups .fd-person-identity small { font-size: 11px; color: #8090a8; }
 .unified-contacts-groups .fd-call-conversation-row .call-header-actions { display: flex; align-items: center; gap: 5px; }
-.unified-contacts-groups .call-header-actions button { display: grid; place-items: center; background: #edf3ff; color: #2563eb; border: 0; border-radius: 9px; width: 35px; height: 35px; cursor: pointer; }
+.unified-contacts-groups .call-header-actions button { display: grid; place-items: center; background: #edf3ff; color: var(--soco-blue); border: 0; border-radius: 9px; width: 35px; height: 35px; cursor: pointer; }
 .unified-contacts-empty { display: grid; justify-items: center; gap: 10px; padding: 55px 15px; text-align: center; color: #8b9aaf; }
 .unified-contacts-empty strong { color: #273950; }
 .unified-contacts-empty p { margin: 0; font-size: 12px; }

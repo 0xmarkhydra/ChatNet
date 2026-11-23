@@ -16,6 +16,12 @@
   --soco-surface: #ffffff;
   --soco-canvas: #f5f7fd;
   --soco-soft-blue: #eff4ff;
+  /* Existing feature surface values, named by role without changing their appearance. */
+  --soco-surface-input: #f8fafe;
+  --soco-surface-page: #f7f9fd;
+  --soco-border-subtle: #e8ecf5;
+  --soco-reaction-like: #ee416a;
+  --soco-reaction-like-hover: #fff2f6;
   --soco-gradient: linear-gradient(115deg, #1769f8 0%, #4267fd 49%, #8955f6 100%);
   --soco-shadow: 0 14px 40px rgba(33, 56, 130, .09);
   --soco-radius-card: 22px;
