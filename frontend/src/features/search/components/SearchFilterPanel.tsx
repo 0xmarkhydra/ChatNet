@@ -36,7 +36,7 @@ export default function SearchFilterPanel({ type, values, minPrice, maxPrice, on
               <button key={item.key} type="button" aria-pressed={selected} onClick={() => onType(item.key)}
                 className={cn(plainButton, 'flex min-h-11 items-center gap-ui-3 rounded-ui-sm px-ui-2 text-[length:var(--soco-type-body)]! font-semibold! hover:bg-muted',
                   selected && 'bg-secondary text-primary hover:bg-secondary')}>
-                <span aria-hidden="true" className={cn('inline-grid size-9 place-items-center rounded-full',
+                <span aria-hidden="true" className={cn('inline-grid size-8.5 place-items-center rounded-ui-sm',
                   selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground')}><Icon size={18} /></span>
                 {item.label}
               </button>
@@ -56,7 +56,7 @@ export default function SearchFilterPanel({ type, values, minPrice, maxPrice, on
         const panelId = idPrefix + id
         const changed = !isDefault(id, values[id])
         return (
-          <div key={id} className={cn('rounded-ui-sm', open && 'bg-muted')}>
+          <div key={id} className="border-b border-border last:border-b-0">
             <button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpenGroup(open ? null : id)}
               className={cn(plainButton, 'grid min-h-13 w-full grid-cols-[minmax(0,1fr)_18px] items-center gap-x-ui-2 rounded-ui-sm p-ui-2 hover:bg-muted')}>
               <span className="text-[length:var(--soco-type-body)] font-semibold">{group.label}</span>
@@ -65,13 +65,13 @@ export default function SearchFilterPanel({ type, values, minPrice, maxPrice, on
                 className={cn('col-start-2 row-span-2 row-start-1 text-muted-foreground transition-transform motion-reduce:transition-none', open && 'rotate-180')} />
             </button>
             {open && (
-              <div id={panelId} className="grid gap-0.5 px-ui-2 pb-ui-2" role="group" aria-label={group.label}>
+              <div id={panelId} className="grid gap-0.5 pb-ui-2" role="group" aria-label={group.label}>
                 {group.options.map(option => {
                   const selected = values[id] === option.value
                   return (
                     <button key={option.value} type="button" aria-pressed={selected} onClick={() => onFilter(id, option.value)}
-                      className={cn(plainButton, 'flex min-h-10 items-center justify-between rounded-ui-sm px-ui-3 text-[length:var(--soco-type-body)]! hover:bg-card max-lg:min-h-11',
-                        selected && 'bg-card font-semibold! text-primary')}>
+                      className={cn(plainButton, 'flex min-h-10 items-center justify-between rounded-ui-sm px-ui-3 text-[length:var(--soco-type-body)]! hover:bg-muted max-lg:min-h-11',
+                        selected && 'bg-secondary font-semibold! text-primary hover:bg-secondary')}>
                       {option.label}
                       {selected && <Check size={16} aria-hidden="true" />}
                     </button>

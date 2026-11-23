@@ -56,7 +56,7 @@ export default function HeaderTitle(p: HeaderTitleProps) {
       ? "Cài đặt tài khoản và quyền riêng tư"
       : p.profileEditing ? "Thông tin cá nhân và quyền hiển thị" : "Trang cá nhân, bài viết và thông tin của bạn",
   };
-  const heading = p.searchResults ? "Kết quả tìm kiếm" : p.tab === "chat" && p.translationSettingsOpen
+  const heading = p.searchResults ? "Tìm kiếm" : p.tab === "chat" && p.translationSettingsOpen
     ? "Ngôn ngữ & dịch AI"
     : p.tab === "chat" && p.desktopSection === "groups"
       ? groupTitle(p)

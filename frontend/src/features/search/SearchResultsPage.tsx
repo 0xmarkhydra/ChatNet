@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Bell, BellRing, Search, SlidersHorizontal, X } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Bell, BellRing, ChevronLeft, Search, SlidersHorizontal, X } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/shared/ui/dialog'
@@ -41,6 +41,7 @@ const FILTER_KEYS = [...Object.keys(FILTER_GROUPS), 'range', 'min', 'max']
 
 export default function SearchResultsPage({ request, sessionId, onOpenProfile, onOpenPost }: SearchResultsPageProps) {
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const query = params.get('q')?.trim().slice(0, 120) ?? ''
   const type = parseType(params.get('type'))
   const values = effectiveFilters(type, parseFilters(params))
@@ -94,6 +95,11 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
     else draft.set('type', next)
     if (next === 'all' && !draft.get('q')) draft.set('type', 'all')
   })
+  // Leave the app only when there is no earlier in-app entry to return to.
+  const goBack = () => {
+    if (window.history.state?.idx > 0) navigate(-1)
+    else navigate('/discover', { replace: true })
+  }
   const resetFilters = () => change(next => FILTER_KEYS.forEach(key => next.delete(key)))
   const submit = (value: string) => change(next => next.set('q', value))
   const startSearch = (value: string, extra: Record<string, string> = {}) => {
@@ -144,16 +150,16 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
     <section className={page} aria-label="Kết quả tìm kiếm">
       <div className="grid min-h-full grid-cols-[340px_minmax(0,1fr)] max-xl:grid-cols-[300px_minmax(0,1fr)] max-lg:block">
         <aside className="flex min-w-0 flex-col gap-ui-3 border-r border-border bg-card p-ui-4 max-lg:hidden" aria-label="Tìm kiếm và bộ lọc">
-          {/* Legacy global h1 rules are unlayered, so these utilities need the important modifier. */}
-          <h1 className="m-0! text-[length:var(--soco-type-display)]! font-bold text-foreground">Kết quả tìm kiếm</h1>
+          <h1 className="sr-only">Kết quả tìm kiếm</h1>
           <SearchForm key={'desktop' + query + type} initialQuery={query} placeholder={PLACEHOLDER[type]} onSubmit={submit} />
           <SearchFilterPanel {...panelProps} />
         </aside>
 
         <div className="mx-auto flex w-full max-w-180 min-w-0 flex-col gap-ui-3 px-ui-4 pt-ui-5 pb-ui-8 max-lg:max-w-none max-lg:gap-ui-2 max-lg:px-ui-3 max-lg:pt-0 max-lg:pb-ui-6">
-          <div className="sticky top-0 z-2 -mx-ui-3 hidden gap-ui-2 border-b border-border bg-card px-ui-3 py-ui-2 max-lg:grid">
-            <h1 className="sr-only">Kết quả tìm kiếm</h1>
+          <div className="sticky top-0 z-2 -mx-ui-3 hidden grid-cols-[minmax(0,1fr)] gap-ui-2 border-b border-border bg-card px-ui-3 py-ui-2 max-lg:grid">
             <div className="flex items-center gap-ui-2">
+              <button type="button" aria-label="Quay lại" className={cn(plainButton, 'inline-grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted')}
+                onClick={goBack}><ChevronLeft size={22} aria-hidden="true" /></button>
               <SearchForm key={'mobile' + query + type} className="flex-1" initialQuery={query} placeholder={PLACEHOLDER[type]} onSubmit={submit} />
               <button type="button" className={cn(plainButton, 'relative inline-grid size-11 shrink-0 place-items-center rounded-full bg-muted')} onClick={() => setFiltersOpen(true)} aria-label={'Bộ lọc' + (activeCount ? ', ' + activeCount + ' đang bật' : '')}>
                 <SlidersHorizontal size={18} aria-hidden="true" />

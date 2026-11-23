@@ -2508,7 +2508,7 @@ export default function AuthedApp({
               /></div>
               <div className="appbar-feed-mobile">{quickSearchControl}</div>
             </>
-          ) : searchInConversationList ? null : quickSearchControl}
+          ) : searchInConversationList || isSearchResultsRoute ? null : quickSearchControl}
           end={
           <AppHeaderActions
             account={

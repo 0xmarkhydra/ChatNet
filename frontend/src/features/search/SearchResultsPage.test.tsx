@@ -190,3 +190,19 @@ it('keeps paging posts when the loaded page is filtered out', async () => {
   expect(view.host.textContent).toContain('Chưa thấy bài viết khớp bộ lọc trong các kết quả đã tải.')
   expect(view.button('Tải thêm bài viết')).toBeTruthy()
 })
+
+it('starts a scoped search from the home scope select', async () => {
+  const view = await mount(routes(), '/search')
+  const select = view.host.querySelector('select[aria-label="Phạm vi tìm kiếm"]') as HTMLSelectElement
+  await act(async () => {
+    select.value = 'posts'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  const input = view.host.querySelector('input[type="search"]') as HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'figma')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => { input.form?.requestSubmit() })
+  expect(view.route()).toBe('?type=posts&q=figma')
+})
