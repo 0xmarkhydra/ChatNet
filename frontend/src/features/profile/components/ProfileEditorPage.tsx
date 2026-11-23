@@ -71,22 +71,22 @@ export default function ProfileEditorPage({
   return (
     <div className="profile-editor-page" aria-label="Chỉnh sửa hồ sơ">
       <form className="profile-editor-form-card" onSubmit={onSave}>
-        <div className="profile-editor-form-heading min-[761px]:flex min-[761px]:min-h-[77px] min-[761px]:items-start min-[761px]:gap-[9px] min-[761px]:[&>div]:min-w-0 min-[761px]:[&>div]:flex-1">
+        <div className="profile-editor-form-heading app-desktop:flex app-desktop:min-h-[77px] app-desktop:items-start app-desktop:gap-[9px] app-desktop:[&>div]:min-w-0 app-desktop:[&>div]:flex-1">
           <button type="button" className="profile-editor-back" onClick={onDiscard} aria-label="Quay lại hồ sơ" title="Quay lại hồ sơ"><ArrowLeft size={20} aria-hidden="true" /></button>
           <div>
-            <h1 ref={heading} tabIndex={-1} className="min-[761px]:m-0 min-[761px]:text-[22px] min-[761px]:font-[780] min-[761px]:leading-[30px] min-[761px]:tracking-[-.3px] min-[761px]:text-[#192c4c]">Thông tin cơ bản</h1>
-            <p className="min-[761px]:mt-[5px] min-[761px]:text-[13px] min-[761px]:leading-5 min-[761px]:text-[#8492aa]">Chỉ thay đổi những thông tin bạn muốn người khác nhìn thấy.</p>
+            <h1 ref={heading} tabIndex={-1} className="app-desktop:m-0 app-desktop:text-[22px] app-desktop:font-[780] app-desktop:leading-[30px] app-desktop:tracking-[-.3px] app-desktop:text-[#192c4c]">Thông tin cơ bản</h1>
+            <p className="app-desktop:mt-[5px] app-desktop:text-[13px] app-desktop:leading-5 app-desktop:text-[#8492aa]">Chỉ thay đổi những thông tin bạn muốn người khác nhìn thấy.</p>
           </div>
         </div>
 
-        <div className="profile-editor-cover-slot min-[761px]:mt-[3px] min-[761px]:shrink-0">{cover(false)}</div>
+        <div className="profile-editor-cover-slot app-desktop:mt-[3px] app-desktop:shrink-0">{cover(false)}</div>
         <div className="profile-editor-avatar-ring">
           <UserAvatar username={username} name={displayName} className="profile-editor-avatar" online />
           <button type="button" className="profile-editor-avatar-button" disabled={mediaBusy} onClick={event => onChangeAvatar(event.currentTarget)}
             aria-label="Đổi ảnh đại diện" title="Đổi ảnh đại diện"><Camera size={17} aria-hidden="true" /></button>
         </div>
 
-        <div className="profile-editor-fields min-[761px]:mt-[27px] min-[761px]:mb-[30px] min-[761px]:mr-[6px] min-[761px]:ml-[14px] min-[761px]:grid min-[761px]:gap-[15px] min-[761px]:max-[1000px]:mx-0">
+        <div className="profile-editor-fields app-desktop:mt-[27px] app-desktop:mb-[30px] app-desktop:mr-[6px] app-desktop:ml-[14px] app-desktop:grid app-desktop:gap-[15px] app-desktop:max-[1000px]:mx-0">
           <label className={profileEditorFieldClass}>
             <span className={profileEditorLabelClass}>Tên hiển thị</span>
             <input className={profileEditorInputClass} autoComplete="name" type="text" name="displayName" required maxLength={100} disabled={profileSaving}
@@ -113,8 +113,8 @@ export default function ProfileEditorPage({
           <ProfilePublicDetailsFields value={publicDetailsDraft} onChange={setPublicDetailsDraft}
             fieldClass={profileEditorFieldClass} labelClass={profileEditorLabelClass} inputClass={profileEditorInputClass} disabled={profileSaving} />
         </div>
-        <footer className="profile-editor-form-footer min-[761px]:mt-auto min-[761px]:flex min-[761px]:min-h-[67px] min-[761px]:flex-wrap min-[761px]:items-end min-[761px]:justify-end min-[761px]:gap-[13px] min-[761px]:border-t min-[761px]:border-[#e8ecf5] min-[761px]:pt-[21px] min-[761px]:pr-[7px]">
-          <span className="profile-editor-save-hint min-[761px]:mr-auto min-[761px]:max-w-[260px] min-[761px]:flex-[1_1_150px] min-[761px]:self-center min-[761px]:text-[11px] min-[761px]:leading-[1.4] min-[761px]:text-[#8291aa] min-[761px]:max-[1000px]:max-w-none min-[761px]:max-[1000px]:basis-full">Ảnh và quyền hiển thị được cập nhật ngay sau khi thay đổi.</span>
+        <footer className="profile-editor-form-footer app-desktop:mt-auto app-desktop:flex app-desktop:min-h-[67px] app-desktop:flex-wrap app-desktop:items-end app-desktop:justify-end app-desktop:gap-[13px] app-desktop:border-t app-desktop:border-border-subtle app-desktop:pt-[21px] app-desktop:pr-[7px]">
+          <span className="profile-editor-save-hint app-desktop:mr-auto app-desktop:max-w-[260px] app-desktop:flex-[1_1_150px] app-desktop:self-center app-desktop:text-[11px] app-desktop:leading-[1.4] app-desktop:text-[#8291aa] app-desktop:max-[1000px]:max-w-none app-desktop:max-[1000px]:basis-full">Ảnh và quyền hiển thị được cập nhật ngay sau khi thay đổi.</span>
           <button type="button" className="profile-editor-discard" onClick={onDiscard} disabled={profileSaving}>
             <RotateCcw size={17} aria-hidden="true" /> Hủy thay đổi
           </button>
@@ -124,7 +124,7 @@ export default function ProfileEditorPage({
         </footer>
       </form>
 
-      <aside className="profile-editor-side min-[761px]:grid min-[761px]:min-w-0 min-[761px]:content-start min-[761px]:gap-6 min-[761px]:max-[1380px]:w-full min-[761px]:max-[1380px]:shrink-0 min-[761px]:max-[1380px]:grid-cols-2 min-[761px]:max-[1380px]:gap-[15px] min-[761px]:max-[1000px]:grid-cols-1" aria-label="Xem trước và quyền hiển thị">
+      <aside className="profile-editor-side app-desktop:grid app-desktop:min-w-0 app-desktop:content-start app-desktop:gap-6 app-desktop:max-[1380px]:w-full app-desktop:max-[1380px]:shrink-0 app-desktop:max-[1380px]:grid-cols-2 app-desktop:max-[1380px]:gap-[15px] app-desktop:max-[1000px]:grid-cols-1" aria-label="Xem trước và quyền hiển thị">
         <ProfileEditorPreview profile={profile} cover={cover(true)} username={username} displayName={displayName} displayNameDraft={displayNameDraft} usernameDraft={usernameDraft} bioDraft={bioDraft} cityDraft={cityDraft} />
 
         <ProfileEditorPrivacyCard privacy={privacy} privacyBusy={privacyBusy} privacyError={privacyError} retryPrivacy={retryPrivacy} changePrivacy={changePrivacy} />
