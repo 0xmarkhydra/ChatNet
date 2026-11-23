@@ -11,6 +11,7 @@ const { createWindowsScreenReader } = require('./screenshot-windows.cjs')
 const { Notification } = require('electron')
 const { createNativeNotifications, registerNotificationIPC } = require('./notifications.cjs')
 const { createWindowLifecycle } = require('./window-lifecycle.cjs')
+const { registerNativeGrantCleanup } = require('./native-grant-cleanup.cjs')
 const { join, isAbsolute } = require('node:path')
 const { pathToFileURL } = require('node:url')
 const { trustedRendererURL, safeExternalURL, isSafeAssetPath } = require('./ipc-policy.cjs')
@@ -51,7 +52,9 @@ function isTrustedFrame(event) {
   return Boolean(mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents &&
     event.senderFrame && event.senderFrame === mainWindow.webContents.mainFrame && trustedURL(event.senderFrame.url))
 }
-function resetNativeGrants() { mediaPermissions?.reset(); screenCapture?.reset(); nativeNotifications?.reset(); screenshots?.reset() }
+const resetNativeGrants = registerNativeGrantCleanup(app, () => ({
+  mediaPermissions, screenCapture, nativeNotifications, screenshots,
+}))
 
 function attachHandlers() {
   const vault = createCredentialVault(join(app.getPath('userData'), 'credentials'), safeStorage)
