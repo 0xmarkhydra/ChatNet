@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BookUser, Clock3, Languages, PhoneCall, Search, UserRoundPlus, Users, UsersRound, X } from 'lucide-react'
+import { Clock3, Search, UsersRound, X } from 'lucide-react'
 import type { Conversation } from '../../chat'
 import type { FriendConnection } from '../types'
 import { CallCenter } from '../../calls'
@@ -25,12 +25,12 @@ type Props = {
 }
 
 const navItems = [
-  { id: 'directory', title: 'Danh sách bạn bè', Icon: BookUser },
-  { id: 'groups', title: 'Danh sách nhóm', Icon: UsersRound },
-  { id: 'invitations', title: 'Lời mời kết bạn', Icon: UserRoundPlus },
-  { id: 'calls', title: 'Lịch sử cuộc gọi', Icon: PhoneCall },
-  { id: 'overview', title: 'Khám phá bạn bè', Icon: Users },
-  { id: 'translation', title: 'Dịch AI cuộc gọi', Icon: Languages },
+  { id: 'directory', title: 'Danh sách bạn bè', label: 'Bạn bè' },
+  { id: 'groups', title: 'Danh sách nhóm', label: 'Nhóm chat' },
+  { id: 'invitations', title: 'Lời mời kết bạn', label: 'Lời mời' },
+  { id: 'calls', title: 'Lịch sử cuộc gọi', label: 'Cuộc gọi' },
+  { id: 'overview', title: 'Khám phá bạn bè', label: 'Khám phá' },
+  { id: 'translation', title: 'Dịch AI cuộc gọi', label: 'Dịch AI' },
 ] as const
 
 const paths: Record<Section, string> = {
@@ -80,21 +80,21 @@ export default function UnifiedContactsPage({
   const isCallSection = section === 'calls' || section === 'translation'
 
   return <section className="unified-contacts" aria-label="Danh bạ và cuộc gọi">
-    <aside className="unified-contacts-nav" aria-label="Danh mục danh bạ">
-      <div className="unified-contacts-nav-title"><BookUser size={21} aria-hidden="true" /><span>Danh bạ</span></div>
-      <nav aria-label="Danh mục">
-        {navItems.map(({ id, title, Icon }, index) => <button
+    <div className="unified-contacts-nav">
+      <h1 className="unified-contacts-visually-hidden">Danh bạ</h1>
+      <nav aria-label="Danh mục danh bạ">
+        {navItems.map(({ id, title, label }) => <button
           type="button" key={id}
-          className={'unified-contacts-nav-item' + (section === id ? ' active' : '') + (index === 3 ? ' separated' : '')}
+          className={'unified-contacts-nav-item' + (section === id ? ' active' : '')}
           aria-current={section === id ? 'page' : undefined}
+          title={title}
           onClick={() => navigateTo(id)}
         >
-          <Icon size={19} strokeWidth={1.85} aria-hidden="true" />
-          <span>{title}</span>
+          <span>{label}</span>
           {id === 'invitations' && incomingRequests > 0 && <small className="unified-contacts-count">{incomingRequests > 99 ? '99+' : incomingRequests}</small>}
         </button>)}
       </nav>
-    </aside>
+    </div>
     <div className="unified-contacts-main">
       <header className="unified-contacts-heading">
         <div><h1>{active.title}</h1><p>{isCallSection ? 'Xem và quản lý cuộc gọi ngay trong danh bạ' : section === 'groups' ? 'Nhóm và các liên hệ từ hội thoại' : 'Kết nối, trò chuyện và gọi cho mọi người'}</p></div>
