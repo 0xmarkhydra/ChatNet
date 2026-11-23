@@ -1,6 +1,4 @@
-import { useRef } from 'react'
-import FeedComposerIconButton from './FeedComposerIconButton'
-import PostStatusPrompt from '../../../shared/ui/PostStatusPrompt'
+import PostComposerLauncher from '../../../shared/ui/PostComposerLauncher'
 
 type Props = {
   username: string
@@ -14,39 +12,22 @@ type Props = {
   onCheckIn: () => void
 }
 
+/** Backward-compatible Feed entrypoint; Feed and Profile share the same Tailwind launcher. */
 export default function SocialFeedComposer({
   username, displayName, draft, pending, storyBusy,
   onCreatePost, onCreateStory, onCreateMediaPost, onCheckIn,
 }: Props) {
-  const quickMediaInput = useRef<HTMLInputElement>(null)
   return (
-    <section className="social-feed-launcher" aria-label="Tạo nội dung mới">
-      <div className="social-feed-launcher-top">
-        <PostStatusPrompt
-          username={username}
-          displayName={displayName}
-          avatarClassName="social-feed-me-avatar"
-          promptClassName="social-feed-launcher-prompt"
-          prompt={draft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
-          onCreatePost={onCreatePost}
-          pending={pending}
-        />
-        <div className="social-feed-launcher-shortcuts" role="group" aria-label="Tạo nội dung nhanh">
-          <input ref={quickMediaInput} className="hidden-media-input" type="file" accept="image/*,video/*" multiple
-            aria-label="Chọn ảnh hoặc video đăng bài"
-            onChange={event => {
-              const files = Array.from(event.currentTarget.files || [])
-              event.currentTarget.value = ''
-              if (files.length) onCreateMediaPost(files)
-            }} />
-          <FeedComposerIconButton icon="photo" aria-label="Ảnh / Video" data-tooltip="Thêm ảnh hoặc video"
-            onClick={() => quickMediaInput.current?.click()} disabled={pending} />
-          <FeedComposerIconButton icon="story" aria-label="Story" data-tooltip="Tạo Story"
-            onClick={onCreateStory} disabled={storyBusy || pending} />
-          <FeedComposerIconButton icon="location" aria-label="Check-in" data-tooltip="Thêm địa điểm check-in"
-            onClick={onCheckIn} disabled={pending} />
-        </div>
-      </div>
-    </section>
+    <PostComposerLauncher
+      username={username}
+      displayName={displayName}
+      prompt={draft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
+      pending={pending}
+      storyBusy={storyBusy}
+      onCreatePost={onCreatePost}
+      onCreateStory={onCreateStory}
+      onCreateMediaPost={onCreateMediaPost}
+      onCheckIn={onCheckIn}
+    />
   )
 }
