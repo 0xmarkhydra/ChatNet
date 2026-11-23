@@ -264,9 +264,7 @@ func (s *server) createCall(w http.ResponseWriter, r *http.Request) {
 		ConversationID int64  `json:"conversationId"`
 		MediaType      string `json:"mediaType"`
 	}
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -893,9 +891,7 @@ func (s *server) putPublicKey(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		PublicKey publicJWK `json:"publicKey"`
 	}
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil || !validP256PublicJWK(body.PublicKey) {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil || !validP256PublicJWK(body.PublicKey) {
 		httpx.Error(w, http.StatusBadRequest, "invalid P-256 public key")
 		return
 	}
@@ -964,9 +960,7 @@ func (s *server) putEnvelope(w http.ResponseWriter, r *http.Request) {
 		IV              string `json:"iv"`
 		Ciphertext      string `json:"ciphertext"`
 	}
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil || body.RecipientUserID <= 0 || !validGeneration(body.Generation) || !validEnvelope(body.IV, body.Ciphertext) {
+	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil || body.RecipientUserID <= 0 || !validGeneration(body.Generation) || !validEnvelope(body.IV, body.Ciphertext) {
 		httpx.Error(w, http.StatusBadRequest, "invalid encrypted key envelope")
 		return
 	}
