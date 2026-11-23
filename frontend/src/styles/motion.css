@@ -29,7 +29,6 @@
   .friend-result:not(.contact-search-row),
   .connect-identity-actions > button,
   .story-card,
-  .post-toolbar button,
   .composer-shortcuts button,
   .profile-actions button,
   .settings-row button,
@@ -67,7 +66,6 @@
   .friend-result:not(.contact-search-row),
   .connect-identity-actions > button,
   .story-card,
-  .post-toolbar button,
   .composer-shortcuts button,
   .profile-actions button,
   .settings-row button,
@@ -94,7 +92,7 @@
     box-shadow: 0 4px 14px rgba(37,99,235,.11);
     transform: translateY(-1px);
   }
-  .modern-shell :is(.story-card, .zalo-post, .shared-media-card):hover {
+  .modern-shell :is(.story-card, .shared-media-card):hover {
     transition: transform var(--soco-motion-standard) var(--soco-motion-ease),
       box-shadow var(--soco-motion-standard) var(--soco-motion-ease);
   }

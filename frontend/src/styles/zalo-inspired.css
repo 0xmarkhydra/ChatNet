@@ -406,72 +406,10 @@
   backdrop-filter: blur(4px);
 }
 
-.post-detail-modal {
-  width: min(720px, 100%);
-  max-height: min(880px, calc(100vh - 40px));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 26px 80px rgba(18, 28, 38, .28);
-}
-
-.post-detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid #e8ece5;
-}
-
-.post-detail-header > div {
-  display: grid;
-  gap: 2px;
-}
-
-.post-detail-header small {
-  color: #707a6d;
-}
-
-.post-detail-header button {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 10px;
-  background: #f2f4f0;
-  font-size: 24px;
-  cursor: pointer;
-}
-
-.post-detail-scroll {
-  min-height: 0;
-  overflow-y: auto;
-  padding: 4px 0 18px;
-  overscroll-behavior: contain;
-}
-
-.post-detail-post {
-  margin: 0;
-  border: 0;
-  box-shadow: none;
-}
-
 @media (max-width: 760px) {
   .post-detail-backdrop {
     align-items: end;
     padding: 0;
-  }
-
-  .post-detail-modal {
-    width: 100%;
-    max-height: 92vh;
-    border-radius: 18px 18px 0 0;
-  }
-
-  .post-detail-scroll {
-    padding-bottom: max(18px, env(safe-area-inset-bottom));
   }
 }
 
@@ -1333,87 +1271,12 @@
   gap: 9px;
 }
 
-.zalo-post {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
-  border: 0;
-  border-radius: 0;
-  padding: 14px 12px 12px;
-  box-shadow: none;
-}
-
-.zalo-post .post-body { display: contents; }
-.zalo-post .post-body > * { grid-column: 1 / -1; min-width: 0; }
-.zalo-post .post-body > .post-author { grid-column: 2; grid-row: 1; }
-.zalo-post .post-author > div { min-width: 0; overflow-wrap: anywhere; }
-.zalo-post .post-more { flex-shrink: 0; }
-.zalo-post .feed-media-preview:empty { display: none; }
-
-.zalo-post > .avatar {
-  display: grid;
-  grid-column: 1;
-  grid-row: 1;
-  width: 42px;
-  height: 42px;
-  flex-basis: 42px;
-}
-
-.zalo-post .post-author strong {
-  color: #2859d8;
-  font-size: 15px;
-}
-
-.zalo-post .post-author small {
-  color: #777d84;
-  font-size: 11px;
-}
-
 .post-more {
   border: 0;
   padding: 0 4px;
   background: transparent;
   color: #666b72;
   letter-spacing: 0;
-}
-
-.zalo-post .post-body p {
-  margin: 9px 0 6px;
-  color: #24272b;
-  font-size: 15px;
-  line-height: 1.48;
-}
-
-.zalo-post .post-toolbar {
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  padding-top: 10px;
-  border-top: 1px solid #edf0f2;
-}
-
-.zalo-post .post-toolbar button,
-.zalo-post .post-stat {
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 0;
-  border-radius: 18px;
-  padding: 0 10px;
-  background: #f6f7f8;
-  color: #53585e;
-  font-size: 13px;
-}
-
-.zalo-post .post-toolbar button.liked {
-  background: #fff0f2;
-  color: #df3851;
-}
-
-.zalo-post .post-toolbar b {
-  color: #d33d51;
-  font-size: 12px;
 }
 
 .feed-empty {
@@ -2198,15 +2061,6 @@
   outline-offset: 2px;
 }
 
-.zalo-post .media-attachments {
-  max-width: 680px;
-  margin: 8px 0 4px;
-}
-
-.zalo-post .media-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .message .media-attachments {
   max-width: min(440px, 75vw);
 }
@@ -2327,7 +2181,6 @@
 .appbar-icon-button,
 .bottom-navigation > button,
 .story-card,
-.zalo-post,
 .composer-shortcuts button,
 .settings-row,
 .discover-grid button {
@@ -2619,23 +2472,6 @@
   object-fit: cover;
 }
 
-.zalo-post .media-attachments {
-  width: 100%;
-  max-width: none;
-  gap: 3px;
-  overflow: hidden;
-  border-radius: 14px;
-}
-
-.zalo-post .media-item {
-  border-radius: 7px;
-}
-
-.zalo-post .media-item img,
-.zalo-post .media-item video {
-  border-radius: 7px;
-}
-
 .feed-media-preview .media-count-1 .media-item img {
   width: 100%;
   height: auto;
@@ -2663,38 +2499,6 @@
   max-height: 520px;
   min-height: 0;
   object-fit: contain;
-}
-
-.post-detail-modal .media-count-1 .media-item img {
-  width: 100%;
-  height: auto;
-  max-height: none;
-  min-height: 0;
-  object-fit: contain;
-}
-
-.post-detail-modal .media-count-1 .media-item video {
-  width: 100%;
-  height: auto;
-  max-height: 72vh;
-  min-height: 0;
-  object-fit: contain;
-}
-
-.zalo-post {
-  transition: box-shadow .18s ease, transform .18s ease;
-}
-
-.zalo-post:hover {
-  box-shadow: 0 7px 24px rgba(35, 55, 78, .07);
-}
-
-.zalo-post .post-author strong {
-  letter-spacing: 0;
-}
-
-.zalo-post .post-toolbar button:hover {
-  background: #eef3f7;
 }
 
 .profile-view {
@@ -3304,21 +3108,6 @@
     height: 116px;
   }
 
-  .zalo-post > .avatar {
-    width: 40px;
-    height: 40px;
-    flex-basis: 40px;
-  }
-
-  .zalo-post .post-toolbar {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .zalo-post .post-toolbar::-webkit-scrollbar {
-    display: none;
-  }
-
   .conversation-open .chatnet-appbar,
   .conversation-open .bottom-navigation {
     display: none;
@@ -3444,7 +3233,7 @@ body { background: #e9ecef; }
 .discover-grid button, .composer-shortcuts button { border-radius: 14px; }
 .auth-tabs button { border-radius: 10px; }
 .quick-create-menu { border-radius: 20px; }
-.composer-shortcuts button, .zalo-post .post-toolbar button { min-height: 44px; }
+.composer-shortcuts button { min-height: 44px; }
 .auth-submit, .feed-submit, .switch-button.on {
   background: var(--chatnet-accent);
   color: #172100;
@@ -3493,9 +3282,7 @@ body { background: #e9ecef; }
 .translation { border-radius: 14px; box-shadow: none; }
 .modern-frame, .profile-avatar, .smart-avatar { box-shadow: none; }
 .zalo-feed { padding: 12px 0; }
-.zalo-post { border-radius: 8px; box-shadow: none; border: 1px solid #e4e6e8; }
 .zalo-feed-view { padding: 0 max(16px, calc((100% - 720px) / 2)); }
-.zalo-post .media-item img, .zalo-post .media-item video { max-height: 520px; object-fit: contain; border-radius: 8px; }
 .zalo-post-composer textarea:focus-visible { outline: 2px solid var(--chatnet-accent-ink); outline-offset: 2px; }
 .profile-view { background: #fff; }
 .profile-view .settings-card, .profile-view .profile-actions { margin-top: 0; border-top: 1px solid #e4e6e8; }
@@ -3521,7 +3308,6 @@ body { background: #e9ecef; }
 }
 @media (max-width: 760px) {
   .zalo-feed { padding: 8px 0; }
-  .zalo-post { border-radius: 0; border-inline: 0; padding-inline: 14px; }
   .profile-view .profile-hero { padding-top: env(safe-area-inset-top); }
 }
 .profile-cover-art {

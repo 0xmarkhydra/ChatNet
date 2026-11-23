@@ -16,6 +16,9 @@ import { API } from '../../../shared/lib/config'
 import type { ToastKind } from '../../../shared/utils/toast'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
 
+const postActions = 'post-comments-post-actions mt-1.25 grid grid-cols-3 items-center gap-ui-1 min-h-12 pt-ui-1 border-t border-border text-ui-label whitespace-nowrap'
+const commentAction = 'inline-flex w-full min-w-0 min-h-control-touch flex-none items-center justify-center gap-2 rounded-ui-md border-0 bg-transparent m-0 px-2 py-1 text-foreground cursor-pointer [&_span]:text-xs [&_span]:leading-tight hover:bg-muted active:bg-secondary max-sm:gap-1'
+
 type SortOrder = 'newest' | 'oldest'
 
 type Props = {
@@ -119,7 +122,7 @@ export default function PostCommentsPage({
             {onOpenOriginal && <FeedRepostPreview post={post} onOpen={onOpenOriginal} />}
           </article>
 
-          {post.repostKind === 'quick' && <div className="post-comments-post-actions post-toolbar post-toolbar-compact">
+          {post.repostKind === 'quick' && <div className={postActions}>
             <FeedRepostAction post={post} request={request} onUpdated={onUpdated}
               onShareToChat={onShareToChat} onFeedback={onFeedback} />
           </div>}
@@ -133,9 +136,9 @@ export default function PostCommentsPage({
               </button>
               <div className="post-comments-totals"><span>{commentCount.toLocaleString('vi-VN')} bình luận</span><span>{sharesLabel}</span></div>
             </div>
-            <div className="post-comments-post-actions post-toolbar post-toolbar-compact">
+            <div className={postActions}>
               <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void onLike(post, emoji)} />
-              <button type="button" aria-label="Bình luận" title="Bình luận"
+              <button type="button" aria-label="Bình luận" title="Bình luận" className={commentAction}
                 onClick={() => composerTarget?.querySelector<HTMLTextAreaElement>('textarea')?.focus()}>
                 <MessageCircle size={21} aria-hidden="true" /><span>Bình luận</span>
               </button>
