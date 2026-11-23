@@ -27,27 +27,28 @@ import (
 )
 
 type server struct {
-	db         *pgxpool.Pool
-	apiKey     string
-	baseURL    string
-	model      string
-	apiStyle   string
-	provider   string
-	authHeader string
-	authScheme string
-	jwtSecret  string
-	client     *http.Client
-	redis      *redis.Client
+	db                *pgxpool.Pool
+	apiKey            string
+	baseURL           string
+	model             string
+	apiStyle          string
+	provider          string
+	authHeader        string
+	authScheme        string
+	jwtSecret         string
+	client            *http.Client
+	redis             *redis.Client
 	limiter           ratelimit.Limiter
 	rateLimitEnabled  bool
 	providerSlots     chan struct{}
+	trustedProxyCIDRs []*net.IPNet
 }
 
 const (
 	translationRateLimitWindow = time.Minute
-	translationUserRateLimit  = 30
-	translationIPRateLimit    = 120
-	providerConcurrencyLimit  = 8
+	translationUserRateLimit   = 30
+	translationIPRateLimit     = 120
+	providerConcurrencyLimit   = 8
 )
 
 var errProviderBusy = errors.New("translation provider is busy")
@@ -95,6 +96,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	trustedProxyCIDRs, err := httpx.ParseTrustedProxyCIDRs(config.Env("CHATNET_TRUSTED_PROXY_CIDRS", ""))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	db, err := database.Open(ctx, config.Env("DATABASE_URL", "postgres://chatnet:chatnet@localhost:5432/chatnet?sslmode=disable"))
 	if err != nil {
@@ -112,20 +117,21 @@ func main() {
 	}
 
 	s := &server{
-		db:         db,
-		apiKey:     config.Env("AI_API_KEY", ""),
-		baseURL:    strings.TrimRight(config.Env("AI_BASE_URL", ""), "/"),
-		model:      config.Env("AI_MODEL", ""),
-		apiStyle:   strings.ToLower(firstEnvDefault("auto", "AI_API_STYLE")),
-		provider:   firstEnvDefault("custom", "AI_PROVIDER"),
-		authHeader: firstEnvDefault("Authorization", "AI_AUTH_HEADER"),
-		authScheme: firstEnvDefault("Bearer", "AI_AUTH_SCHEME"),
-		jwtSecret:  jwtSecret,
-		client:     &http.Client{Timeout: 30 * time.Second},
-		redis:      cache,
+		db:                db,
+		apiKey:            config.Env("AI_API_KEY", ""),
+		baseURL:           strings.TrimRight(config.Env("AI_BASE_URL", ""), "/"),
+		model:             config.Env("AI_MODEL", ""),
+		apiStyle:          strings.ToLower(firstEnvDefault("auto", "AI_API_STYLE")),
+		provider:          firstEnvDefault("custom", "AI_PROVIDER"),
+		authHeader:        firstEnvDefault("Authorization", "AI_AUTH_HEADER"),
+		authScheme:        firstEnvDefault("Bearer", "AI_AUTH_SCHEME"),
+		jwtSecret:         jwtSecret,
+		client:            &http.Client{Timeout: 30 * time.Second},
+		redis:             cache,
 		limiter:           ratelimit.Limiter{Redis: cache},
-		rateLimitEnabled: true,
+		rateLimitEnabled:  true,
 		providerSlots:     make(chan struct{}, providerConcurrencyLimit),
+		trustedProxyCIDRs: trustedProxyCIDRs,
 	}
 
 	switch s.apiStyle {
@@ -413,12 +419,12 @@ func (s *server) allowTranslation(w http.ResponseWriter, r *http.Request, claims
 		userID = strconv.FormatInt(claims.UserID, 10)
 	}
 	for _, limit := range []struct {
-		scope  string
+		scope   string
 		subject string
-		limit  int64
+		limit   int64
 	}{
 		{scope: "translate:user", subject: "u:" + userID, limit: translationUserRateLimit},
-		{scope: "translate:ip", subject: "ip:" + requestIP(r), limit: translationIPRateLimit},
+		{scope: "translate:ip", subject: "ip:" + requestIP(r, s.trustedProxyCIDRs), limit: translationIPRateLimit},
 	} {
 		allowed, _, err := s.limiter.Allow(r.Context(), limit.scope, limit.subject, limit.limit, translationRateLimitWindow)
 		if err != nil {
@@ -434,15 +440,8 @@ func (s *server) allowTranslation(w http.ResponseWriter, r *http.Request, claims
 	return true
 }
 
-func requestIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err == nil && host != "" {
-		return host
-	}
-	if value := strings.TrimSpace(r.RemoteAddr); value != "" {
-		return value
-	}
-	return "unknown"
+func requestIP(r *http.Request, trustedProxyCIDRs []*net.IPNet) string {
+	return httpx.ClientIP(r, trustedProxyCIDRs)
 }
 
 func (s *server) callResponses(ctx context.Context, instructions, text string) (string, error) {

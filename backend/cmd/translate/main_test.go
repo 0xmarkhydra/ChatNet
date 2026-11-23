@@ -21,7 +21,7 @@ func TestRequestIPDoesNotTrustForwardedHeader(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/", nil)
 	r.RemoteAddr = "192.0.2.10:1234"
 	r.Header.Set("X-Forwarded-For", "198.51.100.20")
-	if got := requestIP(r); got != "192.0.2.10" {
+	if got := requestIP(r, nil); got != "192.0.2.10" {
 		t.Fatalf("requestIP=%q", got)
 	}
 }

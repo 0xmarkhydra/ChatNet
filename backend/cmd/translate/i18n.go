@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"chatnet/internal/authx"
 	"chatnet/internal/httpx"
 	"chatnet/internal/languagecatalog"
 )
@@ -117,9 +118,7 @@ func (s *server) translateUIBundle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 
 	var body uiBundleRequest
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32*1024))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 32*1024); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -130,6 +129,10 @@ func (s *server) translateUIBundle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body = normalized
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	if !s.allowTranslation(w, r, claims) {
+		return
+	}
 
 	if body.Locale == "vi" {
 		httpx.JSON(w, http.StatusOK, uiBundleResponse{
