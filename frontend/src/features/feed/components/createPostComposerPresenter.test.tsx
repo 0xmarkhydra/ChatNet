@@ -11,10 +11,10 @@ function setup(overrides: Partial<Parameters<typeof createPostComposerPresenter>
   const element = createPostComposerPresenter({
     props,
     friends: [
-      { username: 'accepted', status: 'accepted' },
-      { username: 'blocked', status: 'accepted', blockedByMe: true },
-      { username: 'request', status: 'outgoing' },
-      { username: 'restricted', status: 'accepted', blockedByOther: true },
+      { id: 1, displayName: 'Accepted', username: 'accepted', status: 'accepted' },
+      { id: 2, displayName: 'Blocked', username: 'blocked', status: 'accepted', blockedByMe: true },
+      { id: 3, displayName: 'Request', username: 'request', status: 'outgoing' },
+      { id: 4, displayName: 'Restricted', username: 'restricted', status: 'accepted', blockedByOther: true },
     ],
     profileDisplayName: 'Profile name',
     sessionDisplayName: 'Session name',
@@ -30,7 +30,7 @@ describe('post composer presenter', () => {
   it('keeps the PostComposer component and restricts tagging to eligible friends', () => {
     const { element, cancelUpload } = setup()
     expect(element.type).toBe(PostComposer)
-    expect(element.props.taggableFriends.map(friend => friend.username)).toEqual(['accepted'])
+    expect(element.props.taggableFriends.map((friend: { username: string }) => friend.username)).toEqual(['accepted'])
     expect(element.props.popup).toBe(true)
     expect(element.props.displayName).toBe('Profile name')
     element.props.cancelUpload?.()
