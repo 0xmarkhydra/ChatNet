@@ -17,6 +17,11 @@ test('missing mappings fail the token contract', () => {
   assert.ok(checkTokenContract(theme, tailwind.replace('--text-ui-page:', '--text-unknown-page:')).some((error) => error.includes('--text-ui-page')))
 })
 
+test('z-index layers and the focus ring must stay tokenised', () => {
+  assert.ok(checkTokenContract(theme.replace('--soco-z-modal:', '--soco-z-other:'), tailwind).some((error) => error.includes('--soco-z-modal')))
+  assert.ok(checkTokenContract(theme.replace('var(--soco-focus-ring)', 'rgba(37, 99, 235, .42)'), tailwind).some((error) => error.includes('focus ring')))
+})
+
 test('Tailwind Preflight stays disabled', () => {
   assert.ok(checkTokenContract(theme, tailwind + '\n@import "tailwindcss";').some((error) => error.includes('Preflight')))
 })

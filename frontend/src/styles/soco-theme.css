@@ -63,6 +63,11 @@
   --soco-shadow-sm: 0 2px 8px rgba(33, 56, 130, .06);
   --soco-shadow-md: 0 8px 24px rgba(33, 56, 130, .09);
   --soco-shadow-overlay: 0 20px 60px rgba(15, 23, 42, .18);
+  /* Layering for new UI; values match what shared/ui already used. Legacy layers (>= 1000) are migrated per feature. */
+  --soco-z-raised: 1;
+  --soco-z-dropdown: 20;
+  --soco-z-overlay: 100;
+  --soco-z-modal: 101;
   --soco-motion-fast: 120ms;
   --soco-motion-normal: 200ms;
   --soco-motion-slow: 320ms;
@@ -85,7 +90,7 @@ body { color: var(--soco-text); background: #eff3fa; }
 button, input, select, textarea { font-family: inherit; }
 button, [role="button"] { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, .42);
+  outline: 3px solid var(--soco-focus-ring);
   outline-offset: 2px;
 }
 button { transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease; }

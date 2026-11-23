@@ -14,12 +14,12 @@ function DialogContent({
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
         data-slot="dialog-overlay"
-        className="fixed inset-0 z-100 bg-black/50"
+        className="fixed inset-0 z-(--soco-z-overlay) bg-black/50"
       />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-101 grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-ui-lg border border-border bg-card p-6 text-foreground shadow-xl outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "fixed top-1/2 left-1/2 z-(--soco-z-modal) grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-ui-lg border border-border bg-card p-6 text-foreground shadow-xl outline-none focus-visible:ring-2 focus-visible:ring-ring",
           className,
         )}
         {...props}

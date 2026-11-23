@@ -9,7 +9,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
-  METRICS, findImprovements, findOrphanTokens, findRegressions, findUnimportedCss, measureDesignDebt, summarizeByArea,
+  METRICS, findImprovements, findOrphanTokens, findRegressions, findUnimportedCss, measureDesignDebt, summarizeByArea, topColours,
 } from './design-debt-lib.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -41,6 +41,10 @@ if (mode === 'report') {
   for (const area of Object.keys(areas).sort((a, b) => weight(b) - weight(a)).slice(0, 15)) {
     const detail = Object.entries(areas[area]).map(([metric, value]) => `${metric}=${value}`).join(' ')
     console.log(`  ${String(weight(area)).padStart(5)}  ${area}  (${detail})`)
+  }
+  console.log('\nMost repeated colours (fallback = inside var(--x, #hex), usually already tokenised):')
+  for (const { hex, total, fallback, token } of topColours(root)) {
+    console.log(`  ${String(total).padStart(4)}  ${hex}  ${fallback ? `(${fallback} fallback) ` : ''}${token ? '= ' + token : '(no token with this exact value)'}`)
   }
   const dead = findUnimportedCss(root)
   console.log(`\nCSS files nothing imports (${dead.length}):`)

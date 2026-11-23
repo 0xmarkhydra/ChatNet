@@ -66,3 +66,23 @@ No backend routes, API contracts, auth/session, service worker or page UX are in
 - `npm run design-debt:report` prints totals per metric and area, CSS files nothing imports and theme tokens never referenced.
 - `npm run design-debt:baseline` rewrites the baseline after debt was removed. Never use it to accept new debt.
 - A legitimately fixed value (SVG, canvas, third-party) may carry `design-debt-ignore: <reason>` in a comment on the same line; an empty reason does not count.
+
+## Layering (z-index)
+
+New UI uses the named layers from `soco-theme.css`, written as `z-(--soco-z-<layer>)`:
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--soco-z-raised` | 1 | Content that must sit above its siblings |
+| `--soco-z-dropdown` | 20 | In-flow absolute popovers such as search suggestions |
+| `--soco-z-overlay` | 100 | Portaled popovers/menus and dialog backdrops (`shared/ui`) |
+| `--soco-z-modal` | 101 | Dialog content above its backdrop |
+
+The values equal what `shared/ui` already used, so adopting a token changes nothing visually. Legacy CSS still uses ad hoc values from -1 to 100100 (many modals sit at 1000-100100, above these layers). A legacy overlay is migrated to a token only together with its feature, after its stacking context and portal are known. Do not renumber legacy values in bulk.
+
+## Colour roles and the focus ring
+
+- Use existing tokens first: `--soco-blue`/`primary`, `--soco-surface`/`card`, `--soco-canvas`/`background`, `--soco-surface-input`, `--soco-surface-page`, `--soco-line` and `--soco-border-subtle`, `--soco-muted`, `--soco-success|warning|danger|info`, `--soco-reaction-like`, `--soco-focus-ring`.
+- `npm run design-debt:report` lists the most repeated hex values and the token with exactly that value. Many values are fallbacks inside `var(--chatnet-accent, #2859d8)`; those are already tokenised and need no change.
+- Several near-identical light-blue tints (`#edf2ff`, `#eff3ff`, `#edf3ff`, `#eaf0ff`, `#eef2ff`, `#f1f5ff`, ...) play one role (hover/selected tint) and map to `secondary`/`accent`. They differ slightly from `--soco-soft-blue`, so each feature decides during its own migration whether the small shift is acceptable. Do not add a token per tint.
+- The global keyboard focus ring uses `--soco-focus-ring`. Inputs with their own ring must disable the legacy outline with `outline-none!` to avoid a double ring.

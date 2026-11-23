@@ -18,6 +18,7 @@ export const tokenGroups = {
   icons: ['sm', 'md', 'lg'],
   surfaces: ['input', 'page'],
   reactions: ['like', 'like-hover'],
+  layers: ['raised', 'dropdown', 'overlay', 'modal'],
 }
 
 // Scan declarations rather than raw text so values in comments/documentation don't falsely fail.
@@ -84,6 +85,8 @@ export function checkTokenContract(theme, tailwind) {
     requireToken(theme, `--soco-reaction-${name}:`, 'reaction color token')
     requireToken(tailwind, `--color-reaction-${name}: var(--soco-reaction-${name})`, 'Tailwind reaction mapping')
   }
+  for (const name of tokenGroups.layers) requireToken(theme, `--soco-z-${name}:`, 'z-index layer token')
+  requireToken(theme, 'outline: 3px solid var(--soco-focus-ring)', 'focus ring token usage')
   requireToken(theme, '--soco-border-subtle:', 'subtle border token')
   requireToken(tailwind, '--color-border-subtle: var(--soco-border-subtle)', 'Tailwind subtle border mapping')
   if (!tailwind.includes('Preflight is intentionally disabled')) {
