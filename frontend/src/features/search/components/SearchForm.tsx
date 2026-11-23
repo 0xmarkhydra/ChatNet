@@ -19,10 +19,12 @@ export type SearchFormProps = {
   onSubmit: (query: string, scope: SearchType) => void
 }
 
-/** Owns only the draft text; the committed query lives in the URL. Remount with a key to reset. */
+/** Owns only the draft text; the committed query lives in the URL and replaces the draft whenever it changes. */
 export default function SearchForm({ initialQuery, placeholder, large = false, autoFocus = false, className, suggest, onSubmit }: SearchFormProps) {
   const listId = useId()
   const [draft, setDraft] = useState(initialQuery)
+  const [committed, setCommitted] = useState(initialQuery)
+  if (committed !== initialQuery) { setCommitted(initialQuery); setDraft(initialQuery) }
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   // Suggestions only appear once the user has typed something different from the committed query.
