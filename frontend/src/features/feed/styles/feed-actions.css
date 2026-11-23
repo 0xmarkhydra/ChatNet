@@ -226,8 +226,8 @@
   cursor: pointer;
 }
 .post-toolbar > .feed-like-button:hover { background: #f4f6fc; }
-.post-toolbar > .feed-like-button.is-liked { color: #ee416a; }
-.post-toolbar > .feed-like-button.is-liked:hover { background: #fff2f6; }
+.post-toolbar > .feed-like-button.is-liked { color: var(--soco-reaction-like); }
+.post-toolbar > .feed-like-button.is-liked:hover { background: var(--soco-reaction-like-hover); }
 .post-toolbar > .feed-like-button:disabled { cursor: not-allowed; opacity: .6; }
 .post-toolbar {
   display: flex;

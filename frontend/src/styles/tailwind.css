@@ -23,6 +23,12 @@
   --spacing-ui-5: var(--soco-space-5);
   --spacing-ui-6: var(--soco-space-6);
   --spacing-ui-8: var(--soco-space-8);
+  --spacing-control-sm: var(--soco-control-sm);
+  --spacing-control-md: var(--soco-control-md);
+  --spacing-control-touch: var(--soco-control-touch);
+  --spacing-icon-sm: var(--soco-icon-sm);
+  --spacing-icon-md: var(--soco-icon-md);
+  --spacing-icon-lg: var(--soco-icon-lg);
   --radius-ui-sm: var(--soco-radius-sm);
   --radius-ui-md: var(--soco-radius-md);
   --radius-ui-lg: var(--soco-radius-lg);
@@ -37,6 +43,11 @@
   --color-background: var(--soco-canvas);
   --color-foreground: var(--soco-text);
   --color-card: var(--soco-surface);
+  --color-surface-input: var(--soco-surface-input);
+  --color-surface-page: var(--soco-surface-page);
+  --color-border-subtle: var(--soco-border-subtle);
+  --color-reaction-like: var(--soco-reaction-like);
+  --color-reaction-like-hover: var(--soco-reaction-like-hover);
   --color-card-foreground: var(--soco-text);
   --color-popover: var(--soco-surface);
   --color-popover-foreground: var(--soco-text);

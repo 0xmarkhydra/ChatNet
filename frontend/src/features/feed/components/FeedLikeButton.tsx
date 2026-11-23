@@ -17,7 +17,7 @@ export default function FeedLikeButton({
   return (
     <button
       type="button"
-      className={`feed-post-like feed-like-button ${postActionClassName}${liked ? ' is-liked text-[#ee416a]! hover:bg-[#fff2f6]!' : ''}`}
+      className={`feed-post-like feed-like-button ${postActionClassName}${liked ? ' is-liked text-reaction-like! hover:bg-reaction-like-hover!' : ''}`}
       disabled={busy}
       aria-pressed={liked}
       aria-busy={busy}
