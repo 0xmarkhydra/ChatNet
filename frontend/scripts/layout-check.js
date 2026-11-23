@@ -91,7 +91,7 @@ async (page) => {
       await nav.getByRole('button', { name: 'Bảng tin' }).click()
       await p.locator('.zalo-post').first().waitFor()
       await p.waitForFunction(() => {
-        const images = [...document.querySelectorAll('.stories-strip img, .zalo-post:first-child img')]
+        const images = [...document.querySelectorAll('.stories-strip img, .feed-post-card img')]
         return images.length > 0 && images.every((image) => image.complete && image.naturalWidth > 0)
       })
       await p.waitForTimeout(300)

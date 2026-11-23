@@ -41,7 +41,7 @@ describe('unified PostCard markup', () => {
     const html = renderToStaticMarkup(<PostCardHeader post={post} authorLabel="Người đăng" name="owner" openPost={() => {}} {...actions} />)
     expect(html).toContain('<header')
     expect(html).toContain('post-card-header')
-    expect(html).toContain('flex!')
+    expect(html).toMatch(/<header class="[^"]*\bflex\b/)
     expect(html).toContain('alt="owner"')
     expect(html).toContain('Người đăng')
     expect(html).toContain('Chỉ mình tôi')

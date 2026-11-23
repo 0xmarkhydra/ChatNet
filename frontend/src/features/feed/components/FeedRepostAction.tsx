@@ -81,7 +81,7 @@ export default function FeedRepostAction({ post, request, onUpdated, onRemoved, 
   }
 
   return <>
-    <button type="button" className={`post-stat feed-share-action feed-repost-action ${postActionClassName} data-[reposted=true]:text-primary!`} data-reposted={Boolean(removedId)} aria-haspopup="dialog"
+    <button type="button" className={`feed-share-action feed-repost-action ${postActionClassName} data-[reposted=true]:text-primary!`} data-reposted={Boolean(removedId)} aria-haspopup="dialog"
       aria-expanded={open} aria-label="Chia sẻ bài viết" onClick={() => { setError(''); setQuote(false); setOpen(true) }}>
       <Share size={18} aria-hidden="true" /><span>Chia sẻ</span>
     </button>

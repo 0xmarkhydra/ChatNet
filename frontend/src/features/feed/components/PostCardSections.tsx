@@ -44,10 +44,10 @@ export function PostCardHeader({
   openPost: () => void
 }) {
   return (
-    <header className="feed-post-header post-card-header flex! w-full! min-w-0! items-center! gap-[9px]!">
+    <header className="feed-post-header post-card-header flex w-full min-w-0 items-center gap-[9px]">
       <UserAvatar username={post.author} name={authorLabel} className="avatar size-10! basis-10! shrink-0! rounded-full! bg-none! bg-secondary! text-primary!" />
-      <div className="post-author flex! min-h-10! min-w-0! flex-1! items-center! justify-between!">
-        <div className="min-w-0!">
+      <div className="feed-post-author flex min-h-10 min-w-0 flex-1 items-center justify-between">
+        <div className="grid min-w-0 gap-[3px]">
           <strong className="block! truncate! text-base! font-bold! text-[#142443]!">
             {onAuthorOpen ? <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(post.author)}>{authorLabel}</button> : authorLabel}
           </strong>
@@ -77,12 +77,12 @@ export function PostCardEngagement({ post, onReactionUsers }: {
 }) {
   const commentsCount = post.comments?.length ?? 0
   return (
-    <div className="post-engagement-summary feed-post-engagement flex! flex-wrap! items-center! justify-between! gap-x-3! gap-y-1.5! px-4! py-2! text-[13px]! text-[#7585a7]!">
-      <button type="button" className="feed-post-likes feed-reaction-users-trigger inline-flex! items-center! gap-2!"
+    <div className="feed-post-engagement whitespace-nowrap flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-2 text-ui-label! text-[#7585a7]!">
+      <button type="button" className="feed-post-likes feed-reaction-users-trigger inline-flex items-center gap-2"
         disabled={post.likes === 0} aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`} onClick={() => onReactionUsers(post)}>
         <span>{formatCount(post.likes)} lượt thích</span>
       </button>
-      <span className="feed-post-conversation-stats ml-auto! text-right!">
+      <span className="feed-post-conversation-stats ml-auto text-right">
         {commentsCount.toLocaleString('vi-VN')} bình luận{Boolean(post.repostCount) && ` · ${formatCount(post.repostCount ?? 0)} lượt đăng lại`}
       </span>
     </div>
@@ -102,9 +102,9 @@ export function PostCardToolbar({
   const commentsId = useId()
   return (
     <>
-      <div className="post-toolbar feed-post-toolbar grid! grid-cols-3! gap-1! mt-0! mx-4! pt-1! border-t! border-border-subtle!">
+      <div className="feed-post-toolbar grid grid-cols-3 items-center gap-1 mt-0 mx-4 pt-1 border-t border-border-subtle">
         <FeedLikeButton post={post} busy={busy} onLike={(emoji) => void like(post, emoji)} />
-        <button type="button" className={`post-stat post-detail-trigger ${postActionClassName}`}
+        <button type="button" className={`post-detail-trigger ${postActionClassName}`}
           aria-expanded={onToggleComments ? Boolean(discussion) : undefined}
           aria-controls={discussion ? commentsId : undefined}
           onClick={onToggleComments ?? openPost}>
