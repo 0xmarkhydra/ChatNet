@@ -5,11 +5,13 @@ on:
     branches:
       - main
       - dev
+      - toan-nguyen-dev
       - 'feat/chatnet-*'
   pull_request:
     branches:
       - main
       - dev
+      - toan-nguyen-dev
   workflow_dispatch:
 
 permissions:
@@ -30,6 +32,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Validate Docker Compose required settings
+        working-directory: ${{ github.workspace }}
+        env:
+          JWT_SECRET: ci-only-jwt-secret
+          OTP_PEPPER: ci-only-otp-pepper
+          POSTGRES_PASSWORD: 6f4a9f8c2d7b1e0a
+          MEDIA_PUBLIC_ORIGIN: https://media.example.invalid
+        run: |
+          empty_env="$(mktemp)"
+          docker compose --env-file "$empty_env" config --quiet
+          for required in POSTGRES_PASSWORD JWT_SECRET OTP_PEPPER MEDIA_PUBLIC_ORIGIN; do
+            if output="$(env -u "$required" docker compose --env-file "$empty_env" config --quiet 2>&1)"; then
+              echo "Compose accepted missing required variable: $required"
+              exit 1
+            fi
+            grep -F "$required must be set" <<< "$output" >/dev/null
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -42,6 +61,9 @@ jobs:
         run: node --test scripts/architecture-boundaries-selfcheck.mjs
       - name: Check feature dependency boundaries
         run: npm run check:architecture
+      - name: Verify API/OpenAPI route contract
+        working-directory: ${{ github.workspace }}
+        run: node scripts/check-api-contract.mjs
       - name: Test baseline ratchet enforcement
         run: node --test scripts/baseline-ratchet-check.selfcheck.mjs
       - name: Reject baseline increases in pull requests

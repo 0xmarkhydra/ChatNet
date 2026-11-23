@@ -10,7 +10,7 @@
     "lint": "node scripts/lint-ratchet.mjs",
     "lint:report": "eslint src",
     "lint:baseline": "node scripts/lint-ratchet.mjs --update",
-    "test:unit": "vitest run",
+    "test:unit": "vitest run --exclude 'output/**'",
     "check:onesignal": "node --experimental-strip-types scripts/onesignal-init-check.mjs",
     "check:push-deeplink": "node scripts/push-notification-deeplink-check.mjs",
     "check:incoming-sound": "node --experimental-strip-types scripts/incoming-sound-check.mjs",
