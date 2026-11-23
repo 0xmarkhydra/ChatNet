@@ -181,7 +181,7 @@ try {
     await timeline.getByText('Khoảnh khắc 1', { exact: true }).waitFor()
     check(await timeline.locator('.post').count() === 17, 'Older own posts missing or duplicated')
     await timeline.locator('.post').first().getByRole('button', { name: 'Thích', exact: true }).click()
-    await page.waitForFunction(() => document.querySelector('.personal-timeline-content .post .liked'))
+    await page.waitForFunction(() => document.querySelector('.personal-timeline-content .feed-post-card .liked'))
     check(await timeline.getByRole('textbox', { name: 'Nội dung bài viết' }).count() === 0, 'Composer must open in a popup')
     await timeline.getByRole('button', { name: 'Bạn đang nghĩ gì?', exact: true }).click()
     const popup = page.getByRole('dialog', { name: 'Tạo bài viết', exact: true })
