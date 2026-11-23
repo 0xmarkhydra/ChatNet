@@ -285,8 +285,9 @@
 .profile-page-friend strong { overflow: hidden; color: #263853; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .profile-page-friend small { overflow: hidden; color: #8290a9; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .profile-page-friend > svg { flex-shrink: 0; color: #9aabc6; }
-.modern-shell.app-layout .profile-page button:focus-visible { outline: 3px solid #a4bafa; outline-offset: 2px; }
-.modern-shell.app-layout .profile-page button:disabled { opacity: .55; cursor: not-allowed; }
+/* Scope page-level interaction states to Profile's own controls, not shared launchers. */
+.modern-shell.app-layout .profile-page :is(.profile-page-cover-action, .profile-page-primary, .profile-page-secondary, .profile-page-more, .profile-page-post-action, .profile-page-more-posts, .profile-page-info-edit, .profile-page-friend):focus-visible { outline: 3px solid #a4bafa; outline-offset: 2px; }
+.modern-shell.app-layout .profile-page :is(.profile-page-cover-action, .profile-page-primary, .profile-page-secondary, .profile-page-more, .profile-page-post-action, .profile-page-more-posts, .profile-page-info-edit, .profile-page-friend):disabled { opacity: .55; cursor: not-allowed; }
 
 @media (min-width: 761px) and (max-width: 1200px) {
   .modern-shell.app-layout .profile-page { padding: 0 17px 26px; }

@@ -79,7 +79,11 @@
     padding: 3px 0 6px;
     overflow-y: auto;
     overflow-x: hidden;
-    overscroll-behavior: contain;
+    /* Keep pull/bounce at either end of this list from moving the app shell. */
+    overscroll-behavior-y: none;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     scrollbar-width: none;
   }
   .conversation-avatar-rail-scroll::-webkit-scrollbar { display: none; }
