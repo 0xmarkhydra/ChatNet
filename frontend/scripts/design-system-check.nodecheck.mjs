@@ -25,6 +25,8 @@ test('z-index layers and the focus ring must stay tokenised', () => {
 test('the app breakpoint variants must stay defined', () => {
   assert.ok(checkTokenContract(theme, tailwind.replace('app-desktop', 'app-other')).some((error) => error.includes('app-desktop')))
   assert.ok(checkTokenContract(theme, tailwind.replace('app-mobile', 'app-other')).some((error) => error.includes('app-mobile')))
+  assert.ok(checkTokenContract(theme, tailwind.replace('app-wide', 'app-other')).some((error) => error.includes('app-wide')))
+  assert.ok(checkTokenContract(theme, tailwind.replace('app-full', 'app-other')).some((error) => error.includes('app-full')))
 })
 
 test('Tailwind Preflight stays disabled', () => {

@@ -95,5 +95,7 @@ Use the named variants from `tailwind.css` instead of arbitrary `min-[761px]:` /
 | --- | --- | --- |
 | `app-mobile:` | `max-width: 760px` | Phone layout |
 | `app-desktop:` | `min-width: 761px` | Desktop layout |
+| `app-wide:` | `min-width: 1121px` | Wide desktop (feed side column, wider gaps) |
+| `app-full:` | `min-width: 1331px` | Extra wide feed layout |
 
 Custom variants are emitted after every built-in variant (`hover:`, `min-[...]`, `max-[...]`, `sm:`). On one element, do not mix `app-*` with an unconverted `min-[1121px]:`-style variant that sets the same property: the `app-*` rule would win at every width. Convert the other breakpoints on that element together, and check widths 760, 761 and just above/below any other breakpoint. `max-[760px]` used to mean `width < 760px`; `app-mobile` is `<= 760px`, matching the legacy `max-width: 760px` CSS.

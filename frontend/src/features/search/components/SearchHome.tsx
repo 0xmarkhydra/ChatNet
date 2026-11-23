@@ -100,9 +100,9 @@ export default function SearchHome({ history, request, sessionId, suggest, ...ac
 
   return (
     <>
-      <header className="flex min-h-16 items-center border-b border-border-subtle bg-card px-ui-6 max-lg:px-ui-3">
-        <h1 className="sr-only">Tìm kiếm</h1>
-        <div className="mx-auto w-full max-w-270">
+      <header className="grid min-h-16 grid-cols-[1fr_minmax(0,46rem)_1fr] items-center gap-ui-4 border-b border-border-subtle bg-card px-ui-6 max-lg:px-ui-3 max-md:grid-cols-1">
+        <h1 className="m-0! text-[length:var(--soco-type-page)]! font-bold tracking-[-0.3px]! text-foreground max-md:sr-only">Tìm kiếm</h1>
+        <div className="min-w-0 md:col-start-2">
           <SearchForm initialQuery="" large suggest={suggest} autoFocus={focusField} placeholder="Tìm người, bài viết, cộng đồng, sản phẩm…" onSubmit={search} />
         </div>
       </header>

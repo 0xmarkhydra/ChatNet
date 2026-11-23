@@ -2,7 +2,6 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Search, X } from "lucide-react";
 import { cn } from "../lib/utils";
-import { Button } from "./button";
 
 const searchFieldVariants = cva(
   "flex w-full min-w-0 items-center gap-2 rounded-ui-md border border-border bg-surface-input px-3 text-muted-foreground transition-colors focus-within:border-primary focus-within:bg-card focus-within:ring-2 focus-within:ring-primary/20",
@@ -19,10 +18,12 @@ type SearchFieldProps = Omit<React.ComponentProps<"input">, "size" | "value" | "
     /** Sizes the field (width, flex, max-width); the field fills whatever box the caller gives it. */
     className?: string;
     clearLabel?: string;
+    /** Optional control after the clear button, e.g. a submit icon button. */
+    trailing?: React.ReactNode;
   };
 
 /** Presentational search box: icon, input and clear button. Suggestions, submit and history stay with the caller. */
-function SearchField({ value, onValueChange, size, className, clearLabel = "Xóa từ khóa", ...props }: SearchFieldProps) {
+function SearchField({ value, onValueChange, size, className, clearLabel = "Xóa từ khóa", trailing, ...props }: SearchFieldProps) {
   return (
     <div data-slot="search-field" className={cn(searchFieldVariants({ size }), className)}>
       <Search size={18} aria-hidden="true" className="shrink-0 text-primary" />
@@ -35,10 +36,16 @@ function SearchField({ value, onValueChange, size, className, clearLabel = "Xóa
         {...props}
       />
       {value && (
-        <Button variant="ghost" size="icon" aria-label={clearLabel} className="size-7 rounded-full" onClick={() => onValueChange("")}>
+        <button
+          type="button"
+          aria-label={clearLabel}
+          onClick={() => onValueChange("")}
+          className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <X size={16} aria-hidden="true" />
-        </Button>
+        </button>
       )}
+      {trailing}
     </div>
   );
 }

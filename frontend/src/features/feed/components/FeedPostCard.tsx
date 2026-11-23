@@ -65,7 +65,7 @@ export default function FeedPostCard({
   const openPost = () => setActivePostId(post.id)
 
   return (
-    <article className="feed-post-card flex flex-col gap-y-2 min-w-0 m-0 px-0 pt-[14px] pb-[11px] overflow-hidden rounded-none border-x-0 border-y border-border-subtle bg-white shadow-none min-[761px]:rounded-2xl min-[761px]:border-0 min-[761px]:shadow-[0_3px_16px_rgba(30,51,96,0.06)] [&>.feed-post-header]:px-4">
+    <article className="feed-post-card flex flex-col gap-y-2 min-w-0 m-0 px-0 pt-[14px] pb-[11px] overflow-hidden rounded-none border-x-0 border-y border-border-subtle bg-white shadow-none app-desktop:rounded-2xl app-desktop:border-0 app-desktop:shadow-[0_3px_16px_rgba(30,51,96,0.06)] [&>.feed-post-header]:px-4">
         <PostCardHeader post={post} authorLabel={authorLabel} name={name} onAuthorOpen={onAuthorOpen}
           onEditPost={onEditPost} openPost={openPost} apiFetch={apiFetch} syncFeedPost={syncFeedPost}
           removeFeedPost={removeFeedPost} setNotice={setNotice} onRepostChanged={onRepostChanged} />
