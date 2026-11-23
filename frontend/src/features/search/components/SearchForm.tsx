@@ -68,7 +68,7 @@ export default function SearchForm({ initialQuery, placeholder, large = false, a
             aria-activedescendant={showList ? listId + '-' + active : undefined} autoComplete="off"
             value={draft} maxLength={120} placeholder={placeholder} autoFocus={autoFocus} enterKeyHint="search"
             onChange={event => edit(event.target.value)} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onKeyDown={onKeyDown}
-            className={cn('h-full min-w-0 flex-1 border-0 bg-transparent p-0 font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden',
+            className={cn('h-full min-w-0 flex-1 border-0 bg-transparent p-0 font-medium text-foreground outline-none! placeholder:font-normal placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden',
               large ? 'text-[length:var(--soco-type-subtitle)]' : 'text-[length:var(--soco-type-body)] max-lg:text-[length:var(--soco-type-subtitle)]')} />
           {draft && (
             <button type="button" className={cn(iconButton, 'size-8 bg-border text-foreground max-lg:size-8')} aria-label="Xóa từ khóa" onClick={() => edit('')}><X size={16} /></button>

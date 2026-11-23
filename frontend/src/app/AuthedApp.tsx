@@ -2236,7 +2236,7 @@ export default function AuthedApp({
     if (tab === 'profile') void loadProfilePosts(false, true);
   }
 
-  const renderPosts = (items: Post[], showSave = false) =>
+  const renderPosts = (items: Post[], showSave = false, onOpen: (id: number) => void = openFeedPostDetails) =>
     items.map((post) => (
       <FeedPostCard
         key={post.id}
@@ -2253,7 +2253,7 @@ export default function AuthedApp({
         token={session.token}
         translationPreferencesLoaded={translationPreferencesLoaded}
         targetLanguage={targetLanguage}
-        setActivePostId={openFeedPostDetails}
+        setActivePostId={onOpen}
         onToggleComments={() => setInlineCommentsId((current) => current === post.id ? null : post.id)}
         discussion={inlineCommentsId === post.id ? renderPostDiscussion(post, openVisitor) : null}
         showSave={showSave}
@@ -2639,6 +2639,7 @@ export default function AuthedApp({
             sessionId: session.sessionId,
             onOpenProfile: username => openVisitorProfile(username),
             onOpenPost: postId => navigate(feedPostPath(postId)),
+            renderPosts: (items, onOpen) => renderPosts(items, false, onOpen),
           },
           discover: {
             request: apiFetch,
