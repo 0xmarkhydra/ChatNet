@@ -487,11 +487,12 @@
     height: 46px;
     border-radius: 50%;
   }
-  .modern-shell.app-layout .social-feed button:focus-visible {
+  /* Do not override buttons owned by shared Tailwind components. */
+  .modern-shell.app-layout .social-feed :is(.social-feed-story, .social-feed-refresh, .social-feed-connect, .social-feed-suggestion-person, .social-feed-filter-options button, .social-feed-header-account):focus-visible {
     outline: 3px solid #a7bfff;
     outline-offset: 2px;
   }
-  .modern-shell.app-layout .social-feed button:disabled {
+  .modern-shell.app-layout .social-feed :is(.social-feed-story, .social-feed-refresh, .social-feed-connect, .social-feed-suggestion-person, .social-feed-filter-options button, .social-feed-header-account):disabled {
     opacity: 0.55;
     cursor: not-allowed;
   }

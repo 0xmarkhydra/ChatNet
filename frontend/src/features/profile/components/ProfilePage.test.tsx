@@ -27,7 +27,8 @@ describe('own profile navigation and composer', () => {
         hasMorePosts={false} postCards={null} profileNote={null}
         highlights={<section aria-label="Tin nổi bật" />}
         onEditProfile={() => {}} onChangeAvatar={onChangeAvatar} onChangeCover={() => {}}
-        onCreatePost={onCreatePost} onCreateStory={onCreateStory} onReloadPosts={() => {}} onLoadMorePosts={() => {}}
+        onCreatePost={onCreatePost} onCreateMediaPost={() => {}} onCreateStory={onCreateStory} onCheckIn={() => {}}
+        onReloadPosts={() => {}} onLoadMorePosts={() => {}}
         onViewFriend={() => {}} onOpenContacts={() => {}} onOpenPost={() => {}}
       />))
       const identityRow = host.querySelector('.profile-page-hero-bottom')
@@ -79,7 +80,8 @@ describe('own profile navigation and composer', () => {
       expect(tabbar?.parentElement?.classList.contains('profile-page')).toBe(true)
       expect(host.querySelector('.profile-page-hero')?.contains(tabbar)).toBe(false)
       expect(tabbar?.classList.contains('is-measured')).toBe(true)
-      expect(host.textContent).toContain('Trung ơi, bạn đang nghĩ gì?')
+      expect(host.textContent).toContain('Bạn đang nghĩ gì?')
+      expect(host.querySelectorAll('[aria-label="Tạo nội dung mới"]')).toHaveLength(1)
       const prompt = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.includes('đang nghĩ gì'))
       await act(async () => prompt?.click())
       expect(onCreatePost).toHaveBeenCalledOnce()

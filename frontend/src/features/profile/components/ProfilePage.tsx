@@ -5,7 +5,7 @@ import type { FriendConnection } from '../../contacts'
 import ProfileMediaGallery, { type ProfileMediaItem } from './ProfileMediaGallery'
 import ProfileSidebar from './ProfileSidebar'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import PostStatusPrompt from '../../../shared/ui/PostStatusPrompt'
+import PostComposerLauncher from '../../../shared/ui/PostComposerLauncher'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import ProfileAvatarMenu from './ProfileAvatarMenu'
 import ProfileHero from './ProfileHero'
@@ -39,7 +39,12 @@ type Props = {
   onChangeAvatar: (opener: HTMLButtonElement | null) => void
   onChangeCover: () => void
   onCreatePost: () => void
+  onCreateMediaPost: (files: File[]) => void
   onCreateStory: () => void
+  onCheckIn: () => void
+  composerPending?: boolean
+  storyBusy?: boolean
+  postDraft?: string
   onReloadPosts: () => void
   onLoadMorePosts: () => void
   onViewFriend: (username: string) => void
@@ -50,7 +55,8 @@ type Props = {
 export default function ProfilePage({
   highlights, username, displayName, email, bio, city, workplace, school, coverUrl, coverSet, avatarSet, avatarVersion, editBusy, friends,
   posts, pendingPost, postsBusy, postsError, hasMorePosts, postCards, profileNote,
-  onEditProfile, onChangeAvatar, onChangeCover, onCreatePost, onCreateStory,
+  onEditProfile, onChangeAvatar, onChangeCover, onCreatePost, onCreateMediaPost, onCreateStory, onCheckIn,
+  composerPending = false, storyBusy = false, postDraft = '',
   onReloadPosts, onLoadMorePosts, onViewFriend, onOpenContacts, onOpenPost,
 }: Props) {
   const [section, setSection] = useState<Section>('posts')
@@ -102,26 +108,28 @@ export default function ProfilePage({
           onEditProfile={onEditProfile} onShowMedia={() => setSection('media')} onShowFriends={() => setSection('friends')}
           onViewFriend={onViewFriend} onOpenPost={onOpenPost} />
         <section className="profile-page-main" aria-label="Nội dung trang cá nhân">
-          <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel">
+          <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel min-[761px]:flex min-[761px]:min-w-0 min-[761px]:flex-col min-[761px]:gap-4">
             {section === 'posts' && (
               <>
-                <div className="profile-page-composer">
-                  <PostStatusPrompt
-                    username={username}
-                    displayName={displayName}
-                    avatarClassName="profile-page-composer-avatar"
-                    prompt={`${displayName.split(' ').slice(-1)[0]} ơi, bạn đang nghĩ gì?`}
-                    onCreatePost={onCreatePost}
-                  />
-                </div>
+                <PostComposerLauncher
+                  username={username}
+                  displayName={displayName}
+                  prompt={postDraft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
+                  onCreatePost={onCreatePost}
+                  onCreateMediaPost={onCreateMediaPost}
+                  onCreateStory={onCreateStory}
+                  onCheckIn={onCheckIn}
+                  pending={composerPending}
+                  storyBusy={storyBusy}
+                />
                 <div className="profile-page-about profile-page-timeline-heading"><h2>Bài viết</h2></div>
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
-                <div className="profile-page-post-feed feed zalo-feed">{postCards}</div>
+                <div className="profile-page-post-feed feed zalo-feed min-[761px]:flex min-[761px]:min-w-0 min-[761px]:flex-col min-[761px]:gap-4">{postCards}</div>
                 {!postsBusy && !postsError && posts.length === 0 && !pendingPost &&
                   <div className="profile-page-blank"><ImageIcon size={30} aria-hidden="true" /><p>Bạn chưa có bài viết nào.</p>
                     <button type="button" onClick={onCreatePost}>Đăng bài đầu tiên</button></div>}
-                {hasMorePosts && <button className="profile-page-more-posts" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>
+                {hasMorePosts && <button className="profile-page-more-posts min-[761px]:mt-[15px] min-[761px]:flex min-[761px]:min-h-[42px] min-[761px]:w-full min-[761px]:cursor-pointer min-[761px]:items-center min-[761px]:justify-center min-[761px]:gap-2 min-[761px]:rounded-[11px] min-[761px]:border min-[761px]:border-[#dde7fa] min-[761px]:bg-[#f5f7ff] min-[761px]:text-xs min-[761px]:font-bold min-[761px]:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>
                   Xem bài viết cũ hơn <ArrowRight size={16} aria-hidden="true" /></button>}
               </>
             )}
@@ -130,7 +138,7 @@ export default function ProfilePage({
                 <h2>Ảnh & video</h2>
                 <p>Ảnh và video từ các bài viết đã tải của bạn.</p>
                 <ProfileMediaGallery items={media} emptyText="Chưa có ảnh hoặc video trong các bài viết đã tải." postsBusy={postsBusy} onOpenPost={onOpenPost} onCreatePost={onCreatePost} />
-                {hasMorePosts && <button className="profile-page-more-posts" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>Tải thêm bài viết để xem ảnh cũ hơn</button>}
+                {hasMorePosts && <button className="profile-page-more-posts min-[761px]:mt-[15px] min-[761px]:flex min-[761px]:min-h-[42px] min-[761px]:w-full min-[761px]:cursor-pointer min-[761px]:items-center min-[761px]:justify-center min-[761px]:gap-2 min-[761px]:rounded-[11px] min-[761px]:border min-[761px]:border-[#dde7fa] min-[761px]:bg-[#f5f7ff] min-[761px]:text-xs min-[761px]:font-bold min-[761px]:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>Tải thêm bài viết để xem ảnh cũ hơn</button>}
               </div>
             )}
             {section === 'about' && (
@@ -149,16 +157,16 @@ export default function ProfilePage({
               <div className="profile-page-subsection">
                 <h2>Bạn bè của bạn</h2>
                 <p>{acceptedFriends.length.toLocaleString('vi-VN')} liên hệ đã kết bạn.</p>
-                <div className="profile-page-friends">
+                <div className="profile-page-friends min-[761px]:grid min-[761px]:grid-cols-2 min-[761px]:gap-2.5">
                   {acceptedFriends.slice(0, 12).map(friend => (
-                    <button type="button" key={friend.id} className="profile-page-friend"
+                    <button type="button" key={friend.id} className="profile-page-friend min-[761px]:flex min-[761px]:min-w-0 min-[761px]:cursor-pointer min-[761px]:items-center min-[761px]:gap-[11px] min-[761px]:rounded-xl min-[761px]:border min-[761px]:border-[#e9edf5] min-[761px]:bg-white min-[761px]:p-3 min-[761px]:text-left min-[761px]:hover:bg-[#f6f8ff] min-[761px]:[&>svg]:shrink-0 min-[761px]:[&>svg]:text-[#9aabc6]"
                       onClick={() => onViewFriend(friend.username)} title={`Xem hồ sơ ${friend.displayName || friend.username}`}>
                       <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="profile-page-friend-avatar" online={friend.online} />
                       <span><strong>{friend.displayName || friend.username}</strong><small>@{friend.username}</small></span><ArrowRight size={16} aria-hidden="true" />
                     </button>
                   ))}
                 </div>
-                {acceptedFriends.length === 0 && <p className="profile-page-hint">Chưa có bạn bè trong danh bạ.</p>}
+                {acceptedFriends.length === 0 && <p className="profile-page-hint min-[761px]:text-[13px] min-[761px]:text-[#8391a9]">Chưa có bạn bè trong danh bạ.</p>}
                 <button type="button" className="profile-page-info-edit" onClick={onOpenContacts}>Mở danh bạ <ArrowRight size={16} /></button>
               </div>
             )}

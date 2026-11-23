@@ -26,6 +26,10 @@ export type ProfileOverviewSectionProps = {
   openVisitor: (username: string) => void;
   onCreateStory: () => void;
   pendingPost: Post | null;
+  postDraft: string;
+  onCreateMediaPost: (files: File[]) => void;
+  onCheckIn: () => void;
+  storyBusy: boolean;
   privacy: UserPrivacy | null;
   privacyBusy: boolean;
   privacyError: string;
@@ -73,6 +77,10 @@ export default function ProfileOverviewSection({
   openVisitor,
   onCreateStory,
   pendingPost,
+  postDraft,
+  onCreateMediaPost,
+  onCheckIn,
+  storyBusy,
   privacy,
   privacyBusy,
   privacyError,
@@ -182,6 +190,12 @@ export default function ProfileOverviewSection({
                 friends={friends}
                 posts={profilePosts}
                 pendingPost={pendingPost}
+                postDraft={postDraft}
+                onCreateMediaPost={onCreateMediaPost}
+                onCreateStory={onCreateStory}
+                onCheckIn={onCheckIn}
+                composerPending={Boolean(pendingPost) || mediaUploading === 'feed'}
+                storyBusy={storyBusy}
                 postsBusy={profilePostsBusy}
                 postsError={profilePostsError}
                 hasMorePosts={profileHasMore}
@@ -198,7 +212,6 @@ export default function ProfileOverviewSection({
                 onChangeAvatar={openAvatarPicker}
                 onChangeCover={() => setCoverEditorOpen(true)}
                 onCreatePost={() => setProfileComposerOpen(true)}
-                onCreateStory={onCreateStory}
                 onReloadPosts={() => void loadProfilePosts(false, true)}
                 onLoadMorePosts={() => void loadProfilePosts(true)}
                 onViewFriend={openVisitor}

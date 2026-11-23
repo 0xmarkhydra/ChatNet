@@ -67,6 +67,7 @@
     "check:settings-notifications-api": "node --experimental-strip-types scripts/settings-notifications-api-check.mjs",
     "check:architecture": "node scripts/architecture-boundaries-check.mjs",
     "check:design-system": "node scripts/design-system-check.mjs && node --test scripts/design-system-check.nodecheck.mjs",
+    "check:tailwind-policy": "node --test scripts/tailwind-css-pr-check.nodecheck.mjs",
     "check:chat-messaging-flow": "node scripts/chat-messaging-flow-check.mjs",
     "check:chat-conversation-flow": "node scripts/chat-conversation-flow-check.mjs",
     "check:scoped-state": "node scripts/scoped-state-check.mjs",
