@@ -30,7 +30,7 @@
   border: 0;
   border-radius: 6px;
   background: #166534;
-  color: #fff;
+  color: var(--soco-surface);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -251,7 +251,7 @@ h1 {
   background:
     radial-gradient(circle at top left, rgba(23, 105, 255, .08), transparent 34%),
     radial-gradient(circle at bottom right, rgba(95, 205, 170, .07), transparent 30%),
-    linear-gradient(#f8fbff, #fff);
+    linear-gradient(#f8fbff, var(--soco-surface));
 }
 
 .day-divider {
@@ -900,7 +900,7 @@ button:disabled {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: linear-gradient(145deg, #e4eeff, #eff4ff);
+  background: linear-gradient(145deg, #e4eeff, var(--soco-soft-blue));
   color: #2859d8;
   font-weight: 900;
 }

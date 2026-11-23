@@ -231,12 +231,12 @@
   border-color: #dae5fb;
   background: #f8faff;
 }
-.connection-dialog .group-member input { accent-color: #2563eb; }
+.connection-dialog .group-member input { accent-color: var(--soco-blue); }
 
 /* Consistent modal typography and fixed height, including opened keyboard. */
 .modern-shell .locale-picker-sheet,
 .modern-shell .translation-hub-popover {
-  background: #fff;
+  background: var(--soco-surface);
   border: 1px solid #e2e8f6;
   box-shadow: 0 -10px 48px rgba(29,52,104,.14);
 }
@@ -550,7 +550,7 @@
     padding: 14px 12px;
     border: 1px solid #e3eafb;
     border-radius: 19px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 4px 24px rgba(36,58,113,.035);
   }
   .modern-shell .group-invite-title {
@@ -597,7 +597,7 @@
     padding: 5px 9px;
     border: 1px solid #e4eaf8;
     border-radius: 19px;
-    background: #fff;
+    background: var(--soco-surface);
   }
   .modern-shell .group-member-row {
     box-sizing: border-box;
@@ -751,7 +751,7 @@
   text-align: left;
   border-left: 0;
   border-right: 0;
-  background: #fff;
+  background: var(--soco-surface);
 }
 .modern-shell .settings-card .settings-install-row { color: #315fd1; }
 .modern-shell .settings-card .settings-logout-row {

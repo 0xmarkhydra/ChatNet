@@ -9,7 +9,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #fff;
+  background: var(--soco-surface);
   color: #102345;
   border-left: 1px solid #e0e4eb;
   box-shadow: -10px 0 30px rgba(16, 35, 69, .10);
@@ -60,7 +60,7 @@
   border: 1px solid #a5b1c5;
   border-radius: 7px;
   color: #0c2446;
-  background: #fff;
+  background: var(--soco-surface);
 }
 .message-search-input:focus-within { border: 2px solid #1766ed; padding: 0 12px; }
 .message-search-input > svg { flex: none; }
@@ -168,7 +168,7 @@
   max-height: 290px;
   overflow-y: auto;
   padding: 8px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #102345;
   border: 1px solid #d9dfe9;
   border-radius: 9px;
@@ -189,7 +189,7 @@
   padding: 7px;
   border: none;
   border-radius: 6px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #102345;
   text-align: left;
   cursor: pointer;
@@ -212,7 +212,7 @@
   border: 1px solid #ccd3df;
   border-radius: 6px;
   color: #172b4c;
-  background: #fff;
+  background: var(--soco-surface);
   font-size: 13px;
 }
 .message-search-popover > input { margin-top: 8px; }

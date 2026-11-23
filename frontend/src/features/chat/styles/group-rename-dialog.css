@@ -7,7 +7,7 @@
   margin: auto;
   border: 1px solid #e1e6f2;
   border-radius: 12px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #273956;
   box-shadow: 0 18px 60px rgba(18, 32, 61, .28);
   overflow-x: hidden;
@@ -61,7 +61,7 @@
   border-radius: 50%;
   border: 2px solid #edf1f7;
   background: linear-gradient(140deg, #5e6ae4, #915de7);
-  color: #fff;
+  color: var(--soco-surface);
   box-shadow: 0 3px 12px rgba(47, 59, 125, .08);
 }
 .group-rename-dialog .group-rename-avatar .avatar-initials {
@@ -84,7 +84,7 @@
   border: 1px solid #a8bdfb;
   border-radius: 5px;
   outline-offset: 2px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #293e5e;
   font: inherit;
   font-size: 15px;
@@ -123,7 +123,7 @@
 }
 .group-rename-dialog .group-rename-confirm {
   background: #126cfa;
-  color: #fff;
+  color: var(--soco-surface);
 }
 .group-rename-dialog .group-rename-actions button:disabled {
   opacity: .55;

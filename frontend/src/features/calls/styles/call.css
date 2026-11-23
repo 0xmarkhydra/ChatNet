@@ -32,7 +32,7 @@
   padding: 12px 14px;
   border-radius: 16px;
   background: rgba(18, 22, 31, .94);
-  color: #fff;
+  color: var(--soco-surface);
   box-shadow: 0 18px 60px rgba(0,0,0,.28);
   backdrop-filter: blur(18px);
 }
@@ -59,7 +59,7 @@
 .incoming-call-card {
   width: min(100%, 390px);
   text-align: center;
-  color: #fff;
+  color: var(--soco-surface);
   padding: 32px 26px 28px;
   border: 1px solid rgba(255,255,255,.10);
   border-radius: 32px;
@@ -83,7 +83,7 @@
 .incoming-call-card h2 { margin: 8px 0 7px; font-size: clamp(24px, 7vw, 31px); }
 .incoming-call-card p { margin: 0; color: rgba(255,255,255,.66); display: flex; gap: 5px; align-items: center; justify-content: center; font-size: 13px; }
 .incoming-call-actions { display: flex; justify-content: center; gap: 58px; margin-top: 38px; }
-.incoming-call-actions button { border: 0; color: #fff; background: transparent; display: grid; justify-items: center; gap: 9px; font-size: 12px; }
+.incoming-call-actions button { border: 0; color: var(--soco-surface); background: transparent; display: grid; justify-items: center; gap: 9px; font-size: 12px; }
 .incoming-call-actions button > svg { width: 62px; height: 62px; padding: 19px; border-radius: 50%; }
 .call-reject > svg { background: #ff3b30; }
 .call-accept > svg { background: #2cc66d; }
@@ -91,7 +91,7 @@
 .secure-call-layer {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   background: #070a11;
-  color: #fff;
+  color: var(--soco-surface);
 }
 .secure-call-stage { position: relative; height: 100%; min-height: 0; display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
 .secure-call-topbar {
@@ -143,7 +143,7 @@
 .call-speaking-dot { width: 7px; height: 7px; border-radius: 50%; background: #49df89; box-shadow: 0 0 0 4px rgba(73,223,137,.13); }
 
 .call-connecting-state { grid-column: 1 / -1; min-height: 300px; display: grid; place-content: center; justify-items: center; gap: 10px; color: rgba(255,255,255,.74); text-align: center; padding: 30px; }
-.call-connecting-state strong { color: #fff; }
+.call-connecting-state strong { color: var(--soco-surface); }
 .call-connecting-state span { max-width: 360px; font-size: 12px; line-height: 1.45; }
 .call-secure-spinner { width: 54px; height: 54px; border-radius: 50%; border: 3px solid rgba(255,255,255,.08); border-top-color: #4d8dff; animation: call-spin .8s linear infinite; }
 @keyframes call-spin { to { transform: rotate(360deg); } }
@@ -154,7 +154,7 @@
   gap: 8px;
   padding: 8px 11px;
   border-radius: 8px;
-  color: #fff;
+  color: var(--soco-surface);
   background: rgba(3, 6, 12, .82);
   box-shadow: 0 5px 20px rgba(0,0,0,.28);
   backdrop-filter: blur(12px);
@@ -195,11 +195,11 @@
   border-top: 1px solid rgba(255,255,255,.07);
   backdrop-filter: blur(20px);
 }
-.secure-call-controls button { width: 64px; border: 0; background: transparent; color: #fff; display: grid; justify-items: center; gap: 6px; font-size: 10px; cursor: pointer; }
+.secure-call-controls button { width: 64px; border: 0; background: transparent; color: var(--soco-surface); display: grid; justify-items: center; gap: 6px; font-size: 10px; cursor: pointer; }
 .secure-call-controls button svg { width: 44px; height: 44px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.10); }
 .secure-call-controls button.is-off svg { background: rgba(255,255,255,.92); color: #111722; }
 .secure-call-controls button.is-on svg { background: #246dff; }
-.secure-call-controls .hangup-button svg { background: #ff3b30; color: #fff; }
+.secure-call-controls .hangup-button svg { background: #ff3b30; color: var(--soco-surface); }
 .secure-call-controls button:disabled { opacity: .45; cursor: default; }
 
 @media (min-width: 800px) {
@@ -258,10 +258,10 @@
 .call-live-footnote { color:#8f9ab5; font-size:10px; line-height:1.4; padding:10px 13px; border-top:1px solid rgba(255,255,255,.06); }
 .call-live-error { display:flex; align-items:center; gap:8px; background:rgba(153,38,58,.2); color:#ffbfc6; font-size:11px; line-height:1.4; padding:10px 13px; }
 .call-live-error span { flex:1; }
-.call-live-error button { border:1px solid rgba(255,190,198,.28); background:rgba(255,255,255,.08); color:#fff; border-radius:8px; padding:7px 9px; white-space:nowrap; cursor:pointer; }
+.call-live-error button { border:1px solid rgba(255,190,198,.28); background:rgba(255,255,255,.08); color:var(--soco-surface); border-radius:8px; padding:7px 9px; white-space:nowrap; cursor:pointer; }
 .call-translation-consent-prompt { position:absolute; z-index:8; bottom:105px; left:50%; transform:translateX(-50%); width:min(92%,460px); display:flex; align-items:center; gap:10px; padding:12px 13px; border:1px solid rgba(153,162,250,.25); border-radius:16px; background:#202641; box-shadow:0 10px 35px rgba(0,0,0,.3); font-size:12px; }
 .call-translation-consent-prompt span { flex:1; }
-.call-translation-consent-prompt button { border:0; border-radius:9px; padding:8px 10px; background:#6f6ae9; color:#fff; cursor:pointer; white-space:nowrap; }
+.call-translation-consent-prompt button { border:0; border-radius:9px; padding:8px 10px; background:#6f6ae9; color:var(--soco-surface); cursor:pointer; white-space:nowrap; }
 .call-translation-consent-prompt button:last-child { background:transparent; padding:5px; }
 @media(max-width:750px) {
   .call-main-layout.has-translation { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(115px,1fr) minmax(190px,48%); }
@@ -310,7 +310,7 @@
   display:grid; place-items:center; flex:0 0 auto;
   background:linear-gradient(140deg,#3878ed,#845cf6);
   box-shadow:0 10px 28px rgba(71,83,234,.23),inset 0 1px rgba(255,255,255,.32);
-  color:#fff; font-weight:700; font-size:19px;
+  color:var(--soco-surface); font-weight:700; font-size:19px;
 }
 .call-heading-copy { display:flex; flex-direction:column; gap:5px; min-width:0; }
 .call-heading-copy strong { font-size:15px; line-height:1.2; font-weight:650; letter-spacing:-.02em; }
@@ -418,7 +418,7 @@
 }
 .call-live-title-icon svg {color:white;}
 .call-live-heading-copy { min-width:0;display:flex;flex:1;flex-direction:column;gap:4px; }
-.call-live-heading-copy strong {color:#fff;font-size:14px;letter-spacing:-.02em;}
+.call-live-heading-copy strong {color:var(--soco-surface);font-size:14px;letter-spacing:-.02em;}
 .call-live-heading-copy small { color:rgba(208,218,248,.58);font-size:10px;padding:0;background:none; }
 .call-live-heading > button {
   width:35px;height:35px; flex:0 0 auto;border-radius:12px;
@@ -433,7 +433,7 @@
 .call-language-select select {
   min-width:0;width:100%;height:46px;appearance:none;outline-offset:2px;
   border-radius:15px;border:1px solid rgba(160,168,244,.2);
-  background:rgba(255,255,255,.075);color:#fff;font-size:12px;
+  background:rgba(255,255,255,.075);color:var(--soco-surface);font-size:12px;
   padding:0 34px 0 39px;
 }
 .call-translation-state { display:flex;align-items:center;gap:9px;min-height:25px;font-size:11px;color:rgba(214,222,248,.73); }
@@ -528,7 +528,7 @@
 .call-consent-actions {display:flex;align-items:center;gap:5px;}
 .call-translation-consent-prompt button,.call-permission-prompt button {
   border:0;border-radius:11px;background:linear-gradient(120deg,#516bef,#7960f5);
-  color:#fff;padding:9px 12px;font-size:11px;font-weight:650;white-space:nowrap;cursor:pointer;
+  color:var(--soco-surface);padding:9px 12px;font-size:11px;font-weight:650;white-space:nowrap;cursor:pointer;
 }
 .call-translation-consent-prompt .call-consent-decline {background:rgba(255,255,255,.08);color:#d7dcec;}
 .call-permission-prompt button:disabled {opacity:.6;}
@@ -605,7 +605,7 @@
 /* SocCo calls visual refresh. Existing LiveKit/E2EE media behavior is unchanged. */
 .incoming-call-layer {
   display:flex; align-items:center; justify-content:center; flex-direction:column;
-  background:#11203a; color:#fff; padding:45px 16px 22px;
+  background:#11203a; color:var(--soco-surface); padding:45px 16px 22px;
 }
 .incoming-call-brand {position:absolute;left:clamp(20px,3vw,45px);top:25px;font-size:17px;font-weight:800;}
 .incoming-call-layout {width:min(900px,100%);display:grid;grid-template-columns:minmax(0,2.5fr) minmax(205px,.85fr);gap:20px;align-items:center;}
@@ -616,7 +616,7 @@
   background:linear-gradient(132deg,#233f69,#322d5b);
   box-shadow:none;
 }
-.incoming-call-title {font-size:16px;color:#fff;margin-bottom:44px;}
+.incoming-call-title {font-size:16px;color:var(--soco-surface);margin-bottom:44px;}
 .incoming-call-orb {position:relative;display:grid;place-items:center;width:168px;height:168px;border-radius:50%;margin:0 auto 26px;background:#3f64a4;box-shadow:inset 0 0 0 12px #3b5998,0 0 0 1px rgba(255,255,255,.08);animation:none;}
 .incoming-call-orb .incoming-call-avatar {width:138px;height:138px;border-radius:50%;object-fit:cover;font-size:44px;}
 .incoming-call-online-dot {position:absolute;width:16px;height:16px;background:#03ba93;border-radius:50%;bottom:24px;right:16px;border:2px solid #3b5998;}
@@ -635,17 +635,17 @@
 .incoming-call-info-box > button {display:flex;align-items:center;gap:7px;width:100%;min-height:34px;margin-top:7px;border:0;border-radius:8px;background:#334a71;color:#f3f6ff;padding:7px 10px;font-size:10px;text-align:left;}
 .incoming-call-info-box > small {display:block;margin-top:12px;color:#b7e6d1;line-height:1.5;}
 .incoming-call-info-box > button:disabled {opacity:.55;}
-.incoming-call-layer button:focus-visible {outline:2px solid #fff;outline-offset:3px;}
+.incoming-call-layer button:focus-visible {outline:2px solid var(--soco-surface);outline-offset:3px;}
 /* Dark navy stage and tile rhythm echo the call-in-progress mockups. */
 .secure-call-layer {
   background:#f5f7fb;
-  color:#fff;
+  color:var(--soco-surface);
 }
 .secure-call-stage {
   box-sizing:border-box; padding:clamp(8px,1.3vw,18px); gap:10px;
   background:#f5f7fb;
 }
-.secure-call-topbar {border-radius:17px;background:#fff;border:0;min-height:68px;}
+.secure-call-topbar {border-radius:17px;background:var(--soco-surface);border:0;min-height:68px;}
 .secure-call-topbar .call-heading-copy strong {color:#1c2f50;}
 .secure-call-topbar .call-security-state {color:#607497;}
 .secure-call-topbar .call-top-separator {color:#93a2c5;}
@@ -658,7 +658,7 @@
 .call-participant-tile {background:linear-gradient(145deg,#304970,#1d3152);border-radius:17px;border:1px solid rgba(255,255,255,.08);}
 .call-participant-tile.is-speaking {border-color:#06bfae;box-shadow:0 0 0 2px #06bfae;}
 .call-participant-label {border-radius:8px;background:#1b3155;}
-.call-live-panel {background:#fff;color:#1b2d50;border:0;border-radius:17px;}
+.call-live-panel {background:var(--soco-surface);color:#1b2d50;border:0;border-radius:17px;}
 .call-live-heading {border-bottom:1px solid #edf0f7;}
 .call-live-heading strong {color:#1b2d50;}
 .call-live-heading small {color:#7b8ca8;}
@@ -693,7 +693,7 @@
   display:grid;grid-template-columns:minmax(0,1fr) minmax(255px,290px);
   gap:12px;padding:0;background:#f5f7fb;
 }
-.call-group-panel {display:flex;min-width:0;min-height:0;flex-direction:column;padding:20px 13px;border-radius:17px;background:#fff;color:#1b2e50;overflow:hidden;}
+.call-group-panel {display:flex;min-width:0;min-height:0;flex-direction:column;padding:20px 13px;border-radius:17px;background:var(--soco-surface);color:#1b2e50;overflow:hidden;}
 .call-group-panel > header {display:grid;gap:8px;margin:0 3px 20px;}
 .call-group-panel > header strong {font-size:17px;}
 .call-group-panel > header span {color:#8292b0;font-size:12px;}

@@ -19,12 +19,12 @@
  border:0;border-radius:11px;padding:10px 15px;min-height:41px;
  font-size:13px;font-weight:720;white-space:nowrap;
 }
-.friends-design-v2 .fd-primary{background:var(--soco-blue);color:#fff}
+.friends-design-v2 .fd-primary{background:var(--soco-blue);color:var(--soco-surface)}
 .friends-design-v2 .fd-primary:hover:not(:disabled){background:#1857da}
 .friends-design-v2 .fd-secondary{background:#edf2ff;color:var(--soco-blue)}
 .friends-design-v2 .fd-secondary:hover:not(:disabled){background:#dfe9ff}
 .fd-searchbar{
- flex:0 0 auto;min-height:82px;border:1px solid #e9eef8;background:#fff;
+ flex:0 0 auto;min-height:82px;border:1px solid #e9eef8;background:var(--soco-surface);
  border-radius:18px;display:flex;align-items:center;gap:16px;padding:15px 21px 15px 24px;
  box-shadow:0 5px 22px rgba(29,51,100,.04);
 }
@@ -41,7 +41,7 @@
 .fd-directory-main,.fd-invitation-main{display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0}
 .fd-directory-main>.fd-list-card,.fd-invitation-main>.fd-invitation-list{flex:1;min-height:0}
 .fd-directory-main>.fd-searchbar,.fd-invitation-main>.fd-invitation-tabs{width:100%;min-width:0}
-.fd-card{background:#fff;border:1px solid var(--fd-border);border-radius:17px;min-width:0;box-shadow:0 5px 25px #1d336408}
+.fd-card{background:var(--soco-surface);border:1px solid var(--fd-border);border-radius:17px;min-width:0;box-shadow:0 5px 25px #1d336408}
 .fd-list-card{padding:17px 15px 18px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .fd-list-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:1px 11px 11px}
 .fd-list-header span,.fd-list-header p{font-size:12px;color:var(--fd-muted)}
@@ -84,7 +84,7 @@
  background-position:center;background-repeat:no-repeat;background-size:cover;
 }
 .fd-profile-core{display:flex;align-items:center;flex-direction:column;text-align:center;padding:0 8px}
-.fd-profile-avatar{width:106px!important;height:106px!important;flex:0 0 106px;border:5px solid #fff!important;margin-top:-42px}
+.fd-profile-avatar{width:106px!important;height:106px!important;flex:0 0 106px;border:5px solid var(--soco-surface)!important;margin-top:-42px}
 .fd-profile-core h2{margin:11px 0 4px;font-size:22px;max-width:100%;overflow-wrap:anywhere}
 .fd-profile-info p,.fd-profile-info button{min-width:0;overflow-wrap:anywhere}
 .fd-profile-options>div:nth-child(2)>button{min-height:32px;padding:5px 4px;border-radius:6px}
@@ -99,7 +99,7 @@
 .fd-profile-info p svg,.fd-profile-info button svg{color:var(--soco-blue);flex:0 0 19px}
 .fd-profile-info button{border:0;background:transparent;padding:0}
 .fd-profile-info button:hover{color:var(--soco-blue)}
-.fd-profile-options{margin:20px 4px 3px;padding:18px 20px;border-radius:13px;background:#f7f9fd;position:relative}
+.fd-profile-options{margin:20px 4px 3px;padding:18px 20px;border-radius:13px;background:var(--soco-surface-page);position:relative}
 .fd-profile-options h3{font-size:13px;display:flex;align-items:center;gap:9px}
 .fd-profile-options h3 svg{color:#697ea4}
 .fd-profile-options>div:nth-child(2){display:flex;gap:4px;flex-wrap:wrap;margin-top:11px;align-items:center}
@@ -107,7 +107,7 @@
 .fd-profile-options>div:nth-child(2)>button:hover{color:var(--soco-blue);text-decoration:underline}
 .fd-profile-options>div:nth-child(2)>span{font-size:11px;color:#a8b4ca}
 .fd-profile-placeholder{margin:auto}
-.fd-invitation-tabs{flex:0 0 auto;min-height:68px;background:#fff;border-radius:15px;display:flex;gap:13px;align-items:center;padding:10px 17px}
+.fd-invitation-tabs{flex:0 0 auto;min-height:68px;background:var(--soco-surface);border-radius:15px;display:flex;gap:13px;align-items:center;padding:10px 17px}
 .fd-invitation-tabs .fd-back{flex:0 0 44px;width:44px;height:44px;border:0;background:#f3f6ff;border-radius:11px;color:#6080bf;display:grid;place-items:center}
 .fd-invitation-tabs .fd-back:hover{background:#e6edff;color:#2459c9}
 .fd-invitation-tabs>div{display:flex;gap:6px;align-items:center;flex:1}
@@ -197,7 +197,7 @@
  .fd-person-row.expanded{background:#edf1ff}
  .fd-inline-profile{
    display:flex;flex-direction:column;min-width:0;margin:0 5px 10px;padding:12px;scroll-margin-bottom:32px;
-   background:#fff;border:1px solid #e1e8f8;border-radius:13px;
+   background:var(--soco-surface);border:1px solid #e1e8f8;border-radius:13px;
    box-shadow:0 6px 18px rgba(29,51,100,.06);
  }
  .fd-inline-profile .fd-profile-actions{margin:18px 0}

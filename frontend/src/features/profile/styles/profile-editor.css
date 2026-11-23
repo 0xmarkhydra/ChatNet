@@ -14,7 +14,7 @@
     padding: 25px 35px 30px 32px;
     overflow-x: hidden;
     overflow-y: auto;
-    background: #f7f9fd;
+    background: var(--soco-surface-page);
     color: #263956;
     scrollbar-gutter: auto;
   }
@@ -23,9 +23,9 @@
   .profile-editor-privacy-card {
     box-sizing: border-box;
     min-width: 0;
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
     border-radius: 17px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 3px 18px rgba(30,51,96,.035);
   }
   .profile-editor-form-card {
@@ -73,8 +73,8 @@
     padding: 0 12px;
     border: 1px solid #e4eaf4;
     border-radius: 10px;
-    color: #2563eb;
-    background: #fff;
+    color: var(--soco-blue);
+    background: var(--soco-surface);
     font: inherit;
     font-size: 12px;
     font-weight: 700;
@@ -90,7 +90,7 @@
     padding: 6px;
     margin: -43px 0 0 16px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--soco-surface);
   }
   .profile-editor-avatar { width: 103px; height: 103px; border-radius: 50%; font-size: 28px; }
   .profile-editor-avatar-button {
@@ -103,10 +103,10 @@
     width: 33px;
     height: 33px;
     padding: 0;
-    border: 3px solid #fff;
+    border: 3px solid var(--soco-surface);
     border-radius: 50%;
-    background: #2563eb;
-    color: #fff;
+    background: var(--soco-blue);
+    color: var(--soco-surface);
     cursor: pointer;
   }
   .profile-editor-discard,
@@ -125,8 +125,8 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  .profile-editor-discard { min-width: 154px; background: #eff3ff; color: #2563eb; }
-  .profile-editor-submit { min-width: 172px; background: #2563eb; color: #fff; }
+  .profile-editor-discard { min-width: 154px; background: #eff3ff; color: var(--soco-blue); }
+  .profile-editor-submit { min-width: 172px; background: var(--soco-blue); color: var(--soco-surface); }
   .profile-editor-submit:not(:disabled):hover { background: #1a52d4; }
   .profile-editor-discard:not(:disabled):hover { background: #e4ebff; }
   .profile-editor-preview-card > h2,
@@ -156,7 +156,7 @@
   }
   .profile-editor-privacy-row button.is-on { color: #2360d0; background: #e8efff; border-color: #d2e0ff; }
   .profile-editor-privacy-row button i { display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #c7cfdf; color: transparent; }
-  .profile-editor-privacy-row button.is-on i { color: #fff; background: #2563eb; }
+  .profile-editor-privacy-row button.is-on i { color: var(--soco-surface); background: var(--soco-blue); }
   .profile-editor-privacy-note { padding: 14px; color: #64748b; font-size: 12px; }
   .profile-editor-privacy-error button { margin-left: 10px; border: 0; color: #a11c1c; background: transparent; cursor: pointer; }
   .modern-shell.app-layout .profile-editor-page button:focus-visible { outline: 3px solid #9db9f4; outline-offset: 2px; }
@@ -181,9 +181,9 @@
     min-height: 112px;
     padding: 22px 24px;
     margin: 0 0 22px;
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
     border-radius: 16px;
-    background: #fff;
+    background: var(--soco-surface);
   }
   .profile-editor-settings-entry > div { flex: 1 1 auto; min-width: 0; }
   .profile-editor-settings-entry strong { color: #213b5c; font-size: 17px; }
@@ -193,8 +193,8 @@
     padding: 11px 17px;
     border: none;
     border-radius: 10px;
-    color: #fff;
-    background: #2563eb;
+    color: var(--soco-surface);
+    background: var(--soco-blue);
     font: inherit;
     font-size: 13px;
     font-weight: 700;

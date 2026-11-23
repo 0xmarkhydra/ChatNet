@@ -7,7 +7,7 @@
 
 .notification-button.active {
   background: #edf4ff;
-  border-color: #eff4ff;
+  border-color: var(--soco-soft-blue);
 }
 
 .push-onboarding {
@@ -46,7 +46,7 @@
   padding: 8px 12px;
   border: 1px solid #b5c7d2;
   border-radius: 8px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #193e56;
   font-size: 14px;
 }
@@ -54,7 +54,7 @@
 .push-onboarding-actions .push-onboarding-enable {
   background: #245f82;
   border-color: #245f82;
-  color: #fff;
+  color: var(--soco-surface);
 }
 
 .push-onboarding-actions button:disabled {

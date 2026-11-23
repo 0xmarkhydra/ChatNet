@@ -56,7 +56,7 @@
 .explore-tabs button.active {
   background: #4f46e5;
   border-color: #4f46e5;
-  color: #fff;
+  color: var(--soco-surface);
 }
 
 .explore-feature {
@@ -96,7 +96,7 @@
 }
 .explore-feature-content { position: relative; z-index: 1; min-width: 0; max-width: 680px; }
 .explore-feature h2 {
-  color: #fff;
+  color: var(--soco-surface);
   font-size: 26px;
   font-weight: 700;
   line-height: 1.3;
@@ -120,9 +120,9 @@
   font-size: 13px;
   font-weight: 700;
 }
-.explore-feature-primary { background: #fff; color: #3730a3; border: 1px solid #fff; }
-.explore-feature-secondary { background: transparent; color: #fff; border: 1px solid #fff; }
-.explore-feature-actions button:focus-visible { outline-color: #fff; }
+.explore-feature-primary { background: var(--soco-surface); color: #3730a3; border: 1px solid var(--soco-surface); }
+.explore-feature-secondary { background: transparent; color: var(--soco-surface); border: 1px solid var(--soco-surface); }
+.explore-feature-actions button:focus-visible { outline-color: var(--soco-surface); }
 
 .explore-topics { min-width: 0; display: grid; gap: 12px; }
 .explore-topics h2 { font-size: 18px; }
@@ -138,7 +138,7 @@
   font-size: 13px;
   font-weight: 650;
 }
-.explore-topic-list button[aria-pressed='true'] { border-color: #3730a3; background: #3730a3; color: #fff; }
+.explore-topic-list button[aria-pressed='true'] { border-color: #3730a3; background: #3730a3; color: var(--soco-surface); }
 
 .explore-content-layout {
   display: grid;
@@ -307,7 +307,7 @@
   height: 14px;
   background: #4f46e5;
   border-radius: 50%;
-  border: 3px solid #fff;
+  border: 3px solid var(--soco-surface);
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
@@ -319,7 +319,7 @@
   align-items: center;
   gap: 8px;
   background: #4f46e5;
-  color: #fff;
+  color: var(--soco-surface);
   border: 0;
   border-radius: 12px;
   font-size: 13px;
@@ -346,7 +346,7 @@
   font-size: 13px;
   font-weight: 700;
 }
-.explore-step .explore-step-primary { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+.explore-step .explore-step-primary { background: #4f46e5; color: var(--soco-surface); border-color: #4f46e5; }
 .explore-empty-community {
   border: 2px dashed #c9cbf5;
   border-radius: 18px;

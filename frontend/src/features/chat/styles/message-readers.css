@@ -134,7 +134,7 @@
   border: 0;
   border-radius: 12px;
   background: var(--soco-blue, #2563eb);
-  color: #fff;
+  color: var(--soco-surface);
   font: inherit;
   font-weight: 600;
   cursor: pointer;

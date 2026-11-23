@@ -1,7 +1,7 @@
 .connection-dialog {
   width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 32px);
   padding: 20px; border: 1px solid #dbe2de; border-radius: 8px;
-  background: #fff; color: #172b24; overflow: auto; box-sizing: border-box;
+  background: var(--soco-surface); color: #172b24; overflow: auto; box-sizing: border-box;
   box-shadow: 0 16px 60px #102d2333;
 }
 .connection-dialog::backdrop { background: #14231c80; }
@@ -13,7 +13,7 @@
 .connection-dialog button:disabled { opacity: .5; cursor: wait; }
 .connection-segments { display: flex; gap: 4px; background: #edf2ef; padding: 4px; border-radius: 6px; margin-bottom: 20px; }
 .connection-segments button { flex: 1; border: 0; border-radius: 4px; background: transparent; font-weight: 600; }
-.connection-segments button[aria-pressed="true"] { background: #fff; color: #08683f; box-shadow: 0 1px 4px #172b2420; }
+.connection-segments button[aria-pressed="true"] { background: var(--soco-surface); color: #08683f; box-shadow: 0 1px 4px #172b2420; }
 .qr-identity { text-align: center; display: grid; gap: 6px; }
 .qr-identity > strong { font-size: 20px; overflow-wrap: anywhere; }
 .qr-identity > span { color: #61726a; overflow-wrap: anywhere; }
@@ -45,7 +45,7 @@
 .chat-friend-bar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 8px 16px; padding: 8px 16px; flex: 0 0 auto; border-bottom: 1px solid #dce4df;
-  background: #fff; color: #54635b; font-size: 13px; letter-spacing: 0;
+  background: var(--soco-surface); color: #54635b; font-size: 13px; letter-spacing: 0;
 }
 .chat-friend-bar > span { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
 .chat-friend-bar svg { flex-shrink: 0; }

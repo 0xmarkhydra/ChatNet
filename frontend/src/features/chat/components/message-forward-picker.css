@@ -14,7 +14,7 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: 18px;
-  background: #fff;
+  background: var(--soco-surface);
   box-shadow: 0 22px 64px rgba(12, 34, 66, .26);
 }
 .chat-forward-header {
@@ -54,7 +54,7 @@
   box-sizing: border-box; width: 100%; min-height: 60px;
   display: flex; align-items: center; gap: 12px;
   padding: 8px; border: none; border-radius: 10px;
-  background: #fff; color: #273a57; text-align: left;
+  background: var(--soco-surface); color: #273a57; text-align: left;
   cursor: pointer; font: inherit;
 }
 .chat-forward-recipient:hover:not(:disabled) { background: #eef3ff; }

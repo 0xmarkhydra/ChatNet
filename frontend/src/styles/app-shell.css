@@ -14,7 +14,7 @@
     margin: 0;
     padding: 0 0 0 76px;
     overflow: hidden;
-    background: #f7f9fd;
+    background: var(--soco-surface-page);
   }
 
   .app-sidebar {
@@ -43,8 +43,8 @@
   .app-sidebar::before {
     z-index: 0;
     box-sizing: border-box;
-    border-right: 1px solid #e8ecf5;
-    background: #fff;
+    border-right: 1px solid var(--soco-border-subtle);
+    background: var(--soco-surface);
     pointer-events: none;
     transition: width .24s cubic-bezier(.2, .8, .2, 1), box-shadow .24s ease;
   }
@@ -73,7 +73,7 @@
     width: 48px;
     height: 48px;
     border-radius: 15px;
-    background: linear-gradient(135deg, #2563eb, #8056e8);
+    background: linear-gradient(135deg, var(--soco-blue), #8056e8);
     box-shadow: 0 8px 17px rgba(37, 99, 235, .14);
   }
 
@@ -153,7 +153,7 @@
   }
   .app-sidebar-link svg { flex: 0 0 auto; }
   .app-sidebar-link:hover { background: #f4f7fd; color: #315cc2; }
-  .app-sidebar-link.is-active { background: #eff3ff; color: #2563eb; font-weight: 750; }
+  .app-sidebar-link.is-active { background: #eff3ff; color: var(--soco-blue); font-weight: 750; }
   .modern-shell.app-layout .app-sidebar-nav > .app-sidebar-link.is-active { background: transparent; }
   .modern-shell.app-layout .app-sidebar-nav .sidebar-liquid-pill {
     position: absolute;
@@ -209,7 +209,7 @@
     place-items: center;
     border-radius: 10px;
     padding: 0 5px;
-    color: #fff;
+    color: var(--soco-surface);
     background: #466ee4;
     font-size: 10px;
     line-height: 1;
@@ -225,7 +225,7 @@
     pointer-events: none;
     margin: 11px 0 12px;
     padding-top: 12px;
-    border-top: 1px solid #e8ecf5;
+    border-top: 1px solid var(--soco-border-subtle);
   }
   .app-sidebar-secondary .app-sidebar-link { min-height: 44px; padding-inline: 18px; font-size: 13px; }
   .app-sidebar:is(:hover, :has(:focus-visible)) .app-sidebar-secondary { width: 232px; }
@@ -243,7 +243,7 @@
     border: none;
     border-radius: 13px;
     padding: 8px 6px;
-    background: #f8fafe;
+    background: var(--soco-surface-input);
     color: #223350;
     text-align: left;
   }
@@ -288,10 +288,10 @@
     margin: 0;
     padding: 0 28px 0 34px;
     border: none;
-    border-bottom: 1px solid #e8ecf5;
+    border-bottom: 1px solid var(--soco-border-subtle);
     border-radius: 0;
     box-shadow: none;
-    background: #fff;
+    background: var(--soco-surface);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -300,13 +300,13 @@
   .modern-shell.app-layout .app-page-heading small { margin-top: 6px; color: #7282a0; font-size: 12px; white-space: nowrap; }
   .modern-shell.app-layout .appbar-brand { display: none; }
   .modern-shell.app-layout > .chatnet-appbar .appbar-search-anchor { flex: 0 1 321px; width: min(32vw, 321px); margin-left: auto; min-width: 0; }
-  .modern-shell.app-layout > .chatnet-appbar .appbar-search { width: 100%; min-width: 0; height: 46px; min-height: 46px; margin: 0; border: 1px solid #e8ecf5; border-radius: 12px; box-shadow: none; background: #f8fafe; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-search { width: 100%; min-width: 0; height: 46px; min-height: 46px; margin: 0; border: 1px solid var(--soco-border-subtle); border-radius: 12px; box-shadow: none; background: var(--soco-surface-input); }
   .modern-shell.app-layout > .chatnet-appbar .appbar-actions { display: flex; align-items: center; flex: 0 0 auto; gap: 12px; margin-left: 0; }
-  .modern-shell.app-layout > .chatnet-appbar .appbar-icon-button { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: #6d7d99; background: #f8fafe; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-icon-button { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: #6d7d99; background: var(--soco-surface-input); }
   .modern-shell.app-layout > .chatnet-appbar .appbar-icon-button:hover { color: #315cce; background: #e3eafe; }
   .modern-shell.app-layout > .chatnet-appbar .appbar-icon-button:focus-visible,
   .modern-shell.app-layout > .chatnet-appbar .app-header-account:focus-visible { outline: 3px solid #9bb7fa; outline-offset: 2px; }
-  .modern-shell.app-layout > .chatnet-appbar .app-header-account { display: grid; flex: 0 0 43px; place-items: center; width: 43px; height: 43px; padding: 0; border: none; border-radius: 50%; background: #2563eb; cursor: pointer; }
+  .modern-shell.app-layout > .chatnet-appbar .app-header-account { display: grid; flex: 0 0 43px; place-items: center; width: 43px; height: 43px; padding: 0; border: none; border-radius: 50%; background: var(--soco-blue); cursor: pointer; }
   .modern-shell.app-layout > .chatnet-appbar .app-header-avatar { display: grid; width: 43px; height: 43px; border-radius: 50%; }
   .modern-shell.app-layout > .chatnet-appbar .appbar-icon-button.notification-appbar { position: relative; }
 
@@ -318,7 +318,7 @@
     width: 100%;
     border: 0;
     border-radius: 0;
-    background: #f7f9fd;
+    background: var(--soco-surface-page);
     box-shadow: none;
   }
 
@@ -331,15 +331,15 @@
     width: 100%;
     height: 100%;
     padding: 10px;
-    background: #f7f9fd;
+    background: var(--soco-surface-page);
   }
   .modern-shell.app-layout .conversation-sidebar,
   .modern-shell.app-layout .conversation-panel {
     min-width: 0;
     min-height: 0;
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
     border-radius: 16px;
-    background: #fff;
+    background: var(--soco-surface);
     overflow: hidden;
     box-shadow: 0 3px 20px rgba(30, 51, 96, .035);
   }
@@ -402,7 +402,7 @@
   min-height: 100%;
   padding: 30px 24px 20px;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--soco-surface);
   box-shadow: -12px 0 36px rgba(28, 48, 91, .13);
   overflow-y: auto;
 }
@@ -412,7 +412,7 @@
   justify-content: space-between;
   gap: 18px;
   padding: 0 4px 22px;
-  border-bottom: 1px solid #e8ecf5;
+  border-bottom: 1px solid var(--soco-border-subtle);
 }
 .app-eyebrow {
   color: #6b82bc;
@@ -441,7 +441,7 @@
   border: 1px solid #e3e9f4;
   border-radius: 11px;
   color: #667994;
-  background: #fff;
+  background: var(--soco-surface);
   cursor: pointer;
 }
 .app-close-button:hover { color: #2e5ecf; background: #f4f7ff; }
@@ -478,7 +478,7 @@
   border: 1px solid #edf0f6;
   border-radius: 14px;
   color: #213454;
-  background: #fff;
+  background: var(--soco-surface);
   text-align: left;
 }
 .app-notification-item.is-button { cursor: pointer; }
@@ -504,7 +504,7 @@
   padding: 6px 10px;
   border: 0;
   border-radius: 8px;
-  color: #fff;
+  color: var(--soco-surface);
   background: #3468d7;
   font-size: 11px;
   font-weight: 750;
@@ -537,7 +537,7 @@
   margin-top: auto;
   padding: 15px 2px 3px;
   border: 0;
-  border-top: 1px solid #e8ecf5;
+  border-top: 1px solid var(--soco-border-subtle);
   color: #3166d3;
   background: transparent;
   font-size: 12px;
@@ -576,9 +576,9 @@
     min-width: 0;
     min-height: 0;
     padding: 20px 17px 22px;
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
     border-radius: 16px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 3px 20px rgba(30, 51, 96, .035);
     overflow-y: auto;
   }
@@ -639,7 +639,7 @@
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 5px;
   padding-bottom: 25px;
-  border-bottom: 1px solid #e8ecf5;
+  border-bottom: 1px solid var(--soco-border-subtle);
 }
 .conversation-info-panel-actions .call-header-actions {
   display: grid;
@@ -712,7 +712,7 @@
   height: 100%;
   padding: 24px clamp(16px, 2.6vw, 38px) 32px;
   overflow: auto;
-  background: #f7f9fd;
+  background: var(--soco-surface-page);
   color: #223451;
 }
 .communication-hub-heading {
@@ -749,7 +749,7 @@
   padding: 0 18px;
   border: 0;
   border-radius: 11px;
-  background: #2563eb;
+  background: var(--soco-blue);
   color: white;
   font: inherit;
   font-size: 12px;
@@ -763,9 +763,9 @@
   box-sizing: border-box;
   min-width: 0;
   align-self: start;
-  border: 1px solid #e8ecf5;
+  border: 1px solid var(--soco-border-subtle);
   border-radius: 16px;
-  background: #fff;
+  background: var(--soco-surface);
   box-shadow: 0 3px 20px rgba(30,51,96,.035);
 }
 .communication-hub-list { padding: 26px; }
@@ -781,7 +781,7 @@
   min-height: 45px;
   border: 1px solid #e8edf7;
   border-radius: 12px;
-  background: #f8fafe;
+  background: var(--soco-surface-input);
   color: #7c8da9;
 }
 .communication-hub-search:focus-within { border-color: #96b5fa; }
@@ -793,7 +793,7 @@
 .communication-hub-row {
   display: flex; align-items: center; gap: 13px;
   min-width: 0; min-height: 86px; padding: 12px;
-  border: 1px solid #edf1f8; border-radius: 13px; background: #fff;
+  border: 1px solid #edf1f8; border-radius: 13px; background: var(--soco-surface);
 }
 .communication-hub-avatar { flex: 0 0 49px; width: 49px; height: 49px; border-radius: 50%; }
 .communication-hub-row-copy { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; gap: 5px; }
@@ -872,11 +872,11 @@
   .modern-shell.app-layout .appbar-feed-tabs {
     display: flex; align-items: center; justify-content: center; gap: 3px;
     width: max-content; max-width: 100%; min-width: 0;
-    padding: 3px; border: 1px solid #e8ecf7; border-radius: 12px; background: #fff;
+    padding: 3px; border: 1px solid var(--soco-line); border-radius: 12px; background: var(--soco-surface);
   }
   .modern-shell.app-layout .appbar-feed-tabs button {
     min-height: 36px; padding: 0 14px; border: 0; border-radius: 9px;
-    background: transparent; color: #697894; font: inherit; font-size: 13px;
+    background: transparent; color: var(--soco-muted); font: inherit; font-size: 13px;
     font-weight: 600; white-space: nowrap; cursor: pointer;
   }
   .modern-shell.app-layout .appbar-feed-tabs .appbar-feed-active-pill {
@@ -893,10 +893,10 @@
   .modern-shell.app-layout > .chatnet-appbar .appbar-primary-action {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     width: auto; min-width: 44px; padding: 0 16px; border-radius: 10px;
-    background: linear-gradient(115deg,#1769f8,#6a5cf6); color: #fff;
+    background: linear-gradient(115deg,#1769f8,#6a5cf6); color: var(--soco-surface);
   }
   .modern-shell.app-layout > .chatnet-appbar .appbar-primary-action:hover {
-    background: linear-gradient(115deg,#1256cc,#5545d4); color: #fff;
+    background: linear-gradient(115deg,#1256cc,#5545d4); color: var(--soco-surface);
   }
   .modern-shell.app-layout .appbar-action-label { font-size: 13px; font-weight: 650; }
   .modern-shell.app-layout > .chatnet-appbar .appbar-primary-action {
@@ -908,8 +908,8 @@
   }
   .modern-shell.app-layout > .chatnet-appbar .appbar-qr-action svg { width: 20px; height: 20px; }
   .modern-shell.app-layout > .chatnet-appbar .appbar-search svg { width: 19px; height: 19px; }
-  .modern-shell.app-layout > .chatnet-appbar .appbar-search input { color: #17233d; font-size: 13px; }
-  .modern-shell.app-layout > .chatnet-appbar .appbar-search input::placeholder { color: #697894; opacity: 1; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-search input { color: var(--soco-text); font-size: 13px; }
+  .modern-shell.app-layout > .chatnet-appbar .appbar-search input::placeholder { color: var(--soco-muted); opacity: 1; }
 }
 @media (max-width: 760px) {
   .chatnet-appbar > .appbar-start,
