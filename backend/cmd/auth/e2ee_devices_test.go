@@ -117,6 +117,26 @@ func TestE2EEFeatureDisabledByDefault(t *testing.T) {
 	}
 }
 
+func TestE2EEManualEndpointsDisabledWhenAutoDefaultEnabled(t *testing.T) {
+	t.Setenv("CHATNET_E2EE_EXPERIMENTAL", "1")
+	t.Setenv("CHATNET_E2EE_AUTO_DEFAULT", "1")
+	s := &server{}
+	for _, test := range []struct {
+		handler http.HandlerFunc
+		method  string
+	}{
+		{s.newE2EEChallenge, http.MethodPost},
+		{s.registerE2EEDevice, http.MethodPost},
+		{s.listE2EEDevices, http.MethodGet},
+	} {
+		w := httptest.NewRecorder()
+		test.handler(w, httptest.NewRequest(test.method, "/", nil))
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("manual E2EE endpoint available in auto mode: %s %d", test.method, w.Code)
+		}
+	}
+}
+
 // Opt-in integration: never mutate a shared production DB.
 func TestE2EEDeviceDirectoryIntegration(t *testing.T) {
 	dbURL, redisAddr := os.Getenv("CHATNET_TEST_DATABASE_URL"), os.Getenv("CHATNET_TEST_REDIS_ADDR")

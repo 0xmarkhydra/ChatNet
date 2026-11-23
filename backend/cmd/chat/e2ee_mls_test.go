@@ -129,6 +129,26 @@ func TestMLSRelayEndpointsDisabledByDefault(t *testing.T) {
 	}
 }
 
+func TestMLSSetupEndpointsDisabledWhenAutoDefaultEnabled(t *testing.T) {
+	t.Setenv("CHATNET_E2EE_EXPERIMENTAL", "1")
+	t.Setenv("CHATNET_E2EE_AUTO_DEFAULT", "1")
+	s := &server{}
+	for _, test := range []struct {
+		handler http.HandlerFunc
+		method  string
+	}{
+		{s.approveMLSPilot, http.MethodPost},
+		{s.getMLSPilotConsents, http.MethodGet},
+		{s.bootstrapMLSConversation, http.MethodPost},
+	} {
+		w := httptest.NewRecorder()
+		test.handler(w, httptest.NewRequest(test.method, "/", nil))
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("MLS endpoint available in auto mode: %s %d", test.method, w.Code)
+		}
+	}
+}
+
 func TestMLSRelayThreeAccountsIntegration(t *testing.T) {
 	url, redisAddr := os.Getenv("CHATNET_TEST_DATABASE_URL"), os.Getenv("CHATNET_TEST_REDIS_ADDR")
 	if url == "" || redisAddr == "" {
@@ -490,6 +510,19 @@ func TestMLSRelayThreeAccountsIntegration(t *testing.T) {
 	// reject plaintext before any MLS group has been established, while
 	// leaving old legacy history untouched and eligible for legacy sends.
 	t.Setenv("CHATNET_E2EE_AUTO_DEFAULT", "1")
+	manualStatus := send(0, directBase+"/status", nil, "GET")
+	if manualStatus.Code != 200 ||
+		!strings.Contains(manualStatus.Body.String(), `"mode":"e2ee"`) ||
+		!strings.Contains(manualStatus.Body.String(), `"autoEnabled":false`) {
+		t.Fatalf("manual MLS room status changed under auto-default: %d %s", manualStatus.Code, manualStatus.Body.String())
+	}
+	manualEvents := send(0, directBase+"/events?deviceId="+devices[0].id, nil, "GET")
+	if manualEvents.Code != 200 || !strings.Contains(manualEvents.Body.String(), `"currentEpoch":1`) {
+		t.Fatalf("established manual MLS room could not read events under auto-default: %d %s", manualEvents.Code, manualEvents.Body.String())
+	}
+	if result := send(0, directBase+"/events", directEvent("application", ""), "POST"); result.Code != http.StatusCreated {
+		t.Fatalf("established manual MLS room could not publish under auto-default: %d %s", result.Code, result.Body.String())
+	}
 	var freshID int64
 	if err := db.QueryRow(ctx, `
 		INSERT INTO conversations(type,created_by,direct_key)
@@ -508,6 +541,18 @@ func TestMLSRelayThreeAccountsIntegration(t *testing.T) {
 	if result := send(0, freshStatus, nil, "GET"); result.Code != 200 ||
 		!strings.Contains(result.Body.String(), `"autoEnabled":true`) {
 		t.Fatalf("new direct room not selected for automatic E2EE: %d %s", result.Code, result.Body.String())
+	}
+	freshEventPath := fmt.Sprintf("/api/conversations/%d/e2ee/events", freshID)
+	if result := send(0, freshEventPath+"?deviceId="+devices[0].id, nil, "GET"); result.Code != http.StatusNotFound {
+		t.Fatalf("new automatic room exposed MLS events before bootstrap: %d %s", result.Code, result.Body.String())
+	}
+	freshCommit := signedMLSEvent(t, users[0], freshID, 1, devices[0].id, "commit", "", devices[0].key)
+	if result := send(0, freshEventPath, freshCommit, "POST"); result.Code != http.StatusNotFound {
+		t.Fatalf("new automatic room accepted MLS event before bootstrap: %d %s", result.Code, result.Body.String())
+	}
+	var freshGroupCount int
+	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM e2ee_mls_groups WHERE conversation_id=$1", freshID).Scan(&freshGroupCount); err != nil || freshGroupCount != 0 {
+		t.Fatalf("blocked automatic MLS write created a group: count=%d err=%v", freshGroupCount, err)
 	}
 	if result := send(0, freshMessages, map[string]any{
 		"text": "CANNOT LEAK", "clientId": testMLSUUID(t),

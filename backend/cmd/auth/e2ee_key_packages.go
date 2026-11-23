@@ -87,7 +87,7 @@ func decodeE2EEPublish(w http.ResponseWriter, r *http.Request) (e2eePackagePubli
 // validate the KeyPackage signature, credential binding, protocol version and ciphersuite
 // before using it to add a device. Transport authorization is not MLS validation.
 func (s *server) publishE2EEKeyPackage(w http.ResponseWriter, r *http.Request) {
-	if !e2eeExperimental(w) {
+	if !e2eeManualEnabled(w) {
 		return
 	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
@@ -205,7 +205,7 @@ func decodeE2EEClaim(w http.ResponseWriter, r *http.Request) (e2eePackageClaim, 
 }
 
 func (s *server) claimE2EEKeyPackage(w http.ResponseWriter, r *http.Request) {
-	if !e2eeExperimental(w) {
+	if !e2eeManualEnabled(w) {
 		return
 	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
