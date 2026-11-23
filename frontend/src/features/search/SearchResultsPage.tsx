@@ -161,7 +161,8 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
     <section className={page} aria-label="Kết quả tìm kiếm">
       <div className="grid min-h-full grid-cols-[340px_minmax(0,1fr)] max-xl:grid-cols-[300px_minmax(0,1fr)] max-lg:block">
         <aside className="flex min-w-0 flex-col gap-ui-3 border-r border-border bg-card p-ui-4 max-lg:hidden" aria-label="Tìm kiếm và bộ lọc">
-          <h1 className="sr-only">Kết quả tìm kiếm</h1>
+          {/* Legacy global h1 rules are unlayered, so these utilities need the important modifier. */}
+          <h1 className="m-0! text-[length:var(--soco-type-page)]! font-bold text-foreground">Kết quả tìm kiếm</h1>
           <SearchForm key={'desktop' + query + type} suggest={suggest} initialQuery={query} placeholder={PLACEHOLDER[type]} onSubmit={submit} />
           <SearchFilterPanel {...panelProps} />
         </aside>
