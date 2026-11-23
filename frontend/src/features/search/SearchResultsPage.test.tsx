@@ -120,7 +120,7 @@ it('explains filtered empty results and clears filters from the empty state', as
   const view = await mount(routes(), '/search?q=thi%E1%BA%BFt&type=people&status=online')
   expect(view.host.textContent).toContain('Alice Nguyễn')
   const offline = await mount(routes({ '/api/users/search': () => ok([people[1]]) }), '/search?q=bob&type=people&status=online')
-  expect(offline.host.textContent).toContain('Không tìm thấy kết quả cho “bob”')
+  expect(offline.host.textContent).toContain('Không có kết quả cho “bob”')
   expect(offline.host.textContent).toContain('1 bộ lọc đang thu hẹp kết quả')
   await offline.click(offline.button('Bỏ bộ lọc'))
   expect(offline.route()).toBe('?q=bob&type=people')
@@ -205,4 +205,44 @@ it('starts a scoped search from the home scope select', async () => {
   })
   await act(async () => { input.form?.requestSubmit() })
   expect(view.route()).toBe('?type=posts&q=figma')
+})
+
+function type(input: HTMLInputElement, value: string) {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+it('suggests past searches, people and communities while typing, and opens a person', async () => {
+  stored.set('socco.search.v1:session-' + (sessionNumber + 1), JSON.stringify({ recent: ['thiết kế logo', 'bàn phím'], saved: [], opened: [] }))
+  const view = await mount(routes(), '/search')
+  const input = view.host.querySelector('input[type="search"]') as HTMLInputElement
+  await act(async () => { input.focus(); type(input, 'thiết') })
+  await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+  const options = [...view.host.querySelectorAll('[role="option"]')].map(option => option.textContent)
+  expect(options[0]).toBe('thiếtEnter')
+  expect(options).toContain('thiết kế logoĐã tìm trước đây')
+  expect(options.some(text => text?.includes('Alice Nguyễn'))).toBe(true)
+  expect(options.some(text => text?.includes('1.200 thành viên'))).toBe(true)
+  expect(input.getAttribute('aria-expanded')).toBe('true')
+
+  await act(async () => { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })) })
+  await act(async () => { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+  expect(view.host.querySelector('[role="listbox"]')).toBeNull()
+
+  await act(async () => { type(input, 'alice') })
+  await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+  const person = [...view.host.querySelectorAll('[role="option"]')].find(option => option.textContent?.includes('Alice Nguyễn'))
+  await view.click(person)
+  expect(view.props.onOpenProfile).toHaveBeenCalledWith('alice')
+})
+
+it('offers an accent-insensitive correction and recent searches when nothing matches', async () => {
+  stored.set('socco.search.v1:session-' + (sessionNumber + 1), JSON.stringify({ recent: ['thiết kế UI', 'figma'], saved: [], opened: [] }))
+  const empty = routes({ '/api/users/search': () => ok([]), '/api/groups/public': () => ok([]), '/api/marketplace/products': () => ok({ products: [] }), '/api/posts': () => ok([]) })
+  const view = await mount(empty, '/search?q=thiet%20ke%20UI')
+  expect(view.host.textContent).toContain('Không có kết quả cho “thiet ke UI”')
+  expect(view.host.textContent).toContain('Mẹo: kiểm tra chính tả')
+  expect(view.button('figma')).toBeTruthy()
+  await view.click(view.button('thiết kế UI'))
+  expect(view.route()).toContain('q=thi%E1%BA%BFt+k%E1%BA%BF+UI')
 })

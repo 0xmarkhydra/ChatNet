@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, BellRing, ChevronLeft, Search, SlidersHorizontal, X } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
@@ -7,9 +7,10 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/shared/
 import { usePostSearch } from '../feed'
 import type { ApiRequest } from '../../shared/types/api'
 import { listRecentProducts, searchCommunities, searchPeople } from './api/search'
+import type { SuggestConfig } from './hooks/useSuggestions'
 import { useRemoteList } from './hooks/useRemoteList'
 import {
-  FILTER_GROUPS, SEARCH_TYPES, activeFilters, effectiveFilters, filterCommunities, filterPeople, filterPosts, filterProducts,
+  FILTER_GROUPS, SEARCH_TYPES, activeFilters, foldText, effectiveFilters, filterCommunities, filterPeople, filterPosts, filterProducts,
   parseFilters, parsePrice, parseType, type FilterId, type SearchType,
 } from './lib/searchFilters'
 import {
@@ -36,7 +37,7 @@ const PLACEHOLDER: Record<SearchType, string> = {
   products: 'Tìm sản phẩm trên Marketplace…',
 }
 const page = 'min-h-full w-full min-w-0 overflow-x-clip bg-background text-foreground'
-const activeChip = 'inline-flex min-h-8 cursor-pointer items-center gap-ui-1 rounded-full border-0 bg-secondary py-0 pr-ui-2 pl-ui-3 text-[length:var(--soco-type-label)]! font-semibold! text-primary max-lg:min-h-11'
+const activeChip = 'inline-flex min-h-8 cursor-pointer items-center gap-ui-1 rounded-full border-0 bg-card py-0 pr-ui-2 pl-ui-3 shadow-ui-sm text-[length:var(--soco-type-label)]! font-semibold! text-primary max-lg:min-h-11'
 const FILTER_KEYS = [...Object.keys(FILTER_GROUPS), 'range', 'min', 'max']
 
 export default function SearchResultsPage({ request, sessionId, onOpenProfile, onOpenPost }: SearchResultsPageProps) {
@@ -75,6 +76,10 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
   const products = useRemoteList(wants('products') ? JSON.stringify([sessionId, 'products']) : '',
     signal => listRecentProducts(request, signal), 'Không thể tải sản phẩm. Hãy thử lại.')
 
+  const foldedQuery = foldText(query)
+  const pastQueries = useMemo(() => [...history.saved.map(item => item.query), ...history.recent], [history])
+  const suggestion = query ? pastQueries.find(item => item !== query && foldText(item) === foldedQuery) : undefined
+  const recentQueries = history.recent.filter(item => item !== query).slice(0, 6)
   const chips = activeFilters(type, values)
   const priceActive = parsePrice(minPrice) !== null || parsePrice(maxPrice) !== null
   const activeCount = chips.length + Number(priceActive)
@@ -112,6 +117,12 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
     startSearch(value)
   }
   const recordOpened = (item: OpenedResult) => updateHistory(sessionId, current => addOpened(current, item))
+  const suggest: SuggestConfig = {
+    history, request, sessionId,
+    onQuery: value => startSearch(value, type === 'all' ? {} : { type }),
+    onPerson: (username, title) => { recordOpened({ kind: 'person', username, title }); onOpenProfile(username) },
+    onCommunity: name => startSearch(name, { type: 'communities' }),
+  }
   const openOpened = (item: OpenedResult) => {
     recordOpened(item)
     if (item.kind === 'person') onOpenProfile(item.username)
@@ -122,7 +133,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
   if (isHome) {
     return (
       <section className={page} aria-label="Tìm kiếm">
-        <SearchHome history={history} request={request} sessionId={sessionId}
+        <SearchHome history={history} request={request} sessionId={sessionId} suggest={suggest}
           onSearch={startSearch} onOpenSaved={openSaved} onOpenOpened={openOpened}
           onRemoveRecent={value => updateHistory(sessionId, current => removeRecent(current, value))}
           onClearRecent={() => updateHistory(sessionId, current => ({ ...current, recent: [] }))}
@@ -151,7 +162,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
       <div className="grid min-h-full grid-cols-[340px_minmax(0,1fr)] max-xl:grid-cols-[300px_minmax(0,1fr)] max-lg:block">
         <aside className="flex min-w-0 flex-col gap-ui-3 border-r border-border bg-card p-ui-4 max-lg:hidden" aria-label="Tìm kiếm và bộ lọc">
           <h1 className="sr-only">Kết quả tìm kiếm</h1>
-          <SearchForm key={'desktop' + query + type} initialQuery={query} placeholder={PLACEHOLDER[type]} onSubmit={submit} />
+          <SearchForm key={'desktop' + query + type} suggest={suggest} initialQuery={query} placeholder={PLACEHOLDER[type]} onSubmit={submit} />
           <SearchFilterPanel {...panelProps} />
         </aside>
 
@@ -160,7 +171,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
             <div className="flex items-center gap-ui-2">
               <button type="button" aria-label="Quay lại" className={cn(plainButton, 'inline-grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted')}
                 onClick={goBack}><ChevronLeft size={22} aria-hidden="true" /></button>
-              <SearchForm key={'mobile' + query + type} className="flex-1" initialQuery={query} placeholder={PLACEHOLDER[type]} onSubmit={submit} />
+              <SearchForm key={'mobile' + query + type} suggest={suggest} className="flex-1" initialQuery={query} placeholder={PLACEHOLDER[type]} onSubmit={submit} />
               <button type="button" className={cn(plainButton, 'relative inline-grid size-11 shrink-0 place-items-center rounded-full bg-muted')} onClick={() => setFiltersOpen(true)} aria-label={'Bộ lọc' + (activeCount ? ', ' + activeCount + ' đang bật' : '')}>
                 <SlidersHorizontal size={18} aria-hidden="true" />
                 {activeCount > 0 && <span className="absolute top-0.5 right-0.5 h-4.5 min-w-4.5 rounded-full bg-primary px-ui-1 text-center text-[length:var(--soco-type-caption)] leading-4.5 font-bold text-primary-foreground">{activeCount}</span>}
@@ -207,6 +218,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
                 items: filterPosts(posts.posts, values, openedAt), loading: posts.loading, error: posts.error, retry: posts.retry,
                 hasMore: posts.hasMore, loadingMore: posts.loadingMore, loadMore: () => void posts.loadMore(),
               }}
+              suggestion={suggestion} recentQueries={recentQueries} onSearch={value => startSearch(value, type === 'all' ? {} : { type })}
               onType={setType} onResetFilters={resetFilters} onOpenProfile={onOpenProfile} onOpenPost={onOpenPost} onOpened={recordOpened} />
           ) : (
             <div className={cn(card, 'grid justify-items-center gap-ui-2 px-ui-5 py-ui-8 text-center')}>
@@ -223,9 +235,12 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
           <DialogTitle>Bộ lọc</DialogTitle>
           <DialogDescription className="sr-only">Thu hẹp kết quả tìm kiếm theo loại và tiêu chí.</DialogDescription>
           <SearchFilterPanel {...panelProps} showTypes={false} />
-          <Button className="h-11 w-full" onClick={() => setFiltersOpen(false)}>
-            {activeCount ? 'Áp dụng ' + activeCount + ' bộ lọc' : 'Xem kết quả'}
-          </Button>
+          <div className="flex gap-ui-2">
+            {activeCount > 0 && <Button variant="secondary" className="h-11 text-primary" onClick={resetFilters}>Đặt lại</Button>}
+            <Button className="h-11 flex-1" onClick={() => setFiltersOpen(false)}>
+              {activeCount ? 'Áp dụng ' + activeCount + ' bộ lọc' : 'Xem kết quả'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </section>

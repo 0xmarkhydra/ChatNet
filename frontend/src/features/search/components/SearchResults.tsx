@@ -30,6 +30,11 @@ export type SearchResultsProps = {
   onOpenProfile: (username: string) => void
   onOpenPost: (postId: number) => void
   onOpened: (item: OpenedResult) => void
+  /** A past search of the user's that matches the query without accents or case, offered as a correction. */
+  suggestion?: string
+  /** The user's other recent searches, offered when nothing matches. */
+  recentQueries: string[]
+  onSearch: (query: string) => void
 }
 
 const row = 'flex items-center gap-ui-3 py-ui-2 [&+&]:border-t [&+&]:border-border max-sm:flex-wrap'
@@ -92,18 +97,41 @@ export default function SearchResults(props: SearchResultsProps) {
 
   if (noResults) {
     return (
-      <section className={cn(card, 'grid justify-items-center gap-ui-2 px-ui-5 py-ui-8 text-center')} aria-live="polite">
-        <span className={emptyIcon} aria-hidden="true"><SearchX size={28} /></span>
-        <h2 className="m-0 text-[length:var(--soco-type-section)] font-bold [overflow-wrap:anywhere] text-foreground">Không tìm thấy kết quả cho “{query}”</h2>
-        <p className="m-0 max-w-105 text-[length:var(--soco-type-body)] text-muted-foreground">Hãy kiểm tra chính tả, thử từ khóa ngắn hơn hoặc tìm ở loại kết quả khác.</p>
-        {props.activeFilterCount > 0 && (
-          <div className="mt-ui-2 flex w-full max-w-110 items-center justify-between gap-ui-3 rounded-ui-sm bg-muted p-ui-3 text-left text-[length:var(--soco-type-label)] max-sm:flex-col max-sm:items-stretch max-sm:text-center">
-            <span>{props.activeFilterCount} bộ lọc đang thu hẹp kết quả</span>
-            <Button size="sm" className={touchButton} onClick={props.onResetFilters}>Bỏ bộ lọc</Button>
-          </div>
+      <div className="flex flex-col gap-ui-3">
+        <section className={cn(card, 'grid justify-items-center gap-ui-2 px-ui-6 pt-ui-8 pb-ui-6 text-center')} aria-live="polite">
+          <span className={cn(emptyIcon, 'mb-ui-1 size-16')} aria-hidden="true"><SearchX size={28} /></span>
+          <h2 className="m-0 text-[length:var(--soco-type-page)] font-bold [overflow-wrap:anywhere] text-foreground">Không có kết quả cho “{query}”</h2>
+          {props.suggestion && (
+            <p className="m-0 text-[length:var(--soco-type-body)] text-foreground/80">
+              Có phải bạn muốn tìm <button type="button" className={cn(link, 'font-bold!')} onClick={() => props.onSearch(props.suggestion ?? '')}>{props.suggestion}</button>?
+            </p>
+          )}
+          {props.activeFilterCount > 0 && (
+            <div className="mt-ui-4 flex w-full items-center gap-ui-3 rounded-ui-sm bg-muted px-ui-4 py-ui-3 text-left max-sm:flex-col max-sm:items-stretch max-sm:text-center">
+              <div className="min-w-0 flex-1">
+                <p className="m-0 text-[length:var(--soco-type-body)] font-semibold text-foreground">{props.activeFilterCount} bộ lọc đang thu hẹp kết quả</p>
+                <p className="m-0 mt-0.5 text-[length:var(--soco-type-label)] text-muted-foreground">Bỏ lọc để xem thêm kết quả ở mọi nơi</p>
+              </div>
+              <Button variant="secondary" size="sm" className={cn(touchButton, 'text-primary')} onClick={props.onResetFilters}>Bỏ bộ lọc</Button>
+            </div>
+          )}
+          {!all && <Button variant="secondary" size="sm" className={cn(touchButton, 'mt-ui-2 text-primary')} onClick={() => props.onType('all')}>Tìm trong tất cả</Button>}
+          <p className="m-0 mt-ui-2 text-[length:var(--soco-type-label)] text-muted-foreground">Mẹo: kiểm tra chính tả, gõ có dấu hoặc dùng từ khóa ngắn hơn.</p>
+        </section>
+        {props.recentQueries.length > 0 && (
+          <section className={card} aria-label="Tìm kiếm gần đây">
+            <h2 className={cn(cardTitle, 'mb-ui-3')}>Tìm kiếm gần đây</h2>
+            <ul className="m-0 flex list-none flex-wrap gap-ui-2 p-0">
+              {props.recentQueries.map(recent => (
+                <li key={recent}>
+                  <button type="button" className={cn(plainButton, 'inline-flex h-9 items-center rounded-full bg-border px-ui-4 text-[length:var(--soco-type-body)]! font-medium! hover:bg-border/70 max-lg:h-11')}
+                    onClick={() => props.onSearch(recent)}>{recent}</button>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
-        {!all && <Button variant="secondary" size="sm" className={touchButton} onClick={() => props.onType('all')}>Tìm trong tất cả</Button>}
-      </section>
+      </div>
     )
   }
 
