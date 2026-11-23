@@ -55,10 +55,25 @@ func TestCORSPreflight(t *testing.T) {
 			if got := response.Header().Get("Access-Control-Allow-Origin"); got != "https://chat.codelocal.cloud" {
 				t.Fatalf("unexpected allowed origin %q", got)
 			}
+			if got := response.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+				t.Fatalf("unexpected credential policy %q", got)
+			}
 			if got := response.Header().Get("Vary"); got != "Origin" {
 				t.Fatalf("unexpected Vary header %q", got)
 			}
 		})
+	}
+}
+
+func TestIsWebOriginUsesExactConfiguredOrigin(t *testing.T) {
+	t.Setenv("CHATNET_WEB_URL", "https://web.example")
+	t.Setenv("CHATNET_CORS_ORIGINS", "https://web.example")
+	if !IsWebOrigin("https://web.example") || IsWebOrigin("https://web.example.evil") || IsWebOrigin("https://other.example") {
+		t.Fatal("web origin check must match exact configured origin")
+	}
+	t.Setenv("CHATNET_CORS_ORIGINS", "https://other.example")
+	if IsWebOrigin("https://web.example") {
+		t.Fatal("web origin must be present in the CORS allowlist")
 	}
 }
 

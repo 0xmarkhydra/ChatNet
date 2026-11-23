@@ -183,3 +183,25 @@ func TestSessionManagementIntegration(t *testing.T) {
 		t.Fatal("revoking A disturbed B")
 	}
 }
+
+func TestSessionManagementUsesRefreshCookie(t *testing.T) {
+	t.Setenv("CHATNET_WEB_URL", "https://chat.example")
+	t.Setenv("CHATNET_CORS_ORIGINS", "https://chat.example")
+	for _, tc := range []struct {
+		origin string
+		wantOK bool
+		want   int
+	}{{origin: "https://chat.example", wantOK: true, want: http.StatusOK}, {origin: "https://evil.example", wantOK: false, want: http.StatusForbidden}} {
+		r := httptest.NewRequest(http.MethodPost, "/api/auth/sessions/list", strings.NewReader(`{}`))
+		r.Header.Set("Origin", tc.origin)
+		r.AddCookie(&http.Cookie{Name: refreshCookieName, Value: strings.Repeat("r", 43)})
+		w := httptest.NewRecorder()
+		request, ok := readSessionManagementRequest(w, r, false)
+		if ok != tc.wantOK || w.Code != tc.want {
+			t.Fatalf("origin=%q cookie session request = %+v, ok=%v, status=%d; want ok=%v, status=%d", tc.origin, request, ok, w.Code, tc.wantOK, tc.want)
+		}
+		if ok && request.RefreshToken != strings.Repeat("r", 43) {
+			t.Fatalf("cookie session request token = %q", request.RefreshToken)
+		}
+	}
+}

@@ -98,19 +98,13 @@ export function createSessionClient(baseURL: string, state: {
       state.save(next)
       return next
     }
-    // Legacy access-only credentials cannot safely recreate a refresh token.
-    // Otherwise logging out could be reversed while a JWT remains valid.
-    if (!previous.refreshToken) {
-      if (unchanged(previous)) state.expire()
-      return null
-    }
     const response = await fetch(`${baseURL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // The refresh credential is required; access tokens cannot renew sessions.
       },
-      body: JSON.stringify({ refreshToken: previous.refreshToken || '' }),
+      body: JSON.stringify({}),
+      credentials: 'include',
       cache: 'no-store',
       signal: AbortSignal.timeout(15_000),
     })
@@ -121,7 +115,7 @@ export function createSessionClient(baseURL: string, state: {
     }
     if (!response.ok) throw new Error('Không thể gia hạn phiên. Vui lòng thử lại.')
     const next = parseSession(await response.json())
-    if (!next?.refreshToken || next.user.id !== previous.user.id) {
+    if (!next || next.refreshToken !== undefined || next.user.id !== previous.user.id) {
       throw new Error('Phản hồi gia hạn phiên không hợp lệ.')
     }
     if (!unchanged(previous)) return state.get()
@@ -134,7 +128,7 @@ export function createSessionClient(baseURL: string, state: {
     const current = state.get()
     if (!current) return Promise.resolve(null)
     if (pending?.sessionId === current.sessionId) return pending.promise
-    if (!force && (nativeAuth || current.refreshToken) && !expiresSoon(current.token)) return Promise.resolve(current)
+    if (!force && !expiresSoon(current.token)) return Promise.resolve(current)
     const operation = { sessionId: current.sessionId, promise: renew(current) }
     pending = operation
     void operation.promise.finally(() => {
@@ -158,13 +152,10 @@ export function createSessionClient(baseURL: string, state: {
   }
 
   async function verify(previous: Session): Promise<boolean> {
-    if (!nativeAuth && !previous.refreshToken) {
-      if (state.get()?.sessionId === previous.sessionId) state.expire()
-      return false
-    }
     const response = await fetch(`${baseURL}/api/auth/session/status`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${previous.token}` },
+      credentials: 'include',
       cache: 'no-store',
       signal: AbortSignal.timeout(15_000),
     })

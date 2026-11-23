@@ -50,6 +50,7 @@ func CORS(next http.Handler) http.Handler {
 		if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
 			if _, ok := allowedOrigins[origin]; ok {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-ChatNet-Relay-Token")
 				w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 			}
@@ -60,6 +61,17 @@ func CORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// IsWebOrigin matches the configured web application origin. Cookie-backed
+// browser sessions use this exact origin check as their CSRF boundary.
+func IsWebOrigin(origin string) bool {
+	origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+	if origin == "" || origin != strings.TrimRight(config.Env("CHATNET_WEB_URL", defaultCORSOrigins[0]), "/") {
+		return false
+	}
+	_, allowed := corsOrigins()[origin]
+	return allowed
 }
 
 func corsOrigins() map[string]struct{} {

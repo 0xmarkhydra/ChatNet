@@ -53,6 +53,20 @@ afterEach(() => {
 })
 
 describe('auth screen edge cases', () => {
+  it('resets email on mode switch and exposes inline validation', async () => {
+    const ui = await mount()
+    try {
+      await ui.fill('auth-email', 'old@example.test')
+      await ui.click('Tạo tài khoản')
+      expect(ui.host.querySelector<HTMLInputElement>('#auth-email')?.value).toBe('')
+      await ui.click('Gửi mã xác minh')
+      const email = ui.host.querySelector<HTMLInputElement>('#auth-email')!
+      expect(email.getAttribute('aria-invalid')).toBe('true')
+      expect(email.getAttribute('aria-describedby')).toBe('auth-email-error')
+      expect(ui.host.querySelector('#auth-email-error')?.textContent).toBe('Email là bắt buộc.')
+    } finally { await ui.close() }
+  })
+
   it('accepts neither an incomplete OTP nor a complete OTP after its expiry', async () => {
     vi.useFakeTimers()
     const load = vi.fn().mockResolvedValueOnce(json({ ...validOtp, expiresInSeconds: 1 }, 202))

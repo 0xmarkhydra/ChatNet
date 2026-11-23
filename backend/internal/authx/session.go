@@ -138,7 +138,11 @@ func CachedSessionMiddleware(secret string, db SessionQuery, rdb *redis.Client, 
 
 func sessionMiddleware(secret string, db SessionQuery, rdb *redis.Client, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		claims, err := Parse(secret, TokenFromRequest(r))
+		rawToken := TokenFromRequest(r)
+		if rawToken == "" && r.Method == http.MethodGet && r.URL.Path == "/api/events" {
+			rawToken, _ = ConsumeEventTicket(r.Context(), rdb, r.URL.Query().Get("ticket"))
+		}
+		claims, err := Parse(secret, rawToken)
 		if err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return

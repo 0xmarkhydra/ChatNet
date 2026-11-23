@@ -138,7 +138,7 @@ describe('async logout notifications belong to the logout visit', () => {
     }
   })
 
-  it('retains account-scoped data for a token refresh in another tab', () => {
+  it('does not copy refresh credentials into app memory after storage synchronization', () => {
     vi.stubGlobal('localStorage', { setItem: vi.fn(), removeItem: vi.fn(), getItem: vi.fn() })
     const hook = mountSession()
     const accountA = session('A')
@@ -149,13 +149,13 @@ describe('async logout notifications belong to the logout visit', () => {
       expect(clearChatPersistence).not.toHaveBeenCalled()
       expect(clearChatOutbox).not.toHaveBeenCalled()
       expect(hook.current.session?.token).toBe('new-access-token')
-      expect(hook.current.session?.refreshToken).toBe(accountA.refreshToken)
+      expect(hook.current.session?.refreshToken).toBeUndefined()
     } finally {
       hook.close()
     }
   })
 
-  it('keeps refresh credentials in memory when browser storage fails', () => {
+  it('does not retain refresh credentials in memory when browser storage fails', () => {
     vi.stubGlobal('localStorage', {
       setItem: vi.fn(() => { throw new Error('storage denied') }),
       removeItem: vi.fn(),
@@ -164,8 +164,8 @@ describe('async logout notifications belong to the logout visit', () => {
     const hook = mountSession()
     try {
       act(() => hook.current.saveSession(session('A')))
-      expect(hook.current.session).toEqual(session('A'))
-      expect(hook.current.session?.refreshToken).toBe('refresh-A')
+      expect(hook.current.session).toEqual({ ...session('A'), refreshToken: undefined })
+      expect(hook.current.session?.refreshToken).toBeUndefined()
     } finally {
       hook.close()
     }

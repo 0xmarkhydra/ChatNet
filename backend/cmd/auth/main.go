@@ -44,14 +44,15 @@ var (
 )
 
 type server struct {
-	db         *pgxpool.Pool
-	redis      *redis.Client
-	limiter    ratelimit.Limiter
-	jwtSecret  string
-	otpPepper  string
-	emailFrom  string
-	resendKey  string
-	resendBase string
+	db                *pgxpool.Pool
+	redis             *redis.Client
+	limiter           ratelimit.Limiter
+	trustedProxyCIDRs []*net.IPNet
+	jwtSecret         string
+	otpPepper         string
+	emailFrom         string
+	resendKey         string
+	resendBase        string
 }
 
 type user struct {
@@ -99,15 +100,20 @@ func main() {
 	defer rdb.Close()
 
 	localMail := localMailEnv()
+	trustedProxyCIDRs, err := parseTrustedProxyCIDRs(config.Env("CHATNET_TRUSTED_PROXY_CIDRS", ""))
+	if err != nil {
+		log.Fatal(err)
+	}
 	s := &server{
-		db:         db,
-		redis:      rdb,
-		limiter:    ratelimit.Limiter{Redis: rdb},
-		jwtSecret:  jwtSecret,
-		otpPepper:  otpPepper,
-		emailFrom:  config.Env("CHATNET_EMAIL_FROM", localMail["CHATNET_EMAIL_FROM"]),
-		resendKey:  config.Env("RESEND_API_KEY", localMail["RESEND_API_KEY"]),
-		resendBase: config.Env("RESEND_API_BASE_URL", localMail["RESEND_API_BASE_URL"]),
+		db:                db,
+		redis:             rdb,
+		limiter:           ratelimit.Limiter{Redis: rdb},
+		trustedProxyCIDRs: trustedProxyCIDRs,
+		jwtSecret:         jwtSecret,
+		otpPepper:         otpPepper,
+		emailFrom:         config.Env("CHATNET_EMAIL_FROM", localMail["CHATNET_EMAIL_FROM"]),
+		resendKey:         config.Env("RESEND_API_KEY", localMail["RESEND_API_KEY"]),
+		resendBase:        config.Env("RESEND_API_BASE_URL", localMail["RESEND_API_BASE_URL"]),
 	}
 
 	mux := http.NewServeMux()
@@ -267,7 +273,7 @@ func (s *server) registerStart(w http.ResponseWriter, r *http.Request) {
 	if !s.allow(w, r, "signup-email", email, 4, time.Hour) {
 		return
 	}
-	if !s.allow(w, r, "signup-ip", clientIP(r), 20, time.Hour) {
+	if !s.allow(w, r, "signup-ip", clientIP(r, s.trustedProxyCIDRs), 20, time.Hour) {
 		return
 	}
 
@@ -354,7 +360,7 @@ func (s *server) registerVerify(w http.ResponseWriter, r *http.Request) {
 	if !s.allow(w, r, "signup-verify-token", token, 12, 10*time.Minute) {
 		return
 	}
-	if !s.allow(w, r, "signup-verify-ip", clientIP(r), 60, 10*time.Minute) {
+	if !s.allow(w, r, "signup-verify-ip", clientIP(r, s.trustedProxyCIDRs), 60, 10*time.Minute) {
 		return
 	}
 
@@ -425,7 +431,7 @@ func (s *server) registerResend(w http.ResponseWriter, r *http.Request) {
 	if !s.allow(w, r, "signup-resend-token", token, 3, 10*time.Minute) {
 		return
 	}
-	if !s.allow(w, r, "signup-resend-ip", clientIP(r), 10, 10*time.Minute) {
+	if !s.allow(w, r, "signup-resend-ip", clientIP(r, s.trustedProxyCIDRs), 10, 10*time.Minute) {
 		return
 	}
 
@@ -487,7 +493,7 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 	if !s.allow(w, r, "login-email", email, 12, 10*time.Minute) {
 		return
 	}
-	if !s.allow(w, r, "login-ip", clientIP(r), 40, 10*time.Minute) {
+	if !s.allow(w, r, "login-ip", clientIP(r, s.trustedProxyCIDRs), 40, 10*time.Minute) {
 		return
 	}
 
@@ -724,19 +730,10 @@ func maskEmail(email string) string {
 	return local + "@" + parts[1]
 }
 
-func clientIP(r *http.Request) string {
-	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
-		if first, _, ok := strings.Cut(forwarded, ","); ok {
-			return strings.TrimSpace(first)
-		}
-		return forwarded
-	}
-	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
-		return realIP
-	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err == nil && host != "" {
-		return host
-	}
-	return strings.TrimSpace(r.RemoteAddr)
+func parseTrustedProxyCIDRs(raw string) ([]*net.IPNet, error) {
+	return httpx.ParseTrustedProxyCIDRs(raw)
+}
+
+func clientIP(r *http.Request, trustedProxyCIDRs []*net.IPNet) string {
+	return httpx.ClientIP(r, trustedProxyCIDRs)
 }

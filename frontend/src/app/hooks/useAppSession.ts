@@ -41,6 +41,7 @@ export function useAppSession(initialSession?: Session | null) {
         throw new Error("Desktop credential boundary violation");
       clearPersistedSession();
     } else {
+      next = { ...next, refreshToken: undefined };
       persistSession(next);
     }
     sessionEpoch.current += 1;
@@ -77,11 +78,12 @@ export function useAppSession(initialSession?: Session | null) {
             "error",
           ),
         );
-    } else if (revoke && current?.refreshToken) {
+    } else if (revoke && current) {
       void fetch(`${API}/api/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: current.refreshToken }),
+        body: JSON.stringify({}),
+        credentials: "include",
         keepalive: true,
       })
         .then((response) => {
@@ -120,9 +122,7 @@ export function useAppSession(initialSession?: Session | null) {
       if (event.key !== "chatnet-session" && event.key !== null) return;
       const previous = sessionRef.current;
       const stored = loadSession();
-      const next = stored && previous?.sessionId === stored.sessionId && previous.user.id === stored.user.id
-        ? { ...stored, refreshToken: previous.refreshToken }
-        : stored;
+      const next = stored;
       // A session identifier alone is not an account boundary: storage can
       // change to a different user while retaining the same session ID.
       if (previous?.sessionId !== next?.sessionId || previous?.user.id !== next?.user.id)
