@@ -58,3 +58,11 @@ Keep existing feature dialog/menu implementations until a feature-scoped QA migr
 5. Run `npm run lint`, `npm run check:architecture`, `npm run test:unit`, `npm run build` before PR.
 
 No backend routes, API contracts, auth/session, service worker or page UX are intentionally changed by this foundation.
+## Design-debt ratchet
+
+`frontend/design-debt-baseline.json` records, per file, hardcoded design values: hex colours, `!important`, `.modern-shell.app-layout` selectors and literal `z-index` in CSS; arbitrary colours, pixel values, breakpoints, `!` modifiers and literal `z-index` in TSX/TS. Counts may only go down.
+
+- `npm run check:design-debt` fails when any file/metric increases or a new file introduces debt (CI runs it; the PR baseline guard also rejects a raised baseline).
+- `npm run design-debt:report` prints totals per metric and area, CSS files nothing imports and theme tokens never referenced.
+- `npm run design-debt:baseline` rewrites the baseline after debt was removed. Never use it to accept new debt.
+- A legitimately fixed value (SVG, canvas, third-party) may carry `design-debt-ignore: <reason>` in a comment on the same line; an empty reason does not count.
