@@ -101,7 +101,7 @@ export default function SearchHome({ history, request, sessionId, suggest, ...ac
   return (
     <>
       <header className="grid min-h-16 grid-cols-[1fr_minmax(0,46rem)_1fr] items-center gap-ui-4 border-b border-border-subtle bg-card px-ui-6 max-lg:px-ui-3 max-md:grid-cols-1">
-        <h1 className="m-0! text-[length:var(--soco-type-page)]! font-bold tracking-[-0.3px]! text-foreground max-md:sr-only">Tìm kiếm</h1>
+        <h1 className="m-0! text-[length:var(--soco-type-page)]! font-bold tracking-[-0.3px]! text-foreground max-md:sr-only">Tìm kiếm</h1>{/* design-debt-ignore: the global h1 rule in styles.css wins over layered utilities */}
         <div className="min-w-0 md:col-start-2">
           <SearchForm initialQuery="" large suggest={suggest} autoFocus={focusField} placeholder="Tìm người, bài viết, cộng đồng, sản phẩm…" onSubmit={search} />
         </div>
