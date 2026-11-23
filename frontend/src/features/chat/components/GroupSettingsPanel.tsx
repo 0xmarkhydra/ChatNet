@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import { ArrowLeft, Bell, Check, ChevronRight, Clock3, Copy, Crown, FileText, Files, Info, LogOut, MoreHorizontal, ScrollText, Search, ShieldCheck, ShieldOff, UserMinus, UserPlus, UserCheck, UsersRound, X } from 'lucide-react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
+import { ArrowLeft, Bell, Check, ChevronRight, Clock3, FileText, Files, Info, ScrollText, Search, ShieldCheck, UserPlus, UsersRound, X } from 'lucide-react'
 import type { GroupMember, Conversation } from '../types'
 import type { FriendConnection } from '../../contacts'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import GroupGovernancePanel from './GroupGovernancePanel'
 import GroupManagementDetails from './GroupManagementDetails'
+import GroupMemberDirectory from './GroupMemberDirectory'
 import '../styles/group-management-workspace.css'
 
 export type GroupManagementSection = 'members' | 'details' | 'permissions' | 'requests' | 'rules' | 'notifications' | 'files' | 'activity'
@@ -72,68 +73,17 @@ export default function GroupSettingsPanel({
   notify,
   onMembersChanged,
 }: Props) {
-  const [openMemberMenu, setOpenMemberMenu] = useState<number | null>(null)
-  const [menuDirection, setMenuDirection] = useState<'down' | 'up'>('down')
   const [activeSection, setActiveSection] = useState<GroupManagementSection>(initialSection)
   const [memberSearch, setMemberSearch] = useState('')
-  const menuRef = useRef<HTMLDivElement>(null)
   const filteredMembers = groupMembers.filter(member => `${member.displayName} ${member.username}`.toLocaleLowerCase('vi-VN').includes(memberSearch.trim().toLocaleLowerCase('vi-VN')))
   const isOwner = activeGroupMember?.role === 'owner'
   const isManager = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
 
-  useEffect(() => {
-    if (openMemberMenu === null) return
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setOpenMemberMenu(null)
-    }
-    document.addEventListener('pointerdown', closeOnOutsideClick)
-    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
-  }, [openMemberMenu])
-
-  useLayoutEffect(() => {
-    if (openMemberMenu === null) return
-    const anchor = menuRef.current
-    const menu = anchor?.querySelector<HTMLElement>('.group-member-menu')
-    const scrollArea = anchor?.closest<HTMLElement>('.group-settings-panel')
-    if (!anchor || !menu || !scrollArea) return
-
-    // Prefer the original downward floating menu. Only flip it above the
-    // three-dot trigger when there is not enough visible room underneath.
-    const anchorBounds = anchor.getBoundingClientRect()
-    const scrollBounds = scrollArea.getBoundingClientRect()
-    const menuHeight = menu.getBoundingClientRect().height
-    const availableBelow = scrollBounds.bottom - anchorBounds.bottom
-    const availableAbove = anchorBounds.top - scrollBounds.top
-    const shouldOpenUp = availableBelow < menuHeight + 4 && availableAbove > availableBelow
-    setMenuDirection(shouldOpenUp ? 'up' : 'down')
-  }, [openMemberMenu])
-
-  useEffect(() => {
-    if (!memberViewOpen) return
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.stopPropagation() // Escape navigates this sidebar view before closing the whole sidebar.
-      if (openMemberMenu !== null) setOpenMemberMenu(null)
-      else setMemberViewOpen(false)
-    }
-    document.addEventListener('keydown', onEscape, true)
-    return () => document.removeEventListener('keydown', onEscape, true)
-  }, [memberViewOpen, openMemberMenu])
-
-  async function copyMemberUsername(username: string) {
-    setOpenMemberMenu(null)
-    try {
-      await navigator.clipboard.writeText('@' + username)
-      notify('Đã sao chép @' + username)
-    } catch {
-      notify('Không sao chép được tên người dùng.')
-    }
-  }
 
   return (
     <section className="group-settings-panel" role="region" aria-label="Quản lý nhóm">
       <div className="group-settings-heading">
-        {memberViewOpen && <button type="button" className="group-member-back" autoFocus onClick={() => { setMemberViewOpen(false); setOpenMemberMenu(null) }} aria-label="Quay lại quản lý nhóm"><ArrowLeft size={20} /></button>}
+        {memberViewOpen && <button type="button" className="group-member-back" autoFocus onClick={() => { setMemberViewOpen(false) }} aria-label="Quay lại quản lý nhóm"><ArrowLeft size={20} /></button>}
         <div>
           <strong>{memberViewOpen ? 'Thành viên nhóm' : 'Quản lý nhóm'}</strong>
           <small>{memberViewOpen ? `${groupMembers.length} thành viên` :
@@ -165,7 +115,7 @@ export default function GroupSettingsPanel({
           ] as const).map(([id, label, Icon]) => (
             <button key={id} type="button" className={activeSection === id ? 'active' : ''}
               aria-current={activeSection === id ? 'page' : undefined}
-              onClick={() => { setActiveSection(id); setOpenMemberMenu(null); setMemberSearch('') }}>
+              onClick={() => { setActiveSection(id); setMemberSearch('') }}>
               <Icon size={16} aria-hidden="true" /><span>{label}</span>
             </button>
           ))}
@@ -195,7 +145,7 @@ export default function GroupSettingsPanel({
             {filteredMembers.length === 0 && <p className="group-management-empty">Không tìm thấy thành viên phù hợp.</p>}
           </div>
           <button type="button" className="group-members-preview" aria-label={`Xem danh sách ${groupMembers.length} thành viên nhóm`}
-            onClick={() => { setMemberViewOpen(true); setOpenMemberMenu(null) }}>
+            onClick={() => setMemberViewOpen(true)}>
             <span className="group-members-preview-icon"><UsersRound size={20} aria-hidden="true" /></span>
             <span className="group-members-preview-copy">
               <strong>Quản lý thành viên</strong><small>Xem tất cả và thao tác với từng người</small>
@@ -276,83 +226,16 @@ export default function GroupSettingsPanel({
         )}
       </>}
 
-      {memberViewOpen && <div className="group-member-directory" aria-label="Danh sách thành viên nhóm">
-        {groupMembers.map((member) => {
-          const isSelf = member.id === userId
-          const canSetRole = activeGroupMember?.role === 'owner' && !isSelf && member.role !== 'owner'
-          const canRemove = canManageActiveGroup && !isSelf && member.role !== 'owner' &&
-            !(activeGroupMember?.role === 'admin' && member.role === 'admin')
-          const canLeave = isSelf && member.role !== 'owner'
-          const menuOpen = openMemberMenu === member.id
-          const relationship = memberFriendRelationship(member.id)
-          const friendActionBusy = friendBusyIds.has(member.id)
-          return <div className={menuOpen ? 'group-member-directory-row menu-open' : 'group-member-directory-row'} key={member.id}>
-            <button type="button" className="group-member-profile"
-              onClick={() => onOpenMemberProfile(member.username)}
-              aria-label={`Xem trang cá nhân ${member.displayName || member.username}`}>
-              <UserAvatar username={member.username} name={member.displayName || member.username}
-                className="group-member-avatar" online={member.online} />
-              <span className="group-member-copy">
-                <strong>{member.displayName || member.username}{isSelf ? ' · Bạn' : ''}</strong>
-                <span>{member.role === 'owner' ? 'Chủ nhóm' : member.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
-                  {member.online ? ' · online' : ''}</span>
-              </span>
-            </button>
-            <div className="group-member-menu-anchor" ref={menuOpen ? menuRef : null}>
-              <button type="button" className="group-member-more"
-                aria-label={`Tùy chọn của ${member.displayName || member.username}`}
-                aria-expanded={menuOpen} aria-haspopup="menu"
-                onClick={() => {
-                  if (!menuOpen) setMenuDirection('down')
-                  setOpenMemberMenu(menuOpen ? null : member.id)
-                }}>
-                <MoreHorizontal size={20} aria-hidden="true" />
-              </button>
-              {menuOpen && <div className={menuDirection === 'up' ? 'group-member-menu open-up' : 'group-member-menu'} role="menu" aria-label={`Tùy chọn của ${member.displayName || member.username}`}>
-                <button type="button" role="menuitem" onClick={() => void copyMemberUsername(member.username)}>
-                  <Copy size={16} aria-hidden="true" /> Sao chép @username
-                </button>
-                {!isSelf && relationship !== 'accepted' && (
-                  <button type="button" role="menuitem"
-                    disabled={friendActionBusy || relationship === 'outgoing'}
-                    onClick={() => {
-                      setOpenMemberMenu(null)
-                      void onMemberFriendAction(member)
-                    }}>
-                    {relationship === 'incoming'
-                      ? <UserCheck size={16} aria-hidden="true" />
-                      : <UserPlus size={16} aria-hidden="true" />}
-                    {relationship === 'incoming'
-                      ? 'Chấp nhận kết bạn'
-                      : relationship === 'outgoing'
-                        ? 'Đã gửi lời mời'
-                        : 'Kết bạn'}
-                  </button>
-                )}
-                {canSetRole && <>
-                  <button type="button" role="menuitem" disabled={groupBusy}
-                    onClick={() => { setOpenMemberMenu(null); void changeGroupMemberRole(member, member.role === 'admin' ? 'member' : 'admin') }}>
-                    {member.role === 'admin' ? <ShieldOff size={16} aria-hidden="true" /> : <ShieldCheck size={16} aria-hidden="true" />}
-                    {member.role === 'admin' ? 'Gỡ quyền admin' : 'Đặt làm admin'}
-                  </button>
-                  <button type="button" role="menuitem" disabled={groupBusy}
-                    onClick={() => { setOpenMemberMenu(null); void changeGroupMemberRole(member, 'owner') }}>
-                    <Crown size={16} aria-hidden="true" /> Chuyển quyền chủ nhóm
-                  </button>
-                </>}
-                {canRemove && <button type="button" role="menuitem" className="danger" disabled={groupBusy}
-                  onClick={() => { setOpenMemberMenu(null); void removeGroupMember(member) }}>
-                  <UserMinus size={16} aria-hidden="true" /> Xóa khỏi nhóm
-                </button>}
-                {canLeave && <button type="button" role="menuitem" className="danger" disabled={groupBusy}
-                  onClick={() => { setOpenMemberMenu(null); void removeGroupMember(member) }}>
-                  <LogOut size={16} aria-hidden="true" /> Rời nhóm
-                </button>}
-              </div>}
-            </div>
-          </div>
-        })}
-      </div>}
+      {memberViewOpen && <GroupMemberDirectory
+        key={activeConversation.id}
+        activeGroupMember={activeGroupMember} canManageActiveGroup={canManageActiveGroup}
+        onOpenMemberProfile={onOpenMemberProfile} memberFriendRelationship={memberFriendRelationship}
+        onMemberFriendAction={onMemberFriendAction} friendBusyIds={friendBusyIds}
+        setMemberViewOpen={setMemberViewOpen} groupBusy={groupBusy}
+        groupMembers={groupMembers} userId={userId}
+        changeGroupMemberRole={changeGroupMemberRole} removeGroupMember={removeGroupMember}
+        notify={notify}
+      />}
     </section>
   )
 }
