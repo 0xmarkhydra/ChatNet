@@ -356,7 +356,7 @@ export default function ProfileSection({
                   <div className="settings-card">
                     <AccountSessionsPanel
                       sessionsBusy={sessionsBusy}
-                      canManageSessions={isDesktopBuild || Boolean(session.refreshToken)}
+                      canManageSessions={isDesktopBuild || Boolean(session)}
                       sessionsOpen={sessionsOpen}
                       setSessionsOpen={setSessionsOpen}
                       fetchAccountSessions={fetchAccountSessions}
@@ -634,7 +634,7 @@ export default function ProfileSection({
                   <AccountSessionsPanel
                     sessionsBusy={sessionsBusy}
                     canManageSessions={
-                      isDesktopBuild || Boolean(session.refreshToken)
+                      isDesktopBuild || Boolean(session)
                     }
                     sessionsOpen={sessionsOpen}
                     setSessionsOpen={setSessionsOpen}
