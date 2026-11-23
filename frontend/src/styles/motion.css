@@ -94,10 +94,6 @@
     box-shadow: 0 4px 14px rgba(37,99,235,.11);
     transform: translateY(-1px);
   }
-  .modern-shell :is(.story-card, .zalo-post, .shared-media-card):hover {
-    transition: transform var(--soco-motion-standard) var(--soco-motion-ease),
-      box-shadow var(--soco-motion-standard) var(--soco-motion-ease);
-  }
   .modern-shell .story-card:not(:disabled):hover { transform: translateY(-3px); }
   .modern-shell .story-card:not(:disabled):active { transform: scale(.965); }
 }

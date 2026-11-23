@@ -225,7 +225,6 @@ h1 {
 }
 
 .chat-head small,
-.post-body small,
 .feed-title small {
   color: #8b95a6;
 }
@@ -403,8 +402,7 @@ button:disabled {
   font-size: 24px;
 }
 
-.post-box,
-.post {
+.post-box {
   background: white;
   border: 1px solid #e5eaf1;
   border-radius: 20px;
@@ -447,12 +445,6 @@ button:disabled {
   gap: 12px;
 }
 
-.post {
-  display: flex;
-  gap: 12px;
-  padding: 16px;
-}
-
 .avatar {
   width: 42px;
   height: 42px;
@@ -467,35 +459,6 @@ button:disabled {
 
 .self-avatar {
   margin-top: 4px;
-}
-
-.post-body {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.post-author {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-}
-
-.post-author > div {
-  display: grid;
-  gap: 3px;
-}
-
-.post-author > span {
-  color: #9aa4b5;
-  letter-spacing: 0;
-}
-
-.post-body p {
-  margin: 9px 0 5px;
-  line-height: 1.55;
-  white-space: pre-wrap;
 }
 
 .post-translation {
@@ -514,8 +477,7 @@ button:disabled {
   border-top: 1px solid #f0f2f6;
 }
 
-.post-toolbar button,
-.post-stat {
+.post-toolbar button {
   border: 0;
   border-radius: 10px;
   padding: 7px 9px;
@@ -526,11 +488,6 @@ button:disabled {
 .post-toolbar button.liked {
   background: #fff0f3;
   color: #d43b55;
-}
-
-.post-stat {
-  display: inline-flex;
-  align-items: center;
 }
 
 .comments {

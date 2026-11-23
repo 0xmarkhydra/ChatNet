@@ -554,7 +554,7 @@ export default function ProfileSection({
                 <div className="feed zalo-feed max-[760px]:-mx-3! max-[760px]:w-[calc(100%+24px)]!">
                   {pendingPost && (
                     <article
-                      className="post zalo-post outgoing-preview"
+                      className="outgoing-preview mb-3.5 grid grid-cols-[42px_minmax(0,1fr)] gap-2.5 overflow-hidden rounded-ui-xl border border-border bg-card px-3 pt-3.5 pb-3 text-foreground shadow-[0_4px_22px_rgba(38,61,120,0.043)]"
                       aria-busy="true"
                     >
                       <UserAvatar
@@ -565,11 +565,9 @@ export default function ProfileSection({
                         )}
                         className="avatar"
                       />
-                      <div className="post-body">
-                        <strong>{userLabel(profileMedia?.displayName || session.user.displayName, name)}</strong>
-                        <p>{pendingPost.content}</p>
-                        <MediaAttachmentsView items={pendingPost.attachments} />
-                      </div>
+                      <strong className="min-w-0 text-ui-body font-bold text-foreground">{userLabel(profileMedia?.displayName || session.user.displayName, name)}</strong>
+                      <p className="col-span-full mt-2.5 mb-1.5 text-ui-body leading-normal whitespace-pre-wrap">{pendingPost.content}</p>
+                      <MediaAttachmentsView items={pendingPost.attachments} />
                     </article>
                   )}
                   {renderPosts(visibleProfilePosts)}

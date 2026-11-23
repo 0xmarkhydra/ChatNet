@@ -1,7 +1,7 @@
 {
   "totals": {
-    "css.hex": 3913,
-    "css.important": 685,
+    "css.hex": 3891,
+    "css.important": 684,
     "css.shellSelector": 1122,
     "css.zIndex": 229,
     "tsx.arbitraryHex": 53,
@@ -151,8 +151,8 @@
     "src/features/feed/components/SocialFeedSidebar.tsx|tsx.arbitraryBreakpoint": 23,
     "src/features/feed/components/SocialFeedSidebar.tsx|tsx.arbitraryPx": 2,
     "src/features/feed/components/StoryViewer.tsx|tsx.zIndex": 1,
-    "src/features/feed/styles/feed-actions.css|css.hex": 83,
-    "src/features/feed/styles/feed-actions.css|css.important": 20,
+    "src/features/feed/styles/feed-actions.css|css.hex": 79,
+    "src/features/feed/styles/feed-actions.css|css.important": 19,
     "src/features/feed/styles/feed-actions.css|css.zIndex": 6,
     "src/features/feed/styles/feed-moderation.css|css.hex": 8,
     "src/features/feed/styles/post-comments-page.css|css.hex": 2,
@@ -258,13 +258,13 @@
     "src/styles/soco-layout-v2.css|css.important": 2,
     "src/styles/soco-layout-v2.css|css.zIndex": 6,
     "src/styles/soco-screens.css|css.hex": 135,
-    "src/styles/soco-theme.css|css.hex": 112,
+    "src/styles/soco-theme.css|css.hex": 110,
     "src/styles/soco-theme.css|css.important": 4,
-    "src/styles/styles.css|css.hex": 131,
+    "src/styles/styles.css|css.hex": 130,
     "src/styles/styles.css|css.important": 2,
     "src/styles/styles.css|css.zIndex": 2,
     "src/styles/tailwind.css|css.hex": 2,
-    "src/styles/zalo-inspired.css|css.hex": 391,
+    "src/styles/zalo-inspired.css|css.hex": 376,
     "src/styles/zalo-inspired.css|css.important": 13,
     "src/styles/zalo-inspired.css|css.zIndex": 37
   }

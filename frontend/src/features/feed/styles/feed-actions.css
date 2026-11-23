@@ -185,34 +185,6 @@
   color: #56617a;
   margin: 3px 0 7px;
 }
-
-.post-engagement-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-  padding: 8px 3px 0;
-  color: #6b7893;
-  font-size: 12px;
-}
-.post-engagement-summary .feed-post-likes {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 8px;
-  margin-right: auto;
-  white-space: nowrap;
-}
-.post-engagement-summary .feed-post-likes svg {
-  color: #ef426b;
-  flex-shrink: 0;
-}
-.post-engagement-summary .feed-post-conversation-stats {
-  margin-left: auto;
-  text-align: right;
-  white-space: nowrap;
-}
 /* The same single-heart button works in a feed card and in post details. */
 .post-toolbar > .feed-like-button {
   display: inline-flex;
@@ -337,8 +309,7 @@
   box-shadow: 0 8px 24px #202f5a33;
   overflow: visible;
 }
-.post-toolbar .feed-reaction-picker > button.feed-reaction-option,
-.zalo-post .post-toolbar .feed-reaction-picker > button.feed-reaction-option {
+.post-toolbar .feed-reaction-picker > button.feed-reaction-option {
   position: relative;
   display: flex;
   align-items: center;
@@ -363,31 +334,19 @@
   transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .post-toolbar .feed-reaction-picker > button.feed-reaction-option:hover,
-.post-toolbar .feed-reaction-picker > button.feed-reaction-option:focus-visible,
-.zalo-post
-  .post-toolbar
-  .feed-reaction-picker
-  > button.feed-reaction-option:hover,
-.zalo-post
-  .post-toolbar
-  .feed-reaction-picker
-  > button.feed-reaction-option:focus-visible {
+.post-toolbar .feed-reaction-picker > button.feed-reaction-option:focus-visible {
   z-index: 2;
   transform: translateY(-3px) scale(1.12);
 }
 .post-toolbar .feed-reaction-picker > button.reaction-like,
 .post-toolbar .feed-reaction-picker > button.reaction-like:hover,
-.post-toolbar .feed-reaction-picker > button.reaction-like:focus-visible,
-.zalo-post .post-toolbar .feed-reaction-picker > button.reaction-like,
-.zalo-post .post-toolbar .feed-reaction-picker > button.reaction-like:hover {
+.post-toolbar .feed-reaction-picker > button.reaction-like:focus-visible {
   background: #2879f4;
   color: #fff;
 }
 .post-toolbar .feed-reaction-picker > button.reaction-love,
 .post-toolbar .feed-reaction-picker > button.reaction-love:hover,
-.post-toolbar .feed-reaction-picker > button.reaction-love:focus-visible,
-.zalo-post .post-toolbar .feed-reaction-picker > button.reaction-love,
-.zalo-post .post-toolbar .feed-reaction-picker > button.reaction-love:hover {
+.post-toolbar .feed-reaction-picker > button.reaction-love:focus-visible {
   background: #f13058;
   color: #fff;
 }
@@ -410,8 +369,7 @@
     gap: 3px;
     padding: 5px;
   }
-  .post-toolbar .feed-reaction-picker > button.feed-reaction-option,
-  .zalo-post .post-toolbar .feed-reaction-picker > button.feed-reaction-option {
+  .post-toolbar .feed-reaction-picker > button.feed-reaction-option {
     flex-basis: 34px;
     width: 34px;
     height: 34px;
@@ -428,19 +386,6 @@
   gap: 4px;
   overflow: visible;
 }
-.zalo-post .post-toolbar.post-toolbar-compact > button {
-  flex: 0 0 40px;
-  width: 40px;
-  min-width: 40px;
-  min-height: 40px !important;
-  height: 40px;
-  padding: 0;
-  border-radius: 50%;
-  background: transparent;
-}
-.zalo-post .post-toolbar.post-toolbar-compact > button:hover {
-  background: #eef3f7;
-}
 .post-toolbar-compact .feed-reaction-control > .feed-reaction-primary {
   min-height: 40px !important;
   padding: 6px 8px;
@@ -455,11 +400,6 @@
   place-items: center;
   width: 22px;
   height: 22px;
-}
-.zalo-post .post-toolbar-compact .feed-reaction-primary b {
-  color: #68768c;
-  font-size: 12px;
-  font-weight: 500;
 }
 @media (prefers-reduced-motion: reduce) {
   .post-toolbar .feed-reaction-picker button {
