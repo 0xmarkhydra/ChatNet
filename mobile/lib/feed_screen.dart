@@ -382,11 +382,13 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     });
   }
 
-  Future<Json?> _pickAndUpload(String scope, {bool multiple = false}) async {
-    final picked = multiple
-        ? await FilePicker.pickFiles(type: FileType.media)
-        : <PlatformFile>[];
-    if (!multiple) {
+  Future<Json?> _pickAndUpload(String scope, {bool multiple = false, PlatformFile? selectedFile}) async {
+    final picked = selectedFile != null
+        ? <PlatformFile>[selectedFile]
+        : multiple
+            ? await FilePicker.pickFiles(type: FileType.media)
+            : <PlatformFile>[];
+    if (!multiple && selectedFile == null) {
       final file = await FilePicker.pickFile(type: FileType.media);
       if (file != null) picked.add(file);
     }
@@ -459,8 +461,9 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     }
   }
 
-  Future<bool> _publishMediaStory() async {
-    final media = await _pickAndUpload('story');
+  Future<bool> _publishMediaStory(PlatformFile file) async {
+    final media = await _pickAndUpload('story', selectedFile: file);
+    if (!mounted) return false;
     if (media == null) return false;
     try {
       final story = object(

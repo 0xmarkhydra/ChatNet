@@ -61,7 +61,7 @@ export default function StoryTextComposer({ busy, onBack, onPublish }: {
       <p className="m-0 text-sm text-muted-foreground">Tin sẽ hiển thị trong 24 giờ.</p>
       {publishFailed && <p role="alert" className="m-0 text-sm text-destructive">Không đăng được tin. Bản nháp vẫn được giữ lại.</p>}
       <div className="flex flex-wrap justify-between gap-2">
-        <Button variant="secondary" aria-label="Quay lại chọn loại tin" onClick={onBack} disabled={busy}><ArrowLeft size={17} aria-hidden="true" /> Quay lại</Button>
+        <Button type="button" variant="secondary" aria-label="Quay lại chọn loại tin" onClick={onBack} disabled={busy}><ArrowLeft size={17} aria-hidden="true" /> Quay lại</Button>
         <Button type="submit" disabled={!canPublish}><Send size={17} aria-hidden="true" /> {busy ? 'Đang đăng...' : 'Đăng Story'}</Button>
       </div>
     </form>
