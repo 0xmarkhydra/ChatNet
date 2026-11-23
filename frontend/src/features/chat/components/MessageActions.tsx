@@ -1,54 +1,14 @@
-import { useState } from 'react'
-import ChatEmojiPicker from './ChatEmojiPicker'
 import { userLabel } from '../../../shared/utils/userLabel'
-import type { Message } from '../types'
-import { messageReactions } from '../utils/messageReactions'
 import { attachmentLabel, formatTime } from '../../../shared/utils/format'
-import type { MessageCopyTarget } from '../utils/messageCopyTarget'
-import { Copy, Forward, Languages, Pin, Reply, SmilePlus } from 'lucide-react'
+import type { MessageActionsProps } from '../types/messageActions'
+import MessageReactionChooser from './MessageReactionChooser'
+import MessageActionList from './MessageActionList'
 
-type Props = {
-  mode?: 'reactions' | 'actions'
-  activeMessageAction: Message
-  onForwardMessage: (message: Message) => void
-  userId: number
-  isPinned: boolean
-  toggleMessagePin: (message: Message) => Promise<void>
-  setMessageActionId: (id: number | null) => void
-  toggleReaction: (message: Message, emoji: string) => Promise<void>
-  setReplyingTo: (message: Message) => void
-  copyTarget: MessageCopyTarget | null
-  copyMessageContent: (message: Message, target: MessageCopyTarget) => Promise<void>
-  translateMessage: (message: Message) => Promise<void>
-  editOwnMessage: (message: Message) => Promise<void>
-  recallOwnMessage: (message: Message) => Promise<void>
-}
-
-export default function MessageActions({
-  mode = 'actions',
-  activeMessageAction,
-  onForwardMessage,
-  userId,
-  isPinned,
-  toggleMessagePin,
-  setMessageActionId,
-  toggleReaction,
-  setReplyingTo,
-  copyTarget,
-  copyMessageContent,
-  translateMessage,
-  editOwnMessage,
-  recallOwnMessage,
-}: Props) {
-  const mine = activeMessageAction.senderId === userId
-  const preview = activeMessageAction.text.trim() || attachmentLabel(activeMessageAction.attachments)
-  const [showAllEmojis, setShowAllEmojis] = useState(false)
-  const selectedEmoji = activeMessageAction.reactions?.find(reaction => reaction.mine)?.emoji
-  const selectReaction = (emoji: string) => {
-    setMessageActionId(null)
-    void toggleReaction(activeMessageAction, emoji)
-  }
-  return (
+export default function MessageActions(props: MessageActionsProps) {
+ const { mode = 'actions', activeMessageAction, userId, setMessageActionId } = props
+ const mine = activeMessageAction.senderId === userId
+ const preview = activeMessageAction.text.trim() || attachmentLabel(activeMessageAction.attachments)
+ return (
     <div
       className={mode === 'reactions' ? 'message-context-backdrop reaction-only' : 'message-context-backdrop'}
       role="dialog"
@@ -68,116 +28,11 @@ export default function MessageActions({
           <time>{formatTime(activeMessageAction.createdAt)}</time>
         </div>}
 
-        {mode === 'reactions' && <div className="message-context-reactions" aria-label="Thả cảm xúc">
-          {messageReactions.map(({ emoji, label }) => (
-            <button
-              key={emoji}
-              type="button"
-              className={(activeMessageAction.reactions || []).some((reaction) => reaction.emoji === emoji && reaction.mine) ? 'active' : ''}
-              aria-pressed={(activeMessageAction.reactions || []).some((reaction) => reaction.emoji === emoji && reaction.mine)}
-              aria-label={`${label} ${emoji}`}
-              title={label}
-              onClick={() => selectReaction(emoji)}
-            >
-              {emoji}
-              <small>{label}</small>
-            </button>
-          ))}
-          <button
-            type="button"
-            className="chat-reaction-more"
-            aria-label="Thêm emoji khác"
-            aria-expanded={showAllEmojis}
-            title="Thêm emoji"
-            onClick={() => setShowAllEmojis(open => !open)}
-          >
-            <SmilePlus size={25} aria-hidden="true" />
-            <small>Thêm</small>
-          </button>
-        </div>}
-        {mode === 'reactions' && showAllEmojis && (
-          <ChatEmojiPicker label="Chọn emoji để thả cảm xúc" selectedEmoji={selectedEmoji} onSelect={selectReaction} />
+        {mode === 'reactions' && (
+          <MessageReactionChooser key={activeMessageAction.id} activeMessageAction={activeMessageAction}
+            toggleReaction={props.toggleReaction} setMessageActionId={setMessageActionId} />
         )}
-
-        {mode === 'actions' && <div className="message-context-actions">
-          {!activeMessageAction.deleted && (
-            <button type="button" onClick={() => {
-                setMessageActionId(null)
-                void toggleMessagePin(activeMessageAction)
-              }}>
-              <span aria-hidden="true"><Pin size={20} strokeWidth={2} /></span>
-              <b>{isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}</b>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              setReplyingTo(activeMessageAction)
-              setMessageActionId(null)
-            }}
-          >
-            <span aria-hidden="true"><Reply size={21} strokeWidth={2} /></span>
-            <b>Trả lời</b>
-          </button>
-
-          {!activeMessageAction.deleted && (
-            <button type="button" onClick={() => {
-              setMessageActionId(null)
-              onForwardMessage(activeMessageAction)
-            }}>
-              <span aria-hidden="true"><Forward size={20} strokeWidth={2} /></span>
-              <b>Chuyển tiếp</b>
-            </button>
-          )}
-
-          {copyTarget && (
-            <button type="button" onClick={() => void copyMessageContent(activeMessageAction, copyTarget)}>
-              <span aria-hidden="true"><Copy size={20} strokeWidth={2} /></span>
-              <b>Sao chép</b>
-            </button>
-          )}
-
-          {!mine && Boolean(activeMessageAction.text.trim()) && (
-            <button
-              type="button"
-              onClick={() => {
-                setMessageActionId(null)
-                void translateMessage(activeMessageAction)
-              }}
-            >
-              <span aria-hidden="true"><Languages size={21} strokeWidth={2} /></span>
-              <b>Dịch</b>
-            </button>
-          )}
-
-          {mine && Boolean(activeMessageAction.text.trim()) && (
-            <button
-              type="button"
-              onClick={() => {
-                setMessageActionId(null)
-                void editOwnMessage(activeMessageAction)
-              }}
-            >
-              <span aria-hidden="true">✎</span>
-              <b>Sửa</b>
-            </button>
-          )}
-
-          {mine && (
-            <button
-              type="button"
-              className="danger"
-              onClick={() => {
-                setMessageActionId(null)
-                void recallOwnMessage(activeMessageAction)
-              }}
-            >
-              <span aria-hidden="true">⌫</span>
-              <b>Thu hồi</b>
-            </button>
-          )}
-        </div>}
-
+        {mode === 'actions' && <MessageActionList {...props} />}
         {mode === 'actions' && <button
           type="button"
           className="message-context-cancel"
