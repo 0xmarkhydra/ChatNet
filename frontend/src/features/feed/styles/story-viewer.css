@@ -408,7 +408,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   overflow-y: auto;
   overscroll-behavior-y: contain;
   scrollbar-width: thin;
-  scrollbar-color: #415781 transparent;
+  scrollbar-color: #415781 transparent; /* design-debt-ignore: dark story viewer scrollbar thumb has no token */
   border-radius: 19px;
   padding: 24px 15px 63px;
 }

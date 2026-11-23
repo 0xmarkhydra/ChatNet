@@ -65,7 +65,7 @@ export default function SearchForm({ initialQuery, placeholder, large = false, a
           aria-activedescendant={showList ? listId + '-' + active : undefined} autoComplete="off" maxLength={120} placeholder={placeholder} autoFocus={autoFocus} enterKeyHint="search"
           value={draft} onValueChange={edit} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onKeyDown={onKeyDown}
           trailing={large ? (
-            <Button type="submit" size="icon" aria-label="Tìm kiếm" className="-mr-3 h-auto w-12 shrink-0 self-stretch rounded-l-none! rounded-r-[11px]! bg-secondary text-primary shadow-[inset_1px_0_0_var(--soco-line)] transition-colors hover:bg-primary hover:text-white disabled:bg-transparent disabled:text-muted-foreground/60 disabled:opacity-100" disabled={!draft.trim()}><CornerDownLeft size={16} strokeWidth={2.4} aria-hidden="true" /></Button>
+            <Button type="submit" size="icon" aria-label="Tìm kiếm" className="-mr-3 h-auto w-12 shrink-0 self-stretch rounded-l-none rounded-r-ui-md bg-secondary text-primary shadow-[inset_1px_0_0_var(--soco-line)] transition-colors hover:bg-primary hover:text-white disabled:bg-transparent disabled:text-muted-foreground/60 disabled:opacity-100" disabled={!draft.trim()}><CornerDownLeft size={16} strokeWidth={2.4} aria-hidden="true" /></Button>
           ) : undefined} />
         {showList && <SearchSuggestions listId={listId} draft={draft} options={options} active={active} onPick={pick} />}
       </div>

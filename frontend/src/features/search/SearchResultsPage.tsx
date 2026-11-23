@@ -184,7 +184,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
         </aside>
 
         {/* The rail sits where a centred results+rail group would put it; the results are centred between the left panel and the rail. */}
-        <div className="grid min-w-0 min-[1280px]:grid-cols-[min(calc(50%_+_210px),calc(100%_-_336px))_320px]">
+        <div className="grid min-w-0 xl:grid-cols-[min(calc(50%_+_210px),calc(100%_-_336px))_320px]">
         <div className="mx-auto flex w-full max-w-190 min-w-0 flex-col gap-ui-3 px-ui-4 pt-ui-4 pb-ui-8 max-lg:max-w-none max-lg:gap-ui-2 max-lg:px-ui-3 max-lg:pt-0 max-lg:pb-ui-6">
           <div className="sticky top-0 z-2 -mx-ui-3 hidden grid-cols-[minmax(0,1fr)] gap-ui-2 border-b border-border bg-card px-ui-3 py-ui-2 max-lg:grid">
             <div className="flex items-center gap-ui-2">
@@ -237,7 +237,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
                 items: filterPosts(posts.posts, values, openedAt), loading: posts.loading, error: posts.error, retry: posts.retry,
                 hasMore: posts.hasMore, loadingMore: posts.loadingMore, loadMore: () => void posts.loadMore(),
               }}
-              below={railBlock('min-[1280px]:hidden')}
+              below={railBlock('xl:hidden')}
               suggestion={suggestion} recentQueries={recentQueries} onSearch={value => startSearch(value, type === 'all' ? {} : { type })}
               onType={setType} onResetFilters={resetFilters} onOpenProfile={onOpenProfile} onOpenPost={onOpenPost} renderPosts={renderPosts} onOpened={recordOpened} />
           ) : (
@@ -248,7 +248,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
             </div>
           )}
         </div>
-        <div className="hidden pt-ui-4 pb-ui-8 min-[1280px]:block">
+        <div className="hidden pt-ui-4 pb-ui-8 xl:block">
           {railBlock('sticky top-ui-4')}
         </div>
         </div>

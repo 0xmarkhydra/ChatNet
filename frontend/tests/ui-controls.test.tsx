@@ -49,7 +49,7 @@ describe("SocCO shared form controls", () => {
       });
       const input = host.querySelector<HTMLInputElement>('input[type="search"]');
       expect(input?.value).toBe("xin chào");
-      expect(input?.getAttribute("data-slot")).toBe("input");
+      expect(input?.getAttribute("data-slot")).toBe("search-field-input");
       expect(input?.getAttribute("aria-controls")).toBe("search-results");
       expect(input?.getAttribute("maxlength")).toBe("120");
       await act(async () => {

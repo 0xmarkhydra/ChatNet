@@ -46,7 +46,7 @@ export default function HeaderSearch({
         <ArrowLeft size={22} aria-hidden="true" />
       </button>
       <SearchField
-        className="max-[760px]:hidden"
+        className="app-mobile:hidden"
         value={value}
         onValueChange={onChange}
         maxLength={maxLength}
@@ -59,7 +59,7 @@ export default function HeaderSearch({
         onKeyDown={onKeyDown}
       />
       {/* Phones keep the legacy expanding search overlay (.appbar-search rules); desktop uses SearchField above. */}
-      <span className="contents min-[761px]:hidden"><label className="appbar-search">
+      <span className="contents app-desktop:hidden"><label className="appbar-search">
         {icon}
         <Input
           ref={inputRef}

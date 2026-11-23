@@ -31,9 +31,9 @@ const gridCls = 'grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(
 const emptyCls = 'grid justify-items-center gap-2.5 px-4 py-12 text-center text-muted-foreground'
 const panelCls = 'grid gap-2.5 rounded-ui-lg border border-border bg-card p-4'
 const rowCls = 'flex items-center justify-between gap-4 border-t border-border py-3'
-const avatarCls = 'grid size-[22px] flex-none place-items-center rounded-full bg-(image:--soco-gradient) text-ui-caption font-bold not-italic text-white'
+const avatarCls = 'grid size-5.5 flex-none place-items-center rounded-full bg-(image:--soco-gradient) text-ui-caption font-bold not-italic text-white'
 const stepCls = 'size-9 cursor-pointer rounded-full border-0 bg-white text-ui-section text-primary'
-const primaryCls = 'min-h-control-touch w-full cursor-pointer rounded-ui-md border-0 bg-primary px-[18px] font-semibold text-white hover:bg-primary/90'
+const primaryCls = 'min-h-control-touch w-full cursor-pointer rounded-ui-md border-0 bg-primary px-4.5 font-semibold text-white hover:bg-primary/90'
 const chipCls = (active: boolean) => cn('min-h-control-sm flex-none cursor-pointer rounded-full border px-3.5 text-ui-label font-semibold', active ? 'border-primary bg-secondary text-primary' : 'border-border bg-card text-foreground')
 
 export default function Marketplace({ userId, searchQuery = '', request, }: Props) {
@@ -216,9 +216,9 @@ export default function Marketplace({ userId, searchQuery = '', request, }: Prop
   return (
     <section className="flex w-full min-w-0 flex-col text-foreground [&_*]:box-border [&_button:focus-visible]:outline-3 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-primary [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-60 [&_h2]:m-0 [&_h3]:m-0 [&_p]:m-0">
       <header className="flex min-h-16 flex-wrap items-center gap-3 border-b border-border-subtle bg-card px-2.5 py-2 sm:gap-4 sm:px-6">
-        <h1 className="m-0! text-ui-page! font-bold tracking-[-0.3px]! text-foreground">Marketplace</h1>
+        <h1 className="m-0! text-ui-page! font-bold tracking-[-0.3px]! text-foreground">Marketplace</h1>{/* design-debt-ignore: the global h1 rule in styles.css wins over layered utilities */}
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3 sm:gap-4">
-        <SearchField aria-label="Tìm trong Marketplace" placeholder="Tìm sản phẩm, mô tả..." value={query} onValueChange={setQuery} className="order-last basis-full sm:order-none sm:max-w-[360px] sm:flex-1 sm:basis-60"/>
+        <SearchField aria-label="Tìm trong Marketplace" placeholder="Tìm sản phẩm, mô tả..." value={query} onValueChange={setQuery} className="order-last basis-full sm:order-none sm:max-w-90 sm:flex-1 sm:basis-60"/>
         <button type="button" aria-label={`Giỏ hàng, ${cart.length} sản phẩm`} onClick={() => setView('cart')} className="relative grid size-control-touch flex-none cursor-pointer place-items-center rounded-ui-md border border-border bg-card text-primary hover:bg-secondary">
           <ShoppingCart size={20} aria-hidden="true"/>
           {cart.length > 0 && <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-ui-caption font-bold text-white">{cart.length}</span>}
@@ -227,7 +227,7 @@ export default function Marketplace({ userId, searchQuery = '', request, }: Prop
         </div>
       </header>
       <div className="flex flex-wrap items-start gap-4 px-2.5 py-3 sm:gap-6 sm:px-7 sm:py-6">
-      <aside className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-3.5 lg:w-[280px] lg:flex-none">
+      <aside className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-3.5 lg:w-70 lg:flex-none">
         <div className="grid gap-2 rounded-ui-lg border border-border bg-card p-3 sm:p-4">
           <h2 className="hidden text-ui-subtitle font-extrabold lg:block">Chợ SocCo</h2>
           <nav aria-label="Sàn mua bán" className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] lg:grid">
@@ -318,7 +318,7 @@ export default function Marketplace({ userId, searchQuery = '', request, }: Prop
               <h3 className="flex items-center gap-2 text-ui-subtitle"><i aria-hidden="true" className={avatarCls}>{String(sellerId).slice(-1)}</i>Người bán #{sellerId}</h3>
               {items.map(item => <div key={item.id} className={rowCls}>
                 <div className="grid min-w-0 gap-1"><strong>{item.title}</strong><small className="text-muted-foreground">{showMoney(item.priceAmount, item.priceUnit)} · Còn {item.stock}</small></div>
-                <div className="flex items-center gap-1 rounded-full bg-secondary p-[3px]">
+                <div className="flex items-center gap-1 rounded-full bg-secondary p-0.75">
                   <button disabled={busy} type="button" aria-label={`Giảm số lượng ${item.title}`} onClick={() => updateCart(item.id, item.quantity - 1)} className={stepCls}>−</button>
                   <span className="min-w-7 text-center font-bold">{item.quantity}</span>
                   <button disabled={busy || item.quantity >= item.stock || item.quantity >= 99} type="button" aria-label={`Tăng số lượng ${item.title}`} onClick={() => updateCart(item.id, item.quantity + 1)} className={stepCls}>＋</button>
