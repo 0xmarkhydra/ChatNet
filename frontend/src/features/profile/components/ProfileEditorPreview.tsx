@@ -23,7 +23,7 @@ export default function ProfileEditorPreview({ profile, cover, username, display
           {cover}
           <div className="profile-editor-preview-identity min-[761px]:flex min-[761px]:items-center min-[761px]:gap-[15px] min-[761px]:pl-5">
             <UserAvatar username={username} name={editName} className="profile-editor-preview-avatar min-[761px]:z-[2] min-[761px]:mt-[-36px] min-[761px]:block min-[761px]:h-[82px] min-[761px]:w-[82px] min-[761px]:shrink-0 min-[761px]:rounded-full min-[761px]:border-[5px] min-[761px]:border-white" />
-            <div className="profile-editor-preview-name min-[761px]:flex min-[761px]:min-w-0 min-[761px]:flex-1 min-[761px]:flex-col min-[761px]:gap-1.5 min-[761px]:pt-2.5"><strong className="min-[761px]:break-words min-[761px]:text-lg min-[761px]:font-bold min-[761px]:text-[#223451]">{editName}</strong><span className="min-[761px]:break-words min-[761px]:text-xs min-[761px]:text-[#8390aa]">@{editUsername}</span></div>
+            <div className="profile-editor-preview-name min-[761px]:flex min-[761px]:min-w-0 min-[761px]:flex-1 min-[761px]:flex-col min-[761px]:gap-1.5 min-[761px]:pt-2.5"><strong className="min-[761px]:break-words min-[761px]:text-ui-section min-[761px]:font-[750] min-[761px]:text-[#223451]">{editName}</strong><span className="min-[761px]:break-words min-[761px]:text-xs min-[761px]:text-[#8390aa]">@{editUsername}</span></div>
           </div>
           <div className="profile-editor-preview-about min-[761px]:px-[11px] min-[761px]:pt-[11px] min-[761px]:text-[13px] min-[761px]:text-[#58708e]">
             <p className="min-[761px]:mb-[9px] min-[761px]:leading-[1.6]">{bioDraft.trim() || 'Thêm tiểu sử để mọi người hiểu hơn về bạn.'}</p>
