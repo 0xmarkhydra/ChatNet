@@ -13,7 +13,7 @@ normative_basis: "ISO/IEC/IEEE 12207:2026, ISO/IEC/IEEE 15289:2019"
 
 ## Stack Docker Compose
 
-Từ thư mục gốc repository, chạy `docker compose up --build`, mở `http://localhost:8080`, kiểm `/api/health` và xem `docker compose logs --tail=100 backend frontend` nếu lỗi. Cần Git, Docker Engine hoặc Desktop có Compose và cổng host 8080 chưa bị chiếm. Cấu hình các tích hợp thử nghiệm theo [Environment](ENVIRONMENT_CONFIGURATION.md). Health không xác nhận OTP, push, LiveKit hoặc dịch AI hoạt động.
+Từ thư mục gốc repository, set `CHATNET_ENV`, `JWT_SECRET` và `OTP_PEPPER` trong shell hoặc secret manager, rồi chạy `docker compose up --build`. Compose fail fast khi thiếu hai secret. Mở `http://localhost:8080`, kiểm `/api/health` và xem `docker compose logs --tail=100 backend frontend` nếu lỗi. Cần Git, Docker Engine hoặc Desktop có Compose và cổng host 8080 chưa bị chiếm. Cấu hình các tích hợp thử nghiệm theo [Environment](ENVIRONMENT_CONFIGURATION.md). Health không xác nhận OTP, push, LiveKit hoặc dịch AI hoạt động.
 
 Dừng bằng `docker compose down` để giữ volume. **`make reset` và `docker compose down -v` xóa dữ liệu volume local.** Không cần reset volume để áp dụng [migration](../04-backend/DATABASE_MIGRATIONS.md).
 

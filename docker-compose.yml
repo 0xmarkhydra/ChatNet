@@ -4,7 +4,8 @@ services:
     environment:
       POSTGRES_DB: chatnet
       POSTGRES_USER: chatnet
-      POSTGRES_PASSWORD: chatnet
+      # Use URL-safe hex; the same value is embedded in DATABASE_URL.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -30,11 +31,13 @@ services:
       dockerfile: Dockerfile.backend
     environment:
       PORT: "8080"
-      CHATNET_ENV: local
-      DATABASE_URL: postgres://chatnet:chatnet@postgres:5432/chatnet?sslmode=disable
+      CHATNET_ENV: ${CHATNET_ENV:-production}
+      DATABASE_URL: postgres://chatnet:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/chatnet?sslmode=disable
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-}
-      OTP_PEPPER: ${OTP_PEPPER:-}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      OTP_PEPPER: ${OTP_PEPPER:?OTP_PEPPER must be set}
+      # Keep these entries when adding CIDRs for an upstream ingress proxy.
+      CHATNET_TRUSTED_PROXY_CIDRS: "${CHATNET_TRUSTED_PROXY_CIDRS:-127.0.0.1/32,172.29.0.10/32}"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_API_BASE_URL: ${RESEND_API_BASE_URL:-https://api.resend.com}
       CHATNET_EMAIL_FROM: ${CHATNET_EMAIL_FROM:-}
@@ -54,7 +57,7 @@ services:
       ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID:-}
       ONESIGNAL_REST_API_KEY: ${ONESIGNAL_REST_API_KEY:-}
       CHATNET_WEB_URL: ${CHATNET_WEB_URL:-https://chat.codelocal.cloud}
-      MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:-http://localhost:8080}
+      MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:?MEDIA_PUBLIC_ORIGIN must be set}
       LIVEKIT_URL: ${LIVEKIT_URL:-}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
@@ -85,7 +88,16 @@ services:
       - "8080:8080"
     depends_on:
       - backend
+    networks:
+      default:
+        ipv4_address: 172.29.0.10
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
