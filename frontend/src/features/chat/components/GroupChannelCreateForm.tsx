@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Hash, Plus, X } from 'lucide-react'
 import '../styles/group-channel-picker.css'
 import '../styles/group-channel-create-info.css'
@@ -12,11 +12,17 @@ type Props = {
 export default function GroupChannelCreateForm({ busy, onCreate, onCancel }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const submitting = useRef(false)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!name.trim() || busy) return
-    if (await onCreate(name.trim(), description.trim())) onCancel()
+    if (!name.trim() || busy || submitting.current) return
+    submitting.current = true
+    try {
+      if (await onCreate(name.trim(), description.trim())) onCancel()
+    } finally {
+      submitting.current = false
+    }
   }
 
   return (
