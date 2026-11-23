@@ -143,7 +143,7 @@ export default function FeedSection({
 }: FeedSectionProps) {
   return (
       <div
-            className="feed-view zalo-feed-view social-feed"
+            className="feed-view zalo-feed-view social-feed max-[760px]:px-0! max-[760px]:pb-[max(24px,env(safe-area-inset-bottom))]!"
             ref={feedViewRef}
             onScroll={(event) => {
               if (feedSearchActive && event.currentTarget.scrollTop > 0)
