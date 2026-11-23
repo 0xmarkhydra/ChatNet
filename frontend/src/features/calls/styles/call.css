@@ -12,12 +12,12 @@
   border-radius: 13px;
   display: grid;
   place-items: center;
-  color: var(--accent, #1677ff);
-  background: color-mix(in srgb, var(--accent, #1677ff) 10%, transparent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   cursor: pointer;
   transition: transform .18s ease, background .18s ease;
 }
-.call-header-actions button:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent, #1677ff) 17%, transparent); }
+.call-header-actions button:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 17%, transparent); }
 
 .call-global-error {
   position: fixed;
