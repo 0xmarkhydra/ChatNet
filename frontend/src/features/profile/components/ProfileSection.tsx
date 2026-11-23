@@ -551,7 +551,7 @@ export default function ProfileSection({
                   </div>
                 )}
 
-                <div className="feed zalo-feed">
+                <div className="feed zalo-feed max-[760px]:-mx-3! max-[760px]:w-[calc(100%+24px)]!">
                   {pendingPost && (
                     <article
                       className="post zalo-post outgoing-preview"
