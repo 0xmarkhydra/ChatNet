@@ -1,15 +1,16 @@
 import { useId, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { CornerDownLeft } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import { SearchField } from '@/shared/ui/search-field'
 import { useSuggestions, type SuggestConfig, type Suggestion } from '../hooks/useSuggestions'
-import { SEARCH_TYPES, type SearchType } from '../lib/searchFilters'
+import type { SearchType } from '../lib/searchFilters'
 import SearchSuggestions from './SearchSuggestions'
 
 export type SearchFormProps = {
   initialQuery: string
   placeholder: string
-  /** Full-width form for the no-keyword home: scope select and submit button next to the field. */
+  /** Full-width form for the no-keyword home: submit button next to the field. */
   large?: boolean
   autoFocus?: boolean
   className?: string
@@ -22,7 +23,6 @@ export type SearchFormProps = {
 export default function SearchForm({ initialQuery, placeholder, large = false, autoFocus = false, className, suggest, onSubmit }: SearchFormProps) {
   const listId = useId()
   const [draft, setDraft] = useState(initialQuery)
-  const [scope, setScope] = useState<SearchType>('all')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   // Suggestions only appear once the user has typed something different from the committed query.
@@ -34,7 +34,7 @@ export default function SearchForm({ initialQuery, placeholder, large = false, a
   const submit = (event: FormEvent) => {
     event.preventDefault()
     setOpen(false)
-    if (draft.trim()) onSubmit(draft.trim().slice(0, 120), scope)
+    if (draft.trim()) onSubmit(draft.trim().slice(0, 120), 'all')
   }
   const pick = (option: Suggestion) => {
     setOpen(false)
@@ -61,18 +61,12 @@ export default function SearchForm({ initialQuery, placeholder, large = false, a
       <div className={cn('relative min-w-0', large ? 'min-w-60 flex-1 max-sm:min-w-0' : 'w-full')}>
         <SearchField role="combobox" aria-label="Tìm kiếm trên SocCo" aria-autocomplete="list" aria-expanded={showList} aria-controls={showList ? listId : undefined}
           aria-activedescendant={showList ? listId + '-' + active : undefined} autoComplete="off" maxLength={120} placeholder={placeholder} autoFocus={autoFocus} enterKeyHint="search"
-          value={draft} onValueChange={edit} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onKeyDown={onKeyDown} />
+          value={draft} onValueChange={edit} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onKeyDown={onKeyDown}
+          trailing={large ? (
+            <Button type="submit" size="icon" aria-label="Tìm kiếm" className="-mr-3 h-auto w-12 shrink-0 self-stretch rounded-l-none! rounded-r-[11px]! bg-secondary text-primary shadow-[inset_1px_0_0_var(--soco-line)] transition-colors hover:bg-primary hover:text-white disabled:bg-transparent disabled:text-muted-foreground/60 disabled:opacity-100" disabled={!draft.trim()}><CornerDownLeft size={16} strokeWidth={2.4} aria-hidden="true" /></Button>
+          ) : undefined} />
         {showList && <SearchSuggestions listId={listId} draft={draft} options={options} active={active} onPick={pick} />}
       </div>
-      {large && (
-        <>
-          <select aria-label="Phạm vi tìm kiếm" value={scope} onChange={event => setScope(event.target.value as SearchType)}
-            className="h-11 cursor-pointer rounded-ui-md border border-border bg-surface-input px-ui-4 text-[length:var(--soco-type-body)] font-semibold text-foreground max-sm:hidden">
-            {SEARCH_TYPES.map(item => <option key={item.key} value={item.key}>{item.key === 'all' ? 'Mọi thứ' : item.label}</option>)}
-          </select>
-          <Button type="submit" className="h-11 px-ui-6 max-sm:px-ui-4" disabled={!draft.trim()}>Tìm kiếm</Button>
-        </>
-      )}
     </form>
   )
 }

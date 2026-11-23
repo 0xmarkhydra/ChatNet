@@ -193,20 +193,19 @@ it('keeps paging posts when the loaded page is filtered out', async () => {
   expect(view.button('Tải thêm bài viết')).toBeTruthy()
 })
 
-it('starts a scoped search from the home scope select', async () => {
+it('starts a search from the home field with the submit icon button', async () => {
   const view = await mount(routes(), '/search')
-  const select = view.host.querySelector('select[aria-label="Phạm vi tìm kiếm"]') as HTMLSelectElement
-  await act(async () => {
-    select.value = 'posts'
-    select.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+  expect(view.host.querySelector('select[aria-label="Phạm vi tìm kiếm"]')).toBeNull()
   const input = view.host.querySelector('input[type="search"]') as HTMLInputElement
+  const submit = view.host.querySelector('button[type="submit"][aria-label="Tìm kiếm"]') as HTMLButtonElement
+  expect(submit.disabled).toBe(true)
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'figma')
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
+  expect(submit.disabled).toBe(false)
   await act(async () => { input.form?.requestSubmit() })
-  expect(view.route()).toBe('?type=posts&q=figma')
+  expect(view.route()).toBe('?q=figma')
 })
 
 function type(input: HTMLInputElement, value: string) {
